@@ -3,12 +3,14 @@ import { createApp } from "./app";
 import { openDb } from "./db/open";
 import { readHardware } from "./bench/hardware";
 import { externalWatcher } from "./supervisor/external";
+import { RunExecutor } from "./bench/execute";
 import { BenchRunner } from "./bench/runner";
 import { ChatRuns } from "./chat/runs";
 import { BenchRunsRepo } from "./db/benchRuns";
 import { ConversationsRepo } from "./db/conversations";
 import { ProfilesRepo } from "./db/profiles";
 import { SettingsRepo } from "./db/settings";
+import { SweepsRepo } from "./db/sweeps";
 import { dbPath } from "./paths";
 import { activeProfileId, getRuntime, serverView, startMonitor } from "./runtime";
 import { profilePaths } from "./supervisor/args";
@@ -46,23 +48,37 @@ const { supervisor, logs } = runtime;
 const development = process.env.NODE_ENV !== "production";
 const monitor = await startMonitor(runtime, settings.get());
 const benchRuns = new BenchRunsRepo(db);
-// Un run resté « running » après un arrêt brutal de Bun est interrompu.
-benchRuns.stopOrphans();
+const sweeps = new SweepsRepo(db);
+const benchGate = runtime.benchGate;
+// Démarrage à froid : un run resté « running » (arrêt brutal de Bun) est interrompu, son sweep aussi (bouton Reprendre).
+// Au rechargement la garde est encore tenue : l'ancien module a déjà rangé son run et le nouveau reprend le sweep.
+if (!benchGate.held) {
+  benchRuns.stopOrphans();
+  sweeps.stopOrphans();
+}
 const allGpus = () => monitor.latest()?.allGpus ?? [];
-const benchRunner = new BenchRunner({
-  repo: benchRuns,
+const executor = new RunExecutor({
   settings: () => settings.get(),
-  server: supervisor,
   logs,
   gpus: allGpus,
-  hardware: () => readHardware(settings.get().binary, allGpus()),
-  onLive: (l) => hub.broadcast({ type: "bench-progress", payload: l }),
-  onRun: (r) => hub.broadcast({ type: "bench-run", payload: r }),
+  disk: () => monitor.latest()?.disk?.model?.readBps ?? null,
   profile: (id) => {
     const p = profiles.get(id);
     return p ? { cwd: p.cwd, env: p.env } : null;
   },
 });
+const benchRunner = new BenchRunner({
+  repo: benchRuns,
+  sweeps,
+  gate: benchGate,
+  executor,
+  hardware: () => readHardware(settings.get().binary, allGpus()),
+  onLive: (l) => hub.broadcast({ type: "bench-progress", payload: l }),
+  onRun: (r) => hub.broadcast({ type: "bench-run", payload: r }),
+  onSweep: (s) => hub.broadcast({ type: "sweep", payload: s }),
+  onSweepLive: (l) => hub.broadcast({ type: "sweep-progress", payload: l }),
+});
+void benchRunner.resume();
 monitor.setModelPathResolver((id) => {
   const p = profiles.get(id);
   return p ? profilePaths(p).model : null;
@@ -77,6 +93,7 @@ const server = createApp({
   chatRuns,
   benchRuns,
   benchRunner,
+  sweeps,
   runtime,
   monitor,
   activeProfileId: () => activeProfileId(supervisor),
@@ -100,7 +117,7 @@ process.prependListener("SIGINT", stopChats);
 process.prependListener("SIGTERM", stopChats);
 
 // Serveur externe : détecté au démarrage puis surveillé (sortie de l'état « external » quand il s'arrête).
-const checkExternal = externalWatcher({ supervisor, port: () => settings.get().port, paused: () => benchRunner.busy });
+const checkExternal = externalWatcher({ supervisor, port: () => settings.get().port, paused: () => benchGate.held || benchRunner.busy });
 void checkExternal();
 const externalTimer = setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS);
 
@@ -114,7 +131,8 @@ g.__llamaWebuiDispose = () => {
   process.off("SIGINT", stopChats);
   process.off("SIGTERM", stopChats);
   chatRuns.dispose();
-  // Rechargement : le run est interrompu et le serveur qu'il avait arrêté relancé (le superviseur survit).
+  // Rechargement : le run ponctuel est interrompu, l'élément de sweep remis en attente ; la garde (runtime) passe au
+  // nouveau module, ou relance le serveur si personne ne la reprend.
   benchRunner.dispose({ restart: true });
   db.close();
 };

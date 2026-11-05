@@ -1,4 +1,5 @@
 import type { ServerView } from "@llama-webui/shared";
+import { BenchGate } from "./bench/gate";
 import { LogBuffer } from "./logs/buffer";
 import { Monitor, type MonitorSettings } from "./monitor/monitor";
 import { Supervisor } from "./supervisor/supervisor";
@@ -10,6 +11,8 @@ export interface Runtime {
   bootId: string;
   /** Monitoring permanent, démarré une fois par startMonitor() (survit lui aussi à bun --hot). */
   monitor: Promise<Monitor> | null;
+  /** Garde du serveur pendant les benchmarks : tenue à travers un rechargement, un sweep reprend sans relance. */
+  benchGate: BenchGate;
 }
 
 const g = globalThis as { __llamaWebuiRuntime?: Runtime };
@@ -17,14 +20,14 @@ const g = globalThis as { __llamaWebuiRuntime?: Runtime };
 /**
  * Superviseur et ring de logs uniques pour tout le process. Ils vivent sur globalThis pour survivre à `bun --hot`
  * (un rechargement de code ne doit ni tuer ni orpheliner llama-server). Les signaux d'arrêt sont installés une seule fois.
- * Conséquence : modifier supervisor.ts, logs/buffer.ts, server/monitor/**, server/collectors/** ou ce fichier demande un
+ * Conséquence : modifier supervisor.ts, logs/buffer.ts, bench/gate.ts, server/monitor/**, server/collectors/** ou ce fichier demande un
  * redémarrage complet de Bun.
  */
 export function getRuntime(): Runtime {
   if (g.__llamaWebuiRuntime) return g.__llamaWebuiRuntime;
   const logs = new LogBuffer(10_000);
   const supervisor = new Supervisor({ logs });
-  const rt: Runtime = { supervisor, logs, bootId: crypto.randomUUID(), monitor: null };
+  const rt: Runtime = { supervisor, logs, bootId: crypto.randomUUID(), monitor: null, benchGate: new BenchGate({ server: supervisor, logs }) };
   g.__llamaWebuiRuntime = rt;
 
   let stopping = false;

@@ -8,6 +8,7 @@ import type { BenchRunsRepo } from "../db/benchRuns";
 import type { ProfilesRepo } from "../db/profiles";
 import type { SettingsRepo } from "../db/settings";
 import { guarded, HttpError, idParam, jsonObject, notFound } from "../http";
+import type { WsHub } from "../ws/hub";
 import { profilePaths } from "../supervisor/args";
 
 export interface BenchRouteDeps {
@@ -15,12 +16,13 @@ export interface BenchRouteDeps {
   benchRunner: BenchRunner;
   settings: SettingsRepo;
   profiles: ProfilesRepo;
+  hub: WsHub;
 }
 
 const KINDS = new Set(["bench", "server"]);
-const STATUSES = new Set(["running", "ok", "failed", "cancelled", "interrupted"]);
+const STATUSES = new Set(["queued", "running", "ok", "failed", "cancelled", "interrupted"]);
 
-export function benchRoutes({ benchRuns, benchRunner, settings, profiles }: BenchRouteDeps) {
+export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }: BenchRouteDeps) {
   const home = homedir();
   /** Nom libre : « <base> », puis « <base> (2) », « (3) »… */
   const freeName = (base: string) => {
@@ -36,16 +38,23 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles }: Benc
         const q = new URL(req.url).searchParams;
         const kind = q.get("kind");
         const status = q.get("status");
+        const sweep = q.get("sweep");
+        const limit = Number(q.get("limit"));
         const runs = benchRuns.list({
           kind: kind && KINDS.has(kind) ? (kind as BenchKind) : undefined,
           status: status && STATUSES.has(status) ? (status as BenchStatus) : undefined,
           modelPath: q.get("model") || undefined,
+          // Par défaut : les runs ponctuels seulement ; « all » ou l'id d'un sweep pour les autres.
+          sweepId: sweep === "all" ? "all" : sweep && /^\d+$/.test(sweep) ? Number(sweep) : "none",
+          limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 5000) : undefined,
         });
         return Response.json({ runs, live: benchRunner.live });
       }),
       DELETE: guarded((req) => {
         if (new URL(req.url).searchParams.get("failed") !== "1") throw new HttpError(400, "?failed=1 attendu");
-        return Response.json({ deleted: benchRuns.deleteFailed() });
+        const ids = benchRuns.deleteFailed();
+        if (ids.length > 0) hub.broadcast({ type: "bench-deleted", payload: { ids } });
+        return Response.json({ deleted: ids.length });
       }),
     },
     "/api/bench/run": {
@@ -66,6 +75,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles }: Benc
         if (!run) throw notFound("Run");
         if (run.status === "running") throw new HttpError(409, "Ce run tourne : annulez-le d'abord");
         benchRuns.delete(id);
+        hub.broadcast({ type: "bench-deleted", payload: { ids: [id] } });
         return new Response(null, { status: 204 });
       }),
     },

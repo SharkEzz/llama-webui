@@ -70,6 +70,47 @@ export const MIGRATIONS: string[] = [
   );`,
   // 8
   `CREATE INDEX bench_runs_by_date ON bench_runs(created_at DESC);`,
+  // 9 — sweeps (spec_json = SweepSpec) ; best_run_id vise bench_runs par son nom, reconstruite juste après
+  `CREATE TABLE sweeps(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL,
+    model_path TEXT NOT NULL,
+    profile_id INTEGER REFERENCES profiles(id) ON DELETE SET NULL,
+    spec_json TEXT NOT NULL,
+    best_run_id INTEGER REFERENCES bench_runs(id) ON DELETE SET NULL,
+    created_at INTEGER NOT NULL,
+    finished_at INTEGER
+  );`,
+  // 10–14 — bench_runs reconstruite en AUTOINCREMENT (un id supprimé n'est jamais redonné : sweeps.best_run_id s'y fie),
+  // avec l'appartenance à un sweep (sweep_id, étiquette, verdict de l'estimateur). Les lignes de J5 sont recopiées.
+  `CREATE TABLE bench_runs_v2(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    status TEXT NOT NULL,
+    model_path TEXT NOT NULL,
+    profile_id INTEGER REFERENCES profiles(id) ON DELETE SET NULL,
+    args_json TEXT NOT NULL,
+    command TEXT NOT NULL,
+    hardware_json TEXT NOT NULL,
+    pp_tps REAL,
+    tg_tps REAL,
+    stats_json TEXT,
+    vram_mib_json TEXT NOT NULL,
+    error TEXT,
+    log_excerpt TEXT NOT NULL DEFAULT '',
+    duration_ms INTEGER,
+    sweep_id INTEGER REFERENCES sweeps(id) ON DELETE CASCADE,
+    sweep_label TEXT,
+    fit TEXT,
+    created_at INTEGER NOT NULL
+  );`,
+  `INSERT INTO bench_runs_v2(id, kind, status, model_path, profile_id, args_json, command, hardware_json, pp_tps, tg_tps, stats_json, vram_mib_json, error, log_excerpt, duration_ms, sweep_id, created_at) SELECT id, kind, status, model_path, profile_id, args_json, command, hardware_json, pp_tps, tg_tps, stats_json, vram_mib_json, error, log_excerpt, duration_ms, sweep_id, created_at FROM bench_runs;`,
+  `DROP TABLE bench_runs;`,
+  `ALTER TABLE bench_runs_v2 RENAME TO bench_runs;`,
+  `CREATE INDEX bench_runs_by_date ON bench_runs(created_at DESC);`,
+  // 15
+  `CREATE INDEX bench_runs_by_sweep ON bench_runs(sweep_id, id);`,
 ];
 
 export function runMigrations(db: Database): void {

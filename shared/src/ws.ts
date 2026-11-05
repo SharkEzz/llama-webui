@@ -16,4 +16,5 @@ export type WsMessage =
   | { type: "bench-run"; payload: BenchRun } // à la création et à la fin d'un run
   | { type: "bench-deleted"; payload: { ids: number[] } }
   | { type: "sweep-progress"; payload: SweepLive | null }
-  | { type: "sweep"; payload: Sweep }; // à chaque changement d'un sweep (statut, compteurs, meilleur)
+  | { type: "sweep"; payload: Sweep } // à chaque changement d'un sweep (statut, compteurs, meilleur)
+  | { type: "sweep-deleted"; payload: { id: number } };
