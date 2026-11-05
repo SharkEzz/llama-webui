@@ -112,7 +112,7 @@ export function BenchForm() {
             <p className="text-xs text-muted-foreground">
               {form.kind === "bench"
                 ? "Mesure brute de llama.cpp : ni décodage spéculatif, ni contexte du profil."
-                : "Un vrai llama-server : échauffement puis r requêtes /completion."}
+                : "Un vrai llama-server : échauffement puis r requêtes de chat (≈ p jetons de texte + consigne, n jetons générés)."}
             </p>
           </div>
         </div>
