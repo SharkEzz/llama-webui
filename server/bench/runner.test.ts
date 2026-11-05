@@ -69,7 +69,7 @@ function setup(port = 8080, patch?: (s: ServerControl) => void, deps?: Partial<E
     onSweepLive: (l) => sweepLives.push(l),
     pauseMs: 0,
   });
-  return { runner, calls, lives, runs, end, repo, sweeps, gate, sweepLives, sweepEvents };
+  return { runner, executor, calls, lives, runs, end, repo, sweeps, gate, sweepLives, sweepEvents };
 }
 
 const spec = BenchSpecSchema.parse({ kind: "bench", modelPath: MODEL, r: 2 });
@@ -228,6 +228,31 @@ test("cancelSweep cancels the queue and releases the gate", async () => {
   expect(calls).toEqual(["stop", "start:cmdA"]);
   expect(gate.held).toBe(false);
 });
+
+test("after a reload the interrupted item is replayed only once the killed process has exited", async () => {
+  Object.assign(process.env, { FAKE_BENCH_STEP_MS: "60" });
+  const first = setup();
+  const { sweep } = sweepOf(first.repo, first.sweeps, [1, 2]);
+  await first.runner.startSweep(sweep.id, { stopServer: true });
+  while (!first.runs.some((r) => r.status === "running")) await Bun.sleep(10);
+  await Bun.sleep(80);
+  // Un process tué qui tarde à sortir (le pilote libère sa VRAM) : rejouer avant, c'est deux llama-bench sur les mêmes cartes.
+  const kill = first.executor.killNow.bind(first.executor);
+  let exitedAt = 0;
+  first.executor.killNow = async () => {
+    await kill();
+    await Bun.sleep(300);
+    exitedAt = Date.now();
+  };
+  first.runner.dispose({ restart: true });
+  const second = setup(8080, undefined, undefined, { gate: first.gate, repo: first.repo, sweeps: first.sweeps, calls: first.calls });
+  await second.runner.resume();
+  while (!second.runs.some((r) => r.status === "running")) await Bun.sleep(5);
+  expect(exitedAt).toBeGreaterThan(0);
+  await sweepEnd(second.sweepLives);
+  expect(first.repo.list({ sweepId: sweep.id }).map((r) => r.status)).toEqual(["ok", "ok"]);
+  expect(first.calls).toEqual(["stop", "start:cmdA"]);
+}, 20_000);
 
 test("a reload hands the held gate to the next runner, which replays the interrupted item", async () => {
   Object.assign(process.env, { FAKE_BENCH_STEP_MS: "60" });

@@ -185,23 +185,28 @@ export class BenchRunner {
     }
   }
 
-  private begin(id: number): Sweep {
+  private begin(id: number, after: Promise<void> | null = null): Sweep {
     this.sweep = { id, cancelled: false };
     const sw = this.deps.sweeps.setStatus(id, "running", { finishedAt: null });
     this.deps.onSweep(sw);
-    void this.loop(id);
+    void this.loop(id, after);
     return sw;
   }
 
-  /** Nouveau module (rechargement) : reprend le sweep en cours avec la garde laissée par l'ancien. */
+  /**
+   * Nouveau module (rechargement) : reprend le sweep en cours avec la garde laissée par l'ancien, une fois sorti le process
+   * qu'il a tué (sinon l'élément rejoué partage les cartes avec lui : VRAM de départ faussée, OOM possible).
+   */
   async resume(): Promise<void> {
     const sw = this.deps.sweeps.running();
-    if (!sw || this.claimed || this.current || this.sweep || !this.deps.gate.adopt()) return;
-    this.begin(sw.id);
+    if (!sw || this.claimed || this.current || this.sweep) return;
+    const after = this.deps.gate.adopt();
+    if (after) this.begin(sw.id, after);
   }
 
-  private async loop(id: number): Promise<void> {
+  private async loop(id: number, after: Promise<void> | null = null): Promise<void> {
     const state = this.sweep!;
+    if (after) await after;
     let lastRun: number | null = null;
     while (!this.disposed && !state.cancelled) {
       const next = this.deps.repo.nextQueued(id);

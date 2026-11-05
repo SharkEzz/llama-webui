@@ -34,7 +34,7 @@ export class BenchGate {
   private stopped: BuiltCommand | null = null;
   private stopping: Promise<void> | null = null;
   private releasing: Promise<void> | null = null;
-  private pending: { cancelled: boolean } | null = null;
+  private pending: { cancelled: boolean; settled: Promise<void> } | null = null;
 
   constructor(private readonly deps: GateDeps) {}
 
@@ -132,9 +132,10 @@ export class BenchGate {
   /** Rechargement de l'ancien module : libère quand `after` est réglé et le délai écoulé, sauf si adopt() vient avant. */
   releaseLater(after: Promise<unknown>): void {
     if (!this.holding || this.releasing) return;
-    const token = { cancelled: false };
+    const settled = Promise.allSettled([after]).then(() => {});
+    const token = { cancelled: false, settled };
     this.pending = token;
-    void Promise.allSettled([after])
+    void settled
       .then(() => Bun.sleep(this.deps.adoptGraceMs ?? 3000))
       .then(() => {
         if (token.cancelled || this.pending !== token) return;
@@ -143,11 +144,15 @@ export class BenchGate {
       });
   }
 
-  /** Nouveau module : reprend une garde laissée par l'ancien (annule la libération différée). */
-  adopt(): boolean {
-    if (!this.holding || !this.pending || this.releasing) return false;
+  /**
+   * Nouveau module : reprend une garde laissée par l'ancien (annule la libération différée). Renvoie la promesse de fin de
+   * l'ancien process (à attendre avant de relancer quoi que ce soit sur les cartes), null si rien à reprendre.
+   */
+  adopt(): Promise<void> | null {
+    if (!this.holding || !this.pending || this.releasing) return null;
+    const { settled } = this.pending;
     this.pending.cancelled = true;
     this.pending = null;
-    return true;
+    return settled;
   }
 }
