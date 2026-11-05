@@ -151,6 +151,8 @@ export interface Snapshot {
   disk: DiskSample | null;
   /** Valeurs ajoutées à l'historique à ce tick (NaN → null). */
   points: Record<string, number | null>;
+  /** Forme de l'historique : un changement (réglages) invalide celui du client. */
+  history: { intervalMs: number; capacity: number };
 }
 
 /** Historique complet : une valeur par tick, la plus ancienne d'abord, `null` = trou. */

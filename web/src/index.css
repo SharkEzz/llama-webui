@@ -48,7 +48,7 @@
 
   /* tons de données : assez sombres pour du texte sur verre clair (AA) */
   --tone-violet: oklch(0.53 0.2 298);
-  --tone-cyan: oklch(0.55 0.11 215);
+  --tone-cyan: oklch(0.55 0.12 215);
   --tone-amber: oklch(0.6 0.15 60);
   --tone-rose: oklch(0.56 0.21 355);
   --success: oklch(0.55 0.14 160);
@@ -123,6 +123,12 @@
   --bubble-rose: oklch(0.7 0.22 350);
   --bubble-opacity: 0.35;
   --bubble-blend: screen;
+
+  /* séries de graphes : steps validés (dataviz validate_palette, bande L 0.48–0.67 sur fond sombre) */
+  --chart-1: oklch(0.66 0.19 300);
+  --chart-2: oklch(0.66 0.12 205);
+  --chart-3: oklch(0.67 0.15 65);
+  --chart-4: oklch(0.63 0.22 355);
 
   --sidebar: oklch(1 0 0 / 4%);
   --sidebar-accent: oklch(1 0 0 / 7%);
@@ -289,4 +295,32 @@
   .bubble {
     animation: none;
   }
+}
+
+/* ---- uPlot : légende vivante aux couleurs du texte (jamais la couleur de la série) ---- */
+.ts-chart .u-legend {
+  @apply mt-1 font-sans text-xs text-muted-foreground;
+}
+.ts-chart .u-legend th {
+  @apply font-normal;
+}
+.ts-chart .u-legend .u-value {
+  @apply num text-foreground;
+}
+.ts-chart .u-legend .u-series:first-child .u-marker {
+  display: none;
+}
+/* repère en trait (comme la marque) : la bordure haute garde la couleur de la série posée par uPlot */
+.ts-chart .u-legend .u-marker {
+  height: 0;
+  width: 0.875rem;
+  border-width: 2px 0 0 0 !important;
+  border-radius: 1px;
+  background: transparent !important;
+}
+.ts-chart .u-cursor-x {
+  border-right: 1px solid var(--muted-foreground);
+}
+.ts-chart .u-cursor-y {
+  display: none;
 }

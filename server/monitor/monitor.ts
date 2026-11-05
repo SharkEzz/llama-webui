@@ -167,7 +167,7 @@ export class Monitor {
     }
 
     const machineP = this.sampleMachine(state);
-    const base: Omit<Snapshot, "points"> = {
+    const base: Omit<Snapshot, "points" | "history"> = {
       at,
       tick: this.tickNo,
       health: null,
@@ -258,9 +258,9 @@ export class Monitor {
   }
 
   /** Une série existante non alimentée à ce tick reçoit un trou : toutes avancent ensemble, alignées sur les instants. */
-  private finish(snap: Omit<Snapshot, "points">): Snapshot {
+  private finish(snap: Omit<Snapshot, "points" | "history">): Snapshot {
     for (const key of this.history.keys()) if (!(key in this.points)) this.push(key, NaN);
-    return { ...snap, points: this.points };
+    return { ...snap, points: this.points, history: { intervalMs: this.history.intervalMs, capacity: this.history.capacity } };
   }
 
   /** Séries de chaque GPU de la machine, utilisée ou non par le serveur. */
