@@ -3,6 +3,7 @@ import { DashboardPage } from "@/features/dashboard/DashboardPage"
 import { HomePage } from "@/features/home/HomePage"
 import { PlaceholderPage } from "@/features/_placeholder/PlaceholderPage"
 import { LogsPage } from "@/features/logs/LogsPage"
+import { ModelsPage } from "@/features/models/ModelsPage"
 import { ProfilesPage } from "@/features/profiles/ProfilesPage"
 import { ServerPage } from "@/features/server/ServerPage"
 import { SettingsPage } from "@/features/settings/SettingsPage"
@@ -22,7 +23,8 @@ export const router = createBrowserRouter([
       { path: "logs", element: <LogsPage /> },
       { path: "system", element: <SystemPage /> },
       { path: "settings", element: <SettingsPage /> },
-      ...ROUTES.filter((r) => !["/", "/dashboard", "/server", "/profiles", "/logs", "/system", "/settings"].includes(r.path)).map((r) => ({
+      { path: "models", element: <ModelsPage /> },
+      ...ROUTES.filter((r) => !["/", "/dashboard", "/server", "/profiles", "/logs", "/system", "/settings", "/models"].includes(r.path)).map((r) => ({
         path: r.path.slice(1),
         element: <PlaceholderPage title={r.label} />,
       })),

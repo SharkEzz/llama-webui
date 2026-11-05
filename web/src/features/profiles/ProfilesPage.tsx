@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router"
 import { Download, Plus, SlidersHorizontal, Upload } from "lucide-react"
 import { toast } from "sonner"
@@ -13,7 +13,9 @@ import { importProfiles, importSummary, useProfiles } from "@/lib/profiles"
 import { isRunning, useServer } from "@/lib/server"
 import { cn } from "@/lib/utils"
 import { ImportBanner } from "./ImportBanner"
-import { ProfileForm } from "./ProfileForm"
+import { type Draft, ProfileForm } from "./ProfileForm"
+import { profileModelPath } from "@llama-webui/shared"
+import { matchingProjector, stem, useModels } from "@/lib/models"
 
 const basename = (p: string) => p.split("/").pop() ?? p
 
@@ -30,6 +32,19 @@ export function ProfilesPage() {
   }, [reload])
 
   const creating = params.get("new") === "1"
+  const fromModel = creating ? params.get("model") : null
+  const models = useModels((s) => s.list)
+  const refreshModels = useModels((s) => s.refresh)
+  useEffect(() => {
+    if (fromModel) void refreshModels()
+  }, [fromModel, refreshModels])
+  const initial = useMemo((): Partial<Draft> | undefined => {
+    if (!fromModel || !models) return undefined
+    const place = (abs: string, cwd?: string) => profileModelPath(abs, { cwd, modelsDir: models.setting, home: models.home })
+    const { cwd, model } = place(fromModel)
+    const projector = matchingProjector(fromModel, models.models)
+    return { name: stem(fromModel), cwd: cwd ?? "", model, ...(projector ? { mmproj: place(projector, cwd).model } : {}) }
+  }, [fromModel, models])
   const requested = Number(params.get("id"))
   const selected = creating ? null : (profiles.find((p) => p.id === requested) ?? profiles[0] ?? null)
   const select = (id: number | "new") => setParams(id === "new" ? { new: "1" } : { id: String(id) }, { replace: true })
@@ -120,7 +135,8 @@ export function ProfilesPage() {
 
           <GlassCard title={selected ? selected.name : "Nouveau profil"}>
             <ProfileForm
-              key={selected?.id ?? "new"}
+              key={selected?.id ?? `new:${initial ? fromModel : ""}`}
+              initial={initial}
               profile={selected}
               settings={settings}
               onSaved={(p) => void reload().then(() => select(p.id))}

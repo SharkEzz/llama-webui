@@ -41,3 +41,11 @@ export function formatPct(n: number | null | undefined): string {
 
 /** Nombre entier groupé : « 32 768 ». */
 export const formatInt = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? "—" : nf(0).format(n))
+
+/** Nombre de paramètres : « 27,3 B », « 600 M », « — » si inconnu. */
+export function formatParams(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n) || n <= 0) return "—"
+  if (n >= 1e9) return `${nf(1).format(n / 1e9)} B`
+  if (n >= 1e6) return `${nf(0).format(n / 1e6)} M`
+  return formatInt(n)
+}
