@@ -2,15 +2,17 @@ import type { Database } from "bun:sqlite";
 import { ZodError } from "zod";
 import type { SettingsRepo } from "./db/settings";
 import type { WsHub } from "./ws/hub";
-import { serveStatic } from "./static";
 import pkg from "./package.json";
 
 export interface AppDeps {
   db: Database;
   hub: WsHub;
   settings: SettingsRepo;
-  distDir: string;
+  /** Page web (import HTML : Bun bundle React + Tailwind à la volée). */
+  index: Bun.HTMLBundle;
+  hostname: string;
   port: number;
+  development: boolean;
 }
 
 const startedAt = Date.now();
@@ -27,10 +29,11 @@ function errorResponse(err: unknown): Response {
 }
 
 export function createApp(deps: AppDeps) {
-  const { hub, settings, distDir, port } = deps;
+  const { hub, settings, index, port, development } = deps;
   return Bun.serve({
     port,
-    hostname: "127.0.0.1",
+    hostname: deps.hostname,
+    development: development ? { hmr: true, console: true } : false,
     routes: {
       "/api/health": {
         GET: () => Response.json({ ok: true, version: pkg.version, uptimeMs: Date.now() - startedAt }),
@@ -50,13 +53,12 @@ export function createApp(deps: AppDeps) {
         },
       },
       "/api/*": () => Response.json({ error: "Route inconnue" }, { status: 404 }),
-    },
-    fetch(req, server) {
-      if (new URL(req.url).pathname === "/ws") {
+      "/ws": (req, server) => {
         if (server.upgrade(req)) return undefined;
         return new Response("Upgrade WebSocket attendu", { status: 426 });
-      }
-      return serveStatic(req, distDir) ?? new Response("Méthode non autorisée", { status: 405 });
+      },
+      // Toute autre adresse sert l'application (fallback SPA : /chat rechargé fonctionne).
+      "/*": index,
     },
     websocket: {
       open: (ws) => hub.attach(ws),

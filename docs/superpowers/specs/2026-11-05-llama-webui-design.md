@@ -25,7 +25,7 @@ Décisions prises en brainstorming :
 - Modèles : navigateur de répertoire + métadonnées GGUF, pas de téléchargement HF.
 - Chat v1 : streaming + Markdown + code, paramètres de sampling par conversation, stats par message. Pas d'images en v1 (prévu v2, le backend garde la porte ouverte).
 - Tuning : sweep paramétrable mesuré par **llama-bench**, validation des meilleurs par **llama-server** réel ; espace de recherche incluant **Vulkan3**, `--override-tensor`, `--n-cpu-moe`.
-- Frontend **Vite** (demande explicite, prime sur le CLAUDE.md « pas de vite » ; CLAUDE.md sera amendé en J1).
+- Frontend servi par **Bun** (HTML imports, `bun-plugin-tailwind`) : un seul process et un seul port. *(Révisé en J1 : Vite avait d'abord été retenu, puis retiré à la demande de l'utilisateur puisque Bun couvre tout.)*
 - **Tests : minimum utile.** Pas de TDD systématique. Seuls les parseurs purs à fixtures (flags `--help`, `/metrics`, `/slots`, nvidia-smi, JSON llama-bench) et l'estimateur/générateur d'espace ont des tests unitaires. Le reste se vérifie à la main via l'UI à chaque jalon.
 
 Hors périmètre v1 : auth, multi-instance, mode router `--models-dir`, téléchargement HF, images dans le chat, RPC/RDMA (voir « Pistes disque/réseau » en J6), thème clair, mobile.
@@ -37,7 +37,7 @@ Hors périmètre v1 : auth, multi-instance, mode router `--models-dir`, téléch
 ```
 llama-webui/
 ├─ server/            Bun (API REST + WebSocket + superviseur + collecteurs + sqlite)
-│  ├─ index.ts        Bun.serve : routes /api/*, /ws, sert web/dist en prod
+│  ├─ index.ts        Bun.serve : routes /api/*, /ws, importe web/index.html (fallback SPA)
 │  ├─ db/             schema.sql, migrations, repos (profiles, conversations, benchmarks, settings)
 │  ├─ supervisor/     copié de llama-tui src/server/{supervisor,args,health,discovery,flags}.ts
 │  ├─ collectors/     copié de llama-tui src/collectors/* (+ src/hardware/*), snapshot 1 Hz
@@ -46,7 +46,7 @@ llama-webui/
 │  ├─ bench/          runner llama-bench (JSON) + runner /completion (copie src/bench/runner.ts)
 │  ├─ tuning/         estimateur (copie src/tuning/*), générateur d'espace, file de sweep
 │  └─ system/         checks système (copie src/tuning/checks.ts)
-├─ web/               Vite + React 19 + TypeScript + Tailwind v4 + shadcn/ui
+├─ web/               React 19 + TypeScript + Tailwind v4 + shadcn/ui (Base UI), bundlé par Bun
 │  ├─ src/app/        routes (react-router), layout, fond animé
 │  ├─ src/features/   dashboard, server, profiles, models, chat, bench, tuning, system, logs, settings
 │  ├─ src/components/ ui (shadcn) + glass/ (cartes verre, gauges, charts)
@@ -61,8 +61,8 @@ llama-webui/
 - Chat : `POST /api/chat/:conversationId/messages` répond en **SSE** (relais du stream OpenAI-compatible de llama-server).
 
 **Dev / prod**
-- `bun run dev` : lance `server/` (`bun --hot`, port 7860) et Vite (port 5173, proxy `/api` et `/ws` vers 7860).
-- `bun run build` : `vite build` → `web/dist` ; `bun run start` : Bun sert l'API et `web/dist` sur 7860.
+- `bun run dev` : `bun --hot server/index.ts` (port 7860, HMR web + rechargement du serveur).
+- `bun run start` : même serveur en `NODE_ENV=production` (bundle minifié en mémoire, pas d'étape de build). `LLAMA_WEBUI_HOST` change l'adresse d'écoute (défaut 127.0.0.1).
 - `bun check` sur l'ensemble, `bun test` pour `server/` et `shared/` (fixtures réutilisées depuis `llama-tui/testdata/`).
 
 **Design system** (skill `frontend-design` au moment de J1)
@@ -86,10 +86,10 @@ llama-webui/
 ## Jalons
 
 ### J1 — Socle (monorepo, API vide, design system)
-- Workspaces `server/ web/ shared/`, scripts dev/build/start/check/test ; amender `CLAUDE.md` (Vite côté web).
-- `server/index.ts` : Bun.serve, `/api/health`, `/ws` avec heartbeat, service de `web/dist`.
+- Workspaces `server/ web/ shared/`, scripts dev/start/check/test.
+- `server/index.ts` : Bun.serve, `/api/health`, `/ws` avec heartbeat, service de l'UI (HTML import).
 - sqlite : ouverture, migrations, table `settings`.
-- Web : Vite + React + Tailwind v4 + shadcn init, react-router, layout (sidebar + header statut), fond animé, composants `GlassCard`, `Gauge`, `StatTile`, page d'accueil avec placeholders.
+- Web : React + Tailwind v4 + shadcn init (Base UI), react-router, layout (sidebar + header statut), fond animé, composants `GlassCard`, `Gauge`, `StatTile`, page d'accueil avec placeholders.
 - **Vérif** : `bun run dev` ouvre l'UI, `/api/health` répond, WS connecté, rendu du fond et des cartes validé visuellement, `bun check` vert.
 
 ### J2 — Serveur, profils, logs
