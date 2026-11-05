@@ -5,3 +5,4 @@ export * from "./shell";
 export * from "./flags";
 export * from "./server";
 export * from "./logs";
+export * from "./monitor";

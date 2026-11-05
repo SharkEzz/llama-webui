@@ -10,6 +10,9 @@ export const SettingsSchema = z.object({
   hiddenGpus: z.array(z.string()).default(["0000:0d:00.0"]),
   defaultProfileId: z.number().int().nullable().default(null),
   llamaTuiImportDismissed: z.boolean().default(false),
+  collectors: z
+    .object({ nvml: z.boolean().default(true), system: z.boolean().default(true), disk: z.boolean().default(true) })
+    .default({ nvml: true, system: true, disk: true }),
   theme: z.enum(["system", "light", "dark"]).default("system"),
 });
 
