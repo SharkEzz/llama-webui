@@ -24,12 +24,16 @@ export class NvmlMonitor {
   private procs: NvmlProc[] = [];
   private sys: NvmlSystem | null = null;
   private lastSampleAt = 0;
+  /** Cadence qui juge la fraîcheur : l'ancienne reste valable tant que le worker n'a pas échantillonné à la nouvelle. */
+  private freshIntervalMs: number;
 
   private constructor(
     private worker: WorkerLike,
     private intervalMs: number,
     private now: () => number,
-  ) {}
+  ) {
+    this.freshIntervalMs = intervalMs;
+  }
 
   /** Driver versions from the last sample; null before the first one. */
   get system(): NvmlSystem | null {
@@ -74,6 +78,7 @@ export class NvmlMonitor {
           monitor.procs = m.snapshot.procs;
           monitor.sys = m.snapshot.system ?? monitor.sys;
           monitor.lastSampleAt = monitor.now();
+          monitor.freshIntervalMs = monitor.intervalMs;
         } else if (m?.type === "error") {
           giveUp();
         }
@@ -85,6 +90,8 @@ export class NvmlMonitor {
   /** New sampling interval and what to read, from the next round on. */
   configure(o: { intervalMs: number; needs: GpuNeeds }): void {
     this.intervalMs = o.intervalMs;
+    // Le tour déjà programmé par le worker tourne encore à l'ancienne cadence : ne pas déclarer périmé ce qu'il va remplacer.
+    this.freshIntervalMs = Math.max(this.freshIntervalMs, o.intervalMs);
     this.worker.postMessage({ type: "configure", intervalMs: o.intervalMs, needs: o.needs });
   }
 
@@ -95,7 +102,7 @@ export class NvmlMonitor {
 
   /** A worker stuck in an NVML call (driver fault) stops sampling: old numbers must not pass for live ones. */
   private fresh(): boolean {
-    return this.now() - this.lastSampleAt <= 3 * this.intervalMs;
+    return this.now() - this.lastSampleAt <= 3 * this.freshIntervalMs;
   }
 
   gpus(): GpuReading[] {

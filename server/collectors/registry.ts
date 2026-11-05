@@ -14,7 +14,8 @@ export type CollectorSettings = Pick<Settings, "collectors" | "pollIntervalMs" |
 export interface AmdSource {
   cards: () => AmdCard[];
   read: (c: AmdCard) => Promise<GpuReading>;
-  procVram: (pid: number) => Promise<Map<string, number>>;
+  /** VRAM du process par carte ; les descripteurs ouverts sur `skipNodes` (cartes à ne pas lire) sont ignorés. */
+  procVram: (pid: number, skipNodes: ReadonlySet<string>) => Promise<Map<string, number>>;
   /** Cartes en veille : listées mais jamais lues, pour ne pas les réveiller. */
   suspended: (c: AmdCard) => Promise<boolean>;
 }
@@ -58,7 +59,7 @@ export class Collectors {
     const c = new Collectors(
       nvml ?? smi!,
       smi,
-      { cards: () => amdCards, read: readAmdCard, procVram: (pid) => readProcAmdVram(pid), suspended: isRuntimeSuspended },
+      { cards: () => amdCards, read: readAmdCard, procVram: (pid, skipNodes) => readProcAmdVram(pid, "/proc", skipNodes), suspended: isRuntimeSuspended },
       new ProcSampler(),
     );
     await c.configure(settings);

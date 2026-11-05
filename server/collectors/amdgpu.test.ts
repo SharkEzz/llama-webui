@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   pciIdsName,
   discoverAmdCards,
@@ -243,4 +243,29 @@ test("pciIdsName names a card from sysfs ids and pci.ids, without lspci (which w
   await Bun.write(join(dev, "device"), "0x9999\n");
   expect(await pciIdsName("0000:08:00.0", join(root, "devices"), [ids])).toBe("AMD GPU 0000:08:00.0");
   rmSync(root, { recursive: true, force: true });
+});
+
+test("discoverAmdCards lists each card's DRM nodes (card and render), so fds can be matched to a card", async () => {
+  const drm = await drmTree();
+  mkdirSync(join(drm, "renderD128"));
+  symlinkSync(join(dirname(drm), "devices", "0000:08:00.0"), join(drm, "renderD128", "device"));
+  mkdirSync(join(drm, "renderD129"));
+  symlinkSync(join(dirname(drm), "devices", "0000:01:00.0"), join(drm, "renderD129", "device"));
+  const [card] = await discoverAmdCards(drm, async (p) => `GPU ${p}`);
+  expect(card!.nodes).toEqual(["card1", "renderD128"]);
+});
+
+test("readProcAmdVram skips fds on cards not to read (hidden or suspended), without opening their fdinfo", async () => {
+  const root = tmp("llt-proc-skip-");
+  const fdinfo = join(root, "123", "fdinfo");
+  const fd = join(root, "123", "fd");
+  mkdirSync(fdinfo, { recursive: true });
+  mkdirSync(fd, { recursive: true });
+  await Bun.write(join(fdinfo, "96"), await fx("fdinfo-amd-vram.txt"));
+  await Bun.write(join(fdinfo, "98"), await fx("fdinfo-amd-igpu.txt"));
+  symlinkSync("/dev/dri/renderD128", join(fd, "96"));
+  symlinkSync("/dev/dri/renderD129", join(fd, "98"));
+  const m = await readProcAmdVram(123, root, new Set(["card2", "renderD129"]));
+  expect(m.get("amd:0000:08:00.0")).toBe(6146240 * 1024);
+  expect(m.has("amd:0000:0d:00.0")).toBe(false);
 });

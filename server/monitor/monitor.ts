@@ -333,19 +333,24 @@ export class Monitor {
       if (this.ticksForPid === 1) await nvidia.refreshApps().catch(() => {});
       else if (this.ticksForPid % APPS_EVERY === 0) void nvidia.refreshApps().catch(() => {});
     }
+    // Cartes masquées ou en veille : ni sysfs ni fdinfo (leurs nœuds DRM sont sautés dans /proc/<pid>/fd).
+    const skipNodes = new Set<string>();
     const readAmd = async (c: AmdCard): Promise<GpuReading | null> => {
-      if (gpuSkipped(n, c.pdev)) return hiddenAmdReading(c);
-      if (await amd.suspended(c).catch(() => false)) return suspendedAmdReading(c);
+      const skip = (r: GpuReading) => {
+        for (const node of c.nodes ?? []) skipNodes.add(node);
+        return r;
+      }
+      if (gpuSkipped(n, c.pdev)) return skip(hiddenAmdReading(c));
+      if (await amd.suspended(c).catch(() => false)) return skip(suspendedAmdReading(c));
       return amd.read(c).catch(() => null);
     };
-    const [amdReadings, amdProc] = await Promise.all([
-      Promise.all(amd.cards().map(readAmd)),
-      pid === null ? new Map<string, number>() : amd.procVram(pid).catch(() => new Map<string, number>()),
-    ]);
+    const amdReadings = await Promise.all(amd.cards().map(readAmd));
+    const amdProc = pid === null ? new Map<string, number>() : await amd.procVram(pid, skipNodes).catch(() => new Map<string, number>());
     const nvProc = pid === null ? new Map<string, number>() : nvidia.procVram(pid);
     const readings = [...nvidia.gpus().map((g) => ({ g, proc: nvProc })), ...amdReadings.flatMap((g) => (g ? [{ g, proc: amdProc }] : []))];
     const all = readings.map(({ g, proc }): GpuSample => {
       if (gpuSkipped(n, g.busId)) return { ...identityReading(g, "hidden"), procVramBytes: 0 };
+      if (g.suspended) return { ...g, procVramBytes: 0 };
       return { ...g, procVramBytes: proc.get(g.key) ?? 0 };
     });
     return all.sort((a, b) => a.busId.localeCompare(b.busId));

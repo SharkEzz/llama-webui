@@ -1,4 +1,4 @@
-import { readdir, realpath } from "node:fs/promises";
+import { readdir, readlink, realpath } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { type GpuReading, identityReading } from "./gpu";
 
@@ -8,6 +8,8 @@ export interface AmdCard {
   devicePath: string;
   hwmonPath: string | null;
   name: string;
+  /** Nœuds DRM de la carte (« card1 », « renderD128 ») : relient un descripteur ouvert à sa carte sans lire son fdinfo. */
+  nodes?: string[];
   /** PCI device whose link is the card's slot link: the upstream port of the card's own PCIe switch, or the GPU itself. */
   linkPath?: string;
   /** The port at the other end of that link (motherboard slot or chipset), whose capability bounds the link's maximum. */
@@ -32,7 +34,11 @@ export function parseFdinfo(text: string): { driver: string; clientId: string; p
   return { driver, clientId, pdev: pdev.toLowerCase(), vramBytes: vram ? Number(vram[1]) * mult : 0 };
 }
 
-export async function readProcAmdVram(pid: number, procRoot = "/proc"): Promise<Map<string, number>> {
+/**
+ * VRAM AMD d'un process, par carte, d'après ses fdinfo. Les descripteurs ouverts sur un nœud de `skipNodes` (carte masquée
+ * ou en veille) sont reconnus par la cible de leur lien /proc/<pid>/fd/N et leur fdinfo n'est pas lu.
+ */
+export async function readProcAmdVram(pid: number, procRoot = "/proc", skipNodes?: ReadonlySet<string>): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   const dir = join(procRoot, String(pid), "fdinfo");
   let entries: string[];
@@ -44,6 +50,10 @@ export async function readProcAmdVram(pid: number, procRoot = "/proc"): Promise<
   const seen = new Set<string>();
   await Promise.all(
     entries.map(async (e) => {
+      if (skipNodes && skipNodes.size > 0) {
+        const target = await readlink(join(procRoot, String(pid), "fd", e)).catch(() => null);
+        if (target && skipNodes.has(basename(target))) return;
+      }
       let text: string;
       try {
         text = await Bun.file(join(dir, e)).text();
@@ -130,7 +140,12 @@ export async function discoverAmdCards(drmRoot = "/sys/class/drm", nameOf: (pdev
       const hw = (await readdir(join(devicePath, "hwmon"))).sort()[0];
       if (hw) hwmonPath = join(devicePath, "hwmon", hw);
     } catch {}
-    cards.push({ card, pdev, devicePath, hwmonPath, name: await nameOf(pdev), ...(await slotLink(devicePath)) });
+    const nodes: string[] = [];
+    for (const e of entries.filter((n) => /^(card|renderD)\d+$/.test(n)).sort()) {
+      const real = await realpath(join(drmRoot, e, "device")).catch(() => null);
+      if (real === devicePath) nodes.push(e);
+    }
+    cards.push({ card, pdev, devicePath, hwmonPath, name: await nameOf(pdev), nodes, ...(await slotLink(devicePath)) });
   }
   return cards;
 }
