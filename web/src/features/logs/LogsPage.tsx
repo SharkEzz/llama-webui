@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { ArrowDownToLine, Copy, Eraser, Search } from "lucide-react"
+import { ArrowDownToLine, Copy, Eraser, ScrollText, Search } from "lucide-react"
 import { toast } from "sonner"
 import { filterLogs, type LogLevel } from "@llama-webui/shared"
+import { GLASS } from "@/components/glass/glass"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { copyText } from "@/lib/clipboard"
 import { hideCurrentLogs, useLogs } from "@/lib/logs"
+import { cn } from "@/lib/utils"
 import { LogRow } from "./LogRow"
 
 const LEVELS: { value: LogLevel; label: string }[] = [
@@ -57,7 +60,7 @@ export function LogsPage() {
         </span>
       </header>
 
-      <div className="glass flex flex-wrap items-center gap-3 p-3">
+      <div className={cn(GLASS, "flex flex-wrap items-center gap-3 p-3")}>
         <Select items={LEVELS} value={minLevel} onValueChange={(v) => v && setMinLevel(v as LogLevel)}>
           <SelectTrigger className="w-56" aria-label="Niveau minimal">
             <SelectValue />
@@ -103,7 +106,7 @@ export function LogsPage() {
         </Button>
       </div>
 
-      <div className="glass relative min-h-0 flex-1 overflow-hidden">
+      <div className={cn(GLASS, "relative min-h-0 flex-1 overflow-hidden")}>
         <div
           ref={scroller}
           className="h-full overflow-auto p-3"
@@ -126,9 +129,13 @@ export function LogsPage() {
           tabIndex={0}
         >
           {lines.length === 0 ? (
-            <p className="p-2 text-sm text-muted-foreground">
-              {all.length === 0 ? "Aucun log : démarrez llama-server depuis la page Serveur." : "Aucune ligne ne correspond aux filtres."}
-            </p>
+            <Alert>
+              <ScrollText />
+              <AlertTitle>{all.length === 0 ? "Aucun log" : "Aucune ligne ne correspond aux filtres"}</AlertTitle>
+              <AlertDescription>
+                {all.length === 0 ? "Démarrez llama-server depuis la page Serveur." : "Baissez le niveau minimal ou changez la recherche."}
+              </AlertDescription>
+            </Alert>
           ) : (
             <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
               {virtualizer.getVirtualItems().map((v) => (

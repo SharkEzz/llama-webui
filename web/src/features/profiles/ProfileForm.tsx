@@ -150,7 +150,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted }: ProfileFo
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-5">
+      <div className="flex flex-wrap items-center gap-2 border-t border-border pt-5">
         <Button type="submit" disabled={saving || !dirty || blocked}>
           <Save /> {profile ? "Enregistrer" : "Créer le profil"}
         </Button>

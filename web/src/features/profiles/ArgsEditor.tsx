@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState } from "react"
+import { useLayoutEffect, useMemo, useRef, useState } from "react"
 import { describeFlag, flagSuggestions, flagOf, reservedFlag, reservedFlagMessage, unknownFlags } from "@llama-webui/shared"
 import { CodeTextarea } from "@/components/CodeTextarea"
+import { Command, CommandItem, CommandList } from "@/components/ui/command"
 import { useFlags } from "@/lib/flags"
-import { cn } from "@/lib/utils"
 import { parseArgs, wordAt } from "./argsText"
 import { highlightArgs } from "./highlight"
 
@@ -23,6 +23,9 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   // Entrée ne complète qu'après un choix aux flèches ; sinon elle garde son rôle (nouvelle ligne).
   const [navigated, setNavigated] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const listRef = useRef<HTMLDivElement>(null)
+  // cmdk attribue lui-même les id de la liste et des options : on les relit pour aria-controls / aria-activedescendant.
+  const [aria, setAria] = useState<{ list?: string; active?: string }>({})
 
   const parsed = useMemo(() => parseArgs(value), [value])
   const at = wordAt(value, cursor)
@@ -50,6 +53,13 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
     setNavigated(false)
   }
 
+  const open = suggestions.length > 0
+  useLayoutEffect(() => {
+    const list = open ? listRef.current?.id || undefined : undefined
+    const active = open ? listRef.current?.querySelector<HTMLElement>("[cmdk-item][data-selected=true]")?.id || undefined : undefined
+    if (list !== aria.list || active !== aria.active) setAria({ list, active })
+  })
+
   const track = () => setCursor(ref.current?.selectionStart ?? 0)
 
   return (
@@ -63,6 +73,11 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
           rows={6}
           placeholder={"-c 32768\n-ngl 99\n-fa on"}
           aria-invalid={!Array.isArray(parsed) || problems.reserved.length > 0}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={aria.list}
+          aria-activedescendant={aria.active}
           onChange={(text, el) => {
             onChange(text)
             setCursor(el.selectionStart)
@@ -91,34 +106,34 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
             e.preventDefault()
           }}
         />
-        {suggestions.length > 0 && (
-          <ul
-            role="listbox"
-            className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-lg border border-white/10 bg-popover p-1 shadow-xl shadow-black/40 backdrop-blur-lg"
+        {open && (
+          <Command
+            shouldFilter={false}
+            loop
+            value={suggestions[active] ?? ""}
+            onValueChange={(v) => {
+              const i = suggestions.indexOf(v)
+              if (i >= 0) setActive(i)
+            }}
+            // garde le focus dans le textarea pendant le clic sur une suggestion
+            onMouseDown={(e) => e.preventDefault()}
+            className="absolute inset-x-0 top-full z-20 mt-1 h-auto rounded-lg! border border-border shadow-xl shadow-surface-shadow backdrop-blur-lg"
           >
-            {suggestions.map((name, i) => {
-              const flag = catalog ? flagOf(catalog, name) : undefined
-              return (
-                <li
-                  key={name}
-                  role="option"
-                  aria-selected={i === active}
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    accept(name)
-                  }}
-                  onMouseEnter={() => setActive(i)}
-                  className={cn("flex cursor-pointer items-baseline gap-3 rounded-md px-2 py-1.5", i === active && "bg-accent")}
-                >
-                  <span className="shrink-0 font-mono text-xs">
-                    {name}
-                    {flag?.value && <span className="text-muted-foreground"> {flag.value}</span>}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">{flag?.help.replace(/\s*\(env: [A-Z0-9_]+\)/g, "")}</span>
-                </li>
-              )
-            })}
-          </ul>
+            <CommandList ref={listRef} aria-label="Flags suggérés">
+              {suggestions.map((name) => {
+                const flag = catalog ? flagOf(catalog, name) : undefined
+                return (
+                  <CommandItem key={name} value={name} onSelect={() => accept(name)} className="items-baseline gap-3 [&>svg:last-child]:hidden">
+                    <span className="shrink-0 font-mono text-xs">
+                      {name}
+                      {flag?.value && <span className="text-muted-foreground"> {flag.value}</span>}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">{flag?.help.replace(/\s*\(env: [A-Z0-9_]+\)/g, "")}</span>
+                  </CommandItem>
+                )
+              })}
+            </CommandList>
+          </Command>
         )}
       </div>
 
@@ -129,10 +144,10 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
         </p>
       ))}
       {problems.unknown.length > 0 && (
-        <p className="text-sm text-tone-amber">Inconnu de ce llama-server : {problems.unknown.join(", ")}</p>
+        <p className="text-sm text-warning">Inconnu de ce llama-server : {problems.unknown.join(", ")}</p>
       )}
       {helpFlag ? (
-        <p className="rounded-md bg-white/5 px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">{describeFlag(helpFlag)}</p>
+        <p className="rounded-md bg-well px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">{describeFlag(helpFlag)}</p>
       ) : catalogError ? (
         <p className="text-xs text-muted-foreground">Aide des flags indisponible : {catalogError}</p>
       ) : (

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils"
 const UI: Record<ServerState["kind"], { label: string; dot: string; text: string }> = {
   idle: { label: "Arrêté", dot: "bg-muted-foreground/60", text: "text-muted-foreground" },
   starting: { label: "Démarrage…", dot: "bg-tone-amber animate-pulse", text: "text-tone-amber" },
-  ready: { label: "Prêt", dot: "bg-emerald-400 shadow-[0_0_10px] shadow-emerald-400/60", text: "text-emerald-300" },
+  ready: { label: "Prêt", dot: "bg-success shadow-[0_0_10px] shadow-success/60", text: "text-success" },
   stopping: { label: "Arrêt…", dot: "bg-tone-amber animate-pulse", text: "text-tone-amber" },
   crashed: { label: "Planté", dot: "bg-destructive", text: "text-destructive" },
   external: { label: "Externe", dot: "bg-tone-cyan", text: "text-tone-cyan" },

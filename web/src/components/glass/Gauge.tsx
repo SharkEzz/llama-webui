@@ -39,7 +39,7 @@ export function Gauge({ value, max = 100, label, unit = "%", size = 96, tone = "
             cy={size / 2}
             r={r}
             fill="none"
-            stroke="rgb(255 255 255 / 10%)"
+            stroke="var(--border)"
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={`${arc} ${circumference}`}

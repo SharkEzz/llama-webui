@@ -51,7 +51,7 @@ export function HomePage() {
       </div>
 
       <GlassCard title="Jalons" icon={Flag}>
-        <ol className="flex flex-col divide-y divide-white/5">
+        <ol className="flex flex-col divide-y divide-border">
           {MILESTONES.map((m) => (
             <li key={m.id} className="flex items-start gap-4 py-3 first:pt-0 last:pb-0">
               <span className="num w-7 shrink-0 pt-px text-sm text-muted-foreground">{m.id}</span>

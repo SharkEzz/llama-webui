@@ -20,7 +20,8 @@
   --foreground: oklch(0.24 0.045 285);
 
   /* verre : blanc translucide, bordure d'encre très légère */
-  --surface: oklch(1 0 0 / 62%);
+  --surface: oklch(1 0 0 / 50%);
+  --surface-blur: 22px;
   --surface-foreground: var(--foreground);
   --surface-border: oklch(0.3 0.04 285 / 11%);
   --surface-shadow: oklch(0.35 0.06 285 / 10%);
@@ -86,6 +87,7 @@
   --foreground: oklch(0.95 0.01 280);
 
   --surface: oklch(0.1 0.02 280 / 42%);
+  --surface-blur: 16px;
   --surface-foreground: var(--foreground);
   --surface-border: oklch(1 0 0 / 10%);
   --surface-shadow: oklch(0 0 0 / 30%);
@@ -205,11 +207,6 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
-}
-
-/* Carte verre (tokens) ; retirée en Task 2 au profit de Card + bg-card. */
-@utility glass {
-  @apply rounded-lg border border-surface-border bg-surface shadow-lg shadow-surface-shadow backdrop-blur-lg;
 }
 
 /* Chiffres : mono à chasse fixe pour que les valeurs ne dansent pas. */

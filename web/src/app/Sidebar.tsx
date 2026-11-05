@@ -15,8 +15,8 @@ function Item({ route }: { route: AppRoute }) {
       className={({ isActive }) =>
         cn(
           "group relative flex h-9 items-center gap-3 rounded-md px-3 text-sm transition-colors",
-          "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-          isActive && "bg-primary/15 text-foreground hover:bg-primary/15",
+          "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
         )
       }
     >
@@ -25,11 +25,11 @@ function Item({ route }: { route: AppRoute }) {
           <span
             aria-hidden="true"
             className={cn(
-              "absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-primary transition-opacity",
+              "absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-sidebar-primary transition-opacity",
               isActive ? "opacity-100" : "opacity-0",
             )}
           />
-          <Icon className={cn("size-4 shrink-0", isActive && "text-primary")} aria-hidden="true" />
+          <Icon className={cn("size-4 shrink-0", isActive && "text-sidebar-primary")} aria-hidden="true" />
           <span className="hidden truncate md:inline">{route.label}</span>
         </>
       )}
@@ -39,7 +39,7 @@ function Item({ route }: { route: AppRoute }) {
 
 export function Sidebar() {
   return (
-    <aside className="glass sticky top-4 m-4 mr-0 flex h-[calc(100dvh-2rem)] flex-col p-3">
+    <aside className="sticky top-4 m-4 mr-0 flex h-[calc(100dvh-2rem)] flex-col rounded-lg border border-sidebar-border bg-sidebar p-3 text-sidebar-foreground shadow-lg shadow-surface-shadow backdrop-blur-(--surface-blur)">
       <div className="flex h-10 items-center gap-2.5 px-2">
         <LlamaMark />
         <span className="hidden text-[0.9375rem] font-semibold tracking-tight md:inline">llama-webui</span>
@@ -49,7 +49,7 @@ export function Sidebar() {
           <Item key={r.path} route={r} />
         ))}
       </nav>
-      <div className="border-t border-white/10 pt-3">
+      <div className="border-t border-sidebar-border pt-3">
         <Item route={settings} />
       </div>
     </aside>

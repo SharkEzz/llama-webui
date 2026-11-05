@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router"
-import { Copy, Info, Play, RotateCw, ScrollText, Server, Square, Terminal, Repeat } from "lucide-react"
+import { CircleAlert, Copy, Info, Play, RotateCw, ScrollText, Server, Square, Terminal, Repeat } from "lucide-react"
 import { toast } from "sonner"
 import type { Settings } from "@llama-webui/shared"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { GlassCard } from "@/components/glass/GlassCard"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LogRow } from "@/features/logs/LogRow"
 import { api } from "@/lib/api"
@@ -49,7 +51,7 @@ export function ServerPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <GlassCard title="llama-server" icon={Server}>
           <StateDetails />
-          <div className="mt-5 flex flex-col gap-3 border-t border-white/10 pt-5">
+          <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
             {state.kind === "external" ? (
               <p className="text-sm text-muted-foreground">
                 Un llama-server lancé hors de llama-webui occupe le port {state.port}
@@ -157,7 +159,7 @@ function StateDetails() {
   const s = view?.state
   if (!s || s.kind === "idle") return <p className="text-sm text-muted-foreground">Aucun serveur en cours.</p>
   return (
-    <dl className="divide-y divide-white/5">
+    <dl className="divide-y divide-border">
       {"profile" in s && <Row label="Profil">{s.profile}</Row>}
       {"pid" in s && s.pid !== null && (
         <Row label="PID">
@@ -207,11 +209,19 @@ function PropsCard() {
       {!live ? (
         <p className="text-sm text-muted-foreground">Disponibles quand le serveur est prêt.</p>
       ) : error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>Lecture de /props impossible</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : !props ? (
-        <p className="text-sm text-muted-foreground">Lecture de /props…</p>
+        <div className="flex flex-col gap-3" aria-label="Lecture de /props…">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-5 w-full" />
+          ))}
+        </div>
       ) : (
-        <dl className="divide-y divide-white/5">
+        <dl className="divide-y divide-border">
           <Row label="Modèle">
             <span className="font-mono text-xs" title={String(props.model_path ?? "")}>
               {String(props.model_alias ?? props.model_path ?? "—")}
@@ -257,7 +267,7 @@ function CommandCard({ command }: { command: string | null }) {
       }
     >
       {command ? (
-        <pre className="overflow-x-auto rounded-md bg-black/30 p-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-foreground/90">
+        <pre className="overflow-x-auto rounded-md bg-well p-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-foreground/90">
           {command}
         </pre>
       ) : (
@@ -283,7 +293,7 @@ function RecentLogs() {
       {last.length === 0 ? (
         <p className="text-sm text-muted-foreground">Rien pour l'instant.</p>
       ) : (
-        <div className="flex flex-col rounded-md bg-black/30 p-3">
+        <div className="flex flex-col rounded-md bg-well p-3">
           {last.map((l) => (
             <LogRow key={l.seq} line={l} />
           ))}

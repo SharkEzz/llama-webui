@@ -22,7 +22,7 @@ export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactN
         </span>
       )
     }
-    if (/^["']/.test(tok)) return <span key={i} className="text-emerald-300">{tok}</span>
+    if (/^["']/.test(tok)) return <span key={i} className="text-success">{tok}</span>
     return <span key={i} className="text-foreground/85">{tok}</span>
   })
 }

@@ -36,7 +36,7 @@ export function CodeTextarea({ value, onChange, highlight, className, ref, onScr
         }}
         className={cn(
           BOX,
-          "relative block field-sizing-content min-h-16 w-full resize-y border-input bg-input/30 text-transparent caret-foreground outline-none transition-colors",
+          "relative block field-sizing-content min-h-16 w-full resize-y border-input bg-well text-transparent caret-foreground outline-none transition-colors",
           "selection:bg-primary/30 selection:text-transparent placeholder:text-muted-foreground",
           "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
           "aria-invalid:border-destructive/50 aria-invalid:ring-3 aria-invalid:ring-destructive/20",

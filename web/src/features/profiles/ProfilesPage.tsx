@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router"
-import { Download, Plus, Upload } from "lucide-react"
+import { Download, Plus, SlidersHorizontal, Upload } from "lucide-react"
 import { toast } from "sonner"
 import type { Settings } from "@llama-webui/shared"
 import { GlassCard } from "@/components/glass/GlassCard"
+import { GLASS } from "@/components/glass/glass"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "@/lib/api"
 import { importProfiles, importSummary, useProfiles } from "@/lib/profiles"
 import { isRunning, useServer } from "@/lib/server"
@@ -80,36 +83,37 @@ export function ProfilesPage() {
       {loaded && <ImportBanner profileCount={profiles.length} onImported={() => void reload()} />}
 
       {loaded && profiles.length === 0 && !creating ? (
-        <GlassCard>
-          <p className="text-sm text-muted-foreground">
-            Aucun profil. Un profil réunit le modèle à charger et les arguments de llama-server : créez-en un, ou importez un JSON
-            exporté depuis llama-webui ou llama-tui.
-          </p>
-        </GlassCard>
+        <Alert className={GLASS}>
+          <SlidersHorizontal />
+          <AlertTitle>Aucun profil</AlertTitle>
+          <AlertDescription>
+            Un profil réunit le modèle à charger et les arguments de llama-server : créez-en un, ou importez un JSON exporté depuis
+            llama-webui ou llama-tui.
+          </AlertDescription>
+        </Alert>
       ) : (
         <div className="grid items-start gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
-          <nav aria-label="Profils" className="glass flex flex-col gap-0.5 p-2">
+          <nav aria-label="Profils" className={cn(GLASS, "flex flex-col gap-0.5 p-2")}>
+            {!loaded && [0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             {creating && (
-              <div className="rounded-md bg-primary/15 px-3 py-2 text-sm font-medium">Nouveau profil</div>
+              <div className="rounded-md bg-accent px-3 py-2 text-sm font-medium">Nouveau profil</div>
             )}
             {profiles.map((p) => {
               const active = view?.profileId === p.id && isRunning(view)
               return (
-                <button
+                <Button
                   key={p.id}
-                  type="button"
+                  variant="ghost"
                   onClick={() => select(p.id)}
-                  className={cn(
-                    "flex flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left transition-colors hover:bg-white/5",
-                    selected?.id === p.id && "bg-primary/15 hover:bg-primary/15",
-                  )}
+                  aria-current={selected?.id === p.id ? "true" : undefined}
+                  className={cn("h-auto flex-col items-start gap-0.5 px-3 py-2 text-left", selected?.id === p.id && "bg-accent")}
                 >
                   <span className="flex w-full items-center gap-2 text-sm font-medium">
                     <span className="truncate">{p.name}</span>
-                    {active && <span className="ml-auto size-2 shrink-0 rounded-full bg-emerald-400" title="Serveur en cours" />}
+                    {active && <span className="ml-auto size-2 shrink-0 rounded-full bg-success" title="Serveur en cours" />}
                   </span>
-                  <span className="w-full truncate font-mono text-[0.7rem] text-muted-foreground">{basename(p.model)}</span>
-                </button>
+                  <span className="w-full truncate font-mono text-[0.7rem] font-normal text-muted-foreground">{basename(p.model)}</span>
+                </Button>
               )
             })}
           </nav>
