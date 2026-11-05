@@ -1,15 +1,17 @@
 import type { Database } from "bun:sqlite";
-import type { Server } from "bun";
-import { ZodError } from "zod";
+import type { ProfilesRepo } from "./db/profiles";
 import type { SettingsRepo } from "./db/settings";
+import { profileRoutes } from "./routes/profiles";
 import type { WsHub } from "./ws/hub";
 import pkg from "./package.json";
-import { guard } from "./security";
+import { guarded, jsonObject } from "./http";
 
 export interface AppDeps {
   db: Database;
   hub: WsHub;
   settings: SettingsRepo;
+  profiles: ProfilesRepo;
+  activeProfileId: () => number | null;
   /** Page web (import HTML : Bun bundle React + Tailwind à la volée). */
   index: Bun.HTMLBundle;
   hostname: string;
@@ -18,32 +20,6 @@ export interface AppDeps {
 }
 
 const startedAt = Date.now();
-
-function errorResponse(err: unknown): Response {
-  if (err instanceof ZodError) {
-    return Response.json({ error: "Réglages invalides", issues: err.issues }, { status: 400 });
-  }
-  if (err instanceof SyntaxError) {
-    return Response.json({ error: "JSON invalide" }, { status: 400 });
-  }
-  console.error(err);
-  return Response.json({ error: "Erreur interne" }, { status: 500 });
-}
-
-type Handler = (req: Request, server: Server<undefined>) => Response | undefined | Promise<Response | undefined>;
-
-/** Applique le garde (hôte, origine, JSON) puis le handler ; toute exception devient une réponse JSON. */
-function guarded(handler: Handler): Handler {
-  return async (req, server) => {
-    const refused = guard(req);
-    if (refused) return refused;
-    try {
-      return await handler(req, server);
-    } catch (err) {
-      return errorResponse(err);
-    }
-  };
-}
 
 export function createApp(deps: AppDeps) {
   const { hub, settings, index, port, development } = deps;
@@ -57,14 +33,9 @@ export function createApp(deps: AppDeps) {
       },
       "/api/settings": {
         GET: guarded(() => Response.json(settings.get())),
-        PATCH: guarded(async (req) => {
-          const body = await req.json();
-          if (typeof body !== "object" || body === null || Array.isArray(body)) {
-            return Response.json({ error: "Objet JSON attendu" }, { status: 400 });
-          }
-          return Response.json(settings.patch(body));
-        }),
+        PATCH: guarded(async (req) => Response.json(settings.patch(await jsonObject(req)))),
       },
+      ...profileRoutes(deps),
       "/api/*": guarded(() => Response.json({ error: "Route inconnue" }, { status: 404 })),
       "/ws": guarded((req, server) => {
         if (server.upgrade(req)) return undefined;

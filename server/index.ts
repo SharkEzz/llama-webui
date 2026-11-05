@@ -1,5 +1,6 @@
 import { createApp } from "./app";
 import { openDb } from "./db/open";
+import { ProfilesRepo } from "./db/profiles";
 import { SettingsRepo } from "./db/settings";
 import { dbPath } from "./paths";
 import { WsHub } from "./ws/hub";
@@ -16,8 +17,9 @@ g.__llamaWebuiDispose?.();
 const db = openDb(dbPath());
 const hub = new WsHub();
 const settings = new SettingsRepo(db);
+const profiles = new ProfilesRepo(db);
 const development = process.env.NODE_ENV !== "production";
-const server = createApp({ db, hub, settings, index, hostname: HOSTNAME, port: PORT, development });
+const server = createApp({ db, hub, settings, profiles, activeProfileId: () => null, index, hostname: HOSTNAME, port: PORT, development });
 
 g.__llamaWebuiDispose = () => {
   hub.dispose();

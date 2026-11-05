@@ -4,6 +4,21 @@ import type { Database } from "bun:sqlite";
 export const MIGRATIONS: string[] = [
   // 1 — réglages clé/valeur
   `CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL);`,
+  // 2 — profils llama-server
+  `CREATE TABLE profiles(
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    model_path TEXT NOT NULL,
+    mmproj_path TEXT,
+    cwd TEXT,
+    host TEXT,
+    port INTEGER,
+    args_json TEXT NOT NULL,
+    env_json TEXT NOT NULL,
+    source TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );`,
 ];
 
 export function runMigrations(db: Database): void {
