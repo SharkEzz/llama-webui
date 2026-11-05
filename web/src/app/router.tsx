@@ -39,6 +39,7 @@ export const router = createBrowserRouter([
       { path: "chat", ...page(() => import("@/features/chat/ChatPage"), "ChatPage") },
       { path: "chat/:id", ...page(() => import("@/features/chat/ChatPage"), "ChatPage") },
       { path: "bench", ...page(() => import("@/features/bench/BenchPage"), "BenchPage") },
+      { path: "tuning", ...page(() => import("@/features/tuning/TuningPage"), "TuningPage") },
       ...ROUTES.filter((r) => r.path in MILESTONE_BY_PATH).map((r) => ({ path: r.path.slice(1), ...placeholder(r.label) })),
       { path: "*", ...placeholder("Page introuvable") },
     ],

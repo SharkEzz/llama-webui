@@ -63,3 +63,11 @@ test("planSweep crosses -ncmoe with device sets and drops what does not fit unle
   expect(all.items).toHaveLength(6);
   expect(all.items[0]!.fit.verdict).toBe("no");
 });
+
+test("a CUDA pair with margin beats a single card at the limit, and the AMD card alone comes after the CUDA pair", () => {
+  for (const mb of [310, 325]) {
+    const e = estimate({ model: fakeModel({ layers: 36, otherBytesPerLayer: mb * MiB }), hw: hw3(), preset: "chat", mmprojBytes: 0 });
+    expect({ mb, dev: e.params.dev, verdict: e.fit.verdict }).toEqual({ mb, dev: ["CUDA0", "CUDA1"], verdict: "fits" });
+    expect(e.ctx).toBe(32768);
+  }
+});

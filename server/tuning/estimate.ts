@@ -49,6 +49,9 @@ type Kind = { name: "gpu" | "moe-cpu" | "partial" | "cpu"; cards: BenchDevice[] 
  * `-ncmoe` pour les MoE qui débordent, `-ngl` partiel pour les denses, puis CPU seul. Le préréglage « 100 Go » place
  * d'emblée les experts en RAM sur toutes les cartes et accepte que la RAM déborde (mmap : relecture NVMe).
  */
+/** « experts de la première couche », « experts des 8 premières couches ». */
+const firstLayers = (n: number) => (n === 1 ? "experts de la première couche" : `experts des ${n} premières couches`);
+
 export function estimate(input: EstimateInput): Estimate {
   const { model, hw, mmprojBytes } = input;
   const pinned = input.pinned ?? {};
@@ -74,8 +77,10 @@ export function estimate(input: EstimateInput): Estimate {
   };
   if (pinnedCards) addSet(pinnedCards);
   else {
-    for (const d of ordered) addSet([d]);
+    // Chaque CUDA seule, la paire CUDA, puis les autres cartes seules (plus lentes ici), puis toutes.
+    for (const d of cuda) addSet([d]);
     if (cuda.length >= 2) addSet(cuda);
+    for (const d of ordered) addSet([d]);
     addSet(ordered);
   }
   const widest = sets.reduce<BenchDevice[]>((a, s) => (s.length > a.length ? s : a), []);
@@ -196,12 +201,16 @@ export function estimate(input: EstimateInput): Estimate {
       return null;
     }
     // Une carte quand tout y tient, au contexte visé et dans le cache préféré ; ensuite seulement on réduit.
+    // Une configuration avec de la marge passe avant une configuration « limite » plus simple.
     const target = ctxList()[0]!;
+    let tight: Tried | null = null;
     for (const k of kinds.filter((x) => x.name === "gpu"))
       for (const ub of ubs) {
         const r = fitKind(k, target, kvs[0]!, ub);
-        if (r) return r;
+        if (r?.fit.verdict === "fits") return r;
+        tight ??= r;
       }
+    if (tight) return tight;
     for (const k of kinds)
       for (const kv of kvs)
         for (const ctx of ctxList())
@@ -258,8 +267,8 @@ export function estimate(input: EstimateInput): Estimate {
       "-ncmoe",
       String(params.ncmoe),
       input.preset === "big"
-        ? `experts des ${params.ncmoe} premières couches en RAM ; attention, normes et experts restants sur ${cards}`
-        : `experts des ${params.ncmoe} premières couches en RAM (${fmtBytes(m.cpuExpertsBytes)})`,
+        ? `${firstLayers(params.ncmoe)} en RAM ; attention, normes et experts restants sur ${cards}`
+        : `${firstLayers(params.ncmoe)} en RAM (${fmtBytes(m.cpuExpertsBytes)})`,
     );
   if (params.ngl === "all") row("-ngl", "all", params.ncmoe ? "toutes les couches sur GPU, sauf les experts ci-dessus" : `${fmtBytes(m.gpuWeights)} de poids tiennent dans ${fmtBytes(totalBudget)} utilisables`);
   else if (typeof params.ngl === "number" && params.ngl > 0) row("-ngl", String(params.ngl), `${params.ngl} couches sur ${L} tiennent, le reste en RAM`);
@@ -268,8 +277,8 @@ export function estimate(input: EstimateInput): Estimate {
     row("-dev", params.dev.join(","), params.dev.length === 1 ? "une seule carte : pas de saut PCIe" : `${params.dev.length} cartes, ${params.dev[0]} reçoit les tampons de calcul`);
   if (params.ts) row("-ts", params.ts.join(","), "réparti selon la VRAM utilisable de chaque carte");
   const kvTotal = [...m.vram.values()].reduce((a, b) => a + b, 0) + m.ram;
-  row("-c", String(ctx), `cache KV ${kv} compris, ${fmtBytes(kvTotal)} au total, marge conservée`);
-  if (params.fa) row("-fa", "on", "requis pour le cache KV quantifié");
+  row("-c", String(ctx), `${fmtBytes(kvTotal)} estimés au total, cache KV ${kv} compris, marge conservée`);
+  if (params.fa) row("-fa", "on", kv === "f16" ? "attention plus rapide, tampons de calcul plus petits" : "requis pour le cache KV quantifié");
   row("-ctk / -ctv", kv, kv === "f16" ? "le budget le permet, pas de perte" : "cache divisé par 2, perte négligeable");
   row("-t", String(threads), `${threads} cœurs physiques`);
   row("-b / -ub", `${batch} / ${params.ub}`, params.ub === 512 && batch === DEFAULT_BATCH ? "défaut" : "prompt processing plus rapide, marge VRAM suffisante");
@@ -278,7 +287,7 @@ export function estimate(input: EstimateInput): Estimate {
   if (numa) row("--numa", "distribute", "plusieurs nœuds NUMA");
 
   if (typeof params.ngl === "number" && params.ngl > 0) warnings.push(`génération lente : ${L - params.ngl} couches sur ${L} en RAM`);
-  if (params.ncmoe) warnings.push(`experts des ${params.ncmoe} premières couches en RAM : génération ralentie`);
+  if (params.ncmoe) warnings.push(`${firstLayers(params.ncmoe)} en RAM : génération ralentie`);
   if (params.ngl === 0) warnings.push("VRAM insuffisante : tout en RAM");
   if (ramOverflowBytes > 0)
     warnings.push(`déborde la RAM de ${fmtBytes(ramOverflowBytes)} : lecture NVMe ≈ ${fmtBytes(diskReadBytesPerToken)} par jeton généré`);
