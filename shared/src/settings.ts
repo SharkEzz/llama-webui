@@ -10,7 +10,10 @@ export const SettingsSchema = z.object({
   hiddenGpus: z.array(z.string()).default(["0000:0d:00.0"]),
   defaultProfileId: z.number().int().nullable().default(null),
   llamaTuiImportDismissed: z.boolean().default(false),
+  theme: z.enum(["system", "light", "dark"]).default("system"),
 });
+
+export type ThemeMode = Settings["theme"];
 
 export type Settings = z.infer<typeof SettingsSchema>;
 

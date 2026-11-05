@@ -4,9 +4,10 @@ import { useWs, WS_STATUS_UI } from "@/lib/ws"
 import { useServer } from "@/lib/server"
 import { ServerStateBadge } from "@/features/server/ServerStateBadge"
 import { Link } from "react-router"
+import { ThemeToggle } from "./ThemeToggle"
 
 const DOT: Record<"ok" | "wait" | "down", string> = {
-  ok: "bg-emerald-400 shadow-[0_0_10px] shadow-emerald-400/60",
+  ok: "bg-success shadow-[0_0_10px] shadow-success/60",
   wait: "bg-tone-amber animate-pulse",
   down: "bg-destructive",
 }
@@ -20,7 +21,7 @@ export function StatusBar() {
   return (
     <div className="flex h-10 items-center justify-end gap-4 text-sm">
       {server && status === "open" && (
-        <Link to="/server" className="mr-auto flex min-w-0 items-center gap-2 rounded-md px-2 py-1 hover:bg-white/5" title="Voir le serveur">
+        <Link to="/server" className="mr-auto flex min-w-0 items-center gap-2 rounded-md px-2 py-1 hover:bg-accent" title="Voir le serveur">
           <span className="text-muted-foreground">llama-server</span>
           <ServerStateBadge state={server} />
           {"profile" in server && <span className="truncate text-muted-foreground">{server.profile}</span>}
@@ -35,6 +36,7 @@ export function StatusBar() {
           API <span className="num text-foreground/80">{version}</span>
         </span>
       )}
+      <ThemeToggle />
     </div>
   )
 }
