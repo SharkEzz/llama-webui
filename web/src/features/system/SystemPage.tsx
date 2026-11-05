@@ -3,6 +3,7 @@ import type { CpuInfo } from "@llama-webui/shared"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "@/lib/api"
 import { useMonitor } from "@/lib/monitor"
+import { ChecksCard } from "./ChecksCard"
 import { CpuCard } from "./CpuCard"
 import { DiskCard } from "./DiskCard"
 import { GpuCard } from "./GpuCard"
@@ -45,6 +46,7 @@ export function SystemPage() {
             <MemoryCard sample={snapshot.system} />
             <DiskCard sample={snapshot.disk} />
           </div>
+          <ChecksCard />
         </>
       )}
     </div>
