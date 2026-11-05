@@ -18,7 +18,7 @@ Objectif : reprendre ce concept en **dashboard web moderne** pour usage personne
 | Modèles | `~/Modèles` (342 Go libres, NVMe) |
 
 Décisions prises en brainstorming :
-- Usage perso localhost. Une seule instance llama-server à la fois. UI en français, thème sombre par défaut ; **mode clair prévu en J7** (demande du 2026-11-05).
+- Usage perso localhost. Une seule instance llama-server à la fois. UI en français, thème sombre par défaut ; **mode clair livré en J3** (demande du 2026-11-05).
 - Logique métier TS de llama-tui **copiée et adaptée** (pas de package partagé, llama-tui intact).
 - **Tout l'état en sqlite** (`bun:sqlite`) : config, profils, conversations, benchmarks. Les profils s'**importent/exportent en JSON** (format compatible llama-tui) ; import des profils de `~/.config/llama-tui/config.json` proposé au premier lancement.
 - Pas de persistance des métriques ni des logs (ring en RAM comme aujourd'hui, 2 min → configurable jusqu'à ~30 min).
@@ -70,7 +70,7 @@ llama-webui/
 - Cartes : `backdrop-filter: blur(16px)`, fond sombre translucide (`oklch(0.1 0.02 280 / 42%)`), bordure `white/10`, léger dégradé interne, ombre douce. Tokens shadcn surchargés dans `web/src/index.css`.
 - Charts temps réel : **uPlot** (léger, 1 Hz sans jank) habillé aux couleurs du thème ; jauges SVG maison. Suivre la skill `dataviz` au moment des charts.
 - Typo : Inter (UI) + JetBrains Mono (chiffres, logs, flags).
-- **Préparer le mode clair** : dès J3, les composants n'utilisent que des tokens (variables CSS : surfaces, bordures, puits de code, tons, état « prêt »…) et plus de couleurs en dur (`white/10`, `black/30`, `emerald-400`…). Le mode clair n'aura alors qu'à redéfinir les variables.
+- **Thèmes clair et sombre, selon les conventions shadcn/Tailwind v4** : variables du thème clair dans `:root`, du sombre dans `.dark` (classe sur `<html>`), exposées à Tailwind par `@theme inline`. Les composants n'emploient que les classes sémantiques (`bg-background`, `bg-card`, `text-muted-foreground`, `border-border`, `bg-muted`, `ring-ring`, `bg-popover`…) et des tokens projet déclarés de la même façon (`--surface`/`bg-surface` pour le verre, `--well` pour les zones de code/logs, `--success`, tons `--tone-*`) ; pas de couleurs en dur (`white/10`, `black/30`, `emerald-400`) ni de `dark:` quand un token suffit. Composants shadcn utilisés tels quels (Card, Button, Badge, Select, DropdownMenu, Tooltip…) plutôt que réinventés ; personnalisation par variantes et tokens, pas par surcharge ad hoc.
 
 ---
 
@@ -101,6 +101,7 @@ llama-webui/
 - **Vérif** : lancer le profil Qwen3.8-27B depuis l'UI, voir PRÊT, switcher, arrêter, importer les 2 profils de llama-tui ; tests unitaires sur args/validation/parse flags avec `llama-tui/testdata/llama-server-help.txt`.
 
 ### J3 — Monitoring
+- **Mode clair** (en tête de jalon) : jeu de tokens clair (verre clair, bulles plus pâles et moins saturées, contrastes AA) ; bascule Système / Sombre / Clair dans la barre d'état (DropdownMenu shadcn), choix en `localStorage` + réglage `theme` en sqlite, classe posée sur `<html>` par un script inline avant le premier rendu (pas de flash), suivi de `prefers-color-scheme` en mode Système ; migration vers les tokens des ~25 couleurs codées en dur de J1-J2 (10 fichiers) ; `GlassCard` réécrit sur `Card` shadcn + token de surface. Vérif : chaque page relue dans les deux thèmes.
 - Copier/adapter `collectors/*` et `hardware/*` : `/slots` + `/metrics` (deltas), NVML worker + fallback nvidia-smi, sysfs AMD (RX 9070 XT, 610M masquée par défaut), `/proc` CPU/RAM/disque, disque du modèle.
 - Snapshot 1 Hz en WS ; historique en RAM, `history_seconds` configurable (défaut 300).
 - Web : page **Dashboard** (débit gen/prompt, spéculatif si drafts, slots/contexte, requêtes récentes, bandeau système), page **Système** (une carte par GPU avec util/VRAM/PCIe/puissance/clocks/temp, CPU + heatmap cœurs, mémoire, disque), page **Réglages** (collecteurs, intervalle, historique, GPU masqués, binaire, models_dir).
@@ -129,7 +130,6 @@ llama-webui/
 
 ### J7 — Finitions
 - Raccourcis clavier globaux, toasts, états vides, gestion d'erreurs uniformes, écran « serveur injoignable ».
-- **Mode clair** : bascule Système / Sombre / Clair (réglage `theme` en sqlite, classe posée sur `<html>` avant le premier rendu pour éviter le flash), jeu de tokens clair (verre clair, bulles plus pâles et moins saturées, contrastes AA), toasts et éditeurs de code colorés compris ; migration vers les tokens des ~25 couleurs codées en dur de J1-J2 (10 fichiers).
 - Fichier `README.md` (installation, `bun run dev`, `bun run start`, import depuis llama-tui), revue `frontend-design` de cohérence visuelle, passe perf (uPlot, mémo).
 
 ---
