@@ -18,7 +18,7 @@ Objectif : reprendre ce concept en **dashboard web moderne** pour usage personne
 | Modèles | `~/Modèles` (342 Go libres, NVMe) |
 
 Décisions prises en brainstorming :
-- Usage perso localhost. Une seule instance llama-server à la fois. UI en français, thème sombre uniquement.
+- Usage perso localhost. Une seule instance llama-server à la fois. UI en français, thème sombre par défaut ; **mode clair prévu en J7** (demande du 2026-11-05).
 - Logique métier TS de llama-tui **copiée et adaptée** (pas de package partagé, llama-tui intact).
 - **Tout l'état en sqlite** (`bun:sqlite`) : config, profils, conversations, benchmarks. Les profils s'**importent/exportent en JSON** (format compatible llama-tui) ; import des profils de `~/.config/llama-tui/config.json` proposé au premier lancement.
 - Pas de persistance des métriques ni des logs (ring en RAM comme aujourd'hui, 2 min → configurable jusqu'à ~30 min).
@@ -28,7 +28,7 @@ Décisions prises en brainstorming :
 - Frontend servi par **Bun** (HTML imports, `bun-plugin-tailwind`) : un seul process et un seul port. *(Révisé en J1 : Vite avait d'abord été retenu, puis retiré à la demande de l'utilisateur puisque Bun couvre tout.)*
 - **Tests : minimum utile.** Pas de TDD systématique. Seuls les parseurs purs à fixtures (flags `--help`, `/metrics`, `/slots`, nvidia-smi, JSON llama-bench) et l'estimateur/générateur d'espace ont des tests unitaires. Le reste se vérifie à la main via l'UI à chaque jalon.
 
-Hors périmètre v1 : auth, multi-instance, mode router `--models-dir`, téléchargement HF, images dans le chat, RPC/RDMA (voir « Pistes disque/réseau » en J6), thème clair, mobile.
+Hors périmètre v1 : auth, multi-instance, mode router `--models-dir`, téléchargement HF, images dans le chat, RPC/RDMA (voir « Pistes disque/réseau » en J6), mobile.
 
 ---
 
@@ -70,6 +70,7 @@ llama-webui/
 - Cartes : `backdrop-filter: blur(16px)`, fond sombre translucide (`oklch(0.1 0.02 280 / 42%)`), bordure `white/10`, léger dégradé interne, ombre douce. Tokens shadcn surchargés dans `web/src/index.css`.
 - Charts temps réel : **uPlot** (léger, 1 Hz sans jank) habillé aux couleurs du thème ; jauges SVG maison. Suivre la skill `dataviz` au moment des charts.
 - Typo : Inter (UI) + JetBrains Mono (chiffres, logs, flags).
+- **Préparer le mode clair** : dès J3, les composants n'utilisent que des tokens (variables CSS : surfaces, bordures, puits de code, tons, état « prêt »…) et plus de couleurs en dur (`white/10`, `black/30`, `emerald-400`…). Le mode clair n'aura alors qu'à redéfinir les variables.
 
 ---
 
@@ -128,6 +129,7 @@ llama-webui/
 
 ### J7 — Finitions
 - Raccourcis clavier globaux, toasts, états vides, gestion d'erreurs uniformes, écran « serveur injoignable ».
+- **Mode clair** : bascule Système / Sombre / Clair (réglage `theme` en sqlite, classe posée sur `<html>` avant le premier rendu pour éviter le flash), jeu de tokens clair (verre clair, bulles plus pâles et moins saturées, contrastes AA), toasts et éditeurs de code colorés compris ; migration vers les tokens des ~25 couleurs codées en dur de J1-J2 (10 fichiers).
 - Fichier `README.md` (installation, `bun run dev`, `bun run start`, import depuis llama-tui), revue `frontend-design` de cohérence visuelle, passe perf (uPlot, mémo).
 
 ---
