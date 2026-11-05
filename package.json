@@ -2,12 +2,16 @@
   "name": "llama-webui",
   "type": "module",
   "private": true,
-  "workspaces": ["shared", "server", "web"],
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev": "bun run --filter './server' --filter './web' dev",
     "build": "bun run --filter './web' build",
     "start": "bun run --filter './server' start",
-    "check": "bun check",
+    "check": "bun check --no-script && bun check -p web",
     "test": "bun test server shared"
   },
   "devDependencies": {
