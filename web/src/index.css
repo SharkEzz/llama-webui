@@ -130,7 +130,8 @@
   --chart-3: oklch(0.67 0.15 65);
   --chart-4: oklch(0.63 0.22 355);
 
-  --sidebar: oklch(1 0 0 / 4%);
+  /* légèrement plus sombre que le fond : la navigation se met en retrait */
+  --sidebar: oklch(0.08 0.02 280 / 22%);
   --sidebar-accent: oklch(1 0 0 / 7%);
 }
 

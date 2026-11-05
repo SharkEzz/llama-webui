@@ -17,7 +17,7 @@ export function RequestsTable({ requests }: { requests: RequestRecord[] }) {
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">Aucune requête depuis le démarrage de ce serveur.</p>
       ) : (
-        <Table className="num text-xs">
+        <Table className="text-xs">
           <TableHeader>
             <TableRow>
               <TableHead>Heure</TableHead>
@@ -30,7 +30,7 @@ export function RequestsTable({ requests }: { requests: RequestRecord[] }) {
               <TableHead className="text-right">Acceptation</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <TableBody className="num">
             {rows.map((r) => (
               <TableRow key={r.at}>
                 <TableCell>{time.format(r.at)}</TableCell>
