@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { Link, useNavigate } from "react-router"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useNavigate, useSearchParams } from "react-router"
 import { Copy, GitCompare, History, MoreHorizontal, RotateCcw, Trash2, UserPlus } from "lucide-react"
 import type { BenchRun, BenchStatus, Measure } from "@llama-webui/shared"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
@@ -49,6 +49,19 @@ export function BenchHistory() {
   const [comparing, setComparing] = useState(false)
   const [deleting, setDeleting] = useState<BenchRun | null>(null)
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
+  const focus = Number(params.get("run")) || null
+
+  // ?run=<id> (depuis Tuning) : historique avec les sweeps, ligne sélectionnée et ramenée à l'écran, puis le paramètre est retiré.
+  useEffect(() => {
+    if (focus === null) return
+    if (filters.sweeps !== "all") return setFilters({ sweeps: "all" })
+    if (!runs.some((r) => r.id === focus)) return
+    if (!selected.includes(focus)) toggle(focus)
+    // Après la mise en page du formulaire (devices chargés en différé), sinon le défilement vise une position périmée.
+    setTimeout(() => document.getElementById(`bench-run-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 400)
+    setParams({}, { replace: true })
+  }, [focus, filters.sweeps, runs])
 
   const models = useMemo(() => [...new Set(runs.map((r) => r.spec.modelPath))].sort(), [runs])
   const shown = runs.filter(
@@ -150,7 +163,7 @@ export function BenchHistory() {
               {shown.map((r) => {
                 const checked = selected.includes(r.id)
                 return (
-                  <TableRow key={r.id} data-state={checked ? "selected" : undefined}>
+                  <TableRow key={r.id} id={`bench-run-${r.id}`} data-state={checked ? "selected" : undefined}>
                     <TableCell>
                       <Checkbox
                         checked={checked}

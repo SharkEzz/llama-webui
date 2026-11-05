@@ -32,6 +32,16 @@ export class SweepsRepo {
     return c;
   }
 
+  private best(runId: number | null): Sweep["best"] {
+    if (runId === null) return null;
+    const b = this.db
+      .query<{ sweep_label: string | null; kind: "bench" | "server"; pp_tps: number | null; tg_tps: number | null }, [number]>(
+        "SELECT sweep_label, kind, pp_tps, tg_tps FROM bench_runs WHERE id = ?",
+      )
+      .get(runId);
+    return b ? { label: b.sweep_label, kind: b.kind, ppTps: b.pp_tps, tgTps: b.tg_tps } : null;
+  }
+
   private toSweep(r: Row): Sweep {
     return {
       id: r.id,
@@ -39,6 +49,7 @@ export class SweepsRepo {
       status: r.status,
       spec: { ...JSON.parse(r.spec_json), profileId: r.profile_id },
       bestRunId: r.best_run_id,
+      best: this.best(r.best_run_id),
       counts: this.counts(r.id),
       createdAt: r.created_at,
       finishedAt: r.finished_at,

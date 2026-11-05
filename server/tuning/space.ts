@@ -1,17 +1,6 @@
-import { type BenchParams, type CacheType, estimatedSweepSeconds, expandSpace, itemLabel, type PlanResult, presetOf, type SweepSpec, type TuningHardware } from "@llama-webui/shared";
+import { type BenchParams, type CacheType, estimatedSweepSeconds, expandSpace, itemLabel, type PlanResult, presetOf, sweepCtx, type SweepSpec, type TuningHardware } from "@llama-webui/shared";
 import type { ModelInfo } from "../models/gguf";
 import { fitOf } from "./placement";
-
-/** Contexte d'un sweep : le -c des autres flags serveur, sinon le minimum du préréglage. */
-export function sweepCtx(spec: Pick<SweepSpec, "serverArgs" | "preset">): number {
-  const args = spec.serverArgs;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
-    const v = a === "-c" || a === "--ctx-size" ? args[i + 1] : a.startsWith("--ctx-size=") ? a.slice(11) : undefined;
-    if (v !== undefined && /^\d+$/.test(v) && Number(v) > 0) return Number(v);
-  }
-  return presetOf(spec.preset).ctxMin;
-}
 
 /** Les éléments d'un sweep, chacun avec le verdict de l'estimateur ; ceux qui ne tiennent pas retirés sauf `includeUnfit`. */
 export function planSweep(o: { model: ModelInfo; hw: TuningHardware; spec: SweepSpec; mmprojBytes: number }): PlanResult {

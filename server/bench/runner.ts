@@ -1,8 +1,7 @@
-import { type BenchHardware, type BenchLive, type BenchRun, type BenchSpec, rankRuns, type Sweep, type SweepLive } from "@llama-webui/shared";
+import { type BenchHardware, type BenchLive, type BenchRun, type BenchSpec, rankRuns, type Sweep, type SweepLive, sweepCtx } from "@llama-webui/shared";
 import type { BenchFinish, BenchRunsRepo } from "../db/benchRuns";
 import type { SweepsRepo } from "../db/sweeps";
 import { HttpError, notFound } from "../http";
-import { sweepCtx } from "../tuning/space";
 import type { RunExecutor } from "./execute";
 import type { BenchGate } from "./gate";
 

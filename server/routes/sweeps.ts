@@ -1,4 +1,4 @@
-import { type BenchSpec, rankRuns, SweepSpecSchema } from "@llama-webui/shared";
+import { type BenchSpec, rankRuns, sweepCtx, SweepSpecSchema } from "@llama-webui/shared";
 import { z } from "zod";
 import { benchBinary } from "../bench/parse";
 import type { BenchRunner } from "../bench/runner";
@@ -9,7 +9,7 @@ import { guarded, HttpError, idParam, jsonObject, notFound } from "../http";
 import type { Monitor } from "../monitor/monitor";
 import { readTuningHardware } from "../tuning/hardware";
 import { loadModel, mmprojBytes } from "../tuning/models";
-import { planSweep, sweepCtx } from "../tuning/space";
+import { planSweep } from "../tuning/space";
 import type { WsHub } from "../ws/hub";
 
 export interface SweepRouteDeps {

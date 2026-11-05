@@ -11,6 +11,7 @@ import {
   gpuDevices,
   type PlanResult,
   type PresetId,
+  presetOf,
   type Profile,
   type Sweep,
   type SweepLive,
@@ -135,7 +136,7 @@ export const useTuning = create<TuningState>()((set, get) => {
   const specBody = () => {
     const s = get()
     return {
-      name: s.run.name.trim() || `${modelName(s.modelPath ?? "modèle")} · ${s.preset} · ${shortDate()}`,
+      name: s.run.name.trim() || `${modelName(s.modelPath ?? "modèle")} · ${presetOf(s.preset).label} · ${shortDate()}`,
       modelPath: s.modelPath,
       mmprojPath: s.mmprojPath,
       profileId: s.profileId,

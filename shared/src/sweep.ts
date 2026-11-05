@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   BenchParamsSchema,
   type BenchParams,
+  type BenchKind,
   type BenchRun,
   benchSpecBase,
   CACHE_TYPES,
@@ -54,6 +55,8 @@ export interface Sweep {
   status: SweepStatus;
   spec: SweepSpec;
   bestRunId: number | null;
+  /** Résumé du meilleur run (historique des sweeps sans charger leurs runs). */
+  best: { label: string | null; kind: BenchKind; ppTps: number | null; tgTps: number | null } | null;
   counts: { total: number; queued: number; running: number; ok: number; failed: number; cancelled: number; interrupted: number };
   createdAt: number;
   finishedAt: number | null;
@@ -111,6 +114,17 @@ export function itemLabel(params: BenchParams, space: SweepSpace): string {
 }
 
 /** Score du préréglage pour un run réussi ; null sinon. */
+/** Contexte d'un sweep : le -c des autres flags serveur, sinon le minimum du préréglage. */
+export function sweepCtx(spec: Pick<SweepSpec, "serverArgs" | "preset">): number {
+  const args = spec.serverArgs;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    const v = a === "-c" || a === "--ctx-size" ? args[i + 1] : a.startsWith("--ctx-size=") ? a.slice(11) : undefined;
+    if (v !== undefined && /^\d+$/.test(v) && Number(v) > 0) return Number(v);
+  }
+  return presetOf(spec.preset).ctxMin;
+}
+
 export function scoreOf(preset: PresetId, run: Pick<BenchRun, "status" | "pp" | "tg">, ctx: number): number | null {
   if (run.status !== "ok" || !run.pp || !run.tg) return null;
   return presetOf(preset).score({ ppTps: run.pp.tps, tgTps: run.tg.tps, ctx });
