@@ -9,3 +9,4 @@ export * from "./monitor";
 export * from "./models";
 export * from "./chat";
 export * from "./sse";
+export * from "./bench";

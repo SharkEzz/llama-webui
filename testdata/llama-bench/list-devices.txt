@@ -1,0 +1,8 @@
+Available devices:
+  CUDA0: NVIDIA GeForce RTX 5070 Ti (15933 MiB, 15643 MiB free)
+  CUDA1: NVIDIA GeForce RTX 5060 Ti (15941 MiB, 15775 MiB free)
+  Vulkan0: AMD Ryzen 5 9600X 6-Core Processor (RADV RAPHAEL_MENDOCINO) (32103 MiB, 31795 MiB free)
+  Vulkan1: NVIDIA GeForce RTX 5070 Ti (16303 MiB, 15643 MiB free)
+  Vulkan2: NVIDIA GeForce RTX 5060 Ti (16311 MiB, 15775 MiB free)
+  Vulkan3: AMD Radeon RX 9070 XT (RADV GFX1201) (16304 MiB, 16225 MiB free)
+  BLAS: OpenBLAS (0 MiB, 0 MiB free)
