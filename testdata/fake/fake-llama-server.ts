@@ -38,7 +38,13 @@ const server = Bun.serve({
       }
       return Response.json({
         content: "x".repeat(body.n_predict ?? 0),
-        timings: { prompt_per_second: Number(process.env.FAKE_PP ?? 1000), predicted_per_second: Number(process.env.FAKE_TG ?? 50) },
+        timings: {
+          prompt_n: Math.ceil(((body as { prompt?: string }).prompt ?? "").length / 4),
+          prompt_per_second: Number(process.env.FAKE_PP ?? 1000),
+          predicted_n: body.n_predict ?? 0,
+          predicted_per_second: Number(process.env.FAKE_TG ?? 50),
+          ...(process.env.FAKE_DRAFT === "1" ? { draft_n: 40, draft_n_accepted: 19 } : {}),
+        },
       });
     }
     if (path === "/v1/chat/completions" && req.method === "POST") return chat(req);

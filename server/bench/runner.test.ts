@@ -1,22 +1,27 @@
 import { afterEach, expect, test } from "bun:test";
-import { resolve } from "node:path";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { type BenchLive, type BenchRun, BenchSpecSchema, DEFAULT_SETTINGS, type ServerState } from "@llama-webui/shared";
 import { BenchRunsRepo } from "../db/benchRuns";
 import { openDb } from "../db/open";
 import { HttpError } from "../http";
 import { LogBuffer } from "../logs/buffer";
 import type { BuiltCommand } from "../supervisor/args";
+import { probeHealth } from "../supervisor/health";
 import { BenchRunner, type ServerControl } from "./runner";
 
 const FAKE = resolve(import.meta.dir, "../../testdata/fake/fake-llama-server");
+const MODEL = join(mkdtempSync(join(tmpdir(), "lw-bench-")), "a.gguf");
+writeFileSync(MODEL, "");
 const cmdA = { display: "cmdA", profileName: "A", profileId: 1, port: 8080 } as BuiltCommand;
 
 afterEach(() => {
-  delete process.env.FAKE_BENCH_OOM;
+  for (const k of ["FAKE_BENCH_OOM", "FAKE_PP", "FAKE_TG", "FAKE_DRAFT", "FAKE_LOAD_MS"]) delete process.env[k];
 });
 
 /** Un serveur géré factice (prêt, profil A) qui note les arrêts et relances. */
-function setup() {
+function setup(port = 8080) {
   const calls: string[] = [];
   let state: ServerState = { kind: "ready", profile: "A", profileId: 1, pid: 1, port: 8080, since: 0 };
   const server: ServerControl = {
@@ -39,7 +44,7 @@ function setup() {
   const end = new Promise<void>((r) => (ended = r));
   const runner = new BenchRunner({
     repo: new BenchRunsRepo(openDb(":memory:")),
-    settings: () => ({ ...DEFAULT_SETTINGS, binary: FAKE }),
+    settings: () => ({ ...DEFAULT_SETTINGS, binary: FAKE, port }),
     server,
     logs: new LogBuffer(100),
     gpus: () => [],
@@ -53,7 +58,7 @@ function setup() {
   return { runner, calls, lives, runs, end };
 }
 
-const spec = BenchSpecSchema.parse({ kind: "bench", modelPath: "/m/a.gguf", r: 2 });
+const spec = BenchSpecSchema.parse({ kind: "bench", modelPath: MODEL, r: 2 });
 
 test("restarts the server it stopped even when llama-bench fails", async () => {
   process.env.FAKE_BENCH_OOM = "1";
@@ -85,4 +90,30 @@ test("a successful run stores pp/tg and refuses a second run meanwhile", async (
   expect(last.pp!.tps).toBeCloseTo(9817.38, 1);
   expect(last.tg!.tps).toBeCloseTo(410.81, 1);
   expect(lives.some((l) => l?.phase === "prompt" && l.step !== null)).toBe(true);
+});
+
+test("a server run measures r times and reports draft acceptance", async () => {
+  Object.assign(process.env, { FAKE_PP: "1000", FAKE_TG: "50", FAKE_DRAFT: "1", FAKE_LOAD_MS: "50" });
+  const port = 18089;
+  const { runner, calls, runs, end } = setup(port);
+  await runner.start(BenchSpecSchema.parse({ kind: "server", modelPath: MODEL, r: 2, p: 64, n: 8 }), { stopServer: true });
+  await end;
+  const last = runs.at(-1)!;
+  expect(last.error).toBeNull();
+  expect(last.status).toBe("ok");
+  expect(last.pp).toEqual({ tps: 1000, stddev: 0, tokens: expect.any(Number) });
+  expect(last.tg!.tps).toBe(50);
+  expect(last.tg!.stddev).toBe(0);
+  expect(last.draftAcceptPct).toBe(47.5);
+  expect(last.command).toContain(`--port ${port}`);
+  expect(calls).toEqual(["stop", "start:cmdA"]);
+  expect(await probeHealth(port)).toBeNull();
+}, 20_000);
+
+test("a missing model is refused before anything stops", async () => {
+  const { runner, calls } = setup();
+  const e = await runner.start(BenchSpecSchema.parse({ kind: "bench", modelPath: "/nulle/part.gguf" }), { stopServer: true }).catch((x) => x);
+  expect((e as HttpError).status).toBe(400);
+  expect(calls).toEqual([]);
+  expect(runner.busy).toBe(false);
 });

@@ -57,6 +57,7 @@ const benchRunner = new BenchRunner({
   hardware: () => readHardware(settings.get().binary, allGpus()),
   onLive: (l) => hub.broadcast({ type: "bench-progress", payload: l }),
   onRun: (r) => hub.broadcast({ type: "bench-run", payload: r }),
+  profileEnv: (id) => profiles.get(id)?.env ?? null,
 });
 monitor.setModelPathResolver((id) => {
   const p = profiles.get(id);

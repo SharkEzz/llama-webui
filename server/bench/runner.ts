@@ -6,6 +6,8 @@ import {
   type BenchSpec,
   benchArgs,
   type GpuSample,
+  type Profile,
+  serverArgs,
   type ServerState,
   type Settings,
   shellQuote,
@@ -14,8 +16,10 @@ import type { BenchFinish, BenchRunsRepo } from "../db/benchRuns";
 import { HttpError } from "../http";
 import type { LogBuffer } from "../logs/buffer";
 import { LineSplitter } from "../logs/lines";
-import type { BuiltCommand } from "../supervisor/args";
+import { dirname } from "node:path";
+import { type BuiltCommand, buildCommand } from "../supervisor/args";
 import { benchBinary, benchFailure, parseBenchJson, parseBenchProgress } from "./parse";
+import { runServerTrial, TrialCancelled } from "./server";
 import { VramProbe } from "./vram";
 
 /** Ce que le runner attend du superviseur : arrêter le serveur géré avant un run, le relancer après. */
@@ -36,6 +40,8 @@ export interface BenchRunnerDeps {
   hardware(): Promise<BenchHardware>;
   onLive(l: BenchLive | null): void;
   onRun(r: BenchRun): void;
+  /** Variables d'environnement du profil d'origine d'un run serveur (null si le profil n'existe plus). */
+  profileEnv?(id: number): Record<string, string> | null;
   fetch?: typeof fetch;
   now?: () => number;
   killTimeoutMs?: number;
@@ -47,6 +53,10 @@ interface Job {
   run: BenchRun;
   spec: BenchSpec;
   argv: string[];
+  /** Run serveur : la commande llama-server mesurée. */
+  cmd: BuiltCommand | null;
+  /** Dernière diffusion de la carte en direct (les lignes de log sont regroupées). */
+  liveAt: number;
   /** Commande du serveur géré arrêté pour ce run, à relancer à la fin. */
   stopped: BuiltCommand | null;
   live: BenchLive;
@@ -65,6 +75,7 @@ const TAIL = 50;
 const LIVE_LINES = 20;
 const VRAM_SAMPLE_MS = 500;
 const MIB = 1024 * 1024;
+const LIVE_THROTTLE_MS = 250;
 
 /**
  * Un benchmark à la fois, hors superviseur. Arrête le serveur géré (après confirmation du client), exécute le run,
@@ -102,16 +113,20 @@ export class BenchRunner {
         throw new HttpError(409, `llama-server tourne (profil ${s.profile}) : il sera arrêté pendant le benchmark puis relancé`, "server-running");
       stopped = this.deps.server.lastCommand;
     }
-    if (spec.kind === "server") throw new HttpError(501, "run serveur : Task 3");
     this.claimed = true;
     try {
-      const argv = this.benchArgv(spec);
+      if (!(await Bun.file(spec.modelPath).exists())) throw new HttpError(400, `Modèle introuvable : ${spec.modelPath}`);
+      if (spec.mmprojPath && !(await Bun.file(spec.mmprojPath).exists())) throw new HttpError(400, `Projecteur introuvable : ${spec.mmprojPath}`);
+      const cmd = spec.kind === "server" ? this.serverCommand(spec) : null;
+      const argv = cmd ? cmd.argv : this.benchArgv(spec);
       const hardware = await this.deps.hardware();
-      const run = this.deps.repo.create(spec, shellQuote(argv.slice(4)), hardware);
+      const run = this.deps.repo.create(spec, cmd ? cmd.display : shellQuote(argv.slice(4)), hardware);
       const job: Job = {
         run,
         spec,
         argv,
+        cmd,
+        liveAt: 0,
         stopped,
         live: { runId: run.id, kind: spec.kind, phase: stopped ? "stopping-server" : "loading", step: null, startedAt: this.now(), lines: [] },
         tail: [],
@@ -130,6 +145,24 @@ export class BenchRunner {
     } finally {
       this.claimed = false;
     }
+  }
+
+  /** llama-server pour un run serveur : modèle, projecteur, flags des champs puis autres flags, sur 127.0.0.1 et le port des réglages. */
+  private serverCommand(spec: BenchSpec): BuiltCommand {
+    const profile: Profile = {
+      id: spec.profileId ?? 0,
+      name: "bench",
+      model: spec.modelPath,
+      ...(spec.mmprojPath ? { mmproj: spec.mmprojPath } : {}),
+      cwd: dirname(spec.modelPath),
+      host: "127.0.0.1",
+      args: [...serverArgs(spec.params), ...spec.serverArgs],
+      env: (spec.profileId !== null ? this.deps.profileEnv?.(spec.profileId) : null) ?? {},
+      source: "ui",
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    return buildCommand(profile, this.deps.settings());
   }
 
   private benchArgv(spec: BenchSpec): string[] {
@@ -158,7 +191,13 @@ export class BenchRunner {
   private setLive(job: Job, patch: Partial<BenchLive>): void {
     if (job.disposed) return;
     job.live = { ...job.live, ...patch };
+    job.liveAt = this.now();
     this.deps.onLive(job.live);
+  }
+
+  /** Nouvelles lignes : diffusées au plus toutes les 250 ms (llama-server en écrit des centaines au chargement). */
+  private touchLive(job: Job): void {
+    if (this.now() - job.liveAt >= LIVE_THROTTLE_MS) this.setLive(job, {});
   }
 
   private line(job: Job, l: string): void {
@@ -176,7 +215,7 @@ export class BenchRunner {
         this.line(job, "arrêt de llama-server pendant le benchmark");
         await this.deps.server.stop();
       }
-      result = job.cancelled ? { status: "cancelled" } : await this.runBench(job);
+      result = job.cancelled ? { status: "cancelled" } : job.cmd ? await this.runServer(job, job.cmd) : await this.runBench(job);
     } catch (e) {
       result = job.cancelled ? { status: "cancelled" } : { status: "failed", error: (e as Error).message };
     }
@@ -259,7 +298,7 @@ export class BenchRunner {
         const runs = p.runs ?? job.spec.r;
         const step = { index: (p.test - 1) * runs + (p.run ?? 0), total: p.tests * runs };
         this.setLive(job, { phase: p.phase, step });
-      } else this.setLive(job, {});
+      } else this.touchLive(job);
     });
     await proc.exited;
     const [out] = await Promise.all([stdout.catch(() => ""), stderr]);
@@ -269,6 +308,37 @@ export class BenchRunner {
     const parsed = proc.exitCode === 0 ? parseBenchJson(out) : null;
     if (parsed && (parsed.pp || parsed.tg)) return { status: "ok", pp: parsed.pp, tg: parsed.tg };
     return { status: "failed", error: benchFailure(job.tail, proc.exitCode ?? proc.signalCode ?? "?").message };
+  }
+
+  private async runServer(job: Job, cmd: BuiltCommand): Promise<BenchFinish> {
+    this.deps.logs.push(`[bench] ${cmd.display}`);
+    const stopSampling = this.sampler(job);
+    try {
+      const r = await runServerTrial({
+        cmd,
+        p: job.spec.p,
+        n: job.spec.n,
+        r: job.spec.r,
+        signal: job.abort.signal,
+        onPhase: (phase, step) => this.setLive(job, { phase, step: step ?? null }),
+        onLine: (l) => {
+          this.line(job, l);
+          this.touchLive(job);
+        },
+        onSpawn: (proc) => {
+          job.proc = proc;
+        },
+        fetch: this.deps.fetch,
+        now: this.now,
+      });
+      return { status: "ok", pp: r.pp, tg: r.tg, draftAcceptPct: r.draftAcceptPct };
+    } catch (e) {
+      if (e instanceof TrialCancelled || job.cancelled) return { status: "cancelled" };
+      return { status: "failed", error: (e as Error).message };
+    } finally {
+      await stopSampling();
+      job.proc = null;
+    }
   }
 
   private async pipe(stream: ReadableStream<Uint8Array>, push: (line: string) => void): Promise<void> {
