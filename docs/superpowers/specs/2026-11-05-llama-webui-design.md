@@ -66,8 +66,8 @@ llama-webui/
 - `bun check` sur l'ensemble, `bun test` pour `server/` et `shared/` (fixtures réutilisées depuis `llama-tui/testdata/`).
 
 **Design system** (skill `frontend-design` au moment de J1)
-- Fond : dégradé sombre profond + 3-4 « bulles » radiales (accent violet/cyan/ambre) en `position:fixed`, animées en CSS (`translate` + `scale`, 40-90 s, `prefers-reduced-motion` respecté), `filter: blur(80px)`.
-- Cartes : `backdrop-filter: blur(16px)`, fond `white/5`, bordure `white/10`, léger dégradé interne, ombre douce. Tokens shadcn surchargés dans `web/src/index.css`.
+- Fond : dégradé sombre profond + 3-4 « bulles » radiales (accent violet/cyan/ambre) en `position:fixed`, animées en CSS (`translate` + `scale`, 80-180 s, `prefers-reduced-motion` respecté), `filter: blur(80px)`.
+- Cartes : `backdrop-filter: blur(16px)`, fond sombre translucide (`oklch(0.1 0.02 280 / 42%)`), bordure `white/10`, léger dégradé interne, ombre douce. Tokens shadcn surchargés dans `web/src/index.css`.
 - Charts temps réel : **uPlot** (léger, 1 Hz sans jank) habillé aux couleurs du thème ; jauges SVG maison. Suivre la skill `dataviz` au moment des charts.
 - Typo : Inter (UI) + JetBrains Mono (chiffres, logs, flags).
 
