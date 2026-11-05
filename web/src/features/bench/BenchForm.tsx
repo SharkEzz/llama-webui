@@ -118,15 +118,14 @@ export function BenchForm() {
         </div>
 
         <PathField label="Modèle" kind="model" error={errors.modelPath} {...field("modelPath")} onPick={(p) => setForm({ modelPath: p })} />
-        {form.kind === "server" && (
-          <PathField
-            label="Projecteur (facultatif)"
-            kind="mmproj"
-            error={errors.mmprojPath}
-            {...field("mmprojPath")}
-            onPick={(p) => setForm({ mmprojPath: p })}
-          />
-        )}
+        <PathField
+          label="Projecteur (facultatif)"
+          kind="mmproj"
+          error={errors.mmprojPath}
+          hint={form.kind === "bench" ? "Ignoré par llama-bench, gardé pour « Créer un profil » et « Relancer »." : undefined}
+          {...field("mmprojPath")}
+          onPick={(p) => setForm({ mmprojPath: p })}
+        />
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
           <TextField label="-ngl" hint="nombre, all ou auto" error={errors.ngl} {...field("ngl")} />
@@ -296,7 +295,7 @@ function TextField({ id, label, hint, error, value, onChange }: TextFieldProps) 
   )
 }
 
-function PathField({ id, label, kind, error, value, onChange, onPick }: TextFieldProps & { kind: "model" | "mmproj"; onPick(p: string): void }) {
+function PathField({ id, label, kind, hint, error, value, onChange, onPick }: TextFieldProps & { kind: "model" | "mmproj"; onPick(p: string): void }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -313,7 +312,7 @@ function PathField({ id, label, kind, error, value, onChange, onPick }: TextFiel
           <ModelPicker kind={kind} onSelect={onPick} />
         </InputGroupAddon>
       </InputGroup>
-      <FieldMessage error={error} />
+      <FieldMessage error={error} hint={hint} />
     </div>
   )
 }

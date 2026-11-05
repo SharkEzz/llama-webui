@@ -9,7 +9,7 @@ import { HttpError } from "../http";
 import { LogBuffer } from "../logs/buffer";
 import type { BuiltCommand } from "../supervisor/args";
 import { probeHealth } from "../supervisor/health";
-import { BenchRunner, type ServerControl } from "./runner";
+import { BenchRunner, type BenchRunnerDeps, type ServerControl } from "./runner";
 
 const FAKE = resolve(import.meta.dir, "../../testdata/fake/fake-llama-server");
 const MODEL = join(mkdtempSync(join(tmpdir(), "lw-bench-")), "a.gguf");
@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 /** Un serveur géré factice (prêt, profil A) qui note les arrêts et relances. */
-function setup(port = 8080, patch?: (s: ServerControl) => void) {
+function setup(port = 8080, patch?: (s: ServerControl) => void, deps?: Partial<BenchRunnerDeps>) {
   const calls: string[] = [];
   let state: ServerState = { kind: "ready", profile: "A", profileId: 1, pid: 1, port: 8080, since: 0 };
   const server: ServerControl = {
@@ -56,6 +56,7 @@ function setup(port = 8080, patch?: (s: ServerControl) => void) {
       if (l === null) ended();
     },
     onRun: (r) => runs.push(r),
+    ...deps,
   });
   return { runner, calls, lives, runs, end, repo };
 }
@@ -156,3 +157,19 @@ test("a reload while the server is stopping restarts it once the stop is over", 
   expect(calls).toEqual(["stop", "start:cmdA"]);
   expect(repo.get(run.id)!.status).toBe("interrupted");
 });
+
+test("a bench run gets its profile's environment", async () => {
+  const { runner, runs, end } = setup(8080, undefined, { profile: () => ({ env: { FAKE_BENCH_OOM: "1" } }) });
+  await runner.start(BenchSpecSchema.parse({ kind: "bench", modelPath: MODEL, profileId: 1, r: 1 }), { stopServer: true });
+  await end;
+  expect(runs.at(-1)!.status).toBe("failed");
+});
+
+test("a server run runs in its profile's directory", async () => {
+  Object.assign(process.env, { FAKE_LOAD_MS: "50" });
+  const cwd = mkdtempSync(join(tmpdir(), "lw-cwd-"));
+  const { runner, runs, end } = setup(18090, undefined, { profile: () => ({ cwd, env: {} }) });
+  await runner.start(BenchSpecSchema.parse({ kind: "server", modelPath: MODEL, profileId: 1, r: 1, p: 16, n: 4 }), { stopServer: true });
+  await end;
+  expect(runs.at(-1)!.logExcerpt).toContain(`cwd ${cwd}`);
+}, 20_000);

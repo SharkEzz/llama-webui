@@ -40,8 +40,8 @@ export interface BenchRunnerDeps {
   hardware(): Promise<BenchHardware>;
   onLive(l: BenchLive | null): void;
   onRun(r: BenchRun): void;
-  /** Variables d'environnement du profil d'origine d'un run serveur (null si le profil n'existe plus). */
-  profileEnv?(id: number): Record<string, string> | null;
+  /** Dossier et variables d'environnement du profil d'origine (null si le profil n'existe plus). */
+  profile?(id: number): Pick<Profile, "cwd" | "env"> | null;
   fetch?: typeof fetch;
   now?: () => number;
   killTimeoutMs?: number;
@@ -150,17 +150,25 @@ export class BenchRunner {
     }
   }
 
-  /** llama-server pour un run serveur : modèle, projecteur, flags des champs puis autres flags, sur 127.0.0.1 et le port des réglages. */
+  private source(spec: BenchSpec): Pick<Profile, "cwd" | "env"> | null {
+    return spec.profileId !== null ? (this.deps.profile?.(spec.profileId) ?? null) : null;
+  }
+
+  /**
+   * llama-server pour un run serveur : modèle, projecteur, flags des champs puis autres flags, sur 127.0.0.1 et le port des
+   * réglages, dans le dossier et avec l'environnement du profil d'origine (ses flags peuvent viser des chemins relatifs).
+   */
   private serverCommand(spec: BenchSpec): BuiltCommand {
+    const source = this.source(spec);
     const profile: Profile = {
       id: spec.profileId ?? 0,
       name: "bench",
       model: spec.modelPath,
       ...(spec.mmprojPath ? { mmproj: spec.mmprojPath } : {}),
-      cwd: dirname(spec.modelPath),
+      cwd: source?.cwd ?? dirname(spec.modelPath),
       host: "127.0.0.1",
       args: [...serverArgs(spec.params), ...spec.serverArgs],
-      env: (spec.profileId !== null ? this.deps.profileEnv?.(spec.profileId) : null) ?? {},
+      env: source?.env ?? {},
       source: "ui",
       createdAt: 0,
       updatedAt: 0,
@@ -290,7 +298,8 @@ export class BenchRunner {
     const stopSampling = this.sampler(job);
     let proc: Child;
     try {
-      proc = Bun.spawn(job.argv, { env: { ...process.env }, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+      // Environnement du profil d'origine (CUDA_VISIBLE_DEVICES… : mêmes cartes que le serveur).
+      proc = Bun.spawn(job.argv, { env: { ...process.env, ...this.source(job.spec)?.env }, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
     } catch (e) {
       await stopSampling();
       return { status: "failed", error: (e as Error).message };

@@ -149,7 +149,8 @@ export function specFromForm(f: BenchForm): { spec: Record<string, unknown> } | 
     spec: {
       kind: f.kind,
       modelPath: f.modelPath.trim(),
-      mmprojPath: f.kind === "server" && f.mmprojPath.trim() ? f.mmprojPath.trim() : null,
+      // Gardé aussi pour llama-bench (qui l'ignore) : « Créer un profil » ou « Relancer » en Serveur en ont besoin.
+      mmprojPath: f.mmprojPath.trim() || null,
       profileId: f.profileId,
       params,
       serverArgs: split,

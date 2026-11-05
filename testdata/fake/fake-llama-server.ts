@@ -12,6 +12,7 @@ const dir = import.meta.dir;
 const log = (s: string) => process.stderr.write(`0.00.000.000 I ${s}\n`);
 
 log("srv  main: loading model");
+log(`srv  main: cwd ${process.cwd()}`);
 if (process.env.FAKE_EXIT_LINES !== undefined) {
   for (const l of process.env.FAKE_EXIT_LINES.split("|")) log(l);
   process.exit(1);
