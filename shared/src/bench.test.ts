@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { benchArgs, BenchSpecSchema, ignoredByBench, paramsFromServerArgs, serverArgs } from "./bench";
+import { benchArgs, type BenchParams, BenchSpecSchema, ignoredByBench, paramsFromServerArgs, serverArgs } from "./bench";
 
 test("paramsFromServerArgs splits a real profile into fields and the rest", () => {
   expect(
@@ -18,7 +18,7 @@ test("an unreadable value stays in the rest with its flag", () => {
 });
 
 test("each tool gets its own separators", () => {
-  const p = { ngl: "all", dev: ["CUDA0", "CUDA1"], ts: [3, 1], ot: ["exps=CPU", "a=CUDA0"], fa: "on" } as const;
+  const p: BenchParams = { ngl: "all", dev: ["CUDA0", "CUDA1"], ts: [3, 1], ot: ["exps=CPU", "a=CUDA0"], fa: "on" };
   expect(benchArgs(p)).toEqual(["-ngl", "999", "-ot", "exps=CPU;a=CUDA0", "-dev", "CUDA0/CUDA1", "-ts", "3/1", "-fa", "on"]);
   expect(serverArgs(p)).toEqual(["-ngl", "all", "-ot", "exps=CPU,a=CUDA0", "-dev", "CUDA0,CUDA1", "-ts", "3,1", "-fa", "on"]);
   expect(paramsFromServerArgs(serverArgs(p)).params).toEqual(p);
