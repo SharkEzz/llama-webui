@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { useNavigate } from "react-router"
+import { Link, useNavigate } from "react-router"
 import { Copy, GitCompare, History, MoreHorizontal, RotateCcw, Trash2, UserPlus } from "lucide-react"
 import type { BenchRun, BenchStatus, Measure } from "@llama-webui/shared"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
@@ -24,6 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { type BenchFilters, KIND_LABEL, STATUS_LABEL, useBench } from "@/lib/bench"
 import { copyText } from "@/lib/clipboard"
+import { cn } from "@/lib/utils"
 import { formatDuration, formatRate } from "@/lib/format"
 import { BenchCompareDialog } from "./BenchCompareDialog"
 import { dateFmt, flagsOf, formatAccept, formatMib, modelName, vramTotal } from "./format"
@@ -108,6 +109,12 @@ export function BenchHistory() {
             items={[{ value: "all", label: "Tous les statuts" }, ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
             onChange={(v) => setFilters({ status: v as BenchFilters["status"] })}
           />
+          <FilterSelect
+            label="Sweeps"
+            value={filters.sweeps}
+            items={[{ value: "none", label: "Sans les sweeps" }, { value: "all", label: "Avec les sweeps" }]}
+            onChange={(v) => setFilters({ sweeps: v as BenchFilters["sweeps"] })}
+          />
         </div>
 
         {!loaded ? (
@@ -127,6 +134,7 @@ export function BenchHistory() {
                 <TableHead>Outil</TableHead>
                 <TableHead>Modèle</TableHead>
                 <TableHead>Flags</TableHead>
+                {filters.sweeps === "all" && <TableHead>Sweep</TableHead>}
                 <TableHead className="text-right">Prompt</TableHead>
                 <TableHead className="text-right">Génération</TableHead>
                 <TableHead className="text-right">MTP</TableHead>
@@ -158,10 +166,10 @@ export function BenchHistory() {
                     <TableCell>
                       <Badge variant="secondary">{KIND_LABEL[r.kind]}</Badge>
                     </TableCell>
-                    <TableCell className="max-w-36 truncate font-mono text-xs" title={r.spec.modelPath}>
+                    <TableCell className={cn("truncate font-mono text-xs", filters.sweeps === "all" ? "max-w-28" : "max-w-36")} title={r.spec.modelPath}>
                       {modelName(r.spec.modelPath)}
                     </TableCell>
-                    <TableCell className="max-w-36">
+                    <TableCell className={filters.sweeps === "all" ? "max-w-28" : "max-w-36"}>
                       <Tooltip>
                         <TooltipTrigger render={<span />} className="block truncate font-mono text-xs text-muted-foreground">
                           {flagsOf(r)}
@@ -169,6 +177,17 @@ export function BenchHistory() {
                         <TooltipContent className="max-w-md font-mono">{r.command}</TooltipContent>
                       </Tooltip>
                     </TableCell>
+                    {filters.sweeps === "all" && (
+                      <TableCell className="max-w-20 text-xs">
+                        {r.sweepId === null ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <Link to={`/tuning?sweep=${r.sweepId}`} className="block truncate underline-offset-4 hover:underline" title={r.sweepLabel ?? undefined}>
+                            #{r.sweepId} <span className="font-mono text-muted-foreground">{r.sweepLabel}</span>
+                          </Link>
+                        )}
+                      </TableCell>
+                    )}
                     <MeasureCell m={r.pp} />
                     <MeasureCell m={r.tg} />
                     <TableCell className="num text-right text-xs">{formatAccept(r.draftAcceptPct)}</TableCell>

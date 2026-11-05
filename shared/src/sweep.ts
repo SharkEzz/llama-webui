@@ -15,7 +15,7 @@ import { NOISE, PRESET_IDS, type PresetId, presetOf } from "./tuning";
 
 const values = <T extends z.ZodType>(t: T) => z.array(t).min(1, "au moins une valeur").optional();
 const p = BenchParamsSchema.shape;
-const inner = <T extends z.ZodType>(s: T) => (s as unknown as z.ZodOptional<z.ZodType>).unwrap();
+const inner = <T extends z.ZodType>(s: z.ZodOptional<T>): T => s.unwrap();
 
 /** Pour chaque flag, les valeurs à essayer ; clé absente = la valeur de la base. */
 export const SweepSpaceSchema = z.strictObject({

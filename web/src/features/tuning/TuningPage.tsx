@@ -5,6 +5,7 @@ import { HardwareCard } from "./HardwareCard"
 import { ModelCard } from "./ModelCard"
 import { PresetPicker } from "./PresetPicker"
 import { RecommendationCard } from "./RecommendationCard"
+import { SpaceEditor } from "./SpaceEditor"
 
 /** Tuning : matériel, modèle et préréglage en haut, recommandation expliquée, puis l'espace de sweep et ses résultats. */
 export function TuningPage() {
@@ -25,6 +26,7 @@ export function TuningPage() {
         <PresetPicker />
       </div>
       <RecommendationCard />
+      <SpaceEditor />
     </div>
   )
 }
