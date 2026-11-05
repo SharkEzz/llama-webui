@@ -22,8 +22,9 @@
   --secondary-foreground: var(--foreground);
   --muted: oklch(1 0 0 / 6%);
   --muted-foreground: oklch(0.72 0.02 280);
-  --accent: oklch(0.78 0.14 200);
-  --accent-foreground: oklch(0.16 0.03 220);
+  /* shadcn : « accent » = fond de survol/sélection des menus, pas une couleur de marque. */
+  --accent: oklch(1 0 0 / 8%);
+  --accent-foreground: var(--foreground);
   --destructive: oklch(0.7 0.2 22);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 14%);

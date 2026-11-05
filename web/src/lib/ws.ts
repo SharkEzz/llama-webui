@@ -12,6 +12,17 @@ interface WsState {
 const BACKOFF_START_MS = 500
 const BACKOFF_MAX_MS = 10_000
 
+type Listener = (msg: WsMessage) => void
+const listeners = new Map<WsMessage["type"], Set<Listener>>()
+
+/** Abonnement aux messages WS d'un type donné. */
+export function onWs<T extends WsMessage["type"]>(type: T, fn: (msg: Extract<WsMessage, { type: T }>) => void): () => void {
+  let set = listeners.get(type)
+  if (!set) listeners.set(type, (set = new Set()))
+  set.add(fn as Listener)
+  return () => set.delete(fn as Listener)
+}
+
 let socket: WebSocket | undefined
 let retryTimer: ReturnType<typeof setTimeout> | undefined
 let backoff = BACKOFF_START_MS
@@ -42,8 +53,10 @@ export const useWs = create<WsState>()((set, get) => {
       } catch {
         return
       }
+      if (typeof msg !== "object" || msg === null) return
       if (msg.type === "ping") ws.send(JSON.stringify({ type: "pong" } satisfies WsMessage))
       set({ lastMessage: msg })
+      for (const fn of listeners.get(msg.type) ?? []) fn(msg)
     }
     ws.onclose = () => {
       if (socket !== ws) return

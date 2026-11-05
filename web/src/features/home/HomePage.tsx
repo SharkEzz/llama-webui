@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react"
 import { Flag } from "lucide-react"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { StatTile } from "@/components/glass/StatTile"
 import { Badge } from "@/components/ui/badge"
 import { formatDuration } from "@/lib/format"
 import { useHealth } from "@/lib/health"
+import { useNow } from "@/lib/useNow"
 import { useWs, WS_STATUS_UI } from "@/lib/ws"
 
 const MILESTONES = [
@@ -15,15 +15,6 @@ const MILESTONES = [
   { id: "J6", title: "Tuning et sweep", detail: "Recommandations d'offload et exploration automatique des réglages." },
   { id: "J7", title: "Finitions", detail: "Raccourcis, états vides, gestion d'erreurs, documentation." },
 ] as const
-
-function useNow(intervalMs: number) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs)
-    return () => clearInterval(id)
-  }, [intervalMs])
-  return now
-}
 
 export function HomePage() {
   const status = useWs((s) => s.status)

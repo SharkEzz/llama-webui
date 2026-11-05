@@ -44,6 +44,8 @@ Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully suppor
 
 **Dans ce projet :** `server/index.ts` importe `web/index.html` ; un seul process Bun sur le port 7860 sert l'API, le WebSocket et l'UI (Tailwind via `bun-plugin-tailwind` dans `bunfig.toml`). `bun run dev` = `bun --hot`, `bun run start` = `NODE_ENV=production` (bundle en mémoire, pas d'étape de build).
 
+**Piège `bun --hot` :** le superviseur llama-server et le ring de logs (`server/runtime.ts`) vivent sur `globalThis` pour survivre aux rechargements (sinon chaque sauvegarde tuerait llama-server). Une modification de `server/supervisor/supervisor.ts`, `server/logs/buffer.ts` ou `server/runtime.ts` n'est donc **pas** prise en compte à chaud : arrêter Bun (Ctrl-C) et relancer `bun run dev`. Pour la même raison, ne pas tester les erreurs du superviseur avec `instanceof` (classe de l'ancien module) mais par `name`.
+
 Server:
 
 ```ts#index.ts

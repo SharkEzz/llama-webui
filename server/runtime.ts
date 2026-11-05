@@ -12,6 +12,7 @@ const g = globalThis as { __llamaWebuiRuntime?: Runtime };
 /**
  * Superviseur et ring de logs uniques pour tout le process. Ils vivent sur globalThis pour survivre à `bun --hot`
  * (un rechargement de code ne doit ni tuer ni orpheliner llama-server). Les signaux d'arrêt sont installés une seule fois.
+ * Conséquence : modifier supervisor.ts, logs/buffer.ts ou ce fichier demande un redémarrage complet de Bun.
  */
 export function getRuntime(): Runtime {
   if (g.__llamaWebuiRuntime) return g.__llamaWebuiRuntime;
