@@ -2,6 +2,7 @@ import index from "../web/index.html";
 import { createApp } from "./app";
 import { openDb } from "./db/open";
 import { readHardware } from "./bench/hardware";
+import { externalWatcher } from "./supervisor/external";
 import { BenchRunner } from "./bench/runner";
 import { ChatRuns } from "./chat/runs";
 import { BenchRunsRepo } from "./db/benchRuns";
@@ -96,18 +97,7 @@ process.prependListener("SIGINT", stopChats);
 process.prependListener("SIGTERM", stopChats);
 
 // Serveur externe : détecté au démarrage puis surveillé (sortie de l'état « external » quand il s'arrête).
-let checking = false;
-const checkExternal = async () => {
-  if (checking) return;
-  checking = true;
-  try {
-    const kind = supervisor.state.kind;
-    if (kind === "external") await supervisor.recheckExternal();
-    else if (kind === "idle") await supervisor.detectExternal(settings.get().port);
-  } finally {
-    checking = false;
-  }
-};
+const checkExternal = externalWatcher({ supervisor, port: () => settings.get().port, paused: () => benchRunner.busy });
 void checkExternal();
 const externalTimer = setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS);
 

@@ -177,7 +177,25 @@ export function BenchForm() {
               })}
             </div>
           )}
-          <FieldMessage error={errors.dev ?? errors.ts} hint="Rien de coché : devices choisis par l'outil. -ts : proportions dans l'ordre des devices cochés." />
+          {form.dev.length === 0 && (
+            <div className="flex items-center gap-3">
+              <Label htmlFor="bench-tsAll" className="font-mono text-xs font-normal">
+                -ts
+              </Label>
+              <Input
+                id="bench-tsAll"
+                className="h-7 w-40 font-mono text-xs"
+                placeholder="ex. 3,1"
+                aria-invalid={errors.ts ? true : undefined}
+                value={form.tsAll}
+                onChange={(e) => setForm({ tsAll: e.target.value })}
+              />
+            </div>
+          )}
+          <FieldMessage
+            error={errors.dev ?? errors.ts}
+            hint="Rien de coché : devices choisis par l'outil, -ts dans leur ordre. Devices cochés : -ts par device, dans l'ordre coché."
+          />
         </fieldset>
 
         <div className="flex flex-col gap-1.5">

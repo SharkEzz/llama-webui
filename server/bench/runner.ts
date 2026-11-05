@@ -59,6 +59,8 @@ interface Job {
   liveAt: number;
   /** Commande du serveur géré arrêté pour ce run, à relancer à la fin. */
   stopped: BuiltCommand | null;
+  /** Arrêt du serveur géré en cours (le superviseur refuse de le relancer avant la fin). */
+  stopping: Promise<void> | null;
   live: BenchLive;
   tail: string[];
   peaks: Map<string, { name: string; bytes: number }>;
@@ -128,6 +130,7 @@ export class BenchRunner {
         cmd,
         liveAt: 0,
         stopped,
+        stopping: null,
         live: { runId: run.id, kind: spec.kind, phase: stopped ? "stopping-server" : "loading", step: null, startedAt: this.now(), lines: [] },
         tail: [],
         peaks: new Map(),
@@ -213,7 +216,8 @@ export class BenchRunner {
     try {
       if (job.stopped) {
         this.line(job, "arrêt de llama-server pendant le benchmark");
-        await this.deps.server.stop();
+        job.stopping = this.deps.server.stop();
+        await job.stopping;
       }
       result = job.cancelled ? { status: "cancelled" } : job.cmd ? await this.runServer(job, job.cmd) : await this.runBench(job);
     } catch (e) {
@@ -246,7 +250,10 @@ export class BenchRunner {
     } catch (e) {
       const msg = `relance de llama-server impossible : ${(e as Error).message}`;
       this.line(job, msg);
-      this.setLive(job, {});
+      if (job.disposed) return;
+      // Noté sur le run (carte « Dernier run », historique) : la carte en direct disparaît juste après.
+      const cur = this.deps.repo.get(job.run.id);
+      this.deps.onRun(this.deps.repo.finish(job.run.id, { error: cur?.error ? `${cur.error} ; ${msg}` : msg }));
     }
   }
 
@@ -403,7 +410,8 @@ export class BenchRunner {
     if (o.restart && cmd) {
       const server = this.deps.server;
       const logs = this.deps.logs;
-      void (proc?.exited ?? Promise.resolve())
+      // Après l'arrêt en cours (le superviseur refuserait « opération en cours ») et la sortie de l'enfant.
+      void Promise.allSettled([job.stopping, proc?.exited])
         .then(() => server.start(cmd))
         .catch((e) => logs.push(`[bench] relance de llama-server impossible : ${(e as Error).message}`));
     }

@@ -15,9 +15,14 @@ async function output(argv: string[], timeoutMs = 5000): Promise<string> {
   return `${out}\n${err}`;
 }
 
-/** « b12119 (6f1e65437) » d'après `<binaire> --version`, mis en cache par binaire ; null si illisible. */
-export function buildOf(binary: string): Promise<string | null> {
-  let p = builds.get(binary);
+/** « b12119 (6f1e65437) » d'après `<binaire> --version`, mis en cache par binaire et date de modification (une recompilation est relue) ; null si illisible. */
+export async function buildOf(binary: string): Promise<string | null> {
+  const path = Bun.which(binary) ?? binary;
+  const mtime = await Bun.file(path)
+    .stat()
+    .then((s) => s.mtimeMs, () => 0);
+  const key = `${path}:${mtime}`;
+  let p = builds.get(key);
   if (!p) {
     p = output([binary, "--version"]).then(
       (text) => {
@@ -26,7 +31,7 @@ export function buildOf(binary: string): Promise<string | null> {
       },
       () => null,
     );
-    builds.set(binary, p);
+    builds.set(key, p);
   }
   return p;
 }

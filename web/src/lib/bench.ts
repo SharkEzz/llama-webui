@@ -29,6 +29,8 @@ export interface BenchForm {
   dev: string[]
   /** Proportion par device coché. */
   ts: Record<string, string>
+  /** -ts sans device coché (« 57,50 ») : proportions dans l'ordre des devices de l'outil. */
+  tsAll: string
   sm: string
   fa: string
   ctk: string
@@ -55,6 +57,7 @@ export const EMPTY_FORM: BenchForm = {
   ub: "",
   dev: [],
   ts: {},
+  tsAll: "",
   sm: "",
   fa: "",
   ctk: "",
@@ -88,6 +91,7 @@ export function formFromSpec(
     ub: str(p.ub),
     dev,
     ts: Object.fromEntries(dev.map((d, i) => [d, str(p.ts?.[i])])),
+    tsAll: dev.length === 0 ? (p.ts ?? []).join(",") : "",
     sm: p.sm ?? "",
     fa: p.fa ?? "",
     ctk: p.ctk ?? "",
@@ -128,6 +132,9 @@ export function specFromForm(f: BenchForm): { spec: Record<string, unknown> } | 
     set("dev", f.dev)
     const ts = f.dev.map((d) => num(f.ts[d] ?? ""))
     if (ts.some((x) => x !== undefined)) set("ts", ts.map((x) => x ?? 0))
+  } else {
+    const ts = f.tsAll.split(/[\s,/]+/).filter(Boolean)
+    if (ts.length > 0) set("ts", ts.map((x) => num(x)))
   }
   set("sm", f.sm)
   set("fa", f.fa)

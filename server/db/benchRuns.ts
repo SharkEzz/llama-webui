@@ -32,7 +32,8 @@ const toRun = (r: Row): BenchRun => {
     id: r.id,
     kind: r.kind,
     status: r.status,
-    spec: JSON.parse(r.args_json),
+    // Le profil d'origine peut avoir été supprimé depuis (profile_id ON DELETE SET NULL).
+    spec: { ...JSON.parse(r.args_json), profileId: r.profile_id },
     command: r.command,
     hardware: JSON.parse(r.hardware_json),
     pp: stats.pp,
@@ -61,7 +62,7 @@ export class BenchRunsRepo {
     const row = this.db
       .query<Row, (string | number | null)[]>(
         `INSERT INTO bench_runs(kind, status, model_path, profile_id, args_json, command, hardware_json, vram_mib_json, created_at)
-         VALUES (?, 'running', ?, ?, ?, ?, ?, '[]', ?) RETURNING *`,
+         VALUES (?, 'running', ?, (SELECT id FROM profiles WHERE id = ?), ?, ?, ?, '[]', ?) RETURNING *`,
       )
       .get(spec.kind, spec.modelPath, spec.profileId, JSON.stringify(spec), command, JSON.stringify(hardware), this.now())!;
     return toRun(row);

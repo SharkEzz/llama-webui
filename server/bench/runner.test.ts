@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 /** Un serveur géré factice (prêt, profil A) qui note les arrêts et relances. */
-function setup(port = 8080) {
+function setup(port = 8080, patch?: (s: ServerControl) => void) {
   const calls: string[] = [];
   let state: ServerState = { kind: "ready", profile: "A", profileId: 1, pid: 1, port: 8080, since: 0 };
   const server: ServerControl = {
@@ -38,12 +38,14 @@ function setup(port = 8080) {
       state = { kind: "starting", profile: "A", profileId: 1, pid: 2, port: 8080, since: 0 };
     },
   };
+  patch?.(server);
   const lives: (BenchLive | null)[] = [];
   const runs: BenchRun[] = [];
   let ended!: () => void;
   const end = new Promise<void>((r) => (ended = r));
+  const repo = new BenchRunsRepo(openDb(":memory:"));
   const runner = new BenchRunner({
-    repo: new BenchRunsRepo(openDb(":memory:")),
+    repo,
     settings: () => ({ ...DEFAULT_SETTINGS, binary: FAKE, port }),
     server,
     logs: new LogBuffer(100),
@@ -55,7 +57,7 @@ function setup(port = 8080) {
     },
     onRun: (r) => runs.push(r),
   });
-  return { runner, calls, lives, runs, end };
+  return { runner, calls, lives, runs, end, repo };
 }
 
 const spec = BenchSpecSchema.parse({ kind: "bench", modelPath: MODEL, r: 2 });
@@ -116,4 +118,41 @@ test("a missing model is refused before anything stops", async () => {
   expect((e as HttpError).status).toBe(400);
   expect(calls).toEqual([]);
   expect(runner.busy).toBe(false);
+});
+
+test("a failed restart is recorded on the run", async () => {
+  const { runner, runs, end } = setup(8080, (s) => {
+    s.start = async () => {
+      throw new Error("port occupé");
+    };
+  });
+  await runner.start(spec, { stopServer: true });
+  await end;
+  const last = runs.at(-1)!;
+  expect(last.status).toBe("ok");
+  expect(last.error).toContain("relance de llama-server impossible : port occupé");
+});
+
+test("a reload while the server is stopping restarts it once the stop is over", async () => {
+  // Comme le superviseur : start est refusé tant qu'une autre opération (l'arrêt) est en cours.
+  let stopping = false;
+  let release!: () => void;
+  const { runner, calls, repo } = setup(8080, (s) => {
+    s.stop = async () => {
+      stopping = true;
+      calls.push("stop");
+      await new Promise<void>((r) => (release = r));
+      stopping = false;
+    };
+    s.start = async (cmd) => {
+      if (stopping) throw new Error("opération en cours, réessayez");
+      calls.push(`start:${cmd.display}`);
+    };
+  });
+  const run = await runner.start(spec, { stopServer: true });
+  runner.dispose({ restart: true });
+  release();
+  await Bun.sleep(50);
+  expect(calls).toEqual(["stop", "start:cmdA"]);
+  expect(repo.get(run.id)!.status).toBe("interrupted");
 });
