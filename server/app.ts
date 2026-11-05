@@ -1,8 +1,10 @@
 import type { Database } from "bun:sqlite";
+import type { Server } from "bun";
 import { ZodError } from "zod";
 import type { SettingsRepo } from "./db/settings";
 import type { WsHub } from "./ws/hub";
 import pkg from "./package.json";
+import { guard } from "./security";
 
 export interface AppDeps {
   db: Database;
@@ -28,6 +30,21 @@ function errorResponse(err: unknown): Response {
   return Response.json({ error: "Erreur interne" }, { status: 500 });
 }
 
+type Handler = (req: Request, server: Server<undefined>) => Response | undefined | Promise<Response | undefined>;
+
+/** Applique le garde (hôte, origine, JSON) puis le handler ; toute exception devient une réponse JSON. */
+function guarded(handler: Handler): Handler {
+  return async (req, server) => {
+    const refused = guard(req);
+    if (refused) return refused;
+    try {
+      return await handler(req, server);
+    } catch (err) {
+      return errorResponse(err);
+    }
+  };
+}
+
 export function createApp(deps: AppDeps) {
   const { hub, settings, index, port, development } = deps;
   return Bun.serve({
@@ -36,27 +53,23 @@ export function createApp(deps: AppDeps) {
     development: development ? { hmr: true, console: true } : false,
     routes: {
       "/api/health": {
-        GET: () => Response.json({ ok: true, version: pkg.version, uptimeMs: Date.now() - startedAt }),
+        GET: guarded(() => Response.json({ ok: true, version: pkg.version, uptimeMs: Date.now() - startedAt })),
       },
       "/api/settings": {
-        GET: () => Response.json(settings.get()),
-        PATCH: async (req) => {
-          try {
-            const body = await req.json();
-            if (typeof body !== "object" || body === null || Array.isArray(body)) {
-              return Response.json({ error: "Objet JSON attendu" }, { status: 400 });
-            }
-            return Response.json(settings.patch(body));
-          } catch (err) {
-            return errorResponse(err);
+        GET: guarded(() => Response.json(settings.get())),
+        PATCH: guarded(async (req) => {
+          const body = await req.json();
+          if (typeof body !== "object" || body === null || Array.isArray(body)) {
+            return Response.json({ error: "Objet JSON attendu" }, { status: 400 });
           }
-        },
+          return Response.json(settings.patch(body));
+        }),
       },
-      "/api/*": () => Response.json({ error: "Route inconnue" }, { status: 404 }),
-      "/ws": (req, server) => {
+      "/api/*": guarded(() => Response.json({ error: "Route inconnue" }, { status: 404 })),
+      "/ws": guarded((req, server) => {
         if (server.upgrade(req)) return undefined;
         return new Response("Upgrade WebSocket attendu", { status: 426 });
-      },
+      }),
       // Toute autre adresse sert l'application (fallback SPA : /chat rechargé fonctionne).
       "/*": index,
     },

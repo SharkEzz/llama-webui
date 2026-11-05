@@ -6,15 +6,26 @@ const KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
 export class SettingsRepo {
   constructor(private readonly db: Database) {}
 
+  /** Réglages courants ; une valeur stockée invalide (schéma durci, JSON abîmé) retombe sur son défaut. */
   get(): Settings {
     const rows = this.db
       .query<{ key: string; value_json: string }, []>("SELECT key, value_json FROM settings")
       .all();
-    const stored: Record<string, unknown> = {};
+    const merged: Record<string, unknown> = { ...DEFAULT_SETTINGS };
     for (const r of rows) {
-      if ((KEYS as string[]).includes(r.key)) stored[r.key] = JSON.parse(r.value_json);
+      const key = r.key as keyof Settings;
+      if (!KEYS.includes(key)) continue;
+      let value: unknown;
+      try {
+        value = JSON.parse(r.value_json);
+      } catch {
+        console.warn(`[llama-webui] réglage « ${key} » illisible, valeur par défaut utilisée`);
+        continue;
+      }
+      if (SettingsSchema.shape[key].safeParse(value).success) merged[key] = value;
+      else console.warn(`[llama-webui] réglage « ${key} » invalide, valeur par défaut utilisée`);
     }
-    return SettingsSchema.parse({ ...DEFAULT_SETTINGS, ...stored });
+    return SettingsSchema.parse(merged);
   }
 
   /** Valide la fusion complète avant d'écrire ; lève une ZodError si invalide. */
