@@ -30,6 +30,5 @@ export type AppRoute = (typeof ROUTES)[number]
 
 /** Jalon qui livrera chaque page encore vide. */
 export const MILESTONE_BY_PATH: Record<string, string> = {
-  "/bench": "J5",
   "/tuning": "J6",
 }

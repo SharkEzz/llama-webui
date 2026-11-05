@@ -48,6 +48,28 @@ export const MIGRATIONS: string[] = [
   );`,
   // 6
   `CREATE INDEX messages_by_conversation ON messages(conversation_id, id);`,
+  // 7 — runs de benchmark (args_json = BenchSpec, matériel figé, stats_json = { pp, tg, draftAcceptPct })
+  `CREATE TABLE bench_runs(
+    id INTEGER PRIMARY KEY,
+    kind TEXT NOT NULL,
+    status TEXT NOT NULL,
+    model_path TEXT NOT NULL,
+    profile_id INTEGER REFERENCES profiles(id) ON DELETE SET NULL,
+    args_json TEXT NOT NULL,
+    command TEXT NOT NULL,
+    hardware_json TEXT NOT NULL,
+    pp_tps REAL,
+    tg_tps REAL,
+    stats_json TEXT,
+    vram_mib_json TEXT NOT NULL,
+    error TEXT,
+    log_excerpt TEXT NOT NULL DEFAULT '',
+    duration_ms INTEGER,
+    sweep_id INTEGER,
+    created_at INTEGER NOT NULL
+  );`,
+  // 8
+  `CREATE INDEX bench_runs_by_date ON bench_runs(created_at DESC);`,
 ];
 
 export function runMigrations(db: Database): void {

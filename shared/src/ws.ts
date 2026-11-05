@@ -1,3 +1,4 @@
+import type { BenchLive, BenchRun } from "./bench";
 import type { LogLine } from "./logs";
 import type { ServerView } from "./server";
 import type { Snapshot } from "./monitor";
@@ -9,4 +10,6 @@ export type WsMessage =
   | { type: "pong" }
   | { type: "snapshot"; payload: Snapshot }
   | { type: "log"; payload: LogLine[] } // lot de lignes
-  | { type: "server-state"; payload: ServerView };
+  | { type: "server-state"; payload: ServerView }
+  | { type: "bench-progress"; payload: BenchLive | null }
+  | { type: "bench-run"; payload: BenchRun }; // à la création et à la fin d'un run

@@ -1,7 +1,11 @@
 import index from "../web/index.html";
 import { createApp } from "./app";
 import { openDb } from "./db/open";
+import { readHardware } from "./bench/hardware";
+import { externalWatcher } from "./supervisor/external";
+import { BenchRunner } from "./bench/runner";
 import { ChatRuns } from "./chat/runs";
+import { BenchRunsRepo } from "./db/benchRuns";
 import { ConversationsRepo } from "./db/conversations";
 import { ProfilesRepo } from "./db/profiles";
 import { SettingsRepo } from "./db/settings";
@@ -41,6 +45,24 @@ const chatRuns = new ChatRuns({
 const { supervisor, logs } = runtime;
 const development = process.env.NODE_ENV !== "production";
 const monitor = await startMonitor(runtime, settings.get());
+const benchRuns = new BenchRunsRepo(db);
+// Un run resté « running » après un arrêt brutal de Bun est interrompu.
+benchRuns.stopOrphans();
+const allGpus = () => monitor.latest()?.allGpus ?? [];
+const benchRunner = new BenchRunner({
+  repo: benchRuns,
+  settings: () => settings.get(),
+  server: supervisor,
+  logs,
+  gpus: allGpus,
+  hardware: () => readHardware(settings.get().binary, allGpus()),
+  onLive: (l) => hub.broadcast({ type: "bench-progress", payload: l }),
+  onRun: (r) => hub.broadcast({ type: "bench-run", payload: r }),
+  profile: (id) => {
+    const p = profiles.get(id);
+    return p ? { cwd: p.cwd, env: p.env } : null;
+  },
+});
 monitor.setModelPathResolver((id) => {
   const p = profiles.get(id);
   return p ? profilePaths(p).model : null;
@@ -53,6 +75,8 @@ const server = createApp({
   profiles,
   conversations,
   chatRuns,
+  benchRuns,
+  benchRunner,
   runtime,
   monitor,
   activeProfileId: () => activeProfileId(supervisor),
@@ -68,23 +92,15 @@ const unsubSnapshot = monitor.onSnapshot((s) => hub.broadcast({ type: "snapshot"
 
 // Arrêt de Bun : les réponses en cours sont enregistrées « interrompues » avant que le runtime n'arrête llama-server
 // (sinon elles verraient la coupure et finiraient « erreur »). En tête de file, devant le gestionnaire du runtime.
-const stopChats = () => chatRuns.dispose();
+const stopChats = () => {
+  chatRuns.dispose();
+  benchRunner.dispose({ restart: false });
+};
 process.prependListener("SIGINT", stopChats);
 process.prependListener("SIGTERM", stopChats);
 
 // Serveur externe : détecté au démarrage puis surveillé (sortie de l'état « external » quand il s'arrête).
-let checking = false;
-const checkExternal = async () => {
-  if (checking) return;
-  checking = true;
-  try {
-    const kind = supervisor.state.kind;
-    if (kind === "external") await supervisor.recheckExternal();
-    else if (kind === "idle") await supervisor.detectExternal(settings.get().port);
-  } finally {
-    checking = false;
-  }
-};
+const checkExternal = externalWatcher({ supervisor, port: () => settings.get().port, paused: () => benchRunner.busy });
 void checkExternal();
 const externalTimer = setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS);
 
@@ -98,6 +114,8 @@ g.__llamaWebuiDispose = () => {
   process.off("SIGINT", stopChats);
   process.off("SIGTERM", stopChats);
   chatRuns.dispose();
+  // Rechargement : le run est interrompu et le serveur qu'il avait arrêté relancé (le superviseur survit).
+  benchRunner.dispose({ restart: true });
   db.close();
 };
 

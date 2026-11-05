@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router"
+import { BenchPage } from "@/features/bench/BenchPage"
 import { ChatPage } from "@/features/chat/ChatPage"
 import { DashboardPage } from "@/features/dashboard/DashboardPage"
 import { HomePage } from "@/features/home/HomePage"
@@ -27,7 +28,8 @@ export const router = createBrowserRouter([
       { path: "models", element: <ModelsPage /> },
       { path: "chat", element: <ChatPage /> },
       { path: "chat/:id", element: <ChatPage /> },
-      ...ROUTES.filter((r) => !["/", "/dashboard", "/server", "/profiles", "/logs", "/system", "/settings", "/models", "/chat"].includes(r.path)).map((r) => ({
+      { path: "bench", element: <BenchPage /> },
+      ...ROUTES.filter((r) => !["/", "/dashboard", "/server", "/profiles", "/logs", "/system", "/settings", "/models", "/chat", "/bench"].includes(r.path)).map((r) => ({
         path: r.path.slice(1),
         element: <PlaceholderPage title={r.label} />,
       })),

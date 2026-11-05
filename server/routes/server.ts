@@ -9,9 +9,11 @@ export interface ServerRouteDeps {
   runtime: Runtime;
   profiles: ProfilesRepo;
   settings: SettingsRepo;
+  /** Un benchmark tourne : il a la main sur les GPU (et relance lui-même le serveur qu'il a arrêté). */
+  benchBusy(): boolean;
 }
 
-export function serverRoutes({ runtime, profiles, settings }: ServerRouteDeps) {
+export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerRouteDeps) {
   const { supervisor, logs } = runtime;
   const view = () => Response.json(serverView(supervisor));
 
@@ -21,6 +23,7 @@ export function serverRoutes({ runtime, profiles, settings }: ServerRouteDeps) {
    */
   const lifecycle = async (fn: () => Promise<void>) => {
     try {
+      if (benchBusy()) throw new HttpError(409, "Un benchmark est en cours");
       await fn();
     } catch (e) {
       if (e instanceof Error && e.name === "SupervisorError") throw new HttpError(409, e.message);
