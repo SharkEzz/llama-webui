@@ -116,7 +116,7 @@ export function BenchHistory() {
             {runs.length === 0 ? "Aucun run enregistré." : "Aucun run ne correspond aux filtres."}
           </p>
         ) : (
-          <Table>
+          <Table className="[&_td]:px-1.5 [&_th]:px-1.5">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8">

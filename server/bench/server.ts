@@ -44,6 +44,8 @@ export class TrialCancelled extends Error {}
 
 const EXIT_GRACE_MS = 2000;
 const WARMUP_PROMPT = "Bonjour.";
+/** Consigne après le texte de remplissage : une génération neuve, pas une recopie. */
+const STORY = "À partir de ce texte, écris une histoire nouvelle et originale, avec d'autres personnages et un autre lieu.";
 const duration = (ms: number) => (ms >= 60_000 ? `${Math.round(ms / 60_000)} min` : ms >= 1000 ? `${Math.round(ms / 1000)} s` : `${ms} ms`);
 
 function measure(values: number[], tokens: number): Measure {
@@ -54,7 +56,7 @@ function measure(values: number[], tokens: number): Measure {
 
 /**
  * Un llama-server lancé pour la mesure (adapté de `BenchRunner.trial` de llama-tui) : santé, échauffement, puis `r`
- * requêtes /completion fixes. Lève une Error lisible en cas d'échec (ligne de log du serveur si elle dit pourquoi),
+ * requêtes de chat fixes (`p` jetons de texte + consigne, `n` jetons générés). Lève une Error lisible en cas d'échec (ligne de log du serveur si elle dit pourquoi),
  * TrialCancelled sur annulation ; le serveur est toujours arrêté à la fin.
  */
 export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrialResult> {
@@ -88,14 +90,15 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
     return new Error(benchFailure(tail, proc.exitCode ?? proc.signalCode ?? "-", "llama-server").message);
   };
 
-  const complete = async (prompt: string, nPredict: number): Promise<Timings> => {
+  /** Une requête mesurée, non stream ; renvoie les timings de llama-server. */
+  const post = async (path: string, body: Record<string, unknown>): Promise<Timings> => {
     const signal = AbortSignal.any([o.signal, AbortSignal.timeout(requestTimeoutMs)]);
     let r: Response;
     try {
-      r = await fetchImpl(`http://127.0.0.1:${cmd.port}/completion`, {
+      r = await fetchImpl(`http://127.0.0.1:${cmd.port}${path}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt, n_predict: nPredict, cache_prompt: false, temperature: 0, seed: 42, stream: false }),
+        body: JSON.stringify({ ...body, cache_prompt: false, temperature: 0, seed: 42, stream: false }),
         signal,
       });
     } catch (e) {
@@ -104,10 +107,10 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
     }
     if (r.status !== 200) {
       await r.body?.cancel().catch(() => {});
-      throw new Error(`/completion a répondu ${r.status}`);
+      throw new Error(`${path} a répondu ${r.status}`);
     }
-    const body = (await r.json()) as { timings?: Timings };
-    return body.timings ?? {};
+    const json = (await r.json()) as { timings?: Timings };
+    return json.timings ?? {};
   };
 
   try {
@@ -120,12 +123,14 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
       await Bun.sleep(healthPollMs);
     }
     o.onPhase("warmup");
-    await complete(WARMUP_PROMPT, 16);
-    const prompt = promptOf(o.p);
+    await post("/completion", { prompt: WARMUP_PROMPT, n_predict: 16 });
+    // Mesure par le chat, comme un vrai usage : un prompt brut répété ferait recopier le modèle, et le décodage
+    // spéculatif (MTP) accepterait presque tous ses drafts (95 % mesurés contre ~50 % en conversation).
+    const messages = [{ role: "user", content: `${promptOf(o.p)}\n\n${STORY}` }];
     const all: Timings[] = [];
     for (let i = 0; i < o.r; i++) {
       o.onPhase("measure", { index: i + 1, total: o.r });
-      all.push(await complete(prompt, o.n));
+      all.push(await post("/v1/chat/completions", { messages, max_tokens: o.n, ignore_eos: true, chat_template_kwargs: { enable_thinking: false } }));
     }
     const last = all.at(-1)!;
     const draftN = all.reduce((a, t) => a + (t.draft_n ?? 0), 0);

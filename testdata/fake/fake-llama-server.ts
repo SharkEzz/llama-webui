@@ -43,7 +43,8 @@ const server = Bun.serve({
           prompt_per_second: Number(process.env.FAKE_PP ?? 1000),
           predicted_n: body.n_predict ?? 0,
           predicted_per_second: Number(process.env.FAKE_TG ?? 50),
-          ...(process.env.FAKE_DRAFT === "1" ? { draft_n: 40, draft_n_accepted: 19 } : {}),
+          // Un prompt brut répété fait recopier le modèle : drafts presque tous acceptés (cf. benchmark serveur).
+          ...(process.env.FAKE_DRAFT === "1" ? { draft_n: 40, draft_n_accepted: 40 } : {}),
         },
       });
     }
@@ -65,13 +66,31 @@ const ANSWER = [
 
 /** Réponse OpenAI en stream : réflexion (si enable_thinking) puis Markdown, un morceau toutes les FAKE_CHAT_DELAY_MS. */
 async function chat(req: Request): Promise<Response> {
-  const body = (await req.json()) as { messages?: unknown[]; chat_template_kwargs?: { enable_thinking?: boolean } };
+  const body = (await req.json()) as {
+    messages?: unknown[];
+    stream?: boolean;
+    max_tokens?: number;
+    chat_template_kwargs?: { enable_thinking?: boolean };
+  };
   // Contexte simulé : ~4 caractères par jeton, FAKE_N_CTX jetons (comme le refus de llama-server).
   const nCtx = Number(process.env.FAKE_N_CTX ?? 40192);
   const nPrompt = Math.ceil(JSON.stringify(body.messages ?? []).length / 4);
   if (nPrompt >= nCtx) {
     const message = `request (${nPrompt} tokens) exceeds the available context size (${nCtx} tokens), try increasing it`;
     return Response.json({ error: { code: 400, message, type: "exceed_context_size_error", n_prompt_tokens: nPrompt, n_ctx: nCtx } }, { status: 400 });
+  }
+  // Non stream (benchmark serveur) : une réponse entière avec ses timings.
+  if (body.stream !== true) {
+    return Response.json({
+      choices: [{ index: 0, message: { role: "assistant", content: "x".repeat(body.max_tokens ?? 0) }, finish_reason: "length" }],
+      timings: {
+        prompt_n: nPrompt,
+        prompt_per_second: Number(process.env.FAKE_PP ?? 1000),
+        predicted_n: body.max_tokens ?? 0,
+        predicted_per_second: Number(process.env.FAKE_TG ?? 50),
+        ...(process.env.FAKE_DRAFT === "1" ? { draft_n: 40, draft_n_accepted: 19 } : {}),
+      },
+    });
   }
   const delay = Number(process.env.FAKE_CHAT_DELAY_MS ?? 60);
   const lines = Number(process.env.FAKE_CHAT_LINES ?? 0);
