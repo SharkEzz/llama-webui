@@ -201,7 +201,11 @@ export class BenchRunner {
     const sw = this.deps.sweeps.running();
     if (!sw || this.claimed || this.current || this.sweep) return;
     const after = this.deps.gate.adopt();
-    if (after) this.begin(sw.id, after);
+    if (after) return void this.begin(sw.id, after);
+    // Garde encore tenue mais plus à reprendre (l'ancien module la libère déjà : rechargement plus long que le délai de grâce),
+    // donc index.ts n'a pas rangé les orphelins : personne ne fera tourner ce sweep, il devient « interrompu » (bouton Reprendre).
+    this.deps.repo.stopOrphans();
+    this.deps.onSweep(this.deps.sweeps.setStatus(sw.id, "interrupted"));
   }
 
   private async loop(id: number, after: Promise<void> | null = null): Promise<void> {

@@ -13,6 +13,7 @@ import { probeHealth } from "../supervisor/health";
 import { RunExecutor, type ExecutorDeps } from "./execute";
 import { BenchGate, type ServerControl } from "./gate";
 import { BenchRunner } from "./runner";
+import { sweepRoutes } from "../routes/sweeps";
 
 const FAKE = resolve(import.meta.dir, "../../testdata/fake/fake-llama-server");
 const MODEL = join(mkdtempSync(join(tmpdir(), "lw-bench-")), "a.gguf");
@@ -270,4 +271,37 @@ test("a reload hands the held gate to the next runner, which replays the interru
   expect(first.repo.list({ sweepId: sweep.id }).map((r) => r.status)).toEqual(["ok", "ok", "ok"]);
   expect(first.sweeps.get(sweep.id)!.status).toBe("done");
   expect(first.gate.held).toBe(false);
+}, 20_000);
+
+test("a reload that finds the gate already being released marks the orphan sweep interrupted instead of leaving it running", async () => {
+  // Le rechargement a pris plus que le délai de grâce : l'ancienne garde relance le serveur (lent) quand le nouveau module démarre.
+  const { runner, gate, repo, sweeps, sweepEvents } = setup(8080, (s) => {
+    s.start = () => new Promise(() => {});
+  });
+  await gate.acquire({ stopServer: true });
+  void gate.release();
+  const { sweep } = sweepOf(repo, sweeps, [1, 2]);
+  expect(gate.held).toBe(true); // index.ts ne lance donc pas stopOrphans()
+  await runner.resume();
+  expect(sweeps.get(sweep.id)!.status).toBe("interrupted");
+  expect(sweepEvents.at(-1)?.status).toBe("interrupted");
+});
+
+test("validating an interrupted sweep also finishes its interrupted items", async () => {
+  const { runner, repo, sweeps, sweepLives } = setup();
+  const { sweep } = sweepOf(repo, sweeps, [1, 2]);
+  await runner.startSweep(sweep.id, { stopServer: true });
+  await sweepEnd(sweepLives);
+  // Comme après un Ctrl-C au milieu de l'élément 2.
+  const second = repo.list({ sweepId: sweep.id }).find((r) => r.sweepLabel === "-ncmoe 2")!;
+  repo.finish(second.id, { status: "interrupted", error: "interrompu" });
+  sweeps.setStatus(sweep.id, "interrupted");
+  const routes = sweepRoutes({ sweeps, benchRuns: repo, benchRunner: runner, settings: null!, monitor: null!, hub: { broadcast() {} } as never });
+  const req = Object.assign(new Request(`http://127.0.0.1:7860/api/sweeps/${sweep.id}/validate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ n: 1, stopServer: true }) }), {
+    params: { id: String(sweep.id) },
+  });
+  expect((await routes["/api/sweeps/:id/validate"].POST(req as never, null as never))!.status).toBe(202);
+  while (sweeps.get(sweep.id)!.status === "running") await Bun.sleep(10);
+  expect(repo.list({ sweepId: sweep.id }).filter((r) => r.status === "interrupted")).toEqual([]);
+  expect(sweeps.get(sweep.id)!.status).toBe("done");
 }, 20_000);

@@ -115,6 +115,8 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
         const { modelPath, mmprojPath, profileId, serverArgs, p, r } = sweep.spec;
         const started = await benchRunner.startSweep(
           () => {
+            // Un sweep interrompu : ses éléments interrompus repartent avec la validation (sinon plus rien ne permet de les finir).
+            benchRuns.requeueInterrupted(sweep.id);
             benchRuns.enqueue(
               sweep.id,
               best.map(({ run }) => ({
