@@ -352,6 +352,7 @@ export const PHASE_LABEL: Record<BenchLive["phase"], string> = {
 }
 
 export const STATUS_LABEL: Record<BenchStatus, string> = {
+  queued: "en attente",
   running: "en cours",
   ok: "terminé",
   failed: "échec",

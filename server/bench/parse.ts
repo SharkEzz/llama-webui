@@ -51,14 +51,14 @@ export function parseBenchProgress(
   };
 }
 
-const DEVICE = /^\s+(\S+): (.+) \((\d+) MiB, \d+ MiB free\)\s*$/;
+const DEVICE = /^\s+(\S+): (.+) \((\d+) MiB, (\d+) MiB free\)\s*$/;
 
 /** La sortie de `llama-bench --list-devices`. */
 export function parseDeviceList(text: string): BenchDevice[] {
   const out: BenchDevice[] = [];
   for (const line of text.split("\n")) {
     const m = DEVICE.exec(line);
-    if (m) out.push({ id: m[1]!, name: m[2]!, totalMib: Number(m[3]) });
+    if (m) out.push({ id: m[1]!, name: m[2]!, totalMib: Number(m[3]), freeMib: Number(m[4]), backend: m[1]!.replace(/\d+$/, "") });
   }
   return out;
 }

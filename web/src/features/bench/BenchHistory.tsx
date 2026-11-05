@@ -30,6 +30,7 @@ import { dateFmt, flagsOf, formatAccept, formatMib, modelName, vramTotal } from 
 
 const MAX_COMPARE = 4
 const STATUS_VARIANT: Record<BenchStatus, "secondary" | "outline" | "destructive"> = {
+  queued: "outline",
   running: "secondary",
   ok: "outline",
   failed: "destructive",

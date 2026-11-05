@@ -35,7 +35,8 @@ test("parseBenchProgress reads the --progress lines", () => {
 test("parseDeviceList keeps names with parentheses", async () => {
   const d = parseDeviceList(await fixture("list-devices.txt"));
   expect(d).toHaveLength(7);
-  expect(d.find((x) => x.id === "Vulkan3")).toEqual({ id: "Vulkan3", name: "AMD Radeon RX 9070 XT (RADV GFX1201)", totalMib: 16304 });
+  expect(d.find((x) => x.id === "Vulkan3")).toEqual({ id: "Vulkan3", name: "AMD Radeon RX 9070 XT (RADV GFX1201)", totalMib: 16304, freeMib: 16225, backend: "Vulkan" });
+  expect(d.find((x) => x.id === "BLAS")?.backend).toBe("BLAS");
 });
 
 test("benchBinary sits next to the server binary", () => {

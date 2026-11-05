@@ -43,6 +43,10 @@ const toRun = (r: Row): BenchRun => {
     error: r.error,
     logExcerpt: r.log_excerpt,
     durationMs: r.duration_ms,
+    diskReadPeakBps: null,
+    sweepId: null,
+    sweepLabel: null,
+    fit: null,
     createdAt: r.created_at,
   };
 };
