@@ -42,6 +42,8 @@ Use `bun check` to type check the project. It reads `tsconfig.json` and reports 
 
 Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
 
+**Exception projet :** le frontend `web/` utilise Vite (décision explicite). Le serveur Bun sert `web/dist` en prod ; en dev Vite proxie `/api` et `/ws` vers le port 7860.
+
 Server:
 
 ```ts#index.ts

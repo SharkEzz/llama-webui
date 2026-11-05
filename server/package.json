@@ -1,0 +1,13 @@
+{
+  "name": "@llama-webui/server",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  },
+  "dependencies": {
+    "@llama-webui/shared": "workspace:*",
+    "zod": "^4"
+  }
+}

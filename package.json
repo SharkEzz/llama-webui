@@ -1,10 +1,14 @@
 {
   "name": "llama-webui",
-  "module": "index.ts",
   "type": "module",
   "private": true,
+  "workspaces": ["shared", "server", "web"],
   "scripts": {
-    "typecheck": "bun check"
+    "dev": "bun run --filter './server' --filter './web' dev",
+    "build": "bun run --filter './web' build",
+    "start": "bun run --filter './server' start",
+    "check": "bun check",
+    "test": "bun test server shared"
   },
   "devDependencies": {
     "@types/bun": "latest"
