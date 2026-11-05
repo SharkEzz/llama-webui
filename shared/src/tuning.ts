@@ -157,3 +157,18 @@ export interface DiskSpeed {
   path: string;
   at: number;
 }
+
+/**
+ * Rôle d'un device de `--list-devices` : une carte dédiée (« gpu »), la copie Vulkan d'une carte déjà vue en CUDA
+ * (« duplicate »), un iGPU qui partage la RAM (« integrated » : Vulkan qui porte le nom du processeur) ou l'hôte (BLAS, CPU).
+ */
+export function deviceRole(d: BenchDevice, all: BenchDevice[]): "gpu" | "duplicate" | "integrated" | "host" {
+  if (d.backend === "BLAS" || d.backend === "CPU" || d.totalMib <= 0) return "host";
+  if (d.backend === "CUDA") return "gpu";
+  if (/processor|\bAPU\b/i.test(d.name)) return "integrated";
+  if (all.some((o) => o.backend === "CUDA" && d.name.startsWith(o.name))) return "duplicate";
+  return "gpu";
+}
+
+/** Les cartes dédiées, dans l'ordre de `--list-devices` : ce qu'un `-dev` absent veut dire pour l'estimation. */
+export const gpuDevices = (all: BenchDevice[]): BenchDevice[] => all.filter((d) => deviceRole(d, all) === "gpu");

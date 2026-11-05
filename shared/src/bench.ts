@@ -3,6 +3,7 @@ import { reservedFlag, reservedFlagMessage } from "./profile";
 import type { FitVerdict } from "./tuning";
 
 export const CACHE_TYPES = ["f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1"] as const;
+export type CacheType = (typeof CACHE_TYPES)[number];
 export const SPLIT_MODES = ["none", "layer", "row", "tensor"] as const;
 export const FLASH_ATTN = ["on", "off", "auto"] as const;
 
