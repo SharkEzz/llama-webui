@@ -1,9 +1,17 @@
+export interface ApiIssue {
+  path: (string | number)[]
+  message: string
+}
+
 export class ApiError extends Error {
   readonly status: number
-  constructor(status: number, message: string) {
+  /** Détail zod renvoyé par l'API pour un 400 (champ par champ). */
+  readonly issues: ApiIssue[]
+  constructor(status: number, message: string, issues: ApiIssue[] = []) {
     super(message)
     this.name = "ApiError"
     this.status = status
+    this.issues = issues
   }
 }
 
@@ -31,7 +39,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
         ? body.error
         : `Erreur HTTP ${res.status}`
-    throw new ApiError(res.status, message)
+    const issues =
+      typeof body === "object" && body !== null && "issues" in body && Array.isArray(body.issues) ? (body.issues as ApiIssue[]) : []
+    throw new ApiError(res.status, message, issues)
   }
   return body as T
 }

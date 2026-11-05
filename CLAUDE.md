@@ -46,6 +46,8 @@ Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully suppor
 
 **Piège `bun --hot` :** le superviseur llama-server et le ring de logs (`server/runtime.ts`) vivent sur `globalThis` pour survivre aux rechargements (sinon chaque sauvegarde tuerait llama-server). Une modification de `server/supervisor/supervisor.ts`, `server/logs/buffer.ts` ou `server/runtime.ts` n'est donc **pas** prise en compte à chaud : arrêter Bun (Ctrl-C) et relancer `bun run dev`. Pour la même raison, ne pas tester les erreurs du superviseur avec `instanceof` (classe de l'ancien module) mais par `name`.
 
+**Nouveau fichier web :** le bundler de `bun run dev` peut ne pas voir un fichier `web/src/**` créé après le démarrage (« Could not resolve », alors que `bun check` passe) : relancer `bun run dev`.
+
 Server:
 
 ```ts#index.ts
