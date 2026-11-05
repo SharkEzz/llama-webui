@@ -1,11 +1,8 @@
-import { Activity, Flag } from "lucide-react"
-import { SERIES } from "@llama-webui/shared"
-import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart"
+import { Flag } from "lucide-react"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { StatTile } from "@/components/glass/StatTile"
 import { Badge } from "@/components/ui/badge"
-import { formatDuration, formatPct } from "@/lib/format"
-import { useMonitor } from "@/lib/monitor"
+import { formatDuration } from "@/lib/format"
 import { useHealth } from "@/lib/health"
 import { useNow } from "@/lib/useNow"
 import { useWs, WS_STATUS_UI } from "@/lib/ws"
@@ -24,9 +21,6 @@ export function HomePage() {
   const { health, fetchedAt, error } = useHealth()
   const now = useNow(1000)
   const online = status === "open"
-  const allGpus = useMonitor((s) => s.snapshot?.allGpus)
-  const gpus = (allGpus ?? []).filter((g) => !g.hidden && !g.suspended)
-  const TONES = ["violet", "cyan", "amber", "rose"] as const
 
   const uptime = online && health && fetchedAt ? formatDuration(health.uptimeMs + (now - fetchedAt)) : "—"
 
@@ -55,25 +49,6 @@ export function HomePage() {
         />
         <StatTile label="Serveur lancé depuis" value={uptime} tone="amber" />
       </div>
-
-      {/* provisoire (J3 Task 5) : déplacé dans le Dashboard en Task 6 */}
-      <GlassCard title="Monitoring (provisoire)" icon={Activity}>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <TimeSeriesChart
-            aria-label="Débit de génération et de prompt"
-            series={[
-              { key: SERIES.genTps, label: "Génération", tone: "violet" },
-              { key: SERIES.ppTps, label: "Prompt", tone: "cyan" },
-            ]}
-          />
-          <TimeSeriesChart
-            aria-label="VRAM utilisée par GPU"
-            series={gpus.map((g, i) => ({ key: SERIES.gpuVramPct(g.key), label: g.name.replace(/^NVIDIA GeForce /, ""), tone: TONES[i % 4]! }))}
-            yMax={100}
-            format={formatPct}
-          />
-        </div>
-      </GlassCard>
 
       <GlassCard title="Jalons" icon={Flag}>
         <ol className="flex flex-col divide-y divide-border">
