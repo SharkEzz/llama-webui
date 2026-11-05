@@ -1,6 +1,17 @@
+import { useState } from "react"
 import { useNavigate } from "react-router"
 import { Copy, ExternalLink, MoreHorizontal, Star, UserPlus } from "lucide-react"
 import { type BenchRun, type BenchStatus, NOISE, type Ranked, rankRuns, type Sweep, sweepCtx } from "@llama-webui/shared"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -46,8 +57,8 @@ export function RankingTable({ sweep, runs }: { sweep: Sweep; runs: BenchRun[] }
 
   return (
     <div className="flex flex-col gap-6">
-      {validate.length > 0 && <Ranking title="Validation (serveur)" ranked={validate} bestId={bestId} server />}
-      <Ranking title="Exploration (llama-bench)" ranked={explore} bestId={bestId} />
+      {validate.length > 0 && <Ranking title="Validation (serveur)" ranked={validate} bestId={bestId} ctx={ctx} server />}
+      <Ranking title="Exploration (llama-bench)" ranked={explore} bestId={bestId} ctx={ctx} />
       {top.length > 1 && (
         <div className="flex flex-col gap-2">
           <RankBars ranked={top} />
@@ -61,8 +72,14 @@ export function RankingTable({ sweep, runs }: { sweep: Sweep; runs: BenchRun[] }
   )
 }
 
-function Ranking({ title, ranked, bestId, server = false }: { title: string; ranked: Ranked[]; bestId: number | null; server?: boolean }) {
+function Ranking({ title, ranked, bestId, ctx, server = false }: { title: string; ranked: Ranked[]; bestId: number | null; ctx: number; server?: boolean }) {
   const navigate = useNavigate()
+  // Un run d'exploration « ne tient pas » : llama-bench l'a mesuré sans réserver le contexte du profil, le profil risque l'OOM.
+  const [unfit, setUnfit] = useState<BenchRun | null>(null)
+  const toProfile = async (run: BenchRun) => {
+    const p = await useTuning.getState().toProfile(run.id)
+    if (p) navigate(`/profiles?id=${p.id}`)
+  }
   return (
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium">{title}</h3>
@@ -128,10 +145,7 @@ function Ranking({ title, ranked, bestId, server = false }: { title: string; ran
                       <DropdownMenuContent align="end" className="min-w-48">
                         <DropdownMenuItem
                           disabled={r.run.status !== "ok"}
-                          onClick={async () => {
-                            const p = await useTuning.getState().toProfile(r.run.id)
-                            if (p) navigate(`/profiles?id=${p.id}`)
-                          }}
+                          onClick={() => (!server && r.run.fit === "no" ? setUnfit(r.run) : void toProfile(r.run))}
                         >
                           <UserPlus /> Créer un profil
                         </DropdownMenuItem>
@@ -150,6 +164,30 @@ function Ranking({ title, ranked, bestId, server = false }: { title: string; ran
           </TableBody>
         </Table>
       )}
+      <AlertDialog open={unfit !== null} onOpenChange={(o) => !o && setUnfit(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cette configuration ne tient pas avec le contexte visé</AlertDialogTitle>
+            <AlertDialogDescription>
+              llama-bench a mesuré <span className="font-mono">{unfit?.sweepLabel}</span> avec seulement son test (prompt et génération), sans réserver le
+              contexte de <span className="num">{ctx.toLocaleString("fr-FR")}</span> jetons. D'après l'estimation, le profil risque de manquer de mémoire au
+              démarrage. Validez-la d'abord sur le serveur, ou baissez -c dans le profil créé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const run = unfit
+                setUnfit(null)
+                if (run) void toProfile(run)
+              }}
+            >
+              Créer quand même
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   )
 }
