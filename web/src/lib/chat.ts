@@ -81,6 +81,7 @@ export const useChat = create<ChatState>((set, get) => {
       set({ streaming: { ...s, content: s.content + pending.content, reasoning: s.reasoning + pending.reasoning } })
       pending = { content: "", reasoning: "" }
     }
+    let ended = false
     const onEvent = (e: ChatEvent) => {
       if (ctl.signal.aborted) return
       const cur = get().current
@@ -98,6 +99,7 @@ export const useChat = create<ChatState>((set, get) => {
         pending.reasoning += e.reasoning ?? ""
         frame ||= requestAnimationFrame(flush)
       } else {
+        ended = true
         cancelAnimationFrame(frame)
         frame = 0
         if (cur?.id === conversationId) set({ current: { ...cur, messages: replace(cur.messages, e.message), live: false } })
@@ -113,6 +115,15 @@ export const useChat = create<ChatState>((set, get) => {
     try {
       const res = await request(ctl.signal)
       if (res) await readSse(res, onEvent)
+      // Flux fini sans « done » (serveur rechargé ou coupé), ou rien en cours (204) : on relit l'état enregistré.
+      if (!ended && !ctl.signal.aborted) {
+        if (get().streaming?.conversationId === conversationId) set({ streaming: null })
+        if (get().current?.id === conversationId) {
+          follow = null
+          set({ current: null })
+          void get().open(conversationId)
+        }
+      }
     } catch (e) {
       if (!ctl.signal.aborted) {
         if (get().streaming?.conversationId === conversationId) set({ streaming: null })

@@ -108,3 +108,17 @@ test("a stream that ends without [DONE] or breaks is an error that keeps the par
   expect([a.status, a.content]).toEqual(["error", "Bon"]);
   expect(a.error).toBe("llama-server a coupé la réponse (arrêté ou planté)");
 });
+
+test("dispose emits done(stopped) to listeners, so their streams close", async () => {
+  const t = setup();
+  const run = t.runs.send(t.conv.id, "Salut");
+  const events: ChatEvent[] = [];
+  run.subscribe((e) => events.push(e));
+  await tick();
+  await t.push(chunk({ content: "Bon" }));
+  t.runs.dispose();
+  const last = events.at(-1)!;
+  expect(last.type).toBe("done");
+  expect(last.type === "done" && [last.message.status, last.message.content]).toEqual(["stopped", "Bon"]);
+  expect(answer(t.repo, t.conv.id).status).toBe("stopped");
+});

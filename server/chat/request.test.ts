@@ -56,3 +56,11 @@ test("a context overflow becomes a clear message, other errors keep llama-server
   expect(llamaErrorMessage({ type: "exceed_context_size_error", message: "?", n_prompt_tokens: 50, n_ctx: 40 })).toContain(`(${n(50)} / ${n(40)} jetons)`);
   expect(llamaErrorMessage({ type: "server_error", message: "boom" })).toBe("llama-server : boom");
 });
+
+test("consecutive messages of the same role are merged (strict templates require alternating roles)", () => {
+  const body = buildChatRequest({ ...conv, systemPrompt: "" }, [m("user", "Q1"), m("assistant", "", "error"), m("user", "Q2"), m("assistant", "R2")]);
+  expect(body.messages).toEqual([
+    { role: "user", content: "Q1\n\nQ2" },
+    { role: "assistant", content: "R2" },
+  ]);
+});

@@ -77,12 +77,17 @@ class Run implements ChatRun {
     this.abort.abort();
   }
 
-  /** Arrêt immédiat avant fermeture de la base : la réponse est enregistrée « interrompue » tout de suite. */
+  /**
+   * Arrêt immédiat avant fermeture de la base : la réponse est enregistrée « interrompue » tout de suite et les abonnés
+   * reçoivent `done` (leurs flux SSE se ferment, sinon ils resteraient ouverts après un rechargement de Bun).
+   */
   detach(): void {
     this.stop();
     if (this.final) return;
-    this.deps.repo.updateMessage(this.assistant.id, { content: this.content, reasoning: this.reasoning, status: "stopped" });
     this.detached = true;
+    this.final = this.deps.repo.updateMessage(this.assistant.id, { content: this.content, reasoning: this.reasoning, status: "stopped" });
+    this.emit({ type: "done", message: this.final });
+    this.listeners.clear();
   }
 
   private emit(e: ChatEvent): void {

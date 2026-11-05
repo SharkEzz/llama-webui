@@ -1,14 +1,20 @@
 import type { ChatMessage, Conversation } from "@llama-webui/shared";
 
 /**
- * Corps de /v1/chat/completions : prompt système, historique terminé (sans réflexion ni réponses en erreur), seules les
+ * Corps de /v1/chat/completions : prompt système, historique terminé (sans réflexion ni réponses en erreur, rôles
+ * consécutifs identiques fusionnés), seules les
  * clés de sampling renseignées (les autres restent celles du serveur), réflexion activée ou non.
  */
 export function buildChatRequest(conv: Conversation, history: ChatMessage[]): Record<string, unknown> {
   const messages: { role: string; content: string }[] = [];
   if (conv.systemPrompt.trim()) messages.push({ role: "system", content: conv.systemPrompt });
   for (const m of history) {
-    if ((m.status === "done" || m.status === "stopped") && m.content !== "") messages.push({ role: m.role, content: m.content });
+    if ((m.status !== "done" && m.status !== "stopped") || m.content === "") continue;
+    // Une réponse en erreur laisse deux messages utilisateur de suite : fusionnés, car les modèles de chat stricts
+    // (Gemma, Mistral…) exigent l'alternance des rôles.
+    const prev = messages.at(-1);
+    if (prev && prev.role === m.role) prev.content += `\n\n${m.content}`;
+    else messages.push({ role: m.role, content: m.content });
   }
   const sampling = Object.fromEntries(Object.entries(conv.sampling).filter(([, v]) => v !== undefined && v !== null));
   return { messages, stream: true, ...sampling, chat_template_kwargs: { enable_thinking: conv.thinking } };
