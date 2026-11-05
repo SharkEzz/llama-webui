@@ -8,6 +8,8 @@ export const SettingsSchema = z.object({
   pollIntervalMs: z.number().int().min(250).default(1000),
   historySeconds: z.number().int().min(30).max(1800).default(300),
   hiddenGpus: z.array(z.string()).default(["0000:0d:00.0"]),
+  defaultProfileId: z.number().int().nullable().default(null),
+  llamaTuiImportDismissed: z.boolean().default(false),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

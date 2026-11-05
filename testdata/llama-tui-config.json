@@ -1,0 +1,159 @@
+{
+  "$schema": "file:///home/tristan/BUILD/llama-tui/schema/config.schema.json",
+  "server": {
+    "binary": "llama-server",
+    "host": "0.0.0.0",
+    "port": 8080
+  },
+  "pollIntervalMs": 1000,
+  "historySeconds": 120,
+  "collectors": {
+    "nvml": true,
+    "system": true,
+    "disk": true
+  },
+  "display": {
+    "dashboard": {
+      "panels": {
+        "throughput": true,
+        "spec": true,
+        "slots": true,
+        "system": true,
+        "requests": true
+      },
+      "throughputCharts": {
+        "gen": true,
+        "prompt": true
+      },
+      "band": {
+        "cpu": true,
+        "ram": true,
+        "disk": true,
+        "gpuPcie": true
+      },
+      "hiddenGpus": [
+        "0000:0d:00.0"
+      ]
+    },
+    "system": {
+      "panels": {
+        "gpu": true,
+        "cpu": true,
+        "mem": true,
+        "disk": true
+      },
+      "gpuCharts": {
+        "util": true,
+        "vram": true,
+        "pcie": true,
+        "power": true
+      },
+      "cpu": {
+        "chart": true,
+        "heatmap": true
+      },
+      "mem": {
+        "chart": true
+      },
+      "disk": {
+        "read": true,
+        "write": true,
+        "model": true
+      },
+      "hiddenGpus": [
+        "0000:0d:00.0"
+      ]
+    }
+  },
+  "profiles": [
+    {
+      "name": "qwen3.8-27b-mtp",
+      "model": "Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf",
+      "mmproj": "mmproj-Qwen3.8-27B-BF16.gguf",
+      "cwd": "~/Modèles",
+      "args": [
+        "--jinja",
+        "-fa",
+        "on",
+        "-np",
+        "1",
+        "-c",
+        "40000",
+        "--temp",
+        "1.0",
+        "--top-p",
+        "0.95",
+        "--top-k",
+        "20",
+        "--min-p",
+        "0.0",
+        "--presence-penalty",
+        "0.0",
+        "--repeat-penalty",
+        "1.0",
+        "--spec-type",
+        "draft-mtp",
+        "-lv",
+        "4"
+      ]
+    },
+    {
+      "name": "qwen3.8-27b-mtp (optimisé) (optimisé)",
+      "model": "Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf",
+      "mmproj": "mmproj-Qwen3.8-27B-BF16.gguf",
+      "cwd": "~/Modèles",
+      "args": [
+        "--jinja",
+        "-np",
+        "1",
+        "--temp",
+        "1.0",
+        "--top-p",
+        "0.95",
+        "--top-k",
+        "20",
+        "--min-p",
+        "0.0",
+        "--presence-penalty",
+        "0.0",
+        "--repeat-penalty",
+        "1.0",
+        "--spec-type",
+        "draft-mtp",
+        "-lv",
+        "4",
+        "-ngl",
+        "99",
+        "-c",
+        "262144",
+        "-fa",
+        "on",
+        "-ctk",
+        "q8_0",
+        "-ctv",
+        "q8_0",
+        "-t",
+        "6",
+        "-b",
+        "2048",
+        "-ub",
+        "512",
+        "-sm",
+        "layer",
+        "-ts",
+        "57,50",
+        "-mg",
+        "1",
+        "--device",
+        "CUDA0,CUDA1",
+        "--fit",
+        "off"
+      ],
+      "env": {
+        "GGML_CUDA_P2P": "1",
+        "NCCL_DEBUG": "INFO"
+      }
+    }
+  ],
+  "defaultProfile": "qwen3.8-27b-mtp"
+}
