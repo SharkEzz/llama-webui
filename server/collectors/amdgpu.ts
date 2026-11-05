@@ -77,18 +77,37 @@ const readNum = async (p: string | null): Promise<number | null> => {
   return Number.isFinite(n) ? n : null;
 };
 
-export async function lspciName(pdev: string): Promise<string> {
-  try {
-    const p = Bun.spawn(["lspci", "-mm", "-s", pdev], { stdout: "pipe", stderr: "ignore" });
-    const out = await new Response(p.stdout).text();
-    const fields = [...out.matchAll(/"([^"]*)"/g)].map((m) => m[1]!);
-    const dev = fields[2];
-    if (dev) return /\[([^\]]+)\]/.exec(dev)?.[1] ?? dev;
-  } catch {}
-  return `AMD GPU ${pdev}`;
+const PCI_IDS = ["/usr/share/hwdata/pci.ids", "/usr/share/misc/pci.ids", "/usr/share/pci.ids"];
+
+/**
+ * Nom d'une carte d'après ses identifiants sysfs (`vendor`, `device` : attributs en cache, lus sans réveiller la carte)
+ * et la base pci.ids. Remplace `lspci`, qui lit l'espace de configuration et réveille une carte en veille (runtime-suspended).
+ */
+export async function pciIdsName(pdev: string, pciRoot = "/sys/bus/pci/devices", idsPaths = PCI_IDS): Promise<string> {
+  const fallback = `AMD GPU ${pdev}`;
+  const id = async (f: string) => (await readText(join(pciRoot, pdev, f)))?.trim().toLowerCase().replace(/^0x/, "") ?? null;
+  const [vendor, device] = await Promise.all([id("vendor"), id("device")]);
+  if (!vendor || !device) return fallback;
+  for (const path of idsPaths) {
+    const text = await readText(path);
+    if (text === null) continue;
+    let inVendor = false;
+    for (const line of text.split("\n")) {
+      if (line.startsWith("#") || line === "") continue;
+      if (!line.startsWith("\t")) {
+        if (inVendor) break;
+        inVendor = line.slice(0, 4).toLowerCase() === vendor;
+      } else if (inVendor && !line.startsWith("\t\t") && line.slice(1, 5).toLowerCase() === device) {
+        const name = line.slice(5).trim();
+        return /\[([^\]]+)\]/.exec(name)?.[1] ?? name;
+      }
+    }
+    return fallback;
+  }
+  return fallback;
 }
 
-export async function discoverAmdCards(drmRoot = "/sys/class/drm", nameOf: (pdev: string) => Promise<string> = lspciName): Promise<AmdCard[]> {
+export async function discoverAmdCards(drmRoot = "/sys/class/drm", nameOf: (pdev: string) => Promise<string> = (pdev) => pciIdsName(pdev)): Promise<AmdCard[]> {
   let entries: string[];
   try {
     entries = await readdir(drmRoot);

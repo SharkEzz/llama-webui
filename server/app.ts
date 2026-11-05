@@ -1,6 +1,8 @@
 import type { Database } from "bun:sqlite";
 import type { ProfilesRepo } from "./db/profiles";
 import type { SettingsRepo } from "./db/settings";
+import type { Monitor } from "./monitor/monitor";
+import { monitorRoutes } from "./routes/monitor";
 import { profileRoutes } from "./routes/profiles";
 import { serverRoutes } from "./routes/server";
 import type { Runtime } from "./runtime";
@@ -15,6 +17,7 @@ export interface AppDeps {
   profiles: ProfilesRepo;
   activeProfileId: () => number | null;
   runtime: Runtime;
+  monitor: Monitor;
   /** Page web (import HTML : Bun bundle React + Tailwind à la volée). */
   index: Bun.HTMLBundle;
   hostname: string;
@@ -25,7 +28,7 @@ export interface AppDeps {
 const startedAt = Date.now();
 
 export function createApp(deps: AppDeps) {
-  const { hub, settings, index, port, development } = deps;
+  const { hub, settings, monitor, index, port, development } = deps;
   return Bun.serve({
     port,
     hostname: deps.hostname,
@@ -36,10 +39,15 @@ export function createApp(deps: AppDeps) {
       },
       "/api/settings": {
         GET: guarded(() => Response.json(settings.get())),
-        PATCH: guarded(async (req) => Response.json(settings.patch(await jsonObject(req)))),
+        PATCH: guarded(async (req) => {
+          const next = settings.patch(await jsonObject(req));
+          await monitor.configure(next);
+          return Response.json(next);
+        }),
       },
       ...profileRoutes(deps),
       ...serverRoutes(deps),
+      ...monitorRoutes({ monitor, bootId: deps.runtime.bootId }),
       "/api/*": guarded(() => Response.json({ error: "Route inconnue" }, { status: 404 })),
       "/ws": guarded((req, server) => {
         if (server.upgrade(req)) return undefined;

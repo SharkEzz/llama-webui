@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  pciIdsName,
   discoverAmdCards,
   isRuntimeSuspended,
   parseDpm,
@@ -228,4 +229,18 @@ test("a link that is down or retraining (current width 0) has an unknown width, 
   const { card, up } = await chipsetCard("llt-wd-");
   await Bun.write(join(up, "current_link_width"), "0\n");
   expect((await readAmdCard(card)).pcieWidth).toBeNull();
+});
+
+test("pciIdsName names a card from sysfs ids and pci.ids, without lspci (which would wake a suspended card)", async () => {
+  const root = mkdtempSync(join(tmpdir(), "llw-pciids-"));
+  const dev = join(root, "devices", "0000:08:00.0");
+  mkdirSync(dev, { recursive: true });
+  await Bun.write(join(dev, "vendor"), "0x1002\n");
+  await Bun.write(join(dev, "device"), "0x7550\n");
+  const ids = join(root, "pci.ids");
+  await Bun.write(ids, "# comment\n1000  Broadcom\n\t0001  Other\n1002  Advanced Micro Devices, Inc. [AMD/ATI]\n\t1638  Cezanne [Radeon Vega Series]\n\t7550  Navi 48 [Radeon RX 9070/9070 XT/9070 GRE]\n\t\t1458 2424  Subsys\n1003  ULSI\n");
+  expect(await pciIdsName("0000:08:00.0", join(root, "devices"), [join(root, "missing.ids"), ids])).toBe("Radeon RX 9070/9070 XT/9070 GRE");
+  await Bun.write(join(dev, "device"), "0x9999\n");
+  expect(await pciIdsName("0000:08:00.0", join(root, "devices"), [ids])).toBe("AMD GPU 0000:08:00.0");
+  rmSync(root, { recursive: true, force: true });
 });

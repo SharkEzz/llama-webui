@@ -4,7 +4,8 @@ import { openDb } from "./db/open";
 import { ProfilesRepo } from "./db/profiles";
 import { SettingsRepo } from "./db/settings";
 import { dbPath } from "./paths";
-import { activeProfileId, getRuntime, serverView } from "./runtime";
+import { activeProfileId, getRuntime, serverView, startMonitor } from "./runtime";
+import { profilePaths } from "./supervisor/args";
 import { WsHub } from "./ws/hub";
 
 const PORT = 7860;
@@ -24,6 +25,11 @@ const settings = new SettingsRepo(db);
 const profiles = new ProfilesRepo(db);
 const { supervisor, logs } = runtime;
 const development = process.env.NODE_ENV !== "production";
+const monitor = await startMonitor(runtime, settings.get());
+monitor.setModelPathResolver((id) => {
+  const p = profiles.get(id);
+  return p ? profilePaths(p).model : null;
+});
 
 const server = createApp({
   db,
@@ -31,6 +37,7 @@ const server = createApp({
   settings,
   profiles,
   runtime,
+  monitor,
   activeProfileId: () => activeProfileId(supervisor),
   index,
   hostname: HOSTNAME,
@@ -40,6 +47,7 @@ const server = createApp({
 
 const unsubState = supervisor.subscribe(() => hub.broadcast({ type: "server-state", payload: serverView(supervisor) }));
 const unsubLogs = logs.onLines((lines) => hub.broadcast({ type: "log", payload: lines }));
+const unsubSnapshot = monitor.onSnapshot((s) => hub.broadcast({ type: "snapshot", payload: s }));
 
 // Serveur externe : détecté au démarrage puis surveillé (sortie de l'état « external » quand il s'arrête).
 let checking = false;
@@ -61,6 +69,8 @@ g.__llamaWebuiDispose = () => {
   clearInterval(externalTimer);
   unsubState();
   unsubLogs();
+  unsubSnapshot();
+  monitor.setModelPathResolver(() => null);
   hub.dispose();
   db.close();
 };

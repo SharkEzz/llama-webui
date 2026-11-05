@@ -159,5 +159,7 @@ export interface HistoryDump {
   capacity: number;
   /** Instant du dernier point. */
   at: number;
+  /** Instant de chaque point (ms), même longueur que chaque série. */
+  times: number[];
   series: Record<string, (number | null)[]>;
 }

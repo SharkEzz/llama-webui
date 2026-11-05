@@ -1,5 +1,6 @@
 import type { ServerView } from "@llama-webui/shared";
 import { LogBuffer } from "./logs/buffer";
+import { Monitor, type MonitorSettings } from "./monitor/monitor";
 import { Supervisor } from "./supervisor/supervisor";
 
 export interface Runtime {
@@ -7,6 +8,8 @@ export interface Runtime {
   logs: LogBuffer;
   /** Identifiant de ce démarrage de llama-webui (stable à travers bun --hot) : le client y rattache la numérotation des logs. */
   bootId: string;
+  /** Monitoring permanent, démarré une fois par startMonitor() (survit lui aussi à bun --hot). */
+  monitor: Promise<Monitor> | null;
 }
 
 const g = globalThis as { __llamaWebuiRuntime?: Runtime };
@@ -14,13 +17,14 @@ const g = globalThis as { __llamaWebuiRuntime?: Runtime };
 /**
  * Superviseur et ring de logs uniques pour tout le process. Ils vivent sur globalThis pour survivre à `bun --hot`
  * (un rechargement de code ne doit ni tuer ni orpheliner llama-server). Les signaux d'arrêt sont installés une seule fois.
- * Conséquence : modifier supervisor.ts, logs/buffer.ts ou ce fichier demande un redémarrage complet de Bun.
+ * Conséquence : modifier supervisor.ts, logs/buffer.ts, server/monitor/**, server/collectors/** ou ce fichier demande un
+ * redémarrage complet de Bun.
  */
 export function getRuntime(): Runtime {
   if (g.__llamaWebuiRuntime) return g.__llamaWebuiRuntime;
   const logs = new LogBuffer(10_000);
   const supervisor = new Supervisor({ logs });
-  const rt: Runtime = { supervisor, logs, bootId: crypto.randomUUID() };
+  const rt: Runtime = { supervisor, logs, bootId: crypto.randomUUID(), monitor: null };
   g.__llamaWebuiRuntime = rt;
 
   let stopping = false;
@@ -28,6 +32,7 @@ export function getRuntime(): Runtime {
     if (stopping) return;
     stopping = true;
     if (supervisor.managedPid !== null) console.log(`[llama-webui] ${signal} : arrêt de llama-server…`);
+    if (rt.monitor) await rt.monitor.then((m) => m.stop()).catch(() => {});
     await supervisor.stop().catch(() => {});
     process.exit(0);
   };
@@ -35,6 +40,12 @@ export function getRuntime(): Runtime {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("exit", () => supervisor.killNow());
   return rt;
+}
+
+/** Le Monitor du process, démarré au premier appel avec ces réglages ; les appels suivants le renvoient tel quel. */
+export function startMonitor(rt: Runtime, settings: MonitorSettings): Promise<Monitor> {
+  rt.monitor ??= Monitor.start({ supervisor: rt.supervisor, settings });
+  return rt.monitor;
 }
 
 export function serverView(supervisor: Supervisor): ServerView {
