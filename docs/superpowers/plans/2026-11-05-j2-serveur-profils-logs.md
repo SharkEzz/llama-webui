@@ -20,6 +20,8 @@
 - Tests minimaux : seulement args / validation de profil / parse des flags, avec la fixture `llama-server-help.txt` de llama-tui. Le reste se vérifie à la main.
 - Fixtures copiées dans `testdata/` du dépôt (pas de chemin vers `../llama-tui` dans les tests).
 - Commits en français, un par tâche, suffixe `Co-Authored-By:` du modèle qui exécute.
+- Sécurité (revue J1) : toute nouvelle route `/api/*` est enveloppée par `guarded()` de `server/app.ts` (contrôle Host/Origin, corps JSON obligatoire en écriture) ; les clients web envoient `content-type: application/json` (déjà fait par `api()`).
+- Un seul process Bun sur 7860 (UI par HTML import, pas de Vite) ; `LLAMA_WEBUI_HOST=0.0.0.0` pour vérifier depuis le navigateur distant (http://192.168.0.20:7860).
 
 ## Review Focus
 
@@ -132,7 +134,7 @@
     | POST | `/api/profiles/import` | body = JSON brut ; `{ imported: Profile[]; skipped: {name, reason}[] }` (rejets de `parseProfileImport` + doublons en base) |
     | GET | `/api/profiles/import/llama-tui` | `{ path, exists, names: string[], dismissed: boolean, profileCount: number }` |
     | POST | `/api/profiles/import/llama-tui` | comme `/import`, source `"llama-tui"` ; si la config llama-tui a `defaultProfile`, régler `defaultProfileId` s'il est encore `null` |
-- [ ] **Step 1 : Implémenter** migration, repo, `llamatui.ts`, routes ; brancher dans `createApp` (passer `profiles: ProfilesRepo` dans `AppDeps`).
+- [ ] **Step 1 : Implémenter** migration, repo, `llamatui.ts`, routes ; brancher dans `createApp` via `guarded()` (passer `profiles: ProfilesRepo` dans `AppDeps`).
 - [ ] **Step 2 : Vérifier à la main** (`bun run start`, `LLAMA_WEBUI_DATA_DIR` temporaire) : `GET /api/profiles/import/llama-tui` → `exists: true`, 2 noms ; `POST` → 2 importés ; 2ᵉ `POST` → 0 importé, 2 `skipped` « existe déjà » ; `POST /api/profiles` avec `args: ["--port","1"]` → 400 avec le message réservé ; duplicate → « (copie) » ; export puis réimport du fichier exporté après suppression → identique.
 - [ ] **Step 3 : Commit** — `J2: profils en sqlite, API CRUD, import/export llama-tui`.
 
