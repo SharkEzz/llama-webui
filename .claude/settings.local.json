@@ -1,0 +1,7 @@
+{
+  "skillOverrides": {
+    "anthropic-skills:xlsx": "off",
+    "anthropic-skills:pptx": "off",
+    "anthropic-skills:docx": "off"
+  }
+}
