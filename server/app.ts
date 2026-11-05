@@ -2,6 +2,8 @@ import type { Database } from "bun:sqlite";
 import type { ProfilesRepo } from "./db/profiles";
 import type { SettingsRepo } from "./db/settings";
 import { profileRoutes } from "./routes/profiles";
+import { serverRoutes } from "./routes/server";
+import type { Runtime } from "./runtime";
 import type { WsHub } from "./ws/hub";
 import pkg from "./package.json";
 import { guarded, jsonObject } from "./http";
@@ -12,6 +14,7 @@ export interface AppDeps {
   settings: SettingsRepo;
   profiles: ProfilesRepo;
   activeProfileId: () => number | null;
+  runtime: Runtime;
   /** Page web (import HTML : Bun bundle React + Tailwind à la volée). */
   index: Bun.HTMLBundle;
   hostname: string;
@@ -36,6 +39,7 @@ export function createApp(deps: AppDeps) {
         PATCH: guarded(async (req) => Response.json(settings.patch(await jsonObject(req)))),
       },
       ...profileRoutes(deps),
+      ...serverRoutes(deps),
       "/api/*": guarded(() => Response.json({ error: "Route inconnue" }, { status: 404 })),
       "/ws": guarded((req, server) => {
         if (server.upgrade(req)) return undefined;
