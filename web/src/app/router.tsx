@@ -1,6 +1,7 @@
 import { createBrowserRouter } from "react-router"
 import { HomePage } from "@/features/home/HomePage"
 import { PlaceholderPage } from "@/features/_placeholder/PlaceholderPage"
+import { LogsPage } from "@/features/logs/LogsPage"
 import { ProfilesPage } from "@/features/profiles/ProfilesPage"
 import { ServerPage } from "@/features/server/ServerPage"
 import { AppLayout } from "./AppLayout"
@@ -14,7 +15,8 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: "server", element: <ServerPage /> },
       { path: "profiles", element: <ProfilesPage /> },
-      ...ROUTES.filter((r) => !["/", "/server", "/profiles"].includes(r.path)).map((r) => ({
+      { path: "logs", element: <LogsPage /> },
+      ...ROUTES.filter((r) => !["/", "/server", "/profiles", "/logs"].includes(r.path)).map((r) => ({
         path: r.path.slice(1),
         element: <PlaceholderPage title={r.label} />,
       })),
