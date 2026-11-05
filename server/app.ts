@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { ChatRuns } from "./chat/runs";
 import type { ConversationsRepo } from "./db/conversations";
 import type { ProfilesRepo } from "./db/profiles";
 import type { SettingsRepo } from "./db/settings";
@@ -19,6 +20,7 @@ export interface AppDeps {
   settings: SettingsRepo;
   profiles: ProfilesRepo;
   conversations: ConversationsRepo;
+  chatRuns: ChatRuns;
   activeProfileId: () => number | null;
   runtime: Runtime;
   monitor: Monitor;

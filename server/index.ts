@@ -1,6 +1,7 @@
 import index from "../web/index.html";
 import { createApp } from "./app";
 import { openDb } from "./db/open";
+import { ChatRuns } from "./chat/runs";
 import { ConversationsRepo } from "./db/conversations";
 import { ProfilesRepo } from "./db/profiles";
 import { SettingsRepo } from "./db/settings";
@@ -27,6 +28,16 @@ const profiles = new ProfilesRepo(db);
 const conversations = new ConversationsRepo(db);
 // Une réponse restée « streaming » après un arrêt brutal de Bun est interrompue.
 conversations.stopOrphans();
+const chatRuns = new ChatRuns({
+  repo: conversations,
+  target: () => {
+    const s = runtime.supervisor.state;
+    if (s.kind === "external") return { port: s.port, profileId: null, modelPath: null };
+    if (s.kind !== "ready") return null;
+    const p = profiles.get(s.profileId);
+    return { port: s.port, profileId: s.profileId, modelPath: p ? profilePaths(p).model : null };
+  },
+});
 const { supervisor, logs } = runtime;
 const development = process.env.NODE_ENV !== "production";
 const monitor = await startMonitor(runtime, settings.get());
@@ -41,6 +52,7 @@ const server = createApp({
   settings,
   profiles,
   conversations,
+  chatRuns,
   runtime,
   monitor,
   activeProfileId: () => activeProfileId(supervisor),
@@ -77,6 +89,7 @@ g.__llamaWebuiDispose = () => {
   unsubSnapshot();
   monitor.setModelPathResolver(() => null);
   hub.dispose();
+  chatRuns.dispose();
   db.close();
 };
 

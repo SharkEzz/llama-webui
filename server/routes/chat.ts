@@ -1,4 +1,6 @@
-import type { ConversationDetail, ConversationSummary } from "@llama-webui/shared";
+import type { Server } from "bun";
+import { type ConversationDetail, type ConversationSummary, formatSse } from "@llama-webui/shared";
+import type { ChatRun, ChatRuns } from "../chat/runs";
 import type { ConversationsRepo } from "../db/conversations";
 import type { ProfilesRepo } from "../db/profiles";
 import { guarded, HttpError, idParam, jsonObject, notFound } from "../http";
@@ -8,11 +10,48 @@ export interface ChatRouteDeps {
   conversations: ConversationsRepo;
   profiles: ProfilesRepo;
   activeProfileId: () => number | null;
-  /** Une génération tourne pour cette conversation. */
-  isLive?: (conversationId: number) => boolean;
+  chatRuns: ChatRuns;
 }
 
-export function chatRoutes({ conversations, profiles, activeProfileId, isLive = () => false }: ChatRouteDeps) {
+const PING_MS = 15_000;
+const enc = new TextEncoder();
+
+/**
+ * Événements d'une génération en SSE. Bun coupe une connexion muette au bout de 10 s : pas de limite pour celle-ci, et un
+ * commentaire « : ping » régulier (un long prompt peut se traiter sans rien envoyer). Le client qui part ne fait que se
+ * désabonner : la génération continue.
+ */
+function sse(req: Request, server: Server<undefined>, run: ChatRun): Response {
+  server.timeout(req, 0);
+  let leave = () => {};
+  let ping: ReturnType<typeof setInterval> | undefined;
+  const stream = new ReadableStream<Uint8Array>({
+    start(c) {
+      let closed = false;
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        clearInterval(ping);
+        leave();
+        c.close();
+      };
+      ping = setInterval(() => !closed && c.enqueue(enc.encode(": ping\n\n")), PING_MS);
+      leave = run.subscribe((e) => {
+        if (closed) return;
+        c.enqueue(enc.encode(formatSse(e.type, e)));
+        if (e.type === "done") queueMicrotask(close);
+      });
+    },
+    cancel() {
+      clearInterval(ping);
+      leave();
+    },
+  });
+  return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
+}
+
+export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns }: ChatRouteDeps) {
+  const isLive = (id: number) => chatRuns.live(id) !== undefined;
   const detail = (id: number): ConversationDetail => {
     const c = conversations.get(id);
     if (!c) throw notFound("Conversation");
@@ -39,9 +78,39 @@ export function chatRoutes({ conversations, profiles, activeProfileId, isLive = 
         conversations.patch(id, await jsonObject(req));
         return Response.json(detail(id));
       }),
-      DELETE: guarded((req) => {
-        conversations.delete(idParam(req, "Conversation"));
+      DELETE: guarded(async (req) => {
+        const id = idParam(req, "Conversation");
+        const run = chatRuns.live(id);
+        if (run) {
+          chatRuns.stop(id);
+          await run.done.catch(() => {});
+        }
+        conversations.delete(id);
         return new Response(null, { status: 204 });
+      }),
+    },
+    "/api/chat/:id/messages": {
+      POST: guarded(async (req, server) => {
+        const id = idParam(req, "Conversation");
+        const { content } = await jsonObject(req);
+        if (typeof content !== "string") throw new HttpError(400, "content : texte attendu");
+        return sse(req, server, chatRuns.send(id, content));
+      }),
+    },
+    "/api/chat/:id/regenerate": {
+      POST: guarded((req, server) => sse(req, server, chatRuns.regenerate(idParam(req, "Conversation")))),
+    },
+    "/api/chat/:id/stop": {
+      POST: guarded((req) => {
+        if (!chatRuns.stop(idParam(req, "Conversation"))) throw new HttpError(409, "Aucune réponse en cours");
+        return new Response(null, { status: 204 });
+      }),
+    },
+    "/api/chat/:id/stream": {
+      GET: guarded((req, server) => {
+        const id = idParam(req, "Conversation");
+        const run = chatRuns.live(id);
+        return run ? sse(req, server, run) : new Response(null, { status: 204 });
       }),
     },
   };
