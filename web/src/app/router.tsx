@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router"
+import { ChatPage } from "@/features/chat/ChatPage"
 import { DashboardPage } from "@/features/dashboard/DashboardPage"
 import { HomePage } from "@/features/home/HomePage"
 import { PlaceholderPage } from "@/features/_placeholder/PlaceholderPage"
@@ -24,7 +25,9 @@ export const router = createBrowserRouter([
       { path: "system", element: <SystemPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "models", element: <ModelsPage /> },
-      ...ROUTES.filter((r) => !["/", "/dashboard", "/server", "/profiles", "/logs", "/system", "/settings", "/models"].includes(r.path)).map((r) => ({
+      { path: "chat", element: <ChatPage /> },
+      { path: "chat/:id", element: <ChatPage /> },
+      ...ROUTES.filter((r) => !["/", "/dashboard", "/server", "/profiles", "/logs", "/system", "/settings", "/models", "/chat"].includes(r.path)).map((r) => ({
         path: r.path.slice(1),
         element: <PlaceholderPage title={r.label} />,
       })),

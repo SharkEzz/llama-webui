@@ -325,3 +325,14 @@
 .ts-chart .u-cursor-y {
   display: none;
 }
+
+/* Code coloré par shiki : couleurs des deux thèmes en variables, fond laissé au conteneur (bg-well). */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  background-color: transparent !important;
+}
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark);
+}
