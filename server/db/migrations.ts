@@ -19,6 +19,8 @@ export const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );`,
+  // 3 — résumés GGUF en cache (clé : chemin ; stamp : mtime et taille de chaque partie)
+  `CREATE TABLE model_cache(path TEXT PRIMARY KEY, stamp TEXT NOT NULL, summary_json TEXT NOT NULL, read_at INTEGER NOT NULL);`,
 ];
 
 export function runMigrations(db: Database): void {

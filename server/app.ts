@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { ProfilesRepo } from "./db/profiles";
 import type { SettingsRepo } from "./db/settings";
 import type { Monitor } from "./monitor/monitor";
+import { modelRoutes } from "./routes/models";
 import { monitorRoutes } from "./routes/monitor";
 import { profileRoutes } from "./routes/profiles";
 import { serverRoutes } from "./routes/server";
@@ -48,6 +49,7 @@ export function createApp(deps: AppDeps) {
       ...profileRoutes(deps),
       ...serverRoutes(deps),
       ...monitorRoutes({ monitor, bootId: deps.runtime.bootId }),
+      ...modelRoutes(deps),
       "/api/*": guarded(() => Response.json({ error: "Route inconnue" }, { status: 404 })),
       "/ws": guarded((req, server) => {
         if (server.upgrade(req)) return undefined;

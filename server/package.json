@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
+    "@huggingface/gguf": "^0.4.6",
     "@llama-webui/shared": "workspace:*",
     "zod": "^4"
   }

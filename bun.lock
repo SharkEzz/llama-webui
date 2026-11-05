@@ -16,6 +16,7 @@
       "name": "@llama-webui/server",
       "version": "0.1.0",
       "dependencies": {
+        "@huggingface/gguf": "^0.4.6",
         "@llama-webui/shared": "workspace:*",
         "zod": "^4",
       },
@@ -135,6 +136,10 @@
     "@fontsource-variable/inter": ["@fontsource-variable/inter@5.3.0", "", {}, "sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA=="],
 
     "@fontsource-variable/jetbrains-mono": ["@fontsource-variable/jetbrains-mono@5.3.0", "", {}, "sha512-F32xpS2NsGYoQi2ADSkKTgpJj7ozajsGgDJ8woTnqjmIB+dxDIqImjl4pXZVEExu8UFZ2ndhmX18EBS/hdz3Lw=="],
+
+    "@huggingface/gguf": ["@huggingface/gguf@0.4.6", "", { "dependencies": { "@huggingface/tasks": "^0.21.33" }, "bin": { "gguf-view": "dist/cli.js" } }, "sha512-+S4ysHzzNN77rU0gBcuuGN+x1TYNP4M7EgOEZ2rKaTz8dZ8o2N92qapQaeTjnPPNiWSc23iCV9E8u2A9VvK+rg=="],
+
+    "@huggingface/tasks": ["@huggingface/tasks@0.21.61", "", {}, "sha512-bAki2SyAkxYbzYCAcOmPYq++CzCHI1CkxeVQnF2jkXAh60wnIuR+jZJ+Eha1aaI049bB1aO8H+icr4C/kvLnuw=="],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.0", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
 
