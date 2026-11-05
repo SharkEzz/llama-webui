@@ -66,6 +66,12 @@ const unsubState = supervisor.subscribe(() => hub.broadcast({ type: "server-stat
 const unsubLogs = logs.onLines((lines) => hub.broadcast({ type: "log", payload: lines }));
 const unsubSnapshot = monitor.onSnapshot((s) => hub.broadcast({ type: "snapshot", payload: s }));
 
+// Arrêt de Bun : les réponses en cours sont enregistrées « interrompues » avant que le runtime n'arrête llama-server
+// (sinon elles verraient la coupure et finiraient « erreur »). En tête de file, devant le gestionnaire du runtime.
+const stopChats = () => chatRuns.dispose();
+process.prependListener("SIGINT", stopChats);
+process.prependListener("SIGTERM", stopChats);
+
 // Serveur externe : détecté au démarrage puis surveillé (sortie de l'état « external » quand il s'arrête).
 let checking = false;
 const checkExternal = async () => {
@@ -89,6 +95,8 @@ g.__llamaWebuiDispose = () => {
   unsubSnapshot();
   monitor.setModelPathResolver(() => null);
   hub.dispose();
+  process.off("SIGINT", stopChats);
+  process.off("SIGTERM", stopChats);
   chatRuns.dispose();
   db.close();
 };

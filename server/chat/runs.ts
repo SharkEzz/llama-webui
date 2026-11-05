@@ -36,6 +36,8 @@ export interface ChatRun {
 /** Erreur déjà mise en mots (réponse de llama-server). */
 class LlamaFailure extends Error {}
 
+const CUT = "llama-server a coupé la réponse (arrêté ou planté)";
+
 class Run implements ChatRun {
   private listeners = new Set<(e: ChatEvent) => void>();
   private content = "";
@@ -101,6 +103,9 @@ class Run implements ChatRun {
     let lastFlush = started;
     let status: ChatMessage["status"] = "done";
     let error: string | null = null;
+    /** La réponse HTTP a commencé : une coupure ensuite vient de llama-server, pas d'une connexion impossible. */
+    let receiving = false;
+    let finished = false;
     try {
       const res = await this.deps.fetch(this.url, {
         method: "POST",
@@ -116,6 +121,7 @@ class Run implements ChatRun {
         } catch {}
         throw new LlamaFailure(err ? llamaErrorMessage(err) : `llama-server : HTTP ${res.status}${text ? ` — ${text}` : ""}`);
       }
+      receiving = true;
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       const parser = new SseParser();
@@ -123,7 +129,10 @@ class Run implements ChatRun {
         const { value, done } = await reader.read();
         if (done) break;
         for (const ev of parser.push(decoder.decode(value, { stream: true }))) {
-          if (ev.data === "[DONE]") break read;
+          if (ev.data === "[DONE]") {
+            finished = true;
+            break read;
+          }
           let j: {
             choices?: { delta?: { content?: string | null; reasoning_content?: string | null } }[];
             timings?: LlamaTimings;
@@ -151,11 +160,17 @@ class Run implements ChatRun {
           if (j.timings) timings = j.timings;
         }
       }
+      if (!finished) throw new LlamaFailure(CUT);
     } catch (e) {
       if (this.stopped) status = "stopped";
       else {
         status = "error";
-        error = e instanceof LlamaFailure ? e.message : `llama-server injoignable : ${e instanceof Error ? e.message : String(e)}`;
+        error =
+          e instanceof LlamaFailure
+            ? e.message
+            : receiving
+              ? CUT
+              : `llama-server injoignable : ${e instanceof Error ? e.message : String(e)}`;
       }
     }
     if (this.detached) return;

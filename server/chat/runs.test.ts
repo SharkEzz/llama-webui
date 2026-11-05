@@ -96,3 +96,15 @@ test("a late subscriber gets what was already written", async () => {
   expect(events[2]).toEqual({ type: "delta", content: " !" });
   expect(events.at(-1)!.type).toBe("done");
 });
+
+test("a stream that ends without [DONE] or breaks is an error that keeps the partial answer", async () => {
+  const t = setup();
+  const run = t.runs.send(t.conv.id, "Salut");
+  await tick();
+  await t.push(chunk({ content: "Bon" }));
+  t.end();
+  await run.done;
+  const a = answer(t.repo, t.conv.id);
+  expect([a.status, a.content]).toEqual(["error", "Bon"]);
+  expect(a.error).toBe("llama-server a coupé la réponse (arrêté ou planté)");
+});
