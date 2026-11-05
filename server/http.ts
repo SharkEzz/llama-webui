@@ -6,6 +6,8 @@ export class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /** Raison lisible par le client (ex. « server-running »), renvoyée dans le corps JSON. */
+    readonly code?: string,
   ) {
     super(message);
   }
@@ -14,7 +16,8 @@ export class HttpError extends Error {
 export const notFound = (what: string) => new HttpError(404, `${what} introuvable`);
 
 export function errorResponse(err: unknown): Response {
-  if (err instanceof HttpError) return Response.json({ error: err.message }, { status: err.status });
+  if (err instanceof HttpError)
+    return Response.json(err.code ? { error: err.message, code: err.code } : { error: err.message }, { status: err.status });
   if (err instanceof ZodError) {
     const first = err.issues[0];
     const where = first && first.path.length > 0 ? ` (${first.path.join(".")})` : "";

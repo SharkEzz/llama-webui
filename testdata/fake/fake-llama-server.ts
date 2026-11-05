@@ -1,5 +1,9 @@
 // Imitates llama-server for supervisor tests.
 const args = process.argv.slice(2);
+if (args.includes("--version")) {
+  process.stderr.write("version: 0.0.0-fake (build 1, commit fake)\n");
+  process.exit(0);
+}
 const port = Number(args[args.indexOf("--port") + 1] ?? 8080);
 const slow = process.env.FAKE_SLOW_ARG !== undefined && args.includes(process.env.FAKE_SLOW_ARG);
 const loadMs = slow ? Number(process.env.FAKE_SLOW_MS ?? 5000) : Number(process.env.FAKE_LOAD_MS ?? 300);

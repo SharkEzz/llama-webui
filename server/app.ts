@@ -1,9 +1,12 @@
 import type { Database } from "bun:sqlite";
+import type { BenchRunner } from "./bench/runner";
 import type { ChatRuns } from "./chat/runs";
+import type { BenchRunsRepo } from "./db/benchRuns";
 import type { ConversationsRepo } from "./db/conversations";
 import type { ProfilesRepo } from "./db/profiles";
 import type { SettingsRepo } from "./db/settings";
 import type { Monitor } from "./monitor/monitor";
+import { benchRoutes } from "./routes/bench";
 import { chatRoutes } from "./routes/chat";
 import { modelRoutes } from "./routes/models";
 import { monitorRoutes } from "./routes/monitor";
@@ -21,6 +24,8 @@ export interface AppDeps {
   profiles: ProfilesRepo;
   conversations: ConversationsRepo;
   chatRuns: ChatRuns;
+  benchRuns: BenchRunsRepo;
+  benchRunner: BenchRunner;
   activeProfileId: () => number | null;
   runtime: Runtime;
   monitor: Monitor;
@@ -52,10 +57,11 @@ export function createApp(deps: AppDeps) {
         }),
       },
       ...profileRoutes(deps),
-      ...serverRoutes(deps),
+      ...serverRoutes({ ...deps, benchBusy: () => deps.benchRunner.busy }),
       ...monitorRoutes({ monitor, bootId: deps.runtime.bootId }),
       ...modelRoutes(deps),
       ...chatRoutes(deps),
+      ...benchRoutes(deps),
       "/api/*": guarded(() => Response.json({ error: "Route inconnue" }, { status: 404 })),
       "/ws": guarded((req, server) => {
         if (server.upgrade(req)) return undefined;

@@ -21,7 +21,7 @@ test("benchFailure reports an out-of-memory load", async () => {
   const f = benchFailure((await fixture("oom-stderr.txt")).split("\n"), 1);
   expect(f.oom).toBe(true);
   expect(f.message.startsWith("Mémoire insuffisante : ")).toBe(true);
-  expect(f.message).toMatch(/unable to allocate CUDA1 buffer|failed to load model/);
+  expect(f.message).toContain("unable to allocate CUDA1 buffer");
   expect(benchFailure(["rien"], 2)).toEqual({ oom: false, message: "llama-bench terminé (code 2)" });
 });
 

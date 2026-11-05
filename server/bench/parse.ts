@@ -70,7 +70,8 @@ const OOM = /out of memory|failed to allocate|unable to allocate/i;
 /** Pourquoi un run a échoué, d'après les dernières lignes de l'outil. */
 export function benchFailure(lines: string[], exit: number | string, tool = "llama-bench"): { message: string; oom: boolean } {
   const oom = lines.some((l) => OOM.test(l));
-  const line = [...lines].reverse().find((l) => ERROR_LINE.test(l))?.trim();
+  // OOM : la ligne d'allocation (« unable to allocate CUDA1 buffer ») plutôt que le « failed to load model » qui suit.
+  const line = [...lines].reverse().find((l) => (oom ? OOM : ERROR_LINE).test(l))?.trim();
   if (!line) return { oom, message: oom ? "Mémoire insuffisante" : `${tool} terminé (code ${exit})` };
   return { oom, message: oom ? `Mémoire insuffisante : ${line}` : line };
 }
