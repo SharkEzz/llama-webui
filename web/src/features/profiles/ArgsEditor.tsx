@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react"
-import { complete, describeFlag, flagOf, reservedFlag, reservedFlagMessage, unknownFlags } from "@llama-webui/shared"
+import { describeFlag, flagSuggestions, flagOf, reservedFlag, reservedFlagMessage, unknownFlags } from "@llama-webui/shared"
 import { CodeTextarea } from "@/components/CodeTextarea"
 import { useFlags } from "@/lib/flags"
 import { cn } from "@/lib/utils"
@@ -20,14 +20,13 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null)
   const [cursor, setCursor] = useState(0)
   const [active, setActive] = useState(0)
+  // Entrée ne complète qu'après un choix aux flèches ; sinon elle garde son rôle (nouvelle ligne).
+  const [navigated, setNavigated] = useState(false)
   const [dismissed, setDismissed] = useState(false)
 
   const parsed = useMemo(() => parseArgs(value), [value])
   const at = wordAt(value, cursor)
-  const suggestions =
-    catalog && !dismissed && at.word.startsWith("-") && !at.word.includes("=")
-      ? complete(catalog, at.word).candidates.filter((c) => c !== at.word).slice(0, MAX_SUGGESTIONS)
-      : []
+  const suggestions = catalog && !dismissed ? flagSuggestions(catalog, at.word, MAX_SUGGESTIONS) : []
   const helpFlag = catalog
     ? (flagOf(catalog, at.word) ?? (!at.word.startsWith("-") ? flagOf(catalog, at.previous) : undefined))
     : undefined
@@ -48,6 +47,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
       setCursor(pos)
     })
     setActive(0)
+    setNavigated(false)
   }
 
   const track = () => setCursor(ref.current?.selectionStart ?? 0)
@@ -68,6 +68,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
             setCursor(el.selectionStart)
             setDismissed(false)
             setActive(0)
+            setNavigated(false)
           }}
           onSelect={track}
           onClick={track}
@@ -78,9 +79,13 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
           onFocus={() => setDismissed(false)}
           onKeyDown={(e) => {
             if (suggestions.length === 0) return
-            if (e.key === "ArrowDown") setActive((a) => (a + 1) % suggestions.length)
-            else if (e.key === "ArrowUp") setActive((a) => (a - 1 + suggestions.length) % suggestions.length)
-            else if (e.key === "Tab" || e.key === "Enter") accept(suggestions[active] ?? suggestions[0]!)
+            if (e.key === "ArrowDown") {
+              setActive((a) => (a + 1) % suggestions.length)
+              setNavigated(true)
+            } else if (e.key === "ArrowUp") {
+              setActive((a) => (a - 1 + suggestions.length) % suggestions.length)
+              setNavigated(true)
+            } else if (e.key === "Tab" || (e.key === "Enter" && navigated)) accept(suggestions[active] ?? suggestions[0]!)
             else if (e.key === "Escape") setDismissed(true)
             else return
             e.preventDefault()
@@ -131,7 +136,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
       ) : catalogError ? (
         <p className="text-xs text-muted-foreground">Aide des flags indisponible : {catalogError}</p>
       ) : (
-        <p className="text-xs text-muted-foreground">Tapez « - » pour voir les flags ; Tab ou Entrée complète.</p>
+        <p className="text-xs text-muted-foreground">Tapez « - » pour voir les flags ; Tab complète, ↑ ↓ puis Entrée choisit.</p>
       )}
     </div>
   )

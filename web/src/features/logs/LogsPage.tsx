@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { copyText } from "@/lib/clipboard"
-import { useLogs } from "@/lib/logs"
+import { hideCurrentLogs, useLogs } from "@/lib/logs"
 import { LogRow } from "./LogRow"
 
 const LEVELS: { value: LogLevel; label: string }[] = [
@@ -23,17 +23,16 @@ const BOTTOM_SLACK_PX = 40
 
 export function LogsPage() {
   const all = useLogs((s) => s.lines)
+  const hiddenBefore = useLogs((s) => s.hiddenBefore)
   const [minLevel, setMinLevel] = useState<LogLevel>("debug")
   const [query, setQuery] = useState("")
   const [follow, setFollow] = useState(true)
-  // « Vider l'affichage » masque les lignes reçues jusqu'ici, sans toucher au ring du serveur.
-  const [clearedBefore, setClearedBefore] = useState(-1)
   const scroller = useRef<HTMLDivElement>(null)
   const userScroll = useRef(false)
 
   const lines = useMemo(
-    () => filterLogs(clearedBefore < 0 ? all : all.filter((l) => l.seq >= clearedBefore), { minLevel, query: query.trim() }),
-    [all, minLevel, query, clearedBefore],
+    () => filterLogs(hiddenBefore < 0 ? all : all.filter((l) => l.seq >= hiddenBefore), { minLevel, query: query.trim() }),
+    [all, minLevel, query, hiddenBefore],
   )
 
   const virtualizer = useVirtualizer({
@@ -99,7 +98,7 @@ export function LogsPage() {
         >
           <Copy /> Copier
         </Button>
-        <Button variant="ghost" size="sm" disabled={lines.length === 0} onClick={() => setClearedBefore(useLogs.getState().seq)}>
+        <Button variant="ghost" size="sm" disabled={lines.length === 0} onClick={hideCurrentLogs}>
           <Eraser /> Vider l'affichage
         </Button>
       </div>

@@ -9,13 +9,16 @@ export class WsHub {
   private readonly clients = new Map<ServerWebSocket<unknown>, { missed: number }>();
   private readonly timer: Timer;
 
-  constructor(pingIntervalMs = PING_INTERVAL_MS) {
+  constructor(
+    private readonly bootId: string,
+    pingIntervalMs = PING_INTERVAL_MS,
+  ) {
     this.timer = setInterval(() => this.heartbeat(), pingIntervalMs);
   }
 
   attach(ws: ServerWebSocket<unknown>): void {
     this.clients.set(ws, { missed: 0 });
-    this.send(ws, { type: "hello", payload: { serverTime: Date.now() } });
+    this.send(ws, { type: "hello", payload: { serverTime: Date.now(), bootId: this.bootId } });
   }
 
   detach(ws: ServerWebSocket<unknown>): void {

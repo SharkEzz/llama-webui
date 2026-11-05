@@ -98,6 +98,16 @@ export function complete(catalog: FlagCatalog, prefix: string): { insert: string
   return { insert: common.slice(prefix.length), candidates };
 }
 
+/**
+ * Suggestions for the word under the cursor: the flags it starts, at most `max`. None when the word is not a flag
+ * being typed (a value, `--x=…`) or is already a complete known flag — Enter then keeps it instead of swapping it
+ * for a longer name (`--verbose` → `--verbose-prompt`).
+ */
+export function flagSuggestions(catalog: FlagCatalog, word: string, max: number): string[] {
+  if (!word.startsWith("-") || word.includes("=") || catalog.byName.has(word)) return [];
+  return complete(catalog, word).candidates.slice(0, max);
+}
+
 /** The flags in `args` the catalogue does not know, as written (`--x=1` as `--x`). Values are not flags: `-1`, `-`. */
 export function unknownFlags(catalog: FlagCatalog, args: string[]): string[] {
   return args.filter((a) => a.length > 1 && a.startsWith("-") && !/^-\d/.test(a) && !flagOf(catalog, a)).map((a) => a.split("=")[0]!);

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { catalogFrom, complete, describeFlag, flagOf, parseHelp, unknownFlags } from "./flags";
+import { catalogFrom, complete, flagSuggestions, describeFlag, flagOf, parseHelp, unknownFlags } from "./flags";
 
 const HELP = await Bun.file(join(import.meta.dir, "../../testdata/llama-server-help.txt")).text();
 const catalog = parseHelp(HELP);
@@ -101,5 +101,23 @@ describe("catalogFrom", () => {
     const c = catalogFrom(JSON.parse(JSON.stringify(catalog.flags)));
     expect(c.flags).toHaveLength(47);
     expect(c.byName.get("-ngl")).toBe(c.byName.get("--n-gpu-layers")!);
+  });
+});
+
+describe("flagSuggestions", () => {
+  test("a word that is already a complete flag gets no suggestion (Enter must not swap it for a longer one)", () => {
+    expect(flagSuggestions(catalog, "--cpu-range", 8)).toEqual([]);
+    expect(flagSuggestions(catalog, "-c", 8)).toEqual([]);
+  });
+
+  test("an unfinished word gets the flags it starts, at most max", () => {
+    expect(flagSuggestions(catalog, "--cpu-r", 8)).toEqual(["--cpu-range", "--cpu-range-batch"]);
+    expect(flagSuggestions(catalog, "--cpu-", 3)).toHaveLength(3);
+  });
+
+  test("values and flags written with = get no suggestion", () => {
+    expect(flagSuggestions(catalog, "8192", 8)).toEqual([]);
+    expect(flagSuggestions(catalog, "--ctx=1", 8)).toEqual([]);
+    expect(flagSuggestions(catalog, "", 8)).toEqual([]);
   });
 });

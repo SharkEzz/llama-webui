@@ -5,6 +5,8 @@ import { Supervisor } from "./supervisor/supervisor";
 export interface Runtime {
   supervisor: Supervisor;
   logs: LogBuffer;
+  /** Identifiant de ce démarrage de llama-webui (stable à travers bun --hot) : le client y rattache la numérotation des logs. */
+  bootId: string;
 }
 
 const g = globalThis as { __llamaWebuiRuntime?: Runtime };
@@ -18,7 +20,7 @@ export function getRuntime(): Runtime {
   if (g.__llamaWebuiRuntime) return g.__llamaWebuiRuntime;
   const logs = new LogBuffer(10_000);
   const supervisor = new Supervisor({ logs });
-  const rt: Runtime = { supervisor, logs };
+  const rt: Runtime = { supervisor, logs, bootId: crypto.randomUUID() };
   g.__llamaWebuiRuntime = rt;
 
   let stopping = false;

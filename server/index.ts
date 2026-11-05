@@ -18,10 +18,10 @@ const g = globalThis as { __llamaWebuiDispose?: () => void };
 g.__llamaWebuiDispose?.();
 
 const db = openDb(dbPath());
-const hub = new WsHub();
+const runtime = getRuntime();
+const hub = new WsHub(runtime.bootId);
 const settings = new SettingsRepo(db);
 const profiles = new ProfilesRepo(db);
-const runtime = getRuntime();
 const { supervisor, logs } = runtime;
 const development = process.env.NODE_ENV !== "production";
 

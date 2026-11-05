@@ -41,7 +41,7 @@ export function serverRoutes({ runtime, profiles, settings }: ServerRouteDeps) {
 
   return {
     "/api/state": {
-      GET: guarded(() => Response.json({ server: serverView(supervisor), logSeq: logs.seq })),
+      GET: guarded(() => Response.json({ server: serverView(supervisor), logSeq: logs.seq, bootId: runtime.bootId })),
     },
     "/api/server/state": { GET: guarded(view) },
     "/api/server/start": {
@@ -100,7 +100,7 @@ export function serverRoutes({ runtime, profiles, settings }: ServerRouteDeps) {
     "/api/logs": {
       GET: guarded((req) => {
         const since = Number(new URL(req.url).searchParams.get("since") ?? 0);
-        return Response.json({ lines: logs.since(Number.isFinite(since) ? since : 0), seq: logs.seq });
+        return Response.json({ lines: logs.since(Number.isFinite(since) ? since : 0), seq: logs.seq, bootId: runtime.bootId });
       }),
     },
   };
