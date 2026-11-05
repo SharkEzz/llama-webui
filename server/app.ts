@@ -1,7 +1,9 @@
 import type { Database } from "bun:sqlite";
+import type { ConversationsRepo } from "./db/conversations";
 import type { ProfilesRepo } from "./db/profiles";
 import type { SettingsRepo } from "./db/settings";
 import type { Monitor } from "./monitor/monitor";
+import { chatRoutes } from "./routes/chat";
 import { modelRoutes } from "./routes/models";
 import { monitorRoutes } from "./routes/monitor";
 import { profileRoutes } from "./routes/profiles";
@@ -16,6 +18,7 @@ export interface AppDeps {
   hub: WsHub;
   settings: SettingsRepo;
   profiles: ProfilesRepo;
+  conversations: ConversationsRepo;
   activeProfileId: () => number | null;
   runtime: Runtime;
   monitor: Monitor;
@@ -50,6 +53,7 @@ export function createApp(deps: AppDeps) {
       ...serverRoutes(deps),
       ...monitorRoutes({ monitor, bootId: deps.runtime.bootId }),
       ...modelRoutes(deps),
+      ...chatRoutes(deps),
       "/api/*": guarded(() => Response.json({ error: "Route inconnue" }, { status: 404 })),
       "/ws": guarded((req, server) => {
         if (server.upgrade(req)) return undefined;

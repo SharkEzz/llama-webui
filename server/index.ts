@@ -1,6 +1,7 @@
 import index from "../web/index.html";
 import { createApp } from "./app";
 import { openDb } from "./db/open";
+import { ConversationsRepo } from "./db/conversations";
 import { ProfilesRepo } from "./db/profiles";
 import { SettingsRepo } from "./db/settings";
 import { dbPath } from "./paths";
@@ -23,6 +24,9 @@ const runtime = getRuntime();
 const hub = new WsHub(runtime.bootId);
 const settings = new SettingsRepo(db);
 const profiles = new ProfilesRepo(db);
+const conversations = new ConversationsRepo(db);
+// Une réponse restée « streaming » après un arrêt brutal de Bun est interrompue.
+conversations.stopOrphans();
 const { supervisor, logs } = runtime;
 const development = process.env.NODE_ENV !== "production";
 const monitor = await startMonitor(runtime, settings.get());
@@ -36,6 +40,7 @@ const server = createApp({
   hub,
   settings,
   profiles,
+  conversations,
   runtime,
   monitor,
   activeProfileId: () => activeProfileId(supervisor),

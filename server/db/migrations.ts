@@ -21,6 +21,33 @@ export const MIGRATIONS: string[] = [
   );`,
   // 3 — résumés GGUF en cache (clé : chemin ; stamp : mtime et taille de chaque partie)
   `CREATE TABLE model_cache(path TEXT PRIMARY KEY, stamp TEXT NOT NULL, summary_json TEXT NOT NULL, read_at INTEGER NOT NULL);`,
+  // 4 — conversations du chat
+  `CREATE TABLE conversations(
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    profile_id INTEGER REFERENCES profiles(id) ON DELETE SET NULL,
+    model_path TEXT,
+    sampling_json TEXT NOT NULL,
+    system_prompt TEXT NOT NULL,
+    thinking INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );`,
+  // 5 — messages (réflexion à part, statut de génération, stats tirées des timings)
+  `CREATE TABLE messages(
+    id INTEGER PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    reasoning TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL,
+    error TEXT,
+    stats_json TEXT,
+    model_path TEXT,
+    created_at INTEGER NOT NULL
+  );`,
+  // 6
+  `CREATE INDEX messages_by_conversation ON messages(conversation_id, id);`,
 ];
 
 export function runMigrations(db: Database): void {
