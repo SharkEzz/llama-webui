@@ -16,6 +16,7 @@ import type { LogBuffer } from "../logs/buffer";
 import { LineSplitter } from "../logs/lines";
 import type { BuiltCommand } from "../supervisor/args";
 import { benchBinary, benchFailure, parseBenchJson, parseBenchProgress } from "./parse";
+import { VramProbe } from "./vram";
 
 /** Ce que le runner attend du superviseur : arrêter le serveur géré avant un run, le relancer après. */
 export interface ServerControl {
@@ -210,20 +211,30 @@ export class BenchRunner {
     }
   }
 
-  /** Échantillonne la VRAM au-dessus de ce que chaque carte tenait avant le lancement. */
-  private sampler(job: Job): () => void {
-    const before = new Map(this.deps.gpus().map((g) => [g.key, g.vramUsedBytes]));
+  /**
+   * Pic de VRAM au-dessus de ce que chaque carte tenait au lancement : relevé rapide (VramProbe, 100 ms) et, en secours,
+   * les snapshots du Monitor (1 s par défaut : un pic court peut leur échapper).
+   */
+  private sampler(job: Job): () => Promise<void> {
+    const gpus = this.deps.gpus();
+    const before = new Map(gpus.map((g) => [g.key, g.vramUsedBytes]));
+    const probe = new VramProbe(gpus);
+    const note = (key: string, name: string, bytes: number) => {
+      const prev = job.peaks.get(key);
+      if (!prev || bytes > prev.bytes) job.peaks.set(key, { name, bytes });
+    };
     const sample = () => {
-      for (const g of this.deps.gpus()) {
-        const above = Math.max(0, g.vramUsedBytes - (before.get(g.key) ?? 0));
-        const prev = job.peaks.get(g.key);
-        if (!prev || above > prev.bytes) job.peaks.set(g.key, { name: g.name, bytes: above });
-      }
+      for (const g of this.deps.gpus()) note(g.key, g.name, Math.max(0, g.vramUsedBytes - (before.get(g.key) ?? 0)));
     };
     const timer = setInterval(sample, VRAM_SAMPLE_MS);
-    return () => {
+    return async () => {
       sample();
       clearInterval(timer);
+      await probe.stop();
+      for (const g of gpus) {
+        const p = probe.get(g.key);
+        if (p) note(g.key, g.name, Math.max(0, p.max - p.first));
+      }
     };
   }
 
@@ -235,7 +246,7 @@ export class BenchRunner {
     try {
       proc = Bun.spawn(job.argv, { env: { ...process.env }, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
     } catch (e) {
-      stopSampling();
+      await stopSampling();
       return { status: "failed", error: (e as Error).message };
     }
     job.proc = proc;
@@ -252,7 +263,7 @@ export class BenchRunner {
     });
     await proc.exited;
     const [out] = await Promise.all([stdout.catch(() => ""), stderr]);
-    stopSampling();
+    await stopSampling();
     job.proc = null;
     if (job.cancelled) return { status: "cancelled" };
     const parsed = proc.exitCode === 0 ? parseBenchJson(out) : null;
