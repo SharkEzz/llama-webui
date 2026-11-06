@@ -6,6 +6,6 @@
   "dependencies": {
     "@huggingface/gguf": "^0.4.6",
     "@llama-webui/shared": "workspace:*",
-    "zod": "^4"
+    "zod": "^4.6.7"
   }
 }
