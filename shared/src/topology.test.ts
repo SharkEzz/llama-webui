@@ -49,6 +49,14 @@ test('phaseOf: a slot still reading its prompt → prompt, then generating', () 
       snap({ slots: [slot({ processing: true, nPromptTokens: 100, nPromptProcessed: 100, nDecoded: 3 })] }),
     ),
   ).toBe('generating');
+  // Real llama-server slot mid-generation: n_prompt_tokens is the slot's context, generated tokens included, and
+  // n_prompt_tokens_processed leaves out what came from the cache.
+  expect(
+    phaseOf(
+      ready,
+      snap({ slots: [slot({ processing: true, nPromptTokens: 1142, nPromptProcessed: 29, nDecoded: 1110 })] }),
+    ),
+  ).toBe('generating');
   // One slot generating, another one reading a prompt: the prompt phase wins (it is the one moving data).
   expect(
     phaseOf(

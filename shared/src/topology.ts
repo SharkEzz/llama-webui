@@ -93,7 +93,9 @@ export function phaseOf(state: ServerState | undefined, snapshot: Snapshot | nul
   if (state.kind === 'starting' || snapshot?.health === 'loading') return 'loading';
   const busy = (snapshot?.slots ?? []).filter((s) => s.processing);
   if (busy.length === 0) return 'idle';
-  return busy.some((s) => s.nPromptProcessed < s.nPromptTokens) ? 'prompt' : 'generating';
+  // Pas encore de token généré : le prompt est en cours. `n_prompt_tokens` ne s'y prête pas : c'est le contexte du
+  // slot, qui grossit des tokens générés, et `n_prompt_tokens_processed` exclut ce qui vient du cache.
+  return busy.some((s) => s.nDecoded === 0) ? 'prompt' : 'generating';
 }
 
 /** Débit utile par voie et par sens (octets/s), après encodage : Gen1 8b/10b, Gen3+ 128b/130b. */
