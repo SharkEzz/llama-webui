@@ -7,10 +7,13 @@ import { ChatRuns } from './chat/runs';
 import { cliOptionsOrExit } from './cli';
 import { BenchRunsRepo } from './db/benchRuns';
 import { ConversationsRepo } from './db/conversations';
+import { DownloadsRepo } from './db/downloads';
 import { openDb } from './db/open';
 import { ProfilesRepo } from './db/profiles';
 import { SettingsRepo } from './db/settings';
 import { SweepsRepo } from './db/sweeps';
+import { HfClient } from './hf/client';
+import { DownloadQueue } from './hf/downloader';
 import { PlacementTracker } from './monitor/placement';
 import { dbPath } from './paths';
 import { buildWebRoutes, unavailableWebRoutes } from './routes/web';
@@ -96,6 +99,17 @@ monitor.setModelPathResolver((id) => {
   const p = profiles.get(id);
   return p ? profilePaths(p).model : null;
 });
+// Hugging Face downloads: recreated on every reload, the new queue resumes the `.part` the old one let go of.
+const hf = new HfClient();
+const downloadsRepo = new DownloadsRepo(db);
+const downloads = new DownloadQueue({
+  repo: downloadsRepo,
+  hf,
+  onItem: (i) => hub.broadcast({ type: 'download', payload: i }),
+  onLive: (l) => hub.broadcast({ type: 'download-progress', payload: l }),
+  onDeleted: (ids) => hub.broadcast({ type: 'download-deleted', payload: { ids } }),
+});
+downloads.resume();
 // Model placement (startup logs): recreated on every reload, it replays the surviving ring.
 const placement = new PlacementTracker({ logs, supervisor });
 
@@ -109,6 +123,9 @@ const server = createApp({
   benchRuns,
   benchRunner,
   sweeps,
+  hf,
+  downloads,
+  downloadsRepo,
   runtime,
   monitor,
   placement,
@@ -129,6 +146,7 @@ const unsubPlacement = placement.onChange((p) => hub.broadcast({ type: 'placemen
 const stopChats = () => {
   chatRuns.dispose();
   benchRunner.dispose({ restart: false });
+  downloads.dispose();
 };
 process.prependListener('SIGINT', stopChats);
 process.prependListener('SIGTERM', stopChats);
@@ -157,6 +175,8 @@ g.__llamaWebuiDispose = () => {
   // Reload: a one-off run is interrupted, the sweep item is queued again; the gate (runtime) is handed to the
   // new module, or restarts the server if nobody takes it over.
   benchRunner.dispose({ restart: true });
+  // The running download stops; its `.part` and its row stay for the new module.
+  downloads.dispose();
   db.close();
 };
 

@@ -1,7 +1,7 @@
 import type { ModelEntry } from '@llama-webui/shared';
-import { Boxes, RefreshCw, Search } from 'lucide-react';
+import { Boxes, Download, RefreshCw, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { GLASS } from '@/components/glass/glass';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -11,9 +11,11 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatBytes, formatInt, formatParams } from '@/lib/format';
+import { queueProgress, useDownloads } from '@/lib/downloads';
+import { formatBytes, formatInt, formatParams, formatPct } from '@/lib/format';
 import { useModels } from '@/lib/models';
 import { cn } from '@/lib/utils';
+import { DownloadSheet } from './hf/DownloadSheet';
 import { ModelDetailDialog } from './ModelDetailDialog';
 
 type KindFilter = 'model' | 'mmproj' | 'all';
@@ -26,7 +28,12 @@ export function ModelsPage() {
   const { list, error, loading, refresh } = useModels();
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<KindFilter>('model');
-  const [open, setOpen] = useState<string | null>(null);
+  // Detail dialog in the URL (`?open=<path>`): the “Details” action of a finished download opens it.
+  const [params, setParams] = useSearchParams();
+  const open = params.get('open');
+  const setOpen = (path: string | null) => setParams(path ? { open: path } : {}, { replace: true });
+  const [sheet, setSheet] = useState(false);
+  const progress = useDownloads((s) => queueProgress(s.items, s.live));
   useEffect(() => void refresh(), [refresh]);
 
   const q = query.trim().toLowerCase();
@@ -42,9 +49,15 @@ export function ModelsPage() {
           <h1 className="text-3xl font-semibold tracking-tight">Models</h1>
           {list && <p className="font-mono text-sm text-muted-foreground">{list.dir}</p>}
         </div>
-        <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw className={cn(loading && 'animate-spin')} /> Rescan
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setSheet(true)}>
+            <Download /> Download
+            {progress !== null && <span className="num text-muted-foreground">· {formatPct(progress * 100)}</span>}
+          </Button>
+          <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
+            <RefreshCw className={cn(loading && 'animate-spin')} /> Rescan
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -62,7 +75,10 @@ export function ModelsPage() {
           <AlertTitle>No GGUF files in {list.setting}</AlertTitle>
           <AlertDescription>
             <p>
-              Put models in this folder or change it in{' '}
+              <button type="button" className="underline underline-offset-4" onClick={() => setSheet(true)}>
+                Download one from Hugging Face
+              </button>
+              , put models in this folder or change it in{' '}
               <Link to="/settings" className="underline underline-offset-4">
                 Settings
               </Link>
@@ -150,6 +166,14 @@ export function ModelsPage() {
         </GlassCard>
       )}
       <ModelDetailDialog path={open} onClose={() => setOpen(null)} />
+      <DownloadSheet
+        open={sheet}
+        onOpenChange={setSheet}
+        onShow={(path) => {
+          setSheet(false);
+          setOpen(path);
+        }}
+      />
     </div>
   );
 }

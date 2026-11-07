@@ -1,4 +1,5 @@
 import type { BenchLive, BenchRun } from './bench';
+import type { DownloadItem, DownloadLive } from './hf';
 import type { LogLine } from './logs';
 import type { Snapshot } from './monitor';
 import type { ServerView } from './server';
@@ -19,4 +20,7 @@ export type WsMessage =
   | { type: 'sweep-progress'; payload: SweepLive | null }
   | { type: 'sweep'; payload: Sweep } // on every sweep change (status, counters, best)
   | { type: 'sweep-deleted'; payload: { id: number } }
-  | { type: 'placement'; payload: ModelPlacement | null }; // placement of the loaded model, on every change
+  | { type: 'placement'; payload: ModelPlacement | null } // placement of the loaded model, on every change
+  | { type: 'download-progress'; payload: DownloadLive | null } // throttled; null when the queue is idle
+  | { type: 'download'; payload: DownloadItem } // on every status change
+  | { type: 'download-deleted'; payload: { ids: number[] } };

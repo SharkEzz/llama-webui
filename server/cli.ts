@@ -31,6 +31,12 @@ Options:
   -h, --help             show this help
 
 A flag takes precedence over the matching environment variable.
+
+Hugging Face downloads (Models page):
+  HF_TOKEN               access token (gated or private repos, higher rate limits); without it, the token
+                         saved by \`hf auth login\` is used (HF_TOKEN_PATH, else $HF_HOME/token,
+                         default ~/.cache/huggingface/token)
+  HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
 `;
 
 function parsePort(raw: string, source: string): number | string {

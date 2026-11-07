@@ -111,6 +111,25 @@ export const MIGRATIONS: string[] = [
   `CREATE INDEX bench_runs_by_date ON bench_runs(created_at DESC);`,
   // 15
   `CREATE INDEX bench_runs_by_sweep ON bench_runs(sweep_id, id);`,
+  // 16 — Hugging Face download queue (files_json = DownloadFile[]; dir = absolute destination folder)
+  `CREATE TABLE downloads(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo TEXT NOT NULL,
+    revision TEXT NOT NULL,
+    variant_key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    quant TEXT,
+    kind TEXT NOT NULL,
+    dir TEXT NOT NULL,
+    files_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    bytes_done INTEGER NOT NULL DEFAULT 0,
+    total_bytes INTEGER NOT NULL,
+    error TEXT,
+    code TEXT,
+    created_at INTEGER NOT NULL,
+    finished_at INTEGER
+  );`,
 ];
 
 export function runMigrations(db: Database): void {
