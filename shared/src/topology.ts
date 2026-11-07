@@ -46,6 +46,7 @@ export interface PlacementBuffer {
   /** Adresse PCI du device (ligne « using device »), null pour l'hôte ou si non loggée. */
   busId: string | null;
   modelBytes: number;
+  /** Cache KV, plus l'état récurrent (« RS ») des modèles hybrides. */
   kvBytes: number;
   computeBytes: number;
 }

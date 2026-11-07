@@ -13,7 +13,8 @@ const LAUNCH = '[llama-webui] lancement:';
 const PREFIX = /^(?:\d+\.\d+(?:\.\d+)*\s+[IWEDT]\s+)?/;
 const USING = /using device (\S+) \(.*\) \(([0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f])\)/i;
 const LAYERS = /offloaded (\d+)\/(\d+) layers to GPU/;
-const BUFFER = /(\S+) (model|KV|compute) buffer size =\s*([\d.]+) MiB/;
+/** `RS` : état des couches récurrentes d'un modèle hybride (Mamba, DeltaNet…), l'équivalent de leur cache KV. */
+const BUFFER = /(\S+) (model|KV|RS|compute) buffer size =\s*([\d.]+) MiB/;
 /** Un nouveau contexte (le principal, puis celui du draft ou du MTP) : il a ses propres buffers compute. */
 const CONTEXT = /llama_context: constructing llama_context/;
 /** Nouvelle réservation du contexte en cours : ses buffers compute remplacent ceux de la précédente. */
@@ -77,7 +78,7 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
     }
     const bytes = Number(m[3]) * MiB;
     if (m[2] === 'model') b.modelBytes += bytes;
-    else if (m[2] === 'KV') b.kvBytes += bytes;
+    else if (m[2] === 'KV' || m[2] === 'RS') b.kvBytes += bytes;
     else {
       const ctx = contexts.at(-1)!;
       ctx.set(device, (ctx.get(device) ?? 0) + bytes);
