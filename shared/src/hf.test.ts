@@ -23,6 +23,15 @@ describe('parseHfInput', () => {
     });
   });
 
+  test('a malformed escape in a URL does not throw', () => {
+    expect(parseHfInput('huggingface.co/org/name/blob/main/model%2')).toEqual({
+      kind: 'repo',
+      repo: 'org/name',
+      file: 'model%2',
+      quant: null,
+    });
+  });
+
   test('Hugging Face URLs', () => {
     expect(parseHfInput('https://huggingface.co/unsloth/Qwen3-0.6B-GGUF')).toMatchObject({
       kind: 'repo',

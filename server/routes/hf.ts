@@ -25,7 +25,7 @@ export function hfRoutes({ hf, downloads, downloadsRepo, settings }: HfRouteDeps
       GET: guarded(async (req) => {
         const q = (new URL(req.url).searchParams.get('q') ?? '').trim();
         if (!q || q.length > 200) throw new HttpError(400, 'Search text expected (200 characters at most)');
-        return Response.json(await hf.search(q));
+        return Response.json(await hf.search(q, { signal: req.signal }));
       }),
     },
     '/api/hf/repo': {
@@ -33,8 +33,8 @@ export function hfRoutes({ hf, downloads, downloadsRepo, settings }: HfRouteDeps
         const q = new URL(req.url).searchParams;
         const repo = await describeRepo(hf, q.get('id') ?? '', {
           modelsDir: modelsDir(),
-          active: downloadsRepo.active(),
           revision: q.get('revision') || undefined,
+          signal: req.signal,
         });
         return Response.json(repo);
       }),
@@ -61,7 +61,7 @@ export function hfRoutes({ hf, downloads, downloadsRepo, settings }: HfRouteDeps
       }),
     },
     '/api/downloads/:id/retry': {
-      POST: guarded((req) => Response.json(downloads.retry(idParam(req, 'Download')), { status: 202 })),
+      POST: guarded(async (req) => Response.json(await downloads.retry(idParam(req, 'Download')), { status: 202 })),
     },
   };
 }

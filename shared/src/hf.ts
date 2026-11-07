@@ -15,6 +15,15 @@ export type HfInput =
   /** `file`: path inside the repo (blob/resolve URL); `quant`: `org/repo:Q4_K_M` (llama.cpp `-hf` syntax). */
   | { kind: 'repo'; repo: string; file: string | null; quant: string | null };
 
+/** A URL path segment, decoded; kept as typed if its escapes are malformed (`%2`). */
+const decodePart = (p: string) => {
+  try {
+    return decodeURIComponent(p);
+  } catch {
+    return p;
+  }
+};
+
 /** What the user typed in the download search box: a repo id, a Hugging Face URL, or a free search. */
 export function parseHfInput(raw: string): HfInput {
   const s = raw.trim();
@@ -23,7 +32,7 @@ export function parseHfInput(raw: string): HfInput {
     ? URL.parse(/^https?:\/\//i.test(s) ? s : `https://${s}`)
     : null;
   if (url && HF_HOSTS.has(url.hostname.toLowerCase())) {
-    const parts = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+    const parts = url.pathname.split('/').filter(Boolean).map(decodePart);
     const [org, name, kind, _rev, ...rest] = parts;
     if (org && name && !NOT_ORG.has(org) && HF_REPO_RE.test(`${org}/${name}`)) {
       const file = (kind === 'blob' || kind === 'resolve') && rest.length > 0 ? rest.join('/') : null;
@@ -82,8 +91,6 @@ export interface HfVariant {
   files: HfFile[];
   totalBytes: number;
   present: HfPresence;
-  /** Queued or downloading. */
-  queued: boolean;
 }
 
 export interface HfRepo {

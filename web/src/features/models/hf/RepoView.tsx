@@ -1,6 +1,13 @@
-import { type HfRepo, type HfVariant, isDownloadActive, type VramFit, vramFit } from '@llama-webui/shared';
+import {
+  type DownloadItem,
+  type HfRepo,
+  type HfVariant,
+  isDownloadActive,
+  type VramFit,
+  vramFit,
+} from '@llama-webui/shared';
 import { ArrowLeft, Check, Download, ExternalLink, Lock } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { TONE_VAR, type Tone } from '@/components/glass/tones';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -52,17 +59,24 @@ export interface RepoHint {
   quant: string | null;
 }
 
-/** A repository's GGUF variants, with what is on disk or queued; mount with `key={id}`. */
+/**
+ * A repository's GGUF variants, with what is on disk or queued; mount with `key={id}`. `delayMs`: wait before asking
+ * the Hub (an id being typed remounts it on every keystroke); `notFound`: shown under a “not found” error.
+ */
 export function RepoView({
   id,
   hint,
   endpoint,
   onBack,
+  delayMs = 0,
+  notFound,
 }: {
   id: string;
   hint: RepoHint;
   endpoint: string;
   onBack?: () => void;
+  delayMs?: number;
+  notFound?: ReactNode;
 }) {
   const [repo, setRepo] = useState<HfRepo | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -71,25 +85,40 @@ export function RepoView({
   const items = useDownloads((s) => s.items);
   const enqueue = useDownloads((s) => s.enqueue);
   const vram = useVramBytes();
+  // Hub ids are case-insensitive: the items hold the canonical one, `id` is what was typed.
+  const lid = id.toLowerCase();
+  const ofRepo = (i: DownloadItem) => i.repo.toLowerCase() === lid;
   // A download of this repo that finishes changes what is on disk: list again.
-  const doneHere = items.filter((i) => i.repo === id && i.status === 'done').length;
+  const doneHere = items.filter((i) => ofRepo(i) && i.status === 'done').length;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: doneHere is a trigger (reload when a download of this repo finishes)
+  /** Only the first load waits for `delayMs`: a reload after a download is not typing. */
+  const firstLoad = useRef(true);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: doneHere is a trigger (reload when a download of this repo finishes); delayMs is only read for the first load
   useEffect(() => {
     const ac = new AbortController();
-    getHfRepo(id, ac.signal).then(
-      (r) => {
-        setRepo(r);
-        setError(null);
+    const t = setTimeout(
+      () => {
+        firstLoad.current = false;
+        getHfRepo(id, ac.signal).then(
+          (r) => {
+            setRepo(r);
+            setError(null);
+          },
+          (e: unknown) => {
+            if (!ac.signal.aborted) setError(e instanceof ApiError ? e : new ApiError(0, String(e)));
+          },
+        );
       },
-      (e: unknown) => {
-        if (!ac.signal.aborted) setError(e instanceof ApiError ? e : new ApiError(0, String(e)));
-      },
+      firstLoad.current ? delayMs : 0,
     );
-    return () => ac.abort();
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [id, doneHere]);
 
-  const queued = new Set(items.filter((i) => i.repo === id && isDownloadActive(i.status)).map((i) => i.key));
+  const queued = new Set(items.filter((i) => ofRepo(i) && isDownloadActive(i.status)).map((i) => i.key));
   const back = onBack && (
     <Button size="xs" variant="ghost" className="w-fit" onClick={onBack}>
       <ArrowLeft /> Results
@@ -116,6 +145,7 @@ export function RepoView({
             )}
           </AlertDescription>
         </Alert>
+        {error.code === 'hf-not-found' && notFound}
       </div>
     );
   if (!repo)

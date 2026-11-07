@@ -69,19 +69,27 @@ export class HfClient {
     return { 'user-agent': USER_AGENT, ...(token ? { authorization: `Bearer ${token}` } : {}), ...extra };
   }
 
-  private async api<T>(path: string, repo?: string): Promise<T> {
+  /** `signal`: the request of the client (a closed sheet, a new keystroke): the Hub call is dropped with it. */
+  private async api<T>(path: string, o: { repo?: string; signal?: AbortSignal } = {}): Promise<T> {
     const { token } = await this.auth();
+    const timeout = AbortSignal.timeout(this.timeoutMs);
     let res: Response;
     try {
       res = await this.fetch(`${this.endpoint}${path}`, {
         headers: this.headers(token),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        signal: o.signal ? AbortSignal.any([timeout, o.signal]) : timeout,
       });
     } catch (e) {
       throw unreachable(e);
     }
-    if (!res.ok) throw hfHttpError(res, { repo, hasToken: token !== null });
-    return (await res.json()) as T;
+    if (!res.ok) throw hfHttpError(res, { repo: o.repo, hasToken: token !== null });
+    try {
+      return (await res.json()) as T;
+    } catch (e) {
+      // A proxy or captive portal answering 200 with an HTML page: not the client's JSON (400).
+      if (o.signal?.aborted) throw unreachable(e);
+      throw new HttpError(502, `Hugging Face sent an invalid response (${path.split('?')[0]})`, 'hf-unreachable');
+    }
   }
 
   async status(): Promise<HfStatus> {
@@ -105,13 +113,13 @@ export class HfClient {
   }
 
   /** GGUF repositories matching `q`, most downloaded first. */
-  async search(q: string, limit = 30): Promise<HfSearchHit[]> {
+  async search(q: string, o: { limit?: number; signal?: AbortSignal } = {}): Promise<HfSearchHit[]> {
     const params = new URLSearchParams({ search: q, filter: 'gguf', sort: 'downloads', direction: '-1' });
-    params.set('limit', String(limit));
+    params.set('limit', String(o.limit ?? 30));
     for (const f of ['downloads', 'likes', 'gated', 'lastModified']) params.append('expand[]', f);
     const rows = await this.api<
       { id: string; downloads?: number; likes?: number; gated?: boolean | string; lastModified?: string }[]
-    >(`/api/models?${params}`);
+    >(`/api/models?${params}`, { signal: o.signal });
     return rows.map((r) => ({
       id: r.id,
       downloads: r.downloads ?? 0,
@@ -122,14 +130,14 @@ export class HfClient {
   }
 
   /** The files of a repository at `revision` (branch, tag or commit), with size and sha256, and the resolved commit. */
-  async repoFiles(id: string, revision = 'main'): Promise<RepoFiles> {
+  async repoFiles(id: string, revision = 'main', signal?: AbortSignal): Promise<RepoFiles> {
     if (!HF_REPO_RE.test(id)) throw new HttpError(400, `Invalid repository id: ${id}`);
     const info = await this.api<{
       id: string;
       sha: string;
       gated?: boolean | string;
       siblings?: { rfilename: string; size?: number; lfs?: { sha256: string; size: number } }[];
-    }>(`/api/models/${id}/revision/${encodeURIComponent(revision)}?blobs=true`, id);
+    }>(`/api/models/${id}/revision/${encodeURIComponent(revision)}?blobs=true`, { repo: id, signal });
     return {
       id: info.id,
       sha: info.sha,

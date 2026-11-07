@@ -11,7 +11,8 @@ import { QueueList } from './QueueList';
 import { RepoView } from './RepoView';
 
 const DEFAULT_ENDPOINT = 'https://huggingface.co';
-const SEARCH_DEBOUNCE_MS = 300;
+/** Wait after the last keystroke before asking the Hub (search, or a repo id being typed). */
+const DEBOUNCE_MS = 300;
 
 /** Compact count: “1.2M”, “45.3k”, “812”. */
 const compact = (n: number) => (n >= 1e6 ? `${fmt(n / 1e6, 1)}M` : n >= 1e3 ? `${fmt(n / 1e3, 1)}k` : formatInt(n));
@@ -45,6 +46,7 @@ function TokenLine({ status }: { status: HfStatus | null }) {
   );
 }
 
+/** Search results for `q`; mount with `key={q}` (no hits or error of the previous text under the new one). */
 function SearchResults({ q, onPick }: { q: string; onPick(id: string): void }) {
   const [hits, setHits] = useState<HfSearchHit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ function SearchResults({ q, onPick }: { q: string; onPick(id: string): void }) {
         },
         (e: unknown) => !ac.signal.aborted && setError(e instanceof Error ? e.message : String(e)),
       );
-    }, SEARCH_DEBOUNCE_MS);
+    }, DEBOUNCE_MS);
     return () => {
       clearTimeout(t);
       ac.abort();
@@ -151,9 +153,7 @@ export function DownloadSheet({
         </div>
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-5 px-4 pb-4">
-            {parsed.kind === 'repo' ? (
-              <RepoView key={parsed.repo} id={parsed.repo} hint={parsed} endpoint={endpoint} />
-            ) : picked ? (
+            {picked ? (
               <RepoView
                 key={picked}
                 id={picked}
@@ -161,8 +161,18 @@ export function DownloadSheet({
                 endpoint={endpoint}
                 onBack={() => setPicked(null)}
               />
+            ) : parsed.kind === 'repo' ? (
+              <RepoView
+                key={parsed.repo}
+                id={parsed.repo}
+                hint={parsed}
+                endpoint={endpoint}
+                delayMs={DEBOUNCE_MS}
+                // `org/name` may also be the start of a search (`bartowski/Llama`): offer its results.
+                notFound={<SearchResults key={parsed.repo} q={parsed.repo} onPick={setPicked} />}
+              />
             ) : parsed.kind === 'query' ? (
-              <SearchResults q={parsed.q} onPick={setPicked} />
+              <SearchResults key={parsed.q} q={parsed.q} onPick={setPicked} />
             ) : (
               <p className="text-sm text-muted-foreground">
                 Files go to <code>&lt;models folder&gt;/&lt;org&gt;/&lt;repo&gt;/</code>, one download at a time; an

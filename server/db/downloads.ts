@@ -126,8 +126,14 @@ export class DownloadsRepo {
     return this.get(id)!;
   }
 
-  /** Back to the queue (retry): the files already in place stay done. */
+  /**
+   * Back to the queue (retry). No file is trusted as done any more (a canceled item's were deleted, others may have
+   * been since): the queue checks each one on disk again and skips those still in place.
+   */
   requeue(id: number): DownloadItem {
+    const item = this.get(id)!;
+    const files = item.files.map((f) => ({ ...f, done: false }));
+    this.db.run('UPDATE downloads SET files_json = ?, bytes_done = 0 WHERE id = ?', [JSON.stringify(files), id]);
     return this.setStatus(id, 'queued');
   }
 

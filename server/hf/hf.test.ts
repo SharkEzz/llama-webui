@@ -148,6 +148,8 @@ describe('HfClient', () => {
     expect(await code(() => new Response('', { status: 401 }))).toBe('hf-unauthorized');
     expect(await code(() => new Response('', { status: 429 }))).toBe('hf-rate-limited');
     expect(await code(() => new Response('', { status: 503 }))).toBe('hf-unreachable');
+    // A proxy answering 200 with a page: the Hub is the problem, not the client's JSON.
+    expect(await code(() => new Response('<html>', { status: 200 }))).toBe('hf-unreachable');
     expect(
       await client(() => {
         throw new TypeError('fetch failed');

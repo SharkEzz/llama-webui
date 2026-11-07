@@ -1,4 +1,4 @@
-import type { DownloadItem, HfPresence, HfRepo, HfVariant } from '@llama-webui/shared';
+import type { HfPresence, HfRepo, HfVariant } from '@llama-webui/shared';
 import type { DownloadInput } from '../db/downloads';
 import { HttpError } from '../http';
 import type { HfClient } from './client';
@@ -17,23 +17,17 @@ async function presence(dir: string, v: RepoVariant): Promise<HfPresence> {
   return complete === v.files.length ? 'complete' : complete > 0 || some ? 'partial' : 'none';
 }
 
-/** A repository as the download sheet shows it: its GGUF variants, what is already on disk or in the queue. */
+/** A repository as the download sheet shows it: its GGUF variants and what is already on disk (the queue: the UI's). */
 export async function describeRepo(
   hf: Pick<HfClient, 'repoFiles' | 'endpoint'>,
   id: string,
-  o: { modelsDir: string; active: DownloadItem[]; revision?: string },
+  o: { modelsDir: string; revision?: string; signal?: AbortSignal },
 ): Promise<HfRepo> {
-  const info = await hf.repoFiles(id, o.revision);
+  const info = await hf.repoFiles(id, o.revision, o.signal);
   const dir = repoDir(o.modelsDir, info.id);
   const { variants, projectors } = groupRepoFiles(info.files);
   const withState = (vs: RepoVariant[]): Promise<HfVariant[]> =>
-    Promise.all(
-      vs.map(async (v) => ({
-        ...v,
-        present: await presence(dir, v),
-        queued: o.active.some((a) => a.repo === info.id && a.key === v.key),
-      })),
-    );
+    Promise.all(vs.map(async (v) => ({ ...v, present: await presence(dir, v) })));
   return {
     id: info.id,
     sha: info.sha,

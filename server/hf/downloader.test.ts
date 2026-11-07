@@ -212,6 +212,19 @@ describe('DownloadQueue', () => {
     expect(new Uint8Array(await s.file('m.gguf').arrayBuffer())).toEqual(body);
   });
 
+  test('a body that ends early without an error is resumed, not started over; the hash is not read again', async () => {
+    const body = data(5000);
+    const s = setup({ 'm.gguf': body });
+    s.hub.script(() => new Response(body.slice(0, 2000), { status: 200 }));
+    const { queue, repo, onLive } = s.make();
+    const [item] = await queue.enqueue([s.input('m.gguf')]);
+    await queue.idle();
+    expect(repo.get(item!.id)!.status).toBe('done');
+    expect(s.hub.cdnCalls().map((c) => c.range)).toEqual([null, 'bytes=2000-']);
+    expect(onLive.mock.calls.some(([l]) => l?.phase === 'verifying')).toBe(false);
+    expect(new Uint8Array(await s.file('m.gguf').arrayBuffer())).toEqual(body);
+  });
+
   test('network errors are retried, then the item fails once the retries are spent', async () => {
     const s = setup({ 'm.gguf': data(100) });
     const down = () => {
@@ -269,10 +282,54 @@ describe('DownloadQueue', () => {
     expect(await s.file('a.gguf.part').exists()).toBe(false);
     expect(existsSync(s.repoDir)).toBe(false); // the folders it created are gone too
     expect(s.hub.cdnCalls().map((c) => new URL(c.url).pathname)).toEqual(['/a.gguf']);
-    expect(() => queue.retry(a!.id)).not.toThrow();
+    await queue.retry(a!.id);
     await queue.idle();
     expect(repo.get(a!.id)!.status).toBe('done');
     await expect(queue.cancel(a!.id)).rejects.toThrow(HttpError);
+  });
+
+  test('retrying a canceled split model downloads again the shards the cancel deleted', async () => {
+    const files = { 'm-00001-of-00002.gguf': data(1000, 1), 'm-00002-of-00002.gguf': data(3000, 2) };
+    const s = setup(files);
+    s.hub.script(
+      () => null,
+      (c) => cut(files['m-00002-of-00002.gguf'].slice(0, 500), c.signal, { hang: true }),
+    );
+    const { queue, repo } = s.make();
+    const [item] = await queue.enqueue([s.input('m-00001-of-00002.gguf', Object.keys(files))]);
+    await until(async () => (await s.file('m-00002-of-00002.gguf.part').size) === 500);
+    expect(repo.get(item!.id)!.files[0]!.done).toBe(true);
+    await queue.cancel(item!.id);
+    await queue.idle();
+    expect(await s.file('m-00001-of-00002.gguf').exists()).toBe(false);
+    await queue.retry(item!.id);
+    await queue.idle();
+    expect(repo.get(item!.id)).toMatchObject({ status: 'done', bytesDone: 4000 });
+    for (const [p, b] of Object.entries(files)) expect(new Uint8Array(await s.file(p).arrayBuffer())).toEqual(b);
+  });
+
+  test('concurrent or repeated requests for one variant queue it once; retry refuses a variant already queued', async () => {
+    const s = setup({ 'm.gguf': data(1000) });
+    const { queue, repo } = s.make();
+    await expect(queue.enqueue([s.input('m.gguf'), s.input('m.gguf')])).rejects.toMatchObject({ status: 400 });
+    s.hub.script((c) => cut(data(1000).slice(0, 10), c.signal, { hang: true }));
+    const both = await Promise.allSettled([queue.enqueue([s.input('m.gguf')]), queue.enqueue([s.input('m.gguf')])]);
+    expect(both.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(repo.active()).toHaveLength(1);
+    const [running] = repo.active();
+    // An older failed item for the same variant cannot be put back next to it.
+    const old = repo.setStatus(repo.create(s.input('m.gguf')).id, 'error', { finished: true });
+    await expect(queue.retry(old.id)).rejects.toMatchObject({ code: 'already-queued' });
+    await queue.cancel(running!.id);
+    await queue.idle();
+  });
+
+  test('retry checks the disk space like a new download', async () => {
+    const s = setup({ 'm.gguf': data(1000) }, { free: 500 });
+    const { queue, repo } = s.make();
+    const failed = repo.setStatus(repo.create(s.input('m.gguf')).id, 'error', { code: 'disk-full', finished: true });
+    await expect(queue.retry(failed.id)).rejects.toMatchObject({ status: 507, code: 'disk-full' });
+    expect(repo.get(failed.id)!.status).toBe('error');
   });
 
   test('refuses a duplicate and a download that does not fit on the disk; skips files already there', async () => {

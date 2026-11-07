@@ -50,6 +50,13 @@ class Retryable extends Error {}
 /** 416: the `.part` does not match the file any more; deleted, then retried from the start. */
 class RangeRejected extends Retryable {}
 
+/** sha256 of the first `bytes` of a file's `.part`: kept across the attempts of an item, so a retry does not re-read it. */
+interface HashState {
+  path: string;
+  hasher: InstanceType<typeof Bun.CryptoHasher>;
+  bytes: number;
+}
+
 interface Current {
   id: number;
   ac: AbortController;
@@ -59,6 +66,7 @@ interface Current {
   progressed: boolean;
   lastEmit: number;
   lastBytes: number;
+  hash: HashState | null;
 }
 
 const isEnospc = (e: unknown) => (e as { code?: string })?.code === 'ENOSPC';
@@ -101,6 +109,8 @@ export class DownloadQueue {
   /** Work was added since the loop last looked at the queue. */
   private dirty = false;
   private disposed = false;
+  /** Serializes enqueue() and retry(): the already-queued and disk space checks must see each other's rows. */
+  private serial: Promise<unknown> = Promise.resolve();
   private readonly fetch: typeof fetch;
   private readonly now: () => number;
   private readonly sleep: (ms: number, signal: AbortSignal) => Promise<void>;
@@ -141,39 +151,30 @@ export class DownloadQueue {
    * Queues downloads. Files already in place (same size) are left out, a variant with nothing left is skipped;
    * refuses a variant already in the queue, or a total that does not fit on the disk.
    */
-  async enqueue(inputs: DownloadInput[]): Promise<DownloadItem[]> {
-    const active = this.deps.repo.active();
-    for (const i of inputs)
-      if (active.some((a) => a.repo === i.repo && a.key === i.key))
-        throw new HttpError(409, `${i.name} is already in the download queue`, 'already-queued');
-
-    const todo: DownloadInput[] = [];
-    let need = 0;
-    for (const i of inputs) {
-      const files: DownloadInput['files'] = [];
-      for (const f of i.files) {
-        const dest = fileDest(i.dir, f.path);
-        if ((await sizeOf(dest)) === f.size) continue;
-        files.push(f);
-        need += f.size - Math.min((await sizeOf(partPath(dest))) ?? 0, f.size);
+  enqueue(inputs: DownloadInput[]): Promise<DownloadItem[]> {
+    return this.exclusive(async () => {
+      const seen = new Set<string>();
+      for (const i of inputs) {
+        if (seen.has(i.key)) throw new HttpError(400, `${i.name} is listed twice`);
+        seen.add(i.key);
+        this.refuseQueued(i.repo, i.key, i.name);
       }
-      if (files.length > 0) todo.push({ ...i, files });
-    }
-    if (todo.length === 0) return [];
-    // What the queue ahead still has to write lands on the same disk most of the time.
-    for (const a of active) need += Math.max(0, a.totalBytes - a.bytesDone);
-    const free = await this.freeBytes(todo[0]!.dir);
-    if (free !== null && free < need + this.marginBytes)
-      throw new HttpError(
-        507,
-        `Not enough disk space: ${fmtBytes(need)} to download (plus ${fmtBytes(this.marginBytes)} margin), ${fmtBytes(free)} free`,
-        'disk-full',
-      );
 
-    const items = todo.map((i) => this.deps.repo.create(i));
-    for (const item of items) this.deps.onItem(item);
-    this.kick();
-    return items;
+      const todo: DownloadInput[] = [];
+      let need = 0;
+      for (const i of inputs) {
+        const left = await this.remaining(i.dir, i.files);
+        need += left.bytes;
+        if (left.files.length > 0) todo.push({ ...i, files: left.files });
+      }
+      if (todo.length === 0) return [];
+      await this.checkSpace(todo[0]!.dir, need);
+
+      const items = todo.map((i) => this.deps.repo.create(i));
+      for (const item of items) this.deps.onItem(item);
+      this.kick();
+      return items;
+    });
   }
 
   /** Cancels a queued or running item: its partial and finished files are deleted. */
@@ -188,8 +189,12 @@ export class DownloadQueue {
     }
     // Out of the queue first: the loop must not pick it up while its files are being deleted.
     const canceled = this.deps.repo.setStatus(id, 'canceled', { finished: true });
-    await this.discard(item);
-    this.deps.onItem(canceled);
+    try {
+      await this.discard(item);
+    } finally {
+      // Canceled either way: the other clients must stop showing it as queued (a failed delete still answers 500).
+      this.deps.onItem(canceled);
+    }
   }
 
   /** Removes a finished item from the list (its files stay). */
@@ -201,16 +206,23 @@ export class DownloadQueue {
     this.deps.onDeleted([id]);
   }
 
-  /** Puts a failed or canceled item back in the queue (the files already in place are kept). */
-  retry(id: number): DownloadItem {
-    const item = this.deps.repo.get(id);
-    if (!item) throw notFound('Download');
-    if (item.status !== 'error' && item.status !== 'canceled')
-      throw new HttpError(409, 'Only a failed or canceled download can be retried', 'not-finished');
-    const next = this.deps.repo.requeue(id);
-    this.deps.onItem(next);
-    this.kick();
-    return next;
+  /**
+   * Puts a failed or canceled item back in the queue. Its files are checked on disk again when it runs (a canceled
+   * item's were deleted): those still in place are kept.
+   */
+  retry(id: number): Promise<DownloadItem> {
+    return this.exclusive(async () => {
+      const item = this.deps.repo.get(id);
+      if (!item) throw notFound('Download');
+      if (item.status !== 'error' && item.status !== 'canceled')
+        throw new HttpError(409, 'Only a failed or canceled download can be retried', 'not-finished');
+      this.refuseQueued(item.repo, item.key, item.name);
+      await this.checkSpace(item.dir, (await this.remaining(item.dir, item.files)).bytes);
+      const next = this.deps.repo.requeue(id);
+      this.deps.onItem(next);
+      this.kick();
+      return next;
+    });
   }
 
   clearFinished(): number[] {
@@ -225,10 +237,48 @@ export class DownloadQueue {
     this.current?.ac.abort(new Error('disposed'));
   }
 
+  private exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.serial.then(fn, fn);
+    this.serial = run.catch(() => {});
+    return run;
+  }
+
+  private refuseQueued(repo: string, key: string, name: string): void {
+    if (this.deps.repo.active().some((a) => a.repo === repo && a.key === key))
+      throw new HttpError(409, `${name} is already in the download queue`, 'already-queued');
+  }
+
+  /** The files not in place yet (same size), and the bytes they still need (their `.part` counts as written). */
+  private async remaining<F extends { path: string; size: number }>(dir: string, files: F[]) {
+    const left: F[] = [];
+    let bytes = 0;
+    for (const f of files) {
+      const dest = fileDest(dir, f.path);
+      if ((await sizeOf(dest)) === f.size) continue;
+      left.push(f);
+      bytes += f.size - Math.min((await sizeOf(partPath(dest))) ?? 0, f.size);
+    }
+    return { files: left, bytes };
+  }
+
+  /** Refuses `need` bytes more if they do not fit next to what the queue still has to write (507). */
+  private async checkSpace(dir: string, need: number): Promise<void> {
+    // What the queue ahead still has to write lands on the same disk most of the time.
+    for (const a of this.deps.repo.active()) need += Math.max(0, a.totalBytes - a.bytesDone);
+    const free = await this.freeBytes(dir);
+    if (free !== null && free < need + this.marginBytes)
+      throw new HttpError(
+        507,
+        `Not enough disk space: ${fmtBytes(need)} to download (plus ${fmtBytes(this.marginBytes)} margin), ${fmtBytes(free)} free`,
+        'disk-full',
+      );
+  }
+
   private kick(): void {
     this.dirty = true;
     if (this.loopP || this.disposed) return;
-    const p = this.loop();
+    // process() handles its own errors: what gets here (the database failing…) is logged, the item is resumed later.
+    const p = this.loop().catch((e: unknown) => console.error('[llama-webui] download queue stopped:', e));
     this.loopP = p;
     void p.finally(() => {
       if (this.loopP === p) this.loopP = null;
@@ -253,9 +303,8 @@ export class DownloadQueue {
     this.deps.onLive(cur.live);
   }
 
+  /** Called for every chunk: only builds (and emits) a new DownloadLive once per `liveEveryMs`. */
   private progress(cur: Current, bytes: number): void {
-    // A new object: the last one emitted may still be held by a listener.
-    cur.live = { ...cur.live, bytesDone: bytes };
     const t = this.now();
     const dt = t - cur.lastEmit;
     if (dt < this.liveEveryMs) return;
@@ -264,6 +313,7 @@ export class DownloadQueue {
     cur.lastBytes = bytes;
     this.setLive(cur, {
       phase: 'downloading',
+      bytesDone: bytes,
       bps: cur.live.bps > 0 ? 0.7 * cur.live.bps + 0.3 * inst : inst,
       retryAt: null,
     });
@@ -305,6 +355,7 @@ export class DownloadQueue {
       progressed: false,
       lastEmit: this.now(),
       lastBytes: doneBytes(start.files),
+      hash: null,
     };
     this.current = cur;
     let item = start.status === 'downloading' ? start : this.deps.repo.setStatus(start.id, 'downloading');
@@ -315,6 +366,8 @@ export class DownloadQueue {
         if (file.done) continue;
         await this.withRetries(cur, item, file, doneBytes(item.files));
         if (this.disposed) return;
+        // Canceled while the file was being checked or renamed: the attempt did not look at the signal again.
+        if (cur.canceled) throw cur.ac.signal.reason;
         item = this.deps.repo.fileDone(item.id, file.path);
       }
       this.finish(item.id, 'done');
@@ -357,15 +410,19 @@ export class DownloadQueue {
   private async fetchFile(cur: Current, item: DownloadItem, file: DownloadFile, base: number): Promise<void> {
     const dest = fileDest(item.dir, file.path);
     const part = partPath(dest);
-    // Put in place in the meantime (e.g. by the previous module instance, just before a reload).
-    if ((await sizeOf(dest)) === file.size) return;
-    // The previous module instance may still be writing this `.part`.
-    await this.handover.idle;
+    // The previous module instance may still be writing this `.part` (bun --hot): wait for every holder before us.
+    // Chained, so that two waiters never get in together.
+    const prev = this.handover.idle;
     let release!: () => void;
-    this.handover.idle = new Promise<void>((r) => {
+    const mine = new Promise<void>((r) => {
       release = r;
     });
+    this.handover.idle = prev.then(() => mine);
     try {
+      await prev;
+      if (cur.ac.signal.aborted) throw cur.ac.signal.reason;
+      // Put in place in the meantime (e.g. by the previous module instance, just before a reload).
+      if ((await sizeOf(dest)) === file.size) return;
       await mkdir(dirname(dest), { recursive: true });
       let offset = (await sizeOf(part)) ?? 0;
       if (offset > file.size) {
@@ -373,22 +430,17 @@ export class DownloadQueue {
         offset = 0;
       }
       this.setLive(cur, { phase: 'downloading', file: file.path, bytesDone: base + offset, retryAt: null });
-      const state = { hasher: file.sha256 ? new Bun.CryptoHasher('sha256') : null };
-      if (offset > 0 && state.hasher) {
-        this.setLive(cur, { phase: 'verifying', bps: 0, retryAt: null });
-        for await (const chunk of Bun.file(part).slice(0, offset).stream()) {
-          if (cur.ac.signal.aborted) throw cur.ac.signal.reason;
-          state.hasher.update(chunk);
-        }
-      }
-      if (offset < file.size) await this.transfer(cur, item, file, part, offset, state, base);
+      const hash = file.sha256 ? await this.hashOf(cur, file.path, part, offset) : null;
+      if (offset < file.size) await this.transfer(cur, item, file, part, offset, hash, base);
 
-      const size = await sizeOf(part);
+      const size = (await sizeOf(part)) ?? 0;
       if (size !== file.size) {
-        await rm(part, { force: true });
-        throw new Retryable(`${file.path}: got ${size ?? 0} of ${file.size} bytes`);
+        // Short (the body ended early): kept and resumed. Too long: it cannot be this file.
+        if (size > file.size) await rm(part, { force: true });
+        throw new Retryable(`${file.path}: got ${size} of ${file.size} bytes`);
       }
-      if (state.hasher && state.hasher.digest('hex') !== file.sha256) {
+      cur.hash = null;
+      if (hash && hash.hasher.digest('hex') !== file.sha256) {
         await rm(part, { force: true });
         throw new HttpError(422, `Checksum mismatch for ${file.path}: the file was deleted`, 'checksum-mismatch');
       }
@@ -398,14 +450,35 @@ export class DownloadQueue {
     }
   }
 
-  /** GET of the file from `offset`, appended to the `.part`. */
+  /**
+   * The sha256 state of the first `offset` bytes of the `.part`: the one of the previous attempt if it covers exactly
+   * them, else read again from the disk (after a restart, a reload, or a write that failed half-way).
+   */
+  private async hashOf(cur: Current, path: string, part: string, offset: number): Promise<HashState> {
+    const kept = cur.hash;
+    if (kept && kept.path === path && kept.bytes === offset) return kept;
+    cur.hash = null;
+    const hash: HashState = { path, hasher: new Bun.CryptoHasher('sha256'), bytes: 0 };
+    if (offset > 0) {
+      this.setLive(cur, { phase: 'verifying', bps: 0, retryAt: null });
+      for await (const chunk of Bun.file(part).slice(0, offset).stream()) {
+        if (cur.ac.signal.aborted) throw cur.ac.signal.reason;
+        hash.hasher.update(chunk);
+        hash.bytes += chunk.byteLength;
+      }
+    }
+    cur.hash = hash;
+    return hash;
+  }
+
+  /** GET of the file from `offset`, appended to the `.part` (and to `hash`, which follows what is on disk). */
   private async transfer(
     cur: Current,
     item: DownloadItem,
     file: DownloadFile,
     part: string,
     offset: number,
-    state: { hasher: InstanceType<typeof Bun.CryptoHasher> | null },
+    hash: HashState | null,
     base: number,
   ): Promise<void> {
     const stall = new AbortController();
@@ -436,7 +509,10 @@ export class DownloadQueue {
       } else if (offset > 0) {
         // The server ignored the Range header: start over.
         start = 0;
-        if (state.hasher) state.hasher = new Bun.CryptoHasher('sha256');
+        if (hash) {
+          hash.hasher = new Bun.CryptoHasher('sha256');
+          hash.bytes = 0;
+        }
       }
       fh = await open(part, start > 0 ? 'a' : 'w');
       let written = start;
@@ -446,8 +522,12 @@ export class DownloadQueue {
       if (!res.body) throw new Retryable(`${file.path}: empty response`);
       for await (const chunk of res.body) {
         bump();
-        state.hasher?.update(chunk);
+        // Written first: a chunk that failed to land on disk must not be hashed.
         await fh.write(chunk);
+        if (hash) {
+          hash.hasher.update(chunk);
+          hash.bytes += chunk.byteLength;
+        }
         written += chunk.byteLength;
         cur.progressed = true;
         this.progress(cur, base + written);

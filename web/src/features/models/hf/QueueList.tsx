@@ -1,4 +1,4 @@
-import { type DownloadItem, type DownloadLive, isDownloadActive } from '@llama-webui/shared';
+import { type DownloadItem, isDownloadActive } from '@llama-webui/shared';
 import { Check, ExternalLink, RotateCcw, Trash2, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,9 @@ const MAX_FINISHED = 20;
 
 /** The download queue: running and queued items first, then the last finished ones. */
 export function QueueList({ endpoint, onShow }: { endpoint: string; onShow(path: string): void }) {
-  const { items, live, clearFinished } = useDownloads();
+  // No `live` here: only the running row follows the progress messages (4 per second).
+  const items = useDownloads((s) => s.items);
+  const clearFinished = useDownloads((s) => s.clearFinished);
   const active = items.filter((i) => isDownloadActive(i.status));
   const finished = items
     .filter((i) => !isDownloadActive(i.status))
@@ -30,25 +32,17 @@ export function QueueList({ endpoint, onShow }: { endpoint: string; onShow(path:
       </div>
       <ul className="flex flex-col gap-2">
         {[...active, ...finished].map((i) => (
-          <QueueRow key={i.id} item={i} live={live?.id === i.id ? live : null} endpoint={endpoint} onShow={onShow} />
+          <QueueRow key={i.id} item={i} endpoint={endpoint} onShow={onShow} />
         ))}
       </ul>
     </section>
   );
 }
 
-function QueueRow({
-  item,
-  live,
-  endpoint,
-  onShow,
-}: {
-  item: DownloadItem;
-  live: DownloadLive | null;
-  endpoint: string;
-  onShow(path: string): void;
-}) {
-  const { cancel, retry, remove } = useDownloads();
+function QueueRow({ item, endpoint, onShow }: { item: DownloadItem; endpoint: string; onShow(path: string): void }) {
+  const cancel = useDownloads((s) => s.cancel);
+  const retry = useDownloads((s) => s.retry);
+  const remove = useDownloads((s) => s.remove);
   const active = isDownloadActive(item.status);
   return (
     <li className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-background/40 p-2.5">
@@ -90,18 +84,18 @@ function QueueRow({
           </div>
         )}
       </div>
-      <RowStatus item={item} live={live} endpoint={endpoint} />
+      <RowStatus item={item} endpoint={endpoint} />
     </li>
   );
 }
 
-function RowStatus({ item, live, endpoint }: { item: DownloadItem; live: DownloadLive | null; endpoint: string }) {
+function RowStatus({ item, endpoint }: { item: DownloadItem; endpoint: string }) {
   const total = formatBytes(item.totalBytes);
   switch (item.status) {
     case 'queued':
       return <p className="text-xs text-muted-foreground">Queued · {total}</p>;
     case 'downloading':
-      return <Running item={item} live={live} />;
+      return <Running item={item} />;
     case 'done':
       return (
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -129,7 +123,8 @@ function RowStatus({ item, live, endpoint }: { item: DownloadItem; live: Downloa
   }
 }
 
-function Running({ item, live }: { item: DownloadItem; live: DownloadLive | null }) {
+function Running({ item }: { item: DownloadItem }) {
+  const live = useDownloads((s) => (s.live?.id === item.id ? s.live : null));
   const now = useNow(1000);
   const done = live?.bytesDone ?? item.bytesDone;
   const pct = item.totalBytes > 0 ? (done / item.totalBytes) * 100 : 0;

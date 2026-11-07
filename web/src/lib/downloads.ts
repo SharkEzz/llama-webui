@@ -18,8 +18,11 @@ export const searchHf = (q: string, signal?: AbortSignal) =>
 export const getHfRepo = (id: string, signal?: AbortSignal) =>
   api<HfRepo>(`/hf/repo?id=${encodeURIComponent(id)}`, { signal });
 
-/** Absolute path of a downloaded item's model (its first shard): what the models list and the detail dialog use. */
-export const downloadPath = (i: DownloadItem) => `${i.dir}/${i.files[0]?.path ?? i.key}`;
+/**
+ * Absolute path of a downloaded item's model (its first shard): what the models list and the detail dialog use.
+ * The key, not `files[0]`: shards already on disk when it was queued are not in `files`.
+ */
+export const downloadPath = (i: DownloadItem) => `${i.dir}/${i.key}`;
 
 interface DownloadsState {
   items: DownloadItem[];
