@@ -34,6 +34,36 @@ test('parsePlacement: real llama-server start, buffers summed per device, bus id
   expect(by.get('CUDA_Host')).toMatchObject({ busId: null, modelBytes: 0, computeBytes: 63.98 * MiB });
 });
 
+test('parsePlacement: the main model only, not a draft model (-md) nor the mmproj buffers', async () => {
+  const main = (await fixture()).split('\n');
+  const loaded = main.findIndex((l) => l.includes('model loaded'));
+  const text = [
+    main[0]!,
+    // mmproj memory estimate, logged before the main model loads
+    'reserve_compute_meta:      CUDA0 compute buffer size =    50.00 MiB',
+    ...main.slice(1, loaded),
+    // draft model
+    'llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 5070 Ti) (0000:01:00.0) - 2000 MiB free',
+    'load_tensors: offloaded 25/25 layers to GPU',
+    'load_tensors:        CUDA0 model buffer size =   500.00 MiB',
+    'llama_kv_cache:      CUDA0 KV buffer size =    10.00 MiB',
+    'sched_reserve:      CUDA0 compute buffer size =    20.00 MiB',
+    // mmproj
+    'clip_ctx: CLIP using CUDA0 backend',
+    'reserve_compute_meta:      CUDA0 compute buffer size =    50.00 MiB',
+    ...main.slice(loaded),
+  ].join('\n');
+  const p = parsePlacement(lines(text))!;
+  expect(p.layers).toEqual({ offloaded: 49, total: 49 });
+  expect(p.buffers.find((b) => b.device === 'CUDA0')).toEqual({
+    device: 'CUDA0',
+    busId: '0000:01:00.0',
+    modelBytes: 12441.95 * MiB,
+    kvBytes: 80 * MiB,
+    computeBytes: 285.56 * MiB,
+  });
+});
+
 test('parsePlacement: only the last launch counts; no launch → null; bare lines (no timestamp) parse too', async () => {
   const first = lines(await fixture());
   const second = lines(

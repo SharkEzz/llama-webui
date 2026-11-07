@@ -14,11 +14,17 @@ const PREFIX = /^(?:\d+\.\d+(?:\.\d+)*\s+[IWEDT]\s+)?/;
 const USING = /using device (\S+) \(.*\) \(([0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f])\)/i;
 const LAYERS = /offloaded (\d+)\/(\d+) layers to GPU/;
 const BUFFER = /(\S+) (model|KV|compute) buffer size =\s*([\d.]+) MiB/;
+/** Buffers du projecteur multimodal (mmproj, clip.cpp) : pas le modèle, et estimés avant même son chargement. */
+const MMPROJ = /^(?:clip\w*|(?:reserve|alloc)_compute_meta):/;
 
 /** Une ligne qui peut changer le placement : évite de relire tout le ring à chaque lot de logs de requêtes. */
 export const RELEVANT = /lancement:|using device|buffer size =|offloaded \d+\/\d+ layers/;
 
-/** Placement issu du dernier lancement présent dans `lines` ; null sans ligne de lancement (ring vidé ou évincé). */
+/**
+ * Placement du modèle principal issu du dernier lancement présent dans `lines` ; null sans ligne de lancement (ring
+ * vidé ou évincé). llama-server charge le modèle principal (poids, cache KV, compute), puis le draft éventuel (-md),
+ * puis le mmproj : le second « offloaded N/M layers » ouvre le draft et clôt la lecture.
+ */
 export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null {
   let start = -1;
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -40,11 +46,12 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
     }
     m = LAYERS.exec(body);
     if (m) {
+      if (layers) break;
       layers = { offloaded: Number(m[1]), total: Number(m[2]) };
       continue;
     }
     m = BUFFER.exec(body);
-    if (!m) continue;
+    if (!m || MMPROJ.test(body)) continue;
     const device = m[1]!;
     let b = buffers.get(device);
     if (!b) {
