@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type { ModelEntry, ModelSummary } from "@llama-webui/shared";
@@ -18,7 +19,10 @@ export function groupGgufFiles(relPaths: string[]): { main: string; files: strin
     }
     const key = `${m[1]}|${m[3]}`;
     let g = shards.get(key);
-    if (!g) shards.set(key, (g = { total: Number(m[3]), parts: new Set() }));
+    if (!g) {
+      g = { total: Number(m[3]), parts: new Set() };
+      shards.set(key, g);
+    }
     g.parts.add(Number(m[2]));
   }
   for (const [key, g] of shards) {
@@ -34,7 +38,7 @@ export function groupGgufFiles(relPaths: string[]): { main: string; files: strin
 
 /** Les `*.gguf` sous `dir` (chemins relatifs) ; les noms commençant par « . » sont ignorés, les liens de dossiers pas suivis. */
 async function walk(dir: string, rel = ""): Promise<string[]> {
-  let entries;
+  let entries: Dirent[];
   try {
     entries = await readdir(join(dir, rel), { withFileTypes: true });
   } catch {

@@ -13,6 +13,7 @@ export function useServerProps(): ServerProps | null {
   const kind = useServer((s) => s.view?.state.kind)
   const pid = useServer((s) => (s.view && "pid" in s.view.state ? s.view.state.pid : null))
   const [props, setProps] = useState<ServerProps | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: pid est un déclencheur : /props est relu à chaque redémarrage du serveur
   useEffect(() => {
     if (kind !== "ready" && kind !== "external") {
       setProps(null)

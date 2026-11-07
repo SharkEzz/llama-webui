@@ -328,11 +328,14 @@
   display: none;
 }
 /* repère en trait (comme la marque) : la bordure haute garde la couleur de la série posée par uPlot */
+/* biome-ignore lint/style/noDescendingSpecificity: l'ordre est volontaire : propriétés distinctes */
 .ts-chart .u-legend .u-marker {
   height: 0;
   width: 0.875rem;
+  /* biome-ignore lint/complexity/noImportantStyles: écrase la bordure posée par uPlot */
   border-width: 2px 0 0 0 !important;
   border-radius: 1px;
+  /* biome-ignore lint/complexity/noImportantStyles: écrase le fond posé par uPlot */
   background: transparent !important;
 }
 .ts-chart .u-cursor-x {
@@ -346,6 +349,7 @@
 .shiki,
 .shiki span {
   color: var(--shiki-light);
+  /* biome-ignore lint/complexity/noImportantStyles: écrase le fond posé par shiki */
   background-color: transparent !important;
 }
 .dark .shiki,

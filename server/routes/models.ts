@@ -43,7 +43,7 @@ export function modelRoutes({ db, settings }: { db: Database; settings: Settings
           ))
         )
           throw notFound("Fichier");
-        let info;
+        let info: Awaited<ReturnType<typeof readModel>>;
         try {
           info = await readModel(path);
         } catch (e) {

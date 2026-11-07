@@ -21,7 +21,10 @@ export function onWs<T extends WsMessage["type"]>(
   fn: (msg: Extract<WsMessage, { type: T }>) => void,
 ): () => void {
   let set = listeners.get(type)
-  if (!set) listeners.set(type, (set = new Set()))
+  if (!set) {
+    set = new Set()
+    listeners.set(type, set)
+  }
   set.add(fn as Listener)
   return () => set.delete(fn as Listener)
 }

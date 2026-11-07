@@ -50,13 +50,14 @@ export function TimeSeriesChart({
   const fmt = useRef(format)
   fmt.current = format
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version déclenche la relecture de l'historique (lu hors closure) ; signature résume `series`
   const data = useMemo((): uPlot.AlignedData => {
     const { times, series: all } = useMonitor.getState().history
     return [times, ...series.map((s) => all.get(s.key) ?? new Array<number | null>(times.length).fill(null))]
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version, signature])
 
   // Création : par jeu de séries, thème (couleurs lues des variables CSS) et forme.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: création par signature/thème/forme ; data est poussée par l'effet suivant (pas de recréation à chaque tick)
   useEffect(() => {
     const el = host.current
     if (!el) return
@@ -109,7 +110,6 @@ export function TimeSeriesChart({
       plot.current = null
     }
     // data : poussées par l'effet suivant, pas de recréation à chaque tick.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, resolved, height, yMax, compact])
 
   useEffect(() => {

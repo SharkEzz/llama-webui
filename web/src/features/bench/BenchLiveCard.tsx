@@ -19,6 +19,7 @@ export function BenchLiveCard() {
   // Les dernières lignes restent visibles : défilement en bas à chaque lot.
   const logRef = useRef<HTMLPreElement>(null)
   const lines = live?.lines
+  // biome-ignore lint/correctness/useExhaustiveDependencies: lines est un déclencheur : défilement en bas à chaque lot
   useEffect(() => {
     const el = logRef.current
     if (el) el.scrollTop = el.scrollHeight

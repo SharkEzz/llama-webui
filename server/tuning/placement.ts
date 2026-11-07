@@ -88,7 +88,10 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
       : used.map((d) => d.freeMib || d.totalMib);
   const sum = ts.reduce((a, b) => a + b, 0);
   let acc = 0;
-  const cum = ts.map((x) => (acc += x) / sum);
+  const cum = ts.map((x) => {
+    acc += x;
+    return acc / sum;
+  });
   const deviceAt = (i: number): string => {
     if (used.length === 0 || i < start) return CPU;
     if (params.sm === "none" || used.length === 1) return used[0]!.id;

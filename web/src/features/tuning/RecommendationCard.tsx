@@ -203,7 +203,10 @@ function PinEditor({ pin, flag, initial }: { pin: PinKey; flag: string; initial:
       open={open}
       onOpenChange={(o) => {
         setOpen(o)
-        if (o) setText(initial), setError(null)
+        if (o) {
+          setText(initial)
+          setError(null)
+        }
       }}
     >
       <PopoverTrigger render={<Button variant="ghost" size="icon-xs" aria-label={`Imposer ${flag}`} />}>
@@ -223,7 +226,10 @@ function PinEditor({ pin, flag, initial }: { pin: PinKey; flag: string; initial:
           <Input
             autoFocus
             value={text}
-            onChange={(e) => (setText(e.target.value), setError(null))}
+            onChange={(e) => {
+              setText(e.target.value)
+              setError(null)
+            }}
             className="font-mono"
             aria-invalid={error ? true : undefined}
           />

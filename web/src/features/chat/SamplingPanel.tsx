@@ -35,7 +35,9 @@ export function SamplingPanel({ props }: { props: ServerProps | null }) {
   const patch = useChat((s) => s.patch)
   const [errors, setErrors] = useState<Partial<Record<Key | "systemPrompt", string>>>({})
   const [system, setSystem] = useState(current?.systemPrompt ?? "")
+  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id et systemPrompt sont des déclencheurs de resynchronisation du champ
   useEffect(() => setSystem(current?.systemPrompt ?? ""), [current?.id, current?.systemPrompt])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id est un déclencheur : remise à zéro des erreurs au changement de conversation
   useEffect(() => setErrors({}), [current?.id])
   if (!current) return null
 

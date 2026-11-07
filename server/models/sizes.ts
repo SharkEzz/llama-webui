@@ -37,7 +37,10 @@ export function weightSizes(tensors: TensorInfo[]): WeightSizes {
     if (m) {
       const index = Number(m[1]);
       let l = layers.get(index);
-      if (!l) layers.set(index, (l = { index, expertsBytes: 0, otherBytes: 0 }));
+      if (!l) {
+        l = { index, expertsBytes: 0, otherBytes: 0 };
+        layers.set(index, l);
+      }
       if (EXPERTS.test(t.name)) l.expertsBytes += t.bytes;
       else l.otherBytes += t.bytes;
     } else if (t.name.startsWith("token_embd.")) embedBytes += t.bytes;

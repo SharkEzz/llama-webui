@@ -26,6 +26,7 @@ export function TuningPage() {
   }, [])
 
   // ?sweep=<id> ouvre ce sweep ; sinon le sweep qui tourne s'affiche de lui-même.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: seul ?sweep déclenche l'ouverture ; openId est lu à jour
   useEffect(() => {
     if (wanted !== null && wanted !== openId) void useTuning.getState().open(wanted)
   }, [wanted])
@@ -34,6 +35,7 @@ export function TuningPage() {
   }, [wanted, liveId, openId])
   // L'URL suit le sweep ouvert quand il change (lancement, fermeture, suppression) ; pas au montage, où ?sweep= attend encore.
   const prevOpen = useRef(openId)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: seul openId déclenche la synchro de l'URL ; wanted et setParams sont lus à jour
   useEffect(() => {
     if (prevOpen.current === openId) return
     prevOpen.current = openId

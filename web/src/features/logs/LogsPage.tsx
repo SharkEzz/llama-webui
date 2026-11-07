@@ -123,6 +123,7 @@ export function LogsPage() {
       </div>
 
       <div className={cn(GLASS, "relative min-h-0 flex-1 overflow-hidden")}>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: gestes de défilement qui coupent le suivi (molette, pointeur, clavier) */}
         <div
           ref={scroller}
           className="h-full overflow-auto p-3"
@@ -142,6 +143,7 @@ export function LogsPage() {
             else if (!atBottom && follow && userScroll.current) setFollow(false)
             if (atBottom) userScroll.current = false
           }}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: la zone défilante doit être atteignable au clavier
           tabIndex={0}
         >
           {lines.length === 0 ? (

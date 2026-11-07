@@ -33,6 +33,7 @@ export function SweepCard() {
   const [confirm, setConfirm] = useState<"resume" | "validate" | null>(null)
   const now = useNow(1000)
   const logRef = useRef<HTMLPreElement>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: live.lines est un déclencheur : défilement en bas à chaque lot
   useEffect(() => {
     const el = logRef.current
     if (el) el.scrollTop = el.scrollHeight

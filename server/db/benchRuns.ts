@@ -201,12 +201,24 @@ export class BenchRunsRepo {
   list(f: BenchFilter = {}): BenchRun[] {
     const where: string[] = [];
     const args: (string | number)[] = [];
-    if (f.kind) where.push("kind = ?"), args.push(f.kind);
-    if (f.modelPath) where.push("model_path = ?"), args.push(f.modelPath);
-    if (f.status) where.push("status = ?"), args.push(f.status);
+    if (f.kind) {
+      where.push("kind = ?");
+      args.push(f.kind);
+    }
+    if (f.modelPath) {
+      where.push("model_path = ?");
+      args.push(f.modelPath);
+    }
+    if (f.status) {
+      where.push("status = ?");
+      args.push(f.status);
+    }
     const sweep = f.sweepId ?? "none";
     if (sweep === "none") where.push("sweep_id IS NULL");
-    else if (sweep !== "all") where.push("sweep_id = ?"), args.push(sweep);
+    else if (sweep !== "all") {
+      where.push("sweep_id = ?");
+      args.push(sweep);
+    }
     const order = typeof sweep === "number" ? "id ASC" : "created_at DESC, id DESC";
     const sql = `SELECT * FROM bench_runs${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY ${order} LIMIT ?`;
     return this.db

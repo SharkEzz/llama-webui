@@ -13,8 +13,7 @@ export class SseParser {
   push(chunk: string): SseEvent[] {
     this.buffer += chunk;
     const out: SseEvent[] = [];
-    let nl: number;
-    while ((nl = this.buffer.indexOf("\n")) >= 0) {
+    for (let nl = this.buffer.indexOf("\n"); nl >= 0; nl = this.buffer.indexOf("\n")) {
       let line = this.buffer.slice(0, nl);
       this.buffer = this.buffer.slice(nl + 1);
       if (line.endsWith("\r")) line = line.slice(0, -1);

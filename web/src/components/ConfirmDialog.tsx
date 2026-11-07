@@ -16,7 +16,7 @@ interface ConfirmDialogProps {
   description: string
   confirmLabel: string
   destructive?: boolean
-  onConfirm(): void | Promise<unknown>
+  onConfirm(): unknown
   /** Élément déclencheur (un bouton). */
   trigger: ReactElement
 }

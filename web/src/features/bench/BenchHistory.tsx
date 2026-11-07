@@ -59,6 +59,7 @@ export function BenchHistory() {
   const focus = Number(params.get("run")) || null
 
   // ?run=<id> (depuis Tuning) : historique avec les sweeps, ligne sélectionnée et ramenée à l'écran, puis le paramètre est retiré.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: déclenché par ?run, les filtres et les runs ; selected, toggle et setParams sont relus à chaque exécution sans relancer l'effet
   useEffect(() => {
     if (focus === null) return
     if (filters.sweeps !== "all") return setFilters({ sweeps: "all" })

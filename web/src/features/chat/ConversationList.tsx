@@ -58,6 +58,7 @@ export function ConversationList({ onNew, onDeleted }: { onNew(): void; onDelete
                 aria-current={c.id === currentId ? "page" : undefined}
               >
                 {c.live && (
+                  // biome-ignore lint/a11y/useAriaPropsSupportedByRole: pastille « réponse en cours », libellé conservé tel quel
                   <span
                     className="size-2 shrink-0 animate-pulse rounded-full bg-success"
                     aria-label="réponse en cours"

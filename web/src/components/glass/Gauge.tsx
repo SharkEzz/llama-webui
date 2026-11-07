@@ -23,6 +23,7 @@ export function Gauge({ value, max = 100, label, unit = "%", size = 96, tone = "
   return (
     <figure className="inline-flex flex-col items-center gap-1.5" style={{ width: size }}>
       <div className="relative" style={{ width: size, height: size }}>
+        {/* biome-ignore lint/a11y/useSemanticElements: jauge SVG : <meter> n'est pas applicable à un <svg> */}
         <svg
           width={size}
           height={size}

@@ -247,8 +247,16 @@ function ValuesRow<T>(props: {
       ))}
       <Input
         value={text}
-        onChange={(e) => (setText(e.target.value), setError(null))}
-        onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), submit())}
+        onChange={(e) => {
+          setText(e.target.value)
+          setError(null)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault()
+            submit()
+          }
+        }}
         onBlur={submit}
         placeholder="ajouter…"
         aria-label={`Ajouter une valeur à ${props.flag}`}

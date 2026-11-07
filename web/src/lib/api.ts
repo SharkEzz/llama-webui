@@ -29,7 +29,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(0, "Serveur llama-webui injoignable")
   }
   const text = await res.text()
-  let body: unknown = undefined
+  let body: unknown
   if (text) {
     try {
       body = JSON.parse(text)

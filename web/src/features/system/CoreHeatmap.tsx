@@ -4,14 +4,17 @@ import { formatPct } from "@/lib/format"
 /** Une case par cœur logique ; l'intensité de --chart-1 suit la charge. */
 export function CoreHeatmap({ cores }: { cores: number[] }) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: liste de cases rendues par le déclencheur du tooltip
     <div
       className="grid grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1"
       role="list"
       aria-label="Charge par cœur"
     >
       {cores.map((pct, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: une case par cœur, l'index est l'identité du cœur
         <Tooltip key={i}>
           <TooltipTrigger
+            // biome-ignore lint/a11y/useSemanticElements: l'élément est rendu par le déclencheur du tooltip
             render={<div role="listitem" />}
             className="flex h-9 items-center justify-center rounded-md border border-border text-[0.65rem] text-muted-foreground num"
             style={{

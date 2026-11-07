@@ -240,7 +240,10 @@ function sweepOf(repo: BenchRunsRepo, sweeps: SweepsRepo, values: number[]) {
 const sweepEnd = (lives: (SweepLive | null)[]) =>
   new Promise<void>((resolve) => {
     const t = setInterval(() => {
-      if (lives.length > 0 && lives.at(-1) === null) clearInterval(t), resolve();
+      if (lives.length > 0 && lives.at(-1) === null) {
+        clearInterval(t);
+        resolve();
+      }
     }, 10);
   });
 

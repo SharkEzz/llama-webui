@@ -49,7 +49,12 @@ export function SweepHistory() {
                 aria-selected={s.id === openId}
                 className={cn("cursor-pointer", s.id === openId && "bg-accent/60")}
                 onClick={() => go(s.id)}
-                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), go(s.id))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    go(s.id)
+                  }
+                }}
               >
                 <TableCell className="max-w-56 truncate font-medium">{s.name}</TableCell>
                 <TableCell className="max-w-40 truncate font-mono text-xs" title={s.spec.modelPath}>

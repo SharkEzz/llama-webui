@@ -13,6 +13,7 @@ export function PresetPicker() {
         {PRESETS.map((p) => {
           const active = p.id === preset
           return (
+            // biome-ignore lint/a11y/useSemanticElements: boutons radio stylés (radiogroup personnalisé)
             <button
               key={p.id}
               type="button"

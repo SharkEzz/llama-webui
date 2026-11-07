@@ -36,7 +36,10 @@ export class History {
 
   series(key: string): Ring {
     let r = this.rings.get(key);
-    if (!r) this.rings.set(key, (r = new Ring(this.capacity)));
+    if (!r) {
+      r = new Ring(this.capacity);
+      this.rings.set(key, r);
+    }
     return r;
   }
 

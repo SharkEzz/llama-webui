@@ -86,8 +86,14 @@ export class SweepsRepo {
   setStatus(id: number, status: SweepStatus, o: { bestRunId?: number | null; finishedAt?: number | null } = {}): Sweep {
     const sets = ["status = ?"];
     const args: (string | number | null)[] = [status];
-    if (o.bestRunId !== undefined) sets.push("best_run_id = ?"), args.push(o.bestRunId);
-    if (o.finishedAt !== undefined) sets.push("finished_at = ?"), args.push(o.finishedAt);
+    if (o.bestRunId !== undefined) {
+      sets.push("best_run_id = ?");
+      args.push(o.bestRunId);
+    }
+    if (o.finishedAt !== undefined) {
+      sets.push("finished_at = ?");
+      args.push(o.finishedAt);
+    }
     this.db.run(`UPDATE sweeps SET ${sets.join(", ")} WHERE id = ?`, [...args, id]);
     return this.get(id)!;
   }

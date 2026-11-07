@@ -15,6 +15,7 @@ export function Thread({ canSend }: { canSend: boolean }) {
     const el = box.current
     if (el && stick.current) el.scrollTop = el.scrollHeight
   })
+  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id est un déclencheur : on recolle en bas à chaque changement de conversation
   useLayoutEffect(() => {
     stick.current = true
   }, [current?.id])

@@ -46,6 +46,7 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
         // HTML produit par shiki à partir du texte (échappé par shiki), pas du HTML de la réponse.
         <div
           className="overflow-x-auto px-3 py-2 font-mono text-[0.8rem] leading-6"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML produit par shiki à partir du texte (échappé), pas celui de la réponse
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (

@@ -222,6 +222,7 @@ function PropsCard() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : !props ? (
+        // biome-ignore lint/a11y/useAriaPropsSupportedByRole: libellé du squelette de chargement, conservé tel quel
         <div className="flex flex-col gap-3" aria-label="Lecture de /props…">
           {[0, 1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-5 w-full" />

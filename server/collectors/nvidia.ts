@@ -104,8 +104,7 @@ export class NvidiaMonitor {
       for await (const chunk of proc.stdout) {
         if (this.proc !== proc) return; // replaced (new interval) or stopped: its last lines would mix with the next stream's
         buf += decoder.decode(chunk, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) >= 0) {
+        for (let nl = buf.indexOf("\n"); nl >= 0; nl = buf.indexOf("\n")) {
           this.onLine(buf.slice(0, nl));
           buf = buf.slice(nl + 1);
         }
