@@ -40,7 +40,7 @@ Use `bun check` to type check the project. It reads `tsconfig.json` and reports 
 
 ## Format et lint (Biome)
 
-Biome (global, config dans `biome.json`) gère le format, le lint et le tri des imports. Style conservé : 2 espaces, guillemets doubles, 120 colonnes, point-virgules dans `server/` et `shared/`, **sans** point-virgule dans `web/` (style shadcn). `web/src/components/ui/**` (shadcn généré) n'est pas linté.
+Biome (global, config dans `biome.json`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`server/`, `shared/` et `web/`). `web/src/components/ui/**` (shadcn généré) est formaté mais pas linté : un `bunx shadcn add` y réintroduit le style shadcn (guillemets doubles, sans point-virgule), à corriger avec `bun run lint:fix`.
 
 - `bun run lint` : vérifie format + lint + imports (lecture seule) ; `bun run lint:fix` applique les corrections sûres.
 - **Avant de clore un jalon / milestone / lot de travail** (et avant de commiter ou d'ouvrir une PR), tout doit être vert : `bun run lint`, `bun run check`, `bun test`. Zéro erreur et zéro warning Biome.
