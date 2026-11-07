@@ -129,8 +129,21 @@ test('linkFlows: the model disk feeds its NVMe link; chipset sums what sits behi
   const f = linkFlows(graph, snapshot);
   expect(f.get('b')).toMatchObject({ fwdBps: 850e6, backBps: 5e6, capacityBps: 4 * 1.969e9 });
   expect(f.get('c')).toMatchObject({ fwdBps: null, backBps: null }); // nothing measurable behind it
-  expect(f.get('cpu-ram')).toMatchObject({ fwdBps: null, backBps: null, activity: 140, capacityBps: null });
+  expect(f.get('cpu-ram')).toMatchObject({ fwdBps: null, backBps: null, capacityBps: null });
   expect(f.get('e')).toMatchObject({ fwdBps: null, backBps: null, activity: null, capacityBps: null });
+});
+
+test('linkFlows: memory activity is a share of the whole machine (0–100), for llama-server as for the system', () => {
+  // llama-server at 140 % (1.4 cores) on the 12 threads of the CPU node.
+  expect(linkFlows(graph, snapshot).get('cpu-ram')!.activity).toBeCloseTo(140 / 12, 5);
+  // Thread count from the live per-core sample when there is one.
+  const sampled = { ...snapshot, system: { ...snapshot.system, corePct: Array(16).fill(0) } } as Snapshot;
+  expect(linkFlows(graph, sampled).get('cpu-ram')!.activity).toBeCloseTo(140 / 16, 5);
+  // Every thread busy: 100, not 1200.
+  const full = { ...snapshot, proc: { cpuPct: 1200, rssBytes: 0 } } as Snapshot;
+  expect(linkFlows(graph, full).get('cpu-ram')!.activity).toBe(100);
+  // No managed server: the machine's own load.
+  expect(linkFlows(graph, { ...snapshot, proc: null } as Snapshot).get('cpu-ram')!.activity).toBe(18);
 });
 
 test('linkFlows / nodeLive: with perf, the memory link carries measured DRAM traffic (writes forward, reads back)', () => {

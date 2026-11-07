@@ -21,7 +21,10 @@ export interface LinkFlow {
   fwdBps: number | null;
   /** Octets/s dans le sens aval → amont. */
   backBps: number | null;
-  /** Lien mémoire sans mesure perf : activité (CPU % de llama-server, sinon de la machine) en guise de repli. */
+  /**
+   * Lien mémoire sans mesure perf : activité CPU en % de la machine (0–100), celle de llama-server ramenée au nombre de
+   * threads, sinon celle de la machine, en guise de repli.
+   */
   activity: number | null;
   /** Capacité du lien dans son état courant (Gen/largeur du moment) et au maximum ; null = inconnue. */
   capacityBps: number | null;
@@ -54,6 +57,14 @@ const sum = (xs: (number | null)[]) => {
   return known.length === 0 ? null : known.reduce((a, b) => a + b, 0);
 };
 
+/** `proc.cpuPct` se compte en cœurs (jusqu'à N × 100) : ramené à la machine pour une échelle commune avec `system.cpuPct`. */
+function cpuActivity(snapshot: Snapshot | null, cpu: TopologyNode | undefined): number | null {
+  const threads = snapshot?.system?.corePct.length || Number(cpu?.detail.logicalThreads) || 0;
+  const proc = snapshot?.proc?.cpuPct;
+  if (proc != null && threads > 0) return Math.min(100, proc / threads);
+  return snapshot?.system?.cpuPct ?? null;
+}
+
 const gpuOf = (snapshot: Snapshot | null, node: TopologyNode): GpuSample | undefined =>
   node.busId ? snapshot?.allGpus.find((g) => g.busId === node.busId) : undefined;
 
@@ -82,7 +93,7 @@ export function linkFlows(graph: TopologyGraph, snapshot: Snapshot | null): Map<
         ...base(l),
         fwdBps: bw ? bw.writeBps : null,
         backBps: bw ? bw.readBps : null,
-        activity: bw ? null : (snapshot?.proc?.cpuPct ?? snapshot?.system?.cpuPct ?? null),
+        activity: bw ? null : cpuActivity(snapshot, byId.get(l.from)),
       });
     } else if (to.kind === 'gpu') {
       const g = gpuOf(snapshot, to);

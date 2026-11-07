@@ -337,8 +337,8 @@ function Link({ link, from, to, flow, color, colors, reducedMotion, smoother }: 
     const f = flowRef.current;
     let target: number;
     if (link.kind === 'memory' && f.fwdBps === null && f.backBps === null) {
-      // Sans mesure DRAM : pulsation dont la cadence suit l'activité CPU ; sans animation, une intensité fixe.
-      const a = Math.min(1, (f.activity ?? 0) / 200);
+      // Sans mesure DRAM : pulsation dont la cadence suit l'activité CPU (0–100) ; sans animation, une intensité fixe.
+      const a = Math.min(1, (f.activity ?? 0) / 100);
       target = reducedMotion
         ? 0.08 + 0.6 * a
         : 0.08 + a * (0.35 + 0.35 * Math.abs(Math.sin(clock.elapsedTime * (1 + 4 * a))));
