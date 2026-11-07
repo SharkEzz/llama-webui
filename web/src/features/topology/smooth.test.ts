@@ -1,13 +1,23 @@
 import { expect, test } from 'bun:test';
-import { flowVisual, Smoother } from './smooth';
+import { flowVisual, MAX_DT, Smoother } from './smooth';
 
 test('Smoother: exponential approach, first value snaps, unknown resets to zero', () => {
   const s = new Smoother(0.5);
   expect(s.step('a', 10, 0.016)).toBe(10); // first sample: no history, take it
-  const v = s.step('a', 0, 0.5); // one time constant later: ~37 % left
+  let v = 10;
+  for (let i = 0; i < 5; i++) v = s.step('a', 0, 0.1); // one time constant later: ~37 % left
   expect(v).toBeCloseTo(10 * Math.exp(-1), 3);
-  expect(s.step('a', 0, 10)).toBeCloseTo(0, 3);
+  for (let i = 0; i < 100; i++) v = s.step('a', 0, 0.1);
+  expect(v).toBeCloseTo(0, 3);
   expect(s.step('b', null, 1)).toBe(0);
+});
+
+test('Smoother: a frame after a long pause eases in (dt capped), it does not jump to the target', () => {
+  const s = new Smoother(0.5);
+  s.step('a', 0, 0.016);
+  // 30 s without a frame: counted as MAX_DT.
+  expect(s.step('a', 10, 30)).toBeCloseTo(10 * (1 - Math.exp(-MAX_DT / 0.5)), 6);
+  expect(s.takeMoving()).toBe(true);
 });
 
 test('flowVisual: log scale, nothing under 100 kB/s, bounded at 20 GB/s', () => {

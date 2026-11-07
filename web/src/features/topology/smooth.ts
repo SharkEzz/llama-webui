@@ -1,7 +1,12 @@
-/** Lissage exponentiel par clé, pour que les valeurs du tick (1 s) n'avancent pas par sauts dans la boucle de rendu. */
 /** Écart à la cible sous lequel une valeur lissée est arrivée (invisible : moins d'un niveau de couleur sur 8 bits). */
 const SETTLED = 2e-3;
+/**
+ * Pas de temps maximal (s) d'une image. La scène peut rester sans image (rien ne bouge) : la suivante arrive avec un
+ * `dt` de toute la pause, qui ferait sauter la valeur à sa cible au lieu de l'en approcher.
+ */
+export const MAX_DT = 0.1;
 
+/** Lissage exponentiel par clé, pour que les valeurs du tick (1 s) n'avancent pas par sauts dans la boucle de rendu. */
 export class Smoother {
   private v = new Map<string, number>();
   private moving = false;
@@ -16,7 +21,7 @@ export class Smoother {
       this.v.set(key, t);
       return t;
     }
-    const next = prev + (t - prev) * (1 - Math.exp(-dt / this.tau));
+    const next = prev + (t - prev) * (1 - Math.exp(-Math.min(dt, MAX_DT) / this.tau));
     this.v.set(key, next);
     if (Math.abs(t - next) > SETTLED) this.moving = true;
     return next;
