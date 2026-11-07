@@ -216,6 +216,17 @@
   }
 }
 
+/* Surfaces flottantes (listes de Select, menus, popovers) : même flou que le verre (GLASS), sinon le texte derrière
+   transparaît à travers --popover. Ciblées par data-slot : components/ui (shadcn) reste d'origine. */
+@layer components {
+  [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"] {
+    backdrop-filter: blur(var(--surface-blur));
+  }
+}
+
 /* Chiffres : mono à chasse fixe pour que les valeurs ne dansent pas. */
 @utility num {
   font-family: var(--font-mono);
