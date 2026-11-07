@@ -216,6 +216,17 @@
   }
 }
 
+/* Surfaces flottantes (listes de Select, menus, popovers) : même flou que le verre (GLASS), sinon le texte derrière
+   transparaît à travers --popover. Ciblées par data-slot : components/ui (shadcn) reste d'origine. */
+@layer components {
+  [data-slot="select-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="popover-content"] {
+    backdrop-filter: blur(var(--surface-blur));
+  }
+}
+
 /* Chiffres : mono à chasse fixe pour que les valeurs ne dansent pas. */
 @utility num {
   font-family: var(--font-mono);
@@ -276,20 +287,36 @@
 }
 
 @keyframes drift-1 {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(25%, 20%) scale(1.15); }
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(25%, 20%) scale(1.15);
+  }
 }
 @keyframes drift-2 {
-  from { transform: translate(0, 0) scale(1.05); }
-  to { transform: translate(-22%, 25%) scale(0.9); }
+  from {
+    transform: translate(0, 0) scale(1.05);
+  }
+  to {
+    transform: translate(-22%, 25%) scale(0.9);
+  }
 }
 @keyframes drift-3 {
-  from { transform: translate(0, 0) scale(0.95); }
-  to { transform: translate(25%, -20%) scale(1.12); }
+  from {
+    transform: translate(0, 0) scale(0.95);
+  }
+  to {
+    transform: translate(25%, -20%) scale(1.12);
+  }
 }
 @keyframes drift-4 {
-  from { transform: translate(0, 0) scale(1.1); }
-  to { transform: translate(-25%, -18%) scale(0.92); }
+  from {
+    transform: translate(0, 0) scale(1.1);
+  }
+  to {
+    transform: translate(-25%, -18%) scale(0.92);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -308,16 +335,18 @@
 .ts-chart .u-legend .u-value {
   @apply num text-foreground;
 }
-.ts-chart .u-legend .u-series:first-child .u-marker {
-  display: none;
-}
 /* repère en trait (comme la marque) : la bordure haute garde la couleur de la série posée par uPlot */
 .ts-chart .u-legend .u-marker {
   height: 0;
   width: 0.875rem;
+  /* biome-ignore lint/complexity/noImportantStyles: écrase la bordure posée par uPlot */
   border-width: 2px 0 0 0 !important;
   border-radius: 1px;
+  /* biome-ignore lint/complexity/noImportantStyles: écrase le fond posé par uPlot */
   background: transparent !important;
+}
+.ts-chart .u-legend .u-series:first-child .u-marker {
+  display: none;
 }
 .ts-chart .u-cursor-x {
   border-right: 1px solid var(--muted-foreground);
@@ -330,6 +359,7 @@
 .shiki,
 .shiki span {
   color: var(--shiki-light);
+  /* biome-ignore lint/complexity/noImportantStyles: écrase le fond posé par shiki */
   background-color: transparent !important;
 }
 .dark .shiki,

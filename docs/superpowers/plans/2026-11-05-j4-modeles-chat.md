@@ -36,11 +36,13 @@
 ### Task 1 : Lecture GGUF et scan des modèles (serveur)
 
 **Files:**
+
 - Create (copies adaptées de `../llama-tui`) : `server/models/gguf.ts`, `server/models/sizes.ts`, `server/models/gguf.test.ts` (de `test/gguf.test.ts`), `server/models/gguf.fixture.ts` (de `test/helpers/gguf.ts`)
 - Create : `shared/src/models.ts`, `server/models/scan.ts`, `server/models/scan.test.ts`, `server/db/modelCache.ts`, `server/routes/models.ts`, `shared/src/models.test.ts`
 - Modify : `server/package.json` (`@huggingface/gguf` à la version de llama-tui), `server/db/migrations.ts`, `server/app.ts`, `shared/src/index.ts`
 
 **Interfaces:**
+
 - `gguf.ts` copié tel quel (cache LRU en mémoire compris) ; `ModelInfo` gagne `kind: "model" | "mmproj"` (`mmproj` si `general.type === "mmproj"` ou `general.architecture === "clip"`) et `hasChatTemplate: boolean` (`tokenizer.chat_template` est une chaîne).
 - `shared/models.ts` :
   - `type ModelKind = "model" | "mmproj"`.
@@ -58,6 +60,7 @@
 
 - [ ] **Step 1 : Copier** `gguf.ts`, `sizes.ts`, le test et son écrivain de fixtures ; ajouter la dépendance (`bun install`).
 - [ ] **Step 2 : Tests qui échouent** — `server/models/gguf.test.ts` copié (attendus inchangés) + un cas « mmproj : `general.type` = mmproj → `kind: "mmproj"` » ; `scan.test.ts` :
+
   ```ts
   test("groupGgufFiles groups shards under the first and reports missing ones", () => {
     expect(groupGgufFiles(["a/Big-00002-of-00003.gguf", "small.gguf", "a/Big-00001-of-00003.gguf"])).toEqual([
@@ -72,6 +75,7 @@
     // 2e scan : 1 lecture (bad seulement, les erreurs ne sont pas en cache)
   });
   ```
+
   `shared/src/models.test.ts` : `profileModelPath("/h/Modèles/q/a.gguf", { modelsDir: "~/Modèles", home: "/h" })` → `{ cwd: "~/Modèles", model: "q/a.gguf" }` ; avec `cwd: "~/Modèles/q"` → `{ cwd: "~/Modèles/q", model: "a.gguf" }` ; avec `cwd: "/autre"` → `{ cwd: "/autre", model: "/h/Modèles/q/a.gguf" }`.
   Run : `bun test server/models shared/src/models.test.ts` — Expected : FAIL (modules absents ; les tests GGUF copiés passent dès la copie, sauf le cas mmproj).
 - [ ] **Step 3 : Implémenter** `shared/models.ts`, la migration, `ModelCacheRepo`, `scan.ts`, les routes.
@@ -83,11 +87,13 @@
 ### Task 2 : Page Modèles et sélecteur de modèle
 
 **Files:**
+
 - Create : `web/src/lib/models.ts`, `web/src/features/models/{ModelsPage,ModelDetailDialog,ModelPicker}.tsx`
 - Modify : `web/src/app/{router.tsx,routes.ts}`, `web/src/lib/format.ts`, `web/src/features/profiles/{ProfileForm,ProfilesPage}.tsx`
 - shadcn : `popover` (`bunx shadcn@latest docs popover` d'abord)
 
 **Interfaces:**
+
 - `lib/models.ts` : store zustand `useModels { list: ModelList | null; error: string | null; loading: boolean; refresh(): Promise<void> }`, chargé au premier usage.
 - `format.ts` : `formatParams(n)` → `27.3e9` = « 27,3 B », `600e6` = « 600 M », `0` = « — ».
 - `ModelsPage` : titre + dossier scanné + bouton « Rescanner » ; filtre texte (fichier, nom, archi, quant) et `Tabs` « Modèles · Projecteurs · Tous » ; `Table` : Fichier (`relPath`, `name` en dessous en `text-muted-foreground`), Archi, Quant (`Badge`), Taille, Paramètres, Couches, Contexte, Experts (« 128 / 8 » ou « — ») ; entrée illisible = ligne avec `Badge variant="destructive"` « illisible » et la raison ; aucun GGUF → `Alert` « Aucun fichier GGUF dans <dir> » avec lien vers Réglages ; chargement en `Skeleton`. Clic sur une ligne lisible → `ModelDetailDialog`.
@@ -105,10 +111,12 @@
 ### Task 3 : Conversations — données, SSE, API
 
 **Files:**
+
 - Create : `shared/src/chat.ts`, `shared/src/chat.test.ts`, `shared/src/sse.ts`, `shared/src/sse.test.ts`, `server/db/conversations.ts`, `server/routes/chat.ts`
 - Modify : `server/db/migrations.ts`, `server/app.ts`, `server/index.ts`, `shared/src/index.ts`
 
 **Interfaces:**
+
 - `shared/chat.ts` :
   - `SamplingSchema = z.strictObject({ temperature: 0–5, top_p: 0–1, top_k: entier 0–1000, min_p: 0–1, presence_penalty: −2–2, repeat_penalty: 0–5, max_tokens: entier 1–1 000 000, seed: entier })`, toutes optionnelles, messages d'erreur en français ; `type Sampling`.
   - `ConversationPatchSchema = z.strictObject({ title?: string 1–200 (trim), systemPrompt?: string ≤ 100 000, sampling?: Sampling, thinking?: boolean })` ; `type ConversationPatch`.
@@ -135,12 +143,15 @@
 ### Task 4 : Génération — relais en streaming, arrêt, régénération, rebranchement
 
 **Files:**
+
 - Create : `server/chat/request.ts`, `server/chat/request.test.ts`, `server/chat/runs.ts`, `server/chat/runs.test.ts`
 - Modify : `server/routes/chat.ts`, `server/app.ts`, `server/index.ts`, `testdata/fake/fake-llama-server.ts`
 
 **Interfaces:**
+
 - `buildChatRequest(conv: Conversation, history: ChatMessage[]): Record<string, unknown>` : `messages` = système (si non vide) + historique (statuts `done`/`stopped`, contenu non vide ; `role` et `content` seulement, réflexion exclue) ; `stream: true` ; clés de `sampling` présentes seulement ; `chat_template_kwargs: { enable_thinking: conv.thinking }`.
 - `ChatRuns` :
+
   ```ts
   interface ChatTarget { port: number; profileId: number | null; modelPath: string | null }
   interface ChatRunsDeps { repo: ConversationsRepo; target(): ChatTarget | null /* null si non prêt */; fetch?: typeof fetch; now?: () => number; flushMs?: number /* 1000 */ }
@@ -154,6 +165,7 @@
     dispose(): void                                           // abort de tout, messages → stopped
   }
   ```
+
   `send` : enregistre le message utilisateur (titre auto si c'est le premier), crée la réponse `streaming` (`model` = cible), POST `http://127.0.0.1:<port>/v1/chat/completions`, lit le flux avec `SseParser` (`choices[0].delta.content` / `.reasoning_content`, `timings` du dernier morceau, `[DONE]`), mesure le TTFT au premier delta, écrit en base toutes les `flushMs` et à la fin (`done` + stats ; abort → `stopped` ; HTTP non 2xx → `error` avec le message de llama-server ; coupure réseau → `error`, texte partiel gardé). `subscribe` rejoue `start` puis un `delta` cumulé, puis le direct ; se désabonner ne coupe **jamais** la génération.
 - Routes : `POST /api/chat/:id/messages { content }` et `POST /api/chat/:id/regenerate` → SSE des `ChatEvent` (`event: <type>`) ; `POST /api/chat/:id/stop` → 204, 409 si rien ne tourne ; `GET /api/chat/:id/stream` → SSE si une génération tourne, sinon 204 ; `live` renseigné dans la liste et le détail ; `DELETE` arrête d'abord la génération. `index.ts` crée `ChatRuns` (cible = état `ready`/`external` du superviseur) et l'arrête dans le dispose.
 - Faux serveur : `POST /v1/chat/completions` en stream — 5 deltas `reasoning_content` puis une réponse Markdown (titre, liste, tableau, bloc `ts`, `<b>html</b>`, lien), un delta toutes les `FAKE_CHAT_DELAY_MS` (défaut 60 ms), dernier morceau avec `timings` ; respecte l'abort ; `enable_thinking: false` → pas de réflexion.
@@ -162,7 +174,7 @@
   - « a run keeps going and is saved when its listener leaves » : se désabonner après le 1er delta, envoyer la suite + `timings` + `[DONE]` → message `done`, `content` et `reasoning` complets, `stats.tgTps` = valeur des timings.
   - « stop saves the partial answer as stopped » : 1 delta, `stop()` → statut `stopped`, contenu partiel, signal du fetch `aborted`.
   - « a late subscriber gets what was already written » : s'abonner après 2 deltas → `start`, puis un `delta` égal au cumul, puis les suivants.
-  Run : `bun test server/chat` — Expected : FAIL (modules absents).
+    Run : `bun test server/chat` — Expected : FAIL (modules absents).
 - [ ] **Step 2 : Implémenter** `request.ts`, `runs.ts`, routes, câblage, faux serveur.
 - [ ] **Step 3 : Vérifier** — `bun test` et `bun run check` verts ; avec le faux serveur prêt : `curl -N -X POST …/messages` montre `start`, des `delta`, `done` ; un `curl` coupé (Ctrl-C) au milieu → `GET /api/chat/:id` finit `done` ; `GET …/stream` pendant une génération rejoue le cumul ; `stop` → `stopped`.
 - [ ] **Step 4 : Commit** — `J4: génération en streaming, arrêt, régénération et rebranchement`.
@@ -172,11 +184,13 @@
 ### Task 5 : Page Chat
 
 **Files:**
+
 - Create : `web/src/lib/chat.ts`, `web/src/lib/highlight.ts`, `web/src/features/chat/{ChatPage,ConversationList,Thread,Message,Markdown,CodeBlock,Reasoning,MessageStats,Composer,SamplingPanel}.tsx`
 - Modify : `web/package.json` (`react-markdown`, `remark-gfm`, `shiki`), `web/src/app/{router.tsx,routes.ts}`, `web/src/index.css`
 - shadcn : `collapsible` (`bunx shadcn@latest docs collapsible` d'abord)
 
 **Interfaces:**
+
 - `lib/chat.ts` : store zustand `useChat { list; current: ConversationDetail | null; streaming: { conversationId; assistantId; content; reasoning } | null; load(); open(id); create(); patch(p: ConversationPatch); remove(id); send(text); regenerate(); stop() }` ; `readSse(res: Response, onEvent: (e: ChatEvent) => void)` sur `SseParser` ; `open(id)` appelle `GET /api/chat/:id/stream` si `live` ; mises à jour du texte regroupées par `requestAnimationFrame`.
 - `lib/highlight.ts` : `highlight(code, lang): Promise<string>` — `createHighlighterCore` + moteur JS (pas de wasm), thèmes `github-light`/`github-dark` en double (`defaultColor: false`), langues `ts tsx js jsx json bash sh python rust go c cpp html css sql yaml toml markdown diff` (inconnue → texte) ; `index.css` : `.shiki span { color: var(--shiki-light) }` et `.dark .shiki span { color: var(--shiki-dark) }`, fond = `bg-well`.
 - Routes `chat` et `chat/:id` ; `/chat` retiré de `MILESTONE_BY_PATH`.

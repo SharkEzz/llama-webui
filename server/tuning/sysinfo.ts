@@ -1,6 +1,6 @@
-import { readdir, realpath, stat } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join } from "node:path";
-import { resolveModelDisk } from "../collectors/disk";
+import { readdir, realpath, stat } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join } from 'node:path';
+import { resolveModelDisk } from '../collectors/disk';
 
 export interface SysReadings {
   /** scaling_governor of every core; empty when unreadable. */
@@ -61,7 +61,7 @@ async function listDir(path: string): Promise<string[] | null> {
 }
 
 async function resolveBinary(binary: string): Promise<string | null> {
-  const p = binary.includes("/") ? binary : Bun.which(binary);
+  const p = binary.includes('/') ? binary : Bun.which(binary);
   if (!p) return null;
   try {
     return await realpath(isAbsolute(p) ? p : join(process.cwd(), p));
@@ -74,7 +74,7 @@ async function gitRoot(dir: string): Promise<string | null> {
   let d = dir;
   for (let i = 0; i < 4; i++) {
     try {
-      await stat(join(d, ".git"));
+      await stat(join(d, '.git'));
       return d;
     } catch {}
     const up = dirname(d);
@@ -86,7 +86,11 @@ async function gitRoot(dir: string): Promise<string | null> {
 
 async function lastCommitMs(repo: string): Promise<number | null> {
   try {
-    const proc = Bun.spawn(["git", "-C", repo, "log", "-1", "--format=%ct"], { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+    const proc = Bun.spawn(['git', '-C', repo, 'log', '-1', '--format=%ct'], {
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'ignore',
+    });
     const out = (await new Response(proc.stdout).text()).trim();
     await proc.exited;
     const n = Number(out);
@@ -99,7 +103,7 @@ async function lastCommitMs(repo: string): Promise<number | null> {
 async function largestBar(resource: string | null): Promise<number> {
   if (!resource) return 0;
   let max = 0;
-  for (const line of resource.split("\n").slice(0, 6)) {
+  for (const line of resource.split('\n').slice(0, 6)) {
     const [start, end] = line.trim().split(/\s+/);
     if (!start || !end) continue;
     try {
@@ -113,10 +117,10 @@ async function largestBar(resource: string | null): Promise<number> {
 async function fsTypeOf(mounts: string | null, path: string): Promise<string | null> {
   if (!mounts) return null;
   let best: { point: string; type: string } | null = null;
-  for (const line of mounts.split("\n")) {
+  for (const line of mounts.split('\n')) {
     const [, point, type] = line.split(/\s+/);
     if (!point || !type) continue;
-    const covers = point === "/" || path === point || path.startsWith(`${point}/`);
+    const covers = point === '/' || path === point || path.startsWith(`${point}/`);
     if (covers && (!best || point.length > best.point.length)) best = { point, type };
   }
   return best?.type ?? null;
@@ -124,52 +128,55 @@ async function fsTypeOf(mounts: string | null, path: string): Promise<string | n
 
 /** Every reading the system checks need; each one tolerant (null / empty when unreadable), never a rejection. */
 export async function readSys(d: SysDeps): Promise<SysReadings> {
-  const proc = d.procRoot ?? "/proc";
-  const sys = d.sysRoot ?? "/sys";
+  const proc = d.procRoot ?? '/proc';
+  const sys = d.sysRoot ?? '/sys';
 
   const governors: string[] = [];
-  const cpus = ((await listDir(join(sys, "devices/system/cpu"))) ?? [])
+  const cpus = ((await listDir(join(sys, 'devices/system/cpu'))) ?? [])
     .filter((n) => /^cpu\d+$/.test(n))
     .sort((a, b) => Number(a.slice(3)) - Number(b.slice(3)));
   for (const c of cpus) {
-    const g = await text(join(sys, "devices/system/cpu", c, "cpufreq/scaling_governor"));
+    const g = await text(join(sys, 'devices/system/cpu', c, 'cpufreq/scaling_governor'));
     if (g !== null) governors.push(g);
   }
-  const thpRaw = await text(join(sys, "kernel/mm/transparent_hugepage/enabled"));
+  const thpRaw = await text(join(sys, 'kernel/mm/transparent_hugepage/enabled'));
   const thp = thpRaw ? (/\[(\w+)\]/.exec(thpRaw)?.[1] ?? thpRaw) : null;
-  const limits = await text(join(proc, "self/limits"));
+  const limits = await text(join(proc, 'self/limits'));
   const memlockRaw = limits ? /^Max locked memory\s+(\S+)/m.exec(limits)?.[1] : undefined;
-  const memlockLimitBytes = memlockRaw === undefined ? null : memlockRaw === "unlimited" ? Number.POSITIVE_INFINITY : Number(memlockRaw);
-  const swapRaw = await text(join(proc, "sys/vm/swappiness"));
+  const memlockLimitBytes =
+    memlockRaw === undefined ? null : memlockRaw === 'unlimited' ? Number.POSITIVE_INFINITY : Number(memlockRaw);
+  const swapRaw = await text(join(proc, 'sys/vm/swappiness'));
   const swappiness = swapRaw === null || Number.isNaN(Number(swapRaw)) ? null : Number(swapRaw);
-  const cmdline = (await text(join(proc, "cmdline"))) ?? "";
-  const iommuEntries = await listDir(join(sys, "class/iommu"));
+  const cmdline = (await text(join(proc, 'cmdline'))) ?? '';
+  const iommuEntries = await listDir(join(sys, 'class/iommu'));
   const iommuActive = iommuEntries === null ? null : iommuEntries.length > 0;
-  const modules = ((await text(join(proc, "modules"))) ?? "")
-    .split("\n")
-    .map((l) => l.split(/\s+/)[0] ?? "")
+  const modules = ((await text(join(proc, 'modules'))) ?? '')
+    .split('\n')
+    .map((l) => l.split(/\s+/)[0] ?? '')
     .filter(Boolean);
 
   const binary = await resolveBinary(d.binary);
-  const backendLibs = binary ? ((await listDir(dirname(binary))) ?? []).filter((n) => /^libggml-.*\.so/.test(n)).sort() : [];
+  const backendLibs = binary
+    ? ((await listDir(dirname(binary))) ?? []).filter((n) => /^libggml-.*\.so/.test(n)).sort()
+    : [];
   const repo = binary ? await gitRoot(dirname(binary)) : null;
   const buildDate = repo ? await lastCommitMs(repo) : null;
 
-  const driver = d.nvml?.driver ?? (await text(join(sys, "module/nvidia/version")));
+  const driver = d.nvml?.driver ?? (await text(join(sys, 'module/nvidia/version')));
   const cudaDriver = d.nvml?.cudaDriver ?? null;
 
   const busIds = d.busIds ?? [];
   const bar1Bytes: Record<string, number> = {};
   for (const bus of busIds) {
-    const size = await largestBar(await text(join(sys, "bus/pci/devices", bus, "resource")));
+    const size = await largestBar(await text(join(sys, 'bus/pci/devices', bus, 'resource')));
     if (size > 0) bar1Bytes[bus] = size;
   }
   const amdDpm: Record<string, { level: string; path: string }> = {};
-  for (const card of ((await listDir(join(sys, "class/drm"))) ?? []).filter((n) => /^card\d+$/.test(n))) {
-    const file = join(sys, "class/drm", card, "device/power_dpm_force_performance_level");
+  for (const card of ((await listDir(join(sys, 'class/drm'))) ?? []).filter((n) => /^card\d+$/.test(n))) {
+    const file = join(sys, 'class/drm', card, 'device/power_dpm_force_performance_level');
     let bus: string;
     try {
-      bus = basename(await realpath(join(sys, "class/drm", card, "device")));
+      bus = basename(await realpath(join(sys, 'class/drm', card, 'device')));
     } catch {
       continue;
     }
@@ -182,15 +189,18 @@ export async function readSys(d: SysDeps): Promise<SysReadings> {
   let systemInfo: string | null = null;
   let cudaDriverError = false;
   for (const l of lines) {
-    if (l.text.includes("system_info:")) systemInfo = l.text;
+    if (l.text.includes('system_info:')) systemInfo = l.text;
     if (/driver version is insufficient/i.test(l.text)) cudaDriverError = true;
   }
 
-  let modelDisk: SysReadings["modelDisk"] = null;
+  let modelDisk: SysReadings['modelDisk'] = null;
   if (d.modelPath) {
     const disk = await (d.resolveDisk ?? ((p: string) => resolveModelDisk(p, { sysRoot: sys })))(d.modelPath);
-    const rot = disk ? await text(join(sys, "block", disk, "queue/rotational")) : null;
-    modelDisk = { rotational: rot === null ? null : rot === "1", fsType: await fsTypeOf(await text(join(proc, "mounts")), d.modelPath) };
+    const rot = disk ? await text(join(sys, 'block', disk, 'queue/rotational')) : null;
+    modelDisk = {
+      rotational: rot === null ? null : rot === '1',
+      fsType: await fsTypeOf(await text(join(proc, 'mounts')), d.modelPath),
+    };
   }
 
   return {

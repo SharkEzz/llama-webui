@@ -1,20 +1,20 @@
-import { z } from "zod";
+import { z } from 'zod';
 import {
-  BenchParamsSchema,
-  type BenchParams,
   type BenchKind,
+  type BenchParams,
+  BenchParamsSchema,
   type BenchRun,
   benchSpecBase,
   CACHE_TYPES,
   FIELD_ORDER,
   FLASH_ATTN,
+  SPLIT_MODES,
   serverArgs,
   serverArgsField,
-  SPLIT_MODES,
-} from "./bench";
-import { NOISE, PRESET_IDS, type PresetId, presetOf } from "./tuning";
+} from './bench';
+import { NOISE, PRESET_IDS, type PresetId, presetOf } from './tuning';
 
-const values = <T extends z.ZodType>(t: T) => z.array(t).min(1, "au moins une valeur").optional();
+const values = <T extends z.ZodType>(t: T) => z.array(t).min(1, 'au moins une valeur').optional();
 const p = BenchParamsSchema.shape;
 const inner = <T extends z.ZodType>(s: z.ZodOptional<T>): T => s.unwrap();
 
@@ -36,9 +36,9 @@ export const SweepSpaceSchema = z.strictObject({
 export type SweepSpace = z.infer<typeof SweepSpaceSchema>;
 
 export const SweepSpecSchema = z.strictObject({
-  name: z.string({ error: "obligatoire" }).trim().min(1, "obligatoire").max(80, "80 caractères au plus"),
+  name: z.string({ error: 'obligatoire' }).trim().min(1, 'obligatoire').max(80, '80 caractères au plus'),
   ...benchSpecBase,
-  preset: z.enum(PRESET_IDS, { error: "préréglage inconnu" }),
+  preset: z.enum(PRESET_IDS, { error: 'préréglage inconnu' }),
   base: BenchParamsSchema.default({}),
   space: SweepSpaceSchema.default({}),
   serverArgs: serverArgsField,
@@ -47,7 +47,7 @@ export const SweepSpecSchema = z.strictObject({
 export type SweepSpec = z.infer<typeof SweepSpecSchema>;
 export type SweepSpecInput = z.input<typeof SweepSpecSchema>;
 
-export type SweepStatus = "running" | "done" | "cancelled" | "interrupted";
+export type SweepStatus = 'running' | 'done' | 'cancelled' | 'interrupted';
 
 export interface Sweep {
   id: number;
@@ -57,7 +57,15 @@ export interface Sweep {
   bestRunId: number | null;
   /** Résumé du meilleur run (historique des sweeps sans charger leurs runs). */
   best: { label: string | null; kind: BenchKind; ppTps: number | null; tgTps: number | null } | null;
-  counts: { total: number; queued: number; running: number; ok: number; failed: number; cancelled: number; interrupted: number };
+  counts: {
+    total: number;
+    queued: number;
+    running: number;
+    ok: number;
+    failed: number;
+    cancelled: number;
+    interrupted: number;
+  };
   createdAt: number;
   finishedAt: number | null;
 }
@@ -68,7 +76,7 @@ export interface SweepLive {
   /** 1-based. */
   index: number;
   total: number;
-  stage: "explore" | "validate";
+  stage: 'explore' | 'validate';
 }
 
 /**
@@ -108,25 +116,25 @@ export function itemLabel(params: BenchParams, space: SweepSpace): string {
   for (const key of FIELD_ORDER) {
     if (!space[key]) continue;
     const args = serverArgs({ [key]: params[key] } as BenchParams);
-    parts.push(args.length ? args.join(" ") : `-${key} défaut`);
+    parts.push(args.length ? args.join(' ') : `-${key} défaut`);
   }
-  return parts.length ? parts.join(" · ") : "base";
+  return parts.length ? parts.join(' · ') : 'base';
 }
 
 /** Score du préréglage pour un run réussi ; null sinon. */
 /** Contexte d'un sweep : le -c des autres flags serveur, sinon le minimum du préréglage. */
-export function sweepCtx(spec: Pick<SweepSpec, "serverArgs" | "preset">): number {
+export function sweepCtx(spec: Pick<SweepSpec, 'serverArgs' | 'preset'>): number {
   const args = spec.serverArgs;
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
-    const v = a === "-c" || a === "--ctx-size" ? args[i + 1] : a.startsWith("--ctx-size=") ? a.slice(11) : undefined;
+    const v = a === '-c' || a === '--ctx-size' ? args[i + 1] : a.startsWith('--ctx-size=') ? a.slice(11) : undefined;
     if (v !== undefined && /^\d+$/.test(v) && Number(v) > 0) return Number(v);
   }
   return presetOf(spec.preset).ctxMin;
 }
 
-export function scoreOf(preset: PresetId, run: Pick<BenchRun, "status" | "pp" | "tg">, ctx: number): number | null {
-  if (run.status !== "ok" || !run.pp || !run.tg) return null;
+export function scoreOf(preset: PresetId, run: Pick<BenchRun, 'status' | 'pp' | 'tg'>, ctx: number): number | null {
+  if (run.status !== 'ok' || !run.pp || !run.tg) return null;
   return presetOf(preset).score({ ppTps: run.pp.tps, tgTps: run.tg.tps, ctx });
 }
 
@@ -141,12 +149,18 @@ export interface Ranked {
 /** Runs réussis par score décroissant, puis les autres dans l'ordre d'origine. */
 export function rankRuns(runs: BenchRun[], preset: PresetId, ctx: number): Ranked[] {
   const scored = runs.map((run) => ({ run, score: scoreOf(preset, run, ctx) }));
-  const ok = scored.filter((s): s is { run: BenchRun; score: number } => s.score !== null).sort((a, b) => b.score - a.score);
+  const ok = scored
+    .filter((s): s is { run: BenchRun; score: number } => s.score !== null)
+    .sort((a, b) => b.score - a.score);
   const rest = scored.filter((s) => s.score === null);
   const best = ok[0];
   let band = 0;
   if (best?.run.pp && best.run.tg) {
-    const low = presetOf(preset).score({ ppTps: best.run.pp.tps * (1 - NOISE.pp), tgTps: best.run.tg.tps * (1 - NOISE.tg), ctx });
+    const low = presetOf(preset).score({
+      ppTps: best.run.pp.tps * (1 - NOISE.pp),
+      tgTps: best.run.tg.tps * (1 - NOISE.tg),
+      ctx,
+    });
     band = best.score - low;
   }
   const ranked: Ranked[] = ok.map((s, i) => ({ ...s, rank: i + 1, tie: i > 0 && best!.score - s.score <= band }));

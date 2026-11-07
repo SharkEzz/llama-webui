@@ -1,15 +1,15 @@
-import type { Settings } from "@llama-webui/shared";
-import { type AmdCard, discoverAmdCards, isRuntimeSuspended, readAmdCard, readProcAmdVram } from "./amdgpu";
-import { type DiskSample, DiskSampler, physicalDisks, resolveModelDisk } from "./disk";
-import type { GpuReading } from "./gpu";
-import { gpuNeeds } from "./needs";
-import { NvidiaMonitor } from "./nvidia";
-import { NvmlMonitor } from "./nvml/monitor";
-import { ProcSampler } from "./proc";
-import { type SystemSample, SystemSampler } from "./system";
+import type { Settings } from '@llama-webui/shared';
+import { type AmdCard, discoverAmdCards, isRuntimeSuspended, readAmdCard, readProcAmdVram } from './amdgpu';
+import { type DiskSample, DiskSampler, physicalDisks, resolveModelDisk } from './disk';
+import type { GpuReading } from './gpu';
+import { gpuNeeds } from './needs';
+import { NvidiaMonitor } from './nvidia';
+import { NvmlMonitor } from './nvml/monitor';
+import { ProcSampler } from './proc';
+import { type SystemSample, SystemSampler } from './system';
 
 /** Ce dont les collecteurs dépendent dans les réglages. */
-export type CollectorSettings = Pick<Settings, "collectors" | "pollIntervalMs" | "hiddenGpus">;
+export type CollectorSettings = Pick<Settings, 'collectors' | 'pollIntervalMs' | 'hiddenGpus'>;
 
 export interface AmdSource {
   cards: () => AmdCard[];
@@ -30,7 +30,7 @@ export interface DiskSource {
 }
 
 /** Binaire nvidia-smi du repli (LLAMA_WEBUI_NVIDIA_SMI pour le tester absent). */
-const nvidiaSmiBin = () => process.env.LLAMA_WEBUI_NVIDIA_SMI || "nvidia-smi";
+const nvidiaSmiBin = () => process.env.LLAMA_WEBUI_NVIDIA_SMI || 'nvidia-smi';
 
 /**
  * Collecteurs matériels (copiés de llama-tui) : NVIDIA par NVML dans un Worker (repli nvidia-smi), AMD par sysfs,
@@ -59,7 +59,12 @@ export class Collectors {
     const c = new Collectors(
       nvml ?? smi!,
       smi,
-      { cards: () => amdCards, read: readAmdCard, procVram: (pid, skipNodes) => readProcAmdVram(pid, "/proc", skipNodes), suspended: isRuntimeSuspended },
+      {
+        cards: () => amdCards,
+        read: readAmdCard,
+        procVram: (pid, skipNodes) => readProcAmdVram(pid, '/proc', skipNodes),
+        suspended: isRuntimeSuspended,
+      },
       new ProcSampler(),
     );
     await c.configure(settings);
@@ -73,8 +78,8 @@ export class Collectors {
   }
 
   /** Source NVIDIA effective (affichée dans Système). */
-  get nvidiaSource(): "nvml" | "nvidia-smi" {
-    return this.smi ? "nvidia-smi" : "nvml";
+  get nvidiaSource(): 'nvml' | 'nvidia-smi' {
+    return this.smi ? 'nvidia-smi' : 'nvml';
   }
 
   /** CPU et mémoire ; undefined quand le collecteur est coupé. */

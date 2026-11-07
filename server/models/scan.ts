@@ -1,8 +1,9 @@
-import { readdir, stat } from "node:fs/promises";
-import { basename, join } from "node:path";
-import type { ModelEntry, ModelSummary } from "@llama-webui/shared";
-import type { ModelCacheRepo } from "../db/modelCache";
-import { type ModelInfo, readModel } from "./gguf";
+import type { Dirent } from 'node:fs';
+import { readdir, stat } from 'node:fs/promises';
+import { basename, join } from 'node:path';
+import type { ModelEntry, ModelSummary } from '@llama-webui/shared';
+import type { ModelCacheRepo } from '../db/modelCache';
+import { type ModelInfo, readModel } from './gguf';
 
 const SHARD = /^(.*)-(\d{5})-of-(\d{5})\.gguf$/;
 
@@ -18,12 +19,15 @@ export function groupGgufFiles(relPaths: string[]): { main: string; files: strin
     }
     const key = `${m[1]}|${m[3]}`;
     let g = shards.get(key);
-    if (!g) shards.set(key, (g = { total: Number(m[3]), parts: new Set() }));
+    if (!g) {
+      g = { total: Number(m[3]), parts: new Set() };
+      shards.set(key, g);
+    }
     g.parts.add(Number(m[2]));
   }
   for (const [key, g] of shards) {
-    const [prefix, total] = key.split("|") as [string, string];
-    const name = (i: number) => `${prefix}-${String(i).padStart(5, "0")}-of-${total}.gguf`;
+    const [prefix, total] = key.split('|') as [string, string];
+    const name = (i: number) => `${prefix}-${String(i).padStart(5, '0')}-of-${total}.gguf`;
     const files: string[] = [];
     const missing: string[] = [];
     for (let i = 1; i <= g.total; i++) (g.parts.has(i) ? files : missing).push(name(i));
@@ -33,8 +37,8 @@ export function groupGgufFiles(relPaths: string[]): { main: string; files: strin
 }
 
 /** Les `*.gguf` sous `dir` (chemins relatifs) ; les noms commençant par « . » sont ignorés, les liens de dossiers pas suivis. */
-async function walk(dir: string, rel = ""): Promise<string[]> {
-  let entries;
+async function walk(dir: string, rel = ''): Promise<string[]> {
+  let entries: Dirent[];
   try {
     entries = await readdir(join(dir, rel), { withFileTypes: true });
   } catch {
@@ -42,12 +46,19 @@ async function walk(dir: string, rel = ""): Promise<string[]> {
   }
   const out: string[] = [];
   for (const e of entries) {
-    if (e.name.startsWith(".")) continue;
+    if (e.name.startsWith('.')) continue;
     const r = rel ? `${rel}/${e.name}` : e.name;
     if (e.isDirectory()) out.push(...(await walk(dir, r)));
-    else if (e.name.endsWith(".gguf")) {
+    else if (e.name.endsWith('.gguf')) {
       if (e.isFile()) out.push(r);
-      else if (e.isSymbolicLink() && (await stat(join(dir, r)).then((s) => s.isFile(), () => false))) out.push(r);
+      else if (
+        e.isSymbolicLink() &&
+        (await stat(join(dir, r)).then(
+          (s) => s.isFile(),
+          () => false,
+        ))
+      )
+        out.push(r);
     }
   }
   return out;
@@ -97,8 +108,8 @@ export async function scanModels(
       const fileBytes = stats.reduce((a, s) => a + (s?.size ?? 0), 0);
       const files = g.files.map((f) => join(dir, f));
       const fail = (error: string): ModelEntry => ({ ok: false, path, relPath: g.main, files, fileBytes, error });
-      if (g.missing.length > 0) return fail(`shard manquant : ${g.missing.map((m) => basename(m)).join(", ")}`);
-      const stamp = stats.map((s) => (s ? `${s.mtimeMs}:${s.size}` : "?")).join("|");
+      if (g.missing.length > 0) return fail(`shard manquant : ${g.missing.map((m) => basename(m)).join(', ')}`);
+      const stamp = stats.map((s) => (s ? `${s.mtimeMs}:${s.size}` : '?')).join('|');
       const hit = o.cache.get(path);
       if (hit && hit.stamp === stamp) return { ok: true, ...hit.summary, relPath: g.main };
       try {

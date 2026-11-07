@@ -1,4 +1,4 @@
-export type ModelKind = "model" | "mmproj";
+export type ModelKind = 'model' | 'mmproj';
 
 /** Résumé d'un GGUF (en-tête seulement), mis en cache en base. */
 export interface ModelSummary {
@@ -43,11 +43,18 @@ export interface ModelList {
 
 export interface ModelDetail extends ModelSummary {
   tensorCount: number;
-  weights: { embedBytes: number; outputBytes: number; layersBytes: number; expertsBytes: number; otherBytes: number; totalBytes: number };
+  weights: {
+    embedBytes: number;
+    outputBytes: number;
+    layersBytes: number;
+    expertsBytes: number;
+    otherBytes: number;
+    totalBytes: number;
+  };
 }
 
-const expand = (p: string, home: string) => (p === "~" ? home : p.startsWith("~/") ? `${home}/${p.slice(2)}` : p);
-const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
+const expand = (p: string, home: string) => (p === '~' ? home : p.startsWith('~/') ? `${home}/${p.slice(2)}` : p);
+const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
 
 /** `abs` relatif à `dir` s'il est dedans, sinon null. */
 function relativeTo(abs: string, dir: string): string | null {
@@ -59,7 +66,10 @@ function relativeTo(abs: string, dir: string): string | null {
  * Chemin de modèle à écrire dans un profil : sans dossier de travail, celui des modèles est pris (tel que saisi) et le
  * chemin lui est relatif ; sous le dossier de travail, relatif ; ailleurs, absolu.
  */
-export function profileModelPath(abs: string, o: { cwd?: string; modelsDir: string; home: string }): { cwd?: string; model: string } {
+export function profileModelPath(
+  abs: string,
+  o: { cwd?: string; modelsDir: string; home: string },
+): { cwd?: string; model: string } {
   const cwd = o.cwd?.trim() ? o.cwd.trim() : o.modelsDir;
   const rel = relativeTo(abs, expand(cwd, o.home));
   return { cwd, model: rel ?? abs };

@@ -1,6 +1,6 @@
-import { useState } from "react"
-import { Link } from "react-router"
-import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
+import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,21 +10,26 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { useChat } from "@/lib/chat"
-import { cn } from "@/lib/utils"
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { useChat } from '@/lib/chat';
+import { cn } from '@/lib/utils';
 
 /** Conversations, la plus récente en haut ; renommer et supprimer par le menu de chaque ligne. */
 export function ConversationList({ onNew, onDeleted }: { onNew(): void; onDeleted(id: number): void }) {
-  const list = useChat((s) => s.list)
-  const currentId = useChat((s) => s.current?.id)
-  const rename = useChat((s) => s.rename)
-  const remove = useChat((s) => s.remove)
-  const [renaming, setRenaming] = useState<{ id: number; title: string } | null>(null)
-  const [deleting, setDeleting] = useState<{ id: number; title: string } | null>(null)
+  const list = useChat((s) => s.list);
+  const currentId = useChat((s) => s.current?.id);
+  const rename = useChat((s) => s.rename);
+  const remove = useChat((s) => s.remove);
+  const [renaming, setRenaming] = useState<{ id: number; title: string } | null>(null);
+  const [deleting, setDeleting] = useState<{ id: number; title: string } | null>(null);
 
   return (
     <div className="flex min-h-0 flex-col gap-2">
@@ -42,26 +47,38 @@ export function ConversationList({ onNew, onDeleted }: { onNew(): void; onDelete
               onChange={(e) => setRenaming({ id: c.id, title: e.target.value })}
               onBlur={() => setRenaming(null)}
               onKeyDown={(e) => {
-                if (e.key === "Escape") setRenaming(null)
-                if (e.key === "Enter" && renaming.title.trim()) void rename(c.id, renaming.title.trim()).finally(() => setRenaming(null))
+                if (e.key === 'Escape') setRenaming(null);
+                if (e.key === 'Enter' && renaming.title.trim())
+                  void rename(c.id, renaming.title.trim()).finally(() => setRenaming(null));
               }}
               aria-label="Nouveau titre"
             />
           ) : (
-            <div key={c.id} className={cn("group flex items-center rounded-md", c.id === currentId && "bg-accent")}>
+            <div key={c.id} className={cn('group flex items-center rounded-md', c.id === currentId && 'bg-accent')}>
               <Button
                 variant="ghost"
                 className="h-auto min-w-0 flex-1 justify-start gap-2 px-2 py-1.5 text-left font-normal"
                 nativeButton={false}
                 render={<Link to={`/chat/${c.id}`} />}
-                aria-current={c.id === currentId ? "page" : undefined}
+                aria-current={c.id === currentId ? 'page' : undefined}
               >
-                {c.live && <span className="size-2 shrink-0 animate-pulse rounded-full bg-success" aria-label="réponse en cours" />}
+                {c.live && (
+                  <>
+                    <span className="size-2 shrink-0 animate-pulse rounded-full bg-success" aria-hidden="true" />
+                    <span className="sr-only">réponse en cours</span>
+                  </>
+                )}
                 <span className="truncate">{c.title}</span>
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  render={<Button variant="ghost" size="icon-xs" className="mr-1 opacity-0 group-hover:opacity-100 data-popup-open:opacity-100" />}
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="mr-1 opacity-0 group-hover:opacity-100 data-popup-open:opacity-100"
+                    />
+                  }
                   aria-label={`Actions pour ${c.title}`}
                 >
                   <MoreHorizontal />
@@ -83,16 +100,18 @@ export function ConversationList({ onNew, onDeleted }: { onNew(): void; onDelete
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer « {deleting?.title} » ?</AlertDialogTitle>
-            <AlertDialogDescription>La conversation et tous ses messages seront définitivement supprimés.</AlertDialogDescription>
+            <AlertDialogDescription>
+              La conversation et tous ses messages seront définitivement supprimés.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={() => {
-                const d = deleting
-                setDeleting(null)
-                if (d) void remove(d.id).then(() => onDeleted(d.id))
+                const d = deleting;
+                setDeleting(null);
+                if (d) void remove(d.id).then(() => onDeleted(d.id));
               }}
             >
               Supprimer
@@ -101,5 +120,5 @@ export function ConversationList({ onNew, onDeleted }: { onNew(): void; onDelete
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }

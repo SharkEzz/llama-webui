@@ -1,24 +1,24 @@
-import index from "../web/index.html";
-import { createApp } from "./app";
-import { openDb } from "./db/open";
-import { readHardware } from "./bench/hardware";
-import { externalWatcher } from "./supervisor/external";
-import { RunExecutor } from "./bench/execute";
-import { BenchRunner } from "./bench/runner";
-import { ChatRuns } from "./chat/runs";
-import { BenchRunsRepo } from "./db/benchRuns";
-import { ConversationsRepo } from "./db/conversations";
-import { ProfilesRepo } from "./db/profiles";
-import { SettingsRepo } from "./db/settings";
-import { SweepsRepo } from "./db/sweeps";
-import { dbPath } from "./paths";
-import { activeProfileId, getRuntime, serverView, startMonitor } from "./runtime";
-import { profilePaths } from "./supervisor/args";
-import { WsHub } from "./ws/hub";
+import index from '../web/index.html';
+import { createApp } from './app';
+import { RunExecutor } from './bench/execute';
+import { readHardware } from './bench/hardware';
+import { BenchRunner } from './bench/runner';
+import { ChatRuns } from './chat/runs';
+import { BenchRunsRepo } from './db/benchRuns';
+import { ConversationsRepo } from './db/conversations';
+import { openDb } from './db/open';
+import { ProfilesRepo } from './db/profiles';
+import { SettingsRepo } from './db/settings';
+import { SweepsRepo } from './db/sweeps';
+import { dbPath } from './paths';
+import { activeProfileId, getRuntime, serverView, startMonitor } from './runtime';
+import { profilePaths } from './supervisor/args';
+import { externalWatcher } from './supervisor/external';
+import { WsHub } from './ws/hub';
 
 const PORT = 7860;
 // Écoute locale par défaut ; LLAMA_WEBUI_HOST=0.0.0.0 pour ouvrir au réseau local (aucune authentification).
-const HOSTNAME = process.env.LLAMA_WEBUI_HOST || "127.0.0.1";
+const HOSTNAME = process.env.LLAMA_WEBUI_HOST || '127.0.0.1';
 const EXTERNAL_CHECK_MS = 2000;
 
 // Sous `bun --hot`, ce module est réévalué : on libère l'instance précédente (timers, db, abonnements).
@@ -38,14 +38,14 @@ const chatRuns = new ChatRuns({
   repo: conversations,
   target: () => {
     const s = runtime.supervisor.state;
-    if (s.kind === "external") return { port: s.port, profileId: null, modelPath: null };
-    if (s.kind !== "ready") return null;
+    if (s.kind === 'external') return { port: s.port, profileId: null, modelPath: null };
+    if (s.kind !== 'ready') return null;
     const p = profiles.get(s.profileId);
     return { port: s.port, profileId: s.profileId, modelPath: p ? profilePaths(p).model : null };
   },
 });
 const { supervisor, logs } = runtime;
-const development = process.env.NODE_ENV !== "production";
+const development = process.env.NODE_ENV !== 'production';
 const monitor = await startMonitor(runtime, settings.get());
 const benchRuns = new BenchRunsRepo(db);
 const sweeps = new SweepsRepo(db);
@@ -73,10 +73,10 @@ const benchRunner = new BenchRunner({
   gate: benchGate,
   executor,
   hardware: () => readHardware(settings.get().binary, allGpus()),
-  onLive: (l) => hub.broadcast({ type: "bench-progress", payload: l }),
-  onRun: (r) => hub.broadcast({ type: "bench-run", payload: r }),
-  onSweep: (s) => hub.broadcast({ type: "sweep", payload: s }),
-  onSweepLive: (l) => hub.broadcast({ type: "sweep-progress", payload: l }),
+  onLive: (l) => hub.broadcast({ type: 'bench-progress', payload: l }),
+  onRun: (r) => hub.broadcast({ type: 'bench-run', payload: r }),
+  onSweep: (s) => hub.broadcast({ type: 'sweep', payload: s }),
+  onSweepLive: (l) => hub.broadcast({ type: 'sweep-progress', payload: l }),
 });
 void benchRunner.resume();
 monitor.setModelPathResolver((id) => {
@@ -103,9 +103,9 @@ const server = createApp({
   development,
 });
 
-const unsubState = supervisor.subscribe(() => hub.broadcast({ type: "server-state", payload: serverView(supervisor) }));
-const unsubLogs = logs.onLines((lines) => hub.broadcast({ type: "log", payload: lines }));
-const unsubSnapshot = monitor.onSnapshot((s) => hub.broadcast({ type: "snapshot", payload: s }));
+const unsubState = supervisor.subscribe(() => hub.broadcast({ type: 'server-state', payload: serverView(supervisor) }));
+const unsubLogs = logs.onLines((lines) => hub.broadcast({ type: 'log', payload: lines }));
+const unsubSnapshot = monitor.onSnapshot((s) => hub.broadcast({ type: 'snapshot', payload: s }));
 
 // Arrêt de Bun : les réponses en cours sont enregistrées « interrompues » avant que le runtime n'arrête llama-server
 // (sinon elles verraient la coupure et finiraient « erreur »). En tête de file, devant le gestionnaire du runtime.
@@ -113,11 +113,15 @@ const stopChats = () => {
   chatRuns.dispose();
   benchRunner.dispose({ restart: false });
 };
-process.prependListener("SIGINT", stopChats);
-process.prependListener("SIGTERM", stopChats);
+process.prependListener('SIGINT', stopChats);
+process.prependListener('SIGTERM', stopChats);
 
 // Serveur externe : détecté au démarrage puis surveillé (sortie de l'état « external » quand il s'arrête).
-const checkExternal = externalWatcher({ supervisor, port: () => settings.get().port, paused: () => benchGate.held || benchRunner.busy });
+const checkExternal = externalWatcher({
+  supervisor,
+  port: () => settings.get().port,
+  paused: () => benchGate.held || benchRunner.busy,
+});
 void checkExternal();
 const externalTimer = setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS);
 
@@ -128,8 +132,8 @@ g.__llamaWebuiDispose = () => {
   unsubSnapshot();
   monitor.setModelPathResolver(() => null);
   hub.dispose();
-  process.off("SIGINT", stopChats);
-  process.off("SIGTERM", stopChats);
+  process.off('SIGINT', stopChats);
+  process.off('SIGTERM', stopChats);
   chatRuns.dispose();
   // Rechargement : le run ponctuel est interrompu, l'élément de sweep remis en attente ; la garde (runtime) passe au
   // nouveau module, ou relance le serveur si personne ne la reprend.
@@ -137,4 +141,4 @@ g.__llamaWebuiDispose = () => {
   db.close();
 };
 
-console.log(`llama-webui sur http://${HOSTNAME}:${server.port}${development ? " (dev, HMR)" : ""}`);
+console.log(`llama-webui sur http://${HOSTNAME}:${server.port}${development ? ' (dev, HMR)' : ''}`);

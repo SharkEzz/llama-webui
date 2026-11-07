@@ -1,19 +1,23 @@
 {
   "name": "llama-webui",
-  "type": "module",
   "private": true,
+  "type": "module",
   "workspaces": [
     "shared",
     "server",
     "web"
   ],
   "scripts": {
-    "dev": "bun --hot server/index.ts",
-    "start": "NODE_ENV=production bun server/index.ts",
     "check": "bun check --no-script && bun check -p web",
+    "dev": "bun --hot server/index.ts",
+    "format": "biome format --write",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "start": "NODE_ENV=production bun server/index.ts",
     "test": "bun test server shared"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.5",
     "@types/bun": "^1.4.4",
     "bun-plugin-tailwind": "^0.1.2"
   },

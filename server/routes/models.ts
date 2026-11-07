@@ -1,14 +1,14 @@
-import { stat } from "node:fs/promises";
-import { homedir } from "node:os";
-import type { Database } from "bun:sqlite";
-import type { ModelDetail, ModelList } from "@llama-webui/shared";
-import { ModelCacheRepo } from "../db/modelCache";
-import type { SettingsRepo } from "../db/settings";
-import { guarded, HttpError, notFound } from "../http";
-import { readModel } from "../models/gguf";
-import { scanModels, toSummary } from "../models/scan";
-import { weightSizes } from "../models/sizes";
-import { expandHome } from "../supervisor/args";
+import type { Database } from 'bun:sqlite';
+import { stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import type { ModelDetail, ModelList } from '@llama-webui/shared';
+import { ModelCacheRepo } from '../db/modelCache';
+import type { SettingsRepo } from '../db/settings';
+import { guarded, HttpError, notFound } from '../http';
+import { readModel } from '../models/gguf';
+import { scanModels, toSummary } from '../models/scan';
+import { weightSizes } from '../models/sizes';
+import { expandHome } from '../supervisor/args';
 
 export function modelRoutes({ db, settings }: { db: Database; settings: SettingsRepo }) {
   const cache = new ModelCacheRepo(db);
@@ -18,26 +18,41 @@ export function modelRoutes({ db, settings }: { db: Database; settings: Settings
   };
 
   return {
-    "/api/models": {
+    '/api/models': {
       GET: guarded(async () => {
         const { setting, dir } = modelsDir();
-        const list: ModelList = { dir, setting, home: homedir(), scannedAt: Date.now(), models: await scanModels(dir, { cache }) };
+        const list: ModelList = {
+          dir,
+          setting,
+          home: homedir(),
+          scannedAt: Date.now(),
+          models: await scanModels(dir, { cache }),
+        };
         return Response.json(list);
       }),
     },
-    "/api/models/info": {
+    '/api/models/info': {
       GET: guarded(async (req) => {
-        const path = new URL(req.url).searchParams.get("path") ?? "";
-        if (!path.startsWith("/") || !path.endsWith(".gguf")) throw new HttpError(400, "Chemin absolu de fichier .gguf attendu");
-        if (!(await stat(path).then((s) => s.isFile(), () => false))) throw notFound("Fichier");
-        let info;
+        const path = new URL(req.url).searchParams.get('path') ?? '';
+        if (!path.startsWith('/') || !path.endsWith('.gguf'))
+          throw new HttpError(400, 'Chemin absolu de fichier .gguf attendu');
+        if (
+          !(await stat(path).then(
+            (s) => s.isFile(),
+            () => false,
+          ))
+        )
+          throw notFound('Fichier');
+        let info: Awaited<ReturnType<typeof readModel>>;
         try {
           info = await readModel(path);
         } catch (e) {
           throw new HttpError(422, (e as Error).message);
         }
         const { dir } = modelsDir();
-        const relPath = path.startsWith(`${dir.replace(/\/+$/, "")}/`) ? path.slice(dir.replace(/\/+$/, "").length + 1) : path;
+        const relPath = path.startsWith(`${dir.replace(/\/+$/, '')}/`)
+          ? path.slice(dir.replace(/\/+$/, '').length + 1)
+          : path;
         const w = weightSizes(info.tensors);
         const detail: ModelDetail = {
           ...toSummary(info, relPath),

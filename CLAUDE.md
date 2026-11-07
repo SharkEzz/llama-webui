@@ -38,6 +38,14 @@ Use `bun check` to type check the project. It reads `tsconfig.json` and reports 
 - `bun check src/index.ts` checks one file and what it imports
 - `bun --check src/index.ts`, `bun test --check` and `bun build --check` type check first, and do nothing else if there is an error
 
+## Format et lint (Biome)
+
+Biome (devDependency épinglée, config dans `biome.json`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`server/`, `shared/` et `web/`). `web/src/components/ui/**` (shadcn généré) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn.
+
+- `bun run lint` : vérifie format + lint + imports (lecture seule) ; `bun run lint:fix` applique les corrections sûres.
+- **Avant de clore un jalon / milestone / lot de travail** (et avant de commiter ou d'ouvrir une PR), tout doit être vert : `bun run lint`, `bun run check`, `bun test`. Zéro erreur et zéro warning Biome.
+- Ne pas désactiver une règle ni la baisser en `warn` pour faire passer le lint. Si une règle est un faux positif, `// biome-ignore lint/<groupe>/<règle>: <raison>` ciblé et motivé (voir `useExhaustiveDependencies` : les dépendances « déclencheur » sont volontaires). Pour lire la dernière valeur dans un effet sans le relancer, préférer `useEffectEvent` (React 19) à un ignore ; pour réinitialiser un état au changement d'identité, un `key` sur le composant plutôt qu'un effet.
+
 ## Frontend
 
 Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.

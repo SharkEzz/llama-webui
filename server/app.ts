@@ -1,24 +1,24 @@
-import type { Database } from "bun:sqlite";
-import type { BenchRunner } from "./bench/runner";
-import type { ChatRuns } from "./chat/runs";
-import type { BenchRunsRepo } from "./db/benchRuns";
-import type { ConversationsRepo } from "./db/conversations";
-import type { ProfilesRepo } from "./db/profiles";
-import type { SettingsRepo } from "./db/settings";
-import type { SweepsRepo } from "./db/sweeps";
-import type { Monitor } from "./monitor/monitor";
-import { benchRoutes } from "./routes/bench";
-import { chatRoutes } from "./routes/chat";
-import { modelRoutes } from "./routes/models";
-import { monitorRoutes } from "./routes/monitor";
-import { profileRoutes } from "./routes/profiles";
-import { serverRoutes } from "./routes/server";
-import { sweepRoutes } from "./routes/sweeps";
-import { tuningRoutes } from "./routes/tuning";
-import type { Runtime } from "./runtime";
-import type { WsHub } from "./ws/hub";
-import pkg from "./package.json";
-import { guarded, jsonObject } from "./http";
+import type { Database } from 'bun:sqlite';
+import type { BenchRunner } from './bench/runner';
+import type { ChatRuns } from './chat/runs';
+import type { BenchRunsRepo } from './db/benchRuns';
+import type { ConversationsRepo } from './db/conversations';
+import type { ProfilesRepo } from './db/profiles';
+import type { SettingsRepo } from './db/settings';
+import type { SweepsRepo } from './db/sweeps';
+import { guarded, jsonObject } from './http';
+import type { Monitor } from './monitor/monitor';
+import pkg from './package.json';
+import { benchRoutes } from './routes/bench';
+import { chatRoutes } from './routes/chat';
+import { modelRoutes } from './routes/models';
+import { monitorRoutes } from './routes/monitor';
+import { profileRoutes } from './routes/profiles';
+import { serverRoutes } from './routes/server';
+import { sweepRoutes } from './routes/sweeps';
+import { tuningRoutes } from './routes/tuning';
+import type { Runtime } from './runtime';
+import type { WsHub } from './ws/hub';
 
 export interface AppDeps {
   db: Database;
@@ -49,10 +49,10 @@ export function createApp(deps: AppDeps) {
     hostname: deps.hostname,
     development: development ? { hmr: true, console: true } : false,
     routes: {
-      "/api/health": {
+      '/api/health': {
         GET: guarded(() => Response.json({ ok: true, version: pkg.version, uptimeMs: Date.now() - startedAt })),
       },
-      "/api/settings": {
+      '/api/settings': {
         GET: guarded(() => Response.json(settings.get())),
         PATCH: guarded(async (req) => {
           const next = settings.patch(await jsonObject(req));
@@ -68,13 +68,13 @@ export function createApp(deps: AppDeps) {
       ...benchRoutes(deps),
       ...sweepRoutes(deps),
       ...tuningRoutes(deps),
-      "/api/*": guarded(() => Response.json({ error: "Route inconnue" }, { status: 404 })),
-      "/ws": guarded((req, server) => {
+      '/api/*': guarded(() => Response.json({ error: 'Route inconnue' }, { status: 404 })),
+      '/ws': guarded((req, server) => {
         if (server.upgrade(req)) return undefined;
-        return new Response("Upgrade WebSocket attendu", { status: 426 });
+        return new Response('Upgrade WebSocket attendu', { status: 426 });
       }),
       // Toute autre adresse sert l'application (fallback SPA : /chat rechargé fonctionne).
-      "/*": index,
+      '/*': index,
     },
     websocket: {
       open: (ws) => hub.attach(ws),

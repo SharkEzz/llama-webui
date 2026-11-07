@@ -23,7 +23,7 @@ export interface FlagCatalog {
 }
 
 const HELP_COLUMN = 40;
-const INDENT = " ".repeat(HELP_COLUMN);
+const INDENT = ' '.repeat(HELP_COLUMN);
 const SECTION = /^----- (.+) -----$/;
 const NAME = /^(-[^\s,]+)(,)?\s*/;
 
@@ -49,22 +49,22 @@ export function catalogFrom(flags: Flag[]): FlagCatalog {
 
 export function parseHelp(text: string): FlagCatalog {
   const flags: Flag[] = [];
-  let section = "";
+  let section = '';
   let help: string[] | null = null;
-  let entry: Omit<Flag, "help"> | null = null;
+  let entry: Omit<Flag, 'help'> | null = null;
   const close = () => {
-    if (entry && help) flags.push({ ...entry, help: help.join(" ") });
+    if (entry && help) flags.push({ ...entry, help: help.join(' ') });
     entry = null;
     help = null;
   };
-  for (const line of text.split("\n")) {
+  for (const line of text.split('\n')) {
     const header = SECTION.exec(line);
     if (header) {
       close();
       section = header[1]!;
-    } else if (line.startsWith("-")) {
+    } else if (line.startsWith('-')) {
       close();
-      const inline = line.length > HELP_COLUMN && line.slice(HELP_COLUMN - 3, HELP_COLUMN) === "   ";
+      const inline = line.length > HELP_COLUMN && line.slice(HELP_COLUMN - 3, HELP_COLUMN) === '   ';
       const { names, value } = namesAndValue(inline ? line.slice(0, HELP_COLUMN) : line);
       if (names.length === 0) continue;
       entry = value === undefined ? { names, section } : { names, value, section };
@@ -78,12 +78,13 @@ export function parseHelp(text: string): FlagCatalog {
 
 /** The flag an argument passes (`--ctx-size=8192` passes `--ctx-size`), if the catalogue knows it. */
 export function flagOf(catalog: FlagCatalog, arg: string): Flag | undefined {
-  if (!arg.startsWith("-")) return undefined;
-  return catalog.byName.get(arg.split("=")[0]!);
+  if (!arg.startsWith('-')) return undefined;
+  return catalog.byName.get(arg.split('=')[0]!);
 }
 
 /** `--long` names before `-short` ones, each in alphabetical order. */
-const byLongThenName = (a: string, b: string) => Number(!a.startsWith("--")) - Number(!b.startsWith("--")) || a.localeCompare(b);
+const byLongThenName = (a: string, b: string) =>
+  Number(!a.startsWith('--')) - Number(!b.startsWith('--')) || a.localeCompare(b);
 
 /**
  * What Tab adds to `prefix`: the rest of the only name it starts, then a space; or the part all the names it
@@ -91,7 +92,7 @@ const byLongThenName = (a: string, b: string) => Number(!a.startsWith("--")) - N
  */
 export function complete(catalog: FlagCatalog, prefix: string): { insert: string; candidates: string[] } {
   const candidates = [...catalog.byName.keys()].filter((n) => n.startsWith(prefix)).sort(byLongThenName);
-  if (candidates.length === 0) return { insert: "", candidates };
+  if (candidates.length === 0) return { insert: '', candidates };
   if (candidates.length === 1) return { insert: `${candidates[0]!.slice(prefix.length)} `, candidates };
   let common = candidates[0]!;
   for (const c of candidates) while (!c.startsWith(common)) common = common.slice(0, -1);
@@ -104,17 +105,19 @@ export function complete(catalog: FlagCatalog, prefix: string): { insert: string
  * for a longer name (`--verbose` → `--verbose-prompt`).
  */
 export function flagSuggestions(catalog: FlagCatalog, word: string, max: number): string[] {
-  if (!word.startsWith("-") || word.includes("=") || catalog.byName.has(word)) return [];
+  if (!word.startsWith('-') || word.includes('=') || catalog.byName.has(word)) return [];
   return complete(catalog, word).candidates.slice(0, max);
 }
 
 /** The flags in `args` the catalogue does not know, as written (`--x=1` as `--x`). Values are not flags: `-1`, `-`. */
 export function unknownFlags(catalog: FlagCatalog, args: string[]): string[] {
-  return args.filter((a) => a.length > 1 && a.startsWith("-") && !/^-\d/.test(a) && !flagOf(catalog, a)).map((a) => a.split("=")[0]!);
+  return args
+    .filter((a) => a.length > 1 && a.startsWith('-') && !/^-\d/.test(a) && !flagOf(catalog, a))
+    .map((a) => a.split('=')[0]!);
 }
 
 /** One line: names, value, help, without the environment variable that sets it. */
 export function describeFlag(flag: Flag): string {
-  const help = flag.help.replace(/\s*\(env: [A-Z0-9_]+\)/g, "").trim();
-  return `${flag.names.join(", ")}${flag.value ? ` ${flag.value}` : ""}${help ? ` — ${help}` : ""}`;
+  const help = flag.help.replace(/\s*\(env: [A-Z0-9_]+\)/g, '').trim();
+  return `${flag.names.join(', ')}${flag.value ? ` ${flag.value}` : ''}${help ? ` — ${help}` : ''}`;
 }

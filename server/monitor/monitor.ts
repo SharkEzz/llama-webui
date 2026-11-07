@@ -1,8 +1,16 @@
-import type { GpuSample, HistoryDump, RequestRecord, RequestStats, Settings, Snapshot, SpecStats } from "@llama-webui/shared";
-import { SERIES } from "@llama-webui/shared";
-import { type AmdCard, hiddenAmdReading, suspendedAmdReading } from "../collectors/amdgpu";
-import type { DiskSample } from "../collectors/disk";
-import { type GpuReading, identityReading, selectUsedGpus } from "../collectors/gpu";
+import type {
+  GpuSample,
+  HistoryDump,
+  RequestRecord,
+  RequestStats,
+  Settings,
+  Snapshot,
+  SpecStats,
+} from '@llama-webui/shared';
+import { SERIES } from '@llama-webui/shared';
+import { type AmdCard, hiddenAmdReading, suspendedAmdReading } from '../collectors/amdgpu';
+import type { DiskSample } from '../collectors/disk';
+import { type GpuReading, identityReading, selectUsedGpus } from '../collectors/gpu';
 import {
   fetchLlama,
   foldRecent,
@@ -13,23 +21,24 @@ import {
   mergeRequestStats,
   requestDelta,
   specStats,
-} from "../collectors/llama";
-import { gpuNeeds, gpuSkipped } from "../collectors/needs";
-import { Collectors } from "../collectors/registry";
-import type { SystemSample } from "../collectors/system";
-import type { ServerState, Supervisor } from "../supervisor/supervisor";
-import { History, historyPoints } from "./history";
+} from '../collectors/llama';
+import { gpuNeeds, gpuSkipped } from '../collectors/needs';
+import { Collectors } from '../collectors/registry';
+import type { SystemSample } from '../collectors/system';
+import type { ServerState, Supervisor } from '../supervisor/supervisor';
+import { History, historyPoints } from './history';
 
 const MODEL_DISK_RETRY_MS = 30_000;
 const APPS_EVERY = 5;
 
-export type MonitorSettings = Pick<Settings, "collectors" | "pollIntervalMs" | "historySeconds" | "hiddenGpus">;
+export type MonitorSettings = Pick<Settings, 'collectors' | 'pollIntervalMs' | 'historySeconds' | 'hiddenGpus'>;
 
 function pidOf(s: ServerState): number | null {
-  if (s.kind === "starting" || s.kind === "ready" || s.kind === "stopping" || s.kind === "external") return s.pid;
+  if (s.kind === 'starting' || s.kind === 'ready' || s.kind === 'stopping' || s.kind === 'external') return s.pid;
   return null;
 }
-const isActive = (s: ServerState) => s.kind === "starting" || s.kind === "ready" || s.kind === "stopping" || s.kind === "external";
+const isActive = (s: ServerState) =>
+  s.kind === 'starting' || s.kind === 'ready' || s.kind === 'stopping' || s.kind === 'external';
 
 /**
  * Échantillonnage permanent (le Poller de llama-tui) : un tick toutes les `pollIntervalMs`, que des onglets soient
@@ -56,14 +65,17 @@ export class Monitor {
   private modelDisks = new Map<number, { disk: string | null; at: number; pending: boolean }>();
 
   private constructor(
-    private readonly supervisor: Pick<Supervisor, "state">,
+    private readonly supervisor: Pick<Supervisor, 'state'>,
     private readonly collectors: Collectors,
     private settings: MonitorSettings,
   ) {
-    this.history = new History(historyPoints(settings.historySeconds, settings.pollIntervalMs), settings.pollIntervalMs);
+    this.history = new History(
+      historyPoints(settings.historySeconds, settings.pollIntervalMs),
+      settings.pollIntervalMs,
+    );
   }
 
-  static async start(deps: { supervisor: Pick<Supervisor, "state">; settings: MonitorSettings }): Promise<Monitor> {
+  static async start(deps: { supervisor: Pick<Supervisor, 'state'>; settings: MonitorSettings }): Promise<Monitor> {
     const collectors = await Collectors.start(deps.settings);
     const m = new Monitor(deps.supervisor, collectors, deps.settings);
     void m.tick();
@@ -71,7 +83,7 @@ export class Monitor {
     return m;
   }
 
-  get nvidiaSource(): "nvml" | "nvidia-smi" {
+  get nvidiaSource(): 'nvml' | 'nvidia-smi' {
     return this.collectors.nvidiaSource;
   }
 
@@ -129,11 +141,11 @@ export class Monitor {
         try {
           fn(snap);
         } catch (err) {
-          console.error("[llama-webui] abonné du monitoring :", err);
+          console.error('[llama-webui] abonné du monitoring :', err);
         }
       }
     } catch (err) {
-      console.error("[llama-webui] tick de monitoring :", err);
+      console.error('[llama-webui] tick de monitoring :', err);
     } finally {
       this.inFlight = false;
     }
@@ -147,7 +159,7 @@ export class Monitor {
 
   /** Ajoute v seulement si la série existe déjà ou si v est connu : une série commence à sa première valeur. */
   private known(key: string, v: number | null | undefined): void {
-    if (typeof v === "number" && Number.isFinite(v)) this.push(key, v);
+    if (typeof v === 'number' && Number.isFinite(v)) this.push(key, v);
     else if (this.history.has(key)) this.push(key, NaN);
   }
 
@@ -171,7 +183,7 @@ export class Monitor {
     }
 
     const machineP = this.sampleMachine(state);
-    const base: Omit<Snapshot, "points" | "history"> = {
+    const base: Omit<Snapshot, 'points' | 'history'> = {
       at,
       tick: this.tickNo,
       health: null,
@@ -234,7 +246,11 @@ export class Monitor {
     const kv = kvUsage(raw?.slots ?? null);
     const metric = (k: string) => raw?.metrics?.get(`llamacpp:${k}`) ?? 0;
     const queue = raw?.metrics
-      ? { processing: metric("requests_processing"), deferred: metric("requests_deferred"), busySlots: metric("n_busy_slots_per_decode") }
+      ? {
+          processing: metric('requests_processing'),
+          deferred: metric('requests_deferred'),
+          busySlots: metric('n_busy_slots_per_decode'),
+        }
       : null;
     this.push(SERIES.kvPct, kv ? (100 * kv.usedTokens) / kv.totalTokens : 0);
     this.push(SERIES.reqProcessing, queue?.processing ?? 0);
@@ -246,7 +262,7 @@ export class Monitor {
     const machine = await machineP;
     return this.finish({
       ...base,
-      health: raw?.health ?? "down",
+      health: raw?.health ?? 'down',
       rates,
       slots: raw?.slots ?? null,
       kv,
@@ -262,9 +278,13 @@ export class Monitor {
   }
 
   /** Une série existante non alimentée à ce tick reçoit un trou : toutes avancent ensemble, alignées sur les instants. */
-  private finish(snap: Omit<Snapshot, "points" | "history">): Snapshot {
+  private finish(snap: Omit<Snapshot, 'points' | 'history'>): Snapshot {
     for (const key of this.history.keys()) if (!(key in this.points)) this.push(key, NaN);
-    return { ...snap, points: this.points, history: { intervalMs: this.history.intervalMs, capacity: this.history.capacity } };
+    return {
+      ...snap,
+      points: this.points,
+      history: { intervalMs: this.history.intervalMs, capacity: this.history.capacity },
+    };
   }
 
   /** Séries de chaque GPU de la machine, utilisée ou non par le serveur. */
@@ -290,7 +310,10 @@ export class Monitor {
     if (sys) {
       this.push(SERIES.sysCpu, system?.cpuPct ?? 0);
       const mem = system?.mem;
-      this.push(SERIES.sysMemPct, mem && mem.totalBytes > 0 ? (100 * (mem.totalBytes - mem.availableBytes)) / mem.totalBytes : 0);
+      this.push(
+        SERIES.sysMemPct,
+        mem && mem.totalBytes > 0 ? (100 * (mem.totalBytes - mem.availableBytes)) / mem.totalBytes : 0,
+      );
       this.known(SERIES.sysTemp, system?.tempC);
     }
     if (dsk) {
@@ -307,7 +330,7 @@ export class Monitor {
    */
   private modelDiskFor(state: ServerState): string | null {
     const disk = this.collectors.disk;
-    if (!disk || !("profileId" in state) || state.kind === "crashed") return null;
+    if (!disk || !('profileId' in state) || state.kind === 'crashed') return null;
     const id = state.profileId;
     const now = Date.now();
     const known = this.modelDisks.get(id);
@@ -343,17 +366,23 @@ export class Monitor {
       const skip = (r: GpuReading) => {
         for (const node of c.nodes ?? []) skipNodes.add(node);
         return r;
-      }
+      };
       if (gpuSkipped(n, c.pdev)) return skip(hiddenAmdReading(c));
       if (await amd.suspended(c).catch(() => false)) return skip(suspendedAmdReading(c));
       return amd.read(c).catch(() => null);
     };
     const amdReadings = await Promise.all(amd.cards().map(readAmd));
-    const amdProc = pid === null ? new Map<string, number>() : await amd.procVram(pid, skipNodes).catch(() => new Map<string, number>());
+    const amdProc =
+      pid === null
+        ? new Map<string, number>()
+        : await amd.procVram(pid, skipNodes).catch(() => new Map<string, number>());
     const nvProc = pid === null ? new Map<string, number>() : nvidia.procVram(pid);
-    const readings = [...nvidia.gpus().map((g) => ({ g, proc: nvProc })), ...amdReadings.flatMap((g) => (g ? [{ g, proc: amdProc }] : []))];
+    const readings = [
+      ...nvidia.gpus().map((g) => ({ g, proc: nvProc })),
+      ...amdReadings.flatMap((g) => (g ? [{ g, proc: amdProc }] : [])),
+    ];
     const all = readings.map(({ g, proc }): GpuSample => {
-      if (gpuSkipped(n, g.busId)) return { ...identityReading(g, "hidden"), procVramBytes: 0 };
+      if (gpuSkipped(n, g.busId)) return { ...identityReading(g, 'hidden'), procVramBytes: 0 };
       if (g.suspended) return { ...g, procVramBytes: 0 };
       return { ...g, procVramBytes: proc.get(g.key) ?? 0 };
     });

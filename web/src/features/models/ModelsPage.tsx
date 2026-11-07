@@ -1,49 +1,49 @@
-import { useEffect, useMemo, useState } from "react"
-import { Link } from "react-router"
-import { Boxes, RefreshCw, Search } from "lucide-react"
-import type { ModelEntry } from "@llama-webui/shared"
-import { GLASS } from "@/components/glass/glass"
-import { GlassCard } from "@/components/glass/GlassCard"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { formatBytes, formatInt, formatParams } from "@/lib/format"
-import { useModels } from "@/lib/models"
-import { cn } from "@/lib/utils"
-import { ModelDetailDialog } from "./ModelDetailDialog"
+import type { ModelEntry } from '@llama-webui/shared';
+import { Boxes, RefreshCw, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
+import { GlassCard } from '@/components/glass/GlassCard';
+import { GLASS } from '@/components/glass/glass';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatBytes, formatInt, formatParams } from '@/lib/format';
+import { useModels } from '@/lib/models';
+import { cn } from '@/lib/utils';
+import { ModelDetailDialog } from './ModelDetailDialog';
 
-type KindFilter = "model" | "mmproj" | "all"
+type KindFilter = 'model' | 'mmproj' | 'all';
 
 const matches = (m: ModelEntry, q: string) =>
-  !q || [m.relPath, ...(m.ok ? [m.name, m.arch, m.quant] : [])].some((s) => s.toLowerCase().includes(q))
+  !q || [m.relPath, ...(m.ok ? [m.name, m.arch, m.quant] : [])].some((s) => s.toLowerCase().includes(q));
 
 /** Les GGUF du dossier des modèles, avec les métadonnées de leur en-tête. */
 export function ModelsPage() {
-  const { list, error, loading, refresh } = useModels()
-  const [query, setQuery] = useState("")
-  const [kind, setKind] = useState<KindFilter>("model")
-  const [open, setOpen] = useState<string | null>(null)
-  useEffect(() => void refresh(), [refresh])
+  const { list, error, loading, refresh } = useModels();
+  const [query, setQuery] = useState('');
+  const [kind, setKind] = useState<KindFilter>('model');
+  const [open, setOpen] = useState<string | null>(null);
+  useEffect(() => void refresh(), [refresh]);
 
-  const q = query.trim().toLowerCase()
+  const q = query.trim().toLowerCase();
   const rows = useMemo(
-    () => (list?.models ?? []).filter((m) => (kind === "all" || !m.ok || m.kind === kind) && matches(m, q)),
+    () => (list?.models ?? []).filter((m) => (kind === 'all' || !m.ok || m.kind === kind) && matches(m, q)),
     [list, kind, q],
-  )
+  );
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Modèles</h1>
           {list && <p className="font-mono text-sm text-muted-foreground">{list.dir}</p>}
         </div>
         <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw className={cn(loading && "animate-spin")} /> Rescanner
+          <RefreshCw className={cn(loading && 'animate-spin')} /> Rescanner
         </Button>
       </div>
 
@@ -62,7 +62,11 @@ export function ModelsPage() {
           <AlertTitle>Aucun fichier GGUF dans {list.setting}</AlertTitle>
           <AlertDescription>
             <p>
-              Déposez des modèles dans ce dossier ou changez-le dans les <Link to="/settings" className="underline underline-offset-4">Réglages</Link>.
+              Déposez des modèles dans ce dossier ou changez-le dans les{' '}
+              <Link to="/settings" className="underline underline-offset-4">
+                Réglages
+              </Link>
+              .
             </p>
           </AlertDescription>
         </Alert>
@@ -74,10 +78,14 @@ export function ModelsPage() {
                 <InputGroupAddon>
                   <Search />
                 </InputGroupAddon>
-                <InputGroupInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Fichier, nom, architecture, quantification" />
+                <InputGroupInput
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Fichier, nom, architecture, quantification"
+                />
               </InputGroup>
               <Tabs value={kind} onValueChange={(v) => setKind(v as KindFilter)}>
-                <TabsList>
+                <TabsList className="h-9 p-1 *:px-3">
                   <TabsTrigger value="model">Modèles</TabsTrigger>
                   <TabsTrigger value="mmproj">Projecteurs</TabsTrigger>
                   <TabsTrigger value="all">Tous</TabsTrigger>
@@ -102,7 +110,11 @@ export function ModelsPage() {
                 </TableHeader>
                 <TableBody>
                   {rows.map((m) => (
-                    <TableRow key={m.path} className={cn(m.ok && "cursor-pointer")} onClick={() => m.ok && setOpen(m.path)}>
+                    <TableRow
+                      key={m.path}
+                      className={cn(m.ok && 'cursor-pointer')}
+                      onClick={() => m.ok && setOpen(m.path)}
+                    >
                       <TableCell className="max-w-md">
                         <div className="truncate font-mono text-xs">{m.relPath}</div>
                         {m.ok && m.name && <div className="truncate text-xs text-muted-foreground">{m.name}</div>}
@@ -116,8 +128,12 @@ export function ModelsPage() {
                           <TableCell className="num text-right">{formatBytes(m.fileBytes)}</TableCell>
                           <TableCell className="num text-right">{formatParams(m.params)}</TableCell>
                           <TableCell className="num text-right">{formatInt(m.blockCount)}</TableCell>
-                          <TableCell className="num text-right">{m.contextLength > 0 ? formatInt(m.contextLength) : "—"}</TableCell>
-                          <TableCell className="num text-right">{m.expertCount > 0 ? `${m.expertCount} / ${m.expertUsedCount}` : "—"}</TableCell>
+                          <TableCell className="num text-right">
+                            {m.contextLength > 0 ? formatInt(m.contextLength) : '—'}
+                          </TableCell>
+                          <TableCell className="num text-right">
+                            {m.expertCount > 0 ? `${m.expertCount} / ${m.expertUsedCount}` : '—'}
+                          </TableCell>
                         </>
                       ) : (
                         <TableCell colSpan={7}>
@@ -135,5 +151,5 @@ export function ModelsPage() {
       )}
       <ModelDetailDialog path={open} onClose={() => setOpen(null)} />
     </div>
-  )
+  );
 }

@@ -1,10 +1,10 @@
-import { join } from "node:path";
+import { join } from 'node:path';
 
 export function parseStat(text: string): { utime: number; stime: number } | null {
-  const close = text.lastIndexOf(")");
+  const close = text.lastIndexOf(')');
   if (close < 0) return null;
   // fields after comm start at field 3 (state); utime=14, stime=15 → indices 11, 12
-  const rest = text.slice(close + 2).split(" ");
+  const rest = text.slice(close + 2).split(' ');
   const utime = Number(rest[11]);
   const stime = Number(rest[12]);
   if (!Number.isFinite(utime) || !Number.isFinite(stime)) return null;
@@ -20,7 +20,7 @@ export class ProcSampler {
   private prev: { pid: number; ticks: number; at: number } | null = null;
 
   constructor(
-    private procRoot = "/proc",
+    private procRoot = '/proc',
     private clkTck = 100,
     private now: () => number = Date.now,
   ) {}
@@ -29,8 +29,8 @@ export class ProcSampler {
     let statText: string, statusText: string;
     try {
       [statText, statusText] = await Promise.all([
-        Bun.file(join(this.procRoot, String(pid), "stat")).text(),
-        Bun.file(join(this.procRoot, String(pid), "status")).text(),
+        Bun.file(join(this.procRoot, String(pid), 'stat')).text(),
+        Bun.file(join(this.procRoot, String(pid), 'status')).text(),
       ]);
     } catch {
       if (this.prev?.pid === pid) this.prev = null;

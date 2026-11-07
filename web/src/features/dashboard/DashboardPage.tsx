@@ -1,30 +1,31 @@
-import { Link } from "react-router"
-import { CircleStop } from "lucide-react"
-import { StatTile } from "@/components/glass/StatTile"
-import { GLASS } from "@/components/glass/glass"
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { ServerStateBadge } from "@/features/server/ServerStateBadge"
-import { formatInt, formatPct } from "@/lib/format"
-import { useMonitor } from "@/lib/monitor"
-import { useServer } from "@/lib/server"
-import { ContextCard } from "./ContextCard"
-import { RequestsTable } from "./RequestsTable"
-import { SystemStrip } from "./SystemStrip"
-import { ThroughputCard } from "./ThroughputCard"
+import { CircleStop } from 'lucide-react';
+import { Link } from 'react-router';
+import { GLASS } from '@/components/glass/glass';
+import { StatTile } from '@/components/glass/StatTile';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { ServerStateBadge } from '@/features/server/ServerStateBadge';
+import { formatInt, formatPct } from '@/lib/format';
+import { useMonitor } from '@/lib/monitor';
+import { useServer } from '@/lib/server';
+import { ContextCard } from './ContextCard';
+import { RequestsTable } from './RequestsTable';
+import { SystemStrip } from './SystemStrip';
+import { ThroughputCard } from './ThroughputCard';
 
-const rate = (v: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(v)
+const rate = (v: number) =>
+  new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(v);
 
 export function DashboardPage() {
-  const snapshot = useMonitor((s) => s.snapshot)
-  const state = useServer((s) => s.view?.state)
-  const active = snapshot?.health != null
-  const spec = snapshot?.spec
-  const kv = snapshot?.kv
+  const snapshot = useMonitor((s) => s.snapshot);
+  const state = useServer((s) => s.view?.state);
+  const active = snapshot?.health != null;
+  const spec = snapshot?.spec;
+  const kv = snapshot?.kv;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-center gap-4">
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
         {state && <ServerStateBadge state={state} className="text-base" />}
       </header>
@@ -33,7 +34,9 @@ export function DashboardPage() {
         <Alert className={GLASS}>
           <CircleStop />
           <AlertTitle>llama-server est arrêté</AlertTitle>
-          <AlertDescription>Débit, slots et requêtes s'affichent dès qu'un serveur tourne. Le bandeau système reste mesuré.</AlertDescription>
+          <AlertDescription>
+            Débit, slots et requêtes s'affichent dès qu'un serveur tourne. Le bandeau système reste mesuré.
+          </AlertDescription>
           <AlertAction>
             <Button size="sm" nativeButton={false} render={<Link to="/server" />}>
               Démarrer
@@ -47,14 +50,18 @@ export function DashboardPage() {
           {spec && spec.drafts > 0 && (
             <StatTile
               label="Acceptation spéculative"
-              value={spec.acceptCum === null ? "—" : formatPct(100 * spec.acceptCum)}
-              hint={spec.meanAcceptedPerDraft === null ? undefined : `${rate(spec.meanAcceptedPerDraft)} tokens acceptés par brouillon`}
+              value={spec.acceptCum === null ? '—' : formatPct(100 * spec.acceptCum)}
+              hint={
+                spec.meanAcceptedPerDraft === null
+                  ? undefined
+                  : `${rate(spec.meanAcceptedPerDraft)} tokens acceptés par brouillon`
+              }
               tone="amber"
             />
           )}
           <StatTile
             label="Contexte utilisé"
-            value={kv ? formatPct((100 * kv.usedTokens) / kv.totalTokens) : "—"}
+            value={kv ? formatPct((100 * kv.usedTokens) / kv.totalTokens) : '—'}
             hint={kv ? `${formatInt(kv.usedTokens)} / ${formatInt(kv.totalTokens)} tokens` : undefined}
             tone="rose"
           />
@@ -73,5 +80,5 @@ export function DashboardPage() {
         </>
       )}
     </div>
-  )
+  );
 }

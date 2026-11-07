@@ -1,5 +1,13 @@
-import type { Database } from "bun:sqlite";
-import type { BenchHardware, BenchKind, BenchRun, BenchSpec, BenchStatus, FitVerdict, Measure } from "@llama-webui/shared";
+import type { Database } from 'bun:sqlite';
+import type {
+  BenchHardware,
+  BenchKind,
+  BenchRun,
+  BenchSpec,
+  BenchStatus,
+  FitVerdict,
+  Measure,
+} from '@llama-webui/shared';
 
 interface Row {
   id: number;
@@ -30,7 +38,7 @@ interface Stats {
   diskReadPeakBps?: number | null;
 }
 
-const NO_HARDWARE: BenchHardware = { cpu: "", gpus: [], build: null };
+const NO_HARDWARE: BenchHardware = { cpu: '', gpus: [], build: null };
 
 const toRun = (r: Row): BenchRun => {
   const stats: Stats = r.stats_json ? JSON.parse(r.stats_json) : { pp: null, tg: null, draftAcceptPct: null };
@@ -41,7 +49,7 @@ const toRun = (r: Row): BenchRun => {
     // Le profil d'origine peut avoir été supprimé depuis (profile_id ON DELETE SET NULL).
     spec: { ...JSON.parse(r.args_json), profileId: r.profile_id },
     command: r.command,
-    hardware: r.hardware_json === "{}" ? NO_HARDWARE : JSON.parse(r.hardware_json),
+    hardware: r.hardware_json === '{}' ? NO_HARDWARE : JSON.parse(r.hardware_json),
     pp: stats.pp,
     tg: stats.tg,
     draftAcceptPct: stats.draftAcceptPct,
@@ -58,7 +66,10 @@ const toRun = (r: Row): BenchRun => {
 };
 
 export type BenchFinish = Partial<
-  Pick<BenchRun, "status" | "pp" | "tg" | "draftAcceptPct" | "vramPeak" | "error" | "logExcerpt" | "durationMs" | "diskReadPeakBps">
+  Pick<
+    BenchRun,
+    'status' | 'pp' | 'tg' | 'draftAcceptPct' | 'vramPeak' | 'error' | 'logExcerpt' | 'durationMs' | 'diskReadPeakBps'
+  >
 >;
 
 export interface BenchFilter {
@@ -66,7 +77,7 @@ export interface BenchFilter {
   modelPath?: string;
   status?: BenchStatus;
   /** "none" (défaut) : hors sweeps ; "all" : tous ; un id : ce sweep. */
-  sweepId?: number | "none" | "all";
+  sweepId?: number | 'none' | 'all';
   /** 200 par défaut. */
   limit?: number;
 }
@@ -86,7 +97,15 @@ export class BenchRunsRepo {
         `INSERT INTO bench_runs(kind, status, model_path, profile_id, args_json, command, hardware_json, vram_mib_json, created_at)
          VALUES (?, 'running', ?, (SELECT id FROM profiles WHERE id = ?), ?, ?, ?, '[]', ?) RETURNING *`,
       )
-      .get(spec.kind, spec.modelPath, spec.profileId, JSON.stringify(spec), command, JSON.stringify(hardware), this.now())!;
+      .get(
+        spec.kind,
+        spec.modelPath,
+        spec.profileId,
+        JSON.stringify(spec),
+        command,
+        JSON.stringify(hardware),
+        this.now(),
+      )!;
     return toRun(row);
   }
 
@@ -97,23 +116,36 @@ export class BenchRunsRepo {
        VALUES (?, 'queued', ?, (SELECT id FROM profiles WHERE id = ?), ?, '', '{}', '[]', ?, ?, ?, ?) RETURNING *`,
     );
     return this.db.transaction(() =>
-      items.map((it) => toRun(q.get(it.spec.kind, it.spec.modelPath, it.spec.profileId, JSON.stringify(it.spec), sweepId, it.label, it.fit, this.now())!)),
+      items.map((it) =>
+        toRun(
+          q.get(
+            it.spec.kind,
+            it.spec.modelPath,
+            it.spec.profileId,
+            JSON.stringify(it.spec),
+            sweepId,
+            it.label,
+            it.fit,
+            this.now(),
+          )!,
+        ),
+      ),
     )();
   }
 
   /** Un élément en attente commence : commande et matériel figés, date du lancement. */
   begin(id: number, o: { command: string; hardware: BenchHardware }): BenchRun {
-    this.db.run("UPDATE bench_runs SET status = 'running', command = ?, hardware_json = ?, created_at = ? WHERE id = ?", [
-      o.command,
-      JSON.stringify(o.hardware),
-      this.now(),
-      id,
-    ]);
+    this.db.run(
+      "UPDATE bench_runs SET status = 'running', command = ?, hardware_json = ?, created_at = ? WHERE id = ?",
+      [o.command, JSON.stringify(o.hardware), this.now(), id],
+    );
     return this.get(id)!;
   }
 
   nextQueued(sweepId: number): BenchRun | null {
-    const row = this.db.query<Row, [number]>("SELECT * FROM bench_runs WHERE sweep_id = ? AND status = 'queued' ORDER BY id LIMIT 1").get(sweepId);
+    const row = this.db
+      .query<Row, [number]>("SELECT * FROM bench_runs WHERE sweep_id = ? AND status = 'queued' ORDER BY id LIMIT 1")
+      .get(sweepId);
     return row ? toRun(row) : null;
   }
 
@@ -126,20 +158,28 @@ export class BenchRunsRepo {
   }
 
   requeueInterrupted(sweepId: number): number {
-    const ids = this.db.query<{ id: number }, [number]>("SELECT id FROM bench_runs WHERE sweep_id = ? AND status = 'interrupted'").all(sweepId);
+    const ids = this.db
+      .query<{ id: number }, [number]>("SELECT id FROM bench_runs WHERE sweep_id = ? AND status = 'interrupted'")
+      .all(sweepId);
     for (const { id } of ids) this.requeue(id);
     return ids.length;
   }
 
   cancelQueued(sweepId: number): number {
-    return this.db.run("UPDATE bench_runs SET status = 'cancelled' WHERE sweep_id = ? AND status = 'queued'", [sweepId]).changes;
+    return this.db.run("UPDATE bench_runs SET status = 'cancelled' WHERE sweep_id = ? AND status = 'queued'", [sweepId])
+      .changes;
   }
 
   finish(id: number, patch: BenchFinish): BenchRun {
     const cur = this.get(id);
     if (!cur) throw new Error(`run ${id} introuvable`);
     const next = { ...cur, ...patch };
-    const stats: Stats = { pp: next.pp, tg: next.tg, draftAcceptPct: next.draftAcceptPct, diskReadPeakBps: next.diskReadPeakBps };
+    const stats: Stats = {
+      pp: next.pp,
+      tg: next.tg,
+      draftAcceptPct: next.draftAcceptPct,
+      diskReadPeakBps: next.diskReadPeakBps,
+    };
     this.db.run(
       `UPDATE bench_runs SET status = ?, pp_tps = ?, tg_tps = ?, stats_json = ?, vram_mib_json = ?, error = ?, log_excerpt = ?, duration_ms = ?
        WHERE id = ?`,
@@ -161,37 +201,55 @@ export class BenchRunsRepo {
   list(f: BenchFilter = {}): BenchRun[] {
     const where: string[] = [];
     const args: (string | number)[] = [];
-    if (f.kind) (where.push("kind = ?"), args.push(f.kind));
-    if (f.modelPath) (where.push("model_path = ?"), args.push(f.modelPath));
-    if (f.status) (where.push("status = ?"), args.push(f.status));
-    const sweep = f.sweepId ?? "none";
-    if (sweep === "none") where.push("sweep_id IS NULL");
-    else if (sweep !== "all") (where.push("sweep_id = ?"), args.push(sweep));
-    const order = typeof sweep === "number" ? "id ASC" : "created_at DESC, id DESC";
-    const sql = `SELECT * FROM bench_runs${where.length ? ` WHERE ${where.join(" AND ")}` : ""} ORDER BY ${order} LIMIT ?`;
-    return this.db.query<Row, (string | number)[]>(sql).all(...args, f.limit ?? (typeof sweep === "number" ? 10_000 : 200)).map(toRun);
+    if (f.kind) {
+      where.push('kind = ?');
+      args.push(f.kind);
+    }
+    if (f.modelPath) {
+      where.push('model_path = ?');
+      args.push(f.modelPath);
+    }
+    if (f.status) {
+      where.push('status = ?');
+      args.push(f.status);
+    }
+    const sweep = f.sweepId ?? 'none';
+    if (sweep === 'none') where.push('sweep_id IS NULL');
+    else if (sweep !== 'all') {
+      where.push('sweep_id = ?');
+      args.push(sweep);
+    }
+    const order = typeof sweep === 'number' ? 'id ASC' : 'created_at DESC, id DESC';
+    const sql = `SELECT * FROM bench_runs${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY ${order} LIMIT ?`;
+    return this.db
+      .query<Row, (string | number)[]>(sql)
+      .all(...args, f.limit ?? (typeof sweep === 'number' ? 10_000 : 200))
+      .map(toRun);
   }
 
   get(id: number): BenchRun | null {
-    const row = this.db.query<Row, [number]>("SELECT * FROM bench_runs WHERE id = ?").get(id);
+    const row = this.db.query<Row, [number]>('SELECT * FROM bench_runs WHERE id = ?').get(id);
     return row ? toRun(row) : null;
   }
 
   delete(id: number): boolean {
-    return this.db.run("DELETE FROM bench_runs WHERE id = ?", [id]).changes > 0;
+    return this.db.run('DELETE FROM bench_runs WHERE id = ?', [id]).changes > 0;
   }
 
   /** Supprime les runs ponctuels en échec, annulés ou interrompus ; renvoie leurs ids (ceux des sweeps restent). */
   deleteFailed(): number[] {
     return this.db
-      .query<{ id: number }, []>(`DELETE FROM bench_runs WHERE sweep_id IS NULL AND status IN ${ENDED_BADLY} RETURNING id`)
+      .query<{ id: number }, []>(
+        `DELETE FROM bench_runs WHERE sweep_id IS NULL AND status IN ${ENDED_BADLY} RETURNING id`,
+      )
       .all()
       .map((r) => r.id);
   }
 
   /** Au démarrage : un run resté « running » (Bun arrêté brutalement) devient « interrupted ». */
   stopOrphans(): number {
-    return this.db.run("UPDATE bench_runs SET status = 'interrupted', error = COALESCE(error, 'interrompu (arrêt de llama-webui)') WHERE status = 'running'")
-      .changes;
+    return this.db.run(
+      "UPDATE bench_runs SET status = 'interrupted', error = COALESCE(error, 'interrompu (arrêt de llama-webui)') WHERE status = 'running'",
+    ).changes;
   }
 }

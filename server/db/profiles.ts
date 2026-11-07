@@ -1,6 +1,6 @@
-import type { Database } from "bun:sqlite";
-import { type Profile, type ProfileInput, ProfileInputSchema, type ProfileSource } from "@llama-webui/shared";
-import { HttpError, notFound } from "../http";
+import type { Database } from 'bun:sqlite';
+import { type Profile, type ProfileInput, ProfileInputSchema, type ProfileSource } from '@llama-webui/shared';
+import { HttpError, notFound } from '../http';
 
 interface Row {
   id: number;
@@ -50,24 +50,33 @@ export class ProfilesRepo {
   ) {}
 
   list(): Profile[] {
-    return this.db.query<Row, []>("SELECT * FROM profiles ORDER BY name COLLATE NOCASE").all().map(fromRow);
+    return this.db.query<Row, []>('SELECT * FROM profiles ORDER BY name COLLATE NOCASE').all().map(fromRow);
   }
 
   get(id: number): Profile | null {
-    const r = this.db.query<Row, [number]>("SELECT * FROM profiles WHERE id = ?").get(id);
+    const r = this.db.query<Row, [number]>('SELECT * FROM profiles WHERE id = ?').get(id);
     return r ? fromRow(r) : null;
   }
 
   private idOfName(name: string): number | null {
-    return this.db.query<{ id: number }, [string]>("SELECT id FROM profiles WHERE name = ?").get(name)?.id ?? null;
+    return this.db.query<{ id: number }, [string]>('SELECT id FROM profiles WHERE name = ?').get(name)?.id ?? null;
   }
 
   private values(p: ProfileInput) {
-    return [p.name, p.model, p.mmproj ?? null, p.cwd ?? null, p.host ?? null, p.port ?? null, JSON.stringify(p.args), JSON.stringify(p.env)] as const;
+    return [
+      p.name,
+      p.model,
+      p.mmproj ?? null,
+      p.cwd ?? null,
+      p.host ?? null,
+      p.port ?? null,
+      JSON.stringify(p.args),
+      JSON.stringify(p.env),
+    ] as const;
   }
 
   /** Valide (ZodError si invalide) ; 409 si le nom est pris. */
-  create(input: unknown, source: ProfileSource = "ui"): Profile {
+  create(input: unknown, source: ProfileSource = 'ui'): Profile {
     const p = ProfileInputSchema.parse(input);
     if (this.idOfName(p.name) !== null) throw conflict(p.name);
     const t = this.now();
@@ -81,7 +90,7 @@ export class ProfilesRepo {
   }
 
   update(id: number, input: unknown): Profile {
-    if (!this.get(id)) throw notFound("Profil");
+    if (!this.get(id)) throw notFound('Profil');
     const p = ProfileInputSchema.parse(input);
     const other = this.idOfName(p.name);
     if (other !== null && other !== id) throw conflict(p.name);
@@ -95,26 +104,29 @@ export class ProfilesRepo {
   }
 
   remove(id: number): void {
-    if (!this.get(id)) throw notFound("Profil");
-    this.db.query("DELETE FROM profiles WHERE id = ?").run(id);
+    if (!this.get(id)) throw notFound('Profil');
+    this.db.query('DELETE FROM profiles WHERE id = ?').run(id);
   }
 
   /** Copie nommée « <nom> (copie) », puis « (copie 2) »… */
   duplicate(id: number): Profile {
     const src = this.get(id);
-    if (!src) throw notFound("Profil");
+    if (!src) throw notFound('Profil');
     let name = `${src.name} (copie)`;
     for (let n = 2; this.idOfName(name) !== null; n++) name = `${src.name} (copie ${n})`;
-    return this.create({ ...toInput(src), name }, src.source === "llama-tui" ? "import" : src.source);
+    return this.create({ ...toInput(src), name }, src.source === 'llama-tui' ? 'import' : src.source);
   }
 
   /** N'écrase jamais : un nom déjà en base est ignoré. */
-  importMany(inputs: ProfileInput[], source: ProfileSource): { imported: Profile[]; skipped: { name: string; reason: string }[] } {
+  importMany(
+    inputs: ProfileInput[],
+    source: ProfileSource,
+  ): { imported: Profile[]; skipped: { name: string; reason: string }[] } {
     const imported: Profile[] = [];
     const skipped: { name: string; reason: string }[] = [];
     this.db.transaction(() => {
       for (const input of inputs) {
-        if (this.idOfName(input.name) !== null) skipped.push({ name: input.name, reason: "existe déjà" });
+        if (this.idOfName(input.name) !== null) skipped.push({ name: input.name, reason: 'existe déjà' });
         else imported.push(this.create(input, source));
       }
     })();
@@ -122,6 +134,6 @@ export class ProfilesRepo {
   }
 
   count(): number {
-    return this.db.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM profiles").get()!.n;
+    return this.db.query<{ n: number }, []>('SELECT COUNT(*) AS n FROM profiles').get()!.n;
   }
 }

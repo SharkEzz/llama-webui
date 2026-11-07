@@ -5,6 +5,7 @@
 **Goal:** Une page Benchmark qui mesure un modèle avec **llama-bench** ou un vrai **llama-server** (flags saisis ou repris d'un profil), suit le run en direct, garde un historique filtrable en sqlite (matériel figé), compare des runs côte à côte et crée un profil depuis un run.
 
 **Architecture:** Les flags vivent sous une forme structurée (`BenchParams`) traduite vers chaque outil : `-dev A/B` et `-ot a;b` pour llama-bench, `-dev A,B` et `-ot a,b` pour llama-server. Un profil se décompose en `BenchParams` et en « autres flags serveur ». Un `BenchRunner` côté serveur exécute un run à la fois, en dehors du superviseur, en deux étapes :
+
 - avant le run, il arrête le serveur géré s'il y en a un, après confirmation ;
 - après le run, il le relance avec la même commande, quelle que soit l'issue.
 
@@ -47,7 +48,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
    - formes longues, forme `--flag=valeur`, `-ot` répété ;
    - `-fa` sans valeur, `-ngl auto|all`, `-dev Vulkan3` ;
    - flags gérés par un champ ou réservés, saisis dans « Autres flags serveur » : refusés sous le champ.
-   
+
    Tests `paramsFromServerArgs` / `BenchSpecSchema` (Task 1).
 4. **Comparer des choses non comparables** : profil MTP mesuré par llama-bench → avertissement dans le formulaire ; comparaison llama-bench + serveur → avertissement ; le run serveur affiche « MTP x % ». Test `ignoredByBench` (Task 1), puis vérif Tasks 4 et 5.
 5. **Annulation et processus orphelins** : annuler pendant l'arrêt du serveur, le chargement, la mesure. Ensuite, `pgrep -f "llama-bench|llama-server"` ne montre que le serveur relancé, et le statut est `cancelled`. Vérif Task 5.
@@ -57,6 +58,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
 ### Task 1 : Traduction des flags et parseurs (purs)
 
 **Files:**
+
 - Create : `shared/src/bench.ts`, `shared/src/bench.test.ts`, `server/bench/parse.ts`, `server/bench/parse.test.ts`
 - Create (fixtures réelles, capturées le 2026-11-05 sur b12119, actuellement dans `/tmp/j5fix/`) :
   - `testdata/llama-bench/ok.json` (Qwen3-0.6B, `-r 2 -p 64 -n 16`, contient `model_filename` mal encodé, à ne pas lire) ;
@@ -67,6 +69,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
 - Modify : `shared/src/index.ts`
 
 **Interfaces:**
+
 - `shared/bench.ts` :
   - `BenchParams` (toutes clés optionnelles ; absente = défaut de l'outil) :
     - `ngl: number | "all" | "auto"` ;
@@ -78,7 +81,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
     - `fa: "on" | "off" | "auto"` ;
     - `ctk`, `ctv` : `"f32"|"f16"|"bf16"|"q8_0"|"q4_0"|"q4_1"|"iq4_nl"|"q5_0"|"q5_1"` ;
     - `t`, `b`, `ub` : entiers ≥ 1.
-    
+
     Schéma zod `BenchParamsSchema` (messages en français).
   - `BenchKind = "bench" | "server"` ; `BenchStatus = "running" | "ok" | "failed" | "cancelled" | "interrupted"`.
   - `BenchSpecSchema = z.strictObject` avec les champs suivants :
@@ -91,7 +94,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
     - `p` : 1–32 768, défaut 512 ;
     - `n` : 1–4 096, défaut 128 ;
     - `r` : 1–20, défaut 3.
-    
+
     Un `serverArgs` qui passe un flag réservé (`reservedFlag`) ou un flag couvert par un champ est refusé à l'index fautif (« -ngl : utilisez le champ -ngl »). `type BenchSpec`.
   - `Measure { tps: number; stddev: number; tokens: number }`.
   - `BenchHardware { cpu: string; gpus: { name; busId; vramTotalBytes }[]; build: string | null }`.
@@ -128,6 +131,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
 
 - [ ] **Step 1 : Fixtures.** Copier les fichiers de `/tmp/j5fix/`. S'ils ont disparu, les recapturer avec les commandes ci-dessus et `2>`/`>` séparés.
 - [ ] **Step 2 : Tests qui échouent.** Dans `shared/src/bench.test.ts` :
+
   ```ts
   test("paramsFromServerArgs splits a real profile into fields and the rest", () => {
     expect(paramsFromServerArgs(["--jinja", "-fa", "on", "-np", "1", "-c", "40000", "--spec-type", "draft-mtp", "-ngl", "all",
@@ -148,6 +152,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
     // serverArgs ["--jinja", "-ngl", "20", "--port", "9"] → issues aux chemins ["serverArgs", 1] et ["serverArgs", 3]
   });
   ```
+
   Dans `server/bench/parse.test.ts` :
   - `ok.json` → `pp.tps` ≈ 9817.38, `pp.tokens` 64, `tg.tps` ≈ 410.81, `tg.tokens` 16, `build` `"b12119 (6f1e65437)"` ;
   - `oom-stdout.json` → `null` ;
@@ -155,7 +160,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
   - `parseBenchProgress("llama-bench: benchmark 2/2: generation run 1/2")` → `{ phase: "generation", test: 2, tests: 2, run: 1, runs: 2 }` ;
   - `parseDeviceList(list-devices.txt)` : 7 entrées, `Vulkan3` = « AMD Radeon RX 9070 XT (RADV GFX1201) », 16 304 MiB ;
   - `benchBinary("/x/bin/llama-server")` → `/x/bin/llama-bench`, `benchBinary("llama-server")` → `llama-bench`, `benchBinary("testdata/fake/fake-llama-server")` → `testdata/fake/fake-llama-bench`.
-  
+
   Run : `bun test shared/src/bench.test.ts server/bench`. Expected : FAIL (modules absents).
 - [ ] **Step 3 : Implémenter** `shared/bench.ts` et `server/bench/parse.ts`.
 - [ ] **Step 4 : Vérifier** : `bun test` et `bun run check` verts.
@@ -166,10 +171,12 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
 ### Task 2 : Runs persistés, runner llama-bench, exclusion avec le serveur, API
 
 **Files:**
+
 - Create : `server/db/benchRuns.ts`, `server/bench/runner.ts`, `server/bench/runner.test.ts`, `server/routes/bench.ts`, `testdata/fake/fake-llama-bench` (exécutable, sur le modèle de `fake-llama-server`) et `testdata/fake/fake-llama-bench.ts`
 - Modify : `server/db/migrations.ts`, `server/http.ts`, `server/app.ts`, `server/index.ts`, `server/routes/server.ts`, `shared/src/ws.ts`, `web/src/lib/api.ts` (`ApiError.code`), `CLAUDE.md` (piège `bun --hot` : `BenchRunner` est rechargé, comme `ChatRuns`)
 
 **Interfaces:**
+
 - **Migrations** (une instruction chacune) :
   - 7 : `CREATE TABLE bench_runs(id INTEGER PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, model_path TEXT NOT NULL, profile_id INTEGER REFERENCES profiles(id) ON DELETE SET NULL, args_json TEXT NOT NULL /* BenchSpec */, command TEXT NOT NULL, hardware_json TEXT NOT NULL, pp_tps REAL, tg_tps REAL, stats_json TEXT /* { pp, tg, draftAcceptPct } */, vram_mib_json TEXT NOT NULL, error TEXT, log_excerpt TEXT NOT NULL DEFAULT '', duration_ms INTEGER, sweep_id INTEGER, created_at INTEGER NOT NULL)`.
   - 8 : `CREATE INDEX bench_runs_by_date ON bench_runs(created_at DESC)`.
@@ -183,6 +190,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
 - **`HttpError(status, message, code?: string)`** : `code` sérialisé dans le corps JSON. Côté client : `ApiError.code: string | null`.
 - **WS** : `{ type: "bench-progress"; payload: BenchLive | null }` et `{ type: "bench-run"; payload: BenchRun }` (envoyé à la création et à la fin d'un run).
 - **`BenchRunner`** :
+
   ```ts
   interface ServerControl { readonly state: ServerState; readonly lastCommand: BuiltCommand | null; stop(): Promise<void>; start(cmd: BuiltCommand): Promise<void> }
   interface BenchRunnerDeps {
@@ -199,6 +207,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
     dispose(o: { restart: boolean }): void
   }
   ```
+
   - **Refus avant le run :**
     - déjà occupé → `HttpError(409, "Un benchmark est en cours")` ;
     - serveur `external` → 409 « Un llama-server externe tourne sur le port N : arrêtez-le d'abord » ;
@@ -211,7 +220,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
     - code 0 et `parseBenchJson` non nul → `ok` ;
     - sinon `failed` avec `benchFailure` ;
     - annulation (SIGTERM, puis SIGKILL après 5 s) → `cancelled`.
-    
+
     `logExcerpt` = tail.
   - **VRAM** (pour les deux types) : base relevée avant le lancement de l'enfant. Échantillon toutes les 500 ms, pic au-dessus de la base par GPU, en MiB arrondis. Les GPU sans hausse sont omis.
   - `command` = `shellQuote` de l'argv sans `setpriv`.
@@ -246,7 +255,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
     - `pp.tps` ≈ 9817.38 et `tg.tps` ≈ 410.81 ;
     - au moins un `BenchLive` en phase `prompt` avec `step` ;
     - `start(spec, { stopServer: false })` sur un serveur `ready` lève un `HttpError` de `code` `server-running`.
-  
+
   Run : `bun test server/bench/runner.test.ts`. Expected : FAIL (module absent).
 - [ ] **Step 2 : Implémenter** : migrations, repo, `HttpError.code`, runner (type `bench`), routes, câblage, garde dans `serverRoutes`, faux llama-bench, note dans `CLAUDE.md`.
 - [ ] **Step 3 : Vérifier** : `bun test` et `bun run check` verts. Avec `LLAMA_WEBUI_DATA_DIR=/tmp/lw-j5` et `curl` :
@@ -262,10 +271,12 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
 ### Task 3 : Runner serveur, MTP, « créer un profil »
 
 **Files:**
+
 - Create : `server/bench/prompt.ts` (copie de `../llama-tui/src/bench/prompt.ts`, `promptOf(tokens: number)`), `server/bench/server.ts`
 - Modify : `server/bench/runner.ts`, `server/bench/runner.test.ts`, `server/routes/bench.ts`, `testdata/fake/fake-llama-server.ts`
 
 **Interfaces:**
+
 - `runServerTrial(o: { cmd: BuiltCommand; p; n; r; fetch; signal; onPhase(ph: BenchPhase, step?); onLine(l: string); now }): Promise<{ pp: Measure; tg: Measure; draftAcceptPct: number | null }>` : adaptation de `BenchRunner.trial` de llama-tui.
   - Même `ERROR_LINE`, même délai d'attente de sortie, timeouts de chargement et de requête à 10 min, `probeHealth` (port occupé → échec).
   - Phases : `loading`, `warmup` (`"Bonjour."`, 16 jetons), puis `measure` × `r` (`step` = i/r).
@@ -290,7 +301,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
   - `kind: "server"`, `r: 2`, faux serveur avec `FAKE_PP=1000 FAKE_TG=50 FAKE_DRAFT=1`, port libre ;
   - attendus : `ok`, `pp.tps` 1000, `tg.tps` 50, `stddev` 0, `draftAcceptPct` 47.5 ;
   - aucun processus `fake-llama-server` restant (`proc.exitCode` connu).
-  
+
   Run : `bun test server/bench/runner.test.ts`. Expected : FAIL (501).
 - [ ] **Step 2 : Implémenter** `prompt.ts`, `server.ts`, le branchement dans le runner, les deux routes et le faux serveur.
 - [ ] **Step 3 : Vérifier** : `bun test` et `bun run check` verts. Avec `curl` :
@@ -304,6 +315,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
 ### Task 4 : Page Benchmark
 
 **Files:**
+
 - Create :
   - `web/src/lib/bench.ts` ;
   - `web/src/features/bench/{BenchPage,BenchForm,BenchLiveCard,BenchHistory,BenchCompareDialog,BenchBars}.tsx`.
@@ -311,6 +323,7 @@ Pendant le run, il relève la VRAM au-dessus de la base sur les collecteurs du M
 - shadcn : `checkbox` (`bunx shadcn@latest docs checkbox` d'abord).
 
 **Interfaces:**
+
 - **`lib/bench.ts`** — store zustand `useBench` :
   - état : `runs`, `live`, `filters: { kind?; modelPath?; status? }`, `draft: BenchSpec`, `selected: number[]` ;
   - actions : `load()`, `setDraft(patch)`, `fromProfile(id)`, `rerun(run)` (`draft = run.spec`), `launch(stopServer?)`, `cancel()`, `remove(id)`, `removeFailed()`, `toProfile(id): Promise<Profile>`, `toggle(id)` ;

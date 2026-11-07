@@ -1,43 +1,107 @@
-import { expect, test } from "bun:test";
-import { benchArgs, type BenchParams, BenchSpecSchema, ignoredByBench, paramsFromServerArgs, serverArgs } from "./bench";
+import { expect, test } from 'bun:test';
+import {
+  type BenchParams,
+  BenchSpecSchema,
+  benchArgs,
+  ignoredByBench,
+  paramsFromServerArgs,
+  serverArgs,
+} from './bench';
 
-test("paramsFromServerArgs splits a real profile into fields and the rest", () => {
+test('paramsFromServerArgs splits a real profile into fields and the rest', () => {
   expect(
     paramsFromServerArgs([
-      "--jinja", "-fa", "on", "-np", "1", "-c", "40000", "--spec-type", "draft-mtp", "-ngl", "all",
-      "--device=CUDA0,Vulkan3", "-ot", "exps=CPU", "--override-tensor", "a=CUDA0,b=CPU", "-ts", "3,1", "--cache-type-k", "q8_0", "-fa",
+      '--jinja',
+      '-fa',
+      'on',
+      '-np',
+      '1',
+      '-c',
+      '40000',
+      '--spec-type',
+      'draft-mtp',
+      '-ngl',
+      'all',
+      '--device=CUDA0,Vulkan3',
+      '-ot',
+      'exps=CPU',
+      '--override-tensor',
+      'a=CUDA0,b=CPU',
+      '-ts',
+      '3,1',
+      '--cache-type-k',
+      'q8_0',
+      '-fa',
     ]),
   ).toEqual({
-    params: { fa: "on", ngl: "all", dev: ["CUDA0", "Vulkan3"], ot: ["exps=CPU", "a=CUDA0", "b=CPU"], ts: [3, 1], ctk: "q8_0" },
-    rest: ["--jinja", "-np", "1", "-c", "40000", "--spec-type", "draft-mtp"],
+    params: {
+      fa: 'on',
+      ngl: 'all',
+      dev: ['CUDA0', 'Vulkan3'],
+      ot: ['exps=CPU', 'a=CUDA0', 'b=CPU'],
+      ts: [3, 1],
+      ctk: 'q8_0',
+    },
+    rest: ['--jinja', '-np', '1', '-c', '40000', '--spec-type', 'draft-mtp'],
   });
 });
 
-test("an unreadable value stays in the rest with its flag", () => {
-  expect(paramsFromServerArgs(["-ngl", "beaucoup", "-t", "8"])).toEqual({ params: { t: 8 }, rest: ["-ngl", "beaucoup"] });
+test('an unreadable value stays in the rest with its flag', () => {
+  expect(paramsFromServerArgs(['-ngl', 'beaucoup', '-t', '8'])).toEqual({
+    params: { t: 8 },
+    rest: ['-ngl', 'beaucoup'],
+  });
 });
 
-test("each tool gets its own separators", () => {
-  const p: BenchParams = { ngl: "all", dev: ["CUDA0", "CUDA1"], ts: [3, 1], ot: ["exps=CPU", "a=CUDA0"], fa: "on" };
-  expect(benchArgs(p)).toEqual(["-ngl", "999", "-ot", "exps=CPU;a=CUDA0", "-dev", "CUDA0/CUDA1", "-ts", "3/1", "-fa", "on"]);
-  expect(serverArgs(p)).toEqual(["-ngl", "all", "-ot", "exps=CPU,a=CUDA0", "-dev", "CUDA0,CUDA1", "-ts", "3,1", "-fa", "on"]);
+test('each tool gets its own separators', () => {
+  const p: BenchParams = { ngl: 'all', dev: ['CUDA0', 'CUDA1'], ts: [3, 1], ot: ['exps=CPU', 'a=CUDA0'], fa: 'on' };
+  expect(benchArgs(p)).toEqual([
+    '-ngl',
+    '999',
+    '-ot',
+    'exps=CPU;a=CUDA0',
+    '-dev',
+    'CUDA0/CUDA1',
+    '-ts',
+    '3/1',
+    '-fa',
+    'on',
+  ]);
+  expect(serverArgs(p)).toEqual([
+    '-ngl',
+    'all',
+    '-ot',
+    'exps=CPU,a=CUDA0',
+    '-dev',
+    'CUDA0,CUDA1',
+    '-ts',
+    '3,1',
+    '-fa',
+    'on',
+  ]);
   expect(paramsFromServerArgs(serverArgs(p)).params).toEqual(p);
 });
 
-test("ignoredByBench names context and speculative decoding", () => {
-  expect(ignoredByBench(["-c", "40000", "--spec-type", "draft-mtp", "--jinja"]).map((i) => i.flag)).toEqual(["-c", "--spec-type"]);
+test('ignoredByBench names context and speculative decoding', () => {
+  expect(ignoredByBench(['-c', '40000', '--spec-type', 'draft-mtp', '--jinja']).map((i) => i.flag)).toEqual([
+    '-c',
+    '--spec-type',
+  ]);
 });
 
-test("BenchSpecSchema refuses managed flags in serverArgs at their index", () => {
+test('BenchSpecSchema refuses managed flags in serverArgs at their index', () => {
   const r = BenchSpecSchema.safeParse({
-    kind: "server",
-    modelPath: "/m/a.gguf",
+    kind: 'server',
+    modelPath: '/m/a.gguf',
     mmprojPath: null,
     profileId: null,
     params: {},
-    serverArgs: ["--jinja", "-ngl", "20", "--port", "9"],
+    serverArgs: ['--jinja', '-ngl', '20', '--port', '9'],
   });
   expect(r.success).toBe(false);
-  expect(r.error!.issues.map((i) => i.path)).toEqual([["serverArgs", 1], ["serverArgs", 3]]);
-  expect(r.error!.issues[0]!.message).toBe("-ngl : utilisez le champ -ngl");
+  expect(r.error!.issues.map((i) => i.path)).toEqual([
+    ['serverArgs', 1],
+    ['serverArgs', 3],
+  ]);
+  expect(r.error!.issues[0]!.message).toBe('-ngl : utilisez le champ -ngl');
 });

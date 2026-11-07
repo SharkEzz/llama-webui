@@ -35,11 +35,13 @@
 ### Task 1 : Thèmes clair/sombre et bascule
 
 **Files:**
+
 - Modify : `web/src/index.css`, `web/index.html`, `web/src/components/ui/sonner.tsx`, `web/src/app/StatusBar.tsx`, `shared/src/settings.ts`
 - Create : `web/src/lib/theme.ts`, `web/src/app/ThemeToggle.tsx`
 - shadcn : `dropdown-menu` (déjà là), vérifier `bunx shadcn@latest docs dropdown-menu`
 
 **Interfaces:**
+
 - `settings.ts` : `theme: z.enum(["system", "light", "dark"]).default("system")`.
 - `index.css` : `:root` = **clair**, `.dark` = **sombre** (valeurs J1/J2 actuelles déplacées dans `.dark`). Tokens projet ajoutés dans les deux blocs puis exposés dans `@theme inline` : `--surface` / `--surface-foreground` (verre des cartes), `--surface-border`, `--well` (fond des zones de code/logs/commande), `--success` (état Prêt, connecté), `--warning`, `--bubble-violet|cyan|amber|rose` + `--bubble-opacity` (bulles pastel peu saturées en clair), `--page-from` / `--page-to` (dégradé de fond). `--card` = `var(--surface)`, `--sidebar` = `var(--surface)`. Utilitaire `.glass` supprimé au profit de `bg-card` + `backdrop-blur-lg` + `border-border` (Task 2). `@custom-variant dark (&:where(.dark, .dark *));`.
 - `index.html` : script inline **avant** le bundle : lit `localStorage["llama-webui:theme"]` (défaut `"system"`), résout avec `matchMedia("(prefers-color-scheme: dark)")`, pose ou retire `class="dark"` sur `<html>` et `style.colorScheme`.
@@ -57,10 +59,12 @@
 ### Task 2 : UI J1-J2 sur tokens et primitives shadcn
 
 **Files:**
+
 - Modify : tous les fichiers de `web/src` (hors `components/ui`) contenant des couleurs en dur — aujourd'hui `components/glass/{GlassCard,StatTile,Gauge,AuroraBackground}.tsx`, `app/{Sidebar,StatusBar,AppLayout}.tsx`, `features/server/{ServerPage,ServerStateBadge}.tsx`, `features/profiles/{ProfilesPage,ProfileForm,ArgsEditor,highlight}.tsx`, `features/logs/{LogsPage,LogRow}.tsx`, `features/home/HomePage.tsx`, `components/CodeTextarea.tsx`
 - shadcn : `card alert skeleton command` (`bunx shadcn@latest docs card|command|alert|skeleton` d'abord)
 
 **Interfaces:**
+
 - `GlassCard` devient une fine composition de `Card` / `CardHeader` / `CardTitle` / `CardAction` / `CardContent` shadcn (mêmes props qu'en J1 : `title?`, `icon?`, `actions?`, `className?`, `children`) ; le verre vient du token `--card` + `backdrop-blur-lg` sur `Card` via `className`, pas d'une classe `.glass`. `StatTile` sur `Card size="sm"`.
 - Sidebar : `bg-sidebar` / `text-sidebar-foreground` / `bg-sidebar-accent` (lien actif) ; liste des profils (`ProfilesPage`) en `Button variant="ghost"` alignés à gauche (état sélectionné via `bg-accent`) au lieu de `<button>` bruts.
 - Suggestions de flags (`ArgsEditor`) rendues avec `Command` / `CommandList` / `CommandItem` (`shouldFilter={false}`, `value` contrôlée = suggestion active) ; le clavier reste géré par le textarea ; ajouter `role="combobox"`, `aria-expanded`, `aria-controls`, `aria-activedescendant` sur le textarea (mineur J2).
@@ -76,6 +80,7 @@
 ### Task 3 : `shared/` et parseurs des collecteurs
 
 **Files:**
+
 - Create : `shared/src/monitor.ts`
 - Create (copies adaptées de `../llama-tui/src/collectors/`) : `server/collectors/{prometheus,llama,gpu,nvidia,amdgpu,system,disk,proc}.ts`
 - Copy fixtures : `../llama-tui/testdata/{metrics-idle.txt,metrics-after.txt,slots-idle.json,slots-busy.json,nvidia-gpu.csv,nvidia-apps.csv,fdinfo-amd-igpu.txt,fdinfo-amd-vram.txt,fdinfo-other.txt}` → `testdata/`
@@ -83,7 +88,9 @@
 - Modify : `shared/src/ws.ts`, `shared/src/settings.ts`, `shared/src/index.ts`
 
 **Interfaces:**
+
 - `monitor.ts` (types sérialisables, copiés de llama-tui sans `Map`) : `GpuSample`, `MemInfo`, `SystemSample`, `DiskSample`, `SlotView`, `Health`, `RequestStats`, `SpecStats`, `RequestRecord`, `CpuInfo` ; `SERIES` (copie de `store.ts`) ;
+
   ```ts
   export interface Snapshot {
     at: number; tick: number;
@@ -114,10 +121,12 @@
 ### Task 4 : `Monitor` serveur, NVML, API et WS
 
 **Files:**
+
 - Create (copies adaptées) : `server/collectors/nvml/{symbols,read,worker,monitor}.ts`, `server/collectors/registry.ts`, `server/hardware/cpu.ts`, `server/monitor/{ring,history,monitor}.ts`, `server/routes/monitor.ts`
 - Modify : `server/runtime.ts`, `server/index.ts`, `server/app.ts`, `server/routes/` (PATCH settings → `monitor.configure`)
 
 **Interfaces:**
+
 - `history.ts` : `Ring` et `History` copiés de llama-tui + `History.dump(at: number): HistoryDump` (NaN → null).
 - `registry.ts` : `Collectors.start(settings)` / `configure(settings)` copiés, avec `config.collectors` et `pollIntervalMs` lus dans `Settings` ; plus de `display`/`needs` : tout est mesuré sauf les cartes de `hiddenGpus` (lecture d'identité seulement) et les cartes AMD en veille.
 - `monitor.ts` : `class Monitor { static async start(deps: { supervisor: Supervisor; settings: Settings }): Promise<Monitor>; configure(settings: Settings): Promise<void>; latest(): Snapshot | null; history(): HistoryDump; onSnapshot(fn: (s: Snapshot) => void): () => void; stop(): void }` — logique de `Poller.doTick` copiée (deltas, `foldRecent`, `specStats`, séries GPU sans trous) ; sans `props` (déjà servi par `/api/server/props`) ni `recheckExternal` (déjà fait par `server/index.ts`) ; `configure` redimensionne l'historique (`History.resized`) quand `historySeconds` change et relance le timer quand `pollIntervalMs` change.
@@ -134,10 +143,12 @@
 ### Task 5 : Web — store de monitoring et charts uPlot
 
 **Files:**
+
 - Create : `web/src/lib/monitor.ts`, `web/src/components/charts/TimeSeriesChart.tsx`, `web/src/components/charts/chartTheme.ts`, `web/src/lib/format.ts` (ajouts)
 - Modify : `web/package.json` (`uplot`)
 
 **Interfaces:**
+
 - `lib/monitor.ts` : store `useMonitor { snapshot: Snapshot | null; history: { intervalMs: number; capacity: number; times: number[]; series: Map<string, (number | null)[]> } }` — à chaque passage du WS à `open` (et sur `hello` d'un autre `bootId`) : `GET /api/monitor/history` remplace tout ; chaque `snapshot` ajoute `snapshot.points` (anneaux bornés à `capacity`, temps = `snapshot.at`) ; `useSeries(key): (number | null)[]` sélecteur.
 - `chartTheme.ts` : couleurs lues des variables CSS (`getComputedStyle(document.documentElement)`) : axes `--muted-foreground`, grille `--border`, séries `--tone-*` ; recalculées quand `useTheme().resolved` change.
 - `TimeSeriesChart({ series: { key: string; label: string; tone: Tone; unit?: string }[]; height?: number; yMax?: number; format?(v: number): string })` : uPlot dans un `ResizeObserver`, données = `useMonitor().history`, mise à jour par `setData` (pas de recréation par tick), légende et curseur en Inter, valeurs en mono tabulaire, `null` = trou.
@@ -152,11 +163,13 @@
 ### Task 6 : Page Dashboard
 
 **Files:**
+
 - Create : `web/src/features/dashboard/{DashboardPage,ThroughputCard,ContextCard,RequestsTable,SystemStrip}.tsx`
 - Modify : `web/src/app/router.tsx` ; retirer le chart provisoire de l'Accueil
 - shadcn : `table progress` (`bunx shadcn@latest docs table|progress`)
 
 **Interfaces:**
+
 - `DashboardPage` : rangée de `StatTile` (débit génération, débit prompt, acceptation spéculative **seulement si** `spec.drafts > 0`, contexte utilisé) ; `ThroughputCard` (`TimeSeriesChart` gen + prompt) ; `ContextCard` (slots : barre `Progress` par slot `nDecoded + nPromptProcessed` / `nCtx`, file `queue.processing` / `deferred`) ; `RequestsTable` (`Table` shadcn : heure, tokens prompt / cache / générés, durée, pp tok/s, tg tok/s, acceptation ; 20 dernières) ; `SystemStrip` (une `Card` compacte : CPU %, RAM, une jauge VRAM par GPU de `snapshot.gpus`, disque du modèle).
 - Sans serveur actif : `Alert` « llama-server est arrêté » avec lien vers Serveur ; le bandeau système reste affiché.
 - [ ] **Step 1 : Implémenter**.
@@ -168,11 +181,13 @@
 ### Task 7 : Pages Système et Réglages
 
 **Files:**
+
 - Create : `web/src/features/system/{SystemPage,GpuCard,CpuCard,CoreHeatmap,MemoryCard,DiskCard}.tsx`, `web/src/features/settings/SettingsPage.tsx`
 - Modify : `web/src/app/router.tsx`, `web/src/app/routes.ts` (`MILESTONE_BY_PATH` sans `/dashboard`, `/system`, `/settings`)
 - shadcn : `tabs slider switch input select` (`bunx shadcn@latest docs tabs|slider`)
 
 **Interfaces:**
+
 - `GpuCard({ gpu })` : nom, bus, vendeur ; `Gauge` util et VRAM ; lignes PCIe (gen×largeur actuelle / max, débit rx/tx), puissance / limite, horloges, température, ventilateur ; sparkline util (`TimeSeriesChart` compact) ; carte masquée ou en veille : `Badge` « masquée » / « en veille », pas de mesures.
 - `CpuCard` + `CoreHeatmap` (une case par cœur, intensité = `corePct`, couleur via `--tone-violet` et opacité, valeur en infobulle) ; `MemoryCard` (RAM utilisée / disponible / swap) ; `DiskCard` (lecture/écriture machine, disque du modèle et son débit de lecture).
 - `SettingsPage` (`Tabs` : « Général », « Monitoring », « Apparence ») : binaire llama-server, `modelsDir`, hôte/port par défaut ; collecteurs (3 `Switch`), intervalle (`Select` 250 / 500 / 1000 / 2000 ms), historique (`Slider` 30–1800 s, pas de 30), GPU masqués (liste de `/api/system/info` avec `Switch` par carte) ; thème (même choix que `ThemeToggle`). Enregistrement champ par champ (`PATCH /api/settings`), erreurs zod sous le champ, toast « Réglage enregistré ».

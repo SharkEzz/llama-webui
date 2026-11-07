@@ -8,11 +8,13 @@
     <script>
       // Thème posé avant le rendu (pas de flash) ; même clé que web/src/lib/theme.ts.
       try {
-        var m = localStorage.getItem("llama-webui:theme")
-        var dark = m === "dark" || (m !== "light" && matchMedia("(prefers-color-scheme: dark)").matches)
-        document.documentElement.classList.toggle("dark", dark)
-        document.documentElement.style.colorScheme = dark ? "dark" : "light"
-      } catch (e) {}
+        const m = localStorage.getItem('llama-webui:theme');
+        const dark = m === 'dark' || (m !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      } catch {
+        // localStorage indisponible : thème par défaut
+      }
     </script>
   </head>
   <body>

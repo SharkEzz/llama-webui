@@ -1,7 +1,14 @@
-import { type BenchDevice, type BenchParams, type CacheType, deviceRole, type Fit, gpuDevices } from "@llama-webui/shared";
-import type { ModelInfo } from "../models/gguf";
-import { EXPERTS } from "../models/sizes";
-import { computeBytes, fmtBytes, kvLayerBytes, marginBytes, MiB, recurrentBytes } from "./memory";
+import {
+  type BenchDevice,
+  type BenchParams,
+  type CacheType,
+  deviceRole,
+  type Fit,
+  gpuDevices,
+} from '@llama-webui/shared';
+import type { ModelInfo } from '../models/gguf';
+import { EXPERTS } from '../models/sizes';
+import { computeBytes, fmtBytes, kvLayerBytes, MiB, marginBytes, recurrentBytes } from './memory';
 
 export interface PlacementInput {
   model: ModelInfo;
@@ -33,18 +40,18 @@ export interface PlacementMeasure {
 }
 
 const LAYER = /^blk\.(\d+)\./;
-const CPU = "CPU";
+const CPU = 'CPU';
 
 /** -ngl en nombre de couches (répétées + sortie) : absent, « all » ou « auto » = tout (llama-bench : -1, llama-server : --fit). */
 function nglOf(p: BenchParams, layers: number): number {
-  return typeof p.ngl === "number" ? p.ngl : layers + 1;
+  return typeof p.ngl === 'number' ? p.ngl : layers + 1;
 }
 
 /** Les `-ot` dans l'ordre : premier motif qui correspond gagnant, comme llama.cpp. */
 function overrides(p: BenchParams, issues: string[]): { re: RegExp; target: string }[] {
   const out: { re: RegExp; target: string }[] = [];
   for (const rule of p.ot ?? []) {
-    const eq = rule.lastIndexOf("=");
+    const eq = rule.lastIndexOf('=');
     try {
       out.push({ re: new RegExp(rule.slice(0, eq)), target: rule.slice(eq + 1) });
     } catch {
@@ -64,8 +71,8 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
     used = [];
     for (const id of params.dev) {
       const d = byId.get(id);
-      if (d && deviceRole(d, input.devices) !== "host") used.push(d);
-      else if (id !== "none") issues.push(`device inconnu : ${id}`);
+      if (d && deviceRole(d, input.devices) !== 'host') used.push(d);
+      else if (id !== 'none') issues.push(`device inconnu : ${id}`);
     }
   } else used = gpuDevices(input.devices);
   const L = model.blockCount;
@@ -75,13 +82,19 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
   const outputOnGpu = used.length > 0 && ngl > L;
 
   // Tranches contiguës proportionnelles à -ts (sinon à la VRAM libre, comme llama.cpp), dans l'ordre de -dev.
-  const ts = params.ts && params.ts.length === used.length && params.ts.some((x) => x > 0) ? params.ts : used.map((d) => d.freeMib || d.totalMib);
+  const ts =
+    params.ts && params.ts.length === used.length && params.ts.some((x) => x > 0)
+      ? params.ts
+      : used.map((d) => d.freeMib || d.totalMib);
   const sum = ts.reduce((a, b) => a + b, 0);
   let acc = 0;
-  const cum = ts.map((x) => (acc += x) / sum);
+  const cum = ts.map((x) => {
+    acc += x;
+    return acc / sum;
+  });
   const deviceAt = (i: number): string => {
     if (used.length === 0 || i < start) return CPU;
-    if (params.sm === "none" || used.length === 1) return used[0]!.id;
+    if (params.sm === 'none' || used.length === 1) return used[0]!.id;
     const frac = (i - start) / Math.max(1, gpuLayers);
     const j = cum.findIndex((c) => frac < c);
     return used[j === -1 ? used.length - 1 : j]!.id;
@@ -112,7 +125,7 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
     const rule = rules.find((r) => r.re.test(t.name));
     if (rule) target = byId.has(rule.target) ? rule.target : CPU;
     else if (layer !== null && layer < ncmoe && EXPERTS.test(t.name)) target = CPU;
-    else if (t.name.startsWith("token_embd.")) target = CPU;
+    else if (t.name.startsWith('token_embd.')) target = CPU;
     else if (layer !== null) target = layerDevice[layer] ?? (outputOnGpu ? lastDevice : CPU);
     else target = outputOnGpu ? lastDevice : CPU;
     if (target === CPU) {
@@ -133,7 +146,17 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
   const extras = computeBytes(model, input.ub) + input.mmprojBytes + recurrentBytes(model);
   if (used.length > 0 && gpuLayers > 0) add(used[0]!.id, extras);
   else ram += extras;
-  return { used: used.map((d) => d.id), vram, ram, layerDevice, cpuWeights, cpuExpertsBytes, cpuOtherBytes, gpuWeights, issues: [...new Set(issues)] };
+  return {
+    used: used.map((d) => d.id),
+    vram,
+    ram,
+    layerDevice,
+    cpuWeights,
+    cpuExpertsBytes,
+    cpuOtherBytes,
+    gpuWeights,
+    issues: [...new Set(issues)],
+  };
 }
 
 const MIN_FREE_RATIO = 0.95;
@@ -149,13 +172,27 @@ export function fitOf(input: PlacementInput, measured: PlacementMeasure = measur
     return { device, bytes, totalBytes, budget: Math.max(0, totalBytes - marginBytes(totalBytes)) };
   });
   const base = { vram, ramBytes: measured.ram, ramAvailableBytes: input.ramAvailableBytes };
-  const unknown = measured.issues.find((i) => i.startsWith("device inconnu"));
-  if (unknown) return { ...base, verdict: "no", reason: unknown };
+  const unknown = measured.issues.find((i) => i.startsWith('device inconnu'));
+  if (unknown) return { ...base, verdict: 'no', reason: unknown };
   const over = vram.find((v) => v.bytes > v.budget);
-  if (over) return { ...base, verdict: "no", reason: `${over.device} : ${fmtBytes(over.bytes)} pour ${fmtBytes(over.budget)} utilisables` };
+  if (over)
+    return {
+      ...base,
+      verdict: 'no',
+      reason: `${over.device} : ${fmtBytes(over.bytes)} pour ${fmtBytes(over.budget)} utilisables`,
+    };
   const near = vram.find((v) => v.bytes > MIN_FREE_RATIO * v.budget);
   if (measured.ram > input.ramAvailableBytes)
-    return { ...base, verdict: "tight", reason: `RAM : ${fmtBytes(measured.ram)} pour ${fmtBytes(input.ramAvailableBytes)} disponibles, le reste est relu sur le disque` };
-  if (near) return { ...base, verdict: "tight", reason: `${near.device} : ${fmtBytes(near.bytes)} pour ${fmtBytes(near.budget)} utilisables, marge réduite` };
-  return { ...base, verdict: "fits", reason: null };
+    return {
+      ...base,
+      verdict: 'tight',
+      reason: `RAM : ${fmtBytes(measured.ram)} pour ${fmtBytes(input.ramAvailableBytes)} disponibles, le reste est relu sur le disque`,
+    };
+  if (near)
+    return {
+      ...base,
+      verdict: 'tight',
+      reason: `${near.device} : ${fmtBytes(near.bytes)} pour ${fmtBytes(near.budget)} utilisables, marge réduite`,
+    };
+  return { ...base, verdict: 'fits', reason: null };
 }

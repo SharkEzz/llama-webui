@@ -1,4 +1,4 @@
-import { dlopen, FFIType as T } from "bun:ffi";
+import { dlopen, FFIType as T } from 'bun:ffi';
 
 /**
  * The subset of NVML used by llama-tui. Names are the C symbols; device handles are
@@ -37,7 +37,7 @@ const outFn = { args: [T.ptr, T.ptr], returns: ret } as const;
 const typedOutFn = { args: [T.ptr, T.u32, T.ptr], returns: ret } as const;
 
 /** dlopen libnvidia-ml; throws when the library or a symbol is missing. */
-export function openNvml(path = "libnvidia-ml.so.1"): NvmlSymbols {
+export function openNvml(path = 'libnvidia-ml.so.1'): NvmlSymbols {
   const { symbols } = dlopen(path, {
     nvmlInit_v2: { args: [], returns: ret },
     nvmlShutdown: { args: [], returns: ret },

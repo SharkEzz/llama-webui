@@ -1,4 +1,4 @@
-import { classifyLine, type LogLine } from "@llama-webui/shared";
+import { classifyLine, type LogLine } from '@llama-webui/shared';
 
 /** Ring des logs en RAM (pas de persistance). Les abonnés reçoivent les nouvelles lignes par lot (une microtâche). */
 export class LogBuffer {

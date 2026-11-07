@@ -1,5 +1,5 @@
-import type { CacheType } from "@llama-webui/shared";
-import type { ModelInfo } from "../models/gguf";
+import type { CacheType } from '@llama-webui/shared';
+import type { ModelInfo } from '../models/gguf';
 
 /** Octets par élément du cache KV. */
 export const KV_BYTES: Record<CacheType, number> = {
@@ -18,7 +18,7 @@ export const MiB = 1024 ** 2;
 export const GiB = 1024 ** 3;
 
 /** Architectures dont le motif de fenêtre glissante n'est pas écrit dans le GGUF. */
-const SWA_PATTERN_DEFAULT: Record<string, number> = { "gpt-oss": 2 };
+const SWA_PATTERN_DEFAULT: Record<string, number> = { 'gpt-oss': 2 };
 
 const swaPattern = (m: ModelInfo) => m.swaPattern ?? SWA_PATTERN_DEFAULT[m.arch] ?? 6;
 
@@ -44,12 +44,13 @@ export function kvLayerBytes(m: ModelInfo, i: number, ctx: number, kv: { k: Cach
 export const recurrentBytes = (m: ModelInfo): number => m.ssmStateBytesPerSeq;
 
 /** Tampons de calcul du GPU principal pour un micro-batch de `ub` jetons. */
-export const computeBytes = (m: ModelInfo, ub: number): number => ub * (m.embeddingLength * 4 + m.vocabSize * 4) + 256 * MiB;
+export const computeBytes = (m: ModelInfo, ub: number): number =>
+  ub * (m.embeddingLength * 4 + m.vocabSize * 4) + 256 * MiB;
 
 /** VRAM gardée libre sur une carte : contexte CUDA/Vulkan, fragmentation. */
 export const marginBytes = (totalBytes: number): number => 512 * MiB + 0.04 * totalBytes;
 
 export function fmtBytes(n: number): string {
-  if (n >= GiB) return `${(n / GiB).toFixed(1).replace(".", ",")} Gio`;
+  if (n >= GiB) return `${(n / GiB).toFixed(1).replace('.', ',')} Gio`;
   return `${Math.round(n / MiB)} Mio`;
 }

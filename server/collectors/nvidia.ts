@@ -1,24 +1,34 @@
-import { type GpuReading, normalizeBusId } from "./gpu";
+import { type GpuReading, normalizeBusId } from './gpu';
 
 const MiB = 1024 ** 2;
-const QUERY = "index,uuid,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,pci.bus_id";
+const QUERY = 'index,uuid,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,pci.bus_id';
 
 const numOrNull = (s: string | undefined): number | null => {
   if (s === undefined) return null;
   const n = Number(s.trim());
-  return s.trim() === "" || !Number.isFinite(n) ? null : n;
+  return s.trim() === '' || !Number.isFinite(n) ? null : n;
 };
 
 export function parseNvidiaGpuLine(line: string): GpuReading | null {
-  const f = line.split(",").map((x) => x.trim());
+  const f = line.split(',').map((x) => x.trim());
   if (f.length < 9) return null;
-  const [, uuid, name, util, used, total, temp, power, bus] = f as [string, string, string, string, string, string, string, string, string];
+  const [, uuid, name, util, used, total, temp, power, bus] = f as [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
   const usedN = numOrNull(used);
   const totalN = numOrNull(total);
-  if (!uuid.startsWith("GPU-") || usedN === null || totalN === null) return null;
+  if (!uuid.startsWith('GPU-') || usedN === null || totalN === null) return null;
   return {
     key: `nvidia:${uuid}`,
-    vendor: "nvidia",
+    vendor: 'nvidia',
     name,
     busId: normalizeBusId(bus),
     utilPct: numOrNull(util),
@@ -32,18 +42,22 @@ export function parseNvidiaGpuLine(line: string): GpuReading | null {
 /** usedBytes null: the driver reports "[N/A]" (the process is on the card, its share unknown). */
 export function parseComputeApps(csv: string): Array<{ pid: number; uuid: string; usedBytes: number | null }> {
   const out: Array<{ pid: number; uuid: string; usedBytes: number | null }> = [];
-  for (const line of csv.split("\n")) {
-    const [pid, uuid, used] = line.split(",").map((x) => x.trim());
+  for (const line of csv.split('\n')) {
+    const [pid, uuid, used] = line.split(',').map((x) => x.trim());
     const p = Number(pid),
       u = Number(used);
-    if (!uuid || !Number.isFinite(p) || pid === "") continue;
-    if (Number.isFinite(u) && used !== "") out.push({ pid: p, uuid, usedBytes: u * MiB });
-    else if (used === "[N/A]" || used === "N/A") out.push({ pid: p, uuid, usedBytes: null });
+    if (!uuid || !Number.isFinite(p) || pid === '') continue;
+    if (Number.isFinite(u) && used !== '') out.push({ pid: p, uuid, usedBytes: u * MiB });
+    else if (used === '[N/A]' || used === 'N/A') out.push({ pid: p, uuid, usedBytes: null });
   }
   return out;
 }
 
-type Spawned = { stdout: ReadableStream<Uint8Array>; exited: Promise<number>; kill(signal?: NodeJS.Signals | number): void };
+type Spawned = {
+  stdout: ReadableStream<Uint8Array>;
+  exited: Promise<number>;
+  kill(signal?: NodeJS.Signals | number): void;
+};
 
 /** One long-lived `nvidia-smi -lms` stream + occasional compute-apps query. */
 export class NvidiaMonitor {
@@ -60,7 +74,7 @@ export class NvidiaMonitor {
 
   constructor(opts: { bin?: string; intervalMs?: number; spawn?: typeof Bun.spawn; appsTimeoutMs?: number } = {}) {
     this.appsTimeoutMs = opts.appsTimeoutMs ?? 3000;
-    this.bin = opts.bin ?? "nvidia-smi";
+    this.bin = opts.bin ?? 'nvidia-smi';
     this.intervalMs = opts.intervalMs ?? 1000;
     this.spawn = opts.spawn ?? Bun.spawn;
   }
@@ -68,11 +82,14 @@ export class NvidiaMonitor {
   start(): void {
     if (this.proc || this.disabled) return;
     try {
-      this.proc = this.spawn([this.bin, `--query-gpu=${QUERY}`, "--format=csv,noheader,nounits", "-lms", String(this.intervalMs)], {
-        stdout: "pipe",
-        stderr: "ignore",
-        stdin: "ignore",
-      }) as unknown as Spawned;
+      this.proc = this.spawn(
+        [this.bin, `--query-gpu=${QUERY}`, '--format=csv,noheader,nounits', '-lms', String(this.intervalMs)],
+        {
+          stdout: 'pipe',
+          stderr: 'ignore',
+          stdin: 'ignore',
+        },
+      ) as unknown as Spawned;
     } catch {
       this.disabled = true;
       return;
@@ -82,13 +99,12 @@ export class NvidiaMonitor {
 
   private async read(proc: Spawned) {
     const decoder = new TextDecoder();
-    let buf = "";
+    let buf = '';
     try {
       for await (const chunk of proc.stdout) {
         if (this.proc !== proc) return; // replaced (new interval) or stopped: its last lines would mix with the next stream's
         buf += decoder.decode(chunk, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) >= 0) {
+        for (let nl = buf.indexOf('\n'); nl >= 0; nl = buf.indexOf('\n')) {
           this.onLine(buf.slice(0, nl));
           buf = buf.slice(nl + 1);
         }
@@ -150,10 +166,10 @@ export class NvidiaMonitor {
   private async queryApps(): Promise<void> {
     let p: Spawned;
     try {
-      p = this.spawn([this.bin, "--query-compute-apps=pid,gpu_uuid,used_memory", "--format=csv,noheader,nounits"], {
-        stdout: "pipe",
-        stderr: "ignore",
-        stdin: "ignore",
+      p = this.spawn([this.bin, '--query-compute-apps=pid,gpu_uuid,used_memory', '--format=csv,noheader,nounits'], {
+        stdout: 'pipe',
+        stderr: 'ignore',
+        stdin: 'ignore',
       }) as unknown as Spawned;
     } catch {
       this.disabled = true;
@@ -170,7 +186,7 @@ export class NvidiaMonitor {
       const text = await Promise.race([read, timedOut]);
       if (text === null) {
         try {
-          p.kill("SIGKILL");
+          p.kill('SIGKILL');
         } catch {}
         return; // keep the previous mapping
       }
