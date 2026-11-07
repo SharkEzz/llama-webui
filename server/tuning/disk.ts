@@ -1,5 +1,5 @@
-import type { DiskSpeed } from "@llama-webui/shared";
-import { HttpError } from "../http";
+import type { DiskSpeed } from '@llama-webui/shared';
+import { HttpError } from '../http';
 
 const GiB = 1024 ** 3;
 const MIN_BYTES = 64 * 1024 ** 2;

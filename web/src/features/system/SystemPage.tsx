@@ -1,26 +1,26 @@
-import type { CpuInfo } from "@llama-webui/shared"
-import { useEffect, useState } from "react"
-import { Skeleton } from "@/components/ui/skeleton"
-import { api } from "@/lib/api"
-import { useMonitor } from "@/lib/monitor"
-import { ChecksCard } from "./ChecksCard"
-import { CpuCard } from "./CpuCard"
-import { DiskCard } from "./DiskCard"
-import { GpuCard } from "./GpuCard"
-import { MemoryCard } from "./MemoryCard"
+import type { CpuInfo } from '@llama-webui/shared';
+import { useEffect, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { api } from '@/lib/api';
+import { useMonitor } from '@/lib/monitor';
+import { ChecksCard } from './ChecksCard';
+import { CpuCard } from './CpuCard';
+import { DiskCard } from './DiskCard';
+import { GpuCard } from './GpuCard';
+import { MemoryCard } from './MemoryCard';
 
 export interface SystemInfo {
-  cpu: CpuInfo
-  gpus: { key: string; name: string; vendor: "nvidia" | "amd"; busId: string; vramTotalBytes: number }[]
-  nvidiaSource: "nvml" | "nvidia-smi"
+  cpu: CpuInfo;
+  gpus: { key: string; name: string; vendor: 'nvidia' | 'amd'; busId: string; vramTotalBytes: number }[];
+  nvidiaSource: 'nvml' | 'nvidia-smi';
 }
 
 export function SystemPage() {
-  const snapshot = useMonitor((s) => s.snapshot)
-  const [info, setInfo] = useState<SystemInfo | null>(null)
+  const snapshot = useMonitor((s) => s.snapshot);
+  const [info, setInfo] = useState<SystemInfo | null>(null);
   useEffect(() => {
-    void api<SystemInfo>("/system/info").then(setInfo, () => {})
-  }, [])
+    void api<SystemInfo>('/system/info').then(setInfo, () => {});
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
@@ -28,7 +28,7 @@ export function SystemPage() {
         <h1 className="text-3xl font-semibold tracking-tight">Système</h1>
         {info && (
           <span className="text-sm text-muted-foreground">
-            Source NVIDIA : {info.nvidiaSource === "nvml" ? "NVML" : "nvidia-smi"}
+            Source NVIDIA : {info.nvidiaSource === 'nvml' ? 'NVML' : 'nvidia-smi'}
           </span>
         )}
       </header>
@@ -54,5 +54,5 @@ export function SystemPage() {
         </>
       )}
     </div>
-  )
+  );
 }

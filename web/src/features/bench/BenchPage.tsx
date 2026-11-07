@@ -1,15 +1,15 @@
-import { useEffect } from "react"
-import { startBenchSync, useBench } from "@/lib/bench"
-import { BenchForm } from "./BenchForm"
-import { BenchHistory } from "./BenchHistory"
-import { BenchLiveCard } from "./BenchLiveCard"
+import { useEffect } from 'react';
+import { startBenchSync, useBench } from '@/lib/bench';
+import { BenchForm } from './BenchForm';
+import { BenchHistory } from './BenchHistory';
+import { BenchLiveCard } from './BenchLiveCard';
 
 /** Benchmark : formulaire et run en cours en haut, historique et comparaison en dessous. */
 export function BenchPage() {
   useEffect(() => {
-    startBenchSync()
-    void useBench.getState().load()
-  }, [])
+    startBenchSync();
+    void useBench.getState().load();
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
@@ -20,5 +20,5 @@ export function BenchPage() {
       </div>
       <BenchHistory />
     </div>
-  )
+  );
 }

@@ -5,21 +5,21 @@ import {
   type Estimate,
   PRESET_IDS,
   SweepSpecSchema,
-} from "@llama-webui/shared";
-import { z } from "zod";
-import { benchBinary } from "../bench/parse";
-import type { BenchRunner } from "../bench/runner";
-import type { SettingsRepo } from "../db/settings";
-import { guarded, HttpError, jsonObject } from "../http";
-import type { Monitor } from "../monitor/monitor";
-import type { Runtime } from "../runtime";
-import { runChecks, summarize } from "../tuning/checks";
-import { measureDiskSpeed } from "../tuning/disk";
-import { estimate } from "../tuning/estimate";
-import { readTuningHardware } from "../tuning/hardware";
-import { loadModel, mmprojBytes } from "../tuning/models";
-import { planSweep } from "../tuning/space";
-import { readSys } from "../tuning/sysinfo";
+} from '@llama-webui/shared';
+import { z } from 'zod';
+import { benchBinary } from '../bench/parse';
+import type { BenchRunner } from '../bench/runner';
+import type { SettingsRepo } from '../db/settings';
+import { guarded, HttpError, jsonObject } from '../http';
+import type { Monitor } from '../monitor/monitor';
+import type { Runtime } from '../runtime';
+import { runChecks, summarize } from '../tuning/checks';
+import { measureDiskSpeed } from '../tuning/disk';
+import { estimate } from '../tuning/estimate';
+import { readTuningHardware } from '../tuning/hardware';
+import { loadModel, mmprojBytes } from '../tuning/models';
+import { planSweep } from '../tuning/space';
+import { readSys } from '../tuning/sysinfo';
 
 export interface TuningRouteDeps {
   settings: SettingsRepo;
@@ -45,10 +45,10 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
     readTuningHardware({ benchBinary: benchBinary(settings.get().binary), mem: monitor.latest()?.system?.mem ?? null });
 
   return {
-    "/api/tuning/hardware": {
+    '/api/tuning/hardware': {
       GET: guarded(async () => Response.json(await hardware())),
     },
-    "/api/tuning/estimate": {
+    '/api/tuning/estimate': {
       POST: guarded(async (req) => {
         const body = EstimateRequest.parse(await jsonObject(req));
         const [model, mmproj, hw] = await Promise.all([
@@ -61,7 +61,7 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
         return Response.json(e);
       }),
     },
-    "/api/tuning/plan": {
+    '/api/tuning/plan': {
       POST: guarded(async (req) => {
         const spec = SweepSpecSchema.parse((await jsonObject(req)).spec);
         const [model, mmproj, hw] = await Promise.all([
@@ -72,9 +72,9 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
         return Response.json(planSweep({ model, hw, spec, mmprojBytes: mmproj }));
       }),
     },
-    "/api/tuning/checks": {
+    '/api/tuning/checks': {
       GET: guarded(async (req) => {
-        const modelPath = new URL(req.url).searchParams.get("model") || null;
+        const modelPath = new URL(req.url).searchParams.get('model') || null;
         const snap = monitor.latest();
         const gpus = snap?.allGpus ?? [];
         const [hw, model, readings] = await Promise.all([
@@ -104,10 +104,10 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
         return Response.json(report);
       }),
     },
-    "/api/tuning/disk-speed": {
+    '/api/tuning/disk-speed': {
       POST: guarded(async (req) => {
         const { modelPath } = z.strictObject({ modelPath: z.string().min(1) }).parse(await jsonObject(req));
-        if (benchRunner.busy) throw new HttpError(409, "Un benchmark est en cours : la mesure serait faussée");
+        if (benchRunner.busy) throw new HttpError(409, 'Un benchmark est en cours : la mesure serait faussée');
         await loadModel(modelPath);
         const d = await measureDiskSpeed(modelPath);
         diskSpeeds.set(modelPath, d);

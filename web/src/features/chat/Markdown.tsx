@@ -1,14 +1,14 @@
-import { memo, type ReactElement, type ReactNode } from "react"
-import ReactMarkdown, { type Components } from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { CodeBlock } from "./CodeBlock"
+import { memo, type ReactElement, type ReactNode } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { CodeBlock } from './CodeBlock';
 
 const components: Components = {
   pre: ({ children }) => {
-    const el = children as ReactElement<{ className?: string; children?: ReactNode }>
-    const lang = /language-(\S+)/.exec(el?.props?.className ?? "")?.[1]
-    return <CodeBlock code={String(el?.props?.children ?? "").replace(/\n$/, "")} lang={lang} />
+    const el = children as ReactElement<{ className?: string; children?: ReactNode }>;
+    const lang = /language-(\S+)/.exec(el?.props?.className ?? '')?.[1];
+    return <CodeBlock code={String(el?.props?.children ?? '').replace(/\n$/, '')} lang={lang} />;
   },
   code: ({ children }) => <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
   a: ({ href, children }) => (
@@ -32,7 +32,7 @@ const components: Components = {
   tr: ({ children }) => <TableRow>{children}</TableRow>,
   th: ({ children }) => <TableHead>{children}</TableHead>,
   td: ({ children }) => <TableCell>{children}</TableCell>,
-}
+};
 
 /** Markdown d'une réponse : GFM (tableaux, listes de tâches), sans HTML brut (affiché comme texte). */
 export const Markdown = memo(function Markdown({ text }: { text: string }) {
@@ -40,5 +40,5 @@ export const Markdown = memo(function Markdown({ text }: { text: string }) {
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
       {text}
     </ReactMarkdown>
-  )
-})
+  );
+});

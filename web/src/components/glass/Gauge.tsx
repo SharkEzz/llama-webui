@@ -1,24 +1,24 @@
-import { TONE_VAR, type Tone } from "./tones"
+import { TONE_VAR, type Tone } from './tones';
 
 interface GaugeProps {
-  value: number
-  max?: number
-  label: string
-  unit?: string
-  size?: number
-  tone?: Tone
+  value: number;
+  max?: number;
+  label: string;
+  unit?: string;
+  size?: number;
+  tone?: Tone;
 }
 
-const SWEEP = 0.75 // arc de 270°
+const SWEEP = 0.75; // arc de 270°
 
 /** Jauge circulaire 270°, ouverture en bas, valeur au centre. */
-export function Gauge({ value, max = 100, label, unit = "%", size = 96, tone = "violet" }: GaugeProps) {
-  const stroke = Math.max(6, Math.round(size / 14))
-  const r = (size - stroke) / 2
-  const circumference = 2 * Math.PI * r
-  const arc = circumference * SWEEP
-  const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0
-  const display = Number.isInteger(value) ? value : value.toFixed(1)
+export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = 'violet' }: GaugeProps) {
+  const stroke = Math.max(6, Math.round(size / 14));
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const arc = circumference * SWEEP;
+  const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
+  const display = Number.isInteger(value) ? value : value.toFixed(1);
 
   return (
     <figure className="inline-flex flex-col items-center gap-1.5" style={{ width: size }}>
@@ -55,7 +55,7 @@ export function Gauge({ value, max = 100, label, unit = "%", size = 96, tone = "
             strokeLinecap="round"
             strokeDasharray={`${arc} ${circumference}`}
             strokeDashoffset={arc * (1 - ratio)}
-            style={{ transition: "stroke-dashoffset 600ms cubic-bezier(0.22, 1, 0.36, 1)" }}
+            style={{ transition: 'stroke-dashoffset 600ms cubic-bezier(0.22, 1, 0.36, 1)' }}
             opacity={ratio === 0 ? 0 : 1}
           />
         </svg>
@@ -72,5 +72,5 @@ export function Gauge({ value, max = 100, label, unit = "%", size = 96, tone = "
       </div>
       <figcaption className="text-xs text-muted-foreground">{label}</figcaption>
     </figure>
-  )
+  );
 }

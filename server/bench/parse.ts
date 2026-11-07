@@ -1,5 +1,5 @@
-import { basename, dirname, join } from "node:path";
-import type { BenchDevice, Measure } from "@llama-webui/shared";
+import { basename, dirname, join } from 'node:path';
+import type { BenchDevice, Measure } from '@llama-webui/shared';
 
 interface BenchJsonEntry {
   n_prompt?: number;
@@ -32,7 +32,7 @@ export function parseBenchJson(
     if (np > 0 && ng === 0) pp = m(np);
     else if (ng > 0 && np === 0) tg = m(ng);
     if (build === null && e.build_number !== undefined)
-      build = `b${e.build_number}${e.build_commit ? ` (${e.build_commit})` : ""}`;
+      build = `b${e.build_number}${e.build_commit ? ` (${e.build_commit})` : ''}`;
   }
   return { pp, tg, build };
 }
@@ -41,7 +41,7 @@ const PROGRESS = /^llama-bench: benchmark (\d+)\/(\d+): (warmup|prompt|generatio
 
 /** Une ligne de `--progress` (stderr) : `llama-bench: benchmark 1/2: prompt run 2/2`. */
 export function parseBenchProgress(line: string): {
-  phase: "warmup" | "prompt" | "generation";
+  phase: 'warmup' | 'prompt' | 'generation';
   test: number;
   tests: number;
   run: number | null;
@@ -50,7 +50,7 @@ export function parseBenchProgress(line: string): {
   const m = PROGRESS.exec(line.trim());
   if (!m) return null;
   return {
-    phase: m[3] as "warmup" | "prompt" | "generation",
+    phase: m[3] as 'warmup' | 'prompt' | 'generation',
     test: Number(m[1]),
     tests: Number(m[2]),
     run: m[4] ? Number(m[4]) : null,
@@ -63,7 +63,7 @@ const DEVICE = /^\s+(\S+): (.+) \((\d+) MiB, (\d+) MiB free\)\s*$/;
 /** La sortie de `llama-bench --list-devices`. */
 export function parseDeviceList(text: string): BenchDevice[] {
   const out: BenchDevice[] = [];
-  for (const line of text.split("\n")) {
+  for (const line of text.split('\n')) {
     const m = DEVICE.exec(line);
     if (m)
       out.push({
@@ -71,7 +71,7 @@ export function parseDeviceList(text: string): BenchDevice[] {
         name: m[2]!,
         totalMib: Number(m[3]),
         freeMib: Number(m[4]),
-        backend: m[1]!.replace(/\d+$/, ""),
+        backend: m[1]!.replace(/\d+$/, ''),
       });
   }
   return out;
@@ -86,7 +86,7 @@ const OOM = /out of memory|failed to allocate|unable to allocate/i;
 export function benchFailure(
   lines: string[],
   exit: number | string,
-  tool = "llama-bench",
+  tool = 'llama-bench',
 ): { message: string; oom: boolean } {
   const oom = lines.some((l) => OOM.test(l));
   // OOM : la ligne d'allocation (« unable to allocate CUDA1 buffer ») plutôt que le « failed to load model » qui suit.
@@ -94,12 +94,12 @@ export function benchFailure(
     .reverse()
     .find((l) => (oom ? OOM : ERROR_LINE).test(l))
     ?.trim();
-  if (!line) return { oom, message: oom ? "Mémoire insuffisante" : `${tool} terminé (code ${exit})` };
+  if (!line) return { oom, message: oom ? 'Mémoire insuffisante' : `${tool} terminé (code ${exit})` };
   return { oom, message: oom ? `Mémoire insuffisante : ${line}` : line };
 }
 
 /** llama-bench à côté du binaire serveur des réglages (nom nu → nom nu, cherché dans le PATH). */
 export function benchBinary(serverBinary: string): string {
-  const name = basename(serverBinary).replace("llama-server", "llama-bench");
-  return serverBinary.includes("/") ? join(dirname(serverBinary), name) : name;
+  const name = basename(serverBinary).replace('llama-server', 'llama-bench');
+  return serverBinary.includes('/') ? join(dirname(serverBinary), name) : name;
 }

@@ -3,7 +3,7 @@
 const SAFE = /^[A-Za-z0-9_\-.,:/=@%+]+$/;
 
 export function shellQuote(args: string[]): string {
-  return args.map((a) => (SAFE.test(a) ? a : `'${a.replaceAll("'", `'\\''`)}'`)).join(" ");
+  return args.map((a) => (SAFE.test(a) ? a : `'${a.replaceAll("'", `'\\''`)}'`)).join(' ');
 }
 
 /**
@@ -13,31 +13,31 @@ export function shellQuote(args: string[]): string {
  */
 export function shellSplit(text: string): string[] | { error: string } {
   const words: string[] = [];
-  let word = "";
+  let word = '';
   let inWord = false;
   for (let i = 0; i < text.length; i++) {
     const c = text[i]!;
-    if (c === " " || c === "\t") {
+    if (c === ' ' || c === '\t') {
       if (inWord) words.push(word);
-      word = "";
+      word = '';
       inWord = false;
       continue;
     }
     inWord = true;
-    if (c === "\\") {
-      if (i + 1 >= text.length) return { error: "barre oblique inverse en fin de ligne" };
+    if (c === '\\') {
+      if (i + 1 >= text.length) return { error: 'barre oblique inverse en fin de ligne' };
       word += text[++i];
     } else if (c === "'") {
       const end = text.indexOf("'", i + 1);
-      if (end < 0) return { error: "guillemet non fermé" };
+      if (end < 0) return { error: 'guillemet non fermé' };
       word += text.slice(i + 1, end);
       i = end;
     } else if (c === '"') {
       for (i++; ; i++) {
-        if (i >= text.length) return { error: "guillemet non fermé" };
+        if (i >= text.length) return { error: 'guillemet non fermé' };
         const d = text[i]!;
         if (d === '"') break;
-        if (d === "\\" && (text[i + 1] === '"' || text[i + 1] === "\\")) word += text[++i];
+        if (d === '\\' && (text[i + 1] === '"' || text[i + 1] === '\\')) word += text[++i];
         else word += d;
       }
     } else word += c;

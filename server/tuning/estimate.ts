@@ -10,11 +10,11 @@ import {
   type Recommendation,
   serverArgs,
   type TuningHardware,
-} from "@llama-webui/shared";
-import type { ModelInfo } from "../models/gguf";
-import { EXPERTS } from "../models/sizes";
-import { computeBytes, fmtBytes, GiB, MiB, marginBytes } from "./memory";
-import { fitOf, measurePlacement, type PlacementInput, type PlacementMeasure } from "./placement";
+} from '@llama-webui/shared';
+import type { ModelInfo } from '../models/gguf';
+import { EXPERTS } from '../models/sizes';
+import { computeBytes, fmtBytes, GiB, MiB, marginBytes } from './memory';
+import { fitOf, measurePlacement, type PlacementInput, type PlacementMeasure } from './placement';
 
 export interface EstimateInput {
   model: ModelInfo;
@@ -27,7 +27,7 @@ export interface EstimateInput {
   ctx?: number;
 }
 
-type Kv = "f16" | "q8_0";
+type Kv = 'f16' | 'q8_0';
 const CTX_STEP = 4096;
 const TS_UNIT = 256 * MiB;
 const DEFAULT_BATCH = 2048;
@@ -42,7 +42,7 @@ interface Tried {
 }
 
 /** Une famille de placement sur un jeu de cartes : produit des flags pour (ctx, kv, ub), ou null si rien ne tient. */
-type Kind = { name: "gpu" | "moe-cpu" | "partial" | "cpu"; cards: BenchDevice[] };
+type Kind = { name: 'gpu' | 'moe-cpu' | 'partial' | 'cpu'; cards: BenchDevice[] };
 
 /**
  * Recommandation par règles (adaptée de l'estimateur de llama-tui) : cartes CUDA puis Vulkan (doublons et iGPU exclus),
@@ -50,7 +50,7 @@ type Kind = { name: "gpu" | "moe-cpu" | "partial" | "cpu"; cards: BenchDevice[] 
  * d'emblée les experts en RAM sur toutes les cartes et accepte que la RAM déborde (mmap : relecture NVMe).
  */
 /** « experts de la première couche », « experts des 8 premières couches ». */
-const firstLayers = (n: number) => (n === 1 ? "experts de la première couche" : `experts des ${n} premières couches`);
+const firstLayers = (n: number) => (n === 1 ? 'experts de la première couche' : `experts des ${n} premières couches`);
 
 export function estimate(input: EstimateInput): Estimate {
   const { model, hw, mmprojBytes } = input;
@@ -58,17 +58,17 @@ export function estimate(input: EstimateInput): Estimate {
   const preset = presetOf(input.preset);
   const L = model.blockCount;
   const isMoe = model.expertCount > 0 && model.tensors.some((t) => EXPERTS.test(t.name));
-  const allowOverflow = input.preset === "big";
+  const allowOverflow = input.preset === 'big';
   const threads = pinned.t ?? Math.max(1, hw.cpu.physicalCores);
   const batch = pinned.b ?? DEFAULT_BATCH;
-  const noFa = pinned.fa === "off";
+  const noFa = pinned.fa === 'off';
   const byId = new Map(hw.devices.map((d) => [d.id, d]));
 
   const budget = (d: BenchDevice) => Math.max(0, d.totalMib * MiB - marginBytes(d.totalMib * MiB));
   const gpus = gpuDevices(hw.devices).filter((d) => budget(d) >= TS_UNIT);
   // CUDA d'abord (dans l'ordre de --list-devices : CUDA0 est la carte la plus rapide ici), puis les autres.
-  const ordered = [...gpus.filter((d) => d.backend === "CUDA"), ...gpus.filter((d) => d.backend !== "CUDA")];
-  const cuda = ordered.filter((d) => d.backend === "CUDA");
+  const ordered = [...gpus.filter((d) => d.backend === 'CUDA'), ...gpus.filter((d) => d.backend !== 'CUDA')];
+  const cuda = ordered.filter((d) => d.backend === 'CUDA');
   const pinnedCards = pinned.dev?.map((id) => byId.get(id)).filter((d): d is BenchDevice => !!d);
 
   const sets: BenchDevice[][] = [];
@@ -85,23 +85,23 @@ export function estimate(input: EstimateInput): Estimate {
   }
   const widest = sets.reduce<BenchDevice[]>((a, s) => (s.length > a.length ? s : a), []);
   const kinds: Kind[] = [];
-  if (input.preset === "big" && widest.length > 0) {
-    if (isMoe) kinds.push({ name: "moe-cpu", cards: widest });
-    kinds.push({ name: "partial", cards: widest });
+  if (input.preset === 'big' && widest.length > 0) {
+    if (isMoe) kinds.push({ name: 'moe-cpu', cards: widest });
+    kinds.push({ name: 'partial', cards: widest });
   } else if (widest.length > 0) {
-    for (const s of sets) kinds.push({ name: "gpu", cards: s });
-    if (isMoe) kinds.push({ name: "moe-cpu", cards: widest });
-    kinds.push({ name: "partial", cards: widest });
+    for (const s of sets) kinds.push({ name: 'gpu', cards: s });
+    if (isMoe) kinds.push({ name: 'moe-cpu', cards: widest });
+    kinds.push({ name: 'partial', cards: widest });
   }
-  kinds.push({ name: "cpu", cards: [] });
+  kinds.push({ name: 'cpu', cards: [] });
 
   const kvs: Kv[] = noFa
-    ? ["f16"]
+    ? ['f16']
     : pinned.ctk
-      ? [pinned.ctk === "f16" ? "f16" : "q8_0"]
-      : preset.kvPreferred === "f16"
-        ? ["f16", "q8_0"]
-        : ["q8_0"];
+      ? [pinned.ctk === 'f16' ? 'f16' : 'q8_0']
+      : preset.kvPreferred === 'f16'
+        ? ['f16', 'q8_0']
+        : ['q8_0'];
   const ubs = pinned.ub ? [pinned.ub] : preset.ub === 512 ? [512] : [preset.ub, 512];
   const ctxMax = Math.max(preset.ctxMin, Math.floor((model.contextLength || preset.ctxMin) / 1024) * 1024);
 
@@ -127,11 +127,11 @@ export function estimate(input: EstimateInput): Estimate {
     const m = measurePlacement(pi);
     const fit = fitOf(pi, m);
     const okRam = allowOverflow || m.ram <= hw.ramAvailableBytes;
-    return fit.verdict !== "no" && okRam ? { params: p, ctx, kv, ub, fit, m } : null;
+    return fit.verdict !== 'no' && okRam ? { params: p, ctx, kv, ub, fit, m } : null;
   };
 
   const common = (kv: Kv, ub: number): BenchParams => ({
-    ...(noFa ? {} : { fa: "on" as const }),
+    ...(noFa ? {} : { fa: 'on' as const }),
     ctk: kv,
     ctv: kv,
     t: threads,
@@ -143,31 +143,31 @@ export function estimate(input: EstimateInput): Estimate {
     const dev = k.cards.map((d) => d.id);
     const ts = tsOf(k.cards, ub);
     const placed = (extra: BenchParams): BenchParams => ({
-      ngl: "all",
+      ngl: 'all',
       ...extra,
       dev,
       ...(ts ? { ts } : {}),
       ...common(kv, ub),
     });
     switch (k.name) {
-      case "gpu":
+      case 'gpu':
         return tryParams(placed({}), ctx, kv, ub);
-      case "moe-cpu":
+      case 'moe-cpu':
         if (pinned.ncmoe !== undefined) return tryParams(placed({ ncmoe: pinned.ncmoe }), ctx, kv, ub);
         for (let n = 1; n <= L; n++) {
           const r = tryParams(placed({ ncmoe: n }), ctx, kv, ub);
           if (r) return r;
         }
         return null;
-      case "partial":
+      case 'partial':
         if (pinned.ngl !== undefined) return tryParams(placed({ ngl: pinned.ngl }), ctx, kv, ub);
         for (let n = L - 1; n >= 1; n--) {
           const r = tryParams(placed({ ngl: n }), ctx, kv, ub);
           if (r) return r;
         }
         return null;
-      case "cpu":
-        return tryParams({ ngl: 0, dev: ["none"], ...common(kv, ub) }, ctx, kv, ub);
+      case 'cpu':
+        return tryParams({ ngl: 0, dev: ['none'], ...common(kv, ub) }, ctx, kv, ub);
     }
   };
 
@@ -206,7 +206,7 @@ export function estimate(input: EstimateInput): Estimate {
         for (const k of kinds) {
           const r = largest(k, kv);
           if (r && (!best || r.ctx > best.ctx)) best = r;
-          if (best && k.name !== "gpu") break;
+          if (best && k.name !== 'gpu') break;
         }
         if (best) return best;
       }
@@ -216,10 +216,10 @@ export function estimate(input: EstimateInput): Estimate {
     // Une configuration avec de la marge passe avant une configuration « limite » plus simple.
     const target = ctxList()[0]!;
     let tight: Tried | null = null;
-    for (const k of kinds.filter((x) => x.name === "gpu"))
+    for (const k of kinds.filter((x) => x.name === 'gpu'))
       for (const ub of ubs) {
         const r = fitKind(k, target, kvs[0]!, ub);
-        if (r?.fit.verdict === "fits") return r;
+        if (r?.fit.verdict === 'fits') return r;
         tight ??= r;
       }
     if (tight) return tight;
@@ -235,14 +235,14 @@ export function estimate(input: EstimateInput): Estimate {
 
   const found = search();
   const warnings: string[] = [];
-  if (pinned.ncmoe && !isMoe) warnings.push("modèle dense : -ncmoe sans effet");
+  if (pinned.ncmoe && !isMoe) warnings.push('modèle dense : -ncmoe sans effet');
 
   if (!found) {
     // Rien ne tient : on montre quand même la configuration la plus simple, sans la valider.
     const ctx = input.ctx ?? preset.ctxMin;
-    const kv: Kv = noFa ? "f16" : "q8_0";
+    const kv: Kv = noFa ? 'f16' : 'q8_0';
     const params: BenchParams = {
-      ...(widest.length ? { ngl: "all" as const, dev: widest.map((d) => d.id) } : { ngl: 0 }),
+      ...(widest.length ? { ngl: 'all' as const, dev: widest.map((d) => d.id) } : { ngl: 0 }),
       ...common(kv, 512),
       ...pinned,
     };
@@ -268,9 +268,9 @@ export function estimate(input: EstimateInput): Estimate {
       params,
       ctx,
       kv,
-      serverArgs: [...serverArgs(params), "-c", String(ctx), "--fit", "off"],
+      serverArgs: [...serverArgs(params), '-c', String(ctx), '--fit', 'off'],
       rows: [],
-      fit: { ...fit, verdict: "no", reason },
+      fit: { ...fit, verdict: 'no', reason },
       ramOverflowBytes: Math.max(0, m.ram - hw.ramAvailableBytes),
       diskReadBytesPerToken: 0,
       warnings: [...warnings, ...m.issues],
@@ -285,7 +285,7 @@ export function estimate(input: EstimateInput): Estimate {
   const diskReadBytesPerToken =
     ramOverflowBytes > 0 && m.cpuWeights > 0 ? activeCpu * Math.min(1, ramOverflowBytes / m.cpuWeights) : 0;
   const mlock =
-    params.ngl !== "all" &&
+    params.ngl !== 'all' &&
     m.cpuWeights > 0 &&
     ramOverflowBytes === 0 &&
     hw.ramAvailableBytes - m.ram >= 2 * GiB &&
@@ -295,63 +295,63 @@ export function estimate(input: EstimateInput): Estimate {
   const rows: Recommendation[] = [];
   const row = (flag: string, value: string, why: string) => rows.push({ flag, value, why });
   const totalBudget = fit.vram.reduce((a, v) => a + v.budget, 0);
-  const cards = used.join(", ");
-  if (params.ngl === "all" && params.ncmoe)
+  const cards = used.join(', ');
+  if (params.ngl === 'all' && params.ncmoe)
     row(
-      "-ncmoe",
+      '-ncmoe',
       String(params.ncmoe),
-      input.preset === "big"
+      input.preset === 'big'
         ? `${firstLayers(params.ncmoe)} en RAM ; attention, normes et experts restants sur ${cards}`
         : `${firstLayers(params.ncmoe)} en RAM (${fmtBytes(m.cpuExpertsBytes)})`,
     );
-  if (params.ngl === "all")
+  if (params.ngl === 'all')
     row(
-      "-ngl",
-      "all",
+      '-ngl',
+      'all',
       params.ncmoe
-        ? "toutes les couches sur GPU, sauf les experts ci-dessus"
+        ? 'toutes les couches sur GPU, sauf les experts ci-dessus'
         : `${fmtBytes(m.gpuWeights)} de poids tiennent dans ${fmtBytes(totalBudget)} utilisables`,
     );
-  else if (typeof params.ngl === "number" && params.ngl > 0)
-    row("-ngl", String(params.ngl), `${params.ngl} couches sur ${L} tiennent, le reste en RAM`);
-  else row("-ngl", "0", "pas une couche ne tient : tout en RAM");
-  if (params.dev && params.dev[0] !== "none")
+  else if (typeof params.ngl === 'number' && params.ngl > 0)
+    row('-ngl', String(params.ngl), `${params.ngl} couches sur ${L} tiennent, le reste en RAM`);
+  else row('-ngl', '0', 'pas une couche ne tient : tout en RAM');
+  if (params.dev && params.dev[0] !== 'none')
     row(
-      "-dev",
-      params.dev.join(","),
+      '-dev',
+      params.dev.join(','),
       params.dev.length === 1
-        ? "une seule carte : pas de saut PCIe"
+        ? 'une seule carte : pas de saut PCIe'
         : `${params.dev.length} cartes, ${params.dev[0]} reçoit les tampons de calcul`,
     );
-  if (params.ts) row("-ts", params.ts.join(","), "réparti selon la VRAM utilisable de chaque carte");
+  if (params.ts) row('-ts', params.ts.join(','), 'réparti selon la VRAM utilisable de chaque carte');
   const kvTotal = [...m.vram.values()].reduce((a, b) => a + b, 0) + m.ram;
-  row("-c", String(ctx), `${fmtBytes(kvTotal)} estimés au total, cache KV ${kv} compris, marge conservée`);
+  row('-c', String(ctx), `${fmtBytes(kvTotal)} estimés au total, cache KV ${kv} compris, marge conservée`);
   if (params.fa)
     row(
-      "-fa",
-      "on",
-      kv === "f16" ? "attention plus rapide, tampons de calcul plus petits" : "requis pour le cache KV quantifié",
+      '-fa',
+      'on',
+      kv === 'f16' ? 'attention plus rapide, tampons de calcul plus petits' : 'requis pour le cache KV quantifié',
     );
-  row("-ctk / -ctv", kv, kv === "f16" ? "le budget le permet, pas de perte" : "cache divisé par 2, perte négligeable");
-  row("-t", String(threads), `${threads} cœurs physiques`);
+  row('-ctk / -ctv', kv, kv === 'f16' ? 'le budget le permet, pas de perte' : 'cache divisé par 2, perte négligeable');
+  row('-t', String(threads), `${threads} cœurs physiques`);
   row(
-    "-b / -ub",
+    '-b / -ub',
     `${batch} / ${params.ub}`,
-    params.ub === 512 && batch === DEFAULT_BATCH ? "défaut" : "prompt processing plus rapide, marge VRAM suffisante",
+    params.ub === 512 && batch === DEFAULT_BATCH ? 'défaut' : 'prompt processing plus rapide, marge VRAM suffisante',
   );
-  row("--fit", "off", "ce qui est mesuré est exactement ce qui est écrit");
-  if (mlock) row("--mlock", "", "tout le modèle en mémoire, RAM suffisante");
-  if (numa) row("--numa", "distribute", "plusieurs nœuds NUMA");
+  row('--fit', 'off', 'ce qui est mesuré est exactement ce qui est écrit');
+  if (mlock) row('--mlock', '', 'tout le modèle en mémoire, RAM suffisante');
+  if (numa) row('--numa', 'distribute', 'plusieurs nœuds NUMA');
 
-  if (typeof params.ngl === "number" && params.ngl > 0)
+  if (typeof params.ngl === 'number' && params.ngl > 0)
     warnings.push(`génération lente : ${L - params.ngl} couches sur ${L} en RAM`);
   if (params.ncmoe) warnings.push(`${firstLayers(params.ncmoe)} en RAM : génération ralentie`);
-  if (params.ngl === 0) warnings.push("VRAM insuffisante : tout en RAM");
+  if (params.ngl === 0) warnings.push('VRAM insuffisante : tout en RAM');
   if (ramOverflowBytes > 0)
     warnings.push(
       `déborde la RAM de ${fmtBytes(ramOverflowBytes)} : lecture NVMe ≈ ${fmtBytes(diskReadBytesPerToken)} par jeton généré`,
     );
-  if (fit.verdict === "tight" && fit.reason && ramOverflowBytes === 0) warnings.push(fit.reason);
+  if (fit.verdict === 'tight' && fit.reason && ramOverflowBytes === 0) warnings.push(fit.reason);
   warnings.push(...m.issues);
 
   return {
@@ -363,12 +363,12 @@ export function estimate(input: EstimateInput): Estimate {
     kv,
     serverArgs: [
       ...serverArgs(params),
-      "-c",
+      '-c',
       String(ctx),
-      "--fit",
-      "off",
-      ...(mlock ? ["--mlock"] : []),
-      ...(numa ? ["--numa", "distribute"] : []),
+      '--fit',
+      'off',
+      ...(mlock ? ['--mlock'] : []),
+      ...(numa ? ['--numa', 'distribute'] : []),
     ],
     rows,
     fit,

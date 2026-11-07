@@ -1,4 +1,4 @@
-import { dirname } from "node:path";
+import { dirname } from 'node:path';
 import {
   type BenchLive,
   type BenchRun,
@@ -9,14 +9,14 @@ import {
   type Settings,
   serverArgs,
   shellQuote,
-} from "@llama-webui/shared";
-import type { BenchFinish } from "../db/benchRuns";
-import type { LogBuffer } from "../logs/buffer";
-import { LineSplitter } from "../logs/lines";
-import { type BuiltCommand, buildCommand } from "../supervisor/args";
-import { benchBinary, benchFailure, parseBenchJson, parseBenchProgress } from "./parse";
-import { runServerTrial, TrialCancelled } from "./server";
-import { VramProbe } from "./vram";
+} from '@llama-webui/shared';
+import type { BenchFinish } from '../db/benchRuns';
+import type { LogBuffer } from '../logs/buffer';
+import { LineSplitter } from '../logs/lines';
+import { type BuiltCommand, buildCommand } from '../supervisor/args';
+import { benchBinary, benchFailure, parseBenchJson, parseBenchProgress } from './parse';
+import { runServerTrial, TrialCancelled } from './server';
+import { VramProbe } from './vram';
 
 export interface ExecutorDeps {
   settings(): Settings;
@@ -26,14 +26,14 @@ export interface ExecutorDeps {
   /** Débit de lecture actuel du disque du modèle (Monitor), null si inconnu. */
   disk(): number | null;
   /** Dossier et variables d'environnement du profil d'origine (null si le profil n'existe plus). */
-  profile?(id: number): Pick<Profile, "cwd" | "env"> | null;
+  profile?(id: number): Pick<Profile, 'cwd' | 'env'> | null;
   fetch?: typeof fetch;
   now?: () => number;
   killTimeoutMs?: number;
 }
 
 export type ExecResult = BenchFinish &
-  Required<Pick<BenchFinish, "status" | "vramPeak" | "logExcerpt" | "durationMs" | "diskReadPeakBps">>;
+  Required<Pick<BenchFinish, 'status' | 'vramPeak' | 'logExcerpt' | 'durationMs' | 'diskReadPeakBps'>>;
 
 type Child = ReturnType<typeof Bun.spawn>;
 
@@ -71,7 +71,7 @@ export class RunExecutor {
     this.killTimeoutMs = deps.killTimeoutMs ?? 5000;
   }
 
-  private source(spec: BenchSpec): Pick<Profile, "cwd" | "env"> | null {
+  private source(spec: BenchSpec): Pick<Profile, 'cwd' | 'env'> | null {
     return spec.profileId !== null ? (this.deps.profile?.(spec.profileId) ?? null) : null;
   }
 
@@ -80,18 +80,18 @@ export class RunExecutor {
    * réglages, dans le dossier et avec l'environnement du profil d'origine (ses flags peuvent viser des chemins relatifs).
    */
   commandOf(spec: BenchSpec): { argv: string[]; display: string; cmd: BuiltCommand | null } {
-    if (spec.kind === "server") {
+    if (spec.kind === 'server') {
       const source = this.source(spec);
       const profile: Profile = {
         id: spec.profileId ?? 0,
-        name: "bench",
+        name: 'bench',
         model: spec.modelPath,
         ...(spec.mmprojPath ? { mmproj: spec.mmprojPath } : {}),
         cwd: source?.cwd ?? dirname(spec.modelPath),
-        host: "127.0.0.1",
+        host: '127.0.0.1',
         args: [...serverArgs(spec.params), ...spec.serverArgs],
         env: source?.env ?? {},
-        source: "ui",
+        source: 'ui',
         createdAt: 0,
         updatedAt: 0,
       };
@@ -100,21 +100,21 @@ export class RunExecutor {
     }
     const bin = benchBinary(this.deps.settings().binary);
     const argv = [
-      "setpriv",
-      "--pdeathsig",
-      "KILL",
-      "--",
+      'setpriv',
+      '--pdeathsig',
+      'KILL',
+      '--',
       bin,
-      "-m",
+      '-m',
       spec.modelPath,
-      "-o",
-      "json",
-      "--progress",
-      "-r",
+      '-o',
+      'json',
+      '--progress',
+      '-r',
       String(spec.r),
-      "-p",
+      '-p',
       String(spec.p),
-      "-n",
+      '-n',
       String(spec.n),
       ...benchArgs(spec.params),
     ];
@@ -133,7 +133,7 @@ export class RunExecutor {
     const ex: Exec = {
       run,
       spec,
-      live: { runId: run.id, kind: run.kind, phase: "loading", step: null, startedAt: o.startedAt ?? t0, lines: [] },
+      live: { runId: run.id, kind: run.kind, phase: 'loading', step: null, startedAt: o.startedAt ?? t0, lines: [] },
       liveAt: 0,
       onLive: o.onLive,
       tail: [],
@@ -150,12 +150,12 @@ export class RunExecutor {
       if (!(await Bun.file(spec.modelPath).exists())) throw new Error(`Modèle introuvable : ${spec.modelPath}`);
       const { argv, cmd } = this.commandOf(spec);
       result = ex.cancelled
-        ? { status: "cancelled" }
+        ? { status: 'cancelled' }
         : cmd
           ? await this.runServer(ex, cmd)
           : await this.runBench(ex, argv);
     } catch (e) {
-      result = ex.cancelled ? { status: "cancelled" } : { status: "failed", error: (e as Error).message };
+      result = ex.cancelled ? { status: 'cancelled' } : { status: 'failed', error: (e as Error).message };
     } finally {
       this.cur = null;
     }
@@ -165,9 +165,9 @@ export class RunExecutor {
     return {
       error: null,
       ...result,
-      status: result.status ?? "failed",
+      status: result.status ?? 'failed',
       vramPeak,
-      logExcerpt: ex.tail.join("\n"),
+      logExcerpt: ex.tail.join('\n'),
       durationMs: this.now() - t0,
       diskReadPeakBps: ex.diskPeak,
     };
@@ -180,7 +180,7 @@ export class RunExecutor {
     ex.cancelled = true;
     ex.abort.abort();
     if (ex.proc) this.kill(ex.proc);
-    this.line(ex, "annulation demandée");
+    this.line(ex, 'annulation demandée');
     this.setLive(ex, {});
     return true;
   }
@@ -194,7 +194,7 @@ export class RunExecutor {
     ex.onLive = () => {};
     const proc = ex.proc;
     try {
-      proc?.kill("SIGKILL");
+      proc?.kill('SIGKILL');
     } catch {}
     await proc?.exited;
   }
@@ -254,13 +254,13 @@ export class RunExecutor {
       // Environnement du profil d'origine (CUDA_VISIBLE_DEVICES… : mêmes cartes que le serveur).
       proc = Bun.spawn(argv, {
         env: { ...process.env, ...this.source(ex.spec)?.env },
-        stdin: "ignore",
-        stdout: "pipe",
-        stderr: "pipe",
+        stdin: 'ignore',
+        stdout: 'pipe',
+        stderr: 'pipe',
       });
     } catch (e) {
       await stopSampling();
-      return { status: "failed", error: (e as Error).message };
+      return { status: 'failed', error: (e as Error).message };
     }
     ex.proc = proc;
     if (ex.cancelled) this.kill(proc);
@@ -277,13 +277,13 @@ export class RunExecutor {
       } else this.touchLive(ex);
     });
     await proc.exited;
-    const [out] = await Promise.all([stdout.catch(() => ""), stderr]);
+    const [out] = await Promise.all([stdout.catch(() => ''), stderr]);
     await stopSampling();
     ex.proc = null;
-    if (ex.cancelled) return { status: "cancelled" };
+    if (ex.cancelled) return { status: 'cancelled' };
     const parsed = proc.exitCode === 0 ? parseBenchJson(out) : null;
-    if (parsed && (parsed.pp || parsed.tg)) return { status: "ok", pp: parsed.pp, tg: parsed.tg };
-    return { status: "failed", error: benchFailure(ex.tail, proc.exitCode ?? proc.signalCode ?? "?").message };
+    if (parsed && (parsed.pp || parsed.tg)) return { status: 'ok', pp: parsed.pp, tg: parsed.tg };
+    return { status: 'failed', error: benchFailure(ex.tail, proc.exitCode ?? proc.signalCode ?? '?').message };
   }
 
   private async runServer(ex: Exec, cmd: BuiltCommand): Promise<BenchFinish> {
@@ -307,10 +307,10 @@ export class RunExecutor {
         fetch: this.deps.fetch,
         now: this.now,
       });
-      return { status: "ok", pp: r.pp, tg: r.tg, draftAcceptPct: r.draftAcceptPct };
+      return { status: 'ok', pp: r.pp, tg: r.tg, draftAcceptPct: r.draftAcceptPct };
     } catch (e) {
-      if (e instanceof TrialCancelled || ex.cancelled) return { status: "cancelled" };
-      return { status: "failed", error: (e as Error).message };
+      if (e instanceof TrialCancelled || ex.cancelled) return { status: 'cancelled' };
+      return { status: 'failed', error: (e as Error).message };
     } finally {
       await stopSampling();
       ex.proc = null;
@@ -328,11 +328,11 @@ export class RunExecutor {
 
   private kill(proc: Child): void {
     try {
-      proc.kill("SIGTERM");
+      proc.kill('SIGTERM');
     } catch {}
     const timer = setTimeout(() => {
       try {
-        proc.kill("SIGKILL");
+        proc.kill('SIGKILL');
       } catch {}
     }, this.killTimeoutMs);
     void proc.exited.then(() => clearTimeout(timer));

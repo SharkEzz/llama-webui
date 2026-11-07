@@ -1,22 +1,22 @@
-import { NavLink } from "react-router"
-import { cn } from "@/lib/utils"
-import { type AppRoute, ROUTES } from "./routes"
+import { NavLink } from 'react-router';
+import { cn } from '@/lib/utils';
+import { type AppRoute, ROUTES } from './routes';
 
-const main = ROUTES.filter((r) => r.path !== "/settings")
-const settings = ROUTES.find((r) => r.path === "/settings")!
+const main = ROUTES.filter((r) => r.path !== '/settings');
+const settings = ROUTES.find((r) => r.path === '/settings')!;
 
 function Item({ route }: { route: AppRoute }) {
-  const Icon = route.icon
+  const Icon = route.icon;
   return (
     <NavLink
       to={route.path}
-      end={route.path === "/"}
+      end={route.path === '/'}
       title={route.label}
       className={({ isActive }) =>
         cn(
-          "group relative flex h-9 items-center gap-3 rounded-md px-3 text-sm transition-colors",
-          "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-          isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
+          'group relative flex h-9 items-center gap-3 rounded-md px-3 text-sm transition-colors',
+          'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+          isActive && 'bg-sidebar-accent text-sidebar-accent-foreground',
         )
       }
     >
@@ -25,16 +25,16 @@ function Item({ route }: { route: AppRoute }) {
           <span
             aria-hidden="true"
             className={cn(
-              "absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-sidebar-primary transition-opacity",
-              isActive ? "opacity-100" : "opacity-0",
+              'absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-sidebar-primary transition-opacity',
+              isActive ? 'opacity-100' : 'opacity-0',
             )}
           />
-          <Icon className={cn("size-4 shrink-0", isActive && "text-sidebar-primary")} aria-hidden="true" />
+          <Icon className={cn('size-4 shrink-0', isActive && 'text-sidebar-primary')} aria-hidden="true" />
           <span className="hidden truncate md:inline">{route.label}</span>
         </>
       )}
     </NavLink>
-  )
+  );
 }
 
 export function Sidebar() {
@@ -53,7 +53,7 @@ export function Sidebar() {
         <Item route={settings} />
       </div>
     </aside>
-  )
+  );
 }
 
 /** Monogramme : trois barres de hauteur croissante, comme un débit qui monte. */
@@ -64,5 +64,5 @@ function LlamaMark() {
       <rect x="8" y="7" width="4" height="11" rx="1.5" fill="var(--tone-violet)" />
       <rect x="14" y="2" width="4" height="16" rx="1.5" fill="var(--tone-rose)" />
     </svg>
-  )
+  );
 }

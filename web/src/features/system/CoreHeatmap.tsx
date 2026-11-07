@@ -1,5 +1,5 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { formatPct } from "@/lib/format"
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatPct } from '@/lib/format';
 
 /** Une case par cœur logique ; l'intensité de --chart-1 suit la charge. */
 export function CoreHeatmap({ cores }: { cores: number[] }) {
@@ -30,5 +30,5 @@ export function CoreHeatmap({ cores }: { cores: number[] }) {
         </Tooltip>
       ))}
     </div>
-  )
+  );
 }

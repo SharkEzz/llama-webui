@@ -1,12 +1,12 @@
-import { expect, test } from "bun:test";
-import type { GpuReading } from "../gpu";
-import { NvmlMonitor, type WorkerLike } from "./monitor";
+import { expect, test } from 'bun:test';
+import type { GpuReading } from '../gpu';
+import { NvmlMonitor, type WorkerLike } from './monitor';
 
 const GPU_A: GpuReading = {
-  key: "nvidia:GPU-a",
-  vendor: "nvidia",
-  name: "RTX",
-  busId: "0000:01:00.0",
+  key: 'nvidia:GPU-a',
+  vendor: 'nvidia',
+  name: 'RTX',
+  busId: '0000:01:00.0',
   utilPct: 10,
   vramUsedBytes: 1,
   vramTotalBytes: 2,
@@ -39,17 +39,17 @@ function fakeWorker(): FakeWorker {
   return w;
 }
 
-test("lowering the interval keeps the last sample fresh until the worker samples at the new pace", async () => {
+test('lowering the interval keeps the last sample fresh until the worker samples at the new pace', async () => {
   const w = fakeWorker();
   let now = 0;
   const p = NvmlMonitor.start({ intervalMs: 2000, createWorker: () => w, now: () => now });
-  w.emit({ type: "ready" });
+  w.emit({ type: 'ready' });
   const mon = (await p)!;
-  w.emit({ type: "sample", snapshot: { gpus: [GPU_A], procs: [], system: { driver: null, cudaDriver: null } } });
+  w.emit({ type: 'sample', snapshot: { gpus: [GPU_A], procs: [], system: { driver: null, cudaDriver: null } } });
   mon.configure({ intervalMs: 250, needs: { gpus: true, pcie: true, skipGpus: [] } });
   now = 1500; // the worker's pending round, scheduled at the old pace, has not run yet
   expect(mon.gpus()).toEqual([GPU_A]);
-  w.emit({ type: "sample", snapshot: { gpus: [GPU_A], procs: [], system: { driver: null, cudaDriver: null } } });
+  w.emit({ type: 'sample', snapshot: { gpus: [GPU_A], procs: [], system: { driver: null, cudaDriver: null } } });
   now = 1500 + 1000; // new pace: 3 × 250 ms without a sample is stale
   expect(mon.gpus()).toEqual([]);
 });

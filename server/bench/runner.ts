@@ -7,14 +7,14 @@ import {
   type Sweep,
   type SweepLive,
   sweepCtx,
-} from "@llama-webui/shared";
-import type { BenchFinish, BenchRunsRepo } from "../db/benchRuns";
-import type { SweepsRepo } from "../db/sweeps";
-import { HttpError, notFound } from "../http";
-import type { RunExecutor } from "./execute";
-import type { BenchGate } from "./gate";
+} from '@llama-webui/shared';
+import type { BenchFinish, BenchRunsRepo } from '../db/benchRuns';
+import type { SweepsRepo } from '../db/sweeps';
+import { HttpError, notFound } from '../http';
+import type { RunExecutor } from './execute';
+import type { BenchGate } from './gate';
 
-export type { ServerControl } from "./gate";
+export type { ServerControl } from './gate';
 
 export interface BenchRunnerDeps {
   repo: BenchRunsRepo;
@@ -42,7 +42,7 @@ interface Current {
   finished: boolean;
 }
 
-const INTERRUPTED = "interrompu (rechargement ou arrêt de llama-webui)";
+const INTERRUPTED = 'interrompu (rechargement ou arrêt de llama-webui)';
 
 /**
  * Les benchmarks : runs ponctuels et sweeps, un à la fois. La garde (gate) arrête le serveur géré une fois et le relance
@@ -86,7 +86,7 @@ export class BenchRunner {
     this.deps.onSweepLive(l);
   }
 
-  private async checkFiles(spec: Pick<BenchSpec, "modelPath" | "mmprojPath">): Promise<void> {
+  private async checkFiles(spec: Pick<BenchSpec, 'modelPath' | 'mmprojPath'>): Promise<void> {
     if (!(await Bun.file(spec.modelPath).exists())) throw new HttpError(400, `Modèle introuvable : ${spec.modelPath}`);
     if (spec.mmprojPath && !(await Bun.file(spec.mmprojPath).exists()))
       throw new HttpError(400, `Projecteur introuvable : ${spec.mmprojPath}`);
@@ -94,7 +94,7 @@ export class BenchRunner {
 
   /** Run ponctuel : créé puis lancé en arrière-plan ; renvoie le run créé (statut « running »). */
   async start(spec: BenchSpec, o: { stopServer: boolean }): Promise<BenchRun> {
-    if (this.busy) throw new HttpError(409, "Un benchmark est en cours");
+    if (this.busy) throw new HttpError(409, 'Un benchmark est en cours');
     this.claimed = true;
     try {
       await this.checkFiles(spec);
@@ -115,7 +115,7 @@ export class BenchRunner {
   }
 
   private newCurrent(run: BenchRun, sweepId: number | null, spec: BenchSpec = run.spec): Current {
-    const phase = this.deps.gate.isStopping ? "stopping-server" : "loading";
+    const phase = this.deps.gate.isStopping ? 'stopping-server' : 'loading';
     const cur: Current = {
       run,
       spec,
@@ -135,7 +135,7 @@ export class BenchRunner {
     try {
       await this.deps.gate.ready();
       result = cur.cancelled
-        ? { status: "cancelled" }
+        ? { status: 'cancelled' }
         : await this.deps.executor.run(cur.run, {
             onLive: (l) => this.setLive(cur, l),
             startedAt: cur.live.startedAt,
@@ -143,8 +143,8 @@ export class BenchRunner {
           });
     } catch (e) {
       result = cur.cancelled
-        ? { status: "cancelled" }
-        : { status: "failed", error: `arrêt de llama-server impossible : ${(e as Error).message}` };
+        ? { status: 'cancelled' }
+        : { status: 'failed', error: `arrêt de llama-server impossible : ${(e as Error).message}` };
     }
     if (this.disposed) return null;
     const finished = this.deps.repo.finish(cur.run.id, { error: null, ...result });
@@ -155,7 +155,7 @@ export class BenchRunner {
 
   /** Relance le serveur ; un échec est noté sur `runId` (carte « Dernier run », historique). */
   private async release(cur: Current | null, runId: number | null): Promise<void> {
-    if (cur && this.deps.gate.stoppedCommand) this.setLive(cur, { phase: "restarting-server", step: null });
+    if (cur && this.deps.gate.stoppedCommand) this.setLive(cur, { phase: 'restarting-server', step: null });
     try {
       await this.deps.gate.release();
     } catch (e) {
@@ -184,18 +184,18 @@ export class BenchRunner {
    * existant, ou la fonction qui le crée (appelée seulement une fois la garde prise : un refus 409 n'écrit rien).
    */
   async startSweep(target: number | (() => number), o: { stopServer: boolean }): Promise<Sweep> {
-    if (this.busy) throw new HttpError(409, "Un benchmark est en cours");
+    if (this.busy) throw new HttpError(409, 'Un benchmark est en cours');
     this.claimed = true;
     try {
-      if (typeof target === "number") {
+      if (typeof target === 'number') {
         const sw = this.deps.sweeps.get(target);
-        if (!sw) throw notFound("Sweep");
+        if (!sw) throw notFound('Sweep');
         await this.checkFiles(sw.spec);
       }
       await this.deps.gate.acquire(o);
       let id: number;
       try {
-        id = typeof target === "number" ? target : target();
+        id = typeof target === 'number' ? target : target();
       } catch (e) {
         await this.deps.gate.release().catch(() => {});
         throw e;
@@ -208,7 +208,7 @@ export class BenchRunner {
 
   private begin(id: number, after: Promise<void> | null = null): Sweep {
     this.sweep = { id, cancelled: false };
-    const sw = this.deps.sweeps.setStatus(id, "running", { finishedAt: null });
+    const sw = this.deps.sweeps.setStatus(id, 'running', { finishedAt: null });
     this.deps.onSweep(sw);
     void this.loop(id, after);
     return sw;
@@ -226,7 +226,7 @@ export class BenchRunner {
     // Garde encore tenue mais plus à reprendre (l'ancien module la libère déjà : rechargement plus long que le délai de grâce),
     // donc index.ts n'a pas rangé les orphelins : personne ne fera tourner ce sweep, il devient « interrompu » (bouton Reprendre).
     this.deps.repo.stopOrphans();
-    this.deps.onSweep(this.deps.sweeps.setStatus(sw.id, "interrupted"));
+    this.deps.onSweep(this.deps.sweeps.setStatus(sw.id, 'interrupted'));
   }
 
   private async loop(id: number, after: Promise<void> | null = null): Promise<void> {
@@ -242,7 +242,7 @@ export class BenchRunner {
         runId: next.id,
         index: counts.total - counts.queued + 1,
         total: counts.total,
-        stage: next.kind === "server" ? "validate" : "explore",
+        stage: next.kind === 'server' ? 'validate' : 'explore',
       });
       const done = await this.item(next, id);
       if (!done) return;
@@ -251,7 +251,7 @@ export class BenchRunner {
       if (this.deps.pauseMs !== 0 && this.deps.repo.nextQueued(id)) await Bun.sleep(this.deps.pauseMs ?? 1000);
     }
     if (this.disposed) return;
-    const sw = this.deps.sweeps.setStatus(id, state.cancelled ? "cancelled" : "done", {
+    const sw = this.deps.sweeps.setStatus(id, state.cancelled ? 'cancelled' : 'done', {
       bestRunId: this.best(id),
       finishedAt: this.now(),
     });
@@ -269,7 +269,7 @@ export class BenchRunner {
     try {
       hardware = await this.deps.hardware();
     } catch {
-      hardware = { cpu: "", gpus: [], build: null };
+      hardware = { cpu: '', gpus: [], build: null };
     }
     if (this.disposed) return null;
     const run = this.deps.repo.begin(queued.id, {
@@ -290,9 +290,9 @@ export class BenchRunner {
     const sw = this.deps.sweeps.get(id);
     if (!sw) return null;
     const runs = this.deps.repo.list({ sweepId: id });
-    const validated = runs.some((r) => r.kind === "server" && r.status === "ok");
+    const validated = runs.some((r) => r.kind === 'server' && r.status === 'ok');
     const top = rankRuns(
-      runs.filter((r) => r.kind === (validated ? "server" : "bench")),
+      runs.filter((r) => r.kind === (validated ? 'server' : 'bench')),
       sw.spec.preset,
       sweepCtx(sw.spec),
     )[0];
@@ -343,12 +343,12 @@ export class BenchRunner {
         if (cur.sweepId !== null && o.restart) repo.requeue(cur.run.id);
         else
           repo.finish(cur.run.id, {
-            status: "interrupted",
+            status: 'interrupted',
             error: INTERRUPTED,
             durationMs: this.now() - cur.live.startedAt,
           });
       }
-      if (sweep && !o.restart) this.deps.sweeps.setStatus(sweep.id, "interrupted");
+      if (sweep && !o.restart) this.deps.sweeps.setStatus(sweep.id, 'interrupted');
     } catch {}
     if (o.restart) this.deps.gate.releaseLater(killed);
   }

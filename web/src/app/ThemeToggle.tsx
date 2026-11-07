@@ -1,6 +1,6 @@
-import type { ThemeMode } from "@llama-webui/shared"
-import { Monitor, Moon, Sun } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import type { ThemeMode } from '@llama-webui/shared';
+import { Monitor, Moon, Sun } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,19 +9,19 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useTheme } from "@/lib/theme"
+} from '@/components/ui/dropdown-menu';
+import { useTheme } from '@/lib/theme';
 
 const MODES: { value: ThemeMode; label: string; Icon: typeof Sun }[] = [
-  { value: "system", label: "Système", Icon: Monitor },
-  { value: "light", label: "Clair", Icon: Sun },
-  { value: "dark", label: "Sombre", Icon: Moon },
-]
+  { value: 'system', label: 'Système', Icon: Monitor },
+  { value: 'light', label: 'Clair', Icon: Sun },
+  { value: 'dark', label: 'Sombre', Icon: Moon },
+];
 
 export function ThemeToggle() {
-  const mode = useTheme((s) => s.mode)
-  const setMode = useTheme((s) => s.setMode)
-  const current = MODES.find((m) => m.value === mode) ?? MODES[0]!
+  const mode = useTheme((s) => s.mode);
+  const setMode = useTheme((s) => s.setMode);
+  const current = MODES.find((m) => m.value === mode) ?? MODES[0]!;
 
   return (
     <DropdownMenu>
@@ -42,5 +42,5 @@ export function ThemeToggle() {
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }

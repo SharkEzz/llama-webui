@@ -1,5 +1,5 @@
-import type { Health, RequestRecord, RequestStats, SlotView, SpecStats } from "@llama-webui/shared";
-import { parsePrometheus } from "./prometheus";
+import type { Health, RequestRecord, RequestStats, SlotView, SpecStats } from '@llama-webui/shared';
+import { parsePrometheus } from './prometheus';
 
 export type { Health, RequestRecord, RequestStats, SlotView, SpecStats };
 
@@ -10,18 +10,18 @@ export interface LlamaRaw {
   metrics: Map<string, number> | null;
 }
 
-const P = "llamacpp:";
-const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
-const numOrNull = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const P = 'llamacpp:';
+const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 export function parseSlots(json: unknown): SlotView[] {
   if (!Array.isArray(json)) return [];
   const out: SlotView[] = [];
   for (const s of json) {
-    if (typeof s !== "object" || s === null) continue;
+    if (typeof s !== 'object' || s === null) continue;
     const o = s as Record<string, unknown>;
     const nt = Array.isArray(o.next_token) ? o.next_token[0] : o.next_token;
-    const next = (typeof nt === "object" && nt !== null ? nt : {}) as Record<string, unknown>;
+    const next = (typeof nt === 'object' && nt !== null ? nt : {}) as Record<string, unknown>;
     out.push({
       id: num(o.id),
       nCtx: num(o.n_ctx),
@@ -45,12 +45,12 @@ export async function fetchLlama(baseUrl: string, fetchImpl: typeof fetch = fetc
   let health: Health;
   try {
     const r = await get(`${baseUrl}/health`, fetchImpl, timeoutMs);
-    health = r.status === 200 ? "ok" : r.status === 503 ? "loading" : "error";
+    health = r.status === 200 ? 'ok' : r.status === 503 ? 'loading' : 'error';
     await r.body?.cancel().catch(() => {});
   } catch {
-    return { at, health: "down", slots: null, metrics: null };
+    return { at, health: 'down', slots: null, metrics: null };
   }
-  if (health !== "ok") return { at, health, slots: null, metrics: null };
+  if (health !== 'ok') return { at, health, slots: null, metrics: null };
   const [slots, metrics] = await Promise.all([
     get(`${baseUrl}/slots`, fetchImpl, timeoutMs)
       .then((r) => r.json())
@@ -84,13 +84,13 @@ export function liveRates(prev: LlamaRaw | null, cur: LlamaRaw): { genTps: numbe
 const m0 = (m: Map<string, number>, k: string) => m.get(P + k) ?? 0;
 
 export function lastRequestStats(prev: Map<string, number>, cur: Map<string, number>): RequestStats | null {
-  const dPred = m0(cur, "tokens_predicted_total") - m0(prev, "tokens_predicted_total");
-  const dPrompt = m0(cur, "prompt_tokens_total") - m0(prev, "prompt_tokens_total");
+  const dPred = m0(cur, 'tokens_predicted_total') - m0(prev, 'tokens_predicted_total');
+  const dPrompt = m0(cur, 'prompt_tokens_total') - m0(prev, 'prompt_tokens_total');
   if (dPred === 0 && dPrompt === 0) return null;
-  const dPredS = m0(cur, "tokens_predicted_seconds_total") - m0(prev, "tokens_predicted_seconds_total");
-  const dPromptS = m0(cur, "prompt_seconds_total") - m0(prev, "prompt_seconds_total");
-  const dDraft = m0(cur, "spec_decode_num_draft_tokens_total") - m0(prev, "spec_decode_num_draft_tokens_total");
-  const dAcc = m0(cur, "spec_decode_num_accepted_tokens_total") - m0(prev, "spec_decode_num_accepted_tokens_total");
+  const dPredS = m0(cur, 'tokens_predicted_seconds_total') - m0(prev, 'tokens_predicted_seconds_total');
+  const dPromptS = m0(cur, 'prompt_seconds_total') - m0(prev, 'prompt_seconds_total');
+  const dDraft = m0(cur, 'spec_decode_num_draft_tokens_total') - m0(prev, 'spec_decode_num_draft_tokens_total');
+  const dAcc = m0(cur, 'spec_decode_num_accepted_tokens_total') - m0(prev, 'spec_decode_num_accepted_tokens_total');
   return {
     genTps: dPred > 0 && dPredS > 0 ? dPred / dPredS : null,
     ppTps: dPrompt > 0 && dPromptS > 0 ? dPrompt / dPromptS : null,
@@ -116,24 +116,24 @@ export function kvUsage(slots: SlotView[] | null): { usedTokens: number; totalTo
  */
 export function requestDelta(prev: Map<string, number>, cur: Map<string, number>, at: number): RequestRecord | null {
   const d = (k: string) => m0(cur, k) - m0(prev, k);
-  const promptTokens = d("prompt_tokens_total");
-  const genTokens = d("tokens_predicted_total");
+  const promptTokens = d('prompt_tokens_total');
+  const genTokens = d('tokens_predicted_total');
   if (promptTokens <= 0 && genTokens <= 0) return null;
-  const pS = d("prompt_seconds_total");
-  const gS = d("tokens_predicted_seconds_total");
+  const pS = d('prompt_seconds_total');
+  const gS = d('tokens_predicted_seconds_total');
   const promptSec = pS > 0 ? pS : null;
   const genSec = gS > 0 ? gS : null;
-  const drafted = d("spec_decode_num_draft_tokens_total");
+  const drafted = d('spec_decode_num_draft_tokens_total');
   return {
     at,
     promptTokens: Math.max(0, promptTokens),
-    cachedTokens: Math.max(0, d("prompt_tokens_cached_total")),
+    cachedTokens: Math.max(0, d('prompt_tokens_cached_total')),
     genTokens: Math.max(0, genTokens),
     promptSec,
     genSec,
     ppTps: promptTokens > 0 && promptSec ? promptTokens / promptSec : null,
     genTps: genTokens > 0 && genSec ? genTokens / genSec : null,
-    specAccept: drafted > 0 ? d("spec_decode_num_accepted_tokens_total") / drafted : null,
+    specAccept: drafted > 0 ? d('spec_decode_num_accepted_tokens_total') / drafted : null,
   };
 }
 
@@ -170,9 +170,9 @@ export function mergeRequestStats(prev: RequestStats | null, delta: RequestStats
 }
 
 export function specStats(m: Map<string, number>): SpecStats {
-  const drafts = m0(m, "spec_decode_num_drafts_total");
-  const draftTokens = m0(m, "spec_decode_num_draft_tokens_total");
-  const accepted = m0(m, "spec_decode_num_accepted_tokens_total");
+  const drafts = m0(m, 'spec_decode_num_drafts_total');
+  const draftTokens = m0(m, 'spec_decode_num_draft_tokens_total');
+  const accepted = m0(m, 'spec_decode_num_accepted_tokens_total');
   const perPos: number[] = [];
   for (const [k, v] of m) {
     const match = POS_RE.exec(k);

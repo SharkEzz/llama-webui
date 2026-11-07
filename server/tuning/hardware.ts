@@ -1,7 +1,7 @@
-import type { CpuInfo, MemInfo, TuningHardware } from "@llama-webui/shared";
-import { listDevices } from "../bench/hardware";
-import { parseMeminfo } from "../collectors/system";
-import { readCpuInfo } from "../hardware/cpu";
+import type { CpuInfo, MemInfo, TuningHardware } from '@llama-webui/shared';
+import { listDevices } from '../bench/hardware';
+import { parseMeminfo } from '../collectors/system';
+import { readCpuInfo } from '../hardware/cpu';
 
 let cpu: Promise<CpuInfo> | null = null;
 
@@ -11,9 +11,9 @@ export async function readTuningHardware(o: { benchBinary: string; mem: MemInfo 
   const mem =
     o.mem ??
     parseMeminfo(
-      await Bun.file("/proc/meminfo")
+      await Bun.file('/proc/meminfo')
         .text()
-        .catch(() => ""),
+        .catch(() => ''),
     );
   return {
     devices: await listDevices(o.benchBinary),

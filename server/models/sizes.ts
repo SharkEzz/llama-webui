@@ -1,4 +1,4 @@
-import type { TensorInfo } from "./gguf";
+import type { TensorInfo } from './gguf';
 
 export interface LayerSizes {
   index: number;
@@ -43,8 +43,8 @@ export function weightSizes(tensors: TensorInfo[]): WeightSizes {
       }
       if (EXPERTS.test(t.name)) l.expertsBytes += t.bytes;
       else l.otherBytes += t.bytes;
-    } else if (t.name.startsWith("token_embd.")) embedBytes += t.bytes;
-    else if (t.name.startsWith("output.")) outputBytes += t.bytes;
+    } else if (t.name.startsWith('token_embd.')) embedBytes += t.bytes;
+    else if (t.name.startsWith('output.')) outputBytes += t.bytes;
     else otherBytes += t.bytes;
   }
   return {

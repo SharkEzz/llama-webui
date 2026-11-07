@@ -1,4 +1,4 @@
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from '@/components/ui/skeleton';
 
 /** Le temps de charger le code d'une page (routes chargées à la demande). */
 export function PageSkeleton() {
@@ -9,5 +9,5 @@ export function PageSkeleton() {
       <Skeleton className="h-64" />
       <Skeleton className="h-64" />
     </div>
-  )
+  );
 }

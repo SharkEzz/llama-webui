@@ -1,6 +1,6 @@
-import type { BunRequest, Server } from "bun";
-import { ZodError } from "zod";
-import { guard } from "./security";
+import type { BunRequest, Server } from 'bun';
+import { ZodError } from 'zod';
+import { guard } from './security';
 
 export class HttpError extends Error {
   constructor(
@@ -22,15 +22,15 @@ export function errorResponse(err: unknown): Response {
     });
   if (err instanceof ZodError) {
     const first = err.issues[0];
-    const where = first && first.path.length > 0 ? ` (${first.path.join(".")})` : "";
+    const where = first && first.path.length > 0 ? ` (${first.path.join('.')})` : '';
     return Response.json(
-      { error: `Données invalides : ${first?.message ?? "?"}${where}`, issues: err.issues },
+      { error: `Données invalides : ${first?.message ?? '?'}${where}`, issues: err.issues },
       { status: 400 },
     );
   }
-  if (err instanceof SyntaxError) return Response.json({ error: "JSON invalide" }, { status: 400 });
+  if (err instanceof SyntaxError) return Response.json({ error: 'JSON invalide' }, { status: 400 });
   console.error(err);
-  return Response.json({ error: "Erreur interne" }, { status: 500 });
+  return Response.json({ error: 'Erreur interne' }, { status: 500 });
 }
 
 export type Handler = (
@@ -62,6 +62,6 @@ export function idParam(req: BunRequest<string>, what: string): number {
 /** Corps JSON objet, sinon 400. */
 export async function jsonObject(req: Request): Promise<Record<string, unknown>> {
   const body: unknown = await req.json();
-  if (typeof body !== "object" || body === null || Array.isArray(body)) throw new HttpError(400, "Objet JSON attendu");
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new HttpError(400, 'Objet JSON attendu');
   return body as Record<string, unknown>;
 }

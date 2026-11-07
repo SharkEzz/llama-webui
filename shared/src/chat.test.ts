@@ -1,7 +1,7 @@
-import { expect, test } from "bun:test";
-import { autoTitle, statsFromTimings } from "./chat";
+import { expect, test } from 'bun:test';
+import { autoTitle, statsFromTimings } from './chat';
 
-test("statsFromTimings maps llama-server timings", () => {
+test('statsFromTimings maps llama-server timings', () => {
   const t = {
     prompt_n: 183,
     prompt_per_second: 183.21,
@@ -26,12 +26,12 @@ test("statsFromTimings maps llama-server timings", () => {
   expect(statsFromTimings(plain, null, 1).draftN).toBeNull();
 });
 
-test("autoTitle keeps the first six words within 48 characters", () => {
-  expect(autoTitle("  Explique-moi   les shards GGUF de llama.cpp en détail stp ")).toBe(
-    "Explique-moi les shards GGUF de llama.cpp…",
+test('autoTitle keeps the first six words within 48 characters', () => {
+  expect(autoTitle('  Explique-moi   les shards GGUF de llama.cpp en détail stp ')).toBe(
+    'Explique-moi les shards GGUF de llama.cpp…',
   );
-  expect(autoTitle("Bonjour")).toBe("Bonjour");
-  expect(autoTitle("Un deux trois quatre cinq six sept")).toBe("Un deux trois quatre cinq six…");
-  expect(autoTitle("   ")).toBe("Nouvelle conversation");
-  expect(autoTitle("a".repeat(60))).toBe(`${"a".repeat(47)}…`);
+  expect(autoTitle('Bonjour')).toBe('Bonjour');
+  expect(autoTitle('Un deux trois quatre cinq six sept')).toBe('Un deux trois quatre cinq six…');
+  expect(autoTitle('   ')).toBe('Nouvelle conversation');
+  expect(autoTitle('a'.repeat(60))).toBe(`${'a'.repeat(47)}…`);
 });

@@ -1,15 +1,15 @@
-import { SERIES, type SystemSample } from "@llama-webui/shared"
-import { MemoryStick } from "lucide-react"
-import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart"
-import { GlassCard } from "@/components/glass/GlassCard"
-import { Progress } from "@/components/ui/progress"
-import { formatBytes, formatPct } from "@/lib/format"
-import { Facts } from "./Facts"
+import { SERIES, type SystemSample } from '@llama-webui/shared';
+import { MemoryStick } from 'lucide-react';
+import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
+import { GlassCard } from '@/components/glass/GlassCard';
+import { Progress } from '@/components/ui/progress';
+import { formatBytes, formatPct } from '@/lib/format';
+import { Facts } from './Facts';
 
 export function MemoryCard({ sample }: { sample: SystemSample | null }) {
-  const mem = sample?.mem
-  const used = mem ? mem.totalBytes - mem.availableBytes : 0
-  const pct = mem && mem.totalBytes > 0 ? (100 * used) / mem.totalBytes : 0
+  const mem = sample?.mem;
+  const used = mem ? mem.totalBytes - mem.availableBytes : 0;
+  const pct = mem && mem.totalBytes > 0 ? (100 * used) / mem.totalBytes : 0;
   return (
     <GlassCard title="Mémoire" icon={MemoryStick}>
       {!mem ? (
@@ -19,7 +19,7 @@ export function MemoryCard({ sample }: { sample: SystemSample | null }) {
           <div className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between text-sm">
               <span>
-                <span className="num">{formatBytes(used)}</span>{" "}
+                <span className="num">{formatBytes(used)}</span>{' '}
                 <span className="text-muted-foreground">sur {formatBytes(mem.totalBytes)}</span>
               </span>
               <span className="num text-muted-foreground">{formatPct(pct)}</span>
@@ -28,13 +28,13 @@ export function MemoryCard({ sample }: { sample: SystemSample | null }) {
           </div>
           <Facts
             rows={[
-              ["Disponible", formatBytes(mem.availableBytes)],
-              ["Cache", formatBytes(mem.cachedBytes)],
+              ['Disponible', formatBytes(mem.availableBytes)],
+              ['Cache', formatBytes(mem.cachedBytes)],
               [
-                "Swap",
+                'Swap',
                 mem.swapTotalBytes > 0
                   ? `${formatBytes(mem.swapUsedBytes)} / ${formatBytes(mem.swapTotalBytes)}`
-                  : "aucun",
+                  : 'aucun',
               ],
             ]}
           />
@@ -43,10 +43,10 @@ export function MemoryCard({ sample }: { sample: SystemSample | null }) {
             height={120}
             yMax={100}
             format={formatPct}
-            series={[{ key: SERIES.sysMemPct, label: "RAM", tone: "cyan" }]}
+            series={[{ key: SERIES.sysMemPct, label: 'RAM', tone: 'cyan' }]}
           />
         </div>
       )}
     </GlassCard>
-  )
+  );
 }

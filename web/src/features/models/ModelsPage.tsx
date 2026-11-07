@@ -1,39 +1,39 @@
-import type { ModelEntry } from "@llama-webui/shared"
-import { Boxes, RefreshCw, Search } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
-import { Link } from "react-router"
-import { GlassCard } from "@/components/glass/GlassCard"
-import { GLASS } from "@/components/glass/glass"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { formatBytes, formatInt, formatParams } from "@/lib/format"
-import { useModels } from "@/lib/models"
-import { cn } from "@/lib/utils"
-import { ModelDetailDialog } from "./ModelDetailDialog"
+import type { ModelEntry } from '@llama-webui/shared';
+import { Boxes, RefreshCw, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router';
+import { GlassCard } from '@/components/glass/GlassCard';
+import { GLASS } from '@/components/glass/glass';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatBytes, formatInt, formatParams } from '@/lib/format';
+import { useModels } from '@/lib/models';
+import { cn } from '@/lib/utils';
+import { ModelDetailDialog } from './ModelDetailDialog';
 
-type KindFilter = "model" | "mmproj" | "all"
+type KindFilter = 'model' | 'mmproj' | 'all';
 
 const matches = (m: ModelEntry, q: string) =>
-  !q || [m.relPath, ...(m.ok ? [m.name, m.arch, m.quant] : [])].some((s) => s.toLowerCase().includes(q))
+  !q || [m.relPath, ...(m.ok ? [m.name, m.arch, m.quant] : [])].some((s) => s.toLowerCase().includes(q));
 
 /** Les GGUF du dossier des modèles, avec les métadonnées de leur en-tête. */
 export function ModelsPage() {
-  const { list, error, loading, refresh } = useModels()
-  const [query, setQuery] = useState("")
-  const [kind, setKind] = useState<KindFilter>("model")
-  const [open, setOpen] = useState<string | null>(null)
-  useEffect(() => void refresh(), [refresh])
+  const { list, error, loading, refresh } = useModels();
+  const [query, setQuery] = useState('');
+  const [kind, setKind] = useState<KindFilter>('model');
+  const [open, setOpen] = useState<string | null>(null);
+  useEffect(() => void refresh(), [refresh]);
 
-  const q = query.trim().toLowerCase()
+  const q = query.trim().toLowerCase();
   const rows = useMemo(
-    () => (list?.models ?? []).filter((m) => (kind === "all" || !m.ok || m.kind === kind) && matches(m, q)),
+    () => (list?.models ?? []).filter((m) => (kind === 'all' || !m.ok || m.kind === kind) && matches(m, q)),
     [list, kind, q],
-  )
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -43,7 +43,7 @@ export function ModelsPage() {
           {list && <p className="font-mono text-sm text-muted-foreground">{list.dir}</p>}
         </div>
         <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw className={cn(loading && "animate-spin")} /> Rescanner
+          <RefreshCw className={cn(loading && 'animate-spin')} /> Rescanner
         </Button>
       </div>
 
@@ -62,7 +62,7 @@ export function ModelsPage() {
           <AlertTitle>Aucun fichier GGUF dans {list.setting}</AlertTitle>
           <AlertDescription>
             <p>
-              Déposez des modèles dans ce dossier ou changez-le dans les{" "}
+              Déposez des modèles dans ce dossier ou changez-le dans les{' '}
               <Link to="/settings" className="underline underline-offset-4">
                 Réglages
               </Link>
@@ -112,7 +112,7 @@ export function ModelsPage() {
                   {rows.map((m) => (
                     <TableRow
                       key={m.path}
-                      className={cn(m.ok && "cursor-pointer")}
+                      className={cn(m.ok && 'cursor-pointer')}
                       onClick={() => m.ok && setOpen(m.path)}
                     >
                       <TableCell className="max-w-md">
@@ -129,10 +129,10 @@ export function ModelsPage() {
                           <TableCell className="num text-right">{formatParams(m.params)}</TableCell>
                           <TableCell className="num text-right">{formatInt(m.blockCount)}</TableCell>
                           <TableCell className="num text-right">
-                            {m.contextLength > 0 ? formatInt(m.contextLength) : "—"}
+                            {m.contextLength > 0 ? formatInt(m.contextLength) : '—'}
                           </TableCell>
                           <TableCell className="num text-right">
-                            {m.expertCount > 0 ? `${m.expertCount} / ${m.expertUsedCount}` : "—"}
+                            {m.expertCount > 0 ? `${m.expertCount} / ${m.expertUsedCount}` : '—'}
                           </TableCell>
                         </>
                       ) : (
@@ -151,5 +151,5 @@ export function ModelsPage() {
       )}
       <ModelDetailDialog path={open} onClose={() => setOpen(null)} />
     </div>
-  )
+  );
 }

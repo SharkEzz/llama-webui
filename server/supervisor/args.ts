@@ -1,6 +1,6 @@
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
-import { type Profile, type ProfileInput, type Settings, shellQuote } from "@llama-webui/shared";
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { type Profile, type ProfileInput, type Settings, shellQuote } from '@llama-webui/shared';
 
 export interface BuiltCommand {
   argv: string[];
@@ -14,8 +14,8 @@ export interface BuiltCommand {
 }
 
 export function expandHome(p: string, home: string = homedir()): string {
-  if (p === "~") return home;
-  if (p.startsWith("~/")) return join(home, p.slice(2));
+  if (p === '~') return home;
+  if (p.startsWith('~/')) return join(home, p.slice(2));
   return p;
 }
 
@@ -39,7 +39,7 @@ export function profilePaths(profile: ProfileInput, home: string = homedir()): P
 
 export function buildCommand(
   profile: Profile,
-  settings: Pick<Settings, "binary" | "host" | "port">,
+  settings: Pick<Settings, 'binary' | 'host' | 'port'>,
   home: string = homedir(),
 ): BuiltCommand {
   const host = profile.host ?? settings.host;
@@ -47,23 +47,23 @@ export function buildCommand(
   // llama-server runs without a shell: `~` is expanded here, relative paths stay relative to its cwd.
   const server = [
     settings.binary,
-    "-m",
+    '-m',
     expandHome(profile.model, home),
-    ...(profile.mmproj ? ["-mm", expandHome(profile.mmproj, home)] : []),
+    ...(profile.mmproj ? ['-mm', expandHome(profile.mmproj, home)] : []),
     ...profile.args,
-    "--host",
+    '--host',
     host,
-    "--port",
+    '--port',
     String(port),
-    "--metrics",
-    "--slots",
-    "--props",
+    '--metrics',
+    '--slots',
+    '--props',
   ];
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
   Object.assign(env, profile.env);
   return {
-    argv: ["setpriv", "--pdeathsig", "KILL", "--", ...server],
+    argv: ['setpriv', '--pdeathsig', 'KILL', '--', ...server],
     display: shellQuote(server),
     cwd: profilePaths(profile, home).cwd,
     env,

@@ -7,5 +7,5 @@ export function AuroraBackground() {
       <div className="bubble bubble-amber" />
       <div className="bubble bubble-rose" />
     </div>
-  )
+  );
 }

@@ -1,6 +1,6 @@
-import { readdir, readlink, realpath } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
-import { type GpuReading, identityReading } from "./gpu";
+import { readdir, readlink, realpath } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
+import { type GpuReading, identityReading } from './gpu';
 
 export interface AmdCard {
   card: string;
@@ -22,17 +22,17 @@ export function parseFdinfo(
   text: string,
 ): { driver: string; clientId: string; pdev: string; vramBytes: number } | null {
   const kv = new Map<string, string>();
-  for (const line of text.split("\n")) {
-    const i = line.indexOf(":");
+  for (const line of text.split('\n')) {
+    const i = line.indexOf(':');
     if (i > 0) kv.set(line.slice(0, i).trim(), line.slice(i + 1).trim());
   }
-  const driver = kv.get("drm-driver");
-  if (driver !== "amdgpu") return null;
-  const pdev = kv.get("drm-pdev");
-  const clientId = kv.get("drm-client-id");
+  const driver = kv.get('drm-driver');
+  if (driver !== 'amdgpu') return null;
+  const pdev = kv.get('drm-pdev');
+  const clientId = kv.get('drm-client-id');
   if (!pdev || !clientId) return null;
-  const vram = /^(\d+)\s*(KiB|MiB|GiB)?$/.exec(kv.get("drm-memory-vram") ?? "0");
-  const mult = { KiB: 1024, MiB: 1024 ** 2, GiB: 1024 ** 3 }[(vram?.[2] ?? "KiB") as "KiB"];
+  const vram = /^(\d+)\s*(KiB|MiB|GiB)?$/.exec(kv.get('drm-memory-vram') ?? '0');
+  const mult = { KiB: 1024, MiB: 1024 ** 2, GiB: 1024 ** 3 }[(vram?.[2] ?? 'KiB') as 'KiB'];
   return { driver, clientId, pdev: pdev.toLowerCase(), vramBytes: vram ? Number(vram[1]) * mult : 0 };
 }
 
@@ -42,11 +42,11 @@ export function parseFdinfo(
  */
 export async function readProcAmdVram(
   pid: number,
-  procRoot = "/proc",
+  procRoot = '/proc',
   skipNodes?: ReadonlySet<string>,
 ): Promise<Map<string, number>> {
   const out = new Map<string, number>();
-  const dir = join(procRoot, String(pid), "fdinfo");
+  const dir = join(procRoot, String(pid), 'fdinfo');
   let entries: string[];
   try {
     entries = await readdir(dir);
@@ -57,7 +57,7 @@ export async function readProcAmdVram(
   await Promise.all(
     entries.map(async (e) => {
       if (skipNodes && skipNodes.size > 0) {
-        const target = await readlink(join(procRoot, String(pid), "fd", e)).catch(() => null);
+        const target = await readlink(join(procRoot, String(pid), 'fd', e)).catch(() => null);
         if (target && skipNodes.has(basename(target))) return;
       }
       let text: string;
@@ -66,7 +66,7 @@ export async function readProcAmdVram(
       } catch {
         return;
       }
-      if (!text.includes("amdgpu")) return;
+      if (!text.includes('amdgpu')) return;
       const info = parseFdinfo(text);
       if (!info) return;
       const id = `${info.pdev}#${info.clientId}`;
@@ -93,28 +93,28 @@ const readNum = async (p: string | null): Promise<number | null> => {
   return Number.isFinite(n) ? n : null;
 };
 
-const PCI_IDS = ["/usr/share/hwdata/pci.ids", "/usr/share/misc/pci.ids", "/usr/share/pci.ids"];
+const PCI_IDS = ['/usr/share/hwdata/pci.ids', '/usr/share/misc/pci.ids', '/usr/share/pci.ids'];
 
 /**
  * Nom d'une carte d'après ses identifiants sysfs (`vendor`, `device` : attributs en cache, lus sans réveiller la carte)
  * et la base pci.ids. Remplace `lspci`, qui lit l'espace de configuration et réveille une carte en veille (runtime-suspended).
  */
-export async function pciIdsName(pdev: string, pciRoot = "/sys/bus/pci/devices", idsPaths = PCI_IDS): Promise<string> {
+export async function pciIdsName(pdev: string, pciRoot = '/sys/bus/pci/devices', idsPaths = PCI_IDS): Promise<string> {
   const fallback = `AMD GPU ${pdev}`;
   const id = async (f: string) =>
-    (await readText(join(pciRoot, pdev, f)))?.trim().toLowerCase().replace(/^0x/, "") ?? null;
-  const [vendor, device] = await Promise.all([id("vendor"), id("device")]);
+    (await readText(join(pciRoot, pdev, f)))?.trim().toLowerCase().replace(/^0x/, '') ?? null;
+  const [vendor, device] = await Promise.all([id('vendor'), id('device')]);
   if (!vendor || !device) return fallback;
   for (const path of idsPaths) {
     const text = await readText(path);
     if (text === null) continue;
     let inVendor = false;
-    for (const line of text.split("\n")) {
-      if (line.startsWith("#") || line === "") continue;
-      if (!line.startsWith("\t")) {
+    for (const line of text.split('\n')) {
+      if (line.startsWith('#') || line === '') continue;
+      if (!line.startsWith('\t')) {
         if (inVendor) break;
         inVendor = line.slice(0, 4).toLowerCase() === vendor;
-      } else if (inVendor && !line.startsWith("\t\t") && line.slice(1, 5).toLowerCase() === device) {
+      } else if (inVendor && !line.startsWith('\t\t') && line.slice(1, 5).toLowerCase() === device) {
         const name = line.slice(5).trim();
         return /\[([^\]]+)\]/.exec(name)?.[1] ?? name;
       }
@@ -125,7 +125,7 @@ export async function pciIdsName(pdev: string, pciRoot = "/sys/bus/pci/devices",
 }
 
 export async function discoverAmdCards(
-  drmRoot = "/sys/class/drm",
+  drmRoot = '/sys/class/drm',
   nameOf: (pdev: string) => Promise<string> = (pdev) => pciIdsName(pdev),
 ): Promise<AmdCard[]> {
   let entries: string[];
@@ -136,8 +136,8 @@ export async function discoverAmdCards(
   }
   const cards: AmdCard[] = [];
   for (const card of entries.filter((e) => /^card\d+$/.test(e)).sort()) {
-    const devLink = join(drmRoot, card, "device");
-    if ((await readText(join(devLink, "vendor"))) !== "0x1002") continue;
+    const devLink = join(drmRoot, card, 'device');
+    if ((await readText(join(devLink, 'vendor'))) !== '0x1002') continue;
     let devicePath: string;
     try {
       devicePath = await realpath(devLink);
@@ -147,12 +147,12 @@ export async function discoverAmdCards(
     const pdev = basename(devicePath).toLowerCase();
     let hwmonPath: string | null = null;
     try {
-      const hw = (await readdir(join(devicePath, "hwmon"))).sort()[0];
-      if (hw) hwmonPath = join(devicePath, "hwmon", hw);
+      const hw = (await readdir(join(devicePath, 'hwmon'))).sort()[0];
+      if (hw) hwmonPath = join(devicePath, 'hwmon', hw);
     } catch {}
     const nodes: string[] = [];
     for (const e of entries.filter((n) => /^(card|renderD)\d+$/.test(n)).sort()) {
-      const real = await realpath(join(drmRoot, e, "device")).catch(() => null);
+      const real = await realpath(join(drmRoot, e, 'device')).catch(() => null);
       if (real === devicePath) nodes.push(e);
     }
     cards.push({ card, pdev, devicePath, hwmonPath, name: await nameOf(pdev), nodes, ...(await slotLink(devicePath)) });
@@ -176,8 +176,8 @@ export async function slotLink(devicePath: string): Promise<{ linkPath: string; 
   for (let i = 0; i < 8; i++) {
     const parent = dirname(link);
     if (parent === link || isHostBridge(dirname(parent))) break;
-    const [vendor, cls] = await Promise.all([readText(join(parent, "vendor")), readText(join(parent, "class"))]);
-    if (vendor !== "0x1002" || !cls?.startsWith("0x0604")) break;
+    const [vendor, cls] = await Promise.all([readText(join(parent, 'vendor')), readText(join(parent, 'class'))]);
+    if (vendor !== '0x1002' || !cls?.startsWith('0x0604')) break;
     link = parent;
   }
   const port = dirname(link);
@@ -193,10 +193,10 @@ async function linkMax(card: AmdCard, link: string): Promise<{ gen: number | nul
   if (card.linkMax) return card.linkMax;
   const port = card.portPath;
   const [gen, width, portGen, portWidth] = await Promise.all([
-    readWith(join(link, "max_link_speed"), parseLinkSpeed),
-    readNum(join(link, "max_link_width")),
-    port ? readWith(join(port, "max_link_speed"), parseLinkSpeed) : null,
-    port ? readNum(join(port, "max_link_width")) : null,
+    readWith(join(link, 'max_link_speed'), parseLinkSpeed),
+    readNum(join(link, 'max_link_width')),
+    port ? readWith(join(port, 'max_link_speed'), parseLinkSpeed) : null,
+    port ? readNum(join(port, 'max_link_width')) : null,
   ]);
   const max = { gen: minKnown(gen, portGen), width: minKnown(width, portWidth) };
   const ends = port ? [gen, width, portGen, portWidth] : [gen, width];
@@ -211,7 +211,7 @@ const minKnown = (a: number | null, b: number | null): number | null => {
   return ka === null ? kb : kb === null ? ka : Math.min(ka, kb);
 };
 
-const GEN_BY_RATE: Record<string, number> = { "2.5": 1, "5": 2, "8": 3, "16": 4, "32": 5, "64": 6 };
+const GEN_BY_RATE: Record<string, number> = { '2.5': 1, '5': 2, '8': 3, '16': 4, '32': 5, '64': 6 };
 
 /** sysfs `current_link_speed` ("32.0 GT/s PCIe") → PCIe generation. */
 export function parseLinkSpeed(text: string): number | null {
@@ -223,7 +223,7 @@ export function parseLinkSpeed(text: string): number | null {
 export function parseDpm(text: string): { curMhz: number | null; maxMhz: number | null } {
   let curMhz: number | null = null;
   let maxMhz: number | null = null;
-  for (const line of text.split("\n")) {
+  for (const line of text.split('\n')) {
     const m = /^\s*\w+:\s*(\d+)\s*Mhz(\s*\*)?/i.exec(line);
     if (!m) continue;
     const mhz = Number(m[1]);
@@ -248,7 +248,7 @@ const ratioPct = (v: number | null, max: number | null): number | null =>
  */
 export async function isRuntimeSuspended(card: AmdCard): Promise<boolean> {
   try {
-    return (await Bun.file(join(card.devicePath, "power", "runtime_status")).text()).trim() === "suspended";
+    return (await Bun.file(join(card.devicePath, 'power', 'runtime_status')).text()).trim() === 'suspended';
   } catch {
     return false;
   }
@@ -257,14 +257,14 @@ export async function isRuntimeSuspended(card: AmdCard): Promise<boolean> {
 /** Placeholder sample for a suspended card: identity only, every metric unknown. */
 const amdIdentity = (card: AmdCard) => ({
   key: `amd:${card.pdev}`,
-  vendor: "amd" as const,
+  vendor: 'amd' as const,
   name: card.name,
   busId: card.pdev,
 });
 
-export const suspendedAmdReading = (card: AmdCard): GpuReading => identityReading(amdIdentity(card), "suspended");
+export const suspendedAmdReading = (card: AmdCard): GpuReading => identityReading(amdIdentity(card), 'suspended');
 /** A card no tab shows: listed, not read. */
-export const hiddenAmdReading = (card: AmdCard): GpuReading => identityReading(amdIdentity(card), "hidden");
+export const hiddenAmdReading = (card: AmdCard): GpuReading => identityReading(amdIdentity(card), 'hidden');
 
 export async function readAmdCard(card: AmdCard): Promise<GpuReading> {
   const d = card.devicePath;
@@ -272,30 +272,30 @@ export async function readAmdCard(card: AmdCard): Promise<GpuReading> {
   const h = (f: string) => hw && join(hw, f);
   const link = card.linkPath ?? d;
   const [util, used, total, temp, pAvg, memBusy, gen, max, width, sclk, mclk, pwm, pwmMax, cap] = await Promise.all([
-    readNum(join(d, "gpu_busy_percent")),
-    readNum(join(d, "mem_info_vram_used")),
-    readNum(join(d, "mem_info_vram_total")),
-    readNum(h("temp1_input")),
-    readNum(h("power1_average")),
-    readNum(join(d, "mem_busy_percent")),
-    readWith(join(link, "current_link_speed"), parseLinkSpeed),
+    readNum(join(d, 'gpu_busy_percent')),
+    readNum(join(d, 'mem_info_vram_used')),
+    readNum(join(d, 'mem_info_vram_total')),
+    readNum(h('temp1_input')),
+    readNum(h('power1_average')),
+    readNum(join(d, 'mem_busy_percent')),
+    readWith(join(link, 'current_link_speed'), parseLinkSpeed),
     linkMax(card, link),
-    readNum(join(link, "current_link_width")),
-    readWith(join(d, "pp_dpm_sclk"), parseDpm),
-    readWith(join(d, "pp_dpm_mclk"), parseDpm),
-    readNum(h("pwm1")),
-    readNum(h("pwm1_max")),
-    readNum(h("power1_cap")),
+    readNum(join(link, 'current_link_width')),
+    readWith(join(d, 'pp_dpm_sclk'), parseDpm),
+    readWith(join(d, 'pp_dpm_mclk'), parseDpm),
+    readNum(h('pwm1')),
+    readNum(h('pwm1_max')),
+    readNum(h('power1_cap')),
   ]);
-  const power = pAvg ?? (await readNum(h("power1_input")));
+  const power = pAvg ?? (await readNum(h('power1_input')));
   let fanPct = ratioPct(pwm, pwmMax);
   if (fanPct === null) {
-    const [rpm, rpmMax] = await Promise.all([readNum(h("fan1_input")), readNum(h("fan1_max"))]);
+    const [rpm, rpmMax] = await Promise.all([readNum(h('fan1_input')), readNum(h('fan1_max'))]);
     fanPct = ratioPct(rpm, rpmMax);
   }
   return {
     key: `amd:${card.pdev}`,
-    vendor: "amd",
+    vendor: 'amd',
     name: card.name,
     busId: card.pdev,
     utilPct: util,

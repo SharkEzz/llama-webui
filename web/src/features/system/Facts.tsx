@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { ReactNode } from 'react';
 
 /** Liste de faits libellé / valeur, valeurs en mono à droite. */
 export function Facts({ rows }: { rows: [string, ReactNode][] }) {
@@ -11,5 +11,5 @@ export function Facts({ rows }: { rows: [string, ReactNode][] }) {
         </div>
       ))}
     </dl>
-  )
+  );
 }

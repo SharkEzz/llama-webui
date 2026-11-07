@@ -1,9 +1,9 @@
-import type { BenchRun, BenchStatus, Measure } from "@llama-webui/shared"
-import { Copy, GitCompare, History, MoreHorizontal, RotateCcw, Trash2, UserPlus } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
-import { Link, useNavigate, useSearchParams } from "react-router"
-import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { GlassCard } from "@/components/glass/GlassCard"
+import type { BenchRun, BenchStatus, Measure } from '@llama-webui/shared';
+import { Copy, GitCompare, History, MoreHorizontal, RotateCcw, Trash2, UserPlus } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { GlassCard } from '@/components/glass/GlassCard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,79 +13,79 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { type BenchFilters, KIND_LABEL, STATUS_LABEL, useBench } from "@/lib/bench"
-import { copyText } from "@/lib/clipboard"
-import { formatDuration, formatRate } from "@/lib/format"
-import { cn } from "@/lib/utils"
-import { BenchCompareDialog } from "./BenchCompareDialog"
-import { dateFmt, flagsOf, formatAccept, formatMib, modelName, vramTotal } from "./format"
+} from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { type BenchFilters, KIND_LABEL, STATUS_LABEL, useBench } from '@/lib/bench';
+import { copyText } from '@/lib/clipboard';
+import { formatDuration, formatRate } from '@/lib/format';
+import { cn } from '@/lib/utils';
+import { BenchCompareDialog } from './BenchCompareDialog';
+import { dateFmt, flagsOf, formatAccept, formatMib, modelName, vramTotal } from './format';
 
-const MAX_COMPARE = 4
-const STATUS_VARIANT: Record<BenchStatus, "secondary" | "outline" | "destructive"> = {
-  queued: "outline",
-  running: "secondary",
-  ok: "outline",
-  failed: "destructive",
-  cancelled: "secondary",
-  interrupted: "secondary",
-}
+const MAX_COMPARE = 4;
+const STATUS_VARIANT: Record<BenchStatus, 'secondary' | 'outline' | 'destructive'> = {
+  queued: 'outline',
+  running: 'secondary',
+  ok: 'outline',
+  failed: 'destructive',
+  cancelled: 'secondary',
+  interrupted: 'secondary',
+};
 
 /** Historique filtrable (type, modèle, statut), sélection pour la comparaison, actions par run. */
 export function BenchHistory() {
-  const runs = useBench((s) => s.runs)
-  const loaded = useBench((s) => s.loaded)
-  const filters = useBench((s) => s.filters)
-  const selected = useBench((s) => s.selected)
-  const { setFilters, toggle } = useBench.getState()
-  const [comparing, setComparing] = useState(false)
-  const [deleting, setDeleting] = useState<BenchRun | null>(null)
-  const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const focus = Number(params.get("run")) || null
+  const runs = useBench((s) => s.runs);
+  const loaded = useBench((s) => s.loaded);
+  const filters = useBench((s) => s.filters);
+  const selected = useBench((s) => s.selected);
+  const { setFilters, toggle } = useBench.getState();
+  const [comparing, setComparing] = useState(false);
+  const [deleting, setDeleting] = useState<BenchRun | null>(null);
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const focus = Number(params.get('run')) || null;
 
   // ?run=<id> (depuis Tuning) : historique avec les sweeps, ligne sélectionnée et ramenée à l'écran, puis le paramètre est retiré.
   // biome-ignore lint/correctness/useExhaustiveDependencies: déclenché par ?run, les filtres et les runs ; selected, toggle et setParams sont relus à chaque exécution sans relancer l'effet
   useEffect(() => {
-    if (focus === null) return
-    if (filters.sweeps !== "all") return setFilters({ sweeps: "all" })
-    if (!runs.some((r) => r.id === focus)) return
-    if (!selected.includes(focus)) toggle(focus)
+    if (focus === null) return;
+    if (filters.sweeps !== 'all') return setFilters({ sweeps: 'all' });
+    if (!runs.some((r) => r.id === focus)) return;
+    if (!selected.includes(focus)) toggle(focus);
     // Après la mise en page du formulaire (devices chargés en différé), sinon le défilement vise une position périmée.
     setTimeout(
-      () => document.getElementById(`bench-run-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      () => document.getElementById(`bench-run-${focus}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
       400,
-    )
-    setParams({}, { replace: true })
-  }, [focus, filters.sweeps, runs])
+    );
+    setParams({}, { replace: true });
+  }, [focus, filters.sweeps, runs]);
 
-  const models = useMemo(() => [...new Set(runs.map((r) => r.spec.modelPath))].sort(), [runs])
+  const models = useMemo(() => [...new Set(runs.map((r) => r.spec.modelPath))].sort(), [runs]);
   const shown = runs.filter(
     (r) =>
-      (filters.kind === "all" || r.kind === filters.kind) &&
-      (filters.model === "all" || r.spec.modelPath === filters.model) &&
-      (filters.status === "all" || r.status === filters.status),
-  )
-  const compared = selected.map((id) => runs.find((r) => r.id === id)).filter((r): r is BenchRun => r !== undefined)
+      (filters.kind === 'all' || r.kind === filters.kind) &&
+      (filters.model === 'all' || r.spec.modelPath === filters.model) &&
+      (filters.status === 'all' || r.status === filters.status),
+  );
+  const compared = selected.map((id) => runs.find((r) => r.id === id)).filter((r): r is BenchRun => r !== undefined);
 
   const toProfile = async (id: number) => {
-    const p = await useBench.getState().toProfile(id)
-    if (p) navigate(`/profiles?id=${p.id}`)
-  }
+    const p = await useBench.getState().toProfile(id);
+    if (p) navigate(`/profiles?id=${p.id}`);
+  };
 
   return (
     <GlassCard
@@ -117,17 +117,17 @@ export function BenchHistory() {
             label="Outil"
             value={filters.kind}
             items={[
-              { value: "all", label: "Tous les outils" },
-              { value: "bench", label: "llama-bench" },
-              { value: "server", label: "Serveur" },
+              { value: 'all', label: 'Tous les outils' },
+              { value: 'bench', label: 'llama-bench' },
+              { value: 'server', label: 'Serveur' },
             ]}
-            onChange={(v) => setFilters({ kind: v as BenchFilters["kind"] })}
+            onChange={(v) => setFilters({ kind: v as BenchFilters['kind'] })}
           />
           <FilterSelect
             label="Modèle"
             value={filters.model}
             items={[
-              { value: "all", label: "Tous les modèles" },
+              { value: 'all', label: 'Tous les modèles' },
               ...models.map((m) => ({ value: m, label: modelName(m) })),
             ]}
             onChange={(v) => setFilters({ model: v })}
@@ -137,19 +137,19 @@ export function BenchHistory() {
             label="Statut"
             value={filters.status}
             items={[
-              { value: "all", label: "Tous les statuts" },
+              { value: 'all', label: 'Tous les statuts' },
               ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label })),
             ]}
-            onChange={(v) => setFilters({ status: v as BenchFilters["status"] })}
+            onChange={(v) => setFilters({ status: v as BenchFilters['status'] })}
           />
           <FilterSelect
             label="Sweeps"
             value={filters.sweeps}
             items={[
-              { value: "none", label: "Sans les sweeps" },
-              { value: "all", label: "Avec les sweeps" },
+              { value: 'none', label: 'Sans les sweeps' },
+              { value: 'all', label: 'Avec les sweeps' },
             ]}
-            onChange={(v) => setFilters({ sweeps: v as BenchFilters["sweeps"] })}
+            onChange={(v) => setFilters({ sweeps: v as BenchFilters['sweeps'] })}
           />
         </div>
 
@@ -157,7 +157,7 @@ export function BenchHistory() {
           <Skeleton className="h-32" />
         ) : shown.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
-            {runs.length === 0 ? "Aucun run enregistré." : "Aucun run ne correspond aux filtres."}
+            {runs.length === 0 ? 'Aucun run enregistré.' : 'Aucun run ne correspond aux filtres.'}
           </p>
         ) : (
           <Table className="[&_td]:px-1.5 [&_th]:px-1.5">
@@ -170,7 +170,7 @@ export function BenchHistory() {
                 <TableHead>Outil</TableHead>
                 <TableHead>Modèle</TableHead>
                 <TableHead>Flags</TableHead>
-                {filters.sweeps === "all" && <TableHead>Sweep</TableHead>}
+                {filters.sweeps === 'all' && <TableHead>Sweep</TableHead>}
                 <TableHead className="text-right">Prompt</TableHead>
                 <TableHead className="text-right">Génération</TableHead>
                 <TableHead className="text-right">MTP</TableHead>
@@ -184,9 +184,9 @@ export function BenchHistory() {
             </TableHeader>
             <TableBody>
               {shown.map((r) => {
-                const checked = selected.includes(r.id)
+                const checked = selected.includes(r.id);
                 return (
-                  <TableRow key={r.id} id={`bench-run-${r.id}`} data-state={checked ? "selected" : undefined}>
+                  <TableRow key={r.id} id={`bench-run-${r.id}`} data-state={checked ? 'selected' : undefined}>
                     <TableCell>
                       <Checkbox
                         checked={checked}
@@ -203,12 +203,12 @@ export function BenchHistory() {
                       <Badge variant="secondary">{KIND_LABEL[r.kind]}</Badge>
                     </TableCell>
                     <TableCell
-                      className={cn("truncate font-mono text-xs", filters.sweeps === "all" ? "max-w-28" : "max-w-36")}
+                      className={cn('truncate font-mono text-xs', filters.sweeps === 'all' ? 'max-w-28' : 'max-w-36')}
                       title={r.spec.modelPath}
                     >
                       {modelName(r.spec.modelPath)}
                     </TableCell>
-                    <TableCell className={filters.sweeps === "all" ? "max-w-28" : "max-w-36"}>
+                    <TableCell className={filters.sweeps === 'all' ? 'max-w-28' : 'max-w-36'}>
                       <Tooltip>
                         <TooltipTrigger
                           render={<span />}
@@ -219,7 +219,7 @@ export function BenchHistory() {
                         <TooltipContent className="max-w-md font-mono">{r.command}</TooltipContent>
                       </Tooltip>
                     </TableCell>
-                    {filters.sweeps === "all" && (
+                    {filters.sweeps === 'all' && (
                       <TableCell className="max-w-20 text-xs">
                         {r.sweepId === null ? (
                           <span className="text-muted-foreground">—</span>
@@ -239,7 +239,7 @@ export function BenchHistory() {
                     <TableCell className="num text-right text-xs">{formatAccept(r.draftAcceptPct)}</TableCell>
                     <TableCell className="num whitespace-nowrap text-right text-xs">
                       {r.vramPeak.length === 0 ? (
-                        "—"
+                        '—'
                       ) : (
                         <Tooltip>
                           <TooltipTrigger render={<span />}>{vramTotal(r)}</TooltipTrigger>
@@ -254,7 +254,7 @@ export function BenchHistory() {
                       )}
                     </TableCell>
                     <TableCell className="num whitespace-nowrap text-right text-xs">
-                      {r.durationMs === null ? "—" : formatDuration(r.durationMs)}
+                      {r.durationMs === null ? '—' : formatDuration(r.durationMs)}
                     </TableCell>
                     <TableCell>
                       {r.error ? (
@@ -279,16 +279,16 @@ export function BenchHistory() {
                         <DropdownMenuContent align="end" className="min-w-48">
                           <DropdownMenuItem
                             onClick={() => {
-                              useBench.getState().rerun(r)
+                              useBench.getState().rerun(r);
                               // La page défile dans le layout, pas dans window : on ramène le formulaire à l'écran.
                               document
-                                .getElementById("bench-modelPath")
-                                ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                                .getElementById('bench-modelPath')
+                                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             }}
                           >
                             <RotateCcw /> Relancer
                           </DropdownMenuItem>
-                          <DropdownMenuItem disabled={r.status === "running"} onClick={() => void toProfile(r.id)}>
+                          <DropdownMenuItem disabled={r.status === 'running'} onClick={() => void toProfile(r.id)}>
                             <UserPlus /> Créer un profil
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => void copyText(r.command)}>
@@ -297,7 +297,7 @@ export function BenchHistory() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant="destructive"
-                            disabled={r.status === "running"}
+                            disabled={r.status === 'running'}
                             onClick={() => setDeleting(r)}
                           >
                             <Trash2 /> Supprimer
@@ -306,7 +306,7 @@ export function BenchHistory() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                )
+                );
               })}
             </TableBody>
           </Table>
@@ -327,8 +327,8 @@ export function BenchHistory() {
             <AlertDialogAction
               variant="destructive"
               onClick={() => {
-                if (deleting) void useBench.getState().remove(deleting.id)
-                setDeleting(null)
+                if (deleting) void useBench.getState().remove(deleting.id);
+                setDeleting(null);
               }}
             >
               Supprimer
@@ -337,19 +337,19 @@ export function BenchHistory() {
         </AlertDialogContent>
       </AlertDialog>
     </GlassCard>
-  )
+  );
 }
 
 function FilterSelect(props: {
-  label: string
-  value: string
-  items: { value: string; label: string }[]
-  onChange(v: string): void
-  wide?: boolean
+  label: string;
+  value: string;
+  items: { value: string; label: string }[];
+  onChange(v: string): void;
+  wide?: boolean;
 }) {
   return (
     <Select items={props.items} value={props.value} onValueChange={(v) => v && props.onChange(v)}>
-      <SelectTrigger className={props.wide ? "w-64" : "w-44"} aria-label={props.label}>
+      <SelectTrigger className={props.wide ? 'w-64' : 'w-44'} aria-label={props.label}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -360,7 +360,7 @@ function FilterSelect(props: {
         ))}
       </SelectContent>
     </Select>
-  )
+  );
 }
 
 /** Débit sur une ligne, écart-type en dessous (le tableau tient sans défilement horizontal). */
@@ -370,9 +370,9 @@ function MeasureCell({ m }: { m: Measure | null }) {
       {formatRate(m?.tps)}
       {m && m.stddev > 0 && (
         <div className="text-[0.7rem] text-muted-foreground">
-          ± {new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(m.stddev)}
+          ± {new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(m.stddev)}
         </div>
       )}
     </TableCell>
-  )
+  );
 }

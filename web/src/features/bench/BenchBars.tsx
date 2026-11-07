@@ -1,11 +1,11 @@
-import type { BenchRun, Measure } from "@llama-webui/shared"
-import { TONE_VAR, type Tone } from "@/components/glass/tones"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { KIND_LABEL } from "@/lib/bench"
-import { formatMeasure } from "./format"
+import type { BenchRun, Measure } from '@llama-webui/shared';
+import { TONE_VAR, type Tone } from '@/components/glass/tones';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { KIND_LABEL } from '@/lib/bench';
+import { formatMeasure } from './format';
 
 /** Ordre fixe des tons : la couleur suit la position du run dans la comparaison, jamais son rang. */
-export const RUN_TONES: Tone[] = ["violet", "cyan", "amber", "rose"]
+export const RUN_TONES: Tone[] = ['violet', 'cyan', 'amber', 'rose'];
 
 /** Débits pp et tg des runs comparés : deux petits graphes en barres, chacun sur sa propre échelle (pas de double axe). */
 export function BenchBars({ runs }: { runs: BenchRun[] }) {
@@ -28,18 +28,18 @@ export function BenchBars({ runs }: { runs: BenchRun[] }) {
         <Panel title="Génération (tok/s)" runs={runs} pick={(r) => r.tg} />
       </div>
     </div>
-  )
+  );
 }
 
 function Panel({ title, runs, pick }: { title: string; runs: BenchRun[]; pick(r: BenchRun): Measure | null }) {
-  const max = Math.max(1, ...runs.map((r) => pick(r)?.tps ?? 0))
+  const max = Math.max(1, ...runs.map((r) => pick(r)?.tps ?? 0));
   return (
     <figure className="flex flex-col gap-2">
       <figcaption className="text-sm font-medium">{title}</figcaption>
       <div className="flex flex-col gap-0.5">
         {runs.map((r, i) => {
-          const m = pick(r)
-          const pct = m ? (m.tps / max) * 100 : 0
+          const m = pick(r);
+          const pct = m ? (m.tps / max) * 100 : 0;
           return (
             <Tooltip key={r.id}>
               <TooltipTrigger
@@ -60,16 +60,16 @@ function Panel({ title, runs, pick }: { title: string; runs: BenchRun[]; pick(r:
                   )}
                 </span>
                 <span className="num text-right text-xs">
-                  {m ? new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(m.tps) : "—"}
+                  {m ? new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(m.tps) : '—'}
                 </span>
               </TooltipTrigger>
               <TooltipContent>
                 #{r.id} · {KIND_LABEL[r.kind]} : {formatMeasure(m)}
               </TooltipContent>
             </Tooltip>
-          )
+          );
         })}
       </div>
     </figure>
-  )
+  );
 }

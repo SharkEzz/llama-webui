@@ -1,4 +1,4 @@
-import { type ReactElement, useState } from "react"
+import { type ReactElement, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,16 +9,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from '@/components/ui/alert-dialog';
 
 interface ConfirmDialogProps {
-  title: string
-  description: string
-  confirmLabel: string
-  destructive?: boolean
-  onConfirm(): unknown
+  title: string;
+  description: string;
+  confirmLabel: string;
+  destructive?: boolean;
+  onConfirm(): unknown;
   /** Élément déclencheur (un bouton). */
-  trigger: ReactElement
+  trigger: ReactElement;
 }
 
 export function ConfirmDialog({
@@ -29,7 +29,7 @@ export function ConfirmDialog({
   onConfirm,
   trigger,
 }: ConfirmDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(false);
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger render={trigger} />
@@ -41,10 +41,10 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Annuler</AlertDialogCancel>
           <AlertDialogAction
-            variant={destructive ? "destructive" : "default"}
+            variant={destructive ? 'destructive' : 'default'}
             onClick={() => {
-              setOpen(false)
-              void onConfirm()
+              setOpen(false);
+              void onConfirm();
             }}
           >
             {confirmLabel}
@@ -52,5 +52,5 @@ export function ConfirmDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }

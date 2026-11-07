@@ -2,7 +2,7 @@
 
 export interface GpuSample {
   key: string; // "nvidia:<uuid>" | "amd:<pdev>"
-  vendor: "nvidia" | "amd";
+  vendor: 'nvidia' | 'amd';
   name: string;
   busId: string; // "0000:01:00.0"
   utilPct: number | null;
@@ -67,7 +67,7 @@ export interface SlotView {
   nRemain: number | null;
 }
 
-export type Health = "ok" | "loading" | "error" | "down";
+export type Health = 'ok' | 'loading' | 'error' | 'down';
 
 export interface RequestStats {
   genTps: number | null;
@@ -106,26 +106,26 @@ export interface CpuInfo {
 
 /** Clés des séries d'historique. */
 export const SERIES = {
-  genTps: "llama.genTps",
-  ppTps: "llama.ppTps",
-  specAccept: "llama.specAccept",
-  cpuPct: "proc.cpuPct",
+  genTps: 'llama.genTps',
+  ppTps: 'llama.ppTps',
+  specAccept: 'llama.specAccept',
+  cpuPct: 'proc.cpuPct',
   gpuUtil: (gpuKey: string) => `gpu.${gpuKey}.util`,
   gpuVramPct: (gpuKey: string) => `gpu.${gpuKey}.vramPct`,
   gpuPcieRx: (gpuKey: string) => `gpu.${gpuKey}.pcieRx`,
   gpuPcieTx: (gpuKey: string) => `gpu.${gpuKey}.pcieTx`,
   gpuPower: (gpuKey: string) => `gpu.${gpuKey}.power`,
   gpuTemp: (gpuKey: string) => `gpu.${gpuKey}.temp`,
-  sysCpu: "sys.cpu",
-  sysMemPct: "sys.memPct",
-  sysTemp: "sys.tempC",
-  diskRead: "disk.read",
-  diskWrite: "disk.write",
-  modelDiskRead: "disk.modelRead",
-  kvPct: "llama.kvPct",
-  reqProcessing: "llama.reqProcessing",
-  reqDeferred: "llama.reqDeferred",
-  busySlots: "llama.busySlots",
+  sysCpu: 'sys.cpu',
+  sysMemPct: 'sys.memPct',
+  sysTemp: 'sys.tempC',
+  diskRead: 'disk.read',
+  diskWrite: 'disk.write',
+  modelDiskRead: 'disk.modelRead',
+  kvPct: 'llama.kvPct',
+  reqProcessing: 'llama.reqProcessing',
+  reqDeferred: 'llama.reqDeferred',
+  busySlots: 'llama.busySlots',
 } as const;
 
 /** État de monitoring poussé à chaque tick sur le WebSocket. */

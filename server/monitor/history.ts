@@ -1,5 +1,5 @@
-import type { HistoryDump } from "@llama-webui/shared";
-import { Ring } from "./ring";
+import type { HistoryDump } from '@llama-webui/shared';
+import { Ring } from './ring';
 
 /** Points d'un historique de `historySeconds` échantillonné toutes les `intervalMs`. */
 export const historyPoints = (historySeconds: number, intervalMs: number) =>

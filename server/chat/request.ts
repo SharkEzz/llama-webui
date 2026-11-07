@@ -1,4 +1,4 @@
-import type { ChatMessage, Conversation } from "@llama-webui/shared";
+import type { ChatMessage, Conversation } from '@llama-webui/shared';
 
 /**
  * Corps de /v1/chat/completions : prompt système, historique terminé (sans réflexion ni réponses en erreur, rôles
@@ -7,9 +7,9 @@ import type { ChatMessage, Conversation } from "@llama-webui/shared";
  */
 export function buildChatRequest(conv: Conversation, history: ChatMessage[]): Record<string, unknown> {
   const messages: { role: string; content: string }[] = [];
-  if (conv.systemPrompt.trim()) messages.push({ role: "system", content: conv.systemPrompt });
+  if (conv.systemPrompt.trim()) messages.push({ role: 'system', content: conv.systemPrompt });
   for (const m of history) {
-    if ((m.status !== "done" && m.status !== "stopped") || m.content === "") continue;
+    if ((m.status !== 'done' && m.status !== 'stopped') || m.content === '') continue;
     // Une réponse en erreur laisse deux messages utilisateur de suite : fusionnés, car les modèles de chat stricts
     // (Gemma, Mistral…) exigent l'alternance des rôles.
     const prev = messages.at(-1);
@@ -28,16 +28,16 @@ export interface LlamaError {
   n_ctx?: number;
 }
 
-const fr = (n: number) => n.toLocaleString("fr-FR");
+const fr = (n: number) => n.toLocaleString('fr-FR');
 
 /** Erreur de llama-server (réponse HTTP ou événement du flux) en message lisible ; le dépassement de contexte est expliqué. */
 export function llamaErrorMessage(e: LlamaError): string {
-  if (e.type === "exceed_context_size_error") {
-    const m = /\((\d+) tokens\).*\((\d+)\s*tokens\)/.exec(e.message ?? "");
+  if (e.type === 'exceed_context_size_error') {
+    const m = /\((\d+) tokens\).*\((\d+)\s*tokens\)/.exec(e.message ?? '');
     const prompt = e.n_prompt_tokens ?? (m ? Number(m[1]) : null);
     const ctx = e.n_ctx ?? (m ? Number(m[2]) : null);
-    const sizes = prompt !== null && ctx !== null ? ` (${fr(prompt)} / ${fr(ctx)} jetons)` : "";
+    const sizes = prompt !== null && ctx !== null ? ` (${fr(prompt)} / ${fr(ctx)} jetons)` : '';
     return `Conversation trop longue pour le contexte du modèle${sizes} : commencez une nouvelle conversation ou utilisez un profil à plus grand contexte.`;
   }
-  return `llama-server : ${e.message ?? "erreur"}`;
+  return `llama-server : ${e.message ?? 'erreur'}`;
 }

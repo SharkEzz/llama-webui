@@ -1,6 +1,6 @@
-import type { GpuReading } from "../gpu";
-import type { GpuNeeds } from "../needs";
-import type { NvmlProc, NvmlSnapshot, NvmlSystem } from "./read";
+import type { GpuReading } from '../gpu';
+import type { GpuNeeds } from '../needs';
+import type { NvmlProc, NvmlSnapshot, NvmlSystem } from './read';
 
 export interface WorkerLike {
   postMessage(m: unknown): void;
@@ -10,10 +10,10 @@ export interface WorkerLike {
   onerror: ((e: unknown) => void) | null;
 }
 
-type WorkerMsg = { type: "ready" } | { type: "error"; message: string } | { type: "sample"; snapshot: NvmlSnapshot };
+type WorkerMsg = { type: 'ready' } | { type: 'error'; message: string } | { type: 'sample'; snapshot: NvmlSnapshot };
 
 const defaultWorker = (): WorkerLike => {
-  const w = new Worker(new URL("./worker.ts", import.meta.url).href) as unknown as WorkerLike;
+  const w = new Worker(new URL('./worker.ts', import.meta.url).href) as unknown as WorkerLike;
   w.unref?.(); // Bun-specific: never keep the TUI alive
   return w;
 };
@@ -69,21 +69,21 @@ export class NvmlMonitor {
       worker.onerror = giveUp;
       worker.onmessage = (e) => {
         const m = e.data as WorkerMsg;
-        if (m?.type === "ready" && !monitor) {
+        if (m?.type === 'ready' && !monitor) {
           clearTimeout(timer);
           monitor = new NvmlMonitor(worker, o.intervalMs, o.now ?? Date.now);
           resolve(monitor);
-        } else if (m?.type === "sample" && monitor) {
+        } else if (m?.type === 'sample' && monitor) {
           monitor.current = m.snapshot.gpus;
           monitor.procs = m.snapshot.procs;
           monitor.sys = m.snapshot.system ?? monitor.sys;
           monitor.lastSampleAt = monitor.now();
           monitor.freshIntervalMs = monitor.intervalMs;
-        } else if (m?.type === "error") {
+        } else if (m?.type === 'error') {
           giveUp();
         }
       };
-      worker.postMessage({ type: "start", intervalMs: o.intervalMs, ...(o.needs ? { needs: o.needs } : {}) });
+      worker.postMessage({ type: 'start', intervalMs: o.intervalMs, ...(o.needs ? { needs: o.needs } : {}) });
     });
   }
 
@@ -92,7 +92,7 @@ export class NvmlMonitor {
     this.intervalMs = o.intervalMs;
     // Le tour déjà programmé par le worker tourne encore à l'ancienne cadence : ne pas déclarer périmé ce qu'il va remplacer.
     this.freshIntervalMs = Math.max(this.freshIntervalMs, o.intervalMs);
-    this.worker.postMessage({ type: "configure", intervalMs: o.intervalMs, needs: o.needs });
+    this.worker.postMessage({ type: 'configure', intervalMs: o.intervalMs, needs: o.needs });
   }
 
   private clear() {

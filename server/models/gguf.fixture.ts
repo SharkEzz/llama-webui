@@ -1,11 +1,11 @@
-import { writeFileSync } from "node:fs";
+import { writeFileSync } from 'node:fs';
 
 export type KvValue =
-  | { type: "u32"; value: number }
-  | { type: "u64"; value: bigint }
-  | { type: "f32"; value: number }
-  | { type: "string"; value: string }
-  | { type: "u32[]"; value: number[] };
+  | { type: 'u32'; value: number }
+  | { type: 'u64'; value: bigint }
+  | { type: 'f32'; value: number }
+  | { type: 'string'; value: string }
+  | { type: 'u32[]'; value: number[] };
 
 export interface FakeTensor {
   name: string;
@@ -63,22 +63,22 @@ class Out {
  */
 export function writeGguf(path: string, kv: Record<string, KvValue>, tensors: FakeTensor[]): void {
   const o = new Out();
-  o.raw(new TextEncoder().encode("GGUF"));
+  o.raw(new TextEncoder().encode('GGUF'));
   o.u32(3);
   o.u64(BigInt(tensors.length));
   o.u64(BigInt(Object.keys(kv).length));
   for (const [key, v] of Object.entries(kv)) {
     o.str(key);
-    if (v.type === "u32") {
+    if (v.type === 'u32') {
       o.u32(T.u32);
       o.u32(v.value);
-    } else if (v.type === "u64") {
+    } else if (v.type === 'u64') {
       o.u32(T.u64);
       o.u64(v.value);
-    } else if (v.type === "f32") {
+    } else if (v.type === 'f32') {
       o.u32(T.f32);
       o.f32(v.value);
-    } else if (v.type === "string") {
+    } else if (v.type === 'string') {
       o.u32(T.string);
       o.str(v.value);
     } else {

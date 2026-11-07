@@ -1,5 +1,5 @@
-import type { BenchDevice, TuningHardware } from "@llama-webui/shared";
-import type { ModelInfo, TensorInfo } from "../models/gguf";
+import type { BenchDevice, TuningHardware } from '@llama-webui/shared';
+import type { ModelInfo, TensorInfo } from '../models/gguf';
 
 const GiB = 1024 ** 3;
 const MiB = 1024 ** 2;
@@ -26,7 +26,7 @@ export function fakeModel(o: FakeModel = {}): ModelInfo {
     tensors.push({ name, shape: [1], dtype: 0, offset, bytes });
     offset += bytes;
   };
-  add("token_embd.weight", o.embedBytes ?? 300 * MiB);
+  add('token_embd.weight', o.embedBytes ?? 300 * MiB);
   for (let i = 0; i < layers; i++) {
     add(`blk.${i}.attn_q.weight`, o.otherBytesPerLayer ?? 100 * MiB);
     if (experts > 0) {
@@ -36,18 +36,18 @@ export function fakeModel(o: FakeModel = {}): ModelInfo {
       add(`blk.${i}.ffn_down_exps.weight`, e / 3);
     }
   }
-  add("output_norm.weight", 1 * MiB);
-  add("output.weight", o.outputBytes ?? 300 * MiB);
+  add('output_norm.weight', 1 * MiB);
+  add('output.weight', o.outputBytes ?? 300 * MiB);
   const fileBytes = offset;
   return {
-    path: "/m/fake.gguf",
-    kind: "model",
+    path: '/m/fake.gguf',
+    kind: 'model',
     hasChatTemplate: true,
-    files: ["/m/fake.gguf"],
+    files: ['/m/fake.gguf'],
     fileBytes,
-    arch: experts > 0 ? "qwen3moe" : "qwen3",
-    name: "fake",
-    quant: "Q4_K_M",
+    arch: experts > 0 ? 'qwen3moe' : 'qwen3',
+    name: 'fake',
+    quant: 'Q4_K_M',
     params: 0,
     blockCount: layers,
     embeddingLength: 4096,
@@ -74,22 +74,22 @@ const dev = (id: string, name: string, totalMib: number, freeMib = totalMib - 30
   name,
   totalMib,
   freeMib,
-  backend: id.replace(/\d+$/, ""),
+  backend: id.replace(/\d+$/, ''),
 });
 
 /** La machine de l'utilisateur : 2 × 16 Go CUDA, la RX 9070 XT en Vulkan, l'iGPU et les doublons Vulkan des cartes NVIDIA. */
 export function hw3(o: { ramAvailableGiB?: number } = {}): TuningHardware {
   return {
     devices: [
-      dev("CUDA0", "NVIDIA GeForce RTX 5070 Ti", 15933),
-      dev("CUDA1", "NVIDIA GeForce RTX 5060 Ti", 15941),
-      dev("Vulkan0", "AMD Ryzen 5 9600X 6-Core Processor (RADV RAPHAEL_MENDOCINO)", 32103),
-      dev("Vulkan1", "NVIDIA GeForce RTX 5070 Ti", 16303),
-      dev("Vulkan2", "NVIDIA GeForce RTX 5060 Ti", 16311),
-      dev("Vulkan3", "AMD Radeon RX 9070 XT (RADV GFX1201)", 16304),
-      dev("BLAS", "OpenBLAS", 0, 0),
+      dev('CUDA0', 'NVIDIA GeForce RTX 5070 Ti', 15933),
+      dev('CUDA1', 'NVIDIA GeForce RTX 5060 Ti', 15941),
+      dev('Vulkan0', 'AMD Ryzen 5 9600X 6-Core Processor (RADV RAPHAEL_MENDOCINO)', 32103),
+      dev('Vulkan1', 'NVIDIA GeForce RTX 5070 Ti', 16303),
+      dev('Vulkan2', 'NVIDIA GeForce RTX 5060 Ti', 16311),
+      dev('Vulkan3', 'AMD Radeon RX 9070 XT (RADV GFX1201)', 16304),
+      dev('BLAS', 'OpenBLAS', 0, 0),
     ],
-    cpu: { model: "AMD Ryzen 5 9600X", physicalCores: 6, logicalThreads: 12, flags: ["avx2", "avx512f"], numaNodes: 1 },
+    cpu: { model: 'AMD Ryzen 5 9600X', physicalCores: 6, logicalThreads: 12, flags: ['avx2', 'avx512f'], numaNodes: 1 },
     ramTotalBytes: 61 * GiB,
     ramAvailableBytes: (o.ramAvailableGiB ?? 55) * GiB,
   };

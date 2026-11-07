@@ -1,66 +1,66 @@
-import { presetOf, type SweepStatus } from "@llama-webui/shared"
-import { CheckCheck, ListOrdered, Play, Square, Trash2, X } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
-import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { GlassCard } from "@/components/glass/GlassCard"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { modelName } from "@/features/bench/format"
-import { PHASE_LABEL } from "@/lib/bench"
-import { formatDuration } from "@/lib/format"
-import { useTuning } from "@/lib/tuning"
-import { useNow } from "@/lib/useNow"
-import { RankingTable } from "./RankingTable"
-import { StopServerDialog } from "./StopServerDialog"
+import { presetOf, type SweepStatus } from '@llama-webui/shared';
+import { CheckCheck, ListOrdered, Play, Square, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { GlassCard } from '@/components/glass/GlassCard';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { modelName } from '@/features/bench/format';
+import { PHASE_LABEL } from '@/lib/bench';
+import { formatDuration } from '@/lib/format';
+import { useTuning } from '@/lib/tuning';
+import { useNow } from '@/lib/useNow';
+import { RankingTable } from './RankingTable';
+import { StopServerDialog } from './StopServerDialog';
 
-export const SWEEP_STATUS: Record<SweepStatus, { label: string; variant: "secondary" | "outline" | "destructive" }> = {
-  running: { label: "en cours", variant: "secondary" },
-  done: { label: "terminé", variant: "outline" },
-  cancelled: { label: "annulé", variant: "secondary" },
-  interrupted: { label: "interrompu", variant: "destructive" },
-}
+export const SWEEP_STATUS: Record<SweepStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {
+  running: { label: 'en cours', variant: 'secondary' },
+  done: { label: 'terminé', variant: 'outline' },
+  cancelled: { label: 'annulé', variant: 'secondary' },
+  interrupted: { label: 'interrompu', variant: 'destructive' },
+};
 
-const VALIDATE_ITEMS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n} meilleur${n > 1 ? "s" : ""}` }))
+const VALIDATE_ITEMS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n} meilleur${n > 1 ? 's' : ''}` }));
 
 /** Le sweep ouvert : progression, élément en cours, actions (annuler, reprendre, valider, supprimer) et classement. */
 export function SweepCard() {
-  const current = useTuning((s) => s.current)
-  const sweepLive = useTuning((s) => s.sweepLive)
-  const live = useTuning((s) => s.live)
-  const [n, setN] = useState("3")
-  const [confirm, setConfirm] = useState<"resume" | "validate" | null>(null)
-  const now = useNow(1000)
-  const logRef = useRef<HTMLPreElement>(null)
+  const current = useTuning((s) => s.current);
+  const sweepLive = useTuning((s) => s.sweepLive);
+  const live = useTuning((s) => s.live);
+  const [n, setN] = useState('3');
+  const [confirm, setConfirm] = useState<'resume' | 'validate' | null>(null);
+  const now = useNow(1000);
+  const logRef = useRef<HTMLPreElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: live.lines est un déclencheur : défilement en bas à chaque lot
   useEffect(() => {
-    const el = logRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [live?.lines])
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [live?.lines]);
 
-  if (!current) return null
-  const { sweep, runs } = current
-  const c = sweep.counts
-  const running = sweep.status === "running"
-  const mine = sweepLive?.sweepId === sweep.id ? sweepLive : null
-  const item = mine?.runId != null ? runs.find((r) => r.id === mine.runId) : undefined
-  const itemLive = mine && live?.runId === mine.runId ? live : null
-  const done = c.total - c.queued - c.running
-  const finished = runs.filter((r) => r.status === "ok" && r.durationMs !== null)
-  const avgMs = finished.length ? finished.reduce((a, r) => a + r.durationMs!, 0) / finished.length : null
-  const left = avgMs !== null ? avgMs * (c.queued + c.running) : null
-  const explored = runs.some((r) => r.kind === "bench" && r.status === "ok")
-  const { cancelSweep, resume, validate, removeSweep, open } = useTuning.getState()
+  if (!current) return null;
+  const { sweep, runs } = current;
+  const c = sweep.counts;
+  const running = sweep.status === 'running';
+  const mine = sweepLive?.sweepId === sweep.id ? sweepLive : null;
+  const item = mine?.runId != null ? runs.find((r) => r.id === mine.runId) : undefined;
+  const itemLive = mine && live?.runId === mine.runId ? live : null;
+  const done = c.total - c.queued - c.running;
+  const finished = runs.filter((r) => r.status === 'ok' && r.durationMs !== null);
+  const avgMs = finished.length ? finished.reduce((a, r) => a + r.durationMs!, 0) / finished.length : null;
+  const left = avgMs !== null ? avgMs * (c.queued + c.running) : null;
+  const explored = runs.some((r) => r.kind === 'bench' && r.status === 'ok');
+  const { cancelSweep, resume, validate, removeSweep, open } = useTuning.getState();
 
-  const act = async (what: "resume" | "validate", stopServer = false) => {
-    const r = what === "resume" ? await resume(sweep.id, stopServer) : await validate(sweep.id, Number(n), stopServer)
-    if (r === "confirm") setConfirm(what)
-  }
+  const act = async (what: 'resume' | 'validate', stopServer = false) => {
+    const r = what === 'resume' ? await resume(sweep.id, stopServer) : await validate(sweep.id, Number(n), stopServer);
+    if (r === 'confirm') setConfirm(what);
+  };
 
   return (
     <GlassCard
-      title={running ? "Sweep en cours" : `Sweep « ${sweep.name} »`}
+      title={running ? 'Sweep en cours' : `Sweep « ${sweep.name} »`}
       icon={ListOrdered}
       actions={
         <>
@@ -88,7 +88,7 @@ export function SweepCard() {
             <span>
               {mine ? (
                 <>
-                  {mine.stage === "validate" ? "Validation" : "Élément"}{" "}
+                  {mine.stage === 'validate' ? 'Validation' : 'Élément'}{' '}
                   <span className="num">
                     {mine.index}/{mine.total}
                   </span>
@@ -102,9 +102,9 @@ export function SweepCard() {
               )}
             </span>
             <span className="num text-xs text-muted-foreground">
-              {c.ok} ok · {c.failed} échec{c.failed > 1 ? "s" : ""}
-              {c.cancelled > 0 && ` · ${c.cancelled} annulé${c.cancelled > 1 ? "s" : ""}`}
-              {c.interrupted > 0 && ` · ${c.interrupted} interrompu${c.interrupted > 1 ? "s" : ""}`}
+              {c.ok} ok · {c.failed} échec{c.failed > 1 ? 's' : ''}
+              {c.cancelled > 0 && ` · ${c.cancelled} annulé${c.cancelled > 1 ? 's' : ''}`}
+              {c.interrupted > 0 && ` · ${c.interrupted} interrompu${c.interrupted > 1 ? 's' : ''}`}
               {running && ` · ${formatDuration(now - sweep.createdAt)}`}
               {running && left !== null && ` · reste ≈ ${formatDuration(left)}`}
             </span>
@@ -117,7 +117,7 @@ export function SweepCard() {
             ref={logRef}
             className="h-32 overflow-auto rounded-md bg-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground"
           >
-            {itemLive.lines.join("\n") || "…"}
+            {itemLive.lines.join('\n') || '…'}
           </pre>
         )}
 
@@ -136,8 +136,8 @@ export function SweepCard() {
               }
             />
           )}
-          {sweep.status === "interrupted" && (
-            <Button size="sm" onClick={() => void act("resume")}>
+          {sweep.status === 'interrupted' && (
+            <Button size="sm" onClick={() => void act('resume')}>
               <Play /> Reprendre
             </Button>
           )}
@@ -160,7 +160,7 @@ export function SweepCard() {
                 variant="outline"
                 disabled={!explored}
                 title={explored ? undefined : "aucun run d'exploration réussi"}
-                onClick={() => void act("validate")}
+                onClick={() => void act('validate')}
               >
                 <CheckCheck /> Valider sur le serveur
               </Button>
@@ -190,5 +190,5 @@ export function SweepCard() {
         onConfirm={() => confirm && void act(confirm, true)}
       />
     </GlassCard>
-  )
+  );
 }

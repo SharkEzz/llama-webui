@@ -1,5 +1,5 @@
-import type { WsMessage } from "@llama-webui/shared";
-import type { ServerWebSocket } from "bun";
+import type { WsMessage } from '@llama-webui/shared';
+import type { ServerWebSocket } from 'bun';
 
 const PING_INTERVAL_MS = 15_000;
 const MAX_MISSED_PINGS = 2;
@@ -18,7 +18,7 @@ export class WsHub {
 
   attach(ws: ServerWebSocket<unknown>): void {
     this.clients.set(ws, { missed: 0 });
-    this.send(ws, { type: "hello", payload: { serverTime: Date.now(), bootId: this.bootId } });
+    this.send(ws, { type: 'hello', payload: { serverTime: Date.now(), bootId: this.bootId } });
   }
 
   detach(ws: ServerWebSocket<unknown>): void {
@@ -35,8 +35,8 @@ export class WsHub {
     }
     const state = this.clients.get(ws);
     if (!state) return;
-    if (msg.type === "pong") state.missed = 0;
-    else if (msg.type === "ping") this.send(ws, { type: "pong" });
+    if (msg.type === 'pong') state.missed = 0;
+    else if (msg.type === 'ping') this.send(ws, { type: 'pong' });
   }
 
   broadcast(msg: WsMessage): void {
@@ -50,7 +50,7 @@ export class WsHub {
 
   dispose(): void {
     clearInterval(this.timer);
-    for (const ws of this.clients.keys()) ws.close(1001, "arrêt");
+    for (const ws of this.clients.keys()) ws.close(1001, 'arrêt');
     this.clients.clear();
   }
 
@@ -61,12 +61,12 @@ export class WsHub {
   private heartbeat(): void {
     for (const [ws, state] of this.clients) {
       if (state.missed >= MAX_MISSED_PINGS) {
-        ws.close(4000, "heartbeat");
+        ws.close(4000, 'heartbeat');
         this.clients.delete(ws);
         continue;
       }
       state.missed++;
-      this.send(ws, { type: "ping" });
+      this.send(ws, { type: 'ping' });
     }
   }
 }

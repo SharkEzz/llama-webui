@@ -1,34 +1,34 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 const num = (min: number, max: number, label: string) =>
   z
-    .number({ error: "Nombre attendu" })
+    .number({ error: 'Nombre attendu' })
     .min(min, `${label} : entre ${min} et ${max}`)
     .max(max, `${label} : entre ${min} et ${max}`);
-const int = (min: number, max: number, label: string) => num(min, max, label).int({ error: "Nombre entier attendu" });
+const int = (min: number, max: number, label: string) => num(min, max, label).int({ error: 'Nombre entier attendu' });
 
 /** Sampling d'une conversation ; une clé absente = valeur du serveur (celle du profil). */
 export const SamplingSchema = z.strictObject({
-  temperature: num(0, 5, "Température").optional(),
-  top_p: num(0, 1, "Top-p").optional(),
-  top_k: int(0, 1000, "Top-k").optional(),
-  min_p: num(0, 1, "Min-p").optional(),
-  presence_penalty: num(-2, 2, "Pénalité de présence").optional(),
-  repeat_penalty: num(0, 5, "Pénalité de répétition").optional(),
-  max_tokens: int(1, 1_000_000, "Jetons max").optional(),
-  seed: z.number({ error: "Nombre attendu" }).int({ error: "Nombre entier attendu" }).optional(),
+  temperature: num(0, 5, 'Température').optional(),
+  top_p: num(0, 1, 'Top-p').optional(),
+  top_k: int(0, 1000, 'Top-k').optional(),
+  min_p: num(0, 1, 'Min-p').optional(),
+  presence_penalty: num(-2, 2, 'Pénalité de présence').optional(),
+  repeat_penalty: num(0, 5, 'Pénalité de répétition').optional(),
+  max_tokens: int(1, 1_000_000, 'Jetons max').optional(),
+  seed: z.number({ error: 'Nombre attendu' }).int({ error: 'Nombre entier attendu' }).optional(),
 });
 export type Sampling = z.infer<typeof SamplingSchema>;
 
 export const ConversationPatchSchema = z.strictObject({
-  title: z.string().trim().min(1, "Obligatoire").max(200, "200 caractères au plus").optional(),
-  systemPrompt: z.string().max(100_000, "Prompt système trop long").optional(),
+  title: z.string().trim().min(1, 'Obligatoire').max(200, '200 caractères au plus').optional(),
+  systemPrompt: z.string().max(100_000, 'Prompt système trop long').optional(),
   sampling: SamplingSchema.optional(),
   thinking: z.boolean().optional(),
 });
 export type ConversationPatch = z.infer<typeof ConversationPatchSchema>;
 
-export type MessageStatus = "streaming" | "done" | "stopped" | "error";
+export type MessageStatus = 'streaming' | 'done' | 'stopped' | 'error';
 
 export interface MessageStats {
   /** Délai entre l'envoi et le premier jeton (réflexion comprise). */
@@ -46,7 +46,7 @@ export interface MessageStats {
 export interface ChatMessage {
   id: number;
   conversationId: number;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   reasoning: string;
   status: MessageStatus;
@@ -81,9 +81,9 @@ export interface ConversationSummary {
 export type ConversationDetail = Conversation & { messages: ChatMessage[]; live: boolean };
 
 export type ChatEvent =
-  | { type: "start"; user: ChatMessage | null; assistant: ChatMessage }
-  | { type: "delta"; content?: string; reasoning?: string }
-  | { type: "done"; message: ChatMessage };
+  | { type: 'start'; user: ChatMessage | null; assistant: ChatMessage }
+  | { type: 'delta'; content?: string; reasoning?: string }
+  | { type: 'done'; message: ChatMessage };
 
 /** `timings` du dernier morceau d'un stream llama-server. */
 export interface LlamaTimings {
@@ -110,7 +110,7 @@ export function statsFromTimings(t: LlamaTimings, ttftMs: number | null, duratio
   };
 }
 
-export const DEFAULT_TITLE = "Nouvelle conversation";
+export const DEFAULT_TITLE = 'Nouvelle conversation';
 const TITLE_WORDS = 6;
 const TITLE_MAX = 48;
 
@@ -118,7 +118,7 @@ const TITLE_MAX = 48;
 export function autoTitle(text: string): string {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return DEFAULT_TITLE;
-  let title = words.slice(0, TITLE_WORDS).join(" ");
+  let title = words.slice(0, TITLE_WORDS).join(' ');
   let cut = words.length > TITLE_WORDS;
   if (title.length > TITLE_MAX - 1 && (cut || title.length > TITLE_MAX)) {
     title = title.slice(0, TITLE_MAX - 1);

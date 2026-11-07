@@ -1,4 +1,4 @@
-export type ModelKind = "model" | "mmproj";
+export type ModelKind = 'model' | 'mmproj';
 
 /** Résumé d'un GGUF (en-tête seulement), mis en cache en base. */
 export interface ModelSummary {
@@ -53,8 +53,8 @@ export interface ModelDetail extends ModelSummary {
   };
 }
 
-const expand = (p: string, home: string) => (p === "~" ? home : p.startsWith("~/") ? `${home}/${p.slice(2)}` : p);
-const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, "") : p);
+const expand = (p: string, home: string) => (p === '~' ? home : p.startsWith('~/') ? `${home}/${p.slice(2)}` : p);
+const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
 
 /** `abs` relatif à `dir` s'il est dedans, sinon null. */
 function relativeTo(abs: string, dir: string): string | null {

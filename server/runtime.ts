@@ -1,8 +1,8 @@
-import type { ServerView } from "@llama-webui/shared";
-import { BenchGate } from "./bench/gate";
-import { LogBuffer } from "./logs/buffer";
-import { Monitor, type MonitorSettings } from "./monitor/monitor";
-import { Supervisor } from "./supervisor/supervisor";
+import type { ServerView } from '@llama-webui/shared';
+import { BenchGate } from './bench/gate';
+import { LogBuffer } from './logs/buffer';
+import { Monitor, type MonitorSettings } from './monitor/monitor';
+import { Supervisor } from './supervisor/supervisor';
 
 export interface Runtime {
   supervisor: Supervisor;
@@ -45,9 +45,9 @@ export function getRuntime(): Runtime {
     await supervisor.stop().catch(() => {});
     process.exit(0);
   };
-  process.on("SIGINT", () => void shutdown("SIGINT"));
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
-  process.on("exit", () => supervisor.killNow());
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('exit', () => supervisor.killNow());
   return rt;
 }
 
@@ -63,12 +63,12 @@ export function serverView(supervisor: Supervisor): ServerView {
   return {
     state,
     command: last?.display ?? null,
-    profileId: "profileId" in state ? state.profileId : (last?.profileId ?? null),
+    profileId: 'profileId' in state ? state.profileId : (last?.profileId ?? null),
   };
 }
 
 /** Profil du serveur géré tant qu'il tourne (pas après un crash). */
 export function activeProfileId(supervisor: Supervisor): number | null {
   const s = supervisor.state;
-  return s.kind === "starting" || s.kind === "ready" || s.kind === "stopping" ? s.profileId : null;
+  return s.kind === 'starting' || s.kind === 'ready' || s.kind === 'stopping' ? s.profileId : null;
 }

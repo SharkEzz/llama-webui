@@ -1,6 +1,6 @@
-import { readdir, realpath, stat } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
-import type { DiskSample } from "@llama-webui/shared";
+import { readdir, realpath, stat } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
+import type { DiskSample } from '@llama-webui/shared';
 
 export type { DiskSample };
 
@@ -9,7 +9,7 @@ const SECTOR = 512;
 /** `/proc/diskstats`: field 6 = sectors read, field 10 = sectors written (always 512-byte units). */
 export function parseDiskstats(text: string): Map<string, { readBytes: number; writeBytes: number }> {
   const out = new Map<string, { readBytes: number; writeBytes: number }>();
-  for (const line of text.split("\n")) {
+  for (const line of text.split('\n')) {
     const f = line.trim().split(/\s+/);
     if (f.length < 10) continue;
     const r = Number(f[5]);
@@ -23,7 +23,7 @@ export function parseDiskstats(text: string): Map<string, { readBytes: number; w
 const VIRTUAL = /^(loop|ram|zram)\d/;
 
 /** Whole physical disks: /sys/block entries backed by a device, minus loop/ram/zram. */
-export async function physicalDisks(sysBlockRoot = "/sys/block"): Promise<string[]> {
+export async function physicalDisks(sysBlockRoot = '/sys/block'): Promise<string[]> {
   let entries: string[];
   try {
     entries = await readdir(sysBlockRoot);
@@ -34,7 +34,7 @@ export async function physicalDisks(sysBlockRoot = "/sys/block"): Promise<string
   for (const e of entries) {
     if (VIRTUAL.test(e)) continue;
     try {
-      await stat(join(sysBlockRoot, e, "device"));
+      await stat(join(sysBlockRoot, e, 'device'));
       out.push(e);
     } catch {}
   }
@@ -58,9 +58,9 @@ export async function resolveModelDisk(
   try {
     const [major, minor] = devMajorMinor(await (o.statDev ?? defaultStatDev)(path));
     if (major === 0) return null;
-    const real = await realpath(join(o.sysRoot ?? "/sys", "dev/block", `${major}:${minor}`));
+    const real = await realpath(join(o.sysRoot ?? '/sys', 'dev/block', `${major}:${minor}`));
     try {
-      await stat(join(real, "partition"));
+      await stat(join(real, 'partition'));
       return basename(dirname(real));
     } catch {
       return basename(real);
@@ -80,14 +80,14 @@ export class DiskSampler {
 
   constructor(o: { disks: string[]; procRoot?: string; now?: () => number }) {
     this.disks = o.disks;
-    this.procRoot = o.procRoot ?? "/proc";
+    this.procRoot = o.procRoot ?? '/proc';
     this.now = o.now ?? Date.now;
   }
 
   async sample(modelDisk: string | null): Promise<DiskSample | null> {
     let text: string;
     try {
-      text = await Bun.file(join(this.procRoot, "diskstats")).text();
+      text = await Bun.file(join(this.procRoot, 'diskstats')).text();
     } catch {
       return null;
     }
@@ -96,7 +96,7 @@ export class DiskSampler {
     const prev = this.prev;
     this.prev = { at, counters };
     const dt = prev ? (at - prev.at) / 1000 : 0;
-    const rate = (disk: string, field: "readBytes" | "writeBytes"): number => {
+    const rate = (disk: string, field: 'readBytes' | 'writeBytes'): number => {
       const c = counters.get(disk)?.[field];
       const p = prev?.counters.get(disk)?.[field];
       if (c === undefined || p === undefined || dt <= 0) return 0;
@@ -105,11 +105,11 @@ export class DiskSampler {
     let readBps = 0;
     let writeBps = 0;
     for (const d of this.disks) {
-      readBps += rate(d, "readBytes");
-      writeBps += rate(d, "writeBytes");
+      readBps += rate(d, 'readBytes');
+      writeBps += rate(d, 'writeBytes');
     }
     const model =
-      modelDisk && counters.has(modelDisk) ? { disk: modelDisk, readBps: rate(modelDisk, "readBytes") } : null;
+      modelDisk && counters.has(modelDisk) ? { disk: modelDisk, readBps: rate(modelDisk, 'readBytes') } : null;
     return { readBps, writeBps, model };
   }
 }

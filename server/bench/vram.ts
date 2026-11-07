@@ -1,6 +1,6 @@
-import { join } from "node:path";
-import type { GpuSample } from "@llama-webui/shared";
-import { LineSplitter } from "../logs/lines";
+import { join } from 'node:path';
+import type { GpuSample } from '@llama-webui/shared';
+import { LineSplitter } from '../logs/lines';
 
 const MIB = 1024 * 1024;
 
@@ -28,25 +28,25 @@ export class VramProbe implements VramPeaks {
 
   constructor(gpus: GpuSample[], o: { intervalMs?: number; sysRoot?: string } = {}) {
     const intervalMs = o.intervalMs ?? 100;
-    const sysRoot = o.sysRoot ?? "/sys";
-    if (gpus.some((g) => g.vendor === "nvidia")) {
+    const sysRoot = o.sysRoot ?? '/sys';
+    if (gpus.some((g) => g.vendor === 'nvidia')) {
       try {
         this.smi = Bun.spawn(
-          ["nvidia-smi", "--query-gpu=uuid,memory.used", "--format=csv,noheader,nounits", "-lms", String(intervalMs)],
-          { stdin: "ignore", stdout: "pipe", stderr: "ignore" },
+          ['nvidia-smi', '--query-gpu=uuid,memory.used', '--format=csv,noheader,nounits', '-lms', String(intervalMs)],
+          { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
         );
         this.smiDone = this.read(this.smi.stdout as ReadableStream<Uint8Array>);
       } catch {}
     }
-    const amd = gpus.filter((g) => g.vendor === "amd" && g.vramTotalBytes > 0);
+    const amd = gpus.filter((g) => g.vendor === 'amd' && g.vramTotalBytes > 0);
     if (amd.length > 0) {
       const tick = async () => {
         for (const g of amd) {
-          const text = await Bun.file(join(sysRoot, "bus/pci/devices", g.busId, "mem_info_vram_used"))
+          const text = await Bun.file(join(sysRoot, 'bus/pci/devices', g.busId, 'mem_info_vram_used'))
             .text()
-            .catch(() => "");
+            .catch(() => '');
           const bytes = Number(text.trim());
-          if (text.trim() !== "" && Number.isFinite(bytes)) this.note(g.key, bytes);
+          if (text.trim() !== '' && Number.isFinite(bytes)) this.note(g.key, bytes);
         }
       };
       void tick();
@@ -80,7 +80,7 @@ export class VramProbe implements VramPeaks {
     if (this.timer) clearInterval(this.timer);
     if (this.smi) {
       try {
-        this.smi.kill("SIGTERM");
+        this.smi.kill('SIGTERM');
       } catch {}
       await Promise.race([this.smiDone, Bun.sleep(500)]);
     }

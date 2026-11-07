@@ -1,9 +1,9 @@
-import type { ProfilesRepo } from "../db/profiles";
-import type { SettingsRepo } from "../db/settings";
-import { guarded, HttpError, jsonObject, notFound } from "../http";
-import { type Runtime, serverView } from "../runtime";
-import { buildCommand } from "../supervisor/args";
-import { getFlags } from "../supervisor/flags";
+import type { ProfilesRepo } from '../db/profiles';
+import type { SettingsRepo } from '../db/settings';
+import { guarded, HttpError, jsonObject, notFound } from '../http';
+import { type Runtime, serverView } from '../runtime';
+import { buildCommand } from '../supervisor/args';
+import { getFlags } from '../supervisor/flags';
 
 export interface ServerRouteDeps {
   runtime: Runtime;
@@ -23,10 +23,10 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
    */
   const lifecycle = async (fn: () => Promise<void>) => {
     try {
-      if (benchBusy()) throw new HttpError(409, "Un benchmark est en cours");
+      if (benchBusy()) throw new HttpError(409, 'Un benchmark est en cours');
       await fn();
     } catch (e) {
-      if (e instanceof Error && e.name === "SupervisorError") throw new HttpError(409, e.message);
+      if (e instanceof Error && e.name === 'SupervisorError') throw new HttpError(409, e.message);
       throw e;
     }
   };
@@ -34,7 +34,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
   const commandFor = (profileId: unknown) => {
     const id = Number(profileId);
     const profile = Number.isInteger(id) ? profiles.get(id) : null;
-    if (!profile) throw notFound("Profil");
+    if (!profile) throw notFound('Profil');
     return buildCommand(profile, settings.get());
   };
 
@@ -43,11 +43,11 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
   };
 
   return {
-    "/api/state": {
+    '/api/state': {
       GET: guarded(() => Response.json({ server: serverView(supervisor), logSeq: logs.seq, bootId: runtime.bootId })),
     },
-    "/api/server/state": { GET: guarded(view) },
-    "/api/server/start": {
+    '/api/server/state': { GET: guarded(view) },
+    '/api/server/start': {
       POST: guarded(async (req) => {
         const cmd = commandFor((await jsonObject(req)).profileId);
         await lifecycle(() => supervisor.start(cmd));
@@ -55,7 +55,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
         return Response.json(serverView(supervisor), { status: 202 });
       }),
     },
-    "/api/server/switch": {
+    '/api/server/switch': {
       POST: guarded(async (req) => {
         const cmd = commandFor((await jsonObject(req)).profileId);
         await lifecycle(() => supervisor.switchTo(cmd));
@@ -63,36 +63,36 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
         return Response.json(serverView(supervisor), { status: 202 });
       }),
     },
-    "/api/server/restart": {
+    '/api/server/restart': {
       POST: guarded(async () => {
         const id = serverView(supervisor).profileId;
-        if (id === null) throw new HttpError(409, "Aucun profil à redémarrer");
+        if (id === null) throw new HttpError(409, 'Aucun profil à redémarrer');
         const cmd = commandFor(id); // relu en base : les modifications du profil sont prises en compte
         await lifecycle(() => supervisor.switchTo(cmd));
         return Response.json(serverView(supervisor), { status: 202 });
       }),
     },
-    "/api/server/stop": {
+    '/api/server/stop': {
       POST: guarded(async () => {
         await lifecycle(() => supervisor.stop());
         return view();
       }),
     },
-    "/api/server/props": {
+    '/api/server/props': {
       GET: guarded(async () => {
         const s = supervisor.state;
-        if (s.kind !== "ready" && s.kind !== "external") throw new HttpError(409, "Serveur non prêt");
+        if (s.kind !== 'ready' && s.kind !== 'external') throw new HttpError(409, 'Serveur non prêt');
         let r: Response;
         try {
           r = await fetch(`http://127.0.0.1:${s.port}/props`, { signal: AbortSignal.timeout(2000) });
         } catch {
-          throw new HttpError(502, "llama-server ne répond pas sur /props");
+          throw new HttpError(502, 'llama-server ne répond pas sur /props');
         }
         if (!r.ok) throw new HttpError(502, `llama-server /props : HTTP ${r.status}`);
         return Response.json(await r.json());
       }),
     },
-    "/api/flags": {
+    '/api/flags': {
       GET: guarded(async () => {
         const { binary } = settings.get();
         const flags = await getFlags(binary);
@@ -100,9 +100,9 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
         return Response.json({ flags });
       }),
     },
-    "/api/logs": {
+    '/api/logs': {
       GET: guarded((req) => {
-        const since = Number(new URL(req.url).searchParams.get("since") ?? 0);
+        const since = Number(new URL(req.url).searchParams.get('since') ?? 0);
         return Response.json({
           lines: logs.since(Number.isFinite(since) ? since : 0),
           seq: logs.seq,

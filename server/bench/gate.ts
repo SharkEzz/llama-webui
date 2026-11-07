@@ -1,7 +1,7 @@
-import type { ServerState } from "@llama-webui/shared";
-import { HttpError } from "../http";
-import type { LogBuffer } from "../logs/buffer";
-import type { BuiltCommand } from "../supervisor/args";
+import type { ServerState } from '@llama-webui/shared';
+import { HttpError } from '../http';
+import type { LogBuffer } from '../logs/buffer';
+import type { BuiltCommand } from '../supervisor/args';
 
 /** Ce que la garde attend du superviseur : arrêter le serveur géré avant un benchmark, le relancer après. */
 export interface ServerControl {
@@ -57,27 +57,27 @@ export class BenchGate {
    * relancer ensuite). Sinon l'arrêt du serveur est lancé sans être attendu : `ready()` le fait.
    */
   async acquire(o: { stopServer: boolean }): Promise<void> {
-    if (this.holding) throw new HttpError(409, "Un benchmark est en cours");
+    if (this.holding) throw new HttpError(409, 'Un benchmark est en cours');
     this.holding = true;
     try {
       const { server } = this.deps;
       const deadline = Date.now() + (this.deps.stoppingTimeoutMs ?? 60_000);
-      while (server.state.kind === "stopping") {
+      while (server.state.kind === 'stopping') {
         if (Date.now() > deadline) throw new HttpError(409, "llama-server met trop de temps à s'arrêter : réessayez");
         await Bun.sleep(POLL_MS);
       }
       const s = server.state;
-      if (s.kind === "external")
+      if (s.kind === 'external')
         throw new HttpError(409, `Un llama-server externe tourne sur le port ${s.port} : arrêtez-le d'abord`);
-      if (s.kind === "starting" || s.kind === "ready") {
+      if (s.kind === 'starting' || s.kind === 'ready') {
         if (!o.stopServer)
           throw new HttpError(
             409,
             `llama-server tourne (profil ${s.profile}) : il sera arrêté pendant le benchmark puis relancé`,
-            "server-running",
+            'server-running',
           );
         const cmd = server.lastCommand;
-        this.deps.logs.push("[bench] arrêt de llama-server pendant le benchmark");
+        this.deps.logs.push('[bench] arrêt de llama-server pendant le benchmark');
         this.stopped = cmd;
         this.stopping = server.stop().then(
           () => {

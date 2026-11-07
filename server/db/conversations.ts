@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Database } from 'bun:sqlite';
 import {
   type ChatMessage,
   type Conversation,
@@ -8,8 +8,8 @@ import {
   DEFAULT_TITLE,
   type MessageStats,
   type MessageStatus,
-} from "@llama-webui/shared";
-import { notFound } from "../http";
+} from '@llama-webui/shared';
+import { notFound } from '../http';
 
 interface ConvRow {
   id: number;
@@ -26,7 +26,7 @@ interface ConvRow {
 interface MsgRow {
   id: number;
   conversation_id: number;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   reasoning: string;
   status: MessageStatus;
@@ -62,7 +62,7 @@ const msg = (r: MsgRow): ChatMessage => ({
 });
 
 export interface NewMessage {
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   status: MessageStatus;
   model?: string | null;
@@ -83,7 +83,7 @@ export class ConversationsRepo {
     private readonly now: () => number = Date.now,
   ) {}
 
-  list(): Omit<ConversationSummary, "live">[] {
+  list(): Omit<ConversationSummary, 'live'>[] {
     return this.db
       .query<{ id: number; title: string; updated_at: number; model_path: string | null; n: number }, []>(
         `SELECT c.id, c.title, c.updated_at, c.model_path, (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS n
@@ -94,7 +94,7 @@ export class ConversationsRepo {
   }
 
   conversation(id: number): Conversation | null {
-    const r = this.db.query<ConvRow, [number]>("SELECT * FROM conversations WHERE id = ?").get(id);
+    const r = this.db.query<ConvRow, [number]>('SELECT * FROM conversations WHERE id = ?').get(id);
     return r ? conv(r) : null;
   }
 
@@ -105,13 +105,13 @@ export class ConversationsRepo {
 
   messages(conversationId: number): ChatMessage[] {
     return this.db
-      .query<MsgRow, [number]>("SELECT * FROM messages WHERE conversation_id = ? ORDER BY id")
+      .query<MsgRow, [number]>('SELECT * FROM messages WHERE conversation_id = ? ORDER BY id')
       .all(conversationId)
       .map(msg);
   }
 
   message(id: number): ChatMessage | null {
-    const r = this.db.query<MsgRow, [number]>("SELECT * FROM messages WHERE id = ?").get(id);
+    const r = this.db.query<MsgRow, [number]>('SELECT * FROM messages WHERE id = ?').get(id);
     return r ? msg(r) : null;
   }
 
@@ -128,9 +128,9 @@ export class ConversationsRepo {
   patch(id: number, raw: unknown): Conversation {
     const p: ConversationPatch = ConversationPatchSchema.parse(raw);
     const c = this.conversation(id);
-    if (!c) throw notFound("Conversation");
+    if (!c) throw notFound('Conversation');
     this.db.run(
-      "UPDATE conversations SET title = ?, system_prompt = ?, sampling_json = ?, thinking = ?, updated_at = ? WHERE id = ?",
+      'UPDATE conversations SET title = ?, system_prompt = ?, sampling_json = ?, thinking = ?, updated_at = ? WHERE id = ?',
       [
         p.title ?? c.title,
         p.systemPrompt ?? c.systemPrompt,
@@ -145,18 +145,18 @@ export class ConversationsRepo {
 
   /** Change le modèle courant de la conversation (le serveur en sert un autre). */
   setModel(id: number, profileId: number | null, modelPath: string | null): void {
-    this.db.run("UPDATE conversations SET profile_id = ?, model_path = ? WHERE id = ?", [profileId, modelPath, id]);
+    this.db.run('UPDATE conversations SET profile_id = ?, model_path = ? WHERE id = ?', [profileId, modelPath, id]);
   }
 
   delete(id: number): void {
-    if (this.db.run("DELETE FROM conversations WHERE id = ?", [id]).changes === 0) throw notFound("Conversation");
+    if (this.db.run('DELETE FROM conversations WHERE id = ?', [id]).changes === 0) throw notFound('Conversation');
   }
 
   addMessage(conversationId: number, m: NewMessage): ChatMessage {
     const t = this.now();
     const r = this.db
       .query<{ id: number }, [number, string, string, string, string | null, number]>(
-        "INSERT INTO messages(conversation_id, role, content, status, model_path, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        'INSERT INTO messages(conversation_id, role, content, status, model_path, created_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id',
       )
       .get(conversationId, m.role, m.content, m.status, m.model ?? null, t)!;
     this.touch(conversationId);
@@ -165,8 +165,8 @@ export class ConversationsRepo {
 
   updateMessage(id: number, u: MessageUpdate): ChatMessage {
     const cur = this.message(id);
-    if (!cur) throw notFound("Message");
-    this.db.run("UPDATE messages SET content = ?, reasoning = ?, status = ?, error = ?, stats_json = ? WHERE id = ?", [
+    if (!cur) throw notFound('Message');
+    this.db.run('UPDATE messages SET content = ?, reasoning = ?, status = ?, error = ?, stats_json = ? WHERE id = ?', [
       u.content ?? cur.content,
       u.reasoning ?? cur.reasoning,
       u.status ?? cur.status,
@@ -179,12 +179,12 @@ export class ConversationsRepo {
   }
 
   setTitle(id: number, title: string): void {
-    this.db.run("UPDATE conversations SET title = ? WHERE id = ?", [title, id]);
+    this.db.run('UPDATE conversations SET title = ? WHERE id = ?', [title, id]);
   }
 
   /** Supprime ce message et tous les suivants de la conversation. */
   deleteFrom(conversationId: number, messageId: number): void {
-    this.db.run("DELETE FROM messages WHERE conversation_id = ? AND id >= ?", [conversationId, messageId]);
+    this.db.run('DELETE FROM messages WHERE conversation_id = ? AND id >= ?', [conversationId, messageId]);
     this.touch(conversationId);
   }
 
@@ -194,6 +194,6 @@ export class ConversationsRepo {
   }
 
   private touch(conversationId: number): void {
-    this.db.run("UPDATE conversations SET updated_at = ? WHERE id = ?", [this.now(), conversationId]);
+    this.db.run('UPDATE conversations SET updated_at = ? WHERE id = ?', [this.now(), conversationId]);
   }
 }

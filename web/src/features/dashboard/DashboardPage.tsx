@@ -1,27 +1,27 @@
-import { CircleStop } from "lucide-react"
-import { Link } from "react-router"
-import { GLASS } from "@/components/glass/glass"
-import { StatTile } from "@/components/glass/StatTile"
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { ServerStateBadge } from "@/features/server/ServerStateBadge"
-import { formatInt, formatPct } from "@/lib/format"
-import { useMonitor } from "@/lib/monitor"
-import { useServer } from "@/lib/server"
-import { ContextCard } from "./ContextCard"
-import { RequestsTable } from "./RequestsTable"
-import { SystemStrip } from "./SystemStrip"
-import { ThroughputCard } from "./ThroughputCard"
+import { CircleStop } from 'lucide-react';
+import { Link } from 'react-router';
+import { GLASS } from '@/components/glass/glass';
+import { StatTile } from '@/components/glass/StatTile';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { ServerStateBadge } from '@/features/server/ServerStateBadge';
+import { formatInt, formatPct } from '@/lib/format';
+import { useMonitor } from '@/lib/monitor';
+import { useServer } from '@/lib/server';
+import { ContextCard } from './ContextCard';
+import { RequestsTable } from './RequestsTable';
+import { SystemStrip } from './SystemStrip';
+import { ThroughputCard } from './ThroughputCard';
 
 const rate = (v: number) =>
-  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(v)
+  new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(v);
 
 export function DashboardPage() {
-  const snapshot = useMonitor((s) => s.snapshot)
-  const state = useServer((s) => s.view?.state)
-  const active = snapshot?.health != null
-  const spec = snapshot?.spec
-  const kv = snapshot?.kv
+  const snapshot = useMonitor((s) => s.snapshot);
+  const state = useServer((s) => s.view?.state);
+  const active = snapshot?.health != null;
+  const spec = snapshot?.spec;
+  const kv = snapshot?.kv;
 
   return (
     <div className="flex flex-col gap-6">
@@ -50,7 +50,7 @@ export function DashboardPage() {
           {spec && spec.drafts > 0 && (
             <StatTile
               label="Acceptation spéculative"
-              value={spec.acceptCum === null ? "—" : formatPct(100 * spec.acceptCum)}
+              value={spec.acceptCum === null ? '—' : formatPct(100 * spec.acceptCum)}
               hint={
                 spec.meanAcceptedPerDraft === null
                   ? undefined
@@ -61,7 +61,7 @@ export function DashboardPage() {
           )}
           <StatTile
             label="Contexte utilisé"
-            value={kv ? formatPct((100 * kv.usedTokens) / kv.totalTokens) : "—"}
+            value={kv ? formatPct((100 * kv.usedTokens) / kv.totalTokens) : '—'}
             hint={kv ? `${formatInt(kv.usedTokens)} / ${formatInt(kv.totalTokens)} tokens` : undefined}
             tone="rose"
           />
@@ -80,5 +80,5 @@ export function DashboardPage() {
         </>
       )}
     </div>
-  )
+  );
 }

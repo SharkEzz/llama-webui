@@ -1,29 +1,29 @@
-import type { Measure } from "@llama-webui/shared"
-import { Activity, Square } from "lucide-react"
-import { useEffect, useRef } from "react"
-import { GlassCard } from "@/components/glass/GlassCard"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { KIND_LABEL, PHASE_LABEL, STATUS_LABEL, useBench } from "@/lib/bench"
-import { formatDuration, formatRate } from "@/lib/format"
-import { useNow } from "@/lib/useNow"
-import { formatAccept, modelName, vramTotal } from "./format"
+import type { Measure } from '@llama-webui/shared';
+import { Activity, Square } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { GlassCard } from '@/components/glass/GlassCard';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { KIND_LABEL, PHASE_LABEL, STATUS_LABEL, useBench } from '@/lib/bench';
+import { formatDuration, formatRate } from '@/lib/format';
+import { useNow } from '@/lib/useNow';
+import { formatAccept, modelName, vramTotal } from './format';
 
 /** Le run en cours (phase, progression, dernières lignes, Annuler), sinon le résumé du dernier run. */
 export function BenchLiveCard() {
-  const live = useBench((s) => s.live)
-  const runs = useBench((s) => s.runs)
-  const now = useNow(1000)
-  const run = live ? runs.find((r) => r.id === live.runId) : runs[0]
+  const live = useBench((s) => s.live);
+  const runs = useBench((s) => s.runs);
+  const now = useNow(1000);
+  const run = live ? runs.find((r) => r.id === live.runId) : runs[0];
   // Les dernières lignes restent visibles : défilement en bas à chaque lot.
-  const logRef = useRef<HTMLPreElement>(null)
-  const lines = live?.lines
+  const logRef = useRef<HTMLPreElement>(null);
+  const lines = live?.lines;
   // biome-ignore lint/correctness/useExhaustiveDependencies: lines est un déclencheur : défilement en bas à chaque lot
   useEffect(() => {
-    const el = logRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [lines])
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lines]);
 
   if (!live) {
     return (
@@ -45,17 +45,17 @@ export function BenchLiveCard() {
           </div>
         )}
       </GlassCard>
-    )
+    );
   }
 
-  const pct = live.step ? Math.round((live.step.index / Math.max(1, live.step.total)) * 100) : null
+  const pct = live.step ? Math.round((live.step.index / Math.max(1, live.step.total)) * 100) : null;
   return (
     <GlassCard
       title="En cours"
       icon={Activity}
       actions={
         // Pendant la relance du serveur le run est fini : plus rien à annuler.
-        live.phase === "restarting-server" ? (
+        live.phase === 'restarting-server' ? (
           <span className="text-sm text-muted-foreground">Relance du serveur…</span>
         ) : (
           <Button variant="outline" size="sm" onClick={() => void useBench.getState().cancel()}>
@@ -80,21 +80,21 @@ export function BenchLiveCard() {
           ref={logRef}
           className="h-48 overflow-auto rounded-md bg-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground"
         >
-          {live.lines.join("\n") || "…"}
+          {live.lines.join('\n') || '…'}
         </pre>
       </div>
     </GlassCard>
-  )
+  );
 }
 
-function RunHeader({ kind, model, status }: { kind: "bench" | "server"; model: string; status?: string }) {
+function RunHeader({ kind, model, status }: { kind: 'bench' | 'server'; model: string; status?: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Badge variant="secondary">{KIND_LABEL[kind]}</Badge>
       <span className="min-w-0 truncate font-mono text-sm">{modelName(model)}</span>
       {status && <span className="text-xs text-muted-foreground">{status}</span>}
     </div>
-  )
+  );
 }
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -104,10 +104,10 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
       <dd className="num text-lg font-semibold tracking-tight">{value}</dd>
       {sub && <dd className="num text-xs text-muted-foreground">{sub}</dd>}
     </div>
-  )
+  );
 }
 
 const deviation = (m: Measure | null) =>
   m && m.stddev > 0
-    ? `± ${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(m.stddev)} sur ${m.tokens} jetons`
-    : undefined
+    ? `± ${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(m.stddev)} sur ${m.tokens} jetons`
+    : undefined;
