@@ -53,8 +53,7 @@ export function BenchCompareDialog({
         <TableHead className="font-mono text-xs">{label}</TableHead>
         {values.map((v, i) => (
           <TableCell
-            // biome-ignore lint/suspicious/noArrayIndexKey: cellules positionnelles (une par run comparé), liste non réordonnée
-            key={i}
+            key={runs[i]!.id}
             className={cn(
               'max-w-56 truncate font-mono text-xs',
               differs && 'bg-accent font-medium text-accent-foreground',

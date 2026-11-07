@@ -1,8 +1,8 @@
 {
   "name": "@llama-webui/server",
   "version": "0.1.0",
-  "type": "module",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@huggingface/gguf": "^0.4.6",
     "@llama-webui/shared": "workspace:*",

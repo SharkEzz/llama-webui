@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { useModels } from '@/lib/models';
 import { startTuningSync, useTuning } from '@/lib/tuning';
@@ -26,20 +26,25 @@ export function TuningPage() {
   }, []);
 
   // ?sweep=<id> ouvre ce sweep ; sinon le sweep qui tourne s'affiche de lui-même.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: seul ?sweep déclenche l'ouverture ; openId est lu à jour
+  // Seul un changement de ?sweep ouvre ; openId est lu à jour sans relancer l'effet.
+  const openWanted = useEffectEvent((id: number) => {
+    if (id !== openId) void useTuning.getState().open(id);
+  });
   useEffect(() => {
-    if (wanted !== null && wanted !== openId) void useTuning.getState().open(wanted);
+    if (wanted !== null) openWanted(wanted);
   }, [wanted]);
   useEffect(() => {
     if (wanted === null && liveId !== null && openId === null) void useTuning.getState().open(liveId);
   }, [wanted, liveId, openId]);
   // L'URL suit le sweep ouvert quand il change (lancement, fermeture, suppression) ; pas au montage, où ?sweep= attend encore.
   const prevOpen = useRef(openId);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: seul openId déclenche la synchro de l'URL ; wanted et setParams sont lus à jour
+  const syncUrl = useEffectEvent(() => {
+    if (openId !== wanted) setParams(openId === null ? {} : { sweep: String(openId) }, { replace: true });
+  });
   useEffect(() => {
     if (prevOpen.current === openId) return;
     prevOpen.current = openId;
-    if (openId !== wanted) setParams(openId === null ? {} : { sweep: String(openId) }, { replace: true });
+    syncUrl();
   }, [openId]);
 
   return (

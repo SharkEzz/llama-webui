@@ -324,11 +324,7 @@
 .ts-chart .u-legend .u-value {
   @apply num text-foreground;
 }
-.ts-chart .u-legend .u-series:first-child .u-marker {
-  display: none;
-}
 /* repère en trait (comme la marque) : la bordure haute garde la couleur de la série posée par uPlot */
-/* biome-ignore lint/style/noDescendingSpecificity: l'ordre est volontaire : propriétés distinctes */
 .ts-chart .u-legend .u-marker {
   height: 0;
   width: 0.875rem;
@@ -337,6 +333,9 @@
   border-radius: 1px;
   /* biome-ignore lint/complexity/noImportantStyles: écrase le fond posé par uPlot */
   background: transparent !important;
+}
+.ts-chart .u-legend .u-series:first-child .u-marker {
+  display: none;
 }
 .ts-chart .u-cursor-x {
   border-right: 1px solid var(--muted-foreground);

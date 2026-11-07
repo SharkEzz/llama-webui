@@ -1,6 +1,6 @@
 import type { BenchRun, BenchStatus, Measure } from '@llama-webui/shared';
 import { Copy, GitCompare, History, MoreHorizontal, RotateCcw, Trash2, UserPlus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { GlassCard } from '@/components/glass/GlassCard';
@@ -59,18 +59,21 @@ export function BenchHistory() {
   const focus = Number(params.get('run')) || null;
 
   // ?run=<id> (depuis Tuning) : historique avec les sweeps, ligne sélectionnée et ramenée à l'écran, puis le paramètre est retiré.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: déclenché par ?run, les filtres et les runs ; selected, toggle et setParams sont relus à chaque exécution sans relancer l'effet
-  useEffect(() => {
-    if (focus === null) return;
-    if (filters.sweeps !== 'all') return setFilters({ sweeps: 'all' });
-    if (!runs.some((r) => r.id === focus)) return;
-    if (!selected.includes(focus)) toggle(focus);
+  // selected et setParams sont lus à jour sans relancer l'effet (déclenché par ?run, les filtres et les runs).
+  const focusRun = useEffectEvent((id: number) => {
+    if (!selected.includes(id)) toggle(id);
     // Après la mise en page du formulaire (devices chargés en différé), sinon le défilement vise une position périmée.
     setTimeout(
-      () => document.getElementById(`bench-run-${focus}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      () => document.getElementById(`bench-run-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
       400,
     );
     setParams({}, { replace: true });
+  });
+  useEffect(() => {
+    if (focus === null) return;
+    if (filters.sweeps !== 'all') return useBench.getState().setFilters({ sweeps: 'all' });
+    if (!runs.some((r) => r.id === focus)) return;
+    focusRun(focus);
   }, [focus, filters.sweeps, runs]);
 
   const models = useMemo(() => [...new Set(runs.map((r) => r.spec.modelPath))].sort(), [runs]);
