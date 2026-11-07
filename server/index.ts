@@ -4,6 +4,7 @@ import { RunExecutor } from './bench/execute';
 import { readHardware } from './bench/hardware';
 import { BenchRunner } from './bench/runner';
 import { ChatRuns } from './chat/runs';
+import { cliOptionsOrExit } from './cli';
 import { BenchRunsRepo } from './db/benchRuns';
 import { ConversationsRepo } from './db/conversations';
 import { openDb } from './db/open';
@@ -18,9 +19,11 @@ import { profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
 import { WsHub } from './ws/hub';
 
-const PORT = 7860;
-// Écoute locale par défaut ; LLAMA_WEBUI_HOST=0.0.0.0 pour ouvrir au réseau local (aucune authentification).
-const HOSTNAME = process.env.LLAMA_WEBUI_HOST || '127.0.0.1';
+// Flags, sinon env, sinon défauts (`--help`). Écoute locale par défaut ; --host 0.0.0.0 (ou LLAMA_WEBUI_HOST) pour
+// ouvrir au réseau local (aucune authentification). Relu à chaque rechargement `bun --hot` : mêmes arguments.
+const cli = cliOptionsOrExit();
+const HOSTNAME = cli.host;
+const PORT = cli.port;
 const EXTERNAL_CHECK_MS = 2000;
 
 // Sous `bun --hot`, ce module est réévalué : on libère l'instance précédente (timers, db, abonnements).
@@ -28,7 +31,7 @@ const EXTERNAL_CHECK_MS = 2000;
 const g = globalThis as { __llamaWebuiDispose?: () => void };
 g.__llamaWebuiDispose?.();
 
-const db = openDb(dbPath());
+const db = openDb(dbPath(cli.dataDir));
 const runtime = getRuntime();
 const hub = new WsHub(runtime.bootId);
 const settings = new SettingsRepo(db);
