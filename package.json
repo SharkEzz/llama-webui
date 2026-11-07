@@ -11,7 +11,10 @@
     "dev": "bun --hot server/index.ts",
     "start": "NODE_ENV=production bun server/index.ts",
     "check": "bun check --no-script && bun check -p web",
-    "test": "bun test server shared"
+    "test": "bun test server shared",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "format": "biome format --write"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",
