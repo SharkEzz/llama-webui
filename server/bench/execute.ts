@@ -4,6 +4,7 @@ import {
   type BenchRun,
   type BenchSpec,
   benchArgs,
+  defer,
   type GpuSample,
   type Profile,
   type Settings,
@@ -144,6 +145,7 @@ export class RunExecutor {
       cancelled: false,
     };
     this.cur = ex;
+    using _cur = defer(() => (this.cur = null));
     let result: BenchFinish;
     try {
       this.setLive(ex, {});
@@ -156,8 +158,6 @@ export class RunExecutor {
           : await this.runBench(ex, argv);
     } catch (e) {
       result = ex.cancelled ? { status: 'cancelled' } : { status: 'failed', error: (e as Error).message };
-    } finally {
-      this.cur = null;
     }
     const vramPeak = [...ex.peaks]
       .map(([key, p]) => ({ key, name: p.name, mib: Math.round(p.bytes / MIB) }))
@@ -290,6 +290,7 @@ export class RunExecutor {
   private async runServer(ex: Exec, cmd: BuiltCommand): Promise<BenchFinish> {
     this.deps.logs.push(`[bench] ${cmd.display}`);
     await using _sampling = this.sampler(ex);
+    using _proc = defer(() => (ex.proc = null));
     try {
       const r = await runServerTrial({
         cmd,
@@ -312,8 +313,6 @@ export class RunExecutor {
     } catch (e) {
       if (e instanceof TrialCancelled || ex.cancelled) return { status: 'cancelled' };
       return { status: 'failed', error: (e as Error).message };
-    } finally {
-      ex.proc = null;
     }
   }
 

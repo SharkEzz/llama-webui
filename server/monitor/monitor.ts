@@ -7,7 +7,7 @@ import type {
   Snapshot,
   SpecStats,
 } from '@llama-webui/shared';
-import { SERIES } from '@llama-webui/shared';
+import { defer, SERIES } from '@llama-webui/shared';
 import { type AmdCard, hiddenAmdReading, suspendedAmdReading } from '../collectors/amdgpu';
 import type { DiskSample } from '../collectors/disk';
 import { type GpuReading, identityReading, selectUsedGpus } from '../collectors/gpu';
@@ -134,6 +134,7 @@ export class Monitor {
   async tick(): Promise<void> {
     if (this.inFlight) return;
     this.inFlight = true;
+    using _tick = defer(() => (this.inFlight = false));
     try {
       const snap = await this.doTick();
       this.current = snap;
@@ -146,8 +147,6 @@ export class Monitor {
       }
     } catch (err) {
       console.error('[llama-webui] tick de monitoring :', err);
-    } finally {
-      this.inFlight = false;
     }
   }
 

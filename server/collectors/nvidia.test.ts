@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { defer } from '@llama-webui/shared';
 import { type GpuSample, normalizeBusId, selectUsedGpus } from './gpu';
 import { NvidiaMonitor, parseComputeApps, parseNvidiaGpuLine } from './nvidia';
 
@@ -111,13 +112,10 @@ test('a compute-apps read abandoned on timeout may fail later without reaching t
   const unhandled: unknown[] = [];
   const onUnhandled = (e: unknown) => unhandled.push(e);
   process.on('unhandledRejection', onUnhandled);
-  try {
-    await mon.refreshApps();
-    fail!(new Error('pipe torn down'));
-    await Bun.sleep(20);
-  } finally {
-    process.off('unhandledRejection', onUnhandled);
-  }
+  using _listener = defer(() => process.off('unhandledRejection', onUnhandled));
+  await mon.refreshApps();
+  fail!(new Error('pipe torn down'));
+  await Bun.sleep(20);
   expect(unhandled).toEqual([]);
 });
 

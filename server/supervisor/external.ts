@@ -1,4 +1,4 @@
-import type { ServerState } from '@llama-webui/shared';
+import { defer, type ServerState } from '@llama-webui/shared';
 
 export interface ExternalWatcherDeps {
   supervisor: {
@@ -17,12 +17,9 @@ export function externalWatcher(d: ExternalWatcherDeps): () => Promise<void> {
   return async () => {
     if (checking || d.paused()) return;
     checking = true;
-    try {
-      const kind = d.supervisor.state.kind;
-      if (kind === 'external') await d.supervisor.recheckExternal();
-      else if (kind === 'idle') await d.supervisor.detectExternal(d.port());
-    } finally {
-      checking = false;
-    }
+    using _check = defer(() => (checking = false));
+    const kind = d.supervisor.state.kind;
+    if (kind === 'external') await d.supervisor.recheckExternal();
+    else if (kind === 'idle') await d.supervisor.detectExternal(d.port());
   };
 }

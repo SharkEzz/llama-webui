@@ -1,5 +1,6 @@
 export * from './bench';
 export * from './chat';
+export * from './dispose';
 export * from './flags';
 export * from './logs';
 export * from './models';

@@ -1,4 +1,4 @@
-import type { ServerState } from '@llama-webui/shared';
+import { defer, type ServerState } from '@llama-webui/shared';
 import { HttpError } from '../http';
 import type { LogBuffer } from '../logs/buffer';
 import type { BuiltCommand } from '../supervisor/args';
@@ -115,20 +115,18 @@ export class BenchGate {
       await this.stopping?.catch(() => {});
       const cmd = this.stopped;
       this.stopped = null;
-      try {
-        if (cmd) {
-          this.deps.logs.push(`[bench] relance de llama-server (${cmd.profileName})`);
-          try {
-            await this.deps.server.start(cmd);
-          } catch (e) {
-            const msg = `relance de llama-server impossible : ${(e as Error).message}`;
-            this.deps.logs.push(`[bench] ${msg}`);
-            throw new Error(msg);
-          }
-        }
-      } finally {
+      using _free = defer(() => {
         this.holding = false;
         this.releasing = null;
+      });
+      if (!cmd) return;
+      this.deps.logs.push(`[bench] relance de llama-server (${cmd.profileName})`);
+      try {
+        await this.deps.server.start(cmd);
+      } catch (e) {
+        const msg = `relance de llama-server impossible : ${(e as Error).message}`;
+        this.deps.logs.push(`[bench] ${msg}`);
+        throw new Error(msg);
       }
     })();
     return this.releasing;

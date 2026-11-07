@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
 import { chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { defer } from '@llama-webui/shared';
 import { tempDir } from '../testing/tempDir';
 import { ModelReadError, type ParsedShard, parseModel, readModel, type TensorInfo } from './gguf';
 import { type FakeTensor, type KvValue, writeGguf } from './gguf.fixture';
@@ -160,17 +161,17 @@ describe('readModel', () => {
   test('a missing shard is a ModelReadError', async () => {
     const p1 = join(dir, 'lone-00001-of-00002.gguf');
     await writeGguf(p1, DENSE_KV, DENSE_TENSORS);
-    await expect(readModel(p1)).rejects.toBeInstanceOf(ModelReadError);
+    expect(readModel(p1)).rejects.toBeInstanceOf(ModelReadError);
   });
 
-  test('an absent file is a ModelReadError', async () => {
-    await expect(readModel(join(dir, 'nope.gguf'))).rejects.toBeInstanceOf(ModelReadError);
+  test('an absent file is a ModelReadError', () => {
+    expect(readModel(join(dir, 'nope.gguf'))).rejects.toBeInstanceOf(ModelReadError);
   });
 
   test('a file that is not a GGUF is a ModelReadError', async () => {
     const path = join(dir, 'junk.gguf');
     await Bun.write(path, 'hello');
-    await expect(readModel(path)).rejects.toBeInstanceOf(ModelReadError);
+    expect(readModel(path)).rejects.toBeInstanceOf(ModelReadError);
   });
 
   test('the cache returns the same object until the file changes', async () => {
@@ -215,11 +216,8 @@ describe('readModel', () => {
     const path = join(locked, 'm.gguf');
     await writeGguf(path, DENSE_KV, DENSE_TENSORS);
     chmodSync(locked, 0o000);
-    try {
-      await expect(readModel(path)).rejects.toThrow(/accès refusé/);
-    } finally {
-      chmodSync(locked, 0o755);
-    }
+    using _unlock = defer(() => chmodSync(locked, 0o755));
+    expect(readModel(path)).rejects.toThrow(/accès refusé/);
   });
 });
 

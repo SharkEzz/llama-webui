@@ -3,6 +3,7 @@ import {
   type BenchLive,
   type BenchRun,
   type BenchSpec,
+  defer,
   rankRuns,
   type Sweep,
   type SweepLive,
@@ -96,21 +97,18 @@ export class BenchRunner {
   async start(spec: BenchSpec, o: { stopServer: boolean }): Promise<BenchRun> {
     if (this.busy) throw new HttpError(409, 'Un benchmark est en cours');
     this.claimed = true;
+    using _claim = defer(() => (this.claimed = false));
+    await this.checkFiles(spec);
+    await this.deps.gate.acquire(o);
     try {
-      await this.checkFiles(spec);
-      await this.deps.gate.acquire(o);
-      try {
-        const hardware = await this.deps.hardware();
-        const run = this.deps.repo.create(spec, this.deps.executor.commandOf(spec).display, hardware);
-        this.deps.onRun(run);
-        void this.oneOff(run, spec);
-        return run;
-      } catch (e) {
-        await this.deps.gate.release().catch(() => {});
-        throw e;
-      }
-    } finally {
-      this.claimed = false;
+      const hardware = await this.deps.hardware();
+      const run = this.deps.repo.create(spec, this.deps.executor.commandOf(spec).display, hardware);
+      this.deps.onRun(run);
+      void this.oneOff(run, spec);
+      return run;
+    } catch (e) {
+      await this.deps.gate.release().catch(() => {});
+      throw e;
     }
   }
 
@@ -186,24 +184,21 @@ export class BenchRunner {
   async startSweep(target: number | (() => number), o: { stopServer: boolean }): Promise<Sweep> {
     if (this.busy) throw new HttpError(409, 'Un benchmark est en cours');
     this.claimed = true;
-    try {
-      if (typeof target === 'number') {
-        const sw = this.deps.sweeps.get(target);
-        if (!sw) throw notFound('Sweep');
-        await this.checkFiles(sw.spec);
-      }
-      await this.deps.gate.acquire(o);
-      let id: number;
-      try {
-        id = typeof target === 'number' ? target : target();
-      } catch (e) {
-        await this.deps.gate.release().catch(() => {});
-        throw e;
-      }
-      return this.begin(id);
-    } finally {
-      this.claimed = false;
+    using _claim = defer(() => (this.claimed = false));
+    if (typeof target === 'number') {
+      const sw = this.deps.sweeps.get(target);
+      if (!sw) throw notFound('Sweep');
+      await this.checkFiles(sw.spec);
     }
+    await this.deps.gate.acquire(o);
+    let id: number;
+    try {
+      id = typeof target === 'number' ? target : target();
+    } catch (e) {
+      await this.deps.gate.release().catch(() => {});
+      throw e;
+    }
+    return this.begin(id);
   }
 
   private begin(id: number, after: Promise<void> | null = null): Sweep {
