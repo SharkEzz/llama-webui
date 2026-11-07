@@ -30,7 +30,7 @@ export function LogsPage() {
   const [minLevel, setMinLevel] = useState<LogLevel>('debug');
   const [query, setQuery] = useState('');
   const [follow, setFollow] = useState(true);
-  const scroller = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLElement>(null);
   const userScroll = useRef(false);
 
   const lines = useMemo(
@@ -123,9 +123,9 @@ export function LogsPage() {
       </div>
 
       <div className={cn(GLASS, 'relative min-h-0 flex-1 overflow-hidden')}>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: gestes de défilement qui coupent le suivi (molette, pointeur, clavier) */}
-        <div
+        <section
           ref={scroller}
+          aria-label="Journaux"
           className="h-full overflow-auto p-3"
           // Le suivi ne se coupe que sur un geste de l'utilisateur : un filtre qui change la hauteur ne doit pas l'arrêter.
           onWheel={(e) => {
@@ -171,7 +171,7 @@ export function LogsPage() {
               ))}
             </div>
           )}
-        </div>
+        </section>
         {!follow && lines.length > 0 && (
           <Button
             size="sm"

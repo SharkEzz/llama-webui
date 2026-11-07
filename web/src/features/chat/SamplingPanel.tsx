@@ -1,4 +1,4 @@
-import type { Sampling } from '@llama-webui/shared';
+import type { ConversationDetail, Sampling } from '@llama-webui/shared';
 import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,14 +32,21 @@ function serverDefault(key: Key, v: unknown): string {
 /** Prompt système, réflexion et sampling de la conversation ouverte, enregistrés au fil de la saisie (contenu du panneau Réglages). */
 export function SamplingPanel({ props }: { props: ServerProps | null }) {
   const current = useChat((s) => s.current);
+  if (!current) return null;
+  // key : changer de conversation remonte le formulaire (champ et erreurs repartent de zéro).
+  return <SamplingForm key={current.id} current={current} props={props} />;
+}
+
+function SamplingForm({ current, props }: { current: ConversationDetail; props: ServerProps | null }) {
   const patch = useChat((s) => s.patch);
   const [errors, setErrors] = useState<Partial<Record<Key | 'systemPrompt', string>>>({});
-  const [system, setSystem] = useState(current?.systemPrompt ?? '');
-  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id et systemPrompt sont des déclencheurs de resynchronisation du champ
-  useEffect(() => setSystem(current?.systemPrompt ?? ''), [current?.id, current?.systemPrompt]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id est un déclencheur : remise à zéro des erreurs au changement de conversation
-  useEffect(() => setErrors({}), [current?.id]);
-  if (!current) return null;
+  const [system, setSystem] = useState(current.systemPrompt ?? '');
+  // Le prompt change côté store (enregistrement, autre onglet) : le champ le suit, pendant le rendu plutôt que dans un effet.
+  const [savedPrompt, setSavedPrompt] = useState(current.systemPrompt);
+  if (savedPrompt !== current.systemPrompt) {
+    setSavedPrompt(current.systemPrompt);
+    setSystem(current.systemPrompt ?? '');
+  }
 
   const params = props?.default_generation_settings?.params ?? {};
   const save = async (p: Parameters<typeof patch>[0], field: Key | 'systemPrompt') => {

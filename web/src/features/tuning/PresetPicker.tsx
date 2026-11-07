@@ -13,21 +13,24 @@ export function PresetPicker() {
         {PRESETS.map((p) => {
           const active = p.id === preset;
           return (
-            // biome-ignore lint/a11y/useSemanticElements: boutons radio stylés (radiogroup personnalisé)
-            <button
+            // Radios natifs (masqués) : Tab entre dans le groupe, les flèches changent de préréglage.
+            <label
               key={p.id}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => useTuning.getState().setPreset(p.id)}
               className={cn(
-                'flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+                'flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50',
                 active ? 'border-primary/40 bg-accent text-accent-foreground' : 'border-transparent hover:bg-muted',
               )}
             >
+              <input
+                type="radio"
+                name="tuning-preset"
+                className="sr-only"
+                checked={active}
+                onChange={() => useTuning.getState().setPreset(p.id)}
+              />
               <span className="text-sm font-medium">{p.label}</span>
               <span className="text-xs text-muted-foreground">{p.hint}</span>
-            </button>
+            </label>
           );
         })}
       </div>
