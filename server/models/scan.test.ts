@@ -27,10 +27,18 @@ test('groupGgufFiles groups shards under the first and reports missing ones', ()
 
 test('scanModels skips hidden dirs, classifies mmproj, reports unreadable files and reuses the cache', async () => {
   const tensors = [{ name: 'token_embd.weight', shape: [8, 4], bytes: 128 }];
-  writeGguf(join(dir, 'model.gguf'), { 'general.architecture': str('llama'), 'llama.block_count': u32(1) }, tensors);
-  writeGguf(join(dir, 'mm.gguf'), { 'general.architecture': str('clip'), 'general.type': str('mmproj') }, tensors);
+  await writeGguf(
+    join(dir, 'model.gguf'),
+    { 'general.architecture': str('llama'), 'llama.block_count': u32(1) },
+    tensors,
+  );
+  await writeGguf(
+    join(dir, 'mm.gguf'),
+    { 'general.architecture': str('clip'), 'general.type': str('mmproj') },
+    tensors,
+  );
   mkdirSync(join(dir, '.cache'));
-  writeGguf(join(dir, '.cache', 'x.gguf'), { 'general.architecture': str('llama') }, tensors);
+  await writeGguf(join(dir, '.cache', 'x.gguf'), { 'general.architecture': str('llama') }, tensors);
   await Bun.write(join(dir, 'bad.gguf'), 'pas un gguf');
   await Bun.write(join(dir, 'notes.txt'), 'rien');
 

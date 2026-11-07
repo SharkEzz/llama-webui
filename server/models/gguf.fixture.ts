@@ -1,5 +1,3 @@
-import { writeFileSync } from 'node:fs';
-
 export type KvValue =
   | { type: 'u32'; value: number }
   | { type: 'u64'; value: bigint }
@@ -61,7 +59,7 @@ class Out {
  * Writes a GGUF v3 file: magic, version, counts, the kv pairs, the tensor infos, padding to 32 bytes, then
  * `bytes` zero bytes per tensor (offsets are the running total rounded up to 32).
  */
-export function writeGguf(path: string, kv: Record<string, KvValue>, tensors: FakeTensor[]): void {
+export async function writeGguf(path: string, kv: Record<string, KvValue>, tensors: FakeTensor[]): Promise<void> {
   const o = new Out();
   o.raw(new TextEncoder().encode('GGUF'));
   o.u32(3);
@@ -106,5 +104,5 @@ export function writeGguf(path: string, kv: Record<string, KvValue>, tensors: Fa
   const last = tensors[tensors.length - 1];
   const dataBytes = last ? offsets[offsets.length - 1]! + last.bytes : 0;
   o.raw(new Uint8Array(dataBytes));
-  writeFileSync(path, o.bytes());
+  await Bun.write(path, o.bytes());
 }

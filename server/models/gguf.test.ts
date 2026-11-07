@@ -77,7 +77,7 @@ describe('tensorBytes', () => {
 describe('readModel', () => {
   test("reads a dense model's metadata and tensors", async () => {
     const path = join(dir, 'dense.gguf');
-    writeGguf(path, DENSE_KV, DENSE_TENSORS);
+    await writeGguf(path, DENSE_KV, DENSE_TENSORS);
     const m = await readModel(path);
     expect({
       arch: m.arch,
@@ -108,7 +108,7 @@ describe('readModel', () => {
 
   test('reads a hybrid model: full_attention_interval, ssm tensors, nextn layers', async () => {
     const path = join(dir, 'hybrid.gguf');
-    writeGguf(
+    await writeGguf(
       path,
       {
         ...DENSE_KV,
@@ -148,8 +148,8 @@ describe('readModel', () => {
   test('sums the shards of a -00001-of-00002 model', async () => {
     const p1 = join(dir, 'big-00001-of-00002.gguf');
     const p2 = join(dir, 'big-00002-of-00002.gguf');
-    writeGguf(p1, DENSE_KV, DENSE_TENSORS.slice(0, 3));
-    writeGguf(p2, { 'general.architecture': str('llama') }, DENSE_TENSORS.slice(3));
+    await writeGguf(p1, DENSE_KV, DENSE_TENSORS.slice(0, 3));
+    await writeGguf(p2, { 'general.architecture': str('llama') }, DENSE_TENSORS.slice(3));
     const m = await readModel(p1);
     expect(m.files).toEqual([p1, p2]);
     expect(m.fileBytes).toBe(Bun.file(p1).size + Bun.file(p2).size);
@@ -159,7 +159,7 @@ describe('readModel', () => {
 
   test('a missing shard is a ModelReadError', async () => {
     const p1 = join(dir, 'lone-00001-of-00002.gguf');
-    writeGguf(p1, DENSE_KV, DENSE_TENSORS);
+    await writeGguf(p1, DENSE_KV, DENSE_TENSORS);
     await expect(readModel(p1)).rejects.toBeInstanceOf(ModelReadError);
   });
 
@@ -175,22 +175,22 @@ describe('readModel', () => {
 
   test('the cache returns the same object until the file changes', async () => {
     const path = join(dir, 'cached.gguf');
-    writeGguf(path, DENSE_KV, DENSE_TENSORS);
+    await writeGguf(path, DENSE_KV, DENSE_TENSORS);
     const a = await readModel(path);
     expect(await readModel(path)).toBe(a);
     await Bun.sleep(20);
-    writeGguf(path, DENSE_KV, DENSE_TENSORS.slice(0, 5));
+    await writeGguf(path, DENSE_KV, DENSE_TENSORS.slice(0, 5));
     expect(await readModel(path)).not.toBe(a);
   });
 
   test('a changed second shard is re-read even when the first is untouched', async () => {
     const p1 = join(dir, 'two-00001-of-00002.gguf');
     const p2 = join(dir, 'two-00002-of-00002.gguf');
-    writeGguf(p1, DENSE_KV, DENSE_TENSORS.slice(0, 3));
-    writeGguf(p2, { 'general.architecture': str('llama') }, DENSE_TENSORS.slice(3));
+    await writeGguf(p1, DENSE_KV, DENSE_TENSORS.slice(0, 3));
+    await writeGguf(p2, { 'general.architecture': str('llama') }, DENSE_TENSORS.slice(3));
     const a = await readModel(p1);
     await Bun.sleep(20);
-    writeGguf(p2, { 'general.architecture': str('llama') }, DENSE_TENSORS.slice(3, 5));
+    await writeGguf(p2, { 'general.architecture': str('llama') }, DENSE_TENSORS.slice(3, 5));
     const b = await readModel(p1);
     expect(b).not.toBe(a);
     expect(b.tensors.length).toBe(5);
@@ -198,11 +198,11 @@ describe('readModel', () => {
 
   test('the cache keeps the last 8 models only', async () => {
     const first = join(dir, 'many-0.gguf');
-    writeGguf(first, DENSE_KV, DENSE_TENSORS);
+    await writeGguf(first, DENSE_KV, DENSE_TENSORS);
     const a = await readModel(first);
     for (let i = 1; i <= 8; i++) {
       const p = join(dir, `many-${i}.gguf`);
-      writeGguf(p, DENSE_KV, DENSE_TENSORS);
+      await writeGguf(p, DENSE_KV, DENSE_TENSORS);
       await readModel(p);
     }
     expect(await readModel(first)).not.toBe(a);
@@ -213,7 +213,7 @@ describe('readModel', () => {
     const locked = join(dir, 'locked');
     mkdirSync(locked);
     const path = join(locked, 'm.gguf');
-    writeGguf(path, DENSE_KV, DENSE_TENSORS);
+    await writeGguf(path, DENSE_KV, DENSE_TENSORS);
     chmodSync(locked, 0o000);
     try {
       await expect(readModel(path)).rejects.toThrow(/accès refusé/);
@@ -245,12 +245,12 @@ describe('vocabulary size', () => {
 
 test('a multimodal projector is kind mmproj; a chat template is noticed', async () => {
   const mm = join(dir, 'mm.gguf');
-  writeGguf(mm, { 'general.architecture': str('clip'), 'general.type': str('mmproj') }, [
+  await writeGguf(mm, { 'general.architecture': str('clip'), 'general.type': str('mmproj') }, [
     { name: 'v.patch_embd.weight', shape: [4], bytes: 64 },
   ]);
   expect((await readModel(mm)).kind).toBe('mmproj');
   const chat = join(dir, 'chat.gguf');
-  writeGguf(chat, { ...DENSE_KV, 'tokenizer.chat_template': str('{{ messages }}') }, DENSE_TENSORS);
+  await writeGguf(chat, { ...DENSE_KV, 'tokenizer.chat_template': str('{{ messages }}') }, DENSE_TENSORS);
   const m = await readModel(chat);
   expect([m.kind, m.hasChatTemplate]).toEqual(['model', true]);
   expect((await readModel(join(dir, 'dense.gguf'))).hasChatTemplate).toBe(false);
