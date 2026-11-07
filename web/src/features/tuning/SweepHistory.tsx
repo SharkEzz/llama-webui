@@ -1,6 +1,6 @@
-import { useNavigate } from "react-router"
-import { History } from "lucide-react"
 import { presetOf } from "@llama-webui/shared"
+import { History } from "lucide-react"
+import { useNavigate } from "react-router"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -25,7 +25,9 @@ export function SweepHistory() {
       {!loaded ? (
         <Skeleton className="h-24" />
       ) : sweeps.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">Aucun sweep : composez un espace de recherche puis lancez-le.</p>
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          Aucun sweep : composez un espace de recherche puis lancez-le.
+        </p>
       ) : (
         <Table>
           <TableHeader>
@@ -61,7 +63,9 @@ export function SweepHistory() {
                   {s.best ? (
                     <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                       <span className="font-mono">{s.best.label?.replace(/^validation · /, "") ?? "—"}</span>
-                      <span className="num shrink-0">{s.best.tgTps === null ? "—" : `${nf.format(s.best.tgTps)} tok/s`}</span>
+                      <span className="num shrink-0">
+                        {s.best.tgTps === null ? "—" : `${nf.format(s.best.tgTps)} tok/s`}
+                      </span>
                       {s.best.kind === "server" && <Badge variant="secondary">serveur</Badge>}
                     </span>
                   ) : (
@@ -71,7 +75,9 @@ export function SweepHistory() {
                 <TableCell>
                   <Badge variant={SWEEP_STATUS[s.status].variant}>{SWEEP_STATUS[s.status].label}</Badge>
                 </TableCell>
-                <TableCell className="num text-right text-xs whitespace-nowrap">{dateFmt.format(s.createdAt)}</TableCell>
+                <TableCell className="num text-right text-xs whitespace-nowrap">
+                  {dateFmt.format(s.createdAt)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -1,6 +1,6 @@
+import { SlidersHorizontal } from "lucide-react"
 import { useEffect } from "react"
 import { useNavigate, useParams } from "react-router"
-import { SlidersHorizontal } from "lucide-react"
 import { GLASS } from "@/components/glass/glass"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -26,7 +26,10 @@ function ContextGauge({ props }: { props: ServerProps | null }) {
   const pct = Math.min(100, (used / nCtx) * 100)
   const high = pct >= 85
   return (
-    <div className="flex min-w-48 flex-col gap-1" title="Prompt et réponse du dernier échange, sur le contexte du serveur">
+    <div
+      className="flex min-w-48 flex-col gap-1"
+      title="Prompt et réponse du dernier échange, sur le contexte du serveur"
+    >
       <div className={cn("num flex justify-between gap-3 text-xs", high ? "text-warning" : "text-muted-foreground")}>
         <span>Contexte</span>
         <span>
@@ -111,7 +114,6 @@ export function ChatPage() {
           onStop={() => void stop()}
         />
       </section>
-
     </div>
   )
 }

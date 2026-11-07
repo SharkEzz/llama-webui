@@ -21,7 +21,14 @@ interface ConfirmDialogProps {
   trigger: ReactElement
 }
 
-export function ConfirmDialog({ title, description, confirmLabel, destructive, onConfirm, trigger }: ConfirmDialogProps) {
+export function ConfirmDialog({
+  title,
+  description,
+  confirmLabel,
+  destructive,
+  onConfirm,
+  trigger,
+}: ConfirmDialogProps) {
   const [open, setOpen] = useState(false)
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>

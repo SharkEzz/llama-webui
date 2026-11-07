@@ -1,5 +1,5 @@
-import type { GpuNeeds } from "../needs";
 import type { GpuReading } from "../gpu";
+import type { GpuNeeds } from "../needs";
 import type { NvmlProc, NvmlSnapshot, NvmlSystem } from "./read";
 
 export interface WorkerLike {

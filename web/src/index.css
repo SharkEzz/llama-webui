@@ -276,20 +276,36 @@
 }
 
 @keyframes drift-1 {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(25%, 20%) scale(1.15); }
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(25%, 20%) scale(1.15);
+  }
 }
 @keyframes drift-2 {
-  from { transform: translate(0, 0) scale(1.05); }
-  to { transform: translate(-22%, 25%) scale(0.9); }
+  from {
+    transform: translate(0, 0) scale(1.05);
+  }
+  to {
+    transform: translate(-22%, 25%) scale(0.9);
+  }
 }
 @keyframes drift-3 {
-  from { transform: translate(0, 0) scale(0.95); }
-  to { transform: translate(25%, -20%) scale(1.12); }
+  from {
+    transform: translate(0, 0) scale(0.95);
+  }
+  to {
+    transform: translate(25%, -20%) scale(1.12);
+  }
 }
 @keyframes drift-4 {
-  from { transform: translate(0, 0) scale(1.1); }
-  to { transform: translate(-25%, -18%) scale(0.92); }
+  from {
+    transform: translate(0, 0) scale(1.1);
+  }
+  to {
+    transform: translate(-25%, -18%) scale(0.92);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

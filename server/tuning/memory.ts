@@ -44,7 +44,8 @@ export function kvLayerBytes(m: ModelInfo, i: number, ctx: number, kv: { k: Cach
 export const recurrentBytes = (m: ModelInfo): number => m.ssmStateBytesPerSeq;
 
 /** Tampons de calcul du GPU principal pour un micro-batch de `ub` jetons. */
-export const computeBytes = (m: ModelInfo, ub: number): number => ub * (m.embeddingLength * 4 + m.vocabSize * 4) + 256 * MiB;
+export const computeBytes = (m: ModelInfo, ub: number): number =>
+  ub * (m.embeddingLength * 4 + m.vocabSize * 4) + 256 * MiB;
 
 /** VRAM gardée libre sur une carte : contexte CUDA/Vulkan, fragmentation. */
 export const marginBytes = (totalBytes: number): number => 512 * MiB + 0.04 * totalBytes;

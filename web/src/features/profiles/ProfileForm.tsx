@@ -1,16 +1,16 @@
-import { useMemo, useState } from "react"
-import { Copy, Download, Play, Save, Trash2 } from "lucide-react"
-import { toast } from "sonner"
 import { type ModelKind, type Profile, profileModelPath, reservedFlag, type Settings } from "@llama-webui/shared"
+import { Copy, Download, Play, Save, Trash2 } from "lucide-react"
+import { useMemo, useState } from "react"
+import { toast } from "sonner"
+import { CodeTextarea } from "@/components/CodeTextarea"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Label } from "@/components/ui/label"
-import { CodeTextarea } from "@/components/CodeTextarea"
 import { ModelPicker } from "@/features/models/ModelPicker"
-import { useModels } from "@/lib/models"
 import { ApiError } from "@/lib/api"
+import { useModels } from "@/lib/models"
 import { createProfile, deleteProfile, duplicateProfile, updateProfile } from "@/lib/profiles"
 import { isRunning, startProfile, useServer } from "@/lib/server"
 import { ArgsEditor } from "./ArgsEditor"
@@ -155,11 +155,23 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {field("name", "Nom")}
-        {field("cwd", "Dossier de travail", { placeholder: "~/Modèles", hint: "Les chemins relatifs du modèle partent d'ici.", mono: true })}
+        {field("cwd", "Dossier de travail", {
+          placeholder: "~/Modèles",
+          hint: "Les chemins relatifs du modèle partent d'ici.",
+          mono: true,
+        })}
         {fileField("model", "model", "Modèle (GGUF)", "Qwen3.8-27B-IQ3_S.gguf")}
         {fileField("mmproj", "mmproj", "Projecteur multimodal", "facultatif")}
-        {field("host", "Hôte", { placeholder: settings?.host ?? "0.0.0.0", hint: "Vide : valeur des réglages.", mono: true })}
-        {field("port", "Port", { placeholder: String(settings?.port ?? 8080), hint: "Vide : valeur des réglages.", mono: true })}
+        {field("host", "Hôte", {
+          placeholder: settings?.host ?? "0.0.0.0",
+          hint: "Vide : valeur des réglages.",
+          mono: true,
+        })}
+        {field("port", "Port", {
+          placeholder: String(settings?.port ?? 8080),
+          hint: "Vide : valeur des réglages.",
+          mono: true,
+        })}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -195,7 +207,13 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
               type="button"
               variant="secondary"
               disabled={dirty || isRunning(view) || view?.state.kind === "external"}
-              title={dirty ? "Enregistrez d'abord" : isRunning(view) ? "Un serveur tourne déjà : utilisez Basculer sur la page Serveur" : undefined}
+              title={
+                dirty
+                  ? "Enregistrez d'abord"
+                  : isRunning(view)
+                    ? "Un serveur tourne déjà : utilisez Basculer sur la page Serveur"
+                    : undefined
+              }
               onClick={() => void startProfile(profile.id)}
             >
               <Play /> Démarrer ce profil
@@ -215,7 +233,12 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
             >
               <Copy /> Dupliquer
             </Button>
-            <Button type="button" variant="ghost" nativeButton={false} render={<a href={`/api/profiles/${profile.id}/export`} download />}>
+            <Button
+              type="button"
+              variant="ghost"
+              nativeButton={false}
+              render={<a href={`/api/profiles/${profile.id}/export`} download />}
+            >
               <Download /> Exporter
             </Button>
             <div className="ml-auto">
@@ -234,7 +257,12 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
                   )
                 }
                 trigger={
-                  <Button type="button" variant="destructive" disabled={isActive} title={isActive ? "Arrêtez d'abord le serveur" : undefined}>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={isActive}
+                    title={isActive ? "Arrêtez d'abord le serveur" : undefined}
+                  >
                     <Trash2 /> Supprimer
                   </Button>
                 }

@@ -1,7 +1,17 @@
 import { z } from "zod";
 
 /** Flags que llama-webui passe lui-même ; un profil ne peut pas les mettre dans `args`. */
-export const RESERVED_FLAGS = ["--host", "--port", "--metrics", "--slots", "--props", "-m", "--model", "-mm", "--mmproj"] as const;
+export const RESERVED_FLAGS = [
+  "--host",
+  "--port",
+  "--metrics",
+  "--slots",
+  "--props",
+  "-m",
+  "--model",
+  "-mm",
+  "--mmproj",
+] as const;
 
 /** Le flag réservé que passe `arg` (`--host=…` compte comme `--host`), s'il en passe un. */
 export function reservedFlag(arg: string): string | undefined {

@@ -47,7 +47,14 @@ async function walk(dir: string, rel = ""): Promise<string[]> {
     if (e.isDirectory()) out.push(...(await walk(dir, r)));
     else if (e.name.endsWith(".gguf")) {
       if (e.isFile()) out.push(r);
-      else if (e.isSymbolicLink() && (await stat(join(dir, r)).then((s) => s.isFile(), () => false))) out.push(r);
+      else if (
+        e.isSymbolicLink() &&
+        (await stat(join(dir, r)).then(
+          (s) => s.isFile(),
+          () => false,
+        ))
+      )
+        out.push(r);
     }
   }
   return out;

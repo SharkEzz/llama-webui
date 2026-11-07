@@ -27,7 +27,13 @@ export function getRuntime(): Runtime {
   if (g.__llamaWebuiRuntime) return g.__llamaWebuiRuntime;
   const logs = new LogBuffer(10_000);
   const supervisor = new Supervisor({ logs });
-  const rt: Runtime = { supervisor, logs, bootId: crypto.randomUUID(), monitor: null, benchGate: new BenchGate({ server: supervisor, logs }) };
+  const rt: Runtime = {
+    supervisor,
+    logs,
+    bootId: crypto.randomUUID(),
+    monitor: null,
+    benchGate: new BenchGate({ server: supervisor, logs }),
+  };
   g.__llamaWebuiRuntime = rt;
 
   let stopping = false;

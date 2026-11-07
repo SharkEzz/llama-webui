@@ -12,7 +12,17 @@ const numOrNull = (s: string | undefined): number | null => {
 export function parseNvidiaGpuLine(line: string): GpuReading | null {
   const f = line.split(",").map((x) => x.trim());
   if (f.length < 9) return null;
-  const [, uuid, name, util, used, total, temp, power, bus] = f as [string, string, string, string, string, string, string, string, string];
+  const [, uuid, name, util, used, total, temp, power, bus] = f as [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
   const usedN = numOrNull(used);
   const totalN = numOrNull(total);
   if (!uuid.startsWith("GPU-") || usedN === null || totalN === null) return null;
@@ -43,7 +53,11 @@ export function parseComputeApps(csv: string): Array<{ pid: number; uuid: string
   return out;
 }
 
-type Spawned = { stdout: ReadableStream<Uint8Array>; exited: Promise<number>; kill(signal?: NodeJS.Signals | number): void };
+type Spawned = {
+  stdout: ReadableStream<Uint8Array>;
+  exited: Promise<number>;
+  kill(signal?: NodeJS.Signals | number): void;
+};
 
 /** One long-lived `nvidia-smi -lms` stream + occasional compute-apps query. */
 export class NvidiaMonitor {
@@ -68,11 +82,14 @@ export class NvidiaMonitor {
   start(): void {
     if (this.proc || this.disabled) return;
     try {
-      this.proc = this.spawn([this.bin, `--query-gpu=${QUERY}`, "--format=csv,noheader,nounits", "-lms", String(this.intervalMs)], {
-        stdout: "pipe",
-        stderr: "ignore",
-        stdin: "ignore",
-      }) as unknown as Spawned;
+      this.proc = this.spawn(
+        [this.bin, `--query-gpu=${QUERY}`, "--format=csv,noheader,nounits", "-lms", String(this.intervalMs)],
+        {
+          stdout: "pipe",
+          stderr: "ignore",
+          stdin: "ignore",
+        },
+      ) as unknown as Spawned;
     } catch {
       this.disabled = true;
       return;

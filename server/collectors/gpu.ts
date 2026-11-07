@@ -1,9 +1,13 @@
 import type { GpuSample } from "@llama-webui/shared";
+
 export type { GpuSample };
 export type GpuReading = Omit<GpuSample, "procVramBytes">;
 
 /** A card listed without its readings: asleep (`suspended`), or shown nowhere (`hidden`). */
-export function identityReading(g: Pick<GpuReading, "key" | "vendor" | "name" | "busId">, why: "suspended" | "hidden"): GpuReading {
+export function identityReading(
+  g: Pick<GpuReading, "key" | "vendor" | "name" | "busId">,
+  why: "suspended" | "hidden",
+): GpuReading {
   return {
     key: g.key,
     vendor: g.vendor,

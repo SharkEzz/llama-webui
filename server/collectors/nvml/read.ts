@@ -1,5 +1,5 @@
-import { type GpuNeeds, gpuSkipped, MEASURE_ALL } from "../needs";
 import { type GpuReading, identityReading, normalizeBusId } from "../gpu";
+import { type GpuNeeds, gpuSkipped, MEASURE_ALL } from "../needs";
 import type { NvmlSymbols } from "./symbols";
 
 export interface NvmlProc {
@@ -81,7 +81,9 @@ function readProcs(lib: NvmlSymbols, h: number, key: string): NvmlProc[] {
       out.push({
         pid: infos.readUInt32LE(i * PROC_INFO_SIZE),
         key,
-        usedBytes: ((v) => (v === VALUE_NOT_AVAILABLE ? null : Number(v)))(infos.readBigUInt64LE(i * PROC_INFO_SIZE + 8)),
+        usedBytes: ((v) => (v === VALUE_NOT_AVAILABLE ? null : Number(v)))(
+          infos.readBigUInt64LE(i * PROC_INFO_SIZE + 8),
+        ),
       });
     }
     return out;
@@ -97,7 +99,8 @@ export function readNvml(lib: NvmlSymbols, handles: number[], filter: GpuNeeds =
   const gpus: GpuReading[] = [];
   const procs: NvmlProc[] = [];
   const u32 = Buffer.alloc(4);
-  const one = (rc: number, mul = 1, div = 1): number | null => (rc === SUCCESS ? (u32.readUInt32LE(0) * mul) / div : null);
+  const one = (rc: number, mul = 1, div = 1): number | null =>
+    rc === SUCCESS ? (u32.readUInt32LE(0) * mul) / div : null;
 
   for (const h of handles) {
     const str = Buffer.alloc(STR_LEN);
@@ -106,7 +109,10 @@ export function readNvml(lib: NvmlSymbols, handles: number[], filter: GpuNeeds =
     const key = `nvidia:${uuid}`;
     const name = lib.nvmlDeviceGetName(h, str.fill(0), STR_LEN) === SUCCESS ? cString(str) : "NVIDIA GPU";
     const pci = Buffer.alloc(PCI_INFO_SIZE);
-    const busId = lib.nvmlDeviceGetPciInfo_v3(h, pci) === SUCCESS ? normalizeBusId(cString(pci, PCI_BUS_ID_OFFSET, PCI_INFO_SIZE)) : "";
+    const busId =
+      lib.nvmlDeviceGetPciInfo_v3(h, pci) === SUCCESS
+        ? normalizeBusId(cString(pci, PCI_BUS_ID_OFFSET, PCI_INFO_SIZE))
+        : "";
     if (gpuSkipped(filter, busId)) {
       gpus.push(identityReading({ key, vendor: "nvidia", name, busId }, "hidden"));
       continue;

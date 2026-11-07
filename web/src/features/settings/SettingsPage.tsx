@@ -1,8 +1,8 @@
+import type { Settings, ThemeMode } from "@llama-webui/shared"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import type { Settings, ThemeMode } from "@llama-webui/shared"
-import { GLASS } from "@/components/glass/glass"
 import { GlassCard } from "@/components/glass/GlassCard"
+import { GLASS } from "@/components/glass/glass"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -11,7 +11,7 @@ import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { SystemInfo } from "@/features/system/SystemPage"
-import { api, ApiError } from "@/lib/api"
+import { ApiError, api } from "@/lib/api"
 import { formatBytes, formatDuration } from "@/lib/format"
 import { useTheme } from "@/lib/theme"
 import { cn } from "@/lib/utils"
@@ -90,7 +90,14 @@ function General({ settings, errors, save }: SectionProps & { errors: Errors }) 
   return (
     <GlassCard title="llama-server">
       <div className="grid gap-5 md:grid-cols-2">
-        <TextField id="binary" label="Binaire" hint="Chemin ou nom dans le PATH." value={settings.binary} error={errors.binary} onCommit={(v) => save({ binary: v })} />
+        <TextField
+          id="binary"
+          label="Binaire"
+          hint="Chemin ou nom dans le PATH."
+          value={settings.binary}
+          error={errors.binary}
+          onCommit={(v) => save({ binary: v })}
+        />
         <TextField
           id="modelsDir"
           label="Dossier des modèles"
@@ -99,7 +106,13 @@ function General({ settings, errors, save }: SectionProps & { errors: Errors }) 
           error={errors.modelsDir}
           onCommit={(v) => save({ modelsDir: v })}
         />
-        <TextField id="host" label="Hôte par défaut" value={settings.host} error={errors.host} onCommit={(v) => save({ host: v })} />
+        <TextField
+          id="host"
+          label="Hôte par défaut"
+          value={settings.host}
+          error={errors.host}
+          onCommit={(v) => save({ host: v })}
+        />
         <TextField
           id="port"
           label="Port par défaut"
@@ -169,11 +182,25 @@ function Monitoring({ settings, save }: SectionProps) {
             checked={c.nvml}
             onChange={(on) => save({ collectors: { ...c, nvml: on } })}
           />
-          <SwitchRow id="sys" label="CPU et mémoire" checked={c.system} onChange={(on) => save({ collectors: { ...c, system: on } })} />
-          <SwitchRow id="disk" label="Disques" checked={c.disk} onChange={(on) => save({ collectors: { ...c, disk: on } })} />
+          <SwitchRow
+            id="sys"
+            label="CPU et mémoire"
+            checked={c.system}
+            onChange={(on) => save({ collectors: { ...c, system: on } })}
+          />
+          <SwitchRow
+            id="disk"
+            label="Disques"
+            checked={c.disk}
+            onChange={(on) => save({ collectors: { ...c, disk: on } })}
+          />
           <div className="flex flex-col gap-1.5">
             <Label>Intervalle de mesure</Label>
-            <Select items={INTERVALS} value={String(settings.pollIntervalMs)} onValueChange={(v) => v && save({ pollIntervalMs: Number(v) })}>
+            <Select
+              items={INTERVALS}
+              value={String(settings.pollIntervalMs)}
+              onValueChange={(v) => v && save({ pollIntervalMs: Number(v) })}
+            >
               <SelectTrigger className="w-40" aria-label="Intervalle de mesure">
                 <SelectValue />
               </SelectTrigger>
@@ -205,7 +232,9 @@ function Monitoring({ settings, save }: SectionProps) {
       </GlassCard>
       <GlassCard title="GPU affichées">
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-muted-foreground">Une carte masquée n'est plus lue (elle n'est pas réveillée si elle dort).</p>
+          <p className="text-sm text-muted-foreground">
+            Une carte masquée n'est plus lue (elle n'est pas réveillée si elle dort).
+          </p>
           {!info ? (
             <Skeleton className="h-24" />
           ) : (
@@ -219,7 +248,11 @@ function Monitoring({ settings, save }: SectionProps) {
                   hint={`${g.busId}${g.vramTotalBytes > 0 ? `, ${formatBytes(g.vramTotalBytes, 0)}` : ""}`}
                   checked={!hidden}
                   onChange={(on) =>
-                    save({ hiddenGpus: on ? settings.hiddenGpus.filter((b) => b !== g.busId) : [...settings.hiddenGpus, g.busId] })
+                    save({
+                      hiddenGpus: on
+                        ? settings.hiddenGpus.filter((b) => b !== g.busId)
+                        : [...settings.hiddenGpus, g.busId],
+                    })
                   }
                 />
               )

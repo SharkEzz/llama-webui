@@ -1,8 +1,9 @@
+import type { BenchRun, BenchStatus, Measure } from "@llama-webui/shared"
+import { Copy, GitCompare, History, MoreHorizontal, RotateCcw, Trash2, UserPlus } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router"
-import { Copy, GitCompare, History, MoreHorizontal, RotateCcw, Trash2, UserPlus } from "lucide-react"
-import type { BenchRun, BenchStatus, Measure } from "@llama-webui/shared"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
+import { GlassCard } from "@/components/glass/GlassCard"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,19 +14,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { GlassCard } from "@/components/glass/GlassCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { type BenchFilters, KIND_LABEL, STATUS_LABEL, useBench } from "@/lib/bench"
 import { copyText } from "@/lib/clipboard"
-import { cn } from "@/lib/utils"
 import { formatDuration, formatRate } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import { BenchCompareDialog } from "./BenchCompareDialog"
 import { dateFmt, flagsOf, formatAccept, formatMib, modelName, vramTotal } from "./format"
 
@@ -59,7 +65,10 @@ export function BenchHistory() {
     if (!runs.some((r) => r.id === focus)) return
     if (!selected.includes(focus)) toggle(focus)
     // Après la mise en page du formulaire (devices chargés en différé), sinon le défilement vise une position périmée.
-    setTimeout(() => document.getElementById(`bench-run-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 400)
+    setTimeout(
+      () => document.getElementById(`bench-run-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      400,
+    )
     setParams({}, { replace: true })
   }, [focus, filters.sweeps, runs])
 
@@ -106,26 +115,39 @@ export function BenchHistory() {
           <FilterSelect
             label="Outil"
             value={filters.kind}
-            items={[{ value: "all", label: "Tous les outils" }, { value: "bench", label: "llama-bench" }, { value: "server", label: "Serveur" }]}
+            items={[
+              { value: "all", label: "Tous les outils" },
+              { value: "bench", label: "llama-bench" },
+              { value: "server", label: "Serveur" },
+            ]}
             onChange={(v) => setFilters({ kind: v as BenchFilters["kind"] })}
           />
           <FilterSelect
             label="Modèle"
             value={filters.model}
-            items={[{ value: "all", label: "Tous les modèles" }, ...models.map((m) => ({ value: m, label: modelName(m) }))]}
+            items={[
+              { value: "all", label: "Tous les modèles" },
+              ...models.map((m) => ({ value: m, label: modelName(m) })),
+            ]}
             onChange={(v) => setFilters({ model: v })}
             wide
           />
           <FilterSelect
             label="Statut"
             value={filters.status}
-            items={[{ value: "all", label: "Tous les statuts" }, ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
+            items={[
+              { value: "all", label: "Tous les statuts" },
+              ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label })),
+            ]}
             onChange={(v) => setFilters({ status: v as BenchFilters["status"] })}
           />
           <FilterSelect
             label="Sweeps"
             value={filters.sweeps}
-            items={[{ value: "none", label: "Sans les sweeps" }, { value: "all", label: "Avec les sweeps" }]}
+            items={[
+              { value: "none", label: "Sans les sweeps" },
+              { value: "all", label: "Avec les sweeps" },
+            ]}
             onChange={(v) => setFilters({ sweeps: v as BenchFilters["sweeps"] })}
           />
         </div>
@@ -179,12 +201,18 @@ export function BenchHistory() {
                     <TableCell>
                       <Badge variant="secondary">{KIND_LABEL[r.kind]}</Badge>
                     </TableCell>
-                    <TableCell className={cn("truncate font-mono text-xs", filters.sweeps === "all" ? "max-w-28" : "max-w-36")} title={r.spec.modelPath}>
+                    <TableCell
+                      className={cn("truncate font-mono text-xs", filters.sweeps === "all" ? "max-w-28" : "max-w-36")}
+                      title={r.spec.modelPath}
+                    >
                       {modelName(r.spec.modelPath)}
                     </TableCell>
                     <TableCell className={filters.sweeps === "all" ? "max-w-28" : "max-w-36"}>
                       <Tooltip>
-                        <TooltipTrigger render={<span />} className="block truncate font-mono text-xs text-muted-foreground">
+                        <TooltipTrigger
+                          render={<span />}
+                          className="block truncate font-mono text-xs text-muted-foreground"
+                        >
                           {flagsOf(r)}
                         </TooltipTrigger>
                         <TooltipContent className="max-w-md font-mono">{r.command}</TooltipContent>
@@ -195,7 +223,11 @@ export function BenchHistory() {
                         {r.sweepId === null ? (
                           <span className="text-muted-foreground">—</span>
                         ) : (
-                          <Link to={`/tuning?sweep=${r.sweepId}`} className="block truncate underline-offset-4 hover:underline" title={r.sweepLabel ?? undefined}>
+                          <Link
+                            to={`/tuning?sweep=${r.sweepId}`}
+                            className="block truncate underline-offset-4 hover:underline"
+                            title={r.sweepLabel ?? undefined}
+                          >
                             #{r.sweepId} <span className="font-mono text-muted-foreground">{r.sweepLabel}</span>
                           </Link>
                         )}
@@ -220,7 +252,9 @@ export function BenchHistory() {
                         </Tooltip>
                       )}
                     </TableCell>
-                    <TableCell className="num whitespace-nowrap text-right text-xs">{r.durationMs === null ? "—" : formatDuration(r.durationMs)}</TableCell>
+                    <TableCell className="num whitespace-nowrap text-right text-xs">
+                      {r.durationMs === null ? "—" : formatDuration(r.durationMs)}
+                    </TableCell>
                     <TableCell>
                       {r.error ? (
                         <Tooltip>
@@ -235,7 +269,10 @@ export function BenchHistory() {
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
-                        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" />} aria-label={`Actions pour le run #${r.id}`}>
+                        <DropdownMenuTrigger
+                          render={<Button variant="ghost" size="icon-xs" />}
+                          aria-label={`Actions pour le run #${r.id}`}
+                        >
                           <MoreHorizontal />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-48">
@@ -243,7 +280,9 @@ export function BenchHistory() {
                             onClick={() => {
                               useBench.getState().rerun(r)
                               // La page défile dans le layout, pas dans window : on ramène le formulaire à l'écran.
-                              document.getElementById("bench-modelPath")?.scrollIntoView({ behavior: "smooth", block: "center" })
+                              document
+                                .getElementById("bench-modelPath")
+                                ?.scrollIntoView({ behavior: "smooth", block: "center" })
                             }}
                           >
                             <RotateCcw /> Relancer
@@ -255,7 +294,11 @@ export function BenchHistory() {
                             <Copy /> Copier la commande
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem variant="destructive" disabled={r.status === "running"} onClick={() => setDeleting(r)}>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={r.status === "running"}
+                            onClick={() => setDeleting(r)}
+                          >
                             <Trash2 /> Supprimer
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -274,7 +317,9 @@ export function BenchHistory() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer le run #{deleting?.id} ?</AlertDialogTitle>
-            <AlertDialogDescription>Ses mesures seront définitivement supprimées de l'historique.</AlertDialogDescription>
+            <AlertDialogDescription>
+              Ses mesures seront définitivement supprimées de l'historique.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
@@ -294,7 +339,13 @@ export function BenchHistory() {
   )
 }
 
-function FilterSelect(props: { label: string; value: string; items: { value: string; label: string }[]; onChange(v: string): void; wide?: boolean }) {
+function FilterSelect(props: {
+  label: string
+  value: string
+  items: { value: string; label: string }[]
+  onChange(v: string): void
+  wide?: boolean
+}) {
   return (
     <Select items={props.items} value={props.value} onValueChange={(v) => v && props.onChange(v)}>
       <SelectTrigger className={props.wide ? "w-64" : "w-44"} aria-label={props.label}>
@@ -317,7 +368,9 @@ function MeasureCell({ m }: { m: Measure | null }) {
     <TableCell className="num whitespace-nowrap text-right text-xs">
       {formatRate(m?.tps)}
       {m && m.stddev > 0 && (
-        <div className="text-[0.7rem] text-muted-foreground">± {new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(m.stddev)}</div>
+        <div className="text-[0.7rem] text-muted-foreground">
+          ± {new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(m.stddev)}
+        </div>
       )}
     </TableCell>
   )

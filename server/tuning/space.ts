@@ -1,9 +1,25 @@
-import { type BenchParams, type CacheType, estimatedSweepSeconds, expandSpace, itemLabel, type PlanResult, presetOf, sweepCtx, type SweepSpec, type TuningHardware } from "@llama-webui/shared";
+import {
+  type BenchParams,
+  type CacheType,
+  estimatedSweepSeconds,
+  expandSpace,
+  itemLabel,
+  type PlanResult,
+  presetOf,
+  type SweepSpec,
+  sweepCtx,
+  type TuningHardware,
+} from "@llama-webui/shared";
 import type { ModelInfo } from "../models/gguf";
 import { fitOf } from "./placement";
 
 /** Les éléments d'un sweep, chacun avec le verdict de l'estimateur ; ceux qui ne tiennent pas retirés sauf `includeUnfit`. */
-export function planSweep(o: { model: ModelInfo; hw: TuningHardware; spec: SweepSpec; mmprojBytes: number }): PlanResult {
+export function planSweep(o: {
+  model: ModelInfo;
+  hw: TuningHardware;
+  spec: SweepSpec;
+  mmprojBytes: number;
+}): PlanResult {
   const { spec } = o;
   const ctx = sweepCtx(spec);
   const { items: all, droppedTs } = expandSpace(spec.base, spec.space);
@@ -26,5 +42,10 @@ export function planSweep(o: { model: ModelInfo; hw: TuningHardware; spec: Sweep
     }
     items.push({ params: params as BenchParams, label: itemLabel(params, spec.space), fit });
   }
-  return { items, excluded, droppedTs, estimatedSeconds: estimatedSweepSeconds(items.length, o.model.fileBytes, spec.r) };
+  return {
+    items,
+    excluded,
+    droppedTs,
+    estimatedSeconds: estimatedSweepSeconds(items.length, o.model.fileBytes, spec.r),
+  };
 }

@@ -1,5 +1,5 @@
-import { MemoryStick } from "lucide-react"
 import { SERIES, type SystemSample } from "@llama-webui/shared"
+import { MemoryStick } from "lucide-react"
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { Progress } from "@/components/ui/progress"
@@ -19,7 +19,8 @@ export function MemoryCard({ sample }: { sample: SystemSample | null }) {
           <div className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between text-sm">
               <span>
-                <span className="num">{formatBytes(used)}</span> <span className="text-muted-foreground">sur {formatBytes(mem.totalBytes)}</span>
+                <span className="num">{formatBytes(used)}</span>{" "}
+                <span className="text-muted-foreground">sur {formatBytes(mem.totalBytes)}</span>
               </span>
               <span className="num text-muted-foreground">{formatPct(pct)}</span>
             </div>
@@ -29,7 +30,12 @@ export function MemoryCard({ sample }: { sample: SystemSample | null }) {
             rows={[
               ["Disponible", formatBytes(mem.availableBytes)],
               ["Cache", formatBytes(mem.cachedBytes)],
-              ["Swap", mem.swapTotalBytes > 0 ? `${formatBytes(mem.swapUsedBytes)} / ${formatBytes(mem.swapTotalBytes)}` : "aucun"],
+              [
+                "Swap",
+                mem.swapTotalBytes > 0
+                  ? `${formatBytes(mem.swapUsedBytes)} / ${formatBytes(mem.swapTotalBytes)}`
+                  : "aucun",
+              ],
             ]}
           />
           <TimeSeriesChart

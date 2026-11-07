@@ -1,6 +1,6 @@
+import { type BenchParams, type BenchRun, benchArgs, serverArgs } from "@llama-webui/shared"
 import { TriangleAlert } from "lucide-react"
 import type { ReactNode } from "react"
-import { type BenchParams, type BenchRun, benchArgs, serverArgs } from "@llama-webui/shared"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -32,7 +32,15 @@ function paramText(run: BenchRun, key: keyof BenchParams): string {
 }
 
 /** Comparaison côte à côte de 2 à 4 runs : flags (différences surlignées), débits, VRAM, matériel, puis barres pp/tg. */
-export function BenchCompareDialog({ runs, open, onOpenChange }: { runs: BenchRun[]; open: boolean; onOpenChange(o: boolean): void }) {
+export function BenchCompareDialog({
+  runs,
+  open,
+  onOpenChange,
+}: {
+  runs: BenchRun[]
+  open: boolean
+  onOpenChange(o: boolean): void
+}) {
   const mixed = new Set(runs.map((r) => r.kind)).size > 1
   const hw = (r: BenchRun) => JSON.stringify({ cpu: r.hardware.cpu, gpus: r.hardware.gpus.map((g) => g.name) })
   const otherHardware = new Set(runs.map(hw)).size > 1
@@ -44,7 +52,14 @@ export function BenchCompareDialog({ runs, open, onOpenChange }: { runs: BenchRu
       <TableRow key={String(label)}>
         <TableHead className="font-mono text-xs">{label}</TableHead>
         {values.map((v, i) => (
-          <TableCell key={i} className={cn("max-w-56 truncate font-mono text-xs", differs && "bg-accent font-medium text-accent-foreground")} title={v}>
+          <TableCell
+            key={i}
+            className={cn(
+              "max-w-56 truncate font-mono text-xs",
+              differs && "bg-accent font-medium text-accent-foreground",
+            )}
+            title={v}
+          >
             {v}
           </TableCell>
         ))}
@@ -63,8 +78,8 @@ export function BenchCompareDialog({ runs, open, onOpenChange }: { runs: BenchRu
           <Alert>
             <TriangleAlert />
             <AlertDescription>
-              llama-bench et serveur ne se comparent pas directement : le décodage spéculatif (MTP, draft) et le contexte du profil ne
-              sont pas mesurés par llama-bench.
+              llama-bench et serveur ne se comparent pas directement : le décodage spéculatif (MTP, draft) et le
+              contexte du profil ne sont pas mesurés par llama-bench.
             </AlertDescription>
           </Alert>
         )}
@@ -86,22 +101,61 @@ export function BenchCompareDialog({ runs, open, onOpenChange }: { runs: BenchRu
             </TableRow>
           </TableHeader>
           <TableBody>
-            {row("Outil", runs.map((r) => KIND_LABEL[r.kind]))}
-            {row("Modèle", runs.map((r) => modelName(r.spec.modelPath)))}
-            {PARAM_ROWS.map((p) => row(p.label, runs.map((r) => paramText(r, p.key))))}
-            {row("Autres flags", runs.map((r) => (r.kind === "server" ? r.spec.serverArgs.join(" ") || "—" : "ignorés")))}
-            {row("-p / -n / -r", runs.map((r) => `${r.spec.p} / ${r.spec.n} / ${r.spec.r}`))}
-            {row("Prompt", runs.map((r) => formatMeasure(r.pp)), false)}
-            {row("Génération", runs.map((r) => formatMeasure(r.tg)), false)}
-            {row("MTP accepté", runs.map((r) => formatAccept(r.draftAcceptPct)), false)}
-            {gpuKeys.map(([key, name]) =>
-              row(`VRAM ${name}`, runs.map((r) => {
-                const v = r.vramPeak.find((x) => x.key === key)
-                return v ? formatMib(v.mib) : "—"
-              }), false),
+            {row(
+              "Outil",
+              runs.map((r) => KIND_LABEL[r.kind]),
             )}
-            {row("Build", runs.map((r) => r.hardware.build ?? "—"))}
-            {row("CPU", runs.map((r) => r.hardware.cpu || "—"))}
+            {row(
+              "Modèle",
+              runs.map((r) => modelName(r.spec.modelPath)),
+            )}
+            {PARAM_ROWS.map((p) =>
+              row(
+                p.label,
+                runs.map((r) => paramText(r, p.key)),
+              ),
+            )}
+            {row(
+              "Autres flags",
+              runs.map((r) => (r.kind === "server" ? r.spec.serverArgs.join(" ") || "—" : "ignorés")),
+            )}
+            {row(
+              "-p / -n / -r",
+              runs.map((r) => `${r.spec.p} / ${r.spec.n} / ${r.spec.r}`),
+            )}
+            {row(
+              "Prompt",
+              runs.map((r) => formatMeasure(r.pp)),
+              false,
+            )}
+            {row(
+              "Génération",
+              runs.map((r) => formatMeasure(r.tg)),
+              false,
+            )}
+            {row(
+              "MTP accepté",
+              runs.map((r) => formatAccept(r.draftAcceptPct)),
+              false,
+            )}
+            {gpuKeys.map(([key, name]) =>
+              row(
+                `VRAM ${name}`,
+                runs.map((r) => {
+                  const v = r.vramPeak.find((x) => x.key === key)
+                  return v ? formatMib(v.mib) : "—"
+                }),
+                false,
+              ),
+            )}
+            {row(
+              "Build",
+              runs.map((r) => r.hardware.build ?? "—"),
+            )}
+            {row(
+              "CPU",
+              runs.map((r) => r.hardware.cpu || "—"),
+            )}
           </TableBody>
         </Table>
         <BenchBars runs={runs} />

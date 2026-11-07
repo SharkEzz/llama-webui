@@ -2,18 +2,28 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { type BenchLive, type BenchRun, type BenchSpec, BenchSpecSchema, DEFAULT_SETTINGS, type ServerState, type Sweep, type SweepLive, SweepSpecSchema } from "@llama-webui/shared";
+import {
+  type BenchLive,
+  type BenchRun,
+  type BenchSpec,
+  BenchSpecSchema,
+  DEFAULT_SETTINGS,
+  type ServerState,
+  type Sweep,
+  type SweepLive,
+  SweepSpecSchema,
+} from "@llama-webui/shared";
 import { BenchRunsRepo } from "../db/benchRuns";
-import { SweepsRepo } from "../db/sweeps";
 import { openDb } from "../db/open";
+import { SweepsRepo } from "../db/sweeps";
 import { HttpError } from "../http";
 import { LogBuffer } from "../logs/buffer";
+import { sweepRoutes } from "../routes/sweeps";
 import type { BuiltCommand } from "../supervisor/args";
 import { probeHealth } from "../supervisor/health";
-import { RunExecutor, type ExecutorDeps } from "./execute";
+import { type ExecutorDeps, RunExecutor } from "./execute";
 import { BenchGate, type ServerControl } from "./gate";
 import { BenchRunner } from "./runner";
-import { sweepRoutes } from "../routes/sweeps";
 
 const FAKE = resolve(import.meta.dir, "../../testdata/fake/fake-llama-server");
 const MODEL = join(mkdtempSync(join(tmpdir(), "lw-bench-")), "a.gguf");
@@ -21,11 +31,26 @@ writeFileSync(MODEL, "");
 const cmdA = { display: "cmdA", profileName: "A", profileId: 1, port: 8080 } as BuiltCommand;
 
 afterEach(() => {
-  for (const k of ["FAKE_BENCH_OOM", "FAKE_BENCH_OOM_ARG", "FAKE_TG_BY_ARG", "FAKE_BENCH_STEP_MS", "FAKE_PP", "FAKE_TG", "FAKE_DRAFT", "FAKE_LOAD_MS"]) delete process.env[k];
+  for (const k of [
+    "FAKE_BENCH_OOM",
+    "FAKE_BENCH_OOM_ARG",
+    "FAKE_TG_BY_ARG",
+    "FAKE_BENCH_STEP_MS",
+    "FAKE_PP",
+    "FAKE_TG",
+    "FAKE_DRAFT",
+    "FAKE_LOAD_MS",
+  ])
+    delete process.env[k];
 });
 
 /** Un serveur géré factice (prêt, profil A) qui note les arrêts et relances. */
-function setup(port = 8080, patch?: (s: ServerControl) => void, deps?: Partial<ExecutorDeps>, shared?: { gate: BenchGate; repo: BenchRunsRepo; sweeps: SweepsRepo; calls: string[] }) {
+function setup(
+  port = 8080,
+  patch?: (s: ServerControl) => void,
+  deps?: Partial<ExecutorDeps>,
+  shared?: { gate: BenchGate; repo: BenchRunsRepo; sweeps: SweepsRepo; calls: string[] },
+) {
   const calls: string[] = shared?.calls ?? [];
   let state: ServerState = { kind: "ready", profile: "A", profileId: 1, pid: 1, port: 8080, since: 0 };
   const server: ServerControl = {
@@ -54,7 +79,13 @@ function setup(port = 8080, patch?: (s: ServerControl) => void, deps?: Partial<E
   const sweeps = shared?.sweeps ?? new SweepsRepo(db!);
   const logs = new LogBuffer(100);
   const gate = shared?.gate ?? new BenchGate({ server, logs, adoptGraceMs: 0 });
-  const executor = new RunExecutor({ settings: () => ({ ...DEFAULT_SETTINGS, binary: FAKE, port }), logs, gpus: () => [], disk: () => null, ...deps });
+  const executor = new RunExecutor({
+    settings: () => ({ ...DEFAULT_SETTINGS, binary: FAKE, port }),
+    logs,
+    gpus: () => [],
+    disk: () => null,
+    ...deps,
+  });
   const runner = new BenchRunner({
     repo,
     sweeps,
@@ -111,7 +142,9 @@ test("a server run measures r times and reports draft acceptance", async () => {
   Object.assign(process.env, { FAKE_PP: "1000", FAKE_TG: "50", FAKE_DRAFT: "1", FAKE_LOAD_MS: "50" });
   const port = 18089;
   const { runner, calls, runs, end } = setup(port);
-  await runner.start(BenchSpecSchema.parse({ kind: "server", modelPath: MODEL, r: 2, p: 64, n: 8 }), { stopServer: true });
+  await runner.start(BenchSpecSchema.parse({ kind: "server", modelPath: MODEL, r: 2, p: 64, n: 8 }), {
+    stopServer: true,
+  });
   await end;
   const last = runs.at(-1)!;
   expect(last.error).toBeNull();
@@ -127,7 +160,9 @@ test("a server run measures r times and reports draft acceptance", async () => {
 
 test("a missing model is refused before anything stops", async () => {
   const { runner, calls } = setup();
-  const e = await runner.start(BenchSpecSchema.parse({ kind: "bench", modelPath: "/nulle/part.gguf" }), { stopServer: true }).catch((x) => x);
+  const e = await runner
+    .start(BenchSpecSchema.parse({ kind: "bench", modelPath: "/nulle/part.gguf" }), { stopServer: true })
+    .catch((x) => x);
   expect((e as HttpError).status).toBe(400);
   expect(calls).toEqual([]);
   expect(runner.busy).toBe(false);
@@ -172,7 +207,9 @@ test("a reload while the server is stopping restarts it once the stop is over", 
 
 test("a bench run gets its profile's environment", async () => {
   const { runner, runs, end } = setup(8080, undefined, { profile: () => ({ env: { FAKE_BENCH_OOM: "1" } }) });
-  await runner.start(BenchSpecSchema.parse({ kind: "bench", modelPath: MODEL, profileId: 1, r: 1 }), { stopServer: true });
+  await runner.start(BenchSpecSchema.parse({ kind: "bench", modelPath: MODEL, profileId: 1, r: 1 }), {
+    stopServer: true,
+  });
   await end;
   expect(runs.at(-1)!.status).toBe("failed");
 });
@@ -181,26 +218,38 @@ test("a server run runs in its profile's directory", async () => {
   Object.assign(process.env, { FAKE_LOAD_MS: "50" });
   const cwd = mkdtempSync(join(tmpdir(), "lw-cwd-"));
   const { runner, runs, end } = setup(18090, undefined, { profile: () => ({ cwd, env: {} }) });
-  await runner.start(BenchSpecSchema.parse({ kind: "server", modelPath: MODEL, profileId: 1, r: 1, p: 16, n: 4 }), { stopServer: true });
+  await runner.start(BenchSpecSchema.parse({ kind: "server", modelPath: MODEL, profileId: 1, r: 1, p: 16, n: 4 }), {
+    stopServer: true,
+  });
   await end;
   expect(runs.at(-1)!.logExcerpt).toContain(`cwd ${cwd}`);
 }, 20_000);
 
 /** Un sweep de llama-bench : un élément par valeur de -ncmoe. */
 function sweepOf(repo: BenchRunsRepo, sweeps: SweepsRepo, values: number[]) {
-  const sw = sweeps.create(SweepSpecSchema.parse({ name: "s", modelPath: MODEL, preset: "chat", r: 1, space: { ncmoe: values } }));
-  const items = values.map((v) => ({ spec: { ...spec, r: 1, params: { ncmoe: v } } as BenchSpec, label: `-ncmoe ${v}`, fit: "fits" as const }));
+  const sw = sweeps.create(
+    SweepSpecSchema.parse({ name: "s", modelPath: MODEL, preset: "chat", r: 1, space: { ncmoe: values } }),
+  );
+  const items = values.map((v) => ({
+    spec: { ...spec, r: 1, params: { ncmoe: v } } as BenchSpec,
+    label: `-ncmoe ${v}`,
+    fit: "fits" as const,
+  }));
   return { sweep: sw, runs: repo.enqueue(sw.id, items) };
 }
 const sweepEnd = (lives: (SweepLive | null)[]) =>
   new Promise<void>((resolve) => {
     const t = setInterval(() => {
-      if (lives.length > 0 && lives.at(-1) === null) (clearInterval(t), resolve());
+      if (lives.length > 0 && lives.at(-1) === null) clearInterval(t), resolve();
     }, 10);
   });
 
 test("a sweep stops the server once, continues after an OOM item and restarts it once", async () => {
-  Object.assign(process.env, { FAKE_BENCH_OOM_ARG: "-ncmoe 4", FAKE_TG_BY_ARG: "-ncmoe 8=30;-ncmoe 16=20", FAKE_BENCH_STEP_MS: "5" });
+  Object.assign(process.env, {
+    FAKE_BENCH_OOM_ARG: "-ncmoe 4",
+    FAKE_TG_BY_ARG: "-ncmoe 8=30;-ncmoe 16=20",
+    FAKE_BENCH_STEP_MS: "5",
+  });
   const { runner, calls, repo, sweeps, sweepLives } = setup();
   const { sweep } = sweepOf(repo, sweeps, [4, 8, 16]);
   await runner.startSweep(sweep.id, { stopServer: true });
@@ -246,7 +295,12 @@ test("after a reload the interrupted item is replayed only once the killed proce
     exitedAt = Date.now();
   };
   first.runner.dispose({ restart: true });
-  const second = setup(8080, undefined, undefined, { gate: first.gate, repo: first.repo, sweeps: first.sweeps, calls: first.calls });
+  const second = setup(8080, undefined, undefined, {
+    gate: first.gate,
+    repo: first.repo,
+    sweeps: first.sweeps,
+    calls: first.calls,
+  });
   await second.runner.resume();
   while (!second.runs.some((r) => r.status === "running")) await Bun.sleep(5);
   expect(exitedAt).toBeGreaterThan(0);
@@ -264,7 +318,12 @@ test("a reload hands the held gate to the next runner, which replays the interru
   while (first.repo.list({ sweepId: sweep.id }).filter((r) => r.status === "ok").length < 1) await Bun.sleep(10);
   await Bun.sleep(80);
   first.runner.dispose({ restart: true });
-  const second = setup(8080, undefined, undefined, { gate: first.gate, repo: first.repo, sweeps: first.sweeps, calls: first.calls });
+  const second = setup(8080, undefined, undefined, {
+    gate: first.gate,
+    repo: first.repo,
+    sweeps: first.sweeps,
+    calls: first.calls,
+  });
   await second.runner.resume();
   await sweepEnd(second.sweepLives);
   expect(first.calls).toEqual(["stop", "start:cmdA"]);
@@ -296,10 +355,24 @@ test("validating an interrupted sweep also finishes its interrupted items", asyn
   const second = repo.list({ sweepId: sweep.id }).find((r) => r.sweepLabel === "-ncmoe 2")!;
   repo.finish(second.id, { status: "interrupted", error: "interrompu" });
   sweeps.setStatus(sweep.id, "interrupted");
-  const routes = sweepRoutes({ sweeps, benchRuns: repo, benchRunner: runner, settings: null!, monitor: null!, hub: { broadcast() {} } as never });
-  const req = Object.assign(new Request(`http://127.0.0.1:7860/api/sweeps/${sweep.id}/validate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ n: 1, stopServer: true }) }), {
-    params: { id: String(sweep.id) },
+  const routes = sweepRoutes({
+    sweeps,
+    benchRuns: repo,
+    benchRunner: runner,
+    settings: null!,
+    monitor: null!,
+    hub: { broadcast() {} } as never,
   });
+  const req = Object.assign(
+    new Request(`http://127.0.0.1:7860/api/sweeps/${sweep.id}/validate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ n: 1, stopServer: true }),
+    }),
+    {
+      params: { id: String(sweep.id) },
+    },
+  );
   expect((await routes["/api/sweeps/:id/validate"].POST(req as never, null as never))!.status).toBe(202);
   while (sweeps.get(sweep.id)!.status === "running") await Bun.sleep(10);
   expect(repo.list({ sweepId: sweep.id }).filter((r) => r.status === "interrupted")).toEqual([]);

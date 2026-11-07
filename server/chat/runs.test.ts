@@ -28,7 +28,12 @@ function setup() {
     signal.addEventListener("abort", () => ctl.error(new DOMException("aborted", "AbortError")));
     return new Response(stream, { headers: { "content-type": "text/event-stream" } });
   }) as typeof fetch;
-  const runs = new ChatRuns({ repo, target: () => ({ port: 8080, profileId: null, modelPath: "/m.gguf" }), fetch: fetchFn, flushMs: 0 });
+  const runs = new ChatRuns({
+    repo,
+    target: () => ({ port: 8080, profileId: null, modelPath: "/m.gguf" }),
+    fetch: fetchFn,
+    flushMs: 0,
+  });
   return {
     repo,
     conv,

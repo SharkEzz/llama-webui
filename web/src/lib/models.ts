@@ -1,5 +1,5 @@
-import { create } from "zustand"
 import type { ModelEntry, ModelList, ModelSummary } from "@llama-webui/shared"
+import { create } from "zustand"
 import { api } from "./api"
 
 interface ModelsState {

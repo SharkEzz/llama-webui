@@ -1,7 +1,7 @@
+import { catalogFrom, type Flag, type FlagCatalog } from "@llama-webui/shared"
 import { useEffect } from "react"
 import { create } from "zustand"
-import { catalogFrom, type Flag, type FlagCatalog } from "@llama-webui/shared"
-import { api, ApiError } from "./api"
+import { ApiError, api } from "./api"
 
 interface FlagsStore {
   catalog: FlagCatalog | null

@@ -17,11 +17,16 @@ export const notFound = (what: string) => new HttpError(404, `${what} introuvabl
 
 export function errorResponse(err: unknown): Response {
   if (err instanceof HttpError)
-    return Response.json(err.code ? { error: err.message, code: err.code } : { error: err.message }, { status: err.status });
+    return Response.json(err.code ? { error: err.message, code: err.code } : { error: err.message }, {
+      status: err.status,
+    });
   if (err instanceof ZodError) {
     const first = err.issues[0];
     const where = first && first.path.length > 0 ? ` (${first.path.join(".")})` : "";
-    return Response.json({ error: `Données invalides : ${first?.message ?? "?"}${where}`, issues: err.issues }, { status: 400 });
+    return Response.json(
+      { error: `Données invalides : ${first?.message ?? "?"}${where}`, issues: err.issues },
+      { status: 400 },
+    );
   }
   if (err instanceof SyntaxError) return Response.json({ error: "JSON invalide" }, { status: 400 });
   console.error(err);

@@ -16,7 +16,9 @@ const int = (min: number, max = 1_000_000) =>
 
 /** Flags de la spec, sous une forme commune aux deux outils. Clé absente = défaut de l'outil. */
 export const BenchParamsSchema = z.strictObject({
-  ngl: z.union([int(0, 9999), z.literal("all"), z.literal("auto")], { error: "nombre, « all » ou « auto »" }).optional(),
+  ngl: z
+    .union([int(0, 9999), z.literal("all"), z.literal("auto")], { error: "nombre, « all » ou « auto »" })
+    .optional(),
   ot: z.array(z.string().regex(/^[^=,;]+=[^=,;]+$/, "motif=buffer attendu (ex. exps=CPU)")).optional(),
   ncmoe: int(0, 9999).optional(),
   dev: z.array(z.string().regex(/^[A-Za-z]+\d*$/, "nom de device attendu (ex. CUDA0)")).optional(),
@@ -129,7 +131,14 @@ export interface BenchRun {
   createdAt: number;
 }
 
-export type BenchPhase = "stopping-server" | "loading" | "warmup" | "prompt" | "generation" | "measure" | "restarting-server";
+export type BenchPhase =
+  | "stopping-server"
+  | "loading"
+  | "warmup"
+  | "prompt"
+  | "generation"
+  | "measure"
+  | "restarting-server";
 
 export interface BenchLive {
   runId: number;
@@ -243,7 +252,13 @@ export const benchArgs = (p: BenchParams): string[] => toArgs(p, "bench");
 const IGNORED: { test: (flag: string) => boolean; why: string }[] = [
   { test: (f) => f === "-c" || f === "--ctx-size", why: "contexte non réservé" },
   {
-    test: (f) => f === "--spec-type" || f === "-md" || f === "--model-draft" || f.startsWith("--draft") || f === "-ngld" || f === "-devd",
+    test: (f) =>
+      f === "--spec-type" ||
+      f === "-md" ||
+      f === "--model-draft" ||
+      f.startsWith("--draft") ||
+      f === "-ngld" ||
+      f === "-devd",
     why: "décodage spéculatif non mesuré",
   },
   { test: (f) => f === "-cmoe" || f === "--cpu-moe", why: "utilisez -ncmoe" },

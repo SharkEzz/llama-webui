@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
 import type { CpuInfo } from "@llama-webui/shared"
+import { useEffect, useState } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { api } from "@/lib/api"
 import { useMonitor } from "@/lib/monitor"
@@ -26,7 +26,11 @@ export function SystemPage() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-baseline gap-4">
         <h1 className="text-3xl font-semibold tracking-tight">Système</h1>
-        {info && <span className="text-sm text-muted-foreground">Source NVIDIA : {info.nvidiaSource === "nvml" ? "NVML" : "nvidia-smi"}</span>}
+        {info && (
+          <span className="text-sm text-muted-foreground">
+            Source NVIDIA : {info.nvidiaSource === "nvml" ? "NVML" : "nvidia-smi"}
+          </span>
+        )}
       </header>
       {!snapshot ? (
         <div className="grid gap-4 lg:grid-cols-2">

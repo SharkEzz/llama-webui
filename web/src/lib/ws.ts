@@ -1,5 +1,5 @@
-import { create } from "zustand"
 import type { WsMessage } from "@llama-webui/shared"
+import { create } from "zustand"
 
 export type WsStatus = "connecting" | "open" | "closed"
 
@@ -16,7 +16,10 @@ type Listener = (msg: WsMessage) => void
 const listeners = new Map<WsMessage["type"], Set<Listener>>()
 
 /** Abonnement aux messages WS d'un type donné. */
-export function onWs<T extends WsMessage["type"]>(type: T, fn: (msg: Extract<WsMessage, { type: T }>) => void): () => void {
+export function onWs<T extends WsMessage["type"]>(
+  type: T,
+  fn: (msg: Extract<WsMessage, { type: T }>) => void,
+): () => void {
   let set = listeners.get(type)
   if (!set) listeners.set(type, (set = new Set()))
   set.add(fn as Listener)

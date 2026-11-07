@@ -1,4 +1,12 @@
-import type { GpuSample, HistoryDump, RequestRecord, RequestStats, Settings, Snapshot, SpecStats } from "@llama-webui/shared";
+import type {
+  GpuSample,
+  HistoryDump,
+  RequestRecord,
+  RequestStats,
+  Settings,
+  Snapshot,
+  SpecStats,
+} from "@llama-webui/shared";
 import { SERIES } from "@llama-webui/shared";
 import { type AmdCard, hiddenAmdReading, suspendedAmdReading } from "../collectors/amdgpu";
 import type { DiskSample } from "../collectors/disk";
@@ -29,7 +37,8 @@ function pidOf(s: ServerState): number | null {
   if (s.kind === "starting" || s.kind === "ready" || s.kind === "stopping" || s.kind === "external") return s.pid;
   return null;
 }
-const isActive = (s: ServerState) => s.kind === "starting" || s.kind === "ready" || s.kind === "stopping" || s.kind === "external";
+const isActive = (s: ServerState) =>
+  s.kind === "starting" || s.kind === "ready" || s.kind === "stopping" || s.kind === "external";
 
 /**
  * Échantillonnage permanent (le Poller de llama-tui) : un tick toutes les `pollIntervalMs`, que des onglets soient
@@ -60,7 +69,10 @@ export class Monitor {
     private readonly collectors: Collectors,
     private settings: MonitorSettings,
   ) {
-    this.history = new History(historyPoints(settings.historySeconds, settings.pollIntervalMs), settings.pollIntervalMs);
+    this.history = new History(
+      historyPoints(settings.historySeconds, settings.pollIntervalMs),
+      settings.pollIntervalMs,
+    );
   }
 
   static async start(deps: { supervisor: Pick<Supervisor, "state">; settings: MonitorSettings }): Promise<Monitor> {
@@ -234,7 +246,11 @@ export class Monitor {
     const kv = kvUsage(raw?.slots ?? null);
     const metric = (k: string) => raw?.metrics?.get(`llamacpp:${k}`) ?? 0;
     const queue = raw?.metrics
-      ? { processing: metric("requests_processing"), deferred: metric("requests_deferred"), busySlots: metric("n_busy_slots_per_decode") }
+      ? {
+          processing: metric("requests_processing"),
+          deferred: metric("requests_deferred"),
+          busySlots: metric("n_busy_slots_per_decode"),
+        }
       : null;
     this.push(SERIES.kvPct, kv ? (100 * kv.usedTokens) / kv.totalTokens : 0);
     this.push(SERIES.reqProcessing, queue?.processing ?? 0);
@@ -264,7 +280,11 @@ export class Monitor {
   /** Une série existante non alimentée à ce tick reçoit un trou : toutes avancent ensemble, alignées sur les instants. */
   private finish(snap: Omit<Snapshot, "points" | "history">): Snapshot {
     for (const key of this.history.keys()) if (!(key in this.points)) this.push(key, NaN);
-    return { ...snap, points: this.points, history: { intervalMs: this.history.intervalMs, capacity: this.history.capacity } };
+    return {
+      ...snap,
+      points: this.points,
+      history: { intervalMs: this.history.intervalMs, capacity: this.history.capacity },
+    };
   }
 
   /** Séries de chaque GPU de la machine, utilisée ou non par le serveur. */
@@ -290,7 +310,10 @@ export class Monitor {
     if (sys) {
       this.push(SERIES.sysCpu, system?.cpuPct ?? 0);
       const mem = system?.mem;
-      this.push(SERIES.sysMemPct, mem && mem.totalBytes > 0 ? (100 * (mem.totalBytes - mem.availableBytes)) / mem.totalBytes : 0);
+      this.push(
+        SERIES.sysMemPct,
+        mem && mem.totalBytes > 0 ? (100 * (mem.totalBytes - mem.availableBytes)) / mem.totalBytes : 0,
+      );
       this.known(SERIES.sysTemp, system?.tempC);
     }
     if (dsk) {
@@ -343,15 +366,21 @@ export class Monitor {
       const skip = (r: GpuReading) => {
         for (const node of c.nodes ?? []) skipNodes.add(node);
         return r;
-      }
+      };
       if (gpuSkipped(n, c.pdev)) return skip(hiddenAmdReading(c));
       if (await amd.suspended(c).catch(() => false)) return skip(suspendedAmdReading(c));
       return amd.read(c).catch(() => null);
     };
     const amdReadings = await Promise.all(amd.cards().map(readAmd));
-    const amdProc = pid === null ? new Map<string, number>() : await amd.procVram(pid, skipNodes).catch(() => new Map<string, number>());
+    const amdProc =
+      pid === null
+        ? new Map<string, number>()
+        : await amd.procVram(pid, skipNodes).catch(() => new Map<string, number>());
     const nvProc = pid === null ? new Map<string, number>() : nvidia.procVram(pid);
-    const readings = [...nvidia.gpus().map((g) => ({ g, proc: nvProc })), ...amdReadings.flatMap((g) => (g ? [{ g, proc: amdProc }] : []))];
+    const readings = [
+      ...nvidia.gpus().map((g) => ({ g, proc: nvProc })),
+      ...amdReadings.flatMap((g) => (g ? [{ g, proc: amdProc }] : [])),
+    ];
     const all = readings.map(({ g, proc }): GpuSample => {
       if (gpuSkipped(n, g.busId)) return { ...identityReading(g, "hidden"), procVramBytes: 0 };
       if (g.suspended) return { ...g, procVramBytes: 0 };

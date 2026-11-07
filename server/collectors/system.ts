@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { MemInfo, SystemSample } from "@llama-webui/shared";
+
 export type { MemInfo, SystemSample };
 
 export interface CpuTimes {
@@ -95,7 +96,9 @@ export class SystemSampler {
 
   private async freqMhz(cores: number): Promise<number | null> {
     const vals = await Promise.all(
-      Array.from({ length: cores }, (_, i) => readText(join(this.sysRoot, "devices/system/cpu", `cpu${i}`, "cpufreq/scaling_cur_freq"))),
+      Array.from({ length: cores }, (_, i) =>
+        readText(join(this.sysRoot, "devices/system/cpu", `cpu${i}`, "cpufreq/scaling_cur_freq")),
+      ),
     );
     const khz = vals.map((v) => Number(v?.trim())).filter((n) => Number.isFinite(n) && n > 0);
     return khz.length === 0 ? null : Math.round(khz.reduce((a, b) => a + b, 0) / khz.length / 1000);

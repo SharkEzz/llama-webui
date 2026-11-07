@@ -87,7 +87,12 @@ function vocabOf(meta: Metadata, arch: string, tensors: TensorInfo[]): number {
 }
 
 /** Pure: assembles a ModelInfo from parsed shards (the first holds the metadata). */
-export function parseModel(path: string, shards: ParsedShard[], fileSizes: number[], parameterCount: number): ModelInfo {
+export function parseModel(
+  path: string,
+  shards: ParsedShard[],
+  fileSizes: number[],
+  parameterCount: number,
+): ModelInfo {
   const meta = shards[0]?.metadata ?? {};
   const arch = String(meta["general.architecture"] ?? "?");
   const k = (name: string) => `${arch}.${name}`;
@@ -100,7 +105,13 @@ export function parseModel(path: string, shards: ParsedShard[], fileSizes: numbe
       fileSizes[i] ?? 0,
     );
     for (const [j, t] of infos.entries())
-      tensors.push({ name: t.name, shape: t.shape.map(Number), dtype: t.dtype, offset: Number(t.offset), bytes: bytes[j]! });
+      tensors.push({
+        name: t.name,
+        shape: t.shape.map(Number),
+        dtype: t.dtype,
+        offset: Number(t.offset),
+        bytes: bytes[j]!,
+      });
   });
   const blockCount = num(meta, k("block_count"), 0);
   const embeddingLength = num(meta, k("embedding_length"), 0);
@@ -108,7 +119,9 @@ export function parseModel(path: string, shards: ParsedShard[], fileSizes: numbe
   const kvRaw = meta[k("attention.head_count_kv")];
   const headCountKv = Array.isArray(kvRaw)
     ? kvRaw.map(Number)
-    : Array.from({ length: blockCount }, () => (typeof kvRaw === "number" || typeof kvRaw === "bigint" ? Number(kvRaw) : headCount));
+    : Array.from({ length: blockCount }, () =>
+        typeof kvRaw === "number" || typeof kvRaw === "bigint" ? Number(kvRaw) : headCount,
+      );
   const headDim = headCount > 0 ? Math.floor(embeddingLength / headCount) : 0;
   const ftype = numOrNull(meta, "general.file_type");
   const quant = ftype !== null ? (GGMLFileQuantizationType[ftype] ?? "?") : "?";
@@ -117,7 +130,11 @@ export function parseModel(path: string, shards: ParsedShard[], fileSizes: numbe
   const state = num(meta, k("ssm.state_size"), 0);
   const conv = num(meta, k("ssm.conv_kernel"), 0);
   const fullAttentionInterval = numOrNull(meta, k("full_attention_interval"));
-  const recurrentLayers = recurrent ? (fullAttentionInterval ? blockCount - Math.floor(blockCount / fullAttentionInterval) : blockCount) : 0;
+  const recurrentLayers = recurrent
+    ? fullAttentionInterval
+      ? blockCount - Math.floor(blockCount / fullAttentionInterval)
+      : blockCount
+    : 0;
   return {
     path,
     kind: meta["general.type"] === "mmproj" || arch === "clip" ? "mmproj" : "model",
@@ -168,7 +185,10 @@ async function sizeOf(path: string): Promise<{ mtimeMs: number; size: number }> 
 export async function readModel(path: string): Promise<ModelInfo> {
   const shard = parseGgufShardFilename(path);
   const files = shard
-    ? Array.from({ length: Number(shard.total) }, (_, i) => `${shard.prefix}-${String(i + 1).padStart(5, "0")}-of-${shard.total}.gguf`)
+    ? Array.from(
+        { length: Number(shard.total) },
+        (_, i) => `${shard.prefix}-${String(i + 1).padStart(5, "0")}-of-${shard.total}.gguf`,
+      )
     : [path];
   const stats = await Promise.all(files.map(sizeOf));
   const stamp = stats.map((s) => `${s.mtimeMs}:${s.size}`).join("|");

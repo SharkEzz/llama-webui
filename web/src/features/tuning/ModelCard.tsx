@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react"
-import { Box } from "lucide-react"
 import { ignoredByBench, type ModelDetail, shellQuote } from "@llama-webui/shared"
+import { Box } from "lucide-react"
+import { useEffect, useState } from "react"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Label } from "@/components/ui/label"
@@ -42,7 +42,10 @@ export function ModelCard() {
     }
   }, [modelPath])
 
-  const items = [{ value: NO_PROFILE, label: "Aucun : modèle seul" }, ...profiles.map((p) => ({ value: String(p.id), label: p.name }))]
+  const items = [
+    { value: NO_PROFILE, label: "Aucun : modèle seul" },
+    ...profiles.map((p) => ({ value: String(p.id), label: p.name })),
+  ]
   const ignored = ignoredByBench(serverArgs)
 
   return (
@@ -50,7 +53,11 @@ export function ModelCard() {
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <Label>Partir d'un profil</Label>
-          <Select items={items} value={profileId === null ? NO_PROFILE : String(profileId)} onValueChange={(v) => void useTuning.getState().fromProfile(v && v !== NO_PROFILE ? Number(v) : null)}>
+          <Select
+            items={items}
+            value={profileId === null ? NO_PROFILE : String(profileId)}
+            onValueChange={(v) => void useTuning.getState().fromProfile(v && v !== NO_PROFILE ? Number(v) : null)}
+          >
             <SelectTrigger className="w-full" aria-label="Profil de départ">
               <SelectValue />
             </SelectTrigger>
@@ -63,8 +70,18 @@ export function ModelCard() {
             </SelectContent>
           </Select>
         </div>
-        <PathInput label="Modèle" kind="model" value={modelPath ?? ""} onCommit={(p) => useTuning.getState().setModel(p || null, mmprojPath)} />
-        <PathInput label="Projecteur (facultatif)" kind="mmproj" value={mmprojPath ?? ""} onCommit={(p) => useTuning.getState().setModel(modelPath, p || null)} />
+        <PathInput
+          label="Modèle"
+          kind="model"
+          value={modelPath ?? ""}
+          onCommit={(p) => useTuning.getState().setModel(p || null, mmprojPath)}
+        />
+        <PathInput
+          label="Projecteur (facultatif)"
+          kind="mmproj"
+          value={mmprojPath ?? ""}
+          onCommit={(p) => useTuning.getState().setModel(modelPath, p || null)}
+        />
 
         {modelPath && !info && !infoError && <Skeleton className="h-16" />}
         {infoError && <p className="text-sm text-destructive">{infoError}</p>}
@@ -79,7 +96,9 @@ export function ModelCard() {
             <dt className="text-muted-foreground">Couches</dt>
             <dd className="num text-right">{info.blockCount}</dd>
             <dt className="text-muted-foreground">Experts</dt>
-            <dd className="num text-right">{info.expertCount > 0 ? `${info.expertUsedCount} actifs sur ${info.expertCount}` : "dense"}</dd>
+            <dd className="num text-right">
+              {info.expertCount > 0 ? `${info.expertUsedCount} actifs sur ${info.expertCount}` : "dense"}
+            </dd>
             <dt className="text-muted-foreground">Contexte max</dt>
             <dd className="num text-right">{formatInt(info.contextLength)}</dd>
           </dl>
@@ -87,9 +106,17 @@ export function ModelCard() {
 
         {serverArgs.length > 0 && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Autres flags du profil (repris par le profil créé et la validation serveur)</span>
-            <code className="rounded-md bg-well px-2.5 py-1.5 font-mono text-xs break-all">{shellQuote(serverArgs)}</code>
-            {ignored.length > 0 && <span className="text-xs text-muted-foreground">Ignorés par llama-bench : {ignored.map((i) => i.flag).join(", ")}</span>}
+            <span className="text-xs text-muted-foreground">
+              Autres flags du profil (repris par le profil créé et la validation serveur)
+            </span>
+            <code className="rounded-md bg-well px-2.5 py-1.5 font-mono text-xs break-all">
+              {shellQuote(serverArgs)}
+            </code>
+            {ignored.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Ignorés par llama-bench : {ignored.map((i) => i.flag).join(", ")}
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -97,7 +124,17 @@ export function ModelCard() {
   )
 }
 
-function PathInput({ label, kind, value, onCommit }: { label: string; kind: "model" | "mmproj"; value: string; onCommit(p: string): void }) {
+function PathInput({
+  label,
+  kind,
+  value,
+  onCommit,
+}: {
+  label: string
+  kind: "model" | "mmproj"
+  value: string
+  onCommit(p: string): void
+}) {
   const [text, setText] = useState(value)
   useEffect(() => setText(value), [value])
   const id = `tuning-${kind}`

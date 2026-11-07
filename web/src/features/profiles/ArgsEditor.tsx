@@ -1,5 +1,12 @@
+import {
+  describeFlag,
+  flagOf,
+  flagSuggestions,
+  reservedFlag,
+  reservedFlagMessage,
+  unknownFlags,
+} from "@llama-webui/shared"
 import { useLayoutEffect, useMemo, useRef, useState } from "react"
-import { describeFlag, flagSuggestions, flagOf, reservedFlag, reservedFlagMessage, unknownFlags } from "@llama-webui/shared"
 import { CodeTextarea } from "@/components/CodeTextarea"
 import { Command, CommandItem, CommandList } from "@/components/ui/command"
 import { useFlags } from "@/lib/flags"
@@ -56,7 +63,9 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   const open = suggestions.length > 0
   useLayoutEffect(() => {
     const list = open ? listRef.current?.id || undefined : undefined
-    const active = open ? listRef.current?.querySelector<HTMLElement>("[cmdk-item][data-selected=true]")?.id || undefined : undefined
+    const active = open
+      ? listRef.current?.querySelector<HTMLElement>("[cmdk-item][data-selected=true]")?.id || undefined
+      : undefined
     if (list !== aria.list || active !== aria.active) setAria({ list, active })
   })
 
@@ -100,7 +109,8 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
             } else if (e.key === "ArrowUp") {
               setActive((a) => (a - 1 + suggestions.length) % suggestions.length)
               setNavigated(true)
-            } else if (e.key === "Tab" || (e.key === "Enter" && navigated)) accept(suggestions[active] ?? suggestions[0]!)
+            } else if (e.key === "Tab" || (e.key === "Enter" && navigated))
+              accept(suggestions[active] ?? suggestions[0]!)
             else if (e.key === "Escape") setDismissed(true)
             else return
             e.preventDefault()
@@ -123,12 +133,19 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
               {suggestions.map((name) => {
                 const flag = catalog ? flagOf(catalog, name) : undefined
                 return (
-                  <CommandItem key={name} value={name} onSelect={() => accept(name)} className="items-baseline gap-3 [&>svg:last-child]:hidden">
+                  <CommandItem
+                    key={name}
+                    value={name}
+                    onSelect={() => accept(name)}
+                    className="items-baseline gap-3 [&>svg:last-child]:hidden"
+                  >
                     <span className="shrink-0 font-mono text-xs">
                       {name}
                       {flag?.value && <span className="text-muted-foreground"> {flag.value}</span>}
                     </span>
-                    <span className="truncate text-xs text-muted-foreground">{flag?.help.replace(/\s*\(env: [A-Z0-9_]+\)/g, "")}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {flag?.help.replace(/\s*\(env: [A-Z0-9_]+\)/g, "")}
+                    </span>
                   </CommandItem>
                 )
               })}
@@ -147,11 +164,15 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
         <p className="text-sm text-warning">Inconnu de ce llama-server : {problems.unknown.join(", ")}</p>
       )}
       {helpFlag ? (
-        <p className="rounded-md bg-well px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">{describeFlag(helpFlag)}</p>
+        <p className="rounded-md bg-well px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">
+          {describeFlag(helpFlag)}
+        </p>
       ) : catalogError ? (
         <p className="text-xs text-muted-foreground">Aide des flags indisponible : {catalogError}</p>
       ) : (
-        <p className="text-xs text-muted-foreground">Tapez « - » pour voir les flags ; Tab complète, ↑ ↓ puis Entrée choisit.</p>
+        <p className="text-xs text-muted-foreground">
+          Tapez « - » pour voir les flags ; Tab complète, ↑ ↓ puis Entrée choisit.
+        </p>
       )}
     </div>
   )

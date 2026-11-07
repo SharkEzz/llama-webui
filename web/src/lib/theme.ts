@@ -1,5 +1,5 @@
-import { create } from "zustand"
 import type { Settings, ThemeMode } from "@llama-webui/shared"
+import { create } from "zustand"
 import { api } from "./api"
 
 const KEY = "llama-webui:theme"

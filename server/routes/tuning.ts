@@ -1,4 +1,11 @@
-import { type ChecksReport, type DiskSpeed, type Estimate, PRESET_IDS, SweepSpecSchema, BenchParamsSchema } from "@llama-webui/shared";
+import {
+  BenchParamsSchema,
+  type ChecksReport,
+  type DiskSpeed,
+  type Estimate,
+  PRESET_IDS,
+  SweepSpecSchema,
+} from "@llama-webui/shared";
 import { z } from "zod";
 import { benchBinary } from "../bench/parse";
 import type { BenchRunner } from "../bench/runner";
@@ -34,7 +41,8 @@ const diskSpeeds = new Map<string, DiskSpeed>();
 const lastEstimates = new Map<string, Estimate>();
 
 export function tuningRoutes({ settings, monitor, benchRunner, runtime }: TuningRouteDeps) {
-  const hardware = () => readTuningHardware({ benchBinary: benchBinary(settings.get().binary), mem: monitor.latest()?.system?.mem ?? null });
+  const hardware = () =>
+    readTuningHardware({ benchBinary: benchBinary(settings.get().binary), mem: monitor.latest()?.system?.mem ?? null });
 
   return {
     "/api/tuning/hardware": {
@@ -43,7 +51,11 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
     "/api/tuning/estimate": {
       POST: guarded(async (req) => {
         const body = EstimateRequest.parse(await jsonObject(req));
-        const [model, mmproj, hw] = await Promise.all([loadModel(body.modelPath), mmprojBytes(body.mmprojPath), hardware()]);
+        const [model, mmproj, hw] = await Promise.all([
+          loadModel(body.modelPath),
+          mmprojBytes(body.mmprojPath),
+          hardware(),
+        ]);
         const e = estimate({ model, hw, preset: body.preset, mmprojBytes: mmproj, pinned: body.pinned, ctx: body.ctx });
         lastEstimates.set(body.modelPath, e);
         return Response.json(e);
@@ -52,7 +64,11 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
     "/api/tuning/plan": {
       POST: guarded(async (req) => {
         const spec = SweepSpecSchema.parse((await jsonObject(req)).spec);
-        const [model, mmproj, hw] = await Promise.all([loadModel(spec.modelPath), mmprojBytes(spec.mmprojPath), hardware()]);
+        const [model, mmproj, hw] = await Promise.all([
+          loadModel(spec.modelPath),
+          mmprojBytes(spec.mmprojPath),
+          hardware(),
+        ]);
         return Response.json(planSweep({ model, hw, spec, mmprojBytes: mmproj }));
       }),
     },

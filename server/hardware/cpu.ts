@@ -2,6 +2,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { CpuInfo } from "@llama-webui/shared";
+
 export type { CpuInfo };
 
 /** Model, physical cores (distinct physical id + core id pairs), logical threads and flags from /proc/cpuinfo. */

@@ -1,4 +1,13 @@
-import { type BenchHardware, type BenchLive, type BenchRun, type BenchSpec, rankRuns, type Sweep, type SweepLive, sweepCtx } from "@llama-webui/shared";
+import {
+  type BenchHardware,
+  type BenchLive,
+  type BenchRun,
+  type BenchSpec,
+  rankRuns,
+  type Sweep,
+  type SweepLive,
+  sweepCtx,
+} from "@llama-webui/shared";
 import type { BenchFinish, BenchRunsRepo } from "../db/benchRuns";
 import type { SweepsRepo } from "../db/sweeps";
 import { HttpError, notFound } from "../http";
@@ -79,7 +88,8 @@ export class BenchRunner {
 
   private async checkFiles(spec: Pick<BenchSpec, "modelPath" | "mmprojPath">): Promise<void> {
     if (!(await Bun.file(spec.modelPath).exists())) throw new HttpError(400, `Modèle introuvable : ${spec.modelPath}`);
-    if (spec.mmprojPath && !(await Bun.file(spec.mmprojPath).exists())) throw new HttpError(400, `Projecteur introuvable : ${spec.mmprojPath}`);
+    if (spec.mmprojPath && !(await Bun.file(spec.mmprojPath).exists()))
+      throw new HttpError(400, `Projecteur introuvable : ${spec.mmprojPath}`);
   }
 
   /** Run ponctuel : créé puis lancé en arrière-plan ; renvoie le run créé (statut « running »). */
@@ -126,9 +136,15 @@ export class BenchRunner {
       await this.deps.gate.ready();
       result = cur.cancelled
         ? { status: "cancelled" }
-        : await this.deps.executor.run(cur.run, { onLive: (l) => this.setLive(cur, l), startedAt: cur.live.startedAt, spec: cur.spec });
+        : await this.deps.executor.run(cur.run, {
+            onLive: (l) => this.setLive(cur, l),
+            startedAt: cur.live.startedAt,
+            spec: cur.spec,
+          });
     } catch (e) {
-      result = cur.cancelled ? { status: "cancelled" } : { status: "failed", error: `arrêt de llama-server impossible : ${(e as Error).message}` };
+      result = cur.cancelled
+        ? { status: "cancelled" }
+        : { status: "failed", error: `arrêt de llama-server impossible : ${(e as Error).message}` };
     }
     if (this.disposed) return null;
     const finished = this.deps.repo.finish(cur.run.id, { error: null, ...result });
@@ -145,7 +161,12 @@ export class BenchRunner {
     } catch (e) {
       if (this.disposed || runId === null) return;
       const prev = this.deps.repo.get(runId);
-      if (prev) this.deps.onRun(this.deps.repo.finish(runId, { error: prev.error ? `${prev.error} ; ${(e as Error).message}` : (e as Error).message }));
+      if (prev)
+        this.deps.onRun(
+          this.deps.repo.finish(runId, {
+            error: prev.error ? `${prev.error} ; ${(e as Error).message}` : (e as Error).message,
+          }),
+        );
     }
   }
 
@@ -216,7 +237,13 @@ export class BenchRunner {
       const next = this.deps.repo.nextQueued(id);
       if (!next) break;
       const { counts } = this.deps.sweeps.get(id)!;
-      this.setSweepLive({ sweepId: id, runId: next.id, index: counts.total - counts.queued + 1, total: counts.total, stage: next.kind === "server" ? "validate" : "explore" });
+      this.setSweepLive({
+        sweepId: id,
+        runId: next.id,
+        index: counts.total - counts.queued + 1,
+        total: counts.total,
+        stage: next.kind === "server" ? "validate" : "explore",
+      });
       const done = await this.item(next, id);
       if (!done) return;
       lastRun = done.id;
@@ -224,7 +251,10 @@ export class BenchRunner {
       if (this.deps.pauseMs !== 0 && this.deps.repo.nextQueued(id)) await Bun.sleep(this.deps.pauseMs ?? 1000);
     }
     if (this.disposed) return;
-    const sw = this.deps.sweeps.setStatus(id, state.cancelled ? "cancelled" : "done", { bestRunId: this.best(id), finishedAt: this.now() });
+    const sw = this.deps.sweeps.setStatus(id, state.cancelled ? "cancelled" : "done", {
+      bestRunId: this.best(id),
+      finishedAt: this.now(),
+    });
     this.deps.onSweep(sw);
     if (this.current) this.setLive(this.current, {});
     await this.release(null, lastRun);
@@ -242,7 +272,10 @@ export class BenchRunner {
       hardware = { cpu: "", gpus: [], build: null };
     }
     if (this.disposed) return null;
-    const run = this.deps.repo.begin(queued.id, { command: this.deps.executor.commandOf(queued.spec).display, hardware });
+    const run = this.deps.repo.begin(queued.id, {
+      command: this.deps.executor.commandOf(queued.spec).display,
+      hardware,
+    });
     this.deps.onRun(run);
     const cur = this.newCurrent(run, sweepId);
     const done = await this.execute(cur);
@@ -258,7 +291,11 @@ export class BenchRunner {
     if (!sw) return null;
     const runs = this.deps.repo.list({ sweepId: id });
     const validated = runs.some((r) => r.kind === "server" && r.status === "ok");
-    const top = rankRuns(runs.filter((r) => r.kind === (validated ? "server" : "bench")), sw.spec.preset, sweepCtx(sw.spec))[0];
+    const top = rankRuns(
+      runs.filter((r) => r.kind === (validated ? "server" : "bench")),
+      sw.spec.preset,
+      sweepCtx(sw.spec),
+    )[0];
     return top?.rank ? top.run.id : null;
   }
 
@@ -304,7 +341,12 @@ export class BenchRunner {
     try {
       if (cur && !cur.finished) {
         if (cur.sweepId !== null && o.restart) repo.requeue(cur.run.id);
-        else repo.finish(cur.run.id, { status: "interrupted", error: INTERRUPTED, durationMs: this.now() - cur.live.startedAt });
+        else
+          repo.finish(cur.run.id, {
+            status: "interrupted",
+            error: INTERRUPTED,
+            durationMs: this.now() - cur.live.startedAt,
+          });
       }
       if (sweep && !o.restart) this.deps.sweeps.setStatus(sweep.id, "interrupted");
     } catch {}

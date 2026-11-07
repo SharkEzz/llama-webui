@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef } from "react"
 import { MessageSquare } from "lucide-react"
+import { useLayoutEffect, useRef } from "react"
 import { useChat } from "@/lib/chat"
 import { Message } from "./Message"
 
@@ -33,7 +33,9 @@ export function Thread({ canSend }: { canSend: boolean }) {
       {messages.length === 0 ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
           <MessageSquare className="size-8" />
-          <p className="text-sm">{current ? "Écrivez le premier message." : "Choisissez une conversation ou écrivez pour en commencer une."}</p>
+          <p className="text-sm">
+            {current ? "Écrivez le premier message." : "Choisissez une conversation ou écrivez pour en commencer une."}
+          </p>
         </div>
       ) : (
         <div className="mx-auto flex max-w-4xl flex-col gap-4 py-2">

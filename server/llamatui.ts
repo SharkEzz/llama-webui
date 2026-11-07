@@ -27,6 +27,8 @@ export async function readLlamaTuiProfiles(path = llamaTuiConfigPath()): Promise
     return { ...empty, exists: true, error: `JSON invalide : ${(e as Error).message}` };
   }
   const defaultProfile =
-    typeof raw === "object" && raw !== null && "defaultProfile" in raw && typeof raw.defaultProfile === "string" ? raw.defaultProfile : null;
+    typeof raw === "object" && raw !== null && "defaultProfile" in raw && typeof raw.defaultProfile === "string"
+      ? raw.defaultProfile
+      : null;
   return { path, exists: true, defaultProfile, ...parseProfileImport(raw) };
 }

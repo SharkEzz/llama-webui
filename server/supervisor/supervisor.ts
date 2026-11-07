@@ -123,7 +123,15 @@ export class Supervisor {
     this.lastCmd = cmd;
     const fail = (message: string) => {
       this.logs.push(`[llama-webui] échec du lancement: ${message}`);
-      this.set({ kind: "crashed", profile: cmd.profileName, profileId: cmd.profileId, exitCode: null, signal: null, at: this.now(), message });
+      this.set({
+        kind: "crashed",
+        profile: cmd.profileName,
+        profileId: cmd.profileId,
+        exitCode: null,
+        signal: null,
+        at: this.now(),
+        message,
+      });
     };
     if (!existsSync(cmd.cwd)) return fail(`répertoire introuvable: ${cmd.cwd}`);
     let proc: Child;
@@ -136,7 +144,14 @@ export class Supervisor {
     this.logs.push(`[llama-webui] lancement: ${cmd.display}`);
     this.pipe(proc.stdout as ReadableStream<Uint8Array>);
     this.pipe(proc.stderr as ReadableStream<Uint8Array>);
-    this.set({ kind: "starting", profile: cmd.profileName, profileId: cmd.profileId, pid: proc.pid, port: cmd.port, since: this.now() });
+    this.set({
+      kind: "starting",
+      profile: cmd.profileName,
+      profileId: cmd.profileId,
+      pid: proc.pid,
+      port: cmd.port,
+      since: this.now(),
+    });
     void proc.exited.then(() => this.onExit(proc, cmd));
     this.healthTimer = setInterval(() => void this.pollHealth(proc, cmd), this.healthPollMs);
   }
@@ -145,7 +160,8 @@ export class Supervisor {
     const split = new LineSplitter();
     const dec = new TextDecoder();
     try {
-      for await (const chunk of stream) for (const l of split.push(dec.decode(chunk, { stream: true }))) this.logs.push(l);
+      for await (const chunk of stream)
+        for (const l of split.push(dec.decode(chunk, { stream: true }))) this.logs.push(l);
     } catch {}
     for (const l of split.flush()) this.logs.push(l);
   }
@@ -155,7 +171,14 @@ export class Supervisor {
     const status = await probeHealth(cmd.port, this.fetchImpl);
     if (status === 200 && this.proc === proc && this._state.kind === "starting") {
       this.clearHealth();
-      this.set({ kind: "ready", profile: cmd.profileName, profileId: cmd.profileId, pid: proc.pid, port: cmd.port, since: this.now() });
+      this.set({
+        kind: "ready",
+        profile: cmd.profileName,
+        profileId: cmd.profileId,
+        pid: proc.pid,
+        port: cmd.port,
+        since: this.now(),
+      });
     }
   }
 
@@ -169,7 +192,9 @@ export class Supervisor {
     this.clearHealth();
     this.proc = null;
     const wasStopping = this._state.kind === "stopping";
-    this.logs.push(`[llama-webui] llama-server terminé (code ${proc.exitCode ?? "-"}${proc.signalCode ? `, ${proc.signalCode}` : ""})`);
+    this.logs.push(
+      `[llama-webui] llama-server terminé (code ${proc.exitCode ?? "-"}${proc.signalCode ? `, ${proc.signalCode}` : ""})`,
+    );
     if (wasStopping) this.set({ kind: "idle" });
     else
       this.set({
@@ -199,7 +224,8 @@ export class Supervisor {
       return;
     }
     const s = this._state;
-    if (s.kind === "starting" || s.kind === "ready") this.set({ kind: "stopping", profile: s.profile, profileId: s.profileId, pid: s.pid, port: s.port });
+    if (s.kind === "starting" || s.kind === "ready")
+      this.set({ kind: "stopping", profile: s.profile, profileId: s.profileId, pid: s.pid, port: s.port });
     this.clearHealth();
     try {
       proc.kill("SIGTERM");

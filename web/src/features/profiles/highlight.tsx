@@ -1,5 +1,5 @@
-import type { ReactNode } from "react"
 import { type FlagCatalog, flagOf, reservedFlag } from "@llama-webui/shared"
+import type { ReactNode } from "react"
 
 const isFlag = (t: string) => t.length > 1 && t.startsWith("-") && !/^-\d/.test(t)
 
@@ -22,8 +22,17 @@ export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactN
         </span>
       )
     }
-    if (/^["']/.test(tok)) return <span key={i} className="text-success">{tok}</span>
-    return <span key={i} className="text-foreground/85">{tok}</span>
+    if (/^["']/.test(tok))
+      return (
+        <span key={i} className="text-success">
+          {tok}
+        </span>
+      )
+    return (
+      <span key={i} className="text-foreground/85">
+        {tok}
+      </span>
+    )
   })
 }
 

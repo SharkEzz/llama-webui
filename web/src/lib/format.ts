@@ -12,7 +12,8 @@ export function formatDuration(ms: number): string {
   return `${sec} s`
 }
 
-const nf = (digits: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: digits, minimumFractionDigits: digits })
+const nf = (digits: number) =>
+  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: digits, minimumFractionDigits: digits })
 const UNITS = ["o", "Ko", "Mo", "Go", "To"]
 
 /** Octets : « 12,3 Go » (base 1024). */
@@ -28,10 +29,12 @@ export function formatBytes(n: number | null | undefined, digits = 1): string {
 }
 
 /** Débit d'octets : « 1,2 Go/s ». */
-export const formatBps = (n: number | null | undefined) => (n == null || !Number.isFinite(n) ? "—" : `${formatBytes(n)}/s`)
+export const formatBps = (n: number | null | undefined) =>
+  n == null || !Number.isFinite(n) ? "—" : `${formatBytes(n)}/s`
 
 /** Débit de tokens : « 42,7 tok/s ». */
-export const formatRate = (tps: number | null | undefined) => (tps == null || !Number.isFinite(tps) ? "—" : `${nf(1).format(tps)} tok/s`)
+export const formatRate = (tps: number | null | undefined) =>
+  tps == null || !Number.isFinite(tps) ? "—" : `${nf(1).format(tps)} tok/s`
 
 /** Pourcentage : « 37 % » (une décimale sous 10). */
 export function formatPct(n: number | null | undefined): string {

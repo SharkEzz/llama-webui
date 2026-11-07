@@ -1,5 +1,15 @@
 import { dirname } from "node:path";
-import { type BenchLive, type BenchRun, type BenchSpec, benchArgs, type GpuSample, type Profile, serverArgs, type Settings, shellQuote } from "@llama-webui/shared";
+import {
+  type BenchLive,
+  type BenchRun,
+  type BenchSpec,
+  benchArgs,
+  type GpuSample,
+  type Profile,
+  type Settings,
+  serverArgs,
+  shellQuote,
+} from "@llama-webui/shared";
 import type { BenchFinish } from "../db/benchRuns";
 import type { LogBuffer } from "../logs/buffer";
 import { LineSplitter } from "../logs/lines";
@@ -22,7 +32,8 @@ export interface ExecutorDeps {
   killTimeoutMs?: number;
 }
 
-export type ExecResult = BenchFinish & Required<Pick<BenchFinish, "status" | "vramPeak" | "logExcerpt" | "durationMs" | "diskReadPeakBps">>;
+export type ExecResult = BenchFinish &
+  Required<Pick<BenchFinish, "status" | "vramPeak" | "logExcerpt" | "durationMs" | "diskReadPeakBps">>;
 
 type Child = ReturnType<typeof Bun.spawn>;
 
@@ -112,7 +123,10 @@ export class RunExecutor {
 
   /** Exécute le run ; `onLive` reçoit les phases loading…measure et les dernières lignes (au plus toutes les 250 ms). */
   /** `spec` : celui demandé (le run enregistré perd un profileId dont le profil n'existe plus). */
-  async run(run: BenchRun, o: { onLive(l: BenchLive): void; startedAt?: number; spec?: BenchSpec }): Promise<ExecResult> {
+  async run(
+    run: BenchRun,
+    o: { onLive(l: BenchLive): void; startedAt?: number; spec?: BenchSpec },
+  ): Promise<ExecResult> {
     if (this.cur) throw new Error("un run est déjà en cours d'exécution");
     const t0 = this.now();
     const spec = o.spec ?? run.spec;
@@ -135,13 +149,19 @@ export class RunExecutor {
       this.setLive(ex, {});
       if (!(await Bun.file(spec.modelPath).exists())) throw new Error(`Modèle introuvable : ${spec.modelPath}`);
       const { argv, cmd } = this.commandOf(spec);
-      result = ex.cancelled ? { status: "cancelled" } : cmd ? await this.runServer(ex, cmd) : await this.runBench(ex, argv);
+      result = ex.cancelled
+        ? { status: "cancelled" }
+        : cmd
+          ? await this.runServer(ex, cmd)
+          : await this.runBench(ex, argv);
     } catch (e) {
       result = ex.cancelled ? { status: "cancelled" } : { status: "failed", error: (e as Error).message };
     } finally {
       this.cur = null;
     }
-    const vramPeak = [...ex.peaks].map(([key, p]) => ({ key, name: p.name, mib: Math.round(p.bytes / MIB) })).filter((p) => p.mib > 0);
+    const vramPeak = [...ex.peaks]
+      .map(([key, p]) => ({ key, name: p.name, mib: Math.round(p.bytes / MIB) }))
+      .filter((p) => p.mib > 0);
     return {
       error: null,
       ...result,
@@ -232,7 +252,12 @@ export class RunExecutor {
     let proc: Child;
     try {
       // Environnement du profil d'origine (CUDA_VISIBLE_DEVICES… : mêmes cartes que le serveur).
-      proc = Bun.spawn(argv, { env: { ...process.env, ...this.source(ex.spec)?.env }, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+      proc = Bun.spawn(argv, {
+        env: { ...process.env, ...this.source(ex.spec)?.env },
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+      });
     } catch (e) {
       await stopSampling();
       return { status: "failed", error: (e as Error).message };
@@ -245,7 +270,10 @@ export class RunExecutor {
       const p = parseBenchProgress(l);
       if (p) {
         const runs = p.runs ?? ex.spec.r;
-        this.setLive(ex, { phase: p.phase, step: { index: (p.test - 1) * runs + (p.run ?? 0), total: p.tests * runs } });
+        this.setLive(ex, {
+          phase: p.phase,
+          step: { index: (p.test - 1) * runs + (p.run ?? 0), total: p.tests * runs },
+        });
       } else this.touchLive(ex);
     });
     await proc.exited;

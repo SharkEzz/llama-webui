@@ -22,7 +22,9 @@ const components: Components = {
   h3: ({ children }) => <h3 className="mt-4 mb-2 font-semibold">{children}</h3>,
   ul: ({ children }) => <ul className="my-3 list-disc space-y-1 pl-6">{children}</ul>,
   ol: ({ children }) => <ol className="my-3 list-decimal space-y-1 pl-6">{children}</ol>,
-  blockquote: ({ children }) => <blockquote className="my-3 border-l-2 border-border pl-4 text-muted-foreground">{children}</blockquote>,
+  blockquote: ({ children }) => (
+    <blockquote className="my-3 border-l-2 border-border pl-4 text-muted-foreground">{children}</blockquote>
+  ),
   hr: () => <hr className="my-4 border-border" />,
   table: ({ children }) => <Table className="my-3">{children}</Table>,
   thead: ({ children }) => <TableHeader>{children}</TableHeader>,

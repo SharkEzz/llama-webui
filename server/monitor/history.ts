@@ -2,7 +2,8 @@ import type { HistoryDump } from "@llama-webui/shared";
 import { Ring } from "./ring";
 
 /** Points d'un historique de `historySeconds` échantillonné toutes les `intervalMs`. */
-export const historyPoints = (historySeconds: number, intervalMs: number) => Math.ceil((historySeconds * 1000) / intervalMs);
+export const historyPoints = (historySeconds: number, intervalMs: number) =>
+  Math.ceil((historySeconds * 1000) / intervalMs);
 
 /**
  * Anneaux nommés de même capacité (copié de llama-tui) + l'anneau des instants de chaque tick.

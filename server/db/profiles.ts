@@ -63,7 +63,16 @@ export class ProfilesRepo {
   }
 
   private values(p: ProfileInput) {
-    return [p.name, p.model, p.mmproj ?? null, p.cwd ?? null, p.host ?? null, p.port ?? null, JSON.stringify(p.args), JSON.stringify(p.env)] as const;
+    return [
+      p.name,
+      p.model,
+      p.mmproj ?? null,
+      p.cwd ?? null,
+      p.host ?? null,
+      p.port ?? null,
+      JSON.stringify(p.args),
+      JSON.stringify(p.env),
+    ] as const;
   }
 
   /** Valide (ZodError si invalide) ; 409 si le nom est pris. */
@@ -109,7 +118,10 @@ export class ProfilesRepo {
   }
 
   /** N'écrase jamais : un nom déjà en base est ignoré. */
-  importMany(inputs: ProfileInput[], source: ProfileSource): { imported: Profile[]; skipped: { name: string; reason: string }[] } {
+  importMany(
+    inputs: ProfileInput[],
+    source: ProfileSource,
+  ): { imported: Profile[]; skipped: { name: string; reason: string }[] } {
     const imported: Profile[] = [];
     const skipped: { name: string; reason: string }[] = [];
     this.db.transaction(() => {

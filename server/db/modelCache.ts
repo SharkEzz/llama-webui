@@ -10,7 +10,9 @@ export class ModelCacheRepo {
 
   get(path: string): { stamp: string; summary: ModelSummary } | null {
     const r = this.db
-      .query<{ stamp: string; summary_json: string }, [string]>("SELECT stamp, summary_json FROM model_cache WHERE path = ?")
+      .query<{ stamp: string; summary_json: string }, [string]>(
+        "SELECT stamp, summary_json FROM model_cache WHERE path = ?",
+      )
       .get(path);
     return r ? { stamp: r.stamp, summary: JSON.parse(r.summary_json) } : null;
   }

@@ -25,7 +25,11 @@ export class SweepsRepo {
 
   private counts(id: number): Counts {
     const c = { ...ZERO };
-    for (const r of this.db.query<{ status: keyof Counts; n: number }, [number]>("SELECT status, count(*) n FROM bench_runs WHERE sweep_id = ? GROUP BY status").all(id)) {
+    for (const r of this.db
+      .query<{ status: keyof Counts; n: number }, [number]>(
+        "SELECT status, count(*) n FROM bench_runs WHERE sweep_id = ? GROUP BY status",
+      )
+      .all(id)) {
       if (r.status in c) c[r.status] = r.n;
       c.total += r.n;
     }
@@ -35,9 +39,10 @@ export class SweepsRepo {
   private best(runId: number | null): Sweep["best"] {
     if (runId === null) return null;
     const b = this.db
-      .query<{ sweep_label: string | null; kind: "bench" | "server"; pp_tps: number | null; tg_tps: number | null }, [number]>(
-        "SELECT sweep_label, kind, pp_tps, tg_tps FROM bench_runs WHERE id = ?",
-      )
+      .query<
+        { sweep_label: string | null; kind: "bench" | "server"; pp_tps: number | null; tg_tps: number | null },
+        [number]
+      >("SELECT sweep_label, kind, pp_tps, tg_tps FROM bench_runs WHERE id = ?")
       .get(runId);
     return b ? { label: b.sweep_label, kind: b.kind, ppTps: b.pp_tps, tgTps: b.tg_tps } : null;
   }
@@ -81,8 +86,8 @@ export class SweepsRepo {
   setStatus(id: number, status: SweepStatus, o: { bestRunId?: number | null; finishedAt?: number | null } = {}): Sweep {
     const sets = ["status = ?"];
     const args: (string | number | null)[] = [status];
-    if (o.bestRunId !== undefined) (sets.push("best_run_id = ?"), args.push(o.bestRunId));
-    if (o.finishedAt !== undefined) (sets.push("finished_at = ?"), args.push(o.finishedAt));
+    if (o.bestRunId !== undefined) sets.push("best_run_id = ?"), args.push(o.bestRunId);
+    if (o.finishedAt !== undefined) sets.push("finished_at = ?"), args.push(o.finishedAt);
     this.db.run(`UPDATE sweeps SET ${sets.join(", ")} WHERE id = ?`, [...args, id]);
     return this.get(id)!;
   }
@@ -90,7 +95,10 @@ export class SweepsRepo {
   /** Supprime le sweep et ses runs (cascade) ; renvoie les ids des runs supprimés. */
   delete(id: number): number[] {
     return this.db.transaction(() => {
-      const ids = this.db.query<{ id: number }, [number]>("SELECT id FROM bench_runs WHERE sweep_id = ? ORDER BY id").all(id).map((r) => r.id);
+      const ids = this.db
+        .query<{ id: number }, [number]>("SELECT id FROM bench_runs WHERE sweep_id = ? ORDER BY id")
+        .all(id)
+        .map((r) => r.id);
       this.db.run("DELETE FROM sweeps WHERE id = ?", [id]);
       return ids;
     })();

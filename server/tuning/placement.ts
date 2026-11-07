@@ -1,7 +1,14 @@
-import { type BenchDevice, type BenchParams, type CacheType, deviceRole, type Fit, gpuDevices } from "@llama-webui/shared";
+import {
+  type BenchDevice,
+  type BenchParams,
+  type CacheType,
+  deviceRole,
+  type Fit,
+  gpuDevices,
+} from "@llama-webui/shared";
 import type { ModelInfo } from "../models/gguf";
 import { EXPERTS } from "../models/sizes";
-import { computeBytes, fmtBytes, kvLayerBytes, marginBytes, MiB, recurrentBytes } from "./memory";
+import { computeBytes, fmtBytes, kvLayerBytes, MiB, marginBytes, recurrentBytes } from "./memory";
 
 export interface PlacementInput {
   model: ModelInfo;
@@ -75,7 +82,10 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
   const outputOnGpu = used.length > 0 && ngl > L;
 
   // Tranches contiguës proportionnelles à -ts (sinon à la VRAM libre, comme llama.cpp), dans l'ordre de -dev.
-  const ts = params.ts && params.ts.length === used.length && params.ts.some((x) => x > 0) ? params.ts : used.map((d) => d.freeMib || d.totalMib);
+  const ts =
+    params.ts && params.ts.length === used.length && params.ts.some((x) => x > 0)
+      ? params.ts
+      : used.map((d) => d.freeMib || d.totalMib);
   const sum = ts.reduce((a, b) => a + b, 0);
   let acc = 0;
   const cum = ts.map((x) => (acc += x) / sum);
@@ -133,7 +143,17 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
   const extras = computeBytes(model, input.ub) + input.mmprojBytes + recurrentBytes(model);
   if (used.length > 0 && gpuLayers > 0) add(used[0]!.id, extras);
   else ram += extras;
-  return { used: used.map((d) => d.id), vram, ram, layerDevice, cpuWeights, cpuExpertsBytes, cpuOtherBytes, gpuWeights, issues: [...new Set(issues)] };
+  return {
+    used: used.map((d) => d.id),
+    vram,
+    ram,
+    layerDevice,
+    cpuWeights,
+    cpuExpertsBytes,
+    cpuOtherBytes,
+    gpuWeights,
+    issues: [...new Set(issues)],
+  };
 }
 
 const MIN_FREE_RATIO = 0.95;
@@ -152,10 +172,24 @@ export function fitOf(input: PlacementInput, measured: PlacementMeasure = measur
   const unknown = measured.issues.find((i) => i.startsWith("device inconnu"));
   if (unknown) return { ...base, verdict: "no", reason: unknown };
   const over = vram.find((v) => v.bytes > v.budget);
-  if (over) return { ...base, verdict: "no", reason: `${over.device} : ${fmtBytes(over.bytes)} pour ${fmtBytes(over.budget)} utilisables` };
+  if (over)
+    return {
+      ...base,
+      verdict: "no",
+      reason: `${over.device} : ${fmtBytes(over.bytes)} pour ${fmtBytes(over.budget)} utilisables`,
+    };
   const near = vram.find((v) => v.bytes > MIN_FREE_RATIO * v.budget);
   if (measured.ram > input.ramAvailableBytes)
-    return { ...base, verdict: "tight", reason: `RAM : ${fmtBytes(measured.ram)} pour ${fmtBytes(input.ramAvailableBytes)} disponibles, le reste est relu sur le disque` };
-  if (near) return { ...base, verdict: "tight", reason: `${near.device} : ${fmtBytes(near.bytes)} pour ${fmtBytes(near.budget)} utilisables, marge réduite` };
+    return {
+      ...base,
+      verdict: "tight",
+      reason: `RAM : ${fmtBytes(measured.ram)} pour ${fmtBytes(input.ramAvailableBytes)} disponibles, le reste est relu sur le disque`,
+    };
+  if (near)
+    return {
+      ...base,
+      verdict: "tight",
+      reason: `${near.device} : ${fmtBytes(near.bytes)} pour ${fmtBytes(near.budget)} utilisables, marge réduite`,
+    };
   return { ...base, verdict: "fits", reason: null };
 }

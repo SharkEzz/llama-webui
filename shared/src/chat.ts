@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 const num = (min: number, max: number, label: string) =>
-  z.number({ error: "Nombre attendu" }).min(min, `${label} : entre ${min} et ${max}`).max(max, `${label} : entre ${min} et ${max}`);
+  z
+    .number({ error: "Nombre attendu" })
+    .min(min, `${label} : entre ${min} et ${max}`)
+    .max(max, `${label} : entre ${min} et ${max}`);
 const int = (min: number, max: number, label: string) => num(min, max, label).int({ error: "Nombre entier attendu" });
 
 /** Sampling d'une conversation ; une clé absente = valeur du serveur (celle du profil). */

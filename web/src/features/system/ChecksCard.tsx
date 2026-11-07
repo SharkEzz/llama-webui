@@ -1,6 +1,16 @@
-import { useEffect, useMemo, useState } from "react"
-import { ChevronDown, CircleCheck, CircleHelp, CircleMinus, Copy, HardDrive, ListChecks, RefreshCw, TriangleAlert } from "lucide-react"
 import type { Check, CheckFamily, CheckState } from "@llama-webui/shared"
+import {
+  ChevronDown,
+  CircleCheck,
+  CircleHelp,
+  CircleMinus,
+  Copy,
+  HardDrive,
+  ListChecks,
+  RefreshCw,
+  TriangleAlert,
+} from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -76,7 +86,13 @@ export function ChecksCard() {
   }, [open, model])
 
   const items = useMemo(
-    () => [{ value: NO_MODEL, label: "Aucun modèle" }, ...(models?.models ?? []).filter(readable).filter((m) => m.kind === "model").map((m) => ({ value: m.path, label: m.relPath }))],
+    () => [
+      { value: NO_MODEL, label: "Aucun modèle" },
+      ...(models?.models ?? [])
+        .filter(readable)
+        .filter((m) => m.kind === "model")
+        .map((m) => ({ value: m.path, label: m.relPath })),
+    ],
     [models],
   )
   const summary = checks?.summary
@@ -89,9 +105,17 @@ export function ChecksCard() {
         <>
           {summary && (
             <span className="hidden items-center gap-1.5 sm:flex">
-              {summary.warn > 0 && <Badge variant="outline" className="text-warning">{summary.warn} à améliorer</Badge>}
+              {summary.warn > 0 && (
+                <Badge variant="outline" className="text-warning">
+                  {summary.warn} à améliorer
+                </Badge>
+              )}
               <Badge variant="outline">{summary.ok} ok</Badge>
-              {summary.unknown > 0 && <Badge variant="secondary">{summary.unknown} inconnu{summary.unknown > 1 ? "s" : ""}</Badge>}
+              {summary.unknown > 0 && (
+                <Badge variant="secondary">
+                  {summary.unknown} inconnu{summary.unknown > 1 ? "s" : ""}
+                </Badge>
+              )}
             </span>
           )}
           <Button variant="ghost" size="sm" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
@@ -102,10 +126,18 @@ export function ChecksCard() {
       }
     >
       <Collapsible open={open} onOpenChange={setOpen}>
-        {!open && <p className="text-sm text-muted-foreground">Réglages du système qui pèsent sur llama.cpp : governor CPU, PCIe, pilotes, swap, débit du disque du modèle.</p>}
+        {!open && (
+          <p className="text-sm text-muted-foreground">
+            Réglages du système qui pèsent sur llama.cpp : governor CPU, PCIe, pilotes, swap, débit du disque du modèle.
+          </p>
+        )}
         <CollapsibleContent className="flex flex-col gap-5">
           <div className="flex flex-wrap items-center gap-3">
-            <Select items={items} value={model ?? NO_MODEL} onValueChange={(v) => v && setModel(v === NO_MODEL ? null : v)}>
+            <Select
+              items={items}
+              value={model ?? NO_MODEL}
+              onValueChange={(v) => v && setModel(v === NO_MODEL ? null : v)}
+            >
               <SelectTrigger className="w-80 max-w-full" aria-label="Modèle à vérifier">
                 <SelectValue />
               </SelectTrigger>
@@ -117,16 +149,29 @@ export function ChecksCard() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" disabled={!model || measuring} onClick={() => model && void useTuning.getState().measureDisk(model)}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!model || measuring}
+              onClick={() => model && void useTuning.getState().measureDisk(model)}
+            >
               <HardDrive className={cn(measuring && "animate-pulse")} />
               {measuring ? "Mesure…" : "Mesurer le disque"}
             </Button>
             {diskSpeed && diskSpeed.path === model && (
               <span className="text-sm text-muted-foreground">
-                <span className="num text-foreground">{formatBps(diskSpeed.bytesPerSec)}</span> · le cache du système peut gonfler la mesure
+                <span className="num text-foreground">{formatBps(diskSpeed.bytesPerSec)}</span> · le cache du système
+                peut gonfler la mesure
               </span>
             )}
-            <Button variant="ghost" size="icon-sm" className="ml-auto" disabled={loading} onClick={() => void useTuning.getState().loadChecks(model)} aria-label="Relire les vérifications">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="ml-auto"
+              disabled={loading}
+              onClick={() => void useTuning.getState().loadChecks(model)}
+              aria-label="Relire les vérifications"
+            >
               <RefreshCw className={cn(loading && "animate-spin")} />
             </Button>
           </div>
@@ -187,14 +232,21 @@ function CheckRow({ check: c }: { check: Check }) {
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{c.label}</span>
-          {c.persistence && <Badge variant="secondary">{c.persistence === "session" ? "jusqu'au redémarrage" : "permanent"}</Badge>}
+          {c.persistence && (
+            <Badge variant="secondary">{c.persistence === "session" ? "jusqu'au redémarrage" : "permanent"}</Badge>
+          )}
         </div>
         <p className="text-muted-foreground">{c.detail}</p>
         {c.state === "warn" && <p className="text-xs text-muted-foreground">Impact : {c.impact}</p>}
         {c.command && (
           <div className="flex items-start gap-1.5 rounded-md bg-well py-1 pr-1 pl-2.5">
             <code className="min-w-0 flex-1 py-0.5 font-mono text-xs break-all">{c.command}</code>
-            <Button variant="ghost" size="icon-xs" onClick={() => void copyText(c.command!)} aria-label="Copier la commande">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => void copyText(c.command!)}
+              aria-label="Copier la commande"
+            >
               <Copy />
             </Button>
           </div>

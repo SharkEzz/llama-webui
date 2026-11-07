@@ -36,12 +36,14 @@
 ### Task 1 : `shared/` — profils, shell, flags, types serveur/logs
 
 **Files:**
+
 - Create : `shared/src/profile.ts`, `shared/src/shell.ts`, `shared/src/flags.ts`, `shared/src/server.ts`, `shared/src/logs.ts`
 - Modify : `shared/src/ws.ts`, `shared/src/settings.ts`, `shared/src/index.ts`
 - Copy : `../llama-tui/testdata/llama-server-help.txt` → `testdata/llama-server-help.txt` ; `../llama-tui/testdata/config/ts-current.json` → `testdata/llama-tui-config.json`
 - Test : `shared/src/flags.test.ts`, `shared/src/profile.test.ts`
 
 **Interfaces (Produces) :**
+
 - `profile.ts` (copie adaptée de `llama-tui/src/config/schema.ts`) :
   - `RESERVED_FLAGS`, `reservedFlag(arg): string | undefined`, `reservedFlagMessage(flag)` → « `${flag} est géré par llama-webui (utilisez les champs du profil)` ».
   - `ProfileInputSchema` = `ProfileSchema` de llama-tui (`strictObject` name, model, mmproj?, cwd?, host?, port?, args default `[]`, env default `{}`) **+** `superRefine` qui refuse les flags réservés dans `args` (path `["args", j]`).
@@ -56,6 +58,7 @@
 
 - [ ] **Step 1 : Copier les fixtures** dans `testdata/` (noms ci-dessus).
 - [ ] **Step 2 : Tests** — `shared/src/flags.test.ts` : copier `../llama-tui/test/flags.test.ts` sans le bloc `loadFlags`, fixture `testdata/llama-server-help.txt` (attendus inchangés : 47 flags, `-c`/`--ctx-size` même objet, etc.) + `catalogFrom(catalog.flags).byName.get("-ngl") === …byName.get("--n-gpu-layers")`. `shared/src/profile.test.ts` :
+
   ```ts
   test("import llama-tui : config entière", async () => {
     const raw = await Bun.file("testdata/llama-tui-config.json").json();
@@ -89,11 +92,13 @@
 ### Task 2 : `server/` — superviseur, args, découverte, flags, ring de logs
 
 **Files:**
+
 - Create : `server/supervisor/supervisor.ts`, `server/supervisor/args.ts`, `server/supervisor/health.ts`, `server/supervisor/discovery.ts`, `server/supervisor/flags.ts`, `server/logs/buffer.ts`, `server/logs/lines.ts`
 - Copy : `../llama-tui/test/fixtures/fake-llama-server.ts` + `fake-llama-server` (sh) + `props.json`, `slots-busy.json`, `metrics-after.txt` → `testdata/fake/`
 - Test : `server/supervisor/args.test.ts`
 
 **Interfaces:**
+
 - Consumes : `shared` (Task 1) — `ProfileInput`, `Profile`, `Settings`, `ServerState`, `shellQuote`, `parseHelp`, `classifyLine`, `LogLine`.
 - Produces :
   - `args.ts` : `BuiltCommand` (llama-tui + `profileId: number`), `expandHome(p, home?)`, `profilePaths(profile: ProfileInput, home?)`, `buildCommand(profile: Profile, settings: Pick<Settings, "binary" | "host" | "port">, home?): BuiltCommand` — copie de llama-tui où `config.server.*` devient `settings.*`.
@@ -113,27 +118,29 @@
 ### Task 3 : Profils — sqlite et API REST
 
 **Files:**
+
 - Modify : `server/db/migrations.ts`, `server/app.ts`, `server/index.ts`
 - Create : `server/db/profiles.ts`, `server/routes/profiles.ts`, `server/llamatui.ts`
 
 **Interfaces:**
+
 - Consumes : Task 1 (`ProfileInputSchema`, `parseProfileImport`, `Profile`), `SettingsRepo` (J1).
 - Produces :
   - Migration 2 : `CREATE TABLE profiles(id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, model_path TEXT NOT NULL, mmproj_path TEXT, cwd TEXT, host TEXT, port INTEGER, args_json TEXT NOT NULL, env_json TEXT NOT NULL, source TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`.
   - `class ProfilesRepo { list(): Profile[]; get(id): Profile | null; create(input: ProfileInput, source?: Profile["source"]): Profile; update(id, input: ProfileInput): Profile; remove(id): void; duplicate(id): Profile; importMany(inputs: ProfileInput[], source): { imported: Profile[]; skipped: { name: string; reason: string }[] } }` — `create/update` valident avec `ProfileInputSchema` ; nom pris → `ProfileConflictError` ; `duplicate` nomme « `<nom> (copie)` », puis « (copie 2) »… ; `importMany` ne remplace jamais : nom déjà en base → `skipped` « existe déjà ».
   - `llamatui.ts` : `llamaTuiConfigPath(env = process.env)` (copie de `defaultConfigPath`), `readLlamaTuiProfiles(): Promise<{ path: string; exists: boolean; profiles: ProfileInput[]; rejected: … }>`.
   - Routes (JSON, erreurs `{ error: string, issues?: ZodIssue[] }`) :
-    | Méthode | Chemin | Réponse |
-    |---|---|---|
-    | GET | `/api/profiles` | `Profile[]` (tri par nom) |
-    | POST | `/api/profiles` | `Profile` 201 ; 400 invalide ; 409 nom pris |
-    | GET/PUT/DELETE | `/api/profiles/:id` | `Profile` / `Profile` / 204 ; 404 inconnu ; DELETE 409 si c'est le profil du serveur en cours |
-    | POST | `/api/profiles/:id/duplicate` | `Profile` 201 |
-    | GET | `/api/profiles/:id/export` | `ProfileInput` (sans id ni dates), `content-disposition: attachment; filename="<nom>.json"` |
-    | GET | `/api/profiles/export` | `{ profiles: ProfileInput[] }` (format importable par llama-tui) |
-    | POST | `/api/profiles/import` | body = JSON brut ; `{ imported: Profile[]; skipped: {name, reason}[] }` (rejets de `parseProfileImport` + doublons en base) |
-    | GET | `/api/profiles/import/llama-tui` | `{ path, exists, names: string[], dismissed: boolean, profileCount: number }` |
-    | POST | `/api/profiles/import/llama-tui` | comme `/import`, source `"llama-tui"` ; si la config llama-tui a `defaultProfile`, régler `defaultProfileId` s'il est encore `null` |
+    | Méthode        | Chemin                           | Réponse                                                                                                                             |
+    | -------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+    | GET            | `/api/profiles`                  | `Profile[]` (tri par nom)                                                                                                           |
+    | POST           | `/api/profiles`                  | `Profile` 201 ; 400 invalide ; 409 nom pris                                                                                         |
+    | GET/PUT/DELETE | `/api/profiles/:id`              | `Profile` / `Profile` / 204 ; 404 inconnu ; DELETE 409 si c'est le profil du serveur en cours                                       |
+    | POST           | `/api/profiles/:id/duplicate`    | `Profile` 201                                                                                                                       |
+    | GET            | `/api/profiles/:id/export`       | `ProfileInput` (sans id ni dates), `content-disposition: attachment; filename="<nom>.json"`                                         |
+    | GET            | `/api/profiles/export`           | `{ profiles: ProfileInput[] }` (format importable par llama-tui)                                                                    |
+    | POST           | `/api/profiles/import`           | body = JSON brut ; `{ imported: Profile[]; skipped: {name, reason}[] }` (rejets de `parseProfileImport` + doublons en base)         |
+    | GET            | `/api/profiles/import/llama-tui` | `{ path, exists, names: string[], dismissed: boolean, profileCount: number }`                                                       |
+    | POST           | `/api/profiles/import/llama-tui` | comme `/import`, source `"llama-tui"` ; si la config llama-tui a `defaultProfile`, régler `defaultProfileId` s'il est encore `null` |
 - [ ] **Step 1 : Implémenter** migration, repo, `llamatui.ts`, routes ; brancher dans `createApp` via `guarded()` (passer `profiles: ProfilesRepo` dans `AppDeps`).
 - [ ] **Step 2 : Vérifier à la main** (`bun run start`, `LLAMA_WEBUI_DATA_DIR` temporaire) : `GET /api/profiles/import/llama-tui` → `exists: true`, 2 noms ; `POST` → 2 importés ; 2ᵉ `POST` → 0 importé, 2 `skipped` « existe déjà » ; `POST /api/profiles` avec `args: ["--port","1"]` → 400 avec le message réservé ; duplicate → « (copie) » ; export puis réimport du fichier exporté après suppression → identique.
 - [ ] **Step 3 : Commit** — `J2: profils en sqlite, API CRUD, import/export llama-tui`.
@@ -143,27 +150,29 @@
 ### Task 4 : Serveur géré — API, WS, cycle de vie Bun
 
 **Files:**
+
 - Create : `server/routes/server.ts`, `server/runtime.ts`
 - Modify : `server/app.ts`, `server/index.ts`, `server/ws/hub.ts`
 
 **Interfaces:**
+
 - Consumes : Tasks 2-3.
 - Produces :
   - `runtime.ts` : `getRuntime(): { supervisor: Supervisor; logs: LogBuffer }` — singleton stocké sur `globalThis.__llamaWebuiRuntime`, **créé une seule fois et conservé à travers `bun --hot`** (le dispose J1 ne libère que hub et db). Installe une seule fois `process.on("SIGINT" | "SIGTERM")` → `await supervisor.stop()` puis `process.exit(0)`, et `process.on("exit")` → `supervisor.killNow()`.
   - `serverView(): ServerView` ; diffusion : `supervisor.subscribe` → `hub.broadcast({ type: "server-state", payload })` ; `logs.onLines` → `hub.broadcast({ type: "log", payload: lines })`. Les abonnements sont refaits à chaque rechargement (désabonner les anciens dans le dispose).
   - Détection externe : au démarrage `detectExternal(settings.port)` ; toutes les 2 s, si `external` → `recheckExternal()`, si `idle` → `detectExternal(settings.port)`.
   - Routes :
-    | Méthode | Chemin | Corps | Réponse |
-    |---|---|---|---|
-    | GET | `/api/state` | — | `{ server: ServerView; logSeq: number }` (rejeu après reconnexion WS) |
-    | GET | `/api/server/state` | — | `ServerView` |
-    | POST | `/api/server/start` | `{ profileId }` | `ServerView` 202 ; 404 profil ; 409 `SupervisorError` |
-    | POST | `/api/server/stop` | — | `ServerView` après arrêt |
-    | POST | `/api/server/restart` | — | relit le profil courant en base, `switchTo(buildCommand(...))` |
-    | POST | `/api/server/switch` | `{ profileId }` | `switchTo` |
-    | GET | `/api/server/props` | — | proxy `GET http://127.0.0.1:<port>/props` si `ready` ou `external` ; sinon 409 « serveur non prêt » |
-    | GET | `/api/flags` | — | `{ flags: Flag[] }` ou 503 `{ error: "llama-server --help a échoué (<binaire>)" }` |
-    | GET | `/api/logs?since=<seq>` | — | `{ lines: LogLine[]; seq: number }` |
+    | Méthode | Chemin                  | Corps           | Réponse                                                                                             |
+    | ------- | ----------------------- | --------------- | --------------------------------------------------------------------------------------------------- |
+    | GET     | `/api/state`            | —               | `{ server: ServerView; logSeq: number }` (rejeu après reconnexion WS)                               |
+    | GET     | `/api/server/state`     | —               | `ServerView`                                                                                        |
+    | POST    | `/api/server/start`     | `{ profileId }` | `ServerView` 202 ; 404 profil ; 409 `SupervisorError`                                               |
+    | POST    | `/api/server/stop`      | —               | `ServerView` après arrêt                                                                            |
+    | POST    | `/api/server/restart`   | —               | relit le profil courant en base, `switchTo(buildCommand(...))`                                      |
+    | POST    | `/api/server/switch`    | `{ profileId }` | `switchTo`                                                                                          |
+    | GET     | `/api/server/props`     | —               | proxy `GET http://127.0.0.1:<port>/props` si `ready` ou `external` ; sinon 409 « serveur non prêt » |
+    | GET     | `/api/flags`            | —               | `{ flags: Flag[] }` ou 503 `{ error: "llama-server --help a échoué (<binaire>)" }`                  |
+    | GET     | `/api/logs?since=<seq>` | —               | `{ lines: LogLine[]; seq: number }`                                                                 |
   - `start`/`switch` mémorisent `defaultProfileId = profileId`.
 - [ ] **Step 1 : Implémenter** `runtime.ts`, routes, branchements.
 - [ ] **Step 2 : Vérifier à la main avec le faux serveur** — `PATCH /api/settings {"binary": "<repo>/testdata/fake/fake-llama-server"}`, profil factice, `start` → WS `server-state` starting puis ready, lignes `log` ; deux `start` rapprochés → le 2ᵉ en 409 ; `stop` → idle.
@@ -175,11 +184,13 @@
 ### Task 5 : Web — stores, page Serveur, pastille globale
 
 **Files:**
+
 - Modify : `web/src/lib/ws.ts`, `web/src/lib/api.ts`, `web/src/app/StatusBar.tsx`, `web/src/app/router.tsx`
 - Create : `web/src/lib/server.ts`, `web/src/lib/logs.ts`, `web/src/features/server/ServerPage.tsx`, `web/src/features/server/ServerStateBadge.tsx`, `web/src/components/ConfirmDialog.tsx`
 - shadcn : `bunx shadcn@latest add alert-dialog select input label textarea switch dropdown-menu`
 
 **Interfaces:**
+
 - `ws.ts` : ajouter `onWs<T extends WsMessage["type"]>(type: T, fn: (msg: Extract<WsMessage, { type: T }>) => void): () => void`.
 - `lib/server.ts` : store `useServer { view: ServerView | null; set(view) }`, alimenté par `onWs("server-state")` et par `GET /api/state` à chaque passage du WS à `open`. Actions `startProfile(id)`, `stopServer()`, `restartServer()`, `switchProfile(id)` → toast d'erreur avec `ApiError.message`.
 - `lib/logs.ts` : store `useLogs { lines: LogLine[]; seq: number }` (≤ 10 000, les plus anciennes jetées), alimenté par `onWs("log")` ; à la reconnexion `GET /api/logs?since=<seq>`.
@@ -196,10 +207,12 @@
 ### Task 6 : Web — page Profils
 
 **Files:**
+
 - Create : `web/src/features/profiles/ProfilesPage.tsx`, `ProfileForm.tsx`, `ArgsEditor.tsx`, `EnvEditor.tsx`, `ImportBanner.tsx`, `web/src/lib/flags.ts`, `web/src/lib/profiles.ts`
 - Modify : `web/src/app/router.tsx`
 
 **Interfaces:**
+
 - `lib/flags.ts` : `useFlags(): { catalog: FlagCatalog | null; error?: string }` — `GET /api/flags` une fois, `catalogFrom`.
 - `lib/profiles.ts` : `useProfiles` (liste + `reload()`), wrappers API Task 3.
 - `ArgsEditor({ value: string[]; onChange(args: string[]): void })` : `textarea` mono en syntaxe shell (`shellQuote` à l'affichage, `shellSplit` à la saisie ; erreur de `shellSplit` affichée sous le champ) ; autocomplétion : quand le mot sous le curseur commence par `-`, liste `complete(catalog, mot).candidates` (8 max, ↑/↓/Tab/Entrée) ; aide inline `describeFlag` du flag sous le curseur ; avertissements ambre pour `unknownFlags` (« inconnu de ce llama-server »), erreur rouge pour un flag réservé (`reservedFlagMessage`).
@@ -216,10 +229,12 @@
 ### Task 7 : Web — page Logs, puis vérification J2 sur le vrai modèle
 
 **Files:**
+
 - Create : `web/src/features/logs/LogsPage.tsx`, `web/src/features/logs/LogRow.tsx`
 - Modify : `web/src/app/router.tsx`, `web/package.json` (`@tanstack/react-virtual`)
 
 **Interfaces:**
+
 - `LogsPage` : liste virtualisée (`useVirtualizer`, hauteur de ligne fixe, mono `text-xs`) sur `filterLogs(useLogs().lines, { minLevel, query })` ; barre d'outils : niveau minimal (Debug / Info / Avert. / Erreur), recherche (surligne la correspondance), bascule **Suivi auto** (désactivée dès que l'utilisateur remonte, réactivée en revenant en bas), **Copier** (lignes filtrées), **Vider l'affichage** (côté client seulement) ; compteur « n lignes ».
 - `LogRow` : couleur par niveau (erreur rose, avert. ambre, debug atténué), étiquette `srv`/`slot` discrète, lignes `[llama-webui]` en violet.
 - [ ] **Step 1 : Implémenter** ; `router.tsx` : `/logs` → `LogsPage`.

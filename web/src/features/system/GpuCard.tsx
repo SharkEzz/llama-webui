@@ -1,5 +1,5 @@
-import { MonitorCog } from "lucide-react"
 import { type GpuSample, SERIES } from "@llama-webui/shared"
+import { MonitorCog } from "lucide-react"
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart"
 import { Gauge } from "@/components/glass/Gauge"
 import { GlassCard } from "@/components/glass/GlassCard"
@@ -8,7 +8,9 @@ import { formatBps, formatBytes, formatPct } from "@/lib/format"
 import { Facts } from "./Facts"
 
 const n = (v: number | null | undefined, unit: string, digits = 0) =>
-  v == null || !Number.isFinite(v) ? "—" : `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: digits }).format(v)} ${unit}`
+  v == null || !Number.isFinite(v)
+    ? "—"
+    : `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: digits }).format(v)} ${unit}`
 
 function pcie(g: GpuSample): string {
   if (g.pcieGen == null) return "—"
@@ -44,15 +46,29 @@ export function GpuCard({ gpu: g }: { gpu: GpuSample }) {
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-start gap-6">
             <Gauge label="Utilisation" value={Math.round(g.utilPct ?? 0)} size={88} tone="violet" />
-            <Gauge label={`VRAM ${formatBytes(g.vramUsedBytes, 1)}`} value={Math.round(vramPct)} size={88} tone="cyan" />
+            <Gauge
+              label={`VRAM ${formatBytes(g.vramUsedBytes, 1)}`}
+              value={Math.round(vramPct)}
+              size={88}
+              tone="cyan"
+            />
             <div className="min-w-56 flex-1">
               <Facts
                 rows={[
                   ["VRAM totale", formatBytes(g.vramTotalBytes)],
                   ["PCIe", pcie(g)],
-                  ["PCIe reçu / émis", g.pcieRxBps == null ? "—" : `${formatBps(g.pcieRxBps)} / ${formatBps(g.pcieTxBps)}`],
-                  ["Puissance", g.powerLimitW != null ? `${n(g.powerW, "W")} / ${n(g.powerLimitW, "W")}` : n(g.powerW, "W")],
-                  ["Horloges GPU / mémoire", g.clockGrMhz == null ? "—" : `${n(g.clockGrMhz, "MHz")} / ${n(g.clockMemMhz, "MHz")}`],
+                  [
+                    "PCIe reçu / émis",
+                    g.pcieRxBps == null ? "—" : `${formatBps(g.pcieRxBps)} / ${formatBps(g.pcieTxBps)}`,
+                  ],
+                  [
+                    "Puissance",
+                    g.powerLimitW != null ? `${n(g.powerW, "W")} / ${n(g.powerLimitW, "W")}` : n(g.powerW, "W"),
+                  ],
+                  [
+                    "Horloges GPU / mémoire",
+                    g.clockGrMhz == null ? "—" : `${n(g.clockGrMhz, "MHz")} / ${n(g.clockMemMhz, "MHz")}`,
+                  ],
                   ["Température", n(g.tempC, "°C")],
                   ["Ventilateur", g.fanPct == null ? "—" : formatPct(g.fanPct)],
                 ]}

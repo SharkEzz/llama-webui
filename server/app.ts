@@ -6,7 +6,9 @@ import type { ConversationsRepo } from "./db/conversations";
 import type { ProfilesRepo } from "./db/profiles";
 import type { SettingsRepo } from "./db/settings";
 import type { SweepsRepo } from "./db/sweeps";
+import { guarded, jsonObject } from "./http";
 import type { Monitor } from "./monitor/monitor";
+import pkg from "./package.json";
 import { benchRoutes } from "./routes/bench";
 import { chatRoutes } from "./routes/chat";
 import { modelRoutes } from "./routes/models";
@@ -17,8 +19,6 @@ import { sweepRoutes } from "./routes/sweeps";
 import { tuningRoutes } from "./routes/tuning";
 import type { Runtime } from "./runtime";
 import type { WsHub } from "./ws/hub";
-import pkg from "./package.json";
-import { guarded, jsonObject } from "./http";
 
 export interface AppDeps {
   db: Database;

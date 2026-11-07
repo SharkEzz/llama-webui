@@ -1,7 +1,8 @@
 import type { MessageStats as Stats } from "@llama-webui/shared"
 import { formatInt, formatPct } from "@/lib/format"
 
-const dec = (v: number, digits = 1) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(v)
+const dec = (v: number, digits = 1) =>
+  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(v)
 
 /** « 1,2 s avant le 1er jeton · 183 t/s prompt · 51,2 t/s · 412 jetons · MTP 50 % ». */
 export function MessageStats({ stats }: { stats: Stats }) {

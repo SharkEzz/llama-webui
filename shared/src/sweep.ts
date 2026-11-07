@@ -1,16 +1,16 @@
 import { z } from "zod";
 import {
-  BenchParamsSchema,
-  type BenchParams,
   type BenchKind,
+  type BenchParams,
+  BenchParamsSchema,
   type BenchRun,
   benchSpecBase,
   CACHE_TYPES,
   FIELD_ORDER,
   FLASH_ATTN,
+  SPLIT_MODES,
   serverArgs,
   serverArgsField,
-  SPLIT_MODES,
 } from "./bench";
 import { NOISE, PRESET_IDS, type PresetId, presetOf } from "./tuning";
 
@@ -57,7 +57,15 @@ export interface Sweep {
   bestRunId: number | null;
   /** Résumé du meilleur run (historique des sweeps sans charger leurs runs). */
   best: { label: string | null; kind: BenchKind; ppTps: number | null; tgTps: number | null } | null;
-  counts: { total: number; queued: number; running: number; ok: number; failed: number; cancelled: number; interrupted: number };
+  counts: {
+    total: number;
+    queued: number;
+    running: number;
+    ok: number;
+    failed: number;
+    cancelled: number;
+    interrupted: number;
+  };
   createdAt: number;
   finishedAt: number | null;
 }
@@ -141,12 +149,18 @@ export interface Ranked {
 /** Runs réussis par score décroissant, puis les autres dans l'ordre d'origine. */
 export function rankRuns(runs: BenchRun[], preset: PresetId, ctx: number): Ranked[] {
   const scored = runs.map((run) => ({ run, score: scoreOf(preset, run, ctx) }));
-  const ok = scored.filter((s): s is { run: BenchRun; score: number } => s.score !== null).sort((a, b) => b.score - a.score);
+  const ok = scored
+    .filter((s): s is { run: BenchRun; score: number } => s.score !== null)
+    .sort((a, b) => b.score - a.score);
   const rest = scored.filter((s) => s.score === null);
   const best = ok[0];
   let band = 0;
   if (best?.run.pp && best.run.tg) {
-    const low = presetOf(preset).score({ ppTps: best.run.pp.tps * (1 - NOISE.pp), tgTps: best.run.tg.tps * (1 - NOISE.tg), ctx });
+    const low = presetOf(preset).score({
+      ppTps: best.run.pp.tps * (1 - NOISE.pp),
+      tgTps: best.run.tg.tps * (1 - NOISE.tg),
+      ctx,
+    });
     band = best.score - low;
   }
   const ranked: Ranked[] = ok.map((s, i) => ({ ...s, rank: i + 1, tie: i > 0 && best!.score - s.score <= band }));

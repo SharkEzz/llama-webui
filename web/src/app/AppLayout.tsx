@@ -29,7 +29,12 @@ export function AppLayout({ loading = false }: { loading?: boolean }) {
       <div className="grid h-dvh grid-cols-[4.5rem_minmax(0,1fr)] md:grid-cols-[240px_minmax(0,1fr)]">
         <Sidebar />
         <ScrollArea className="h-dvh">
-          <div className={cn("mx-auto flex flex-col", wide ? "max-w-none gap-3 px-3 pt-3 pb-3 lg:px-3" : "max-w-6xl gap-6 px-6 pt-4 pb-10 lg:px-10")}>
+          <div
+            className={cn(
+              "mx-auto flex flex-col",
+              wide ? "max-w-none gap-3 px-3 pt-3 pb-3 lg:px-3" : "max-w-6xl gap-6 px-6 pt-4 pb-10 lg:px-10",
+            )}
+          >
             <StatusBar />
             <main>{loading ? <PageSkeleton /> : <Outlet />}</main>
           </div>

@@ -1,12 +1,13 @@
-import { Cpu } from "lucide-react"
 import { type CpuInfo, SERIES, type SystemSample } from "@llama-webui/shared"
+import { Cpu } from "lucide-react"
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { formatPct } from "@/lib/format"
 import { CoreHeatmap } from "./CoreHeatmap"
 import { Facts } from "./Facts"
 
-const dec = (v: number, d = 2) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: d, minimumFractionDigits: d }).format(v)
+const dec = (v: number, d = 2) =>
+  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: d, minimumFractionDigits: d }).format(v)
 
 export function CpuCard({ info, sample }: { info: CpuInfo | null; sample: SystemSample | null }) {
   return (

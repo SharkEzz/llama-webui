@@ -103,7 +103,11 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
     "/api/logs": {
       GET: guarded((req) => {
         const since = Number(new URL(req.url).searchParams.get("since") ?? 0);
-        return Response.json({ lines: logs.since(Number.isFinite(since) ? since : 0), seq: logs.seq, bootId: runtime.bootId });
+        return Response.json({
+          lines: logs.since(Number.isFinite(since) ? since : 0),
+          seq: logs.seq,
+          bootId: runtime.bootId,
+        });
       }),
     },
   };

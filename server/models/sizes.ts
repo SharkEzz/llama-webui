@@ -44,5 +44,11 @@ export function weightSizes(tensors: TensorInfo[]): WeightSizes {
     else if (t.name.startsWith("output.")) outputBytes += t.bytes;
     else otherBytes += t.bytes;
   }
-  return { layers: [...layers.values()].sort((a, b) => a.index - b.index), embedBytes, outputBytes, otherBytes, totalBytes };
+  return {
+    layers: [...layers.values()].sort((a, b) => a.index - b.index),
+    embedBytes,
+    outputBytes,
+    otherBytes,
+    totalBytes,
+  };
 }

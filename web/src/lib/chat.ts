@@ -1,5 +1,3 @@
-import { create } from "zustand"
-import { toast } from "sonner"
 import {
   type ChatEvent,
   type ChatMessage,
@@ -8,7 +6,9 @@ import {
   type ConversationSummary,
   SseParser,
 } from "@llama-webui/shared"
-import { api, ApiError } from "./api"
+import { toast } from "sonner"
+import { create } from "zustand"
+import { ApiError, api } from "./api"
 
 /** Réponse en cours d'écriture dans la conversation ouverte. */
 export interface Streaming {
@@ -88,8 +88,11 @@ export const useChat = create<ChatState>((set, get) => {
       if (e.type === "start") {
         if (cur?.id === conversationId) {
           // Régénération : la dernière réponse disparaît (le serveur l'a supprimée).
-          let messages = e.user ? cur.messages : cur.messages.slice(0, cur.messages.findLastIndex((m) => m.role === "user") + 1)
-          for (const m of [e.user, e.assistant]) if (m && !messages.some((x) => x.id === m.id)) messages = [...messages, m]
+          let messages = e.user
+            ? cur.messages
+            : cur.messages.slice(0, cur.messages.findLastIndex((m) => m.role === "user") + 1)
+          for (const m of [e.user, e.assistant])
+            if (m && !messages.some((x) => x.id === m.id)) messages = [...messages, m]
           set({ current: { ...cur, messages, live: true } })
         }
         pending = { content: "", reasoning: "" }
@@ -102,14 +105,17 @@ export const useChat = create<ChatState>((set, get) => {
         ended = true
         cancelAnimationFrame(frame)
         frame = 0
-        if (cur?.id === conversationId) set({ current: { ...cur, messages: replace(cur.messages, e.message), live: false } })
+        if (cur?.id === conversationId)
+          set({ current: { ...cur, messages: replace(cur.messages, e.message), live: false } })
         set({ streaming: null })
         // Le premier message donne son titre à la conversation (côté serveur).
-        void get().loadList().then(() => {
-          const title = get().list.find((x) => x.id === conversationId)?.title
-          const c = get().current
-          if (title && c?.id === conversationId && c.title !== title) set({ current: { ...c, title } })
-        })
+        void get()
+          .loadList()
+          .then(() => {
+            const title = get().list.find((x) => x.id === conversationId)?.title
+            const c = get().current
+            if (title && c?.id === conversationId && c.title !== title) set({ current: { ...c, title } })
+          })
       }
     }
     try {

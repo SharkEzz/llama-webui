@@ -18,7 +18,9 @@ export interface AmdCard {
   linkMax?: { gen: number; width: number };
 }
 
-export function parseFdinfo(text: string): { driver: string; clientId: string; pdev: string; vramBytes: number } | null {
+export function parseFdinfo(
+  text: string,
+): { driver: string; clientId: string; pdev: string; vramBytes: number } | null {
   const kv = new Map<string, string>();
   for (const line of text.split("\n")) {
     const i = line.indexOf(":");
@@ -38,7 +40,11 @@ export function parseFdinfo(text: string): { driver: string; clientId: string; p
  * VRAM AMD d'un process, par carte, d'après ses fdinfo. Les descripteurs ouverts sur un nœud de `skipNodes` (carte masquée
  * ou en veille) sont reconnus par la cible de leur lien /proc/<pid>/fd/N et leur fdinfo n'est pas lu.
  */
-export async function readProcAmdVram(pid: number, procRoot = "/proc", skipNodes?: ReadonlySet<string>): Promise<Map<string, number>> {
+export async function readProcAmdVram(
+  pid: number,
+  procRoot = "/proc",
+  skipNodes?: ReadonlySet<string>,
+): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   const dir = join(procRoot, String(pid), "fdinfo");
   let entries: string[];
@@ -95,7 +101,8 @@ const PCI_IDS = ["/usr/share/hwdata/pci.ids", "/usr/share/misc/pci.ids", "/usr/s
  */
 export async function pciIdsName(pdev: string, pciRoot = "/sys/bus/pci/devices", idsPaths = PCI_IDS): Promise<string> {
   const fallback = `AMD GPU ${pdev}`;
-  const id = async (f: string) => (await readText(join(pciRoot, pdev, f)))?.trim().toLowerCase().replace(/^0x/, "") ?? null;
+  const id = async (f: string) =>
+    (await readText(join(pciRoot, pdev, f)))?.trim().toLowerCase().replace(/^0x/, "") ?? null;
   const [vendor, device] = await Promise.all([id("vendor"), id("device")]);
   if (!vendor || !device) return fallback;
   for (const path of idsPaths) {
@@ -117,7 +124,10 @@ export async function pciIdsName(pdev: string, pciRoot = "/sys/bus/pci/devices",
   return fallback;
 }
 
-export async function discoverAmdCards(drmRoot = "/sys/class/drm", nameOf: (pdev: string) => Promise<string> = (pdev) => pciIdsName(pdev)): Promise<AmdCard[]> {
+export async function discoverAmdCards(
+  drmRoot = "/sys/class/drm",
+  nameOf: (pdev: string) => Promise<string> = (pdev) => pciIdsName(pdev),
+): Promise<AmdCard[]> {
   let entries: string[];
   try {
     entries = await readdir(drmRoot);
@@ -229,7 +239,8 @@ const readWith = async <T>(p: string | null, parse: (t: string) => T): Promise<T
   return t === null ? null : parse(t);
 };
 
-const ratioPct = (v: number | null, max: number | null): number | null => (v === null || max === null || max <= 0 ? null : Math.round((v / max) * 100));
+const ratioPct = (v: number | null, max: number | null): number | null =>
+  v === null || max === null || max <= 0 ? null : Math.round((v / max) * 100);
 
 /**
  * True when the kernel has runtime-suspended the card (laptop dGPU, idle secondary card).
@@ -244,7 +255,12 @@ export async function isRuntimeSuspended(card: AmdCard): Promise<boolean> {
 }
 
 /** Placeholder sample for a suspended card: identity only, every metric unknown. */
-const amdIdentity = (card: AmdCard) => ({ key: `amd:${card.pdev}`, vendor: "amd" as const, name: card.name, busId: card.pdev });
+const amdIdentity = (card: AmdCard) => ({
+  key: `amd:${card.pdev}`,
+  vendor: "amd" as const,
+  name: card.name,
+  busId: card.pdev,
+});
 
 export const suspendedAmdReading = (card: AmdCard): GpuReading => identityReading(amdIdentity(card), "suspended");
 /** A card no tab shows: listed, not read. */

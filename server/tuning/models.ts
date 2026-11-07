@@ -6,7 +6,8 @@ const cache = new Map<string, { stamp: string; info: ModelInfo }>();
 
 /** GGUF lu (en cache tant que taille et date ne changent pas) ; 400 chemin invalide, 404 absent, 422 illisible. */
 export async function loadModel(path: string): Promise<ModelInfo> {
-  if (!path.startsWith("/") || !path.endsWith(".gguf")) throw new HttpError(400, "Chemin absolu de fichier .gguf attendu");
+  if (!path.startsWith("/") || !path.endsWith(".gguf"))
+    throw new HttpError(400, "Chemin absolu de fichier .gguf attendu");
   const st = await stat(path).catch(() => null);
   if (!st?.isFile()) throw notFound("Modèle");
   const stamp = `${st.size}:${st.mtimeMs}`;

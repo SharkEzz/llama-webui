@@ -1,4 +1,13 @@
-import type { BenchDevice, Check, CheckFamily, CpuInfo, DiskSpeed, Estimate, GpuSample, MemInfo } from "@llama-webui/shared";
+import type {
+  BenchDevice,
+  Check,
+  CheckFamily,
+  CpuInfo,
+  DiskSpeed,
+  Estimate,
+  GpuSample,
+  MemInfo,
+} from "@llama-webui/shared";
 import type { ModelInfo } from "../models/gguf";
 import { fmtBytes, GiB } from "./memory";
 import type { SysReadings } from "./sysinfo";
@@ -27,7 +36,8 @@ const NA = "non applicable (carte ignorée)";
 const OLD_BUILD_MS = 60 * 86400_000;
 const NETWORK_FS = /^(nfs|nfs4|cifs|smb3?|fuse|sshfs|9p|afs|ceph|glusterfs)/;
 
-const pcieLabel = (gen: number | null | undefined, width: number | null | undefined) => `x${width ?? "?"} Gen${gen ?? "?"}`;
+const pcieLabel = (gen: number | null | undefined, width: number | null | undefined) =>
+  `x${width ?? "?"} Gen${gen ?? "?"}`;
 
 export function runChecks(ctx: CheckContext): Check[] {
   const { readings: r, estimate } = ctx;
@@ -42,11 +52,20 @@ export function runChecks(ctx: CheckContext): Check[] {
     const id = `${family}.pcie.${g.busId}`;
     const label = `Lien PCIe ${g.name}`;
     const impact = "chargement et offload CPU↔GPU plus lents";
-    if (g.pcieGenMax == null || g.pcieWidthMax == null) return push({ id, family, label, state: "unknown", detail: "lien PCIe inconnu", impact });
+    if (g.pcieGenMax == null || g.pcieWidthMax == null)
+      return push({ id, family, label, state: "unknown", detail: "lien PCIe inconnu", impact });
     // Idle links train down (ASPM): only a link seen under load says anything (null until then, see withObservedLinks).
     if (g.pcieGen == null || g.pcieWidth == null)
-      return push({ id, family, label, state: "unknown", detail: "mesuré sous charge : lancer le serveur d'abord", impact });
-    const below = (g.pcieGen as number) < (g.pcieGenMax as number) || (g.pcieWidth as number) < (g.pcieWidthMax as number);
+      return push({
+        id,
+        family,
+        label,
+        state: "unknown",
+        detail: "mesuré sous charge : lancer le serveur d'abord",
+        impact,
+      });
+    const below =
+      (g.pcieGen as number) < (g.pcieGenMax as number) || (g.pcieWidth as number) < (g.pcieWidthMax as number);
     push({
       id,
       family,
@@ -70,7 +89,8 @@ export function runChecks(ctx: CheckContext): Check[] {
         const label = `Persistance ${g.name}`;
         const impact = "premier chargement et réveil de la carte plus lents";
         if (!on) push({ id, family: "nvidia", label, state: "na", detail: NA, impact });
-        else if (g.persistence == null) push({ id, family: "nvidia", label, state: "unknown", detail: "NVML ne le dit pas", impact });
+        else if (g.persistence == null)
+          push({ id, family: "nvidia", label, state: "unknown", detail: "NVML ne le dit pas", impact });
         else if (g.persistence) push({ id, family: "nvidia", label, state: "ok", detail: "activée", impact });
         else
           push({
@@ -103,7 +123,8 @@ export function runChecks(ctx: CheckContext): Check[] {
             persistence: "session",
             impact,
           });
-        else push({ id, family: "nvidia", label, state: "ok", detail: `${Math.round(g.powerLimitW)} W (défaut)`, impact });
+        else
+          push({ id, family: "nvidia", label, state: "ok", detail: `${Math.round(g.powerLimitW)} W (défaut)`, impact });
       }
       pcie("nvidia", g);
       // resizable BAR
@@ -112,7 +133,8 @@ export function runChecks(ctx: CheckContext): Check[] {
         const label = `Resizable BAR ${g.name}`;
         const impact = "transferts hôte→VRAM par fenêtre de 256 MiB";
         const bar = r.bar1Bytes[bus];
-        if (bar === undefined || g.vramTotalBytes <= 0) push({ id, family: "nvidia", label, state: "unknown", detail: "taille du BAR1 inconnue", impact });
+        if (bar === undefined || g.vramTotalBytes <= 0)
+          push({ id, family: "nvidia", label, state: "unknown", detail: "taille du BAR1 inconnue", impact });
         else if (bar < g.vramTotalBytes)
           push({
             id,
@@ -130,7 +152,10 @@ export function runChecks(ctx: CheckContext): Check[] {
       const id = "nvidia.driver";
       const label = "Pilote NVIDIA";
       const impact = "le backend CUDA du build refuse de démarrer";
-      const cuda = r.cudaDriver == null ? "" : `, CUDA ${Math.floor(r.cudaDriver / 1000)}.${Math.floor((r.cudaDriver % 1000) / 10)}`;
+      const cuda =
+        r.cudaDriver == null
+          ? ""
+          : `, CUDA ${Math.floor(r.cudaDriver / 1000)}.${Math.floor((r.cudaDriver % 1000) / 10)}`;
       if (r.cudaDriverError)
         push({
           id,
@@ -141,16 +166,29 @@ export function runChecks(ctx: CheckContext): Check[] {
           persistence: "permanent",
           impact,
         });
-      else if (r.driver === null) push({ id, family: "nvidia", label, state: "unknown", detail: "version inconnue", impact });
+      else if (r.driver === null)
+        push({ id, family: "nvidia", label, state: "unknown", detail: "version inconnue", impact });
       else push({ id, family: "nvidia", label, state: "ok", detail: `pilote ${r.driver}${cuda}`, impact });
     }
     {
       const id = "nvidia.uvm";
       const label = "Module nvidia_uvm";
       const impact = "CUDA ne s'initialise pas";
-      if (r.modules.length === 0) push({ id, family: "nvidia", label, state: "unknown", detail: "/proc/modules illisible", impact });
-      else if (r.modules.includes("nvidia_uvm")) push({ id, family: "nvidia", label, state: "ok", detail: "chargé", impact });
-      else push({ id, family: "nvidia", label, state: "warn", detail: "absent", command: "sudo modprobe nvidia_uvm", persistence: "session", impact });
+      if (r.modules.length === 0)
+        push({ id, family: "nvidia", label, state: "unknown", detail: "/proc/modules illisible", impact });
+      else if (r.modules.includes("nvidia_uvm"))
+        push({ id, family: "nvidia", label, state: "ok", detail: "chargé", impact });
+      else
+        push({
+          id,
+          family: "nvidia",
+          label,
+          state: "warn",
+          detail: "absent",
+          command: "sudo modprobe nvidia_uvm",
+          persistence: "session",
+          impact,
+        });
     }
   }
 
@@ -162,9 +200,26 @@ export function runChecks(ctx: CheckContext): Check[] {
       const impact = "fréquences qui hésitent sous charge";
       const dpm = r.amdDpm[g.busId];
       if (!retained(g.busId)) push({ id, family: "amd", label, state: "na", detail: NA, impact });
-      else if (!dpm) push({ id, family: "amd", label, state: "unknown", detail: "power_dpm_force_performance_level illisible", impact });
+      else if (!dpm)
+        push({
+          id,
+          family: "amd",
+          label,
+          state: "unknown",
+          detail: "power_dpm_force_performance_level illisible",
+          impact,
+        });
       else if (dpm.level === "auto")
-        push({ id, family: "amd", label, state: "warn", detail: "auto", command: `echo high | sudo tee ${dpm.path}`, persistence: "session", impact });
+        push({
+          id,
+          family: "amd",
+          label,
+          state: "warn",
+          detail: "auto",
+          command: `echo high | sudo tee ${dpm.path}`,
+          persistence: "session",
+          impact,
+        });
       else push({ id, family: "amd", label, state: "ok", detail: dpm.level, impact });
       pcie("amd", g);
     }
@@ -173,8 +228,10 @@ export function runChecks(ctx: CheckContext): Check[] {
       const label = "Backend ROCm/HIP";
       const impact = "la carte AMD tourne en Vulkan, plus lent";
       if (!anyRetained) push({ id, family: "amd", label, state: "na", detail: NA, impact });
-      else if (r.backendLibs.length === 0) push({ id, family: "amd", label, state: "unknown", detail: "bibliothèques du build introuvables", impact });
-      else if (r.backendLibs.some((l) => l.startsWith("libggml-hip"))) push({ id, family: "amd", label, state: "ok", detail: "présent", impact });
+      else if (r.backendLibs.length === 0)
+        push({ id, family: "amd", label, state: "unknown", detail: "bibliothèques du build introuvables", impact });
+      else if (r.backendLibs.some((l) => l.startsWith("libggml-hip")))
+        push({ id, family: "amd", label, state: "ok", detail: "présent", impact });
       else
         push({
           id,
@@ -197,7 +254,8 @@ export function runChecks(ctx: CheckContext): Check[] {
           family: "amd",
           label,
           state: "unknown",
-          detail: "rocminfo non consulté : si HIP refuse la carte, ajouter HSA_OVERRIDE_GFX_VERSION=… dans env du profil",
+          detail:
+            "rocminfo non consulté : si HIP refuse la carte, ajouter HSA_OVERRIDE_GFX_VERSION=… dans env du profil",
           impact,
         });
     }
@@ -209,7 +267,8 @@ export function runChecks(ctx: CheckContext): Check[] {
     const label = "Gouverneur CPU";
     const impact = "prompt processing et offload CPU plus lents";
     const bad = r.governors.filter((g) => g !== "performance");
-    if (r.governors.length === 0) push({ id, family: "cpu", label, state: "unknown", detail: "cpufreq illisible", impact });
+    if (r.governors.length === 0)
+      push({ id, family: "cpu", label, state: "unknown", detail: "cpufreq illisible", impact });
     else if (bad.length === 0) push({ id, family: "cpu", label, state: "ok", detail: "performance", impact });
     else
       push({
@@ -248,7 +307,8 @@ export function runChecks(ctx: CheckContext): Check[] {
     const wantsMlock = estimate?.serverArgs.includes("--mlock") ?? false;
     const need = ctx.model?.fileBytes ?? 0;
     if (!wantsMlock) push({ id, family: "cpu", label, state: "ok", detail: "--mlock non recommandé ici", impact });
-    else if (r.memlockLimitBytes === null) push({ id, family: "cpu", label, state: "unknown", detail: "illisible", impact });
+    else if (r.memlockLimitBytes === null)
+      push({ id, family: "cpu", label, state: "unknown", detail: "illisible", impact });
     else if (r.memlockLimitBytes < need)
       push({
         id,
@@ -294,7 +354,14 @@ export function runChecks(ctx: CheckContext): Check[] {
     const impact = "accès mémoire distants";
     if (ctx.cpu.numaNodes <= 1) push({ id, family: "cpu", label, state: "ok", detail: "un seul nœud", impact });
     else if (estimate?.serverArgs.includes("--numa"))
-      push({ id, family: "cpu", label, state: "ok", detail: `${ctx.cpu.numaNodes} nœuds, --numa distribute recommandé`, impact });
+      push({
+        id,
+        family: "cpu",
+        label,
+        state: "ok",
+        detail: `${ctx.cpu.numaNodes} nœuds, --numa distribute recommandé`,
+        impact,
+      });
     else
       push({
         id,
@@ -314,10 +381,22 @@ export function runChecks(ctx: CheckContext): Check[] {
     const impact = "les cartes NVIDIA ne servent pas";
     const cudaListed = ctx.devices.some((d) => d.backend === "CUDA");
     if (cudaListed) push({ id, family: "build", label, state: "ok", detail: "présent", impact });
-    else if (nvidia.length === 0) push({ id, family: "build", label, state: "ok", detail: "pas de carte NVIDIA", impact });
-    else if (r.backendLibs.length === 0) push({ id, family: "build", label, state: "unknown", detail: "bibliothèques du build introuvables", impact });
-    else if (r.backendLibs.some((l) => l.startsWith("libggml-cuda"))) push({ id, family: "build", label, state: "ok", detail: "présent", impact });
-    else push({ id, family: "build", label, state: "warn", detail: "absent : reconstruire llama.cpp avec -DGGML_CUDA=ON", persistence: "permanent", impact });
+    else if (nvidia.length === 0)
+      push({ id, family: "build", label, state: "ok", detail: "pas de carte NVIDIA", impact });
+    else if (r.backendLibs.length === 0)
+      push({ id, family: "build", label, state: "unknown", detail: "bibliothèques du build introuvables", impact });
+    else if (r.backendLibs.some((l) => l.startsWith("libggml-cuda")))
+      push({ id, family: "build", label, state: "ok", detail: "présent", impact });
+    else
+      push({
+        id,
+        family: "build",
+        label,
+        state: "warn",
+        detail: "absent : reconstruire llama.cpp avec -DGGML_CUDA=ON",
+        persistence: "permanent",
+        impact,
+      });
   }
   {
     const id = "build.simd";
@@ -325,10 +404,18 @@ export function runChecks(ctx: CheckContext): Check[] {
     const impact = "calcul CPU plus lent";
     const want = ["AVX2", "AVX512"].filter((f) => ctx.cpu.flags.includes(f === "AVX2" ? "avx2" : "avx512f"));
     if (r.systemInfo === null)
-      push({ id, family: "build", label, state: "unknown", detail: "pas de system_info dans les logs : lancer le serveur d'abord", impact });
+      push({
+        id,
+        family: "build",
+        label,
+        state: "unknown",
+        detail: "pas de system_info dans les logs : lancer le serveur d'abord",
+        impact,
+      });
     else {
       const missing = want.filter((f) => !new RegExp(`\\b${f} = 1\\b`).test(r.systemInfo as string));
-      if (missing.length === 0) push({ id, family: "build", label, state: "ok", detail: want.join(", ") || "aucune", impact });
+      if (missing.length === 0)
+        push({ id, family: "build", label, state: "ok", detail: want.join(", ") || "aucune", impact });
       else
         push({
           id,
@@ -345,7 +432,8 @@ export function runChecks(ctx: CheckContext): Check[] {
     const id = "build.age";
     const label = "Âge du build";
     const impact = "optimisations et correctifs récents absents";
-    if (r.buildDate === null) push({ id, family: "build", label, state: "unknown", detail: "date inconnue (pas de dépôt git)", impact });
+    if (r.buildDate === null)
+      push({ id, family: "build", label, state: "unknown", detail: "date inconnue (pas de dépôt git)", impact });
     else {
       const days = Math.floor((ctx.now - r.buildDate) / 86400_000);
       if (ctx.now - r.buildDate > OLD_BUILD_MS)
@@ -368,10 +456,14 @@ export function runChecks(ctx: CheckContext): Check[] {
     const id = "kernel.iommu";
     const label = "IOMMU";
     const impact = "copies entre cartes plus lentes";
-    const pt = /\biommu=pt\b/.test(r.cmdline) || /\bamd_iommu=off\b/.test(r.cmdline) || /\bintel_iommu=off\b/.test(r.cmdline);
-    if (r.iommuActive === null) push({ id, family: "kernel", label, state: "unknown", detail: "/sys/class/iommu illisible", impact });
-    else if (!r.iommuActive || pt) push({ id, family: "kernel", label, state: "ok", detail: r.iommuActive ? "passthrough" : "inactif", impact });
-    else if (ctx.retainedBusIds.length < 2) push({ id, family: "kernel", label, state: "ok", detail: "actif, une seule carte", impact });
+    const pt =
+      /\biommu=pt\b/.test(r.cmdline) || /\bamd_iommu=off\b/.test(r.cmdline) || /\bintel_iommu=off\b/.test(r.cmdline);
+    if (r.iommuActive === null)
+      push({ id, family: "kernel", label, state: "unknown", detail: "/sys/class/iommu illisible", impact });
+    else if (!r.iommuActive || pt)
+      push({ id, family: "kernel", label, state: "ok", detail: r.iommuActive ? "passthrough" : "inactif", impact });
+    else if (ctx.retainedBusIds.length < 2)
+      push({ id, family: "kernel", label, state: "ok", detail: "actif, une seule carte", impact });
     else
       push({
         id,
@@ -390,20 +482,67 @@ export function runChecks(ctx: CheckContext): Check[] {
     const d = r.modelDisk;
     if (d === null) push({ id, family: "kernel", label, state: "unknown", detail: "inconnu", impact });
     else if (d.rotational === true)
-      push({ id, family: "kernel", label, state: "warn", detail: "disque rotatif : déplacer le modèle sur un SSD local", persistence: "permanent", impact });
+      push({
+        id,
+        family: "kernel",
+        label,
+        state: "warn",
+        detail: "disque rotatif : déplacer le modèle sur un SSD local",
+        persistence: "permanent",
+        impact,
+      });
     else if (d.fsType && NETWORK_FS.test(d.fsType))
-      push({ id, family: "kernel", label, state: "warn", detail: `${d.fsType} : déplacer le modèle sur un SSD local`, persistence: "permanent", impact });
-    else push({ id, family: "kernel", label, state: "ok", detail: `${d.fsType ?? "?"}${d.rotational === false ? ", SSD" : ""}`, impact });
+      push({
+        id,
+        family: "kernel",
+        label,
+        state: "warn",
+        detail: `${d.fsType} : déplacer le modèle sur un SSD local`,
+        persistence: "permanent",
+        impact,
+      });
+    else
+      push({
+        id,
+        family: "kernel",
+        label,
+        state: "ok",
+        detail: `${d.fsType ?? "?"}${d.rotational === false ? ", SSD" : ""}`,
+        impact,
+      });
   }
   {
     const id = "kernel.disk-speed";
     const label = "Débit du disque du modèle";
     const impact = "un modèle qui déborde la RAM lit le disque à chaque jeton";
     const d = ctx.diskSpeed;
-    if (!d) push({ id, family: "kernel", label, state: "unknown", detail: "non mesuré : bouton « Mesurer le disque »", impact });
+    if (!d)
+      push({
+        id,
+        family: "kernel",
+        label,
+        state: "unknown",
+        detail: "non mesuré : bouton « Mesurer le disque »",
+        impact,
+      });
     else if (d.bytesPerSec < DISK_OK_BPS)
-      push({ id, family: "kernel", label, state: "warn", detail: `lecture séquentielle ${fmtBytes(d.bytesPerSec)}/s${overflow ? " alors que le modèle déborde" : ""}`, impact });
-    else push({ id, family: "kernel", label, state: "ok", detail: `lecture séquentielle ${fmtBytes(d.bytesPerSec)}/s`, impact });
+      push({
+        id,
+        family: "kernel",
+        label,
+        state: "warn",
+        detail: `lecture séquentielle ${fmtBytes(d.bytesPerSec)}/s${overflow ? " alors que le modèle déborde" : ""}`,
+        impact,
+      });
+    else
+      push({
+        id,
+        family: "kernel",
+        label,
+        state: "ok",
+        detail: `lecture séquentielle ${fmtBytes(d.bytesPerSec)}/s`,
+        impact,
+      });
   }
   {
     const id = "kernel.swap";

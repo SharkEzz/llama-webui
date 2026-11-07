@@ -26,8 +26,20 @@ test("benchFailure reports an out-of-memory load", async () => {
 });
 
 test("parseBenchProgress reads the --progress lines", () => {
-  expect(parseBenchProgress("llama-bench: benchmark 2/2: generation run 1/2")).toEqual({ phase: "generation", test: 2, tests: 2, run: 1, runs: 2 });
-  expect(parseBenchProgress("llama-bench: benchmark 1/2: warmup prompt run")).toEqual({ phase: "warmup", test: 1, tests: 2, run: null, runs: null });
+  expect(parseBenchProgress("llama-bench: benchmark 2/2: generation run 1/2")).toEqual({
+    phase: "generation",
+    test: 2,
+    tests: 2,
+    run: 1,
+    runs: 2,
+  });
+  expect(parseBenchProgress("llama-bench: benchmark 1/2: warmup prompt run")).toEqual({
+    phase: "warmup",
+    test: 1,
+    tests: 2,
+    run: null,
+    runs: null,
+  });
   expect(parseBenchProgress("llama-bench: benchmark 1/2: starting")).toBeNull();
   expect(parseBenchProgress("ggml_cuda_init: found 2 CUDA devices")).toBeNull();
 });
@@ -35,7 +47,13 @@ test("parseBenchProgress reads the --progress lines", () => {
 test("parseDeviceList keeps names with parentheses", async () => {
   const d = parseDeviceList(await fixture("list-devices.txt"));
   expect(d).toHaveLength(7);
-  expect(d.find((x) => x.id === "Vulkan3")).toEqual({ id: "Vulkan3", name: "AMD Radeon RX 9070 XT (RADV GFX1201)", totalMib: 16304, freeMib: 16225, backend: "Vulkan" });
+  expect(d.find((x) => x.id === "Vulkan3")).toEqual({
+    id: "Vulkan3",
+    name: "AMD Radeon RX 9070 XT (RADV GFX1201)",
+    totalMib: 16304,
+    freeMib: 16225,
+    backend: "Vulkan",
+  });
   expect(d.find((x) => x.id === "BLAS")?.backend).toBe("BLAS");
 });
 

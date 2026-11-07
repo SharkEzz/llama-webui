@@ -1,6 +1,6 @@
+import type { ChatMessage } from "@llama-webui/shared"
 import { Check, Copy, RotateCcw } from "lucide-react"
 import { useState } from "react"
-import type { ChatMessage } from "@llama-webui/shared"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { copyText } from "@/lib/clipboard"
@@ -20,7 +20,9 @@ export function Message({ message, live, canRegenerate, onRegenerate }: MessageP
   const [copied, setCopied] = useState(false)
   if (message.role === "user")
     return (
-      <div className="ml-auto max-w-[85%] rounded-lg bg-muted px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap">{message.content}</div>
+      <div className="ml-auto max-w-[85%] rounded-lg bg-muted px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap">
+        {message.content}
+      </div>
     )
 
   const content = live ? live.content : message.content
@@ -29,7 +31,11 @@ export function Message({ message, live, canRegenerate, onRegenerate }: MessageP
   return (
     <div className="group flex flex-col gap-1 text-sm">
       {reasoning && <Reasoning text={reasoning} writing={writing && !content} />}
-      {content ? <Markdown text={content} /> : writing && !reasoning && <p className="animate-pulse text-muted-foreground">…</p>}
+      {content ? (
+        <Markdown text={content} />
+      ) : (
+        writing && !reasoning && <p className="animate-pulse text-muted-foreground">…</p>
+      )}
       {message.status === "stopped" && (
         <Badge variant="outline" className="w-fit">
           interrompue

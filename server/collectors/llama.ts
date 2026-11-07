@@ -1,6 +1,7 @@
+import type { Health, RequestRecord, RequestStats, SlotView, SpecStats } from "@llama-webui/shared";
 import { parsePrometheus } from "./prometheus";
-import type { SlotView, Health, RequestStats, SpecStats, RequestRecord } from "@llama-webui/shared";
-export type { SlotView, Health, RequestStats, SpecStats, RequestRecord };
+
+export type { Health, RequestRecord, RequestStats, SlotView, SpecStats };
 
 export interface LlamaRaw {
   at: number;

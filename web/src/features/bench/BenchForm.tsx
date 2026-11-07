@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
-import { Play, TriangleAlert } from "lucide-react"
 import { CACHE_TYPES, FLASH_ATTN, ignoredByBench, SPLIT_MODES } from "@llama-webui/shared"
+import { Play, TriangleAlert } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -15,8 +15,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Input } from "@/components/ui/input"
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -55,7 +55,10 @@ export function BenchForm() {
   const gpuDevices = (devices ?? []).filter((d) => d.totalMib > 0)
   // Un -dev du formulaire (profil, run relancé) absent de --list-devices reste affiché, coché, pour qu'on puisse le retirer.
   const missing = form.dev.filter((id) => !gpuDevices.some((d) => d.id === id))
-  const shownDevices = [...gpuDevices.map((d) => ({ id: d.id, label: `${d.name} · ${Math.round(d.totalMib / 102.4) / 10} Gio` })), ...missing.map((id) => ({ id, label: "absent de --list-devices" }))]
+  const shownDevices = [
+    ...gpuDevices.map((d) => ({ id: d.id, label: `${d.name} · ${Math.round(d.totalMib / 102.4) / 10} Gio` })),
+    ...missing.map((id) => ({ id, label: "absent de --list-devices" })),
+  ]
 
   const launch = async (stopServer = false) => {
     const r = await useBench.getState().launch(stopServer)
@@ -72,7 +75,10 @@ export function BenchForm() {
     onChange: (e: { target: { value: string } }) => setForm({ [k]: e.target.value } as Partial<Form>),
   })
 
-  const profileItems = [{ value: NO_PROFILE, label: "Aucun : modèle et flags" }, ...profiles.map((p) => ({ value: String(p.id), label: p.name }))]
+  const profileItems = [
+    { value: NO_PROFILE, label: "Aucun : modèle et flags" },
+    ...profiles.map((p) => ({ value: String(p.id), label: p.name })),
+  ]
 
   return (
     <GlassCard title="Nouveau benchmark" icon={Play}>
@@ -102,7 +108,9 @@ export function BenchForm() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">Préremplit le modèle et les flags ; le profil n'est pas modifié.</p>
+            <p className="text-xs text-muted-foreground">
+              Préremplit le modèle et les flags ; le profil n'est pas modifié.
+            </p>
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Outil</Label>
@@ -120,12 +128,22 @@ export function BenchForm() {
           </div>
         </div>
 
-        <PathField label="Modèle" kind="model" error={errors.modelPath} {...field("modelPath")} onPick={(p) => setForm({ modelPath: p })} />
+        <PathField
+          label="Modèle"
+          kind="model"
+          error={errors.modelPath}
+          {...field("modelPath")}
+          onPick={(p) => setForm({ modelPath: p })}
+        />
         <PathField
           label="Projecteur (facultatif)"
           kind="mmproj"
           error={errors.mmprojPath}
-          hint={form.kind === "bench" ? "Ignoré par llama-bench, gardé pour « Créer un profil » et « Relancer »." : undefined}
+          hint={
+            form.kind === "bench"
+              ? "Ignoré par llama-bench, gardé pour « Créer un profil » et « Relancer »."
+              : undefined
+          }
           {...field("mmprojPath")}
           onPick={(p) => setForm({ mmprojPath: p })}
         />
@@ -136,10 +154,34 @@ export function BenchForm() {
           <TextField label="-t" hint="threads" error={errors.t} {...field("t")} />
           <TextField label="-b" error={errors.b} {...field("b")} />
           <TextField label="-ub" error={errors.ub} {...field("ub")} />
-          <OptionField label="-sm" options={SPLIT_MODES} value={form.sm} error={errors.sm} onChange={(v) => setForm({ sm: v })} />
-          <OptionField label="-fa" options={FLASH_ATTN} value={form.fa} error={errors.fa} onChange={(v) => setForm({ fa: v })} />
-          <OptionField label="-ctk" options={CACHE_TYPES} value={form.ctk} error={errors.ctk} onChange={(v) => setForm({ ctk: v })} />
-          <OptionField label="-ctv" options={CACHE_TYPES} value={form.ctv} error={errors.ctv} onChange={(v) => setForm({ ctv: v })} />
+          <OptionField
+            label="-sm"
+            options={SPLIT_MODES}
+            value={form.sm}
+            error={errors.sm}
+            onChange={(v) => setForm({ sm: v })}
+          />
+          <OptionField
+            label="-fa"
+            options={FLASH_ATTN}
+            value={form.fa}
+            error={errors.fa}
+            onChange={(v) => setForm({ fa: v })}
+          />
+          <OptionField
+            label="-ctk"
+            options={CACHE_TYPES}
+            value={form.ctk}
+            error={errors.ctk}
+            onChange={(v) => setForm({ ctk: v })}
+          />
+          <OptionField
+            label="-ctv"
+            options={CACHE_TYPES}
+            value={form.ctv}
+            error={errors.ctv}
+            onChange={(v) => setForm({ ctv: v })}
+          />
         </div>
 
         <fieldset className="flex flex-col gap-2">
@@ -147,7 +189,9 @@ export function BenchForm() {
           {devices === null ? (
             <p className="text-xs text-muted-foreground">Lecture des devices…</p>
           ) : shownDevices.length === 0 ? (
-            <p className="text-xs text-muted-foreground">Aucun device lu (llama-bench introuvable ?) : le choix reste automatique.</p>
+            <p className="text-xs text-muted-foreground">
+              Aucun device lu (llama-bench introuvable ?) : le choix reste automatique.
+            </p>
           ) : (
             <div className="grid gap-x-6 gap-y-2 md:grid-cols-2">
               {shownDevices.map((d) => {
@@ -157,7 +201,9 @@ export function BenchForm() {
                     <Checkbox
                       id={`dev-${d.id}`}
                       checked={on}
-                      onCheckedChange={(c) => setForm({ dev: c ? [...form.dev, d.id] : form.dev.filter((x) => x !== d.id) })}
+                      onCheckedChange={(c) =>
+                        setForm({ dev: c ? [...form.dev, d.id] : form.dev.filter((x) => x !== d.id) })
+                      }
                     />
                     <Label htmlFor={`dev-${d.id}`} className="min-w-0 flex-1 font-normal">
                       <span className="font-mono text-xs">{d.id}</span>
@@ -202,7 +248,12 @@ export function BenchForm() {
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="bench-ot">-ot</Label>
-          <Textarea {...field("ot")} rows={2} className="font-mono text-xs" placeholder="une règle par ligne, ex. exps=CPU" />
+          <Textarea
+            {...field("ot")}
+            rows={2}
+            className="font-mono text-xs"
+            placeholder="une règle par ligne, ex. exps=CPU"
+          />
           <FieldMessage error={errors.ot} />
         </div>
 
@@ -214,10 +265,19 @@ export function BenchForm() {
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="bench-serverArgs">Autres flags serveur</Label>
-          <Textarea {...field("serverArgs")} rows={2} className="font-mono text-xs" placeholder="--jinja -c 40000 --spec-type draft-mtp" />
+          <Textarea
+            {...field("serverArgs")}
+            rows={2}
+            className="font-mono text-xs"
+            placeholder="--jinja -c 40000 --spec-type draft-mtp"
+          />
           <FieldMessage
             error={errors.serverArgs}
-            hint={form.kind === "bench" ? "Ignorés par llama-bench (gardés pour un run serveur ou un profil)." : "Passés tels quels à llama-server."}
+            hint={
+              form.kind === "bench"
+                ? "Ignorés par llama-bench (gardés pour un run serveur ou un profil)."
+                : "Passés tels quels à llama-server."
+            }
           />
         </div>
 
@@ -239,7 +299,9 @@ export function BenchForm() {
         )}
 
         <div className="flex items-center justify-end gap-3">
-          {external && <p className="text-xs text-muted-foreground">Un llama-server externe tourne : arrêtez-le d'abord.</p>}
+          {external && (
+            <p className="text-xs text-muted-foreground">Un llama-server externe tourne : arrêtez-le d'abord.</p>
+          )}
           <Button type="submit" disabled={live !== null || launching || external || form.modelPath.trim() === ""}>
             <Play /> Lancer
           </Button>
@@ -251,8 +313,8 @@ export function BenchForm() {
           <AlertDialogHeader>
             <AlertDialogTitle>Arrêter llama-server ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Le profil « {confirm} » sera arrêté pendant le benchmark, puis relancé avec la même commande à la fin, même en cas d'échec
-              ou d'annulation. Le chat est indisponible pendant ce temps.
+              Le profil « {confirm} » sera arrêté pendant le benchmark, puis relancé avec la même commande à la fin,
+              même en cas d'échec ou d'annulation. Le chat est indisponible pendant ce temps.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -292,13 +354,29 @@ function TextField({ id, label, hint, error, value, onChange }: TextFieldProps) 
       <Label htmlFor={id} className="font-mono">
         {label}
       </Label>
-      <Input id={id} value={value} onChange={onChange} aria-invalid={error ? true : undefined} placeholder="défaut" className="font-mono" />
+      <Input
+        id={id}
+        value={value}
+        onChange={onChange}
+        aria-invalid={error ? true : undefined}
+        placeholder="défaut"
+        className="font-mono"
+      />
       <FieldMessage error={error} hint={hint} />
     </div>
   )
 }
 
-function PathField({ id, label, kind, hint, error, value, onChange, onPick }: TextFieldProps & { kind: "model" | "mmproj"; onPick(p: string): void }) {
+function PathField({
+  id,
+  label,
+  kind,
+  hint,
+  error,
+  value,
+  onChange,
+  onPick,
+}: TextFieldProps & { kind: "model" | "mmproj"; onPick(p: string): void }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -320,13 +398,27 @@ function PathField({ id, label, kind, hint, error, value, onChange, onPick }: Te
   )
 }
 
-function OptionField(props: { label: string; options: readonly string[]; value: string; error?: string; onChange(v: string): void }) {
+function OptionField(props: {
+  label: string
+  options: readonly string[]
+  value: string
+  error?: string
+  onChange(v: string): void
+}) {
   const items = [{ value: DEFAULT, label: "défaut" }, ...props.options.map((o) => ({ value: o, label: o }))]
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <Label className="font-mono">{props.label}</Label>
-      <Select items={items} value={props.value || DEFAULT} onValueChange={(v) => props.onChange(v && v !== DEFAULT ? v : "")}>
-        <SelectTrigger className="w-full font-mono" aria-label={props.label} aria-invalid={props.error ? true : undefined}>
+      <Select
+        items={items}
+        value={props.value || DEFAULT}
+        onValueChange={(v) => props.onChange(v && v !== DEFAULT ? v : "")}
+      >
+        <SelectTrigger
+          className="w-full font-mono"
+          aria-label={props.label}
+          aria-invalid={props.error ? true : undefined}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react"
-import { CheckCheck, ListOrdered, Play, Square, Trash2, X } from "lucide-react"
 import { presetOf, type SweepStatus } from "@llama-webui/shared"
+import { CheckCheck, ListOrdered, Play, Square, Trash2, X } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { Badge } from "@/components/ui/badge"
@@ -87,7 +87,10 @@ export function SweepCard() {
             <span>
               {mine ? (
                 <>
-                  {mine.stage === "validate" ? "Validation" : "Élément"} <span className="num">{mine.index}/{mine.total}</span>
+                  {mine.stage === "validate" ? "Validation" : "Élément"}{" "}
+                  <span className="num">
+                    {mine.index}/{mine.total}
+                  </span>
                   {item?.sweepLabel && <span className="font-mono text-xs"> · {item.sweepLabel}</span>}
                   {itemLive && <span className="text-muted-foreground"> · {PHASE_LABEL[itemLive.phase]}</span>}
                 </>
@@ -109,7 +112,10 @@ export function SweepCard() {
         </div>
 
         {itemLive && (
-          <pre ref={logRef} className="h-32 overflow-auto rounded-md bg-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground">
+          <pre
+            ref={logRef}
+            className="h-32 overflow-auto rounded-md bg-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground"
+          >
             {itemLive.lines.join("\n") || "…"}
           </pre>
         )}
@@ -148,7 +154,13 @@ export function SweepCard() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button size="sm" variant="outline" disabled={!explored} title={explored ? undefined : "aucun run d'exploration réussi"} onClick={() => void act("validate")}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!explored}
+                title={explored ? undefined : "aucun run d'exploration réussi"}
+                onClick={() => void act("validate")}
+              >
                 <CheckCheck /> Valider sur le serveur
               </Button>
             </div>
@@ -171,7 +183,11 @@ export function SweepCard() {
 
         <RankingTable sweep={sweep} runs={runs} />
       </div>
-      <StopServerDialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)} onConfirm={() => confirm && void act(confirm, true)} />
+      <StopServerDialog
+        open={confirm !== null}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        onConfirm={() => confirm && void act(confirm, true)}
+      />
     </GlassCard>
   )
 }

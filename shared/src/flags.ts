@@ -83,7 +83,8 @@ export function flagOf(catalog: FlagCatalog, arg: string): Flag | undefined {
 }
 
 /** `--long` names before `-short` ones, each in alphabetical order. */
-const byLongThenName = (a: string, b: string) => Number(!a.startsWith("--")) - Number(!b.startsWith("--")) || a.localeCompare(b);
+const byLongThenName = (a: string, b: string) =>
+  Number(!a.startsWith("--")) - Number(!b.startsWith("--")) || a.localeCompare(b);
 
 /**
  * What Tab adds to `prefix`: the rest of the only name it starts, then a space; or the part all the names it
@@ -110,7 +111,9 @@ export function flagSuggestions(catalog: FlagCatalog, word: string, max: number)
 
 /** The flags in `args` the catalogue does not know, as written (`--x=1` as `--x`). Values are not flags: `-1`, `-`. */
 export function unknownFlags(catalog: FlagCatalog, args: string[]): string[] {
-  return args.filter((a) => a.length > 1 && a.startsWith("-") && !/^-\d/.test(a) && !flagOf(catalog, a)).map((a) => a.split("=")[0]!);
+  return args
+    .filter((a) => a.length > 1 && a.startsWith("-") && !/^-\d/.test(a) && !flagOf(catalog, a))
+    .map((a) => a.split("=")[0]!);
 }
 
 /** One line: names, value, help, without the environment variable that sets it. */

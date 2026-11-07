@@ -9,7 +9,13 @@ let cpu: Promise<string> | null = null;
 
 /** Sortie d'une commande courte (stdout + stderr), tuée après `timeoutMs`. */
 async function output(argv: string[], timeoutMs = 5000): Promise<string> {
-  const proc = Bun.spawn(argv, { stdin: "ignore", stdout: "pipe", stderr: "pipe", timeout: timeoutMs, killSignal: "SIGKILL" });
+  const proc = Bun.spawn(argv, {
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: timeoutMs,
+    killSignal: "SIGKILL",
+  });
   const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
   await proc.exited;
   return `${out}\n${err}`;
@@ -20,7 +26,10 @@ export async function buildOf(binary: string): Promise<string | null> {
   const path = Bun.which(binary) ?? binary;
   const mtime = await Bun.file(path)
     .stat()
-    .then((s) => s.mtimeMs, () => 0);
+    .then(
+      (s) => s.mtimeMs,
+      () => 0,
+    );
   const key = `${path}:${mtime}`;
   let p = builds.get(key);
   if (!p) {
@@ -38,7 +47,10 @@ export async function buildOf(binary: string): Promise<string | null> {
 
 /** Le matériel au moment du run, figé dans `hardware_json`. */
 export async function readHardware(binary: string, gpus: GpuSample[]): Promise<BenchHardware> {
-  cpu ??= readCpuInfo().then((c) => c.model, () => "");
+  cpu ??= readCpuInfo().then(
+    (c) => c.model,
+    () => "",
+  );
   return {
     cpu: await cpu,
     gpus: gpus.map((g) => ({ name: g.name, busId: g.busId, vramTotalBytes: g.vramTotalBytes })),

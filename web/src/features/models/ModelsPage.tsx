@@ -1,9 +1,9 @@
+import type { ModelEntry } from "@llama-webui/shared"
+import { Boxes, RefreshCw, Search } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router"
-import { Boxes, RefreshCw, Search } from "lucide-react"
-import type { ModelEntry } from "@llama-webui/shared"
-import { GLASS } from "@/components/glass/glass"
 import { GlassCard } from "@/components/glass/GlassCard"
+import { GLASS } from "@/components/glass/glass"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -62,7 +62,11 @@ export function ModelsPage() {
           <AlertTitle>Aucun fichier GGUF dans {list.setting}</AlertTitle>
           <AlertDescription>
             <p>
-              Déposez des modèles dans ce dossier ou changez-le dans les <Link to="/settings" className="underline underline-offset-4">Réglages</Link>.
+              Déposez des modèles dans ce dossier ou changez-le dans les{" "}
+              <Link to="/settings" className="underline underline-offset-4">
+                Réglages
+              </Link>
+              .
             </p>
           </AlertDescription>
         </Alert>
@@ -74,7 +78,11 @@ export function ModelsPage() {
                 <InputGroupAddon>
                   <Search />
                 </InputGroupAddon>
-                <InputGroupInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Fichier, nom, architecture, quantification" />
+                <InputGroupInput
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Fichier, nom, architecture, quantification"
+                />
               </InputGroup>
               <Tabs value={kind} onValueChange={(v) => setKind(v as KindFilter)}>
                 <TabsList>
@@ -102,7 +110,11 @@ export function ModelsPage() {
                 </TableHeader>
                 <TableBody>
                   {rows.map((m) => (
-                    <TableRow key={m.path} className={cn(m.ok && "cursor-pointer")} onClick={() => m.ok && setOpen(m.path)}>
+                    <TableRow
+                      key={m.path}
+                      className={cn(m.ok && "cursor-pointer")}
+                      onClick={() => m.ok && setOpen(m.path)}
+                    >
                       <TableCell className="max-w-md">
                         <div className="truncate font-mono text-xs">{m.relPath}</div>
                         {m.ok && m.name && <div className="truncate text-xs text-muted-foreground">{m.name}</div>}
@@ -116,8 +128,12 @@ export function ModelsPage() {
                           <TableCell className="num text-right">{formatBytes(m.fileBytes)}</TableCell>
                           <TableCell className="num text-right">{formatParams(m.params)}</TableCell>
                           <TableCell className="num text-right">{formatInt(m.blockCount)}</TableCell>
-                          <TableCell className="num text-right">{m.contextLength > 0 ? formatInt(m.contextLength) : "—"}</TableCell>
-                          <TableCell className="num text-right">{m.expertCount > 0 ? `${m.expertCount} / ${m.expertUsedCount}` : "—"}</TableCell>
+                          <TableCell className="num text-right">
+                            {m.contextLength > 0 ? formatInt(m.contextLength) : "—"}
+                          </TableCell>
+                          <TableCell className="num text-right">
+                            {m.expertCount > 0 ? `${m.expertCount} / ${m.expertUsedCount}` : "—"}
+                          </TableCell>
                         </>
                       ) : (
                         <TableCell colSpan={7}>

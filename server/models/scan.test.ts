@@ -2,10 +2,10 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openDb } from "../db/open";
 import { ModelCacheRepo } from "../db/modelCache";
-import { type KvValue, writeGguf } from "./gguf.fixture";
+import { openDb } from "../db/open";
 import { readModel } from "./gguf";
+import { type KvValue, writeGguf } from "./gguf.fixture";
 import { groupGgufFiles, scanModels } from "./scan";
 
 const dir = mkdtempSync(join(tmpdir(), "lw-scan-"));
@@ -15,7 +15,11 @@ const u32 = (value: number): KvValue => ({ type: "u32", value });
 
 test("groupGgufFiles groups shards under the first and reports missing ones", () => {
   expect(groupGgufFiles(["a/Big-00002-of-00003.gguf", "small.gguf", "a/Big-00001-of-00003.gguf"])).toEqual([
-    { main: "a/Big-00001-of-00003.gguf", files: ["a/Big-00001-of-00003.gguf", "a/Big-00002-of-00003.gguf"], missing: ["a/Big-00003-of-00003.gguf"] },
+    {
+      main: "a/Big-00001-of-00003.gguf",
+      files: ["a/Big-00001-of-00003.gguf", "a/Big-00002-of-00003.gguf"],
+      missing: ["a/Big-00003-of-00003.gguf"],
+    },
     { main: "small.gguf", files: ["small.gguf"], missing: [] },
   ]);
 });

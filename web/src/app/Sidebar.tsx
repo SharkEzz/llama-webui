@@ -1,6 +1,6 @@
 import { NavLink } from "react-router"
 import { cn } from "@/lib/utils"
-import { ROUTES, type AppRoute } from "./routes"
+import { type AppRoute, ROUTES } from "./routes"
 
 const main = ROUTES.filter((r) => r.path !== "/settings")
 const settings = ROUTES.find((r) => r.path === "/settings")!

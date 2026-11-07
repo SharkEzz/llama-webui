@@ -1,7 +1,7 @@
-import { create } from "zustand"
-import { toast } from "sonner"
 import type { ServerView } from "@llama-webui/shared"
-import { api, ApiError } from "./api"
+import { toast } from "sonner"
+import { create } from "zustand"
+import { ApiError, api } from "./api"
 import { onWs, useWs } from "./ws"
 
 interface ServerStore {

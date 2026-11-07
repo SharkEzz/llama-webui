@@ -1,5 +1,5 @@
-import { Link } from "react-router"
 import type { Snapshot } from "@llama-webui/shared"
+import { Link } from "react-router"
 import { Gauge } from "@/components/glass/Gauge"
 import { GLASS } from "@/components/glass/glass"
 import type { Tone } from "@/components/glass/tones"
@@ -15,7 +15,11 @@ export function SystemStrip({ snapshot }: { snapshot: Snapshot | null }) {
   const sys = snapshot?.system
   const mem = sys?.mem
   const memUsed = mem ? mem.totalBytes - mem.availableBytes : 0
-  const gpus = snapshot ? (snapshot.gpus.length > 0 ? snapshot.gpus : snapshot.allGpus.filter((g) => !g.hidden && !g.suspended)) : []
+  const gpus = snapshot
+    ? snapshot.gpus.length > 0
+      ? snapshot.gpus
+      : snapshot.allGpus.filter((g) => !g.hidden && !g.suspended)
+    : []
   const disk = snapshot?.disk
 
   return (
@@ -39,7 +43,9 @@ export function SystemStrip({ snapshot }: { snapshot: Snapshot | null }) {
         ))}
       </Link>
       <div className="flex min-w-36 flex-col gap-1 self-center text-sm">
-        <span className="text-xs text-muted-foreground">Disque{disk?.model ? ` du modèle (${disk.model.disk})` : ""}</span>
+        <span className="text-xs text-muted-foreground">
+          Disque{disk?.model ? ` du modèle (${disk.model.disk})` : ""}
+        </span>
         <span className="num">{disk ? formatBps(disk.model?.readBps ?? disk.readBps) : "—"}</span>
         <span className="text-xs text-muted-foreground">en lecture</span>
       </div>

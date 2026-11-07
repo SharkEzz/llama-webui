@@ -8,7 +8,11 @@ import { useNow } from "@/lib/useNow"
 import { useWs, WS_STATUS_UI } from "@/lib/ws"
 
 const MILESTONES = [
-  { id: "J2", title: "Serveur, profils, logs", detail: "Démarrer et arrêter llama-server, gérer les profils, suivre les logs." },
+  {
+    id: "J2",
+    title: "Serveur, profils, logs",
+    detail: "Démarrer et arrêter llama-server, gérer les profils, suivre les logs.",
+  },
   { id: "J3", title: "Monitoring", detail: "Débit, slots, GPU NVIDIA et AMD, CPU, mémoire, disque en temps réel." },
   { id: "J4", title: "Modèles et chat", detail: "Parcourir les GGUF, discuter avec le modèle chargé." },
   { id: "J5", title: "Benchmark", detail: "Mesurer avec llama-bench ou le serveur, comparer l'historique." },

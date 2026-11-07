@@ -104,7 +104,10 @@ export class ConversationsRepo {
   }
 
   messages(conversationId: number): ChatMessage[] {
-    return this.db.query<MsgRow, [number]>("SELECT * FROM messages WHERE conversation_id = ? ORDER BY id").all(conversationId).map(msg);
+    return this.db
+      .query<MsgRow, [number]>("SELECT * FROM messages WHERE conversation_id = ? ORDER BY id")
+      .all(conversationId)
+      .map(msg);
   }
 
   message(id: number): ChatMessage | null {

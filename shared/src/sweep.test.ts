@@ -3,7 +3,10 @@ import type { BenchRun, Measure } from "./bench";
 import { expandSpace, itemLabel, rankRuns, SweepSpecSchema } from "./sweep";
 
 test("expandSpace crosses the dimensions in field order and applies -ts only where it fits", () => {
-  const { items, droppedTs } = expandSpace({ fa: "on" }, { ngl: ["all", 20], dev: [["CUDA0"], ["CUDA0", "CUDA1"]], ts: [[3, 1]] });
+  const { items, droppedTs } = expandSpace(
+    { fa: "on" },
+    { ngl: ["all", 20], dev: [["CUDA0"], ["CUDA0", "CUDA1"]], ts: [[3, 1]] },
+  );
   expect(items).toEqual([
     { fa: "on", ngl: "all", dev: ["CUDA0"] },
     { fa: "on", ngl: "all", dev: ["CUDA0", "CUDA1"], ts: [3, 1] },
@@ -15,14 +18,20 @@ test("expandSpace crosses the dimensions in field order and applies -ts only whe
 });
 
 test("expandSpace drops duplicates and a base -ts that no longer matches the devices", () => {
-  const { items } = expandSpace({ ts: [1, 1], dev: ["CUDA0", "CUDA1"] }, { dev: [["CUDA0"], ["CUDA0", "CUDA1"], ["CUDA0"]] });
+  const { items } = expandSpace(
+    { ts: [1, 1], dev: ["CUDA0", "CUDA1"] },
+    { dev: [["CUDA0"], ["CUDA0", "CUDA1"], ["CUDA0"]] },
+  );
   expect(items).toEqual([{ dev: ["CUDA0"] }, { dev: ["CUDA0", "CUDA1"], ts: [1, 1] }]);
 });
 
 test("itemLabel names only the varying dimensions", () => {
-  expect(itemLabel({ fa: "on", ngl: "all", dev: ["CUDA0", "Vulkan3"], ncmoe: 8 }, { ngl: ["all"], dev: [["CUDA0", "Vulkan3"]], ncmoe: [8] })).toBe(
-    "-ngl all · -ncmoe 8 · -dev CUDA0,Vulkan3",
-  );
+  expect(
+    itemLabel(
+      { fa: "on", ngl: "all", dev: ["CUDA0", "Vulkan3"], ncmoe: 8 },
+      { ngl: ["all"], dev: [["CUDA0", "Vulkan3"]], ncmoe: [8] },
+    ),
+  ).toBe("-ngl all · -ncmoe 8 · -dev CUDA0,Vulkan3");
   expect(itemLabel({ ngl: 5 }, {})).toBe("base");
 });
 

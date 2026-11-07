@@ -1,5 +1,3 @@
-import { create } from "zustand"
-import { toast } from "sonner"
 import {
   type BenchLive,
   type BenchParams,
@@ -11,14 +9,16 @@ import {
   gpuDevices,
   type PlanResult,
   type PresetId,
-  presetOf,
   type Profile,
+  presetOf,
   type Sweep,
   type SweepLive,
   type SweepSpace,
   type TuningHardware,
 } from "@llama-webui/shared"
-import { api, ApiError } from "./api"
+import { toast } from "sonner"
+import { create } from "zustand"
+import { ApiError, api } from "./api"
 import { onWs, useWs } from "./ws"
 
 type Draft = Pick<BenchSpec, "modelPath" | "mmprojPath" | "profileId" | "params" | "serverArgs">
@@ -84,8 +84,15 @@ let planTimer: ReturnType<typeof setTimeout> | null = null
 let estimateSeq = 0
 let planSeq = 0
 
-const modelName = (p: string) => p.split("/").pop()!.replace(/\.gguf$/, "")
-const shortDate = () => new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date())
+const modelName = (p: string) =>
+  p
+    .split("/")
+    .pop()!
+    .replace(/\.gguf$/, "")
+const shortDate = () =>
+  new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(
+    new Date(),
+  )
 
 /** Une action qui prend la garde : 409 « server-running » → le client demande confirmation. */
 async function guarded(fn: () => Promise<unknown>): Promise<"ok" | "confirm" | "error"> {
@@ -106,9 +113,16 @@ export function suggestedSpace(e: Estimate, hw: TuningHardware, preset: PresetId
   if (n !== undefined && n > 0) space.ncmoe = [...new Set([n - 8, n - 4, n, n + 4, n + 8].filter((x) => x >= 0))]
   const gpus = gpuDevices(hw.devices)
   const biggest = [...gpus].sort((a, b) => b.totalMib - a.totalMib)[0]
-  const sets = [e.params.dev, gpus.map((d) => d.id), gpus.filter((d) => d.backend === "CUDA").map((d) => d.id), biggest ? [biggest.id] : []]
+  const sets = [
+    e.params.dev,
+    gpus.map((d) => d.id),
+    gpus.filter((d) => d.backend === "CUDA").map((d) => d.id),
+    biggest ? [biggest.id] : [],
+  ]
   const seen = new Set<string>()
-  const dev = sets.filter((s): s is string[] => !!s && s.length > 0 && s[0] !== "none" && !seen.has(s.join()) && !!seen.add(s.join()))
+  const dev = sets.filter(
+    (s): s is string[] => !!s && s.length > 0 && s[0] !== "none" && !seen.has(s.join()) && !!seen.add(s.join()),
+  )
   if (dev.length > 1) space.dev = dev
   if (preset === "agent") space.ub = [512, 2048]
   return space
@@ -125,7 +139,10 @@ export const useTuning = create<TuningState>()((set, get) => {
     const seq = ++estimateSeq
     set({ estimating: true })
     try {
-      const estimate = await api<Estimate>("/tuning/estimate", { method: "POST", body: JSON.stringify({ modelPath, mmprojPath, preset, pinned }) })
+      const estimate = await api<Estimate>("/tuning/estimate", {
+        method: "POST",
+        body: JSON.stringify({ modelPath, mmprojPath, preset, pinned }),
+      })
       if (seq === estimateSeq) set({ estimate, estimateError: null })
     } catch (e) {
       if (seq === estimateSeq) set({ estimate: null, estimateError: e instanceof Error ? e.message : String(e) })
@@ -219,7 +236,14 @@ export const useTuning = create<TuningState>()((set, get) => {
       if (id === null) return set({ profileId: null, serverArgs: [] })
       try {
         const d = await api<Draft>(`/bench/from-profile/${id}`)
-        set({ profileId: id, modelPath: d.modelPath, mmprojPath: d.mmprojPath, serverArgs: d.serverArgs, estimate: null, plan: null })
+        set({
+          profileId: id,
+          modelPath: d.modelPath,
+          mmprojPath: d.mmprojPath,
+          serverArgs: d.serverArgs,
+          estimate: null,
+          plan: null,
+        })
         refresh()
       } catch (e) {
         fail(e)
@@ -245,7 +269,8 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     setSpace(patch) {
       const space = { ...get().space, ...patch } as Record<string, unknown>
-      for (const k of Object.keys(space)) if (space[k] === undefined || (Array.isArray(space[k]) && (space[k] as unknown[]).length === 0)) delete space[k]
+      for (const k of Object.keys(space))
+        if (space[k] === undefined || (Array.isArray(space[k]) && (space[k] as unknown[]).length === 0)) delete space[k]
       set({ space: space as SweepSpace })
       schedulePlan()
     },
@@ -276,7 +301,10 @@ export const useTuning = create<TuningState>()((set, get) => {
       set({ launching: true })
       try {
         return await guarded(async () => {
-          const r = await api<{ sweep: Sweep }>("/sweeps", { method: "POST", body: JSON.stringify({ spec: specBody(), stopServer }) })
+          const r = await api<{ sweep: Sweep }>("/sweeps", {
+            method: "POST",
+            body: JSON.stringify({ spec: specBody(), stopServer }),
+          })
           set({ run: { ...get().run, name: "" } })
           await get().open(r.sweep.id)
         })
@@ -356,7 +384,10 @@ export const useTuning = create<TuningState>()((set, get) => {
     async measureDisk(modelPath) {
       set({ measuring: true })
       try {
-        const diskSpeed = await api<DiskSpeed>("/tuning/disk-speed", { method: "POST", body: JSON.stringify({ modelPath }) })
+        const diskSpeed = await api<DiskSpeed>("/tuning/disk-speed", {
+          method: "POST",
+          body: JSON.stringify({ modelPath }),
+        })
         set({ diskSpeed })
         await get().loadChecks(modelPath)
       } catch (e) {
@@ -370,7 +401,10 @@ export const useTuning = create<TuningState>()((set, get) => {
 
 function dropSweep(id: number) {
   const s = useTuning.getState()
-  useTuning.setState({ sweeps: s.sweeps.filter((x) => x.id !== id), current: s.current?.sweep.id === id ? null : s.current })
+  useTuning.setState({
+    sweeps: s.sweeps.filter((x) => x.id !== id),
+    current: s.current?.sweep.id === id ? null : s.current,
+  })
 }
 
 let started = false
@@ -392,7 +426,10 @@ export function startTuningSync(): void {
     const { current } = useTuning.getState()
     if (!current || run.sweepId !== current.sweep.id) return
     const i = current.runs.findIndex((r) => r.id === run.id)
-    const runs = i === -1 ? [...current.runs, run].sort((a, b) => a.id - b.id) : current.runs.map((r) => (r.id === run.id ? run : r))
+    const runs =
+      i === -1
+        ? [...current.runs, run].sort((a, b) => a.id - b.id)
+        : current.runs.map((r) => (r.id === run.id ? run : r))
     useTuning.setState({ current: { ...current, runs } })
   })
   onWs("bench-deleted", ({ payload: { ids } }) => {

@@ -1,5 +1,5 @@
-import { Zap } from "lucide-react"
 import { SERIES } from "@llama-webui/shared"
+import { Zap } from "lucide-react"
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart"
 import { GlassCard } from "@/components/glass/GlassCard"
 

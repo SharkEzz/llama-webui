@@ -34,14 +34,15 @@ function Panel({ title, ranked, pick }: { title: string; ranked: Ranked[]; pick(
                 className="grid grid-cols-[2rem_minmax(0,13rem)_minmax(0,1fr)_3.5rem] items-center gap-2 rounded-sm py-1 outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
                 aria-label={`${r.run.sweepLabel ?? `#${r.run.id}`} : ${formatMeasure(m)}`}
               >
-                <span className="num text-xs text-muted-foreground">
-                  {r.tie ? "1=" : r.rank}
-                </span>
+                <span className="num text-xs text-muted-foreground">{r.tie ? "1=" : r.rank}</span>
                 <span className="truncate font-mono text-xs">{r.run.sweepLabel ?? `#${r.run.id}`}</span>
                 <span className="relative h-3">
                   {m && (
                     <>
-                      <span className="absolute inset-y-0 left-0 rounded-r-[4px] bg-chart-1" style={{ width: pct(m.tps) }} />
+                      <span
+                        className="absolute inset-y-0 left-0 rounded-r-[4px] bg-chart-1"
+                        style={{ width: pct(m.tps) }}
+                      />
                       {m.stddev > 0 && (
                         <span
                           className="absolute top-1/2 h-px -translate-y-1/2 bg-foreground/70"

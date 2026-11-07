@@ -1,6 +1,6 @@
+import { deviceRole } from "@llama-webui/shared"
 import { Cpu, ListChecks } from "lucide-react"
 import { Link } from "react-router"
-import { deviceRole } from "@llama-webui/shared"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -40,7 +40,8 @@ export function HardwareCard() {
                       <span className="font-mono text-xs">{d.id}</span>
                       {role && <Badge variant="outline">{role}</Badge>}
                       <span className="num ml-auto shrink-0 text-xs">
-                        {formatBytes(d.freeMib * MiB)} <span className="text-muted-foreground">/ {formatBytes(d.totalMib * MiB)}</span>
+                        {formatBytes(d.freeMib * MiB)}{" "}
+                        <span className="text-muted-foreground">/ {formatBytes(d.totalMib * MiB)}</span>
                       </span>
                     </span>
                     <span className="truncate text-xs text-muted-foreground" title={d.name}>
@@ -49,19 +50,24 @@ export function HardwareCard() {
                   </li>
                 )
               })}
-            {hw.devices.length === 0 && <li className="text-muted-foreground">Aucun device : vérifiez le binaire dans les réglages.</li>}
+            {hw.devices.length === 0 && (
+              <li className="text-muted-foreground">Aucun device : vérifiez le binaire dans les réglages.</li>
+            )}
           </ul>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 border-t pt-3">
             <dt className="text-muted-foreground">RAM</dt>
             <dd className="num text-right">
-              {formatBytes(hw.ramAvailableBytes)} <span className="text-muted-foreground">disponibles / {formatBytes(hw.ramTotalBytes)}</span>
+              {formatBytes(hw.ramAvailableBytes)}{" "}
+              <span className="text-muted-foreground">disponibles / {formatBytes(hw.ramTotalBytes)}</span>
             </dd>
             <dt className="text-muted-foreground">CPU</dt>
             <dd className="min-w-0 truncate text-right" title={hw.cpu.model}>
               {hw.cpu.physicalCores} cœurs · {hw.cpu.model}
             </dd>
           </dl>
-          <p className="text-xs text-muted-foreground">Les doublons (une carte vue par deux backends) et l'iGPU ne sont pas proposés par l'estimateur.</p>
+          <p className="text-xs text-muted-foreground">
+            Les doublons (une carte vue par deux backends) et l'iGPU ne sont pas proposés par l'estimateur.
+          </p>
         </div>
       )}
     </GlassCard>

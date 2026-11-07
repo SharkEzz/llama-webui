@@ -1,6 +1,6 @@
+import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 import { Link } from "react-router"
-import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,7 +43,8 @@ export function ConversationList({ onNew, onDeleted }: { onNew(): void; onDelete
               onBlur={() => setRenaming(null)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") setRenaming(null)
-                if (e.key === "Enter" && renaming.title.trim()) void rename(c.id, renaming.title.trim()).finally(() => setRenaming(null))
+                if (e.key === "Enter" && renaming.title.trim())
+                  void rename(c.id, renaming.title.trim()).finally(() => setRenaming(null))
               }}
               aria-label="Nouveau titre"
             />
@@ -56,12 +57,23 @@ export function ConversationList({ onNew, onDeleted }: { onNew(): void; onDelete
                 render={<Link to={`/chat/${c.id}`} />}
                 aria-current={c.id === currentId ? "page" : undefined}
               >
-                {c.live && <span className="size-2 shrink-0 animate-pulse rounded-full bg-success" aria-label="réponse en cours" />}
+                {c.live && (
+                  <span
+                    className="size-2 shrink-0 animate-pulse rounded-full bg-success"
+                    aria-label="réponse en cours"
+                  />
+                )}
                 <span className="truncate">{c.title}</span>
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  render={<Button variant="ghost" size="icon-xs" className="mr-1 opacity-0 group-hover:opacity-100 data-popup-open:opacity-100" />}
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="mr-1 opacity-0 group-hover:opacity-100 data-popup-open:opacity-100"
+                    />
+                  }
                   aria-label={`Actions pour ${c.title}`}
                 >
                   <MoreHorizontal />
@@ -83,7 +95,9 @@ export function ConversationList({ onNew, onDeleted }: { onNew(): void; onDelete
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer « {deleting?.title} » ?</AlertDialogTitle>
-            <AlertDialogDescription>La conversation et tous ses messages seront définitivement supprimés.</AlertDialogDescription>
+            <AlertDialogDescription>
+              La conversation et tous ses messages seront définitivement supprimés.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>

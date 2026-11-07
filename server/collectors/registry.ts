@@ -59,7 +59,12 @@ export class Collectors {
     const c = new Collectors(
       nvml ?? smi!,
       smi,
-      { cards: () => amdCards, read: readAmdCard, procVram: (pid, skipNodes) => readProcAmdVram(pid, "/proc", skipNodes), suspended: isRuntimeSuspended },
+      {
+        cards: () => amdCards,
+        read: readAmdCard,
+        procVram: (pid, skipNodes) => readProcAmdVram(pid, "/proc", skipNodes),
+        suspended: isRuntimeSuspended,
+      },
       new ProcSampler(),
     );
     await c.configure(settings);

@@ -1,4 +1,4 @@
-import { type BenchSpec, rankRuns, sweepCtx, SweepSpecSchema } from "@llama-webui/shared";
+import { type BenchSpec, rankRuns, SweepSpecSchema, sweepCtx } from "@llama-webui/shared";
 import { z } from "zod";
 import { benchBinary } from "../bench/parse";
 import type { BenchRunner } from "../bench/runner";
@@ -21,7 +21,10 @@ export interface SweepRouteDeps {
   hub: WsHub;
 }
 
-const ValidateRequest = z.strictObject({ n: z.number().int().min(1).max(5).default(3), stopServer: z.boolean().optional() });
+const ValidateRequest = z.strictObject({
+  n: z.number().int().min(1).max(5).default(3),
+  stopServer: z.boolean().optional(),
+});
 
 export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor, hub }: SweepRouteDeps) {
   const getSweep = (req: Parameters<typeof idParam>[0]) => {
@@ -42,11 +45,17 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
         const [model, mmproj, hw] = await Promise.all([
           loadModel(spec.modelPath),
           mmprojBytes(spec.mmprojPath),
-          readTuningHardware({ benchBinary: benchBinary(settings.get().binary), mem: monitor.latest()?.system?.mem ?? null }),
+          readTuningHardware({
+            benchBinary: benchBinary(settings.get().binary),
+            mem: monitor.latest()?.system?.mem ?? null,
+          }),
         ]);
         const plan = planSweep({ model, hw, spec, mmprojBytes: mmproj });
         if (plan.items.length === 0)
-          throw new HttpError(409, `Aucune configuration à exécuter : ${plan.excluded} exclue${plan.excluded > 1 ? "s" : ""} par l'estimateur`);
+          throw new HttpError(
+            409,
+            `Aucune configuration à exécuter : ${plan.excluded} exclue${plan.excluded > 1 ? "s" : ""} par l'estimateur`,
+          );
         const { modelPath, mmprojPath, profileId, serverArgs, p, n, r } = spec;
         const sweep = await benchRunner.startSweep(
           () => {
@@ -54,7 +63,17 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
             benchRuns.enqueue(
               s.id,
               plan.items.map((it) => ({
-                spec: { kind: "bench", modelPath, mmprojPath, profileId, params: it.params, serverArgs, p, n, r } satisfies BenchSpec,
+                spec: {
+                  kind: "bench",
+                  modelPath,
+                  mmprojPath,
+                  profileId,
+                  params: it.params,
+                  serverArgs,
+                  p,
+                  n,
+                  r,
+                } satisfies BenchSpec,
                 label: it.label,
                 fit: it.fit.verdict,
               })),
@@ -94,7 +113,8 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
         const started = await benchRunner.startSweep(
           () => {
             benchRuns.requeueInterrupted(sweep.id);
-            if (!benchRuns.nextQueued(sweep.id)) throw new HttpError(409, "Rien à reprendre : aucun élément interrompu ou en attente");
+            if (!benchRuns.nextQueued(sweep.id))
+              throw new HttpError(409, "Rien à reprendre : aucun élément interrompu ou en attente");
             return sweep.id;
           },
           { stopServer: body.stopServer === true },
@@ -120,7 +140,17 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
             benchRuns.enqueue(
               sweep.id,
               best.map(({ run }) => ({
-                spec: { kind: "server", modelPath, mmprojPath, profileId, params: run.spec.params, serverArgs, p, n: sweep.spec.n, r } satisfies BenchSpec,
+                spec: {
+                  kind: "server",
+                  modelPath,
+                  mmprojPath,
+                  profileId,
+                  params: run.spec.params,
+                  serverArgs,
+                  p,
+                  n: sweep.spec.n,
+                  r,
+                } satisfies BenchSpec,
                 label: `validation · ${run.sweepLabel ?? "base"}`,
                 fit: run.fit ?? "fits",
               })),

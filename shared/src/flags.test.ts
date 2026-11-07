@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { catalogFrom, complete, flagSuggestions, describeFlag, flagOf, parseHelp, unknownFlags } from "./flags";
+import { catalogFrom, complete, describeFlag, flagOf, flagSuggestions, parseHelp, unknownFlags } from "./flags";
 
 const HELP = await Bun.file(join(import.meta.dir, "../../testdata/llama-server-help.txt")).text();
 const catalog = parseHelp(HELP);
@@ -36,7 +36,9 @@ describe("parseHelp", () => {
       section: "common params",
     });
     expect(flagOf(catalog, "--split-mode")?.value).toBe("{none,layer,row,tensor}");
-    expect(flagOf(catalog, "--split-mode")?.help).toStartWith("how to split the model across multiple GPUs, one of: - none: use one GPU only");
+    expect(flagOf(catalog, "--split-mode")?.help).toStartWith(
+      "how to split the model across multiple GPUs, one of: - none: use one GPU only",
+    );
   });
 
   test("each flag is in the section that lists it", () => {
@@ -66,7 +68,15 @@ describe("complete", () => {
   test("several matches: their common part, and the list", () => {
     expect(complete(catalog, "--cpu-")).toEqual({
       insert: "",
-      candidates: ["--cpu-mask", "--cpu-mask-batch", "--cpu-moe", "--cpu-range", "--cpu-range-batch", "--cpu-strict", "--cpu-strict-batch"],
+      candidates: [
+        "--cpu-mask",
+        "--cpu-mask-batch",
+        "--cpu-moe",
+        "--cpu-range",
+        "--cpu-range-batch",
+        "--cpu-strict",
+        "--cpu-strict-batch",
+      ],
     });
     expect(complete(catalog, "--cpu-r")).toEqual({ insert: "ange", candidates: ["--cpu-range", "--cpu-range-batch"] });
   });
@@ -83,13 +93,18 @@ describe("complete", () => {
 
 describe("unknownFlags", () => {
   test("flags the installed llama-server does not list; values and negative numbers are not flags", () => {
-    expect(unknownFlags(catalog, ["--foo", "-ngl", "99", "--keep", "-1", "--ctx-size=4096", "--bar=1", "-"])).toEqual(["--foo", "--bar"]);
+    expect(unknownFlags(catalog, ["--foo", "-ngl", "99", "--keep", "-1", "--ctx-size=4096", "--bar=1", "-"])).toEqual([
+      "--foo",
+      "--bar",
+    ]);
   });
 });
 
 describe("describeFlag", () => {
   test("names, value and help on one line, without the environment variable", () => {
-    expect(describeFlag(flagOf(catalog, "-c")!)).toBe("-c, --ctx-size N — size of the prompt context (default: 0, 0 = loaded from model)");
+    expect(describeFlag(flagOf(catalog, "-c")!)).toBe(
+      "-c, --ctx-size N — size of the prompt context (default: 0, 0 = loaded from model)",
+    );
     expect(describeFlag(flagOf(catalog, "--swa-full")!)).toBe(
       "--swa-full — use full-size SWA cache (default: false) [(more info)](https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)",
     );

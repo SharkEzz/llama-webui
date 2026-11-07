@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { type BenchDevice, CACHE_TYPES, FLASH_ATTN, gpuDevices, SPLIT_MODES, serverArgs } from "@llama-webui/shared"
 import { Plus, Sparkles, Waypoints, X } from "lucide-react"
-import { type BenchDevice, CACHE_TYPES, FLASH_ATTN, gpuDevices, serverArgs, SPLIT_MODES } from "@llama-webui/shared"
+import { useState } from "react"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,17 +11,24 @@ import { useTuning } from "@/lib/tuning"
 import { cn } from "@/lib/utils"
 import { PlanTable } from "./PlanTable"
 
-
 const show = (v: unknown) => (Array.isArray(v) ? v.join(",") : String(v))
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 const int = (t: string) => (/^\d+$/.test(t.trim()) ? Number(t.trim()) : null)
 const list = (t: string) => {
-  const xs = t.split(/[\s,/]+/).filter(Boolean).map(Number)
+  const xs = t
+    .split(/[\s,/]+/)
+    .filter(Boolean)
+    .map(Number)
   return xs.length >= 2 && xs.every((x) => Number.isFinite(x) && x >= 0) ? xs : null
 }
 
 /** Motifs -ot proposés : ils visent les experts MoE (llama.cpp applique la première règle qui correspond). */
-const OT_SUGGESTIONS = ["exps=CPU", "blk\\.(\\d|1\\d)\\.ffn_.*_exps=CPU", "blk\\.[0-9]\\.ffn_.*_exps=CPU", "ffn_.*_exps=Vulkan3"]
+const OT_SUGGESTIONS = [
+  "exps=CPU",
+  "blk\\.(\\d|1\\d)\\.ffn_.*_exps=CPU",
+  "blk\\.[0-9]\\.ffn_.*_exps=CPU",
+  "ffn_.*_exps=Vulkan3",
+]
 
 /** L'espace de recherche : une ligne par flag, chaque valeur ajoutée multiplie les configurations. */
 export function SpaceEditor() {
@@ -43,7 +50,12 @@ export function SpaceEditor() {
       title="Espace de recherche"
       icon={Waypoints}
       actions={
-        <Button size="sm" variant="outline" disabled={!estimate?.ok} onClick={() => useTuning.getState().suggestSpace()}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!estimate?.ok}
+          onClick={() => useTuning.getState().suggestSpace()}
+        >
           <Sparkles /> Partir de la recommandation
         </Button>
       }
@@ -64,7 +76,9 @@ export function SpaceEditor() {
                 </Button>
               </>
             )}
-            <span className="w-full text-xs text-muted-foreground">Chaque valeur d'une ligne remplace celle de la base ; une ligne vide n'intervient pas.</span>
+            <span className="w-full text-xs text-muted-foreground">
+              Chaque valeur d'une ligne remplace celle de la base ; une ligne vide n'intervient pas.
+            </span>
           </div>
 
           <div className="flex flex-col divide-y">
@@ -101,11 +115,33 @@ export function SpaceEditor() {
               wide
             />
             <ToggleRow flag="-fa" options={FLASH_ATTN} values={space.fa ?? []} onChange={(fa) => setSpace({ fa })} />
-            <ToggleRow flag="-ctk" options={CACHE_TYPES} values={space.ctk ?? []} onChange={(ctk) => setSpace({ ctk })} />
-            <ToggleRow flag="-ctv" options={CACHE_TYPES} values={space.ctv ?? []} onChange={(ctv) => setSpace({ ctv })} />
+            <ToggleRow
+              flag="-ctk"
+              options={CACHE_TYPES}
+              values={space.ctk ?? []}
+              onChange={(ctk) => setSpace({ ctk })}
+            />
+            <ToggleRow
+              flag="-ctv"
+              options={CACHE_TYPES}
+              values={space.ctv ?? []}
+              onChange={(ctv) => setSpace({ ctv })}
+            />
             <ToggleRow flag="-sm" options={SPLIT_MODES} values={space.sm ?? []} onChange={(sm) => setSpace({ sm })} />
-            <ValuesRow flag="-ub" values={space.ub ?? []} onChange={(ub) => setSpace({ ub })} parse={(t) => int(t) || "un entier"} suggestions={[256, 512, 1024, 2048]} />
-            <ValuesRow flag="-b" values={space.b ?? []} onChange={(b) => setSpace({ b })} parse={(t) => int(t) || "un entier"} suggestions={[512, 2048, 4096]} />
+            <ValuesRow
+              flag="-ub"
+              values={space.ub ?? []}
+              onChange={(ub) => setSpace({ ub })}
+              parse={(t) => int(t) || "un entier"}
+              suggestions={[256, 512, 1024, 2048]}
+            />
+            <ValuesRow
+              flag="-b"
+              values={space.b ?? []}
+              onChange={(b) => setSpace({ b })}
+              parse={(t) => int(t) || "un entier"}
+              suggestions={[512, 2048, 4096]}
+            />
             <ValuesRow
               flag="-t"
               values={space.t ?? []}
@@ -117,11 +153,22 @@ export function SpaceEditor() {
 
           <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
             <Field label="Nom du sweep" id="sweep-name">
-              <Input id="sweep-name" value={run.name} placeholder="automatique : modèle · préréglage · date" maxLength={80} onChange={(e) => setRun({ name: e.target.value })} />
+              <Input
+                id="sweep-name"
+                value={run.name}
+                placeholder="automatique : modèle · préréglage · date"
+                maxLength={80}
+                onChange={(e) => setRun({ name: e.target.value })}
+              />
             </Field>
             <NumField label="p (prompt)" value={run.p} onChange={(p) => setRun({ p })} />
             <NumField label="n (génération)" value={run.n} onChange={(n) => setRun({ n })} />
-            <NumField label="r (répétitions)" value={run.r} onChange={(r) => setRun({ r })} hint="r ≥ 3 pour que l'écart-type ait un sens" />
+            <NumField
+              label="r (répétitions)"
+              value={run.r}
+              onChange={(r) => setRun({ r })}
+              hint="r ≥ 3 pour que l'écart-type ait un sens"
+            />
           </div>
           <Label className="flex items-center gap-2 font-normal">
             <Checkbox checked={includeUnfit} onCheckedChange={(v) => setIncludeUnfit(v === true)} />
@@ -191,7 +238,12 @@ function ValuesRow<T>(props: {
   return (
     <Row flag={props.flag} hint={props.hint}>
       {props.values.map((v) => (
-        <Chip key={show(v)} label={show(v)} mono={props.mono} onRemove={() => props.onChange(props.values.filter((x) => !same(x, v)))} />
+        <Chip
+          key={show(v)}
+          label={show(v)}
+          mono={props.mono}
+          onRemove={() => props.onChange(props.values.filter((x) => !same(x, v)))}
+        />
       ))}
       <Input
         value={text}
@@ -213,7 +265,17 @@ function ValuesRow<T>(props: {
   )
 }
 
-function ToggleRow<T extends string>({ flag, options, values, onChange }: { flag: string; options: readonly T[]; values: T[]; onChange(v: T[]): void }) {
+function ToggleRow<T extends string>({
+  flag,
+  options,
+  values,
+  onChange,
+}: {
+  flag: string
+  options: readonly T[]
+  values: T[]
+  onChange(v: T[]): void
+}) {
   return (
     <Row flag={flag}>
       {options.map((o) => {
@@ -235,7 +297,15 @@ function ToggleRow<T extends string>({ flag, options, values, onChange }: { flag
   )
 }
 
-function DevRow({ gpus, values, onChange }: { gpus: BenchDevice[]; values: string[][]; onChange(v: string[][]): void }) {
+function DevRow({
+  gpus,
+  values,
+  onChange,
+}: {
+  gpus: BenchDevice[]
+  values: string[][]
+  onChange(v: string[][]): void
+}) {
   const [draft, setDraft] = useState<string[]>([])
   const add = (...sets: string[][]) => {
     const next = [...values]
@@ -251,7 +321,16 @@ function DevRow({ gpus, values, onChange }: { gpus: BenchDevice[]; values: strin
       <div className="flex w-full flex-wrap items-center gap-3 pt-1">
         {gpus.map((d) => (
           <Label key={d.id} className="flex items-center gap-1.5 font-mono text-xs font-normal">
-            <Checkbox checked={draft.includes(d.id)} onCheckedChange={(c) => setDraft(c ? gpus.map((g) => g.id).filter((id) => id === d.id || draft.includes(id)) : draft.filter((x) => x !== d.id))} />
+            <Checkbox
+              checked={draft.includes(d.id)}
+              onCheckedChange={(c) =>
+                setDraft(
+                  c
+                    ? gpus.map((g) => g.id).filter((id) => id === d.id || draft.includes(id))
+                    : draft.filter((x) => x !== d.id),
+                )
+              }
+            />
             {d.id}
           </Label>
         ))}
@@ -284,11 +363,28 @@ function Field({ label, id, hint, children }: { label: string; id: string; hint?
   )
 }
 
-function NumField({ label, value, onChange, hint }: { label: string; value: number; onChange(v: number): void; hint?: string }) {
+function NumField({
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string
+  value: number
+  onChange(v: number): void
+  hint?: string
+}) {
   const id = `sweep-${label.split(" ")[0]}`
   return (
     <Field label={label} id={id} hint={hint}>
-      <Input id={id} type="number" min={1} value={value} className="num" onChange={(e) => e.target.value !== "" && onChange(Number(e.target.value))} />
+      <Input
+        id={id}
+        type="number"
+        min={1}
+        value={value}
+        className="num"
+        onChange={(e) => e.target.value !== "" && onChange(Number(e.target.value))}
+      />
     </Field>
   )
 }

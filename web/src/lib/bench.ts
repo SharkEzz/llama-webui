@@ -1,5 +1,3 @@
-import { create } from "zustand"
-import { toast } from "sonner"
 import {
   type BenchDevice,
   type BenchKind,
@@ -12,7 +10,9 @@ import {
   shellQuote,
   shellSplit,
 } from "@llama-webui/shared"
-import { api, ApiError } from "./api"
+import { toast } from "sonner"
+import { create } from "zustand"
+import { ApiError, api } from "./api"
 import { onWs, useWs } from "./ws"
 
 /** Le formulaire tel qu'il se saisit : tout en texte, converti à l'envoi (le serveur valide et renvoie les erreurs par champ). */
@@ -73,7 +73,8 @@ const str = (v: number | string | undefined) => (v === undefined ? "" : String(v
 
 /** Les champs d'un BenchSpec (ou d'un brouillon tiré d'un profil). */
 export function formFromSpec(
-  s: Pick<BenchSpec, "modelPath" | "mmprojPath" | "profileId" | "params" | "serverArgs"> & Partial<Pick<BenchSpec, "kind" | "p" | "n" | "r">>,
+  s: Pick<BenchSpec, "modelPath" | "mmprojPath" | "profileId" | "params" | "serverArgs"> &
+    Partial<Pick<BenchSpec, "kind" | "p" | "n" | "r">>,
   base: BenchForm = EMPTY_FORM,
 ): BenchForm {
   const p = s.params
@@ -131,10 +132,18 @@ export function specFromForm(f: BenchForm): { spec: Record<string, unknown> } | 
   if (f.dev.length > 0) {
     set("dev", f.dev)
     const ts = f.dev.map((d) => num(f.ts[d] ?? ""))
-    if (ts.some((x) => x !== undefined)) set("ts", ts.map((x) => x ?? 0))
+    if (ts.some((x) => x !== undefined))
+      set(
+        "ts",
+        ts.map((x) => x ?? 0),
+      )
   } else {
     const ts = f.tsAll.split(/[\s,/]+/).filter(Boolean)
-    if (ts.length > 0) set("ts", ts.map((x) => num(x)))
+    if (ts.length > 0)
+      set(
+        "ts",
+        ts.map((x) => num(x)),
+      )
   }
   set("sm", f.sm)
   set("fa", f.fa)
@@ -219,7 +228,9 @@ export const useBench = create<BenchState>()((set, get) => ({
 
   async load() {
     try {
-      const { runs, live } = await api<{ runs: BenchRun[]; live: BenchLive | null }>(`/bench/runs?sweep=${get().filters.sweeps}&limit=${HISTORY_LIMIT}`)
+      const { runs, live } = await api<{ runs: BenchRun[]; live: BenchLive | null }>(
+        `/bench/runs?sweep=${get().filters.sweeps}&limit=${HISTORY_LIMIT}`,
+      )
       set({ runs, live, loaded: true, selected: get().selected.filter((id) => runs.some((r) => r.id === id)) })
     } catch (e) {
       fail(e)
@@ -253,8 +264,13 @@ export const useBench = create<BenchState>()((set, get) => ({
       return
     }
     try {
-      const draft = await api<Pick<BenchSpec, "modelPath" | "mmprojPath" | "profileId" | "params" | "serverArgs">>(`/bench/from-profile/${id}`)
-      set({ form: formFromSpec(draft, { ...EMPTY_FORM, kind: form.kind, p: form.p, n: form.n, r: form.r }), errors: {} })
+      const draft = await api<Pick<BenchSpec, "modelPath" | "mmprojPath" | "profileId" | "params" | "serverArgs">>(
+        `/bench/from-profile/${id}`,
+      )
+      set({
+        form: formFromSpec(draft, { ...EMPTY_FORM, kind: form.kind, p: form.p, n: form.n, r: form.r }),
+        errors: {},
+      })
     } catch (e) {
       fail(e)
     }
@@ -310,7 +326,11 @@ export const useBench = create<BenchState>()((set, get) => ({
   async removeFailed() {
     try {
       const { deleted } = await api<{ deleted: number }>("/bench/runs?failed=1", { method: "DELETE" })
-      toast.success(deleted === 0 ? "Aucun run en échec" : `${deleted} run${deleted > 1 ? "s" : ""} supprimé${deleted > 1 ? "s" : ""}`)
+      toast.success(
+        deleted === 0
+          ? "Aucun run en échec"
+          : `${deleted} run${deleted > 1 ? "s" : ""} supprimé${deleted > 1 ? "s" : ""}`,
+      )
       await get().load()
     } catch (e) {
       fail(e)

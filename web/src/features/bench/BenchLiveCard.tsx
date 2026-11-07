@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react"
+import type { Measure } from "@llama-webui/shared"
 import { Activity, Square } from "lucide-react"
+import { useEffect, useRef } from "react"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { KIND_LABEL, PHASE_LABEL, STATUS_LABEL, useBench } from "@/lib/bench"
-import type { Measure } from "@llama-webui/shared"
 import { formatDuration, formatRate } from "@/lib/format"
 import { useNow } from "@/lib/useNow"
 import { formatAccept, modelName, vramTotal } from "./format"
@@ -28,7 +28,9 @@ export function BenchLiveCard() {
     return (
       <GlassCard title="Dernier run" icon={Activity}>
         {!run ? (
-          <p className="text-sm text-muted-foreground">Aucun run pour l'instant : lancez un benchmark avec le formulaire.</p>
+          <p className="text-sm text-muted-foreground">
+            Aucun run pour l'instant : lancez un benchmark avec le formulaire.
+          </p>
         ) : (
           <div className="flex flex-col gap-4">
             <RunHeader kind={run.kind} model={run.spec.modelPath} status={STATUS_LABEL[run.status]} />
@@ -73,7 +75,10 @@ export function BenchLiveCard() {
           </div>
           <Progress value={pct} aria-label="Progression du benchmark" />
         </div>
-        <pre ref={logRef} className="h-48 overflow-auto rounded-md bg-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground">
+        <pre
+          ref={logRef}
+          className="h-48 overflow-auto rounded-md bg-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground"
+        >
           {live.lines.join("\n") || "…"}
         </pre>
       </div>
@@ -102,4 +107,6 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 const deviation = (m: Measure | null) =>
-  m && m.stddev > 0 ? `± ${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(m.stddev)} sur ${m.tokens} jetons` : undefined
+  m && m.stddev > 0
+    ? `± ${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(m.stddev)} sur ${m.tokens} jetons`
+    : undefined

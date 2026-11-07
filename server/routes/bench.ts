@@ -1,15 +1,23 @@
 import { homedir } from "node:os";
 import { basename } from "node:path";
-import { type BenchKind, type BenchSpec, BenchSpecSchema, type BenchStatus, paramsFromServerArgs, profileModelPath, serverArgs } from "@llama-webui/shared";
-import type { BenchRunner } from "../bench/runner";
+import {
+  type BenchKind,
+  type BenchSpec,
+  BenchSpecSchema,
+  type BenchStatus,
+  paramsFromServerArgs,
+  profileModelPath,
+  serverArgs,
+} from "@llama-webui/shared";
 import { listDevices } from "../bench/hardware";
 import { benchBinary } from "../bench/parse";
+import type { BenchRunner } from "../bench/runner";
 import type { BenchRunsRepo } from "../db/benchRuns";
 import type { ProfilesRepo } from "../db/profiles";
 import type { SettingsRepo } from "../db/settings";
 import { guarded, HttpError, idParam, jsonObject, notFound } from "../http";
-import type { WsHub } from "../ws/hub";
 import { profilePaths } from "../supervisor/args";
+import type { WsHub } from "../ws/hub";
 
 export interface BenchRouteDeps {
   benchRuns: BenchRunsRepo;
@@ -103,7 +111,9 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }:
         const { spec } = run;
         const modelsDir = settings.get().modelsDir;
         const placed = profileModelPath(spec.modelPath, { modelsDir, home });
-        const mmproj = spec.mmprojPath ? profileModelPath(spec.mmprojPath, { cwd: placed.cwd, modelsDir, home }).model : undefined;
+        const mmproj = spec.mmprojPath
+          ? profileModelPath(spec.mmprojPath, { cwd: placed.cwd, modelsDir, home }).model
+          : undefined;
         const origin = spec.profileId !== null ? profiles.get(spec.profileId) : null;
         const profile = profiles.create({
           name: freeName(`${basename(spec.modelPath).replace(/\.gguf$/, "")} — bench #${run.id}`),

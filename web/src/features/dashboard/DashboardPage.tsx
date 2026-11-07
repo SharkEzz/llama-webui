@@ -1,7 +1,7 @@
-import { Link } from "react-router"
 import { CircleStop } from "lucide-react"
-import { StatTile } from "@/components/glass/StatTile"
+import { Link } from "react-router"
 import { GLASS } from "@/components/glass/glass"
+import { StatTile } from "@/components/glass/StatTile"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { ServerStateBadge } from "@/features/server/ServerStateBadge"
@@ -13,7 +13,8 @@ import { RequestsTable } from "./RequestsTable"
 import { SystemStrip } from "./SystemStrip"
 import { ThroughputCard } from "./ThroughputCard"
 
-const rate = (v: number) => new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(v)
+const rate = (v: number) =>
+  new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(v)
 
 export function DashboardPage() {
   const snapshot = useMonitor((s) => s.snapshot)
@@ -33,7 +34,9 @@ export function DashboardPage() {
         <Alert className={GLASS}>
           <CircleStop />
           <AlertTitle>llama-server est arrêté</AlertTitle>
-          <AlertDescription>Débit, slots et requêtes s'affichent dès qu'un serveur tourne. Le bandeau système reste mesuré.</AlertDescription>
+          <AlertDescription>
+            Débit, slots et requêtes s'affichent dès qu'un serveur tourne. Le bandeau système reste mesuré.
+          </AlertDescription>
           <AlertAction>
             <Button size="sm" nativeButton={false} render={<Link to="/server" />}>
               Démarrer
@@ -48,7 +51,11 @@ export function DashboardPage() {
             <StatTile
               label="Acceptation spéculative"
               value={spec.acceptCum === null ? "—" : formatPct(100 * spec.acceptCum)}
-              hint={spec.meanAcceptedPerDraft === null ? undefined : `${rate(spec.meanAcceptedPerDraft)} tokens acceptés par brouillon`}
+              hint={
+                spec.meanAcceptedPerDraft === null
+                  ? undefined
+                  : `${rate(spec.meanAcceptedPerDraft)} tokens acceptés par brouillon`
+              }
               tone="amber"
             />
           )}

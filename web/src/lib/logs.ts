@@ -1,5 +1,5 @@
-import { create } from "zustand"
 import { EMPTY_LOG_VIEW, type LogLine, type LogView, mergeLogs, onBoot } from "@llama-webui/shared"
+import { create } from "zustand"
 import { api } from "./api"
 import { onWs, useWs } from "./ws"
 

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { runChecks, type CheckContext } from "./checks";
+import { type CheckContext, runChecks } from "./checks";
 import { hw3 } from "./fixtures";
 import type { SysReadings } from "./sysinfo";
 

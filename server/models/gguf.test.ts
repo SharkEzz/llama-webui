@@ -3,8 +3,8 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ModelReadError, type ParsedShard, parseModel, readModel, type TensorInfo } from "./gguf";
-import { tensorBytes, weightSizes } from "./sizes";
 import { type FakeTensor, type KvValue, writeGguf } from "./gguf.fixture";
+import { tensorBytes, weightSizes } from "./sizes";
 
 const t = (name: string, bytes: number): TensorInfo => ({ name, shape: [bytes], dtype: 0, offset: 0, bytes });
 const u32 = (value: number): KvValue => ({ type: "u32", value });
@@ -229,8 +229,10 @@ describe("vocabulary size", () => {
   });
   const vocab = (s: ParsedShard) => parseModel("/m.gguf", [s], [100], 0).vocabSize;
 
-  test("<arch>.vocab_size when present", () => expect(vocab(shard({ "qwen35.vocab_size": 9, "tokenizer.ggml.tokens": ["a", "b"] }))).toBe(9));
-  test("else the tokenizer's token list (llama.cpp's own source)", () => expect(vocab(shard({ "tokenizer.ggml.tokens": ["a", "b", "c", "d", "e"] }))).toBe(5));
+  test("<arch>.vocab_size when present", () =>
+    expect(vocab(shard({ "qwen35.vocab_size": 9, "tokenizer.ggml.tokens": ["a", "b"] }))).toBe(9));
+  test("else the tokenizer's token list (llama.cpp's own source)", () =>
+    expect(vocab(shard({ "tokenizer.ggml.tokens": ["a", "b", "c", "d", "e"] }))).toBe(5));
   test("else the output tensor's second dimension", () => expect(vocab(shard({}))).toBe(7));
   test("else the embedding tensor's", () => {
     const s = shard({});
@@ -241,7 +243,9 @@ describe("vocabulary size", () => {
 
 test("a multimodal projector is kind mmproj; a chat template is noticed", async () => {
   const mm = join(dir, "mm.gguf");
-  writeGguf(mm, { "general.architecture": str("clip"), "general.type": str("mmproj") }, [{ name: "v.patch_embd.weight", shape: [4], bytes: 64 }]);
+  writeGguf(mm, { "general.architecture": str("clip"), "general.type": str("mmproj") }, [
+    { name: "v.patch_embd.weight", shape: [4], bytes: 64 },
+  ]);
   expect((await readModel(mm)).kind).toBe("mmproj");
   const chat = join(dir, "chat.gguf");
   writeGguf(chat, { ...DENSE_KV, "tokenizer.chat_template": str("{{ messages }}") }, DENSE_TENSORS);

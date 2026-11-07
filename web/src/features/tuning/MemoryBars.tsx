@@ -1,12 +1,13 @@
-import { CircleAlert, TriangleAlert } from "lucide-react"
 import type { DeviceBudget, Fit } from "@llama-webui/shared"
+import { CircleAlert, TriangleAlert } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatBytes } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 type Level = "fits" | "tight" | "over"
 
-const levelOf = (bytes: number, budget: number): Level => (bytes <= 0.95 * budget ? "fits" : bytes <= budget ? "tight" : "over")
+const levelOf = (bytes: number, budget: number): Level =>
+  bytes <= 0.95 * budget ? "fits" : bytes <= budget ? "tight" : "over"
 
 const FILL: Record<Level, string> = { fits: "bg-chart-1", tight: "bg-warning", over: "bg-destructive" }
 
@@ -14,8 +15,21 @@ const FILL: Record<Level, string> = { fits: "bg-chart-1", tight: "bg-warning", o
  * Une jauge par device puis la RAM : remplissage = mémoire estimée sur la mémoire totale, trait = budget utilisable.
  * Une seule teinte ; « limite » et « dépasse » prennent les couleurs d'état, toujours accompagnées d'un libellé.
  */
-export function MemoryBars({ fit, names, ramTotalBytes }: { fit: Fit; names: Record<string, string>; ramTotalBytes: number }) {
-  const ram: DeviceBudget = { device: "RAM", bytes: fit.ramBytes, budget: fit.ramAvailableBytes, totalBytes: Math.max(ramTotalBytes, fit.ramAvailableBytes) }
+export function MemoryBars({
+  fit,
+  names,
+  ramTotalBytes,
+}: {
+  fit: Fit
+  names: Record<string, string>
+  ramTotalBytes: number
+}) {
+  const ram: DeviceBudget = {
+    device: "RAM",
+    bytes: fit.ramBytes,
+    budget: fit.ramAvailableBytes,
+    totalBytes: Math.max(ramTotalBytes, fit.ramAvailableBytes),
+  }
   return (
     <div className="flex flex-col gap-3">
       {fit.vram.map((d) => (
@@ -32,19 +46,32 @@ function Bar({ d, name, ram = false }: { d: DeviceBudget; name: string; ram?: bo
   const pct = (x: number) => `${Math.min(100, (x / total) * 100)}%`
   return (
     <Tooltip>
-      <TooltipTrigger render={<div />} className="flex flex-col gap-1.5 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50" tabIndex={0}>
+      <TooltipTrigger
+        render={<div />}
+        className="flex flex-col gap-1.5 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        tabIndex={0}
+      >
         <div className="flex items-baseline gap-2 text-sm">
           <span className="font-mono font-medium">{d.device}</span>
           <span className="num ml-auto text-xs whitespace-nowrap">
-            {formatBytes(d.bytes)} <span className="text-muted-foreground">/ {formatBytes(d.budget)} {ram ? "disponibles" : "utilisables"}</span>
+            {formatBytes(d.bytes)}{" "}
+            <span className="text-muted-foreground">
+              / {formatBytes(d.budget)} {ram ? "disponibles" : "utilisables"}
+            </span>
           </span>
         </div>
         <div className="relative h-2 rounded-full bg-muted">
           <div className={cn("absolute inset-y-0 left-0 rounded-full", FILL[level])} style={{ width: pct(d.bytes) }} />
-          <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground/60" style={{ left: pct(d.budget) }} aria-hidden="true" />
+          <div
+            className="absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground/60"
+            style={{ left: pct(d.budget) }}
+            aria-hidden="true"
+          />
         </div>
         {level !== "fits" && (
-          <span className={cn("flex items-center gap-1 text-xs", level === "tight" ? "text-warning" : "text-destructive")}>
+          <span
+            className={cn("flex items-center gap-1 text-xs", level === "tight" ? "text-warning" : "text-destructive")}
+          >
             {level === "tight" ? <TriangleAlert className="size-3.5" /> : <CircleAlert className="size-3.5" />}
             {level === "tight"
               ? "limite : moins de 5 % de marge"

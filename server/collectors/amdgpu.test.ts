@@ -3,12 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
-  pciIdsName,
   discoverAmdCards,
   isRuntimeSuspended,
   parseDpm,
   parseFdinfo,
   parseLinkSpeed,
+  pciIdsName,
   readAmdCard,
   readProcAmdVram,
   suspendedAmdReading,
@@ -150,17 +150,31 @@ test("isRuntimeSuspended reads power/runtime_status without touching the device"
   expect(await isRuntimeSuspended(card)).toBe(false);
   await Bun.write(join(dev, "power", "runtime_status"), "suspended\n");
   expect(await isRuntimeSuspended(card)).toBe(true);
-  expect(suspendedAmdReading(card)).toMatchObject({ key: "amd:0000:08:00.0", name: "Radeon RX 9070", busId: "0000:08:00.0", utilPct: null, suspended: true });
+  expect(suspendedAmdReading(card)).toMatchObject({
+    key: "amd:0000:08:00.0",
+    name: "Radeon RX 9070",
+    busId: "0000:08:00.0",
+    utilPct: null,
+    suspended: true,
+  });
 });
 
 /** A fake sysfs PCI device under `root`/devices/pci0000:00 with its identity and link attributes. */
-const pciNode = (root: string) => async (path: string, vendor: string, cls: string, cur: [string, string], max: [string, string]) => {
-  const p = join(root, "devices", "pci0000:00", path);
-  mkdirSync(p, { recursive: true });
-  const files = { vendor, class: cls, current_link_speed: cur[0], current_link_width: cur[1], max_link_speed: max[0], max_link_width: max[1] };
-  await Promise.all(Object.entries(files).map(([f, v]) => Bun.write(join(p, f), `${v}\n`)));
-  return p;
-};
+const pciNode =
+  (root: string) => async (path: string, vendor: string, cls: string, cur: [string, string], max: [string, string]) => {
+    const p = join(root, "devices", "pci0000:00", path);
+    mkdirSync(p, { recursive: true });
+    const files = {
+      vendor,
+      class: cls,
+      current_link_speed: cur[0],
+      current_link_width: cur[1],
+      max_link_speed: max[0],
+      max_link_width: max[1],
+    };
+    await Promise.all(Object.entries(files).map(([f, v]) => Bun.write(join(p, f), `${v}\n`)));
+    return p;
+  };
 
 /** Exposes `gpu` as drm `card`, the way /sys/class/drm/cardN/device links to the PCI device. */
 const drmCard = (root: string, card: string, gpu: string) => {
@@ -180,9 +194,27 @@ async function chipsetCard(prefix: string, slotMax: [string, string] = ["16.0 GT
   await node("0000:00:01.1", "0x1022", "0x060400", ["16.0 GT/s PCIe", "4"], ["16.0 GT/s PCIe", "16"]);
   await node("0000:00:01.1/0000:04:00.0", "0x1022", "0x060400", ["16.0 GT/s PCIe", "4"], ["16.0 GT/s PCIe", "4"]);
   await node(chip, "0x1022", "0x060400", ["16.0 GT/s PCIe", "4"], slotMax);
-  const up = await node(`${chip}/0000:06:00.0`, "0x1002", "0x060400", ["16.0 GT/s PCIe", "4"], ["32.0 GT/s PCIe", "16"]);
-  await node(`${chip}/0000:06:00.0/0000:07:00.0`, "0x1002", "0x060400", ["32.0 GT/s PCIe", "16"], ["32.0 GT/s PCIe", "16"]);
-  const gpu = await node(`${chip}/0000:06:00.0/0000:07:00.0/0000:08:00.0`, "0x1002", "0x030000", ["32.0 GT/s PCIe", "16"], ["32.0 GT/s PCIe", "16"]);
+  const up = await node(
+    `${chip}/0000:06:00.0`,
+    "0x1002",
+    "0x060400",
+    ["16.0 GT/s PCIe", "4"],
+    ["32.0 GT/s PCIe", "16"],
+  );
+  await node(
+    `${chip}/0000:06:00.0/0000:07:00.0`,
+    "0x1002",
+    "0x060400",
+    ["32.0 GT/s PCIe", "16"],
+    ["32.0 GT/s PCIe", "16"],
+  );
+  const gpu = await node(
+    `${chip}/0000:06:00.0/0000:07:00.0/0000:08:00.0`,
+    "0x1002",
+    "0x030000",
+    ["32.0 GT/s PCIe", "16"],
+    ["32.0 GT/s PCIe", "16"],
+  );
   const [card] = await discoverAmdCards(drmCard(root, "card1", gpu), async () => "Radeon RX 9070 XT");
   return { card: card!, slot: join(root, "devices", "pci0000:00", chip), up };
 }
@@ -202,8 +234,20 @@ test("the slot link walk stops below an ATI-chipset root port (vendor 0x1002) an
   const node = pciNode(root);
   await node("0000:00:02.0", "0x1002", "0x060400", ["5.0 GT/s PCIe", "8"], ["5.0 GT/s PCIe", "16"]);
   await node("0000:00:02.0/0000:01:00.0", "0x1002", "0x060400", ["5.0 GT/s PCIe", "8"], ["16.0 GT/s PCIe", "8"]);
-  await node("0000:00:02.0/0000:01:00.0/0000:02:00.0", "0x1002", "0x060400", ["16.0 GT/s PCIe", "16"], ["16.0 GT/s PCIe", "16"]);
-  const gpu = await node("0000:00:02.0/0000:01:00.0/0000:02:00.0/0000:03:00.0", "0x1002", "0x030000", ["16.0 GT/s PCIe", "16"], ["16.0 GT/s PCIe", "16"]);
+  await node(
+    "0000:00:02.0/0000:01:00.0/0000:02:00.0",
+    "0x1002",
+    "0x060400",
+    ["16.0 GT/s PCIe", "16"],
+    ["16.0 GT/s PCIe", "16"],
+  );
+  const gpu = await node(
+    "0000:00:02.0/0000:01:00.0/0000:02:00.0/0000:03:00.0",
+    "0x1002",
+    "0x030000",
+    ["16.0 GT/s PCIe", "16"],
+    ["16.0 GT/s PCIe", "16"],
+  );
   const [card] = await discoverAmdCards(drmCard(root, "card0", gpu), async () => "Radeon RX 6600");
   expect(card!.linkPath!.endsWith("/0000:01:00.0")).toBe(true);
   const g = await readAmdCard(card!);
@@ -238,8 +282,13 @@ test("pciIdsName names a card from sysfs ids and pci.ids, without lspci (which w
   await Bun.write(join(dev, "vendor"), "0x1002\n");
   await Bun.write(join(dev, "device"), "0x7550\n");
   const ids = join(root, "pci.ids");
-  await Bun.write(ids, "# comment\n1000  Broadcom\n\t0001  Other\n1002  Advanced Micro Devices, Inc. [AMD/ATI]\n\t1638  Cezanne [Radeon Vega Series]\n\t7550  Navi 48 [Radeon RX 9070/9070 XT/9070 GRE]\n\t\t1458 2424  Subsys\n1003  ULSI\n");
-  expect(await pciIdsName("0000:08:00.0", join(root, "devices"), [join(root, "missing.ids"), ids])).toBe("Radeon RX 9070/9070 XT/9070 GRE");
+  await Bun.write(
+    ids,
+    "# comment\n1000  Broadcom\n\t0001  Other\n1002  Advanced Micro Devices, Inc. [AMD/ATI]\n\t1638  Cezanne [Radeon Vega Series]\n\t7550  Navi 48 [Radeon RX 9070/9070 XT/9070 GRE]\n\t\t1458 2424  Subsys\n1003  ULSI\n",
+  );
+  expect(await pciIdsName("0000:08:00.0", join(root, "devices"), [join(root, "missing.ids"), ids])).toBe(
+    "Radeon RX 9070/9070 XT/9070 GRE",
+  );
   await Bun.write(join(dev, "device"), "0x9999\n");
   expect(await pciIdsName("0000:08:00.0", join(root, "devices"), [ids])).toBe("AMD GPU 0000:08:00.0");
   rmSync(root, { recursive: true, force: true });

@@ -1,7 +1,12 @@
 import type { Tone } from "@/components/glass/tones"
 
 /** Série de graphe par ton : --chart-N (validés pour chaque thème), dans l'ordre fixe violet, cyan, ambre, rose. */
-const CHART_VAR: Record<Tone, string> = { violet: "--chart-1", cyan: "--chart-2", amber: "--chart-3", rose: "--chart-4" }
+const CHART_VAR: Record<Tone, string> = {
+  violet: "--chart-1",
+  cyan: "--chart-2",
+  amber: "--chart-3",
+  rose: "--chart-4",
+}
 
 export interface ChartTheme {
   axis: string

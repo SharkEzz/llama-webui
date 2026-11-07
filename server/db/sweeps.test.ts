@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
+import { expect, test } from "bun:test";
 import { copyFileSync, existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,8 +11,18 @@ import { SweepsRepo } from "./sweeps";
 
 const hw = { cpu: "", gpus: [], build: null };
 const spec = BenchSpecSchema.parse({ kind: "bench", modelPath: "/m/a.gguf" });
-const sweepSpec = SweepSpecSchema.parse({ name: "s", modelPath: "/m/a.gguf", preset: "chat", space: { ncmoe: [0, 8, 16] } });
-const items = (n: number) => Array.from({ length: n }, (_, i) => ({ spec: { ...spec, params: { ncmoe: i } } as BenchSpec, label: `-ncmoe ${i}`, fit: "fits" as const }));
+const sweepSpec = SweepSpecSchema.parse({
+  name: "s",
+  modelPath: "/m/a.gguf",
+  preset: "chat",
+  space: { ncmoe: [0, 8, 16] },
+});
+const items = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({
+    spec: { ...spec, params: { ncmoe: i } } as BenchSpec,
+    label: `-ncmoe ${i}`,
+    fit: "fits" as const,
+  }));
 
 test("a deleted run's id is never handed out again", () => {
   const repo = new BenchRunsRepo(openDb(":memory:"));
@@ -26,11 +36,15 @@ const J5_DB = "/tmp/lw-j5/llama-webui.sqlite";
 test.skipIf(!existsSync(J5_DB))("the migration keeps every J5 run", () => {
   const copy = join(mkdtempSync(join(tmpdir(), "lw-mig-")), "db.sqlite");
   copyFileSync(J5_DB, copy);
-  const before = new Database(copy, { readonly: true }).query<{ n: number; max: number }, []>("SELECT count(*) n, max(id) max FROM bench_runs").get()!;
+  const before = new Database(copy, { readonly: true })
+    .query<{ n: number; max: number }, []>("SELECT count(*) n, max(id) max FROM bench_runs")
+    .get()!;
   const db = openDb(copy);
   const after = db.query<{ n: number; max: number }, []>("SELECT count(*) n, max(id) max FROM bench_runs").get()!;
   expect(after).toEqual(before);
-  expect(db.query<{ version: number }, []>("SELECT version FROM schema_version").get()!.version).toBe(MIGRATIONS.length);
+  expect(db.query<{ version: number }, []>("SELECT version FROM schema_version").get()!.version).toBe(
+    MIGRATIONS.length,
+  );
   const repo = new BenchRunsRepo(db);
   expect(repo.list({ sweepId: "all", limit: 1000 })).toHaveLength(before.n);
   expect(repo.create(spec, "x", hw).id).toBe(before.max + 1);
@@ -50,7 +64,11 @@ test("a sweep counts its queued items, cascades on delete and forgets a deleted 
   expect(sweeps.get(s.id)!.counts).toMatchObject({ total: 3, queued: 3 });
   expect(runs.nextQueued(s.id)!.id).toBe(queued[0]!.id);
   runs.begin(queued[0]!.id, { command: "cmd", hardware: hw });
-  runs.finish(queued[0]!.id, { status: "ok", pp: { tps: 900, stddev: 9, tokens: 512 }, tg: { tps: 50, stddev: 0.5, tokens: 128 } });
+  runs.finish(queued[0]!.id, {
+    status: "ok",
+    pp: { tps: 900, stddev: 9, tokens: 512 },
+    tg: { tps: 50, stddev: 0.5, tokens: 128 },
+  });
   sweeps.setStatus(s.id, "running", { bestRunId: queued[0]!.id });
   expect(sweeps.get(s.id)!.best).toEqual({ label: "-ncmoe 0", kind: "bench", ppTps: 900, tgTps: 50 });
   expect(runs.list({}).map((r) => r.id)).toEqual([]); // les runs de sweep sont masqués par défaut

@@ -1,10 +1,10 @@
-import { test, expect } from "bun:test";
+import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DEFAULT_SETTINGS } from "@llama-webui/shared";
 import { openDb } from "./open";
 import { SettingsRepo } from "./settings";
-import { DEFAULT_SETTINGS } from "@llama-webui/shared";
 
 test("settings: défauts puis patch persisté", () => {
   const dir = mkdtempSync(join(tmpdir(), "lw-"));

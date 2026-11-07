@@ -1,11 +1,18 @@
+import type { ModelDetail } from "@llama-webui/shared"
+import { Copy, Plus } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useNavigate } from "react-router"
-import { Copy, Plus } from "lucide-react"
 import { toast } from "sonner"
-import type { ModelDetail } from "@llama-webui/shared"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Facts } from "@/features/system/Facts"
 import { api } from "@/lib/api"
@@ -59,7 +66,10 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
                 ["Contexte", detail.contextLength > 0 ? formatInt(detail.contextLength) : "—"],
                 ["Dimension", formatInt(detail.embeddingLength)],
                 ["Têtes / têtes KV", `${detail.headCount} / ${detail.headCountKv}`],
-                ["Experts (actifs)", detail.expertCount > 0 ? `${detail.expertCount} (${detail.expertUsedCount})` : "—"],
+                [
+                  "Experts (actifs)",
+                  detail.expertCount > 0 ? `${detail.expertCount} (${detail.expertUsedCount})` : "—",
+                ],
                 ["Couches MTP", detail.nextnLayers > 0 ? formatInt(detail.nextnLayers) : "—"],
                 ["Récurrent", yesNo(detail.recurrent)],
                 ["Fenêtre glissante", detail.slidingWindow ? formatInt(detail.slidingWindow) : "—"],
@@ -79,7 +89,9 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
                 ]}
               />
               <div className="flex flex-col gap-1">
-                <p className="text-sm text-muted-foreground">{detail.files.length > 1 ? `${detail.files.length} fichiers` : "Fichier"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {detail.files.length > 1 ? `${detail.files.length} fichiers` : "Fichier"}
+                </p>
                 {detail.files.map((f) => (
                   <p key={f} className="break-all font-mono text-xs">
                     {f}
@@ -90,7 +102,11 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
           </div>
         )}
         <DialogFooter>
-          <Button variant="ghost" disabled={!path} onClick={() => path && copyText(path).then(() => toast.success("Chemin copié"))}>
+          <Button
+            variant="ghost"
+            disabled={!path}
+            onClick={() => path && copyText(path).then(() => toast.success("Chemin copié"))}
+          >
             <Copy /> Copier le chemin
           </Button>
           {detail?.kind === "model" && (

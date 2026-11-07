@@ -19,7 +19,16 @@ export interface Preset {
 }
 
 export const PRESETS: readonly Preset[] = [
-  { id: "chat", label: "Chat réactif", hint: "débit de génération d'abord, 32 k de contexte", ctxTarget: 32768, ctxMin: 8192, kvPreferred: "f16", ub: 512, score: (r) => r.tgTps },
+  {
+    id: "chat",
+    label: "Chat réactif",
+    hint: "débit de génération d'abord, 32 k de contexte",
+    ctxTarget: 32768,
+    ctxMin: 8192,
+    kvPreferred: "f16",
+    ub: 512,
+    score: (r) => r.tgTps,
+  },
   {
     id: "agent",
     label: "Agent & RAG",
@@ -40,7 +49,16 @@ export const PRESETS: readonly Preset[] = [
     ub: 512,
     score: (r) => r.ctx * 1e6 + r.tgTps,
   },
-  { id: "fit", label: "Faire tenir le modèle", hint: "qu'il démarre et réponde, même lentement", ctxTarget: 8192, ctxMin: 8192, kvPreferred: "q8_0", ub: 512, score: (r) => r.tgTps },
+  {
+    id: "fit",
+    label: "Faire tenir le modèle",
+    hint: "qu'il démarre et réponde, même lentement",
+    ctxTarget: 8192,
+    ctxMin: 8192,
+    kvPreferred: "q8_0",
+    ub: 512,
+    score: (r) => r.tgTps,
+  },
   {
     id: "big",
     label: "Modèle de 100 Go",

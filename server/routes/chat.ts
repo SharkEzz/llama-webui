@@ -1,5 +1,5 @@
-import type { Server } from "bun";
 import { type ConversationDetail, type ConversationSummary, formatSse } from "@llama-webui/shared";
+import type { Server } from "bun";
 import type { ChatRun, ChatRuns } from "../chat/runs";
 import type { ConversationsRepo } from "../db/conversations";
 import type { ProfilesRepo } from "../db/profiles";
@@ -60,14 +60,19 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
 
   return {
     "/api/chat": {
-      GET: guarded(() => Response.json(conversations.list().map((c): ConversationSummary => ({ ...c, live: isLive(c.id) })))),
+      GET: guarded(() =>
+        Response.json(conversations.list().map((c): ConversationSummary => ({ ...c, live: isLive(c.id) }))),
+      ),
       POST: guarded(async (req) => {
         const body = await jsonObject(req);
         const id = body.profileId === undefined ? activeProfileId() : Number(body.profileId);
         if (id !== null && !Number.isInteger(id)) throw new HttpError(400, "profileId : entier attendu");
         const profile = id !== null ? profiles.get(id) : null;
         if (id !== null && !profile) throw notFound("Profil");
-        const c = conversations.create({ profileId: profile?.id ?? null, modelPath: profile ? profilePaths(profile).model : null });
+        const c = conversations.create({
+          profileId: profile?.id ?? null,
+          modelPath: profile ? profilePaths(profile).model : null,
+        });
         return Response.json(detail(c.id), { status: 201 });
       }),
     },

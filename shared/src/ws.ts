@@ -1,7 +1,7 @@
 import type { BenchLive, BenchRun } from "./bench";
 import type { LogLine } from "./logs";
-import type { ServerView } from "./server";
 import type { Snapshot } from "./monitor";
+import type { ServerView } from "./server";
 import type { Sweep, SweepLive } from "./sweep";
 
 /** Messages échangés sur le WebSocket /ws. */

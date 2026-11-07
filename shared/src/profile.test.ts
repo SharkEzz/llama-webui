@@ -25,5 +25,10 @@ test("import : valides gardés, invalides expliqués", () => {
 
 test("import : profil seul et tableau", () => {
   expect(parseProfileImport({ name: "a", model: "m" }).profiles).toHaveLength(1);
-  expect(parseProfileImport([{ name: "a", model: "m" }, { name: "b", model: "m" }]).profiles).toHaveLength(2);
+  expect(
+    parseProfileImport([
+      { name: "a", model: "m" },
+      { name: "b", model: "m" },
+    ]).profiles,
+  ).toHaveLength(2);
 });

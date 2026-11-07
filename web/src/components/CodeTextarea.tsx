@@ -19,7 +19,14 @@ export function CodeTextarea({ value, onChange, highlight, className, ref, onScr
   const pre = useRef<HTMLPreElement>(null)
   return (
     <div className={cn("relative", className)}>
-      <pre ref={pre} aria-hidden="true" className={cn(BOX, "pointer-events-none absolute inset-0 m-0 overflow-hidden border-transparent text-foreground")}>
+      <pre
+        ref={pre}
+        aria-hidden="true"
+        className={cn(
+          BOX,
+          "pointer-events-none absolute inset-0 m-0 overflow-hidden border-transparent text-foreground",
+        )}
+      >
         {highlight(value)}
         {/* une dernière ligne vide doit aussi occuper sa hauteur */}
         {"\n"}

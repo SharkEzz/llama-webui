@@ -1,6 +1,6 @@
-import { useState } from "react"
-import { FolderOpen } from "lucide-react"
 import type { ModelKind } from "@llama-webui/shared"
+import { FolderOpen } from "lucide-react"
+import { useState } from "react"
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { InputGroupButton } from "@/components/ui/input-group"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -23,7 +23,12 @@ export function ModelPicker({ kind, onSelect }: { kind: ModelKind; onSelect(path
       }}
     >
       <PopoverTrigger
-        render={<InputGroupButton size="icon-xs" aria-label={kind === "mmproj" ? "Choisir un projecteur" : "Choisir un modèle"} />}
+        render={
+          <InputGroupButton
+            size="icon-xs"
+            aria-label={kind === "mmproj" ? "Choisir un projecteur" : "Choisir un modèle"}
+          />
+        }
       >
         <FolderOpen />
       </PopoverTrigger>

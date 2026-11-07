@@ -4,7 +4,8 @@ import { NvidiaMonitor, parseComputeApps, parseNvidiaGpuLine } from "./nvidia";
 
 const fx = (n: string) => Bun.file(`${import.meta.dir}/../../testdata/${n}`).text();
 const gpuCsv = await fx("nvidia-gpu.csv");
-const LINE = "0, GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28, NVIDIA GeForce RTX 5070 Ti, 0, 5895, 16303, 38, 49.86, 00000000:01:00.0";
+const LINE =
+  "0, GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28, NVIDIA GeForce RTX 5070 Ti, 0, 5895, 16303, 38, 49.86, 00000000:01:00.0";
 
 test("normalizeBusId", () => {
   expect(normalizeBusId("00000000:01:00.0")).toBe("0000:01:00.0");
@@ -30,7 +31,11 @@ test("parseNvidiaGpuLine", () => {
 test("parseComputeApps", async () => {
   const apps = parseComputeApps(await fx("nvidia-apps.csv"));
   expect(apps.length).toBe(2);
-  expect(apps[0]).toEqual({ pid: 49730, uuid: "GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28", usedBytes: 5875 * 1024 ** 2 });
+  expect(apps[0]).toEqual({
+    pid: 49730,
+    uuid: "GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28",
+    usedBytes: 5875 * 1024 ** 2,
+  });
 });
 
 function fakeSpawn(chunks: string[], appsCsv = "") {
@@ -69,7 +74,9 @@ test("NvidiaMonitor procVram from compute apps", async () => {
 
 test("compute apps with [N/A] memory keep the process on its card, counting the card's VRAM in use", async () => {
   expect(parseComputeApps("49730, GPU-x, [N/A]\n")).toEqual([{ pid: 49730, uuid: "GPU-x", usedBytes: null }]);
-  const mon = new NvidiaMonitor({ spawn: fakeSpawn([gpuCsv], "49730, GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28, [N/A]\n") });
+  const mon = new NvidiaMonitor({
+    spawn: fakeSpawn([gpuCsv], "49730, GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28, [N/A]\n"),
+  });
   mon.start();
   await Bun.sleep(20);
   await mon.refreshApps();
@@ -128,7 +135,11 @@ const g = (key: string, busId: string, procVramBytes: number): GpuSample => ({
 });
 
 test("selectUsedGpus", () => {
-  const used = selectUsedGpus([g("b", "0000:08:00.0", 6 * 1024 ** 3), g("i", "0000:0d:00.0", 32 * 1024), g("a", "0000:01:00.0", 5 * 1024 ** 3)]);
+  const used = selectUsedGpus([
+    g("b", "0000:08:00.0", 6 * 1024 ** 3),
+    g("i", "0000:0d:00.0", 32 * 1024),
+    g("a", "0000:01:00.0", 5 * 1024 ** 3),
+  ]);
   expect(used.map((x) => x.key)).toEqual(["a", "b"]);
 });
 
@@ -154,7 +165,11 @@ test("configure restarts a running nvidia-smi stream at the new pace, and only t
   const spawn = ((a: string[]) => {
     argv.push(a);
     const i = argv.length;
-    return { stdout: new ReadableStream<Uint8Array>({ start() {} }), exited: new Promise<number>(() => {}), kill: () => kills.push(i) };
+    return {
+      stdout: new ReadableStream<Uint8Array>({ start() {} }),
+      exited: new Promise<number>(() => {}),
+      kill: () => kills.push(i),
+    };
   }) as unknown as typeof Bun.spawn;
   const mon = new NvidiaMonitor({ spawn, intervalMs: 1000 });
   mon.configure({ intervalMs: 500 }); // not started: nothing to restart

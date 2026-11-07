@@ -1,6 +1,7 @@
 import { readdir, realpath, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { DiskSample } from "@llama-webui/shared";
+
 export type { DiskSample };
 
 const SECTOR = 512;
@@ -50,7 +51,10 @@ export function devMajorMinor(dev: bigint): [number, number] {
 const defaultStatDev = async (p: string): Promise<bigint> => (await stat(p, { bigint: true })).dev;
 
 /** Disk holding `path` (a partition resolves to its parent disk); null when unknown (tmpfs, btrfs, NFS, missing file). */
-export async function resolveModelDisk(path: string, o: { sysRoot?: string; statDev?: (p: string) => Promise<bigint> } = {}): Promise<string | null> {
+export async function resolveModelDisk(
+  path: string,
+  o: { sysRoot?: string; statDev?: (p: string) => Promise<bigint> } = {},
+): Promise<string | null> {
   try {
     const [major, minor] = devMajorMinor(await (o.statDev ?? defaultStatDev)(path));
     if (major === 0) return null;
@@ -104,7 +108,8 @@ export class DiskSampler {
       readBps += rate(d, "readBytes");
       writeBps += rate(d, "writeBytes");
     }
-    const model = modelDisk && counters.has(modelDisk) ? { disk: modelDisk, readBps: rate(modelDisk, "readBytes") } : null;
+    const model =
+      modelDisk && counters.has(modelDisk) ? { disk: modelDisk, readBps: rate(modelDisk, "readBytes") } : null;
     return { readBps, writeBps, model };
   }
 }

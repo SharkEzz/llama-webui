@@ -1,5 +1,5 @@
-import { create } from "zustand"
 import type { Profile } from "@llama-webui/shared"
+import { create } from "zustand"
 import { api } from "./api"
 
 interface ProfilesStore {
@@ -34,7 +34,8 @@ export interface LlamaTuiStatus {
 const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) })
 
 export const createProfile = (input: unknown) => api<Profile>("/profiles", { method: "POST", ...json(input) })
-export const updateProfile = (id: number, input: unknown) => api<Profile>(`/profiles/${id}`, { method: "PUT", ...json(input) })
+export const updateProfile = (id: number, input: unknown) =>
+  api<Profile>(`/profiles/${id}`, { method: "PUT", ...json(input) })
 export const deleteProfile = (id: number) => api<void>(`/profiles/${id}`, { method: "DELETE" })
 export const duplicateProfile = (id: number) => api<Profile>(`/profiles/${id}/duplicate`, { method: "POST" })
 export const importProfiles = (raw: unknown) => api<ImportResult>("/profiles/import", { method: "POST", ...json(raw) })

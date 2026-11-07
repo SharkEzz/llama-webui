@@ -75,7 +75,10 @@ describe("liveRates", () => {
   });
   test("no prev or idle → 0", () => {
     expect(liveRates(null, raw(1000, [slot({ nDecoded: 5 })]))).toEqual({ genTps: 0, ppTps: 0 });
-    expect(liveRates(raw(0, [slot({})]), raw(1000, [slot({ processing: false, nDecoded: 9 })]))).toEqual({ genTps: 0, ppTps: 0 });
+    expect(liveRates(raw(0, [slot({})]), raw(1000, [slot({ processing: false, nDecoded: 9 })]))).toEqual({
+      genTps: 0,
+      ppTps: 0,
+    });
   });
 });
 
@@ -111,8 +114,13 @@ describe("fetchLlama", () => {
     expect(r.slots).toBeNull();
   });
   test("ok → slots and metrics", async () => {
-    const body = { "/health": '{"status":"ok"}', "/slots": await fx("slots-busy.json").text(), "/metrics": await fx("metrics-after.txt").text() };
-    const f = (async (u: string) => new Response(body[new URL(u).pathname as keyof typeof body])) as unknown as typeof fetch;
+    const body = {
+      "/health": '{"status":"ok"}',
+      "/slots": await fx("slots-busy.json").text(),
+      "/metrics": await fx("metrics-after.txt").text(),
+    };
+    const f = (async (u: string) =>
+      new Response(body[new URL(u).pathname as keyof typeof body])) as unknown as typeof fetch;
     const r = await fetchLlama("http://x", f);
     expect(r.health).toBe("ok");
     expect(r.slots?.[0]?.nDecoded).toBe(21);
@@ -120,7 +128,9 @@ describe("fetchLlama", () => {
   });
   test("hung server → down within timeout", async () => {
     const f = ((_u: string, init?: RequestInit) =>
-      new Promise((_r, rej) => init?.signal?.addEventListener("abort", () => rej(new Error("abort"))))) as unknown as typeof fetch;
+      new Promise((_r, rej) =>
+        init?.signal?.addEventListener("abort", () => rej(new Error("abort"))),
+      )) as unknown as typeof fetch;
     const t0 = Date.now();
     const r = await fetchLlama("http://x", f, 50);
     expect(r.health).toBe("down");
@@ -144,7 +154,11 @@ describe("mergeRequestStats (prompt and generation counters land on different ti
   });
   test("a new prompt starts a new request", () => {
     const prev = { genTps: 44.7, ppTps: 124.6, specAccept: 0.415 };
-    expect(mergeRequestStats(prev, { genTps: null, ppTps: 90, specAccept: null })).toEqual({ genTps: null, ppTps: 90, specAccept: null });
+    expect(mergeRequestStats(prev, { genTps: null, ppTps: 90, specAccept: null })).toEqual({
+      genTps: null,
+      ppTps: 90,
+      specAccept: null,
+    });
   });
   test("both in one delta", () => {
     const d = { genTps: 5, ppTps: 27.8, specAccept: 0.8 };
@@ -214,21 +228,55 @@ describe("context usage and recent requests", () => {
       spec_decode_num_draft_tokens_total: 10,
       spec_decode_num_accepted_tokens_total: 5,
     });
-    expect(requestDelta(cur, gen, 7)).toMatchObject({ promptTokens: 0, genTokens: 300, genSec: 60, genTps: 5, specAccept: 0.5 });
+    expect(requestDelta(cur, gen, 7)).toMatchObject({
+      promptTokens: 0,
+      genTokens: 300,
+      genSec: 60,
+      genTps: 5,
+      specAccept: 0.5,
+    });
   });
 
   test("foldRecent starts on prompt deltas and completes on generation-only deltas", () => {
-    const p: RequestRecord = { at: 1, promptTokens: 68, cachedTokens: 0, genTokens: 0, promptSec: 2, genSec: null, ppTps: 34, genTps: null, specAccept: null };
-    const g: RequestRecord = { at: 2, promptTokens: 0, cachedTokens: 0, genTokens: 300, promptSec: null, genSec: 60, ppTps: null, genTps: 5, specAccept: 0.5 };
+    const p: RequestRecord = {
+      at: 1,
+      promptTokens: 68,
+      cachedTokens: 0,
+      genTokens: 0,
+      promptSec: 2,
+      genSec: null,
+      ppTps: 34,
+      genTps: null,
+      specAccept: null,
+    };
+    const g: RequestRecord = {
+      at: 2,
+      promptTokens: 0,
+      cachedTokens: 0,
+      genTokens: 300,
+      promptSec: null,
+      genSec: 60,
+      ppTps: null,
+      genTps: 5,
+      specAccept: 0.5,
+    };
     const l1 = foldRecent([], p);
     const l2 = foldRecent(l1, g);
     expect(l2).toEqual([{ ...p, genTokens: 300, genSec: 60, genTps: 5, specAccept: 0.5 }]);
-    expect(foldRecent(l2, { ...g, genTokens: 100, genSec: 20, specAccept: null })[0]).toMatchObject({ genTokens: 400, genSec: 80, genTps: 5, specAccept: 0.5 });
+    expect(foldRecent(l2, { ...g, genTokens: 100, genSec: 20, specAccept: null })[0]).toMatchObject({
+      genTokens: 400,
+      genSec: 80,
+      genTps: 5,
+      specAccept: 0.5,
+    });
     expect(foldRecent(l2, { ...p, at: 3 }).map((r) => r.at)).toEqual([3, 1]);
     expect(foldRecent([], g)).toEqual([g]);
     expect(foldRecent(l2, null)).toBe(l2);
     // Kept for wide dashboards, where Requêtes récentes grows to fill its column.
-    const many = Array.from({ length: 45 }, (_, i) => ({ ...p, at: i })).reduce<RequestRecord[]>((l, r) => foldRecent(l, r), []);
+    const many = Array.from({ length: 45 }, (_, i) => ({ ...p, at: i })).reduce<RequestRecord[]>(
+      (l, r) => foldRecent(l, r),
+      [],
+    );
     expect(many.length).toBe(40);
     expect(many[0]!.at).toBe(44);
   });

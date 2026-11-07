@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { filterLogs, type LogLevel } from "@llama-webui/shared"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { ArrowDownToLine, Copy, Eraser, ScrollText, Search } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { filterLogs, type LogLevel } from "@llama-webui/shared"
 import { GLASS } from "@/components/glass/glass"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
@@ -34,7 +34,8 @@ export function LogsPage() {
   const userScroll = useRef(false)
 
   const lines = useMemo(
-    () => filterLogs(hiddenBefore < 0 ? all : all.filter((l) => l.seq >= hiddenBefore), { minLevel, query: query.trim() }),
+    () =>
+      filterLogs(hiddenBefore < 0 ? all : all.filter((l) => l.seq >= hiddenBefore), { minLevel, query: query.trim() }),
     [all, minLevel, query, hiddenBefore],
   )
 
@@ -55,8 +56,14 @@ export function LogsPage() {
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-3xl font-semibold tracking-tight">Logs</h1>
         <span className="text-sm text-muted-foreground">
-          <span className="num text-foreground/80">{lines.length.toLocaleString("fr-FR")}</span> ligne{lines.length > 1 ? "s" : ""}
-          {lines.length !== all.length && <> sur <span className="num">{all.length.toLocaleString("fr-FR")}</span></>}
+          <span className="num text-foreground/80">{lines.length.toLocaleString("fr-FR")}</span> ligne
+          {lines.length > 1 ? "s" : ""}
+          {lines.length !== all.length && (
+            <>
+              {" "}
+              sur <span className="num">{all.length.toLocaleString("fr-FR")}</span>
+            </>
+          )}
         </span>
       </header>
 
@@ -74,8 +81,17 @@ export function LogsPage() {
           </SelectContent>
         </Select>
         <div className="relative min-w-48 flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Rechercher" className="pl-8" aria-label="Rechercher dans les logs" />
+          <Search
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Rechercher"
+            className="pl-8"
+            aria-label="Rechercher dans les logs"
+          />
         </div>
         <div className="flex items-center gap-2">
           <Switch
@@ -133,7 +149,9 @@ export function LogsPage() {
               <ScrollText />
               <AlertTitle>{all.length === 0 ? "Aucun log" : "Aucune ligne ne correspond aux filtres"}</AlertTitle>
               <AlertDescription>
-                {all.length === 0 ? "Démarrez llama-server depuis la page Serveur." : "Baissez le niveau minimal ou changez la recherche."}
+                {all.length === 0
+                  ? "Démarrez llama-server depuis la page Serveur."
+                  : "Baissez le niveau minimal ou changez la recherche."}
               </AlertDescription>
             </Alert>
           ) : (

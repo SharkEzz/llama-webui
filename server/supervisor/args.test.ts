@@ -6,7 +6,11 @@ const settings = { binary: "llama-server", host: "0.0.0.0", port: 8080 };
 const p = (input: ProfileInput): Profile => ({ ...input, id: 1, source: "ui", createdAt: 0, updatedAt: 0 });
 
 test("builds argv with pdeathsig and mandatory flags", () => {
-  const cmd = buildCommand(p({ name: "q", model: "m.gguf", mmproj: "p.gguf", cwd: "~/Models", args: ["-c", "40000"], env: {} }), settings, "/home/x");
+  const cmd = buildCommand(
+    p({ name: "q", model: "m.gguf", mmproj: "p.gguf", cwd: "~/Models", args: ["-c", "40000"], env: {} }),
+    settings,
+    "/home/x",
+  );
   expect(cmd.argv).toEqual([
     "setpriv",
     "--pdeathsig",
@@ -35,13 +39,19 @@ test("builds argv with pdeathsig and mandatory flags", () => {
 });
 
 test("~ in model and mmproj is expanded for llama-server, which runs without a shell", () => {
-  const cmd = buildCommand(p({ name: "q", model: "~/Models/m.gguf", mmproj: "~/Models/p.gguf", args: [], env: {} }), settings, "/home/x");
+  const cmd = buildCommand(
+    p({ name: "q", model: "~/Models/m.gguf", mmproj: "~/Models/p.gguf", args: [], env: {} }),
+    settings,
+    "/home/x",
+  );
   expect(cmd.argv.slice(5, 9)).toEqual(["-m", "/home/x/Models/m.gguf", "-mm", "/home/x/Models/p.gguf"]);
   expect(cmd.display).toContain("-m /home/x/Models/m.gguf");
 });
 
 test("profilePaths: the files as llama-server opens them, from its cwd, ~ expanded everywhere", () => {
-  expect(profilePaths({ name: "q", model: "m.gguf", mmproj: "sub/p.gguf", cwd: "~/Models", args: [], env: {} }, "/home/x")).toEqual({
+  expect(
+    profilePaths({ name: "q", model: "m.gguf", mmproj: "sub/p.gguf", cwd: "~/Models", args: [], env: {} }, "/home/x"),
+  ).toEqual({
     cwd: "/home/x/Models",
     model: "/home/x/Models/m.gguf",
     mmproj: "/home/x/Models/sub/p.gguf",
@@ -51,7 +61,9 @@ test("profilePaths: the files as llama-server opens them, from its cwd, ~ expand
     model: "/home/x/Models/m.gguf",
     mmproj: null,
   });
-  expect(profilePaths({ name: "q", model: "/abs/m.gguf", cwd: "/elsewhere", args: [], env: {} }, "/home/x").model).toBe("/abs/m.gguf");
+  expect(profilePaths({ name: "q", model: "/abs/m.gguf", cwd: "/elsewhere", args: [], env: {} }, "/home/x").model).toBe(
+    "/abs/m.gguf",
+  );
 });
 
 test("profile port/host override server", () => {
@@ -88,7 +100,14 @@ test("shellSplit undoes shellQuote", () => {
 });
 
 test("shellSplit reads what a user types: spaces separate, quotes group", () => {
-  expect(shellSplit(`--ctx-size 8192 -ngl 99 --chat-template "a b"`)).toEqual(["--ctx-size", "8192", "-ngl", "99", "--chat-template", "a b"]);
+  expect(shellSplit(`--ctx-size 8192 -ngl 99 --chat-template "a b"`)).toEqual([
+    "--ctx-size",
+    "8192",
+    "-ngl",
+    "99",
+    "--chat-template",
+    "a b",
+  ]);
   expect(shellSplit("  a   b  ")).toEqual(["a", "b"]);
   expect(shellSplit("")).toEqual([]);
   expect(shellSplit(`"say \\"hi\\"" 'x\\y'`)).toEqual([`say "hi"`, "x\\y"]);

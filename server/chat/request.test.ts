@@ -14,7 +14,12 @@ const conv: Conversation = {
   updatedAt: 0,
 };
 let n = 0;
-const m = (role: ChatMessage["role"], content: string, status: ChatMessage["status"] = "done", reasoning = ""): ChatMessage => ({
+const m = (
+  role: ChatMessage["role"],
+  content: string,
+  status: ChatMessage["status"] = "done",
+  reasoning = "",
+): ChatMessage => ({
   id: ++n,
   conversationId: 1,
   role,
@@ -28,7 +33,12 @@ const m = (role: ChatMessage["role"], content: string, status: ChatMessage["stat
 });
 
 test("empty sampling sends no sampling key, reasoning and failed messages stay out", () => {
-  const body = buildChatRequest(conv, [m("user", "Salut"), m("assistant", "Bonjour", "done", "Il dit bonjour."), m("user", "Et alors ?"), m("assistant", "", "error")]);
+  const body = buildChatRequest(conv, [
+    m("user", "Salut"),
+    m("assistant", "Bonjour", "done", "Il dit bonjour."),
+    m("user", "Et alors ?"),
+    m("assistant", "", "error"),
+  ]);
   expect(body.messages).toEqual([
     { role: "system", content: "Réponds en français." },
     { role: "user", content: "Salut" },
@@ -37,9 +47,12 @@ test("empty sampling sends no sampling key, reasoning and failed messages stay o
   ]);
   expect(body.stream).toBe(true);
   expect(body.temperature).toBe(0.2);
-  for (const k of ["top_p", "top_k", "min_p", "presence_penalty", "repeat_penalty", "max_tokens", "seed"]) expect(k in body).toBe(false);
+  for (const k of ["top_p", "top_k", "min_p", "presence_penalty", "repeat_penalty", "max_tokens", "seed"])
+    expect(k in body).toBe(false);
   expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
-  expect(buildChatRequest({ ...conv, systemPrompt: "  " }, [m("user", "x")]).messages).toEqual([{ role: "user", content: "x" }]);
+  expect(buildChatRequest({ ...conv, systemPrompt: "  " }, [m("user", "x")]).messages).toEqual([
+    { role: "user", content: "x" },
+  ]);
 });
 
 test("a context overflow becomes a clear message, other errors keep llama-server's text", () => {
@@ -53,12 +66,19 @@ test("a context overflow becomes a clear message, other errors keep llama-server
   ).toBe(
     `Conversation trop longue pour le contexte du modèle (${n(41234)} / ${n(40000)} jetons) : commencez une nouvelle conversation ou utilisez un profil à plus grand contexte.`,
   );
-  expect(llamaErrorMessage({ type: "exceed_context_size_error", message: "?", n_prompt_tokens: 50, n_ctx: 40 })).toContain(`(${n(50)} / ${n(40)} jetons)`);
+  expect(
+    llamaErrorMessage({ type: "exceed_context_size_error", message: "?", n_prompt_tokens: 50, n_ctx: 40 }),
+  ).toContain(`(${n(50)} / ${n(40)} jetons)`);
   expect(llamaErrorMessage({ type: "server_error", message: "boom" })).toBe("llama-server : boom");
 });
 
 test("consecutive messages of the same role are merged (strict templates require alternating roles)", () => {
-  const body = buildChatRequest({ ...conv, systemPrompt: "" }, [m("user", "Q1"), m("assistant", "", "error"), m("user", "Q2"), m("assistant", "R2")]);
+  const body = buildChatRequest({ ...conv, systemPrompt: "" }, [
+    m("user", "Q1"),
+    m("assistant", "", "error"),
+    m("user", "Q2"),
+    m("assistant", "R2"),
+  ]);
   expect(body.messages).toEqual([
     { role: "user", content: "Q1\n\nQ2" },
     { role: "assistant", content: "R2" },

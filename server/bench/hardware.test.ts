@@ -7,7 +7,10 @@ import { buildOf } from "./hardware";
 test("buildOf reads the version again after the binary is rebuilt", async () => {
   const bin = join(mkdtempSync(join(tmpdir(), "lw-build-")), "llama-server");
   const write = (n: number) => {
-    writeFileSync(bin, `#!/bin/sh\necho "version: ${n} (c${n})" >&2\necho "built with cc (build ${n}, commit c${n})" >&2\n`);
+    writeFileSync(
+      bin,
+      `#!/bin/sh\necho "version: ${n} (c${n})" >&2\necho "built with cc (build ${n}, commit c${n})" >&2\n`,
+    );
     chmodSync(bin, 0o755);
     utimesSync(bin, n * 1000, n * 1000);
   };

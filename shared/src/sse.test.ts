@@ -4,7 +4,7 @@ import { formatSse, SseParser } from "./sse";
 test("an event split across chunks comes out once complete", () => {
   const p = new SseParser();
   expect(p.push('data: {"a"')).toEqual([]);
-  expect(p.push(':1}\n')).toEqual([]);
+  expect(p.push(":1}\n")).toEqual([]);
   expect(p.push("\n")).toEqual([{ event: "message", data: '{"a":1}' }]);
 });
 
@@ -17,5 +17,7 @@ test("CRLF, multi-line data, comments and named events", () => {
 });
 
 test("formatSse writes one event the parser reads back", () => {
-  expect(new SseParser().push(formatSse("delta", { content: "x\ny" }))).toEqual([{ event: "delta", data: '{"content":"x\\ny"}' }]);
+  expect(new SseParser().push(formatSse("delta", { content: "x\ny" }))).toEqual([
+    { event: "delta", data: '{"content":"x\\ny"}' },
+  ]);
 });

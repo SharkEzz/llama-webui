@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { DEFAULT_SETTINGS, SettingsSchema, type Settings } from "@llama-webui/shared";
+import { DEFAULT_SETTINGS, type Settings, SettingsSchema } from "@llama-webui/shared";
 
 const KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
 
@@ -8,9 +8,7 @@ export class SettingsRepo {
 
   /** Réglages courants ; une valeur stockée invalide (schéma durci, JSON abîmé) retombe sur son défaut. */
   get(): Settings {
-    const rows = this.db
-      .query<{ key: string; value_json: string }, []>("SELECT key, value_json FROM settings")
-      .all();
+    const rows = this.db.query<{ key: string; value_json: string }, []>("SELECT key, value_json FROM settings").all();
     const merged: Record<string, unknown> = { ...DEFAULT_SETTINGS };
     for (const r of rows) {
       const key = r.key as keyof Settings;

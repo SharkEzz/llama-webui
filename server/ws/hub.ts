@@ -1,5 +1,5 @@
-import type { ServerWebSocket } from "bun";
 import type { WsMessage } from "@llama-webui/shared";
+import type { ServerWebSocket } from "bun";
 
 const PING_INTERVAL_MS = 15_000;
 const MAX_MISSED_PINGS = 2;

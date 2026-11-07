@@ -67,10 +67,15 @@ export class BenchGate {
         await Bun.sleep(POLL_MS);
       }
       const s = server.state;
-      if (s.kind === "external") throw new HttpError(409, `Un llama-server externe tourne sur le port ${s.port} : arrêtez-le d'abord`);
+      if (s.kind === "external")
+        throw new HttpError(409, `Un llama-server externe tourne sur le port ${s.port} : arrêtez-le d'abord`);
       if (s.kind === "starting" || s.kind === "ready") {
         if (!o.stopServer)
-          throw new HttpError(409, `llama-server tourne (profil ${s.profile}) : il sera arrêté pendant le benchmark puis relancé`, "server-running");
+          throw new HttpError(
+            409,
+            `llama-server tourne (profil ${s.profile}) : il sera arrêté pendant le benchmark puis relancé`,
+            "server-running",
+          );
         const cmd = server.lastCommand;
         this.deps.logs.push("[bench] arrêt de llama-server pendant le benchmark");
         this.stopped = cmd;

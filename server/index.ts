@@ -1,19 +1,19 @@
 import index from "../web/index.html";
 import { createApp } from "./app";
-import { openDb } from "./db/open";
-import { readHardware } from "./bench/hardware";
-import { externalWatcher } from "./supervisor/external";
 import { RunExecutor } from "./bench/execute";
+import { readHardware } from "./bench/hardware";
 import { BenchRunner } from "./bench/runner";
 import { ChatRuns } from "./chat/runs";
 import { BenchRunsRepo } from "./db/benchRuns";
 import { ConversationsRepo } from "./db/conversations";
+import { openDb } from "./db/open";
 import { ProfilesRepo } from "./db/profiles";
 import { SettingsRepo } from "./db/settings";
 import { SweepsRepo } from "./db/sweeps";
 import { dbPath } from "./paths";
 import { activeProfileId, getRuntime, serverView, startMonitor } from "./runtime";
 import { profilePaths } from "./supervisor/args";
+import { externalWatcher } from "./supervisor/external";
 import { WsHub } from "./ws/hub";
 
 const PORT = 7860;
@@ -117,7 +117,11 @@ process.prependListener("SIGINT", stopChats);
 process.prependListener("SIGTERM", stopChats);
 
 // Serveur externe : détecté au démarrage puis surveillé (sortie de l'état « external » quand il s'arrête).
-const checkExternal = externalWatcher({ supervisor, port: () => settings.get().port, paused: () => benchGate.held || benchRunner.busy });
+const checkExternal = externalWatcher({
+  supervisor,
+  port: () => settings.get().port,
+  paused: () => benchGate.held || benchRunner.busy,
+});
 void checkExternal();
 const externalTimer = setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS);
 

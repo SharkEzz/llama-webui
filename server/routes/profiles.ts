@@ -22,7 +22,11 @@ function attachment(filename: string, body: unknown): Response {
 }
 
 export function profileRoutes({ profiles, settings, activeProfileId }: ProfileRouteDeps) {
-  const mustGet = (id: number) => profiles.get(id) ?? (() => { throw notFound("Profil"); })();
+  const mustGet = (id: number) =>
+    profiles.get(id) ??
+    (() => {
+      throw notFound("Profil");
+    })();
 
   return {
     "/api/profiles": {
@@ -68,7 +72,8 @@ export function profileRoutes({ profiles, settings, activeProfileId }: ProfileRo
       PUT: guarded(async (req) => Response.json(profiles.update(idParam(req, "Profil"), await req.json()))),
       DELETE: guarded((req) => {
         const id = idParam(req, "Profil");
-        if (activeProfileId() === id) throw new HttpError(409, "Ce profil est celui du serveur en cours : arrêtez-le d'abord");
+        if (activeProfileId() === id)
+          throw new HttpError(409, "Ce profil est celui du serveur en cours : arrêtez-le d'abord");
         profiles.remove(id);
         if (settings.get().defaultProfileId === id) settings.patch({ defaultProfileId: null });
         return new Response(null, { status: 204 });

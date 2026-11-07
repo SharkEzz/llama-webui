@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
 import type { Sampling } from "@llama-webui/shared"
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -52,44 +52,48 @@ export function SamplingPanel({ props }: { props: ServerProps | null }) {
 
   return (
     <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="sys-prompt">Prompt système</Label>
-          <Textarea
-            id="sys-prompt"
-            value={system}
-            onChange={(e) => setSystem(e.target.value)}
-            onBlur={() => system !== current.systemPrompt && void save({ systemPrompt: system }, "systemPrompt")}
-            placeholder="Aucun"
-            className="max-h-48 text-sm"
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="sys-prompt">Prompt système</Label>
+        <Textarea
+          id="sys-prompt"
+          value={system}
+          onChange={(e) => setSystem(e.target.value)}
+          onBlur={() => system !== current.systemPrompt && void save({ systemPrompt: system }, "systemPrompt")}
+          placeholder="Aucun"
+          className="max-h-48 text-sm"
+        />
+        {errors.systemPrompt && <p className="text-xs text-destructive">{errors.systemPrompt}</p>}
+      </div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-0.5">
+          <Label htmlFor="thinking">Réflexion</Label>
+          <p className="text-xs text-muted-foreground">Le modèle réfléchit avant de répondre (s'il sait le faire).</p>
+        </div>
+        <Switch
+          id="thinking"
+          checked={current.thinking}
+          onCheckedChange={(on) => void save({ thinking: on }, "systemPrompt")}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {FIELDS.map((f) => (
+          <NumberField
+            key={`${current.id}:${f.key}`}
+            id={`s-${f.key}`}
+            label={f.label}
+            step={f.step}
+            value={current.sampling[f.key]}
+            placeholder={serverDefault(f.key, params[f.server])}
+            error={errors[f.key]}
+            onCommit={(v) => {
+              const { [f.key]: _old, ...rest } = current.sampling
+              void save({ sampling: v === undefined ? rest : { ...rest, [f.key]: v } }, f.key)
+            }}
+            onInvalid={(msg) => setErrors((e) => ({ ...e, [f.key]: msg }))}
           />
-          {errors.systemPrompt && <p className="text-xs text-destructive">{errors.systemPrompt}</p>}
-        </div>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-0.5">
-            <Label htmlFor="thinking">Réflexion</Label>
-            <p className="text-xs text-muted-foreground">Le modèle réfléchit avant de répondre (s'il sait le faire).</p>
-          </div>
-          <Switch id="thinking" checked={current.thinking} onCheckedChange={(on) => void save({ thinking: on }, "systemPrompt")} />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          {FIELDS.map((f) => (
-            <NumberField
-              key={`${current.id}:${f.key}`}
-              id={`s-${f.key}`}
-              label={f.label}
-              step={f.step}
-              value={current.sampling[f.key]}
-              placeholder={serverDefault(f.key, params[f.server])}
-              error={errors[f.key]}
-              onCommit={(v) => {
-                const { [f.key]: _old, ...rest } = current.sampling
-                void save({ sampling: v === undefined ? rest : { ...rest, [f.key]: v } }, f.key)
-              }}
-              onInvalid={(msg) => setErrors((e) => ({ ...e, [f.key]: msg }))}
-            />
-          ))}
-        </div>
-        <p className="text-xs text-muted-foreground">Un champ vide garde la valeur du profil (affichée en gris).</p>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">Un champ vide garde la valeur du profil (affichée en gris).</p>
     </div>
   )
 }

@@ -63,7 +63,11 @@ class Run implements ChatRun {
   subscribe(listener: (e: ChatEvent) => void): () => void {
     listener({ type: "start", user: this.user, assistant: this.assistant });
     if (this.content || this.reasoning)
-      listener({ type: "delta", ...(this.content ? { content: this.content } : {}), ...(this.reasoning ? { reasoning: this.reasoning } : {}) });
+      listener({
+        type: "delta",
+        ...(this.content ? { content: this.content } : {}),
+        ...(this.reasoning ? { reasoning: this.reasoning } : {}),
+      });
     if (this.final) {
       listener({ type: "done", message: this.final });
       return () => {};
@@ -85,7 +89,11 @@ class Run implements ChatRun {
     this.stop();
     if (this.final) return;
     this.detached = true;
-    this.final = this.deps.repo.updateMessage(this.assistant.id, { content: this.content, reasoning: this.reasoning, status: "stopped" });
+    this.final = this.deps.repo.updateMessage(this.assistant.id, {
+      content: this.content,
+      reasoning: this.reasoning,
+      status: "stopped",
+    });
     this.emit({ type: "done", message: this.final });
     this.listeners.clear();
   }
@@ -124,7 +132,9 @@ class Run implements ChatRun {
         try {
           err = JSON.parse(text)?.error;
         } catch {}
-        throw new LlamaFailure(err ? llamaErrorMessage(err) : `llama-server : HTTP ${res.status}${text ? ` — ${text}` : ""}`);
+        throw new LlamaFailure(
+          err ? llamaErrorMessage(err) : `llama-server : HTTP ${res.status}${text ? ` — ${text}` : ""}`,
+        );
       }
       receiving = true;
       const reader = res.body.getReader();
@@ -252,7 +262,8 @@ export class ChatRuns {
   private prepare(conversationId: number) {
     const conv = this.deps.repo.conversation(conversationId);
     if (!conv) throw notFound("Conversation");
-    if (this.runs.has(conversationId)) throw new HttpError(409, "Une réponse est déjà en cours dans cette conversation");
+    if (this.runs.has(conversationId))
+      throw new HttpError(409, "Une réponse est déjà en cours dans cette conversation");
     const target = this.o.target();
     if (!target) throw new HttpError(409, "llama-server n'est pas prêt");
     return { conv, target };
@@ -265,7 +276,12 @@ export class ChatRuns {
       repo.setModel(conversationId, target.profileId, target.modelPath);
     const conv = repo.conversation(conversationId)!;
     const history = repo.messages(conversationId);
-    const assistant = repo.addMessage(conversationId, { role: "assistant", content: "", status: "streaming", model: target.modelPath });
+    const assistant = repo.addMessage(conversationId, {
+      role: "assistant",
+      content: "",
+      status: "streaming",
+      model: target.modelPath,
+    });
     const run = new Run(
       this.deps,
       user,

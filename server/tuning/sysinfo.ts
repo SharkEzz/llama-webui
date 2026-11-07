@@ -86,7 +86,11 @@ async function gitRoot(dir: string): Promise<string | null> {
 
 async function lastCommitMs(repo: string): Promise<number | null> {
   try {
-    const proc = Bun.spawn(["git", "-C", repo, "log", "-1", "--format=%ct"], { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+    const proc = Bun.spawn(["git", "-C", repo, "log", "-1", "--format=%ct"], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "ignore",
+    });
     const out = (await new Response(proc.stdout).text()).trim();
     await proc.exited;
     const n = Number(out);
@@ -139,7 +143,8 @@ export async function readSys(d: SysDeps): Promise<SysReadings> {
   const thp = thpRaw ? (/\[(\w+)\]/.exec(thpRaw)?.[1] ?? thpRaw) : null;
   const limits = await text(join(proc, "self/limits"));
   const memlockRaw = limits ? /^Max locked memory\s+(\S+)/m.exec(limits)?.[1] : undefined;
-  const memlockLimitBytes = memlockRaw === undefined ? null : memlockRaw === "unlimited" ? Number.POSITIVE_INFINITY : Number(memlockRaw);
+  const memlockLimitBytes =
+    memlockRaw === undefined ? null : memlockRaw === "unlimited" ? Number.POSITIVE_INFINITY : Number(memlockRaw);
   const swapRaw = await text(join(proc, "sys/vm/swappiness"));
   const swappiness = swapRaw === null || Number.isNaN(Number(swapRaw)) ? null : Number(swapRaw);
   const cmdline = (await text(join(proc, "cmdline"))) ?? "";
@@ -151,7 +156,9 @@ export async function readSys(d: SysDeps): Promise<SysReadings> {
     .filter(Boolean);
 
   const binary = await resolveBinary(d.binary);
-  const backendLibs = binary ? ((await listDir(dirname(binary))) ?? []).filter((n) => /^libggml-.*\.so/.test(n)).sort() : [];
+  const backendLibs = binary
+    ? ((await listDir(dirname(binary))) ?? []).filter((n) => /^libggml-.*\.so/.test(n)).sort()
+    : [];
   const repo = binary ? await gitRoot(dirname(binary)) : null;
   const buildDate = repo ? await lastCommitMs(repo) : null;
 
@@ -190,7 +197,10 @@ export async function readSys(d: SysDeps): Promise<SysReadings> {
   if (d.modelPath) {
     const disk = await (d.resolveDisk ?? ((p: string) => resolveModelDisk(p, { sysRoot: sys })))(d.modelPath);
     const rot = disk ? await text(join(sys, "block", disk, "queue/rotational")) : null;
-    modelDisk = { rotational: rot === null ? null : rot === "1", fsType: await fsTypeOf(await text(join(proc, "mounts")), d.modelPath) };
+    modelDisk = {
+      rotational: rot === null ? null : rot === "1",
+      fsType: await fsTypeOf(await text(join(proc, "mounts")), d.modelPath),
+    };
   }
 
   return {

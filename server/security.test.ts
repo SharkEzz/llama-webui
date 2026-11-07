@@ -1,4 +1,4 @@
-import { test, expect } from "bun:test";
+import { expect, test } from "bun:test";
 import { guard } from "./security";
 
 const req = (url: string, init: RequestInit & { headers?: Record<string, string> } = {}) => new Request(url, init);
@@ -20,8 +20,20 @@ test("guard: Origin d'un autre site refusé, même origine acceptée", () => {
 
 test("guard: écriture sans JSON refusée (CSRF par requête simple)", () => {
   const body = '{"port":1}';
-  expect(guard(req("http://127.0.0.1:7860/api/settings", { method: "PATCH", body, headers: { "content-type": "text/plain" } }))?.status).toBe(415);
+  expect(
+    guard(
+      req("http://127.0.0.1:7860/api/settings", { method: "PATCH", body, headers: { "content-type": "text/plain" } }),
+    )?.status,
+  ).toBe(415);
   expect(guard(req("http://127.0.0.1:7860/api/settings", { method: "POST", body }))?.status).toBe(415);
-  expect(guard(req("http://127.0.0.1:7860/api/settings", { method: "PATCH", body, headers: { "content-type": "application/json; charset=utf-8" } }))).toBeUndefined();
+  expect(
+    guard(
+      req("http://127.0.0.1:7860/api/settings", {
+        method: "PATCH",
+        body,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+    ),
+  ).toBeUndefined();
   expect(guard(req("http://127.0.0.1:7860/api/server/stop", { method: "POST" }))).toBeUndefined(); // sans corps
 });

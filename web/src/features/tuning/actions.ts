@@ -1,4 +1,11 @@
-import { type BenchParams, CACHE_TYPES, type Estimate, presetOf, type Profile, profileModelPath } from "@llama-webui/shared"
+import {
+  type BenchParams,
+  CACHE_TYPES,
+  type Estimate,
+  type Profile,
+  presetOf,
+  profileModelPath,
+} from "@llama-webui/shared"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { EMPTY_FORM, formFromSpec, useBench } from "@/lib/bench"
@@ -61,7 +68,10 @@ export function benchFromEstimate(e: Estimate): void {
   const { modelPath, mmprojPath, profileId, serverArgs } = useTuning.getState()
   if (!modelPath) return
   const rest = mergeArgs(["-c", String(e.ctx)], serverArgs)
-  useBench.setState({ form: formFromSpec({ modelPath, mmprojPath, profileId, params: e.params, serverArgs: rest }, EMPTY_FORM), errors: {} })
+  useBench.setState({
+    form: formFromSpec({ modelPath, mmprojPath, profileId, params: e.params, serverArgs: rest }, EMPTY_FORM),
+    errors: {},
+  })
 }
 
 export type PinKey = "ngl" | "ncmoe" | "dev" | "ts" | "kv" | "t" | "ub"
@@ -87,11 +97,16 @@ export function parsePin(key: PinKey, text: string): Partial<BenchParams> | stri
       return ids.length === 0 ? "au moins un device (CUDA0,Vulkan3)" : { dev: ids }
     }
     case "ts": {
-      const xs = t.split(/[\s,/]+/).filter(Boolean).map(Number)
+      const xs = t
+        .split(/[\s,/]+/)
+        .filter(Boolean)
+        .map(Number)
       return xs.length < 2 || xs.some((x) => !Number.isFinite(x) || x < 0) ? "des proportions (3,1)" : { ts: xs }
     }
     case "kv":
-      return (CACHE_TYPES as readonly string[]).includes(t) ? { ctk: t as BenchParams["ctk"], ctv: t as BenchParams["ctv"] } : `un type parmi ${CACHE_TYPES.join(", ")}`
+      return (CACHE_TYPES as readonly string[]).includes(t)
+        ? { ctk: t as BenchParams["ctk"], ctv: t as BenchParams["ctv"] }
+        : `un type parmi ${CACHE_TYPES.join(", ")}`
   }
 }
 

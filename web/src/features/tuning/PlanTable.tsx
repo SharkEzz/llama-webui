@@ -1,6 +1,6 @@
-import { useState } from "react"
-import { CircleAlert, CircleCheck, Play, TriangleAlert } from "lucide-react"
 import type { FitVerdict } from "@llama-webui/shared"
+import { CircleAlert, CircleCheck, Play, TriangleAlert } from "lucide-react"
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -17,7 +17,11 @@ const LONG_SECONDS = 3600
 export const VERDICT: Record<FitVerdict, { label: string; className: string; icon: typeof CircleCheck }> = {
   fits: { label: "tient", className: "bg-success/15 text-success", icon: CircleCheck },
   tight: { label: "limite", className: "bg-warning/15 text-warning", icon: TriangleAlert },
-  no: { label: "ne tient pas", className: "bg-destructive/10 text-destructive dark:bg-destructive/20", icon: CircleAlert },
+  no: {
+    label: "ne tient pas",
+    className: "bg-destructive/10 text-destructive dark:bg-destructive/20",
+    icon: CircleAlert,
+  },
 }
 
 export function VerdictBadge({ verdict }: { verdict: FitVerdict }) {
@@ -47,7 +51,14 @@ export function PlanTable() {
   if (!plan) return planning ? <Skeleton className="h-24" /> : null
 
   const n = plan.items.length
-  const why = n === 0 ? "aucune configuration à exécuter" : busy ? "un sweep est en cours" : external ? "un serveur externe occupe les cartes" : null
+  const why =
+    n === 0
+      ? "aucune configuration à exécuter"
+      : busy
+        ? "un sweep est en cours"
+        : external
+          ? "un serveur externe occupe les cartes"
+          : null
   return (
     <div className="flex flex-col gap-3 border-t pt-4" aria-busy={planning}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -66,12 +77,26 @@ export function PlanTable() {
             </span>
           )}
         </span>
-        {plan.droppedTs > 0 && <span className="text-xs text-muted-foreground">-ts ignoré pour {plan.droppedTs} combinaison(s) sans le même nombre de devices</span>}
-        <Button className="ml-auto" disabled={why !== null || launching} title={why ?? undefined} onClick={() => void launch()}>
+        {plan.droppedTs > 0 && (
+          <span className="text-xs text-muted-foreground">
+            -ts ignoré pour {plan.droppedTs} combinaison(s) sans le même nombre de devices
+          </span>
+        )}
+        <Button
+          className="ml-auto"
+          disabled={why !== null || launching}
+          title={why ?? undefined}
+          onClick={() => void launch()}
+        >
           <Play /> Lancer le sweep
         </Button>
       </div>
-      {why && n === 0 && <p className="text-sm text-muted-foreground">Rien à lancer : {plan.excluded > 0 ? "toutes les configurations sont exclues, cochez « inclure »" : "ajoutez des valeurs"}.</p>}
+      {why && n === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Rien à lancer :{" "}
+          {plan.excluded > 0 ? "toutes les configurations sont exclues, cochez « inclure »" : "ajoutez des valeurs"}.
+        </p>
+      )}
       {plan.estimatedSeconds > LONG_SECONDS && (
         <p className="flex items-center gap-2 text-sm text-warning">
           <TriangleAlert className="size-4" /> Sweep long : le serveur restera arrêté pendant toute la durée.

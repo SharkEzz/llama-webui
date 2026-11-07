@@ -43,8 +43,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
         ? body.error
         : `Erreur HTTP ${res.status}`
     const issues =
-      typeof body === "object" && body !== null && "issues" in body && Array.isArray(body.issues) ? (body.issues as ApiIssue[]) : []
-    const code = typeof body === "object" && body !== null && "code" in body && typeof body.code === "string" ? body.code : null
+      typeof body === "object" && body !== null && "issues" in body && Array.isArray(body.issues)
+        ? (body.issues as ApiIssue[])
+        : []
+    const code =
+      typeof body === "object" && body !== null && "code" in body && typeof body.code === "string" ? body.code : null
     throw new ApiError(res.status, message, issues, code)
   }
   return body as T

@@ -33,7 +33,15 @@ const defaultFormat = (v: number) => new Intl.NumberFormat("fr-FR", { maximumFra
  * Série temporelle de l'historique de monitoring (uPlot). Le graphe est créé une fois par jeu de séries et par thème,
  * puis seulement alimenté (setData) à chaque tick ; null = trou. Légende vivante = valeurs sous le curseur.
  */
-export function TimeSeriesChart({ series, height = 160, yMax, format = defaultFormat, compact = false, className, ...aria }: TimeSeriesChartProps) {
+export function TimeSeriesChart({
+  series,
+  height = 160,
+  yMax,
+  format = defaultFormat,
+  compact = false,
+  className,
+  ...aria
+}: TimeSeriesChartProps) {
   const host = useRef<HTMLDivElement>(null)
   const plot = useRef<uPlot | null>(null)
   const resolved = useTheme((s) => s.resolved)
@@ -64,7 +72,9 @@ export function TimeSeriesChart({ series, height = 160, yMax, format = defaultFo
       height,
       padding: compact ? [2, 0, 2, 0] : [8, 20, 0, 0],
       legend: { show: !compact, live: true },
-      cursor: compact ? { show: false } : { points: { size: 8, width: 2, stroke: () => "transparent" }, drag: { x: false, y: false } },
+      cursor: compact
+        ? { show: false }
+        : { points: { size: 8, width: 2, stroke: () => "transparent" }, drag: { x: false, y: false } },
       scales: {
         x: { time: true },
         y: { range: (_u, _min, max) => [0, yMax ?? Math.max(1, max * 1.15)] },

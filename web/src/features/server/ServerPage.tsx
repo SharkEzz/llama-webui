@@ -1,14 +1,14 @@
+import type { Settings } from "@llama-webui/shared"
+import { CircleAlert, Copy, Info, Play, Repeat, RotateCw, ScrollText, Server, Square, Terminal } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router"
-import { CircleAlert, Copy, Info, Play, RotateCw, ScrollText, Server, Square, Terminal, Repeat } from "lucide-react"
 import { toast } from "sonner"
-import type { Settings } from "@llama-webui/shared"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { GlassCard } from "@/components/glass/GlassCard"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { LogRow } from "@/features/logs/LogRow"
 import { api } from "@/lib/api"
 import { copyText } from "@/lib/clipboard"
@@ -31,7 +31,10 @@ export function ServerPage() {
 
   useEffect(() => {
     void reload().catch(() => {})
-    void api<Settings>("/settings").then((s) => setDefaultId(s.defaultProfileId), () => {})
+    void api<Settings>("/settings").then(
+      (s) => setDefaultId(s.defaultProfileId),
+      () => {},
+    )
   }, [reload])
 
   // Profil proposé : celui du serveur, sinon le dernier utilisé, sinon le premier.
@@ -85,7 +88,10 @@ export function ServerPage() {
                 </Select>
                 <div className="flex flex-wrap gap-2">
                   {!running && (
-                    <Button disabled={busy || !selectedProfile || state.kind === "stopping"} onClick={() => selectedId !== null && void startProfile(selectedId)}>
+                    <Button
+                      disabled={busy || !selectedProfile || state.kind === "stopping"}
+                      onClick={() => selectedId !== null && void startProfile(selectedId)}
+                    >
                       <Play /> Démarrer
                     </Button>
                   )}
@@ -178,7 +184,8 @@ function StateDetails() {
       )}
       {s.kind === "crashed" && (
         <Row label="Arrêt">
-          {[s.message, s.exitCode !== null ? `code ${s.exitCode}` : null, s.signal].filter(Boolean).join(", ") || "inattendu"}
+          {[s.message, s.exitCode !== null ? `code ${s.exitCode}` : null, s.signal].filter(Boolean).join(", ") ||
+            "inattendu"}
         </Row>
       )}
     </dl>
@@ -229,7 +236,8 @@ function PropsCard() {
           </Row>
           {props.model_ftype !== undefined && <Row label="Quantification">{String(props.model_ftype)}</Row>}
           <Row label="Contexte">
-            <span className="num">{typeof gen.n_ctx === "number" ? gen.n_ctx.toLocaleString("fr-FR") : "—"}</span> tokens
+            <span className="num">{typeof gen.n_ctx === "number" ? gen.n_ctx.toLocaleString("fr-FR") : "—"}</span>{" "}
+            tokens
           </Row>
           <Row label="Slots">
             <span className="num">{String(props.total_slots ?? "—")}</span>
