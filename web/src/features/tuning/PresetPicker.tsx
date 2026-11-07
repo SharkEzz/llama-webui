@@ -1,5 +1,6 @@
 import { PRESETS } from '@llama-webui/shared';
 import { Target } from 'lucide-react';
+import { useId } from 'react';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { useTuning } from '@/lib/tuning';
 import { cn } from '@/lib/utils';
@@ -7,6 +8,8 @@ import { cn } from '@/lib/utils';
 /** L'objectif de la recommandation et du classement des sweeps. */
 export function PresetPicker() {
   const preset = useTuning((s) => s.preset);
+  // Nom de groupe propre à l'instance : deux PresetPicker montés ne partagent pas leurs radios.
+  const group = useId();
   return (
     <GlassCard title="Préréglage" icon={Target}>
       <div role="radiogroup" aria-label="Préréglage" className="flex flex-col gap-1">
@@ -23,7 +26,7 @@ export function PresetPicker() {
             >
               <input
                 type="radio"
-                name="tuning-preset"
+                name={group}
                 className="sr-only"
                 checked={active}
                 onChange={() => useTuning.getState().setPreset(p.id)}

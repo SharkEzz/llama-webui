@@ -40,12 +40,13 @@ export function SamplingPanel({ props }: { props: ServerProps | null }) {
 function SamplingForm({ current, props }: { current: ConversationDetail; props: ServerProps | null }) {
   const patch = useChat((s) => s.patch);
   const [errors, setErrors] = useState<Partial<Record<Key | 'systemPrompt', string>>>({});
-  const [system, setSystem] = useState(current.systemPrompt ?? '');
-  // Le prompt change côté store (enregistrement, autre onglet) : le champ le suit, pendant le rendu plutôt que dans un effet.
+  const [system, setSystem] = useState(current.systemPrompt);
+  // Le prompt change côté store (enregistrement, autre onglet) : le champ le suit, pendant le rendu plutôt que dans un effet,
+  // sauf s'il contient une saisie pas encore enregistrée (elle l'emporte et sera enregistrée au blur).
   const [savedPrompt, setSavedPrompt] = useState(current.systemPrompt);
   if (savedPrompt !== current.systemPrompt) {
     setSavedPrompt(current.systemPrompt);
-    setSystem(current.systemPrompt ?? '');
+    if (system === savedPrompt) setSystem(current.systemPrompt);
   }
 
   const params = props?.default_generation_settings?.params ?? {};
@@ -87,7 +88,7 @@ function SamplingForm({ current, props }: { current: ConversationDetail; props: 
       <div className="grid grid-cols-2 gap-3">
         {FIELDS.map((f) => (
           <NumberField
-            key={`${current.id}:${f.key}`}
+            key={f.key}
             id={`s-${f.key}`}
             label={f.label}
             step={f.step}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { Tone } from '@/components/glass/tones';
@@ -56,11 +56,16 @@ export function TimeSeriesChart({
     return [times, ...series.map((s) => all.get(s.key) ?? new Array<number | null>(times.length).fill(null))];
   }, [version, signature]);
 
+  // Séries et données courantes, lues à la création sans la relancer : les données sont poussées par l'effet suivant
+  // (pas de recréation à chaque tick), les séries sont résumées par `signature`.
+  const latest = useEffectEvent(() => ({ series, data }));
+
   // Création : par jeu de séries, thème (couleurs lues des variables CSS) et forme.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: création par signature/thème/forme ; data est poussée par l'effet suivant (pas de recréation à chaque tick)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: signature et resolved sont des déclencheurs (séries lues via latest, couleurs via readChartTheme)
   useEffect(() => {
     const el = host.current;
     if (!el) return;
+    const { series, data } = latest();
     const theme = readChartTheme();
     const axis: uPlot.Axis = {
       stroke: theme.axis,
@@ -109,7 +114,6 @@ export function TimeSeriesChart({
       u.destroy();
       plot.current = null;
     };
-    // data : poussées par l'effet suivant, pas de recréation à chaque tick.
   }, [signature, resolved, height, yMax, compact]);
 
   useEffect(() => {

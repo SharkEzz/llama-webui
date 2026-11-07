@@ -71,10 +71,10 @@ export function BenchHistory() {
   });
   useEffect(() => {
     if (focus === null) return;
-    if (filters.sweeps !== 'all') return useBench.getState().setFilters({ sweeps: 'all' });
+    if (filters.sweeps !== 'all') return setFilters({ sweeps: 'all' });
     if (!runs.some((r) => r.id === focus)) return;
     focusRun(focus);
-  }, [focus, filters.sweeps, runs]);
+  }, [focus, filters.sweeps, runs, setFilters]);
 
   const models = useMemo(() => [...new Set(runs.map((r) => r.spec.modelPath))].sort(), [runs]);
   const shown = runs.filter(
