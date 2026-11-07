@@ -66,7 +66,7 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
       POST: guarded(async (req) => {
         const body = await jsonObject(req);
         const id = body.profileId === undefined ? activeProfileId() : Number(body.profileId);
-        if (id !== null && !Number.isInteger(id)) throw new HttpError(400, 'profileId : entier attendu');
+        if (id !== null && !Number.isInteger(id)) throw new HttpError(400, 'profileId: expected an integer');
         const profile = id !== null ? profiles.get(id) : null;
         if (id !== null && !profile) throw notFound('Profile');
         const c = conversations.create({
@@ -98,7 +98,7 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
       POST: guarded(async (req, server) => {
         const id = idParam(req, 'Conversation');
         const { content } = await jsonObject(req);
-        if (typeof content !== 'string') throw new HttpError(400, 'content : texte attendu');
+        if (typeof content !== 'string') throw new HttpError(400, 'content: expected a string');
         return sse(req, server, chatRuns.send(id, content));
       }),
     },

@@ -59,7 +59,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }:
         return Response.json({ runs, live: benchRunner.live });
       }),
       DELETE: guarded((req) => {
-        if (new URL(req.url).searchParams.get('failed') !== '1') throw new HttpError(400, '?failed=1 attendu');
+        if (new URL(req.url).searchParams.get('failed') !== '1') throw new HttpError(400, '?failed=1 expected');
         const ids = benchRuns.deleteFailed();
         if (ids.length > 0) hub.broadcast({ type: 'bench-deleted', payload: { ids } });
         return Response.json({ deleted: ids.length });

@@ -88,7 +88,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
         } catch {
           throw new HttpError(502, 'llama-server is not responding on /props');
         }
-        if (!r.ok) throw new HttpError(502, `llama-server /props : HTTP ${r.status}`);
+        if (!r.ok) throw new HttpError(502, `llama-server /props: HTTP ${r.status}`);
         return Response.json(await r.json());
       }),
     },
