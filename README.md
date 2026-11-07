@@ -108,6 +108,11 @@ NVMe drives, GPUs and chipset, discovered automatically from sysfs. Particles fl
 Recursive scan of your models folder with GGUF header metadata: architecture, quantization, size, parameters, layers,
 context length and experts (MoE). Split (sharded) models and multimodal projectors are recognized.
 
+Download GGUF models from **Hugging Face** without leaving the app: search the Hub (or paste a repo id or URL), pick a
+quantization (shards are grouped, a matching `mmproj` is offered, a badge tells whether it fits in your VRAM) and it lands
+in `<models folder>/<org>/<repo>/`. One download at a time, with live progress, sha256 verification, a free-space check,
+and automatic resume after a network error or a restart.
+
 <p align="center">
   <img src="docs/assets/screenshots/models.jpg" alt="Models table with architecture, quantization, size, parameters, layers, context and experts" width="100%">
 </p>
@@ -197,6 +202,10 @@ lists them.
 ```bash
 bun run start --host 0.0.0.0 --port 8080
 ```
+
+Hugging Face downloads use the same token as the `hf` CLI: `HF_TOKEN` if set, otherwise the token saved by
+`hf auth login` (`~/.cache/huggingface/token`, or `$HF_HOME/token`). It is only needed for gated or private repos (and
+gives higher rate limits); llama-webui never stores it. `HF_ENDPOINT` points to a mirror.
 
 Everything else (binary path, default `llama-server` host and port, models folder, polling interval, history length,
 hidden GPUs, collectors, theme) is set from the **Settings** page and stored in the SQLite database inside the data
