@@ -2,6 +2,9 @@
   "skillOverrides": {
     "anthropic-skills:xlsx": "off",
     "anthropic-skills:pptx": "off",
-    "anthropic-skills:docx": "off"
+    "anthropic-skills:docx": "off",
+    "anthropic-skills:computer-use": "off",
+    "anthropic-skills:pdf": "off",
+    "anthropic-skills:built-in-browser": "off"
   }
 }
