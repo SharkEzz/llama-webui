@@ -19,6 +19,7 @@ import { serverRoutes } from './routes/server';
 import { sweepRoutes } from './routes/sweeps';
 import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
+import type { WebRoutes } from './routes/web';
 import type { Runtime } from './runtime';
 import type { WsHub } from './ws/hub';
 
@@ -37,8 +38,8 @@ export interface AppDeps {
   monitor: Monitor;
   /** Répartition du modèle chargé (logs de llama-server), pour la page Topologie. */
   placement: PlacementTracker;
-  /** Page web (import HTML : Bun bundle React + Tailwind à la volée). */
-  index: Bun.HTMLBundle;
+  /** Interface web : import HTML (développement, HMR) ou fichiers construits au démarrage (production). */
+  web: WebRoutes;
   hostname: string;
   port: number;
   development: boolean;
@@ -47,7 +48,7 @@ export interface AppDeps {
 const startedAt = Date.now();
 
 export function createApp(deps: AppDeps) {
-  const { hub, settings, monitor, index, port, development } = deps;
+  const { hub, settings, monitor, port, development } = deps;
   return Bun.serve({
     port,
     hostname: deps.hostname,
@@ -78,8 +79,8 @@ export function createApp(deps: AppDeps) {
         if (server.upgrade(req)) return undefined;
         return new Response('Upgrade WebSocket attendu', { status: 426 });
       }),
-      // Toute autre adresse sert l'application (fallback SPA : /chat rechargé fonctionne).
-      '/*': index,
+      // Toute autre adresse sert l'application (fallback SPA `/*` : /chat rechargé fonctionne).
+      ...deps.web,
     },
     websocket: {
       open: (ws) => hub.attach(ws),
