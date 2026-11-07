@@ -5,6 +5,7 @@ import {
   type BenchSpec,
   type ChecksReport,
   type DiskSpeed,
+  defer,
   type Estimate,
   gpuDevices,
   type PlanResult,
@@ -138,6 +139,9 @@ export const useTuning = create<TuningState>()((set, get) => {
     if (!modelPath) return set({ estimate: null, estimating: false, estimateError: null });
     const seq = ++estimateSeq;
     set({ estimating: true });
+    using _estimating = defer(() => {
+      if (seq === estimateSeq) set({ estimating: false });
+    });
     try {
       const estimate = await api<Estimate>('/tuning/estimate', {
         method: 'POST',
@@ -146,8 +150,6 @@ export const useTuning = create<TuningState>()((set, get) => {
       if (seq === estimateSeq) set({ estimate, estimateError: null });
     } catch (e) {
       if (seq === estimateSeq) set({ estimate: null, estimateError: e instanceof Error ? e.message : String(e) });
-    } finally {
-      if (seq === estimateSeq) set({ estimating: false });
     }
   };
   const specBody = () => {
@@ -175,6 +177,9 @@ export const useTuning = create<TuningState>()((set, get) => {
     if (!get().modelPath) return set({ plan: null, planError: null });
     const seq = ++planSeq;
     set({ planning: true });
+    using _planning = defer(() => {
+      if (seq === planSeq) set({ planning: false });
+    });
     try {
       const plan = await api<PlanResult>('/tuning/plan', {
         method: 'POST',
@@ -183,8 +188,6 @@ export const useTuning = create<TuningState>()((set, get) => {
       if (seq === planSeq) set({ plan, planError: null });
     } catch (e) {
       if (seq === planSeq) set({ plan: null, planError: e instanceof Error ? e.message : String(e) });
-    } finally {
-      if (seq === planSeq) set({ planning: false });
     }
   };
   const refresh = () => {
@@ -303,18 +306,15 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     async launch(stopServer = false) {
       set({ launching: true });
-      try {
-        return await guarded(async () => {
-          const r = await api<{ sweep: Sweep }>('/sweeps', {
-            method: 'POST',
-            body: JSON.stringify({ spec: specBody(), stopServer }),
-          });
-          set({ run: { ...get().run, name: '' } });
-          await get().open(r.sweep.id);
+      using _launching = defer(() => set({ launching: false }));
+      return await guarded(async () => {
+        const r = await api<{ sweep: Sweep }>('/sweeps', {
+          method: 'POST',
+          body: JSON.stringify({ spec: specBody(), stopServer }),
         });
-      } finally {
-        set({ launching: false });
-      }
+        set({ run: { ...get().run, name: '' } });
+        await get().open(r.sweep.id);
+      });
     },
 
     async loadSweeps() {
@@ -374,19 +374,19 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     async loadChecks(modelPath) {
       set({ checksLoading: true, checksModel: modelPath });
+      using _loading = defer(() => set({ checksLoading: false }));
       try {
         const q = modelPath ? `?model=${encodeURIComponent(modelPath)}` : '';
         const checks = await api<ChecksReport>(`/tuning/checks${q}`);
         if (get().checksModel === modelPath) set({ checks });
       } catch (e) {
         fail(e);
-      } finally {
-        set({ checksLoading: false });
       }
     },
 
     async measureDisk(modelPath) {
       set({ measuring: true });
+      using _measuring = defer(() => set({ measuring: false }));
       try {
         const diskSpeed = await api<DiskSpeed>('/tuning/disk-speed', {
           method: 'POST',
@@ -396,8 +396,6 @@ export const useTuning = create<TuningState>()((set, get) => {
         await get().loadChecks(modelPath);
       } catch (e) {
         fail(e);
-      } finally {
-        set({ measuring: false });
       }
     },
   };
