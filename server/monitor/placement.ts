@@ -21,6 +21,13 @@ const CONTEXT = /llama_context: constructing llama_context/;
 const RESERVE = /sched_reserve: reserving/;
 /** Buffers du projecteur multimodal (mmproj, clip.cpp) : pas le modèle, et estimés avant même son chargement. */
 const MMPROJ = /^(?:clip\w*|(?:reserve|alloc)_compute_meta):/;
+/**
+ * Début et fin de l'ajustement à la mémoire (-fit, actif par défaut), la fin écrite quelle qu'en soit l'issue. Ses sondes
+ * chargent le modèle sans allouer (couches, buffers à 0 MiB, contextes, puis le draft ou le MTP) : à -lv 5, leurs lignes
+ * sortent entre les deux et ne sont pas le vrai chargement.
+ */
+const FIT_START = /fitting params to device memory \.\.\./;
+const FIT_DONE = /common_fit_params: fitting params to free memory took/;
 
 /** Une ligne qui peut changer le placement : évite de relire tout le ring à chaque lot de logs de requêtes. */
 export const RELEVANT = /lancement:|using device|buffer size =|offloaded \d+\/\d+ layers/;
@@ -30,6 +37,7 @@ export const RELEVANT = /lancement:|using device|buffer size =|offloaded \d+\/\d
  * vidé ou évincé). llama-server charge le modèle principal (poids, cache KV, compute), puis le draft éventuel (-md),
  * puis le mmproj : le second « offloaded N/M layers » ouvre le draft et clôt la lecture. Le compute se compte par
  * contexte (celui d'un MTP s'ajoute à celui du modèle) et un contexte réservé à nouveau ne garde que sa dernière taille.
+ * Les sondes de l'ajustement (-fit, visibles à -lv 5) précèdent le chargement : elles sont sautées.
  */
 export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null {
   let start = -1;
@@ -46,8 +54,12 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
   // Compute par contexte puis par device ; un premier contexte implicite pour les logs sans « constructing ».
   const contexts: Map<string, number>[] = [new Map()];
   let constructed = false;
+  let fitting = false;
   for (let i = start + 1; i < lines.length; i++) {
     const body = lines[i]!.text.replace(PREFIX, '');
+    if (FIT_START.test(body)) fitting = true;
+    else if (FIT_DONE.test(body)) fitting = false;
+    if (fitting) continue;
     if (CONTEXT.test(body)) {
       if (constructed) contexts.push(new Map());
       constructed = true;

@@ -1,0 +1,96 @@
+[llama-webui] lancement: llama-server -m Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf -mm mmproj-Qwen3.8-27B-BF16.gguf -c 64500 --spec-type draft-mtp -lv 5 -np 1 -fa on --host 0.0.0.0 --port 8080 --metrics --slots --props
+0.00.650.517 I srv    load_model: loading model 'Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf'
+0.00.650.517 I srv    load_model: local path 'Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf'
+0.00.659.077 I srv    load_model: [mtmd] estimated worst-case memory usage of mmproj is 1161.02 MiB (took 8.54 ms)
+0.00.659.083 D srv    load_model: [mtmd] adding 1136.09 MiB to fit_params_target for device CUDA0
+0.00.659.084 D srv    load_model: [mtmd] adding 24.93 MiB to fit_params_target for device CPU
+0.00.659.098 I cmn  common_fit_a: fitting params to device memory ...
+0.00.659.099 I cmn  common_fit_a: (for bugs during this step try to reproduce them with -fit off, or provide --verbose logs if the bug only occurs with -fit on)
+0.00.659.117 I common_params_fit_impl: getting device memory data for initial parameters:
+0.00.689.340 I llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 5070 Ti) (0000:01:00.0) - 15683 MiB free
+0.00.689.354 I llama_prepare_model_devices: using device CUDA1 (NVIDIA GeForce RTX 5060 Ti) (0000:03:00.0) - 15804 MiB free
+0.00.689.356 I llama_prepare_model_devices: using device ROCm0 (AMD Radeon RX 9070 XT) (0000:08:00.0) - 16238 MiB free
+0.00.775.499 I load_tensors: offloaded 66/66 layers to GPU
+0.00.775.502 I load_tensors:        CUDA0 model buffer size =     0.00 MiB
+0.00.775.503 I load_tensors:        CUDA1 model buffer size =     0.00 MiB
+0.00.775.504 I load_tensors:    CUDA_Host model buffer size =     0.00 MiB
+0.00.775.504 I load_tensors:        ROCm0 model buffer size =     0.00 MiB
+0.00.777.007 I llama_context: constructing llama_context
+0.00.780.403 I llama_context:  ROCm_Host  output buffer size =     0.95 MiB
+0.00.780.583 I llama_kv_cache:      CUDA0 KV buffer size =     0.00 MiB
+0.00.780.584 I llama_kv_cache:      CUDA1 KV buffer size =     0.00 MiB
+0.00.780.584 I llama_kv_cache:      ROCm0 KV buffer size =     0.00 MiB
+0.00.780.617 I llama_memory_recurrent:      CUDA0 RS buffer size =     0.00 MiB
+0.00.780.617 I llama_memory_recurrent:      CUDA1 RS buffer size =     0.00 MiB
+0.00.780.618 I llama_memory_recurrent:      ROCm0 RS buffer size =     0.00 MiB
+0.00.780.685 I sched_reserve: reserving ...
+0.00.781.795 D sched_reserve: reserving full memory module
+0.00.852.708 I sched_reserve:      CUDA0 compute buffer size =   504.08 MiB
+0.00.852.708 I sched_reserve:      CUDA1 compute buffer size =   454.06 MiB
+0.00.852.708 I sched_reserve:      ROCm0 compute buffer size =   454.06 MiB
+0.00.852.709 I sched_reserve:  CUDA_Host compute buffer size =   352.09 MiB
+0.00.865.131 I operator(): getting device memory data for the extra model at a context size of 64500:
+0.00.890.625 I llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 5070 Ti) (0000:01:00.0) - 15683 MiB free
+0.00.890.634 I llama_prepare_model_devices: using device CUDA1 (NVIDIA GeForce RTX 5060 Ti) (0000:03:00.0) - 15802 MiB free
+0.00.890.634 I llama_prepare_model_devices: using device ROCm0 (AMD Radeon RX 9070 XT) (0000:08:00.0) - 16092 MiB free
+0.00.964.966 I load_tensors: offloaded 66/66 layers to GPU
+0.00.964.968 I load_tensors:        CUDA0 model buffer size =     0.00 MiB
+0.00.964.968 I load_tensors:        CUDA1 model buffer size =     0.00 MiB
+0.00.964.968 I load_tensors:    CUDA_Host model buffer size =     0.00 MiB
+0.00.964.968 I load_tensors:        ROCm0 model buffer size =     0.00 MiB
+0.00.966.489 I llama_context: constructing llama_context
+0.00.966.916 I llama_context:  ROCm_Host  output buffer size =     0.95 MiB
+0.00.967.028 I llama_kv_cache:      ROCm0 KV buffer size =     0.00 MiB
+0.00.967.076 I sched_reserve: reserving ...
+0.00.968.970 D sched_reserve: reserving full memory module
+0.00.971.310 I sched_reserve:      ROCm0 compute buffer size =   454.06 MiB
+0.00.971.311 I sched_reserve:  CUDA_Host compute buffer size =   302.07 MiB
+0.00.982.674 I common_params_fit_impl: projected to use 17908 MiB of device memory vs. 47577 MiB of free device memory
+0.00.982.675 I common_fit_params: successfully fit params to free device memory
+0.00.982.678 I common_fit_params: fitting params to free memory took 0.32 seconds
+0.01.008.330 I llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 5070 Ti) (0000:01:00.0) - 15683 MiB free
+0.01.008.340 I llama_prepare_model_devices: using device CUDA1 (NVIDIA GeForce RTX 5060 Ti) (0000:03:00.0) - 15802 MiB free
+0.01.008.341 I llama_prepare_model_devices: using device ROCm0 (AMD Radeon RX 9070 XT) (0000:08:00.0) - 16090 MiB free
+0.01.328.147 I load_tensors: offloaded 66/66 layers to GPU
+0.01.328.155 I load_tensors:   CPU_Mapped model buffer size =   388.38 MiB
+0.01.328.156 I load_tensors:        CUDA0 model buffer size =  3028.39 MiB
+0.01.328.156 I load_tensors:        CUDA1 model buffer size =  3600.89 MiB
+0.01.328.156 I load_tensors:        ROCm0 model buffer size =  4530.42 MiB
+0.02.499.606 I llama_context: constructing llama_context
+0.02.502.911 I llama_context:  ROCm_Host  output buffer size =     0.95 MiB
+0.02.504.867 I llama_kv_cache:      CUDA0 KV buffer size =  1260.00 MiB
+0.02.508.683 I llama_kv_cache:      CUDA1 KV buffer size =  1512.00 MiB
+0.02.511.344 I llama_kv_cache:      ROCm0 KV buffer size =  1260.00 MiB
+0.02.511.691 I llama_memory_recurrent:      CUDA0 RS buffer size =   211.97 MiB
+0.02.512.224 I llama_memory_recurrent:      CUDA1 RS buffer size =   199.50 MiB
+0.02.512.845 I llama_memory_recurrent:      ROCm0 RS buffer size =   187.03 MiB
+0.02.512.926 I sched_reserve: reserving ...
+0.02.514.130 D sched_reserve: reserving full memory module
+0.02.554.794 I sched_reserve:      CUDA0 compute buffer size =   504.08 MiB
+0.02.554.795 I sched_reserve:      CUDA1 compute buffer size =   414.06 MiB
+0.02.554.795 I sched_reserve:      ROCm0 compute buffer size =   414.06 MiB
+0.02.554.796 I sched_reserve:  CUDA_Host compute buffer size =   352.09 MiB
+0.02.670.164 I common_speculative_init_result: creating MTP draft context against the target model 'Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf'
+0.02.670.185 I llama_context: constructing llama_context
+0.02.670.409 I llama_context:  ROCm_Host  output buffer size =     0.95 MiB
+0.02.671.498 I llama_kv_cache:      ROCm0 KV buffer size =   252.00 MiB
+0.02.671.745 I sched_reserve: reserving ...
+0.02.672.903 D sched_reserve: reserving full memory module
+0.02.700.648 I sched_reserve:      ROCm0 compute buffer size =   454.06 MiB
+0.02.700.649 I sched_reserve:  CUDA_Host compute buffer size =   302.07 MiB
+0.02.701.256 I clip_ctx: CLIP using CUDA0 backend
+0.03.049.051 I reserve_compute_meta:      CUDA0 compute buffer size =   248.10 MiB
+0.03.049.054 I reserve_compute_meta:        CPU compute buffer size =    24.93 MiB
+0.03.049.055 I reserve_compute_meta: graph splits = 1, nodes = 823
+0.03.049.079 I srv    load_model: loaded multimodal model, 'mmproj-Qwen3.8-27B-BF16.gguf'
+0.03.049.101 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 64512, kv_unified = 'false'
+0.03.049.972 I sched_reserve: reserving ...
+0.03.061.420 D sched_reserve: reserving full memory module
+0.03.094.684 I sched_reserve:      ROCm0 compute buffer size =   454.06 MiB
+0.03.094.685 I sched_reserve:  CUDA_Host compute buffer size =   302.07 MiB
+0.03.099.223 I srv    load_model: speculative decoding context initialized
+0.03.099.227 I slot   load_model: id  0 | task -1 | new slot, n_ctx = 64512
+0.03.099.245 I srv    load_model: prompt cache is enabled, size limit: 8192 MiB
+0.03.099.245 I srv    load_model: use `--cache-ram 0` to disable the prompt cache
+0.03.099.246 I srv    load_model: for more info see https://github.com/ggml-org/llama.cpp/pull/16391
+0.03.099.246 I srv    load_model: context checkpoints enabled, max = 32, min spacing = 8192

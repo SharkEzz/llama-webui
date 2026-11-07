@@ -52,6 +52,25 @@ test('parsePlacement: real MTP + mmproj start, compute per context (last reserva
   expect(by.get('ROCm0')!.modelBytes).toBeCloseTo(4530.42 * MiB, 0);
 });
 
+test('parsePlacement: at -lv 5 the -fit probes (no-alloc loads, 0 MiB buffers, own contexts) are left out', async () => {
+  const text = (await Bun.file(`${import.meta.dir}/../../testdata/llama-server-load-mtp-lv5.txt`).text()).trimEnd();
+  // The probes print their « offloaded » lines and 0 MiB model buffers before the real load.
+  expect(text.split('\n').filter((l) => /offloaded \d+\/\d+ layers/.test(l))).toHaveLength(3);
+  const p = parsePlacement(lines(text))!;
+  expect(p.layers).toEqual({ offloaded: 66, total: 66 });
+  const by = new Map(p.buffers.map((b) => [b.device, b]));
+  expect(p.buffers.map((b) => b.device)).toEqual(['CPU_Mapped', 'CUDA0', 'CUDA1', 'ROCm0', 'CUDA_Host']);
+  expect(by.get('CUDA0')).toMatchObject({ busId: '0000:01:00.0' });
+  expect(by.get('CUDA0')!.modelBytes).toBeCloseTo(3028.39 * MiB, 0);
+  expect(by.get('ROCm0')!.modelBytes).toBeCloseTo(4530.42 * MiB, 0);
+  expect(by.get('CPU_Mapped')!.modelBytes).toBeCloseTo(388.38 * MiB, 0);
+  // Same totals as the -lv 4 start: the probes' KV (0 MiB) and compute reservations are not added.
+  expect(by.get('ROCm0')!.kvBytes).toBeCloseTo((1260 + 252 + 187.03) * MiB, 0);
+  expect(by.get('CUDA1')!.computeBytes).toBeCloseTo(414.06 * MiB, 0);
+  expect(by.get('ROCm0')!.computeBytes).toBeCloseTo((414.06 + 454.06) * MiB, 0);
+  expect(by.get('CUDA_Host')!.computeBytes).toBeCloseTo((352.09 + 302.07) * MiB, 0);
+});
+
 test('parsePlacement: the main model only, not a draft model (-md) nor the mmproj buffers', async () => {
   const main = (await fixture()).split('\n');
   const loaded = main.findIndex((l) => l.includes('model loaded'));
