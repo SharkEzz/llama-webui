@@ -59,8 +59,6 @@ type Spawned = {
   kill(signal?: NodeJS.Signals | number): void;
 };
 
-/** One long-lived `nvidia-smi -lms` stream + occasional compute-apps query. */
-
 /** `reached` se résout à null après `ms` ; le minuteur est annulé à la sortie de la portée (`using`). */
 function timeoutAfter(ms: number): { reached: Promise<null> } & Disposable {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -70,6 +68,7 @@ function timeoutAfter(ms: number): { reached: Promise<null> } & Disposable {
   return { reached, [Symbol.dispose]: () => clearTimeout(timer) };
 }
 
+/** One long-lived `nvidia-smi -lms` stream + occasional compute-apps query. */
 export class NvidiaMonitor {
   private bin: string;
   private intervalMs: number;

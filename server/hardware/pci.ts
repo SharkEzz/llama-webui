@@ -1,6 +1,7 @@
 import { readdir, realpath } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import type { TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/shared';
+import { physicalDisks } from '../collectors/disk';
 import { readCpuInfo } from './cpu';
 
 /*
@@ -227,19 +228,10 @@ interface BlockDev {
   sizeBytes: number | null;
 }
 
-const VIRTUAL = /^(loop|ram|zram)\d/;
-
 async function blockDevices(sysRoot: string): Promise<BlockDev[]> {
   const dir = join(sysRoot, 'block');
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch {
-    return [];
-  }
   const out: BlockDev[] = [];
-  for (const block of entries.sort()) {
-    if (VIRTUAL.test(block)) continue;
+  for (const block of await physicalDisks(dir)) {
     const ctrlPath = await realpath(join(dir, block, 'device')).catch(() => null);
     if (!ctrlPath) continue;
     const sectors = await readNum(join(dir, block, 'size'));

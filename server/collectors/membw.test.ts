@@ -65,7 +65,6 @@ test('MemBandwidthSampler: system read/write rates from per-interval CAS counts 
     '--log-fd',
     '1',
   ]);
-  expect(s.available).toBe(true);
   const bw = s.sample()!;
   expect(bw.readBps).toBeCloseTo((252177 / 1) * 64, 0);
   expect(bw.writeBps).toBeCloseTo((49654 / 1) * 64, 0);
@@ -79,7 +78,6 @@ test('MemBandwidthSampler: perf missing or event unknown → unknown, retried on
   const perf = fakePerf(() => new Error('ENOENT'));
   using s = new MemBandwidthSampler({ spawn: perf.spawn, now: () => now });
   s.start();
-  expect(s.available).toBe(false);
   expect(s.sample()).toBeNull();
   s.start();
   expect(perf.calls).toHaveLength(1); // no spawn loop
@@ -92,7 +90,6 @@ test('MemBandwidthSampler: perf missing or event unknown → unknown, retried on
   using d = new MemBandwidthSampler({ spawn: dead.spawn, now: () => now });
   d.start();
   await Bun.sleep(10);
-  expect(d.available).toBe(false);
   expect(d.sample()).toBeNull();
   expect(d.sample()).toBeNull();
   expect(dead.calls).toHaveLength(1);
@@ -193,7 +190,6 @@ test('MemBandwidthSampler: perf that dies after giving values is relaunched afte
   await Bun.sleep(10);
   expect(s.sample()).toBeNull(); // dead: no stale values
   expect(s.procSample()).toBeNull();
-  expect(s.available).toBe(false);
   s.setPid(42);
   expect(sysOnce.calls).toHaveLength(2);
   now = 61_000;

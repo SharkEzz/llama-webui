@@ -234,11 +234,6 @@ export class MemBandwidthSampler implements Disposable {
     return r === null ? null : r * BYTES_PER_EVENT;
   }
 
-  /** La mesure système a déjà donné des valeurs (affiché dans Système). */
-  get available(): boolean {
-    return Boolean(this.system?.gotData && !this.system.dead);
-  }
-
   stop(): void {
     this.system?.stop();
     this.system = null;
