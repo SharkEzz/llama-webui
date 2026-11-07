@@ -22,7 +22,6 @@
 
 <p align="center">
   <a href="#features">Features</a> ·
-  <a href="#screenshots">Screenshots</a> ·
   <a href="#requirements">Requirements</a> ·
   <a href="#installation">Installation</a> ·
   <a href="#configuration">Configuration</a> ·
@@ -63,6 +62,13 @@ one dashboard designed for a **single machine you own**:
   llama.cpp build) and the latest logs.
 - The child process is tied to llama-webui (`setpriv --pdeathsig`), so it never outlives it.
 
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/server.jpg" alt="Server page with status, effective command line and server properties"><p align="center"><sub><b>Server</b>: status, effective command and <code>/props</code></sub></p></td>
+    <td width="50%"><img src="docs/assets/screenshots/profiles.jpg" alt="Profile editor with model, projector, arguments and inline flag help"><p align="center"><sub><b>Profiles</b>: editor with inline flag help</sub></p></td>
+  </tr>
+</table>
+
 ### 📈 Live monitoring
 
 - **Dashboard**: generation and prompt tokens/s, speculative-decoding acceptance (draft model or MTP), context usage
@@ -71,12 +77,20 @@ one dashboard designed for a **single machine you own**:
   fans, plus CPU, memory and disk. NVIDIA through NVML (falls back to `nvidia-smi`), AMD through sysfs.
 - **Logs**: 10,000-line live ring buffer with level filter, search and auto-follow.
 
+<p align="center">
+  <img src="docs/assets/screenshots/system.jpg" alt="System page with per-GPU utilization, VRAM, PCIe, power, clocks and temperature" width="100%">
+</p>
+
 ### 🧭 3D hardware topology
 
 The **Topology (Topologie)** page draws your machine as an interactive 3D scene (react-three-fiber): CPU, memory,
 NVMe drives, GPUs and chipset, discovered automatically from sysfs. Particles flow along each link according to
 **measured** PCIe, NVMe and DRAM traffic (DRAM through `perf` on AMD Zen 4/5), and HUD cards show the current phase
 (loading, prompt, generation) and **how the model is split across devices**, parsed from `llama-server`'s startup logs.
+
+<p align="center">
+  <img src="docs/assets/screenshots/topology.jpg" alt="3D hardware topology with live PCIe, NVMe and DRAM traffic and model placement per device" width="100%">
+</p>
 
 ### 💬 Chat
 
@@ -86,10 +100,18 @@ NVMe drives, GPUs and chipset, discovered automatically from sysfs. Particles fl
 - **Stats under every answer**: time to first token, prompt and generation speed, token count, MTP/draft acceptance.
 - Conversations are persisted in SQLite and generation keeps running server-side if you leave the page.
 
+<p align="center">
+  <img src="docs/assets/screenshots/chat.jpg" alt="Chat with highlighted code and per-message statistics" width="100%">
+</p>
+
 ### 📦 Models
 
 Recursive scan of your models folder with GGUF header metadata: architecture, quantization, size, parameters, layers,
 context length and experts (MoE). Split (sharded) models and multimodal projectors are recognized.
+
+<p align="center">
+  <img src="docs/assets/screenshots/models.jpg" alt="Models table with architecture, quantization, size, parameters, layers, context and experts" width="100%">
+</p>
 
 ### ⏱️ Benchmark
 
@@ -99,6 +121,10 @@ context length and experts (MoE). Split (sharded) models and multimodal projecto
   `-ot`, threads, batch sizes…
 - Live progress, a filterable history, **side-by-side comparison** with differences highlighted, and **turn any run into
   a profile**.
+
+<p align="center">
+  <img src="docs/assets/screenshots/benchmark.jpg" alt="Benchmark history with prompt and generation speed, MTP acceptance and peak VRAM" width="100%">
+</p>
 
 ### 🪄 Tuning and sweeps
 
@@ -112,32 +138,19 @@ context length and experts (MoE). Split (sharded) models and multimodal projecto
 - A read-only **system checks** panel (NVIDIA persistence mode and power limit, PCIe link, ReBAR, AMD DPM, CPU governor,
   THP, memlock, swappiness, IOMMU, disk speed…) with the command to fix each item.
 
+<p align="center">
+  <img src="docs/assets/screenshots/tuning.jpg" alt="Tuning recommendation table with per-device VRAM and RAM estimates" width="100%">
+</p>
+
 ### 🎨 Polished UI
 
 Light and dark themes (or follow the system), a refined glass look, and real-time updates over a single WebSocket that
 reconnects on its own.
 
-## Screenshots
-
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/screenshots/topology.jpg" alt="3D hardware topology with live PCIe, NVMe and DRAM traffic and model placement per device"><p align="center"><sub><b>Topology</b>: live data flows and model placement</sub></p></td>
-    <td width="50%"><img src="docs/assets/screenshots/chat.jpg" alt="Chat with highlighted code and per-message statistics"><p align="center"><sub><b>Chat</b>: Markdown, code and per-answer stats</sub></p></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/assets/screenshots/tuning.jpg" alt="Tuning recommendation table with per-device VRAM and RAM estimates"><p align="center"><sub><b>Tuning</b>: flags, reasons and memory estimate</sub></p></td>
-    <td width="50%"><img src="docs/assets/screenshots/benchmark.jpg" alt="Benchmark history with prompt and generation speed, MTP acceptance and peak VRAM"><p align="center"><sub><b>Benchmark</b>: history and comparison</sub></p></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/assets/screenshots/system.jpg" alt="System page with per-GPU utilization, VRAM, PCIe, power, clocks and temperature"><p align="center"><sub><b>System</b>: per-GPU telemetry</sub></p></td>
-    <td width="50%"><img src="docs/assets/screenshots/server.jpg" alt="Server page with status, effective command line and server properties"><p align="center"><sub><b>Server</b>: status and effective command</sub></p></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/assets/screenshots/profiles.jpg" alt="Profile editor with model, projector, arguments and inline flag help"><p align="center"><sub><b>Profiles</b>: editor with flag help</sub></p></td>
-    <td width="50%"><img src="docs/assets/screenshots/models.jpg" alt="Models table with architecture, quantization, size, parameters, layers, context and experts"><p align="center"><sub><b>Models</b>: GGUF metadata</sub></p></td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="docs/assets/screenshots/dashboard-light.jpg" alt="Dashboard in light theme"><p align="center"><sub><b>Light theme</b></sub></p></td>
+    <td width="50%"><img src="docs/assets/screenshots/dashboard.jpg" alt="Dashboard in dark theme"><p align="center"><sub><b>Dark</b></sub></p></td>
+    <td width="50%"><img src="docs/assets/screenshots/dashboard-light.jpg" alt="Dashboard in light theme"><p align="center"><sub><b>Light</b></sub></p></td>
   </tr>
 </table>
 
