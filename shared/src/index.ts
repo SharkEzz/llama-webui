@@ -8,6 +8,7 @@ export * from './monitor';
 export * from './profile';
 export * from './server';
 export * from './settings';
+export * from './setup';
 export * from './shell';
 export * from './sse';
 export * from './sweep';

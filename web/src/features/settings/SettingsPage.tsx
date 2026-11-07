@@ -1,22 +1,22 @@
 import type { Settings, ThemeMode } from '@llama-webui/shared';
+import { ListChecks } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { Link } from 'react-router';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { GLASS } from '@/components/glass/glass';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { SystemInfo } from '@/features/system/SystemPage';
-import { ApiError, api } from '@/lib/api';
-import { formatBytes, formatDuration } from '@/lib/format';
+import { api } from '@/lib/api';
+import { formatDuration } from '@/lib/format';
+import { type SettingsErrors, useSettingsEditor } from '@/lib/settings';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
-
-type Errors = Partial<Record<keyof Settings, string>>;
+import { GpuSwitches, SwitchRow, TextField } from './fields';
 
 const INTERVALS = [250, 500, 1000, 2000].map((ms) => ({ value: String(ms), label: `${ms} ms` }));
 const THEMES: { value: ThemeMode; label: string }[] = [
@@ -27,36 +27,16 @@ const THEMES: { value: ThemeMode; label: string }[] = [
 
 /** Settings saved field by field (PATCH /api/settings); validation error shown under the field. */
 export function SettingsPage() {
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [errors, setErrors] = useState<Errors>({});
-
-  useEffect(() => {
-    void api<Settings>('/settings').then(setSettings, (e: Error) => toast.error(e.message));
-  }, []);
-
-  const save = async (patch: Partial<Settings>) => {
-    const keys = Object.keys(patch) as (keyof Settings)[];
-    try {
-      const next = await api<Settings>('/settings', { method: 'PATCH', body: JSON.stringify(patch) });
-      setSettings(next);
-      setErrors((e) => {
-        const copy = { ...e };
-        for (const k of keys) delete copy[k];
-        return copy;
-      });
-      toast.success('Setting saved', { id: 'settings-saved' });
-    } catch (e) {
-      if (e instanceof ApiError && e.issues.length > 0) {
-        const next: Errors = {};
-        for (const i of e.issues) next[i.path[0] as keyof Settings] ??= i.message;
-        setErrors((old) => ({ ...old, ...next }));
-      } else toast.error(e instanceof Error ? e.message : String(e));
-    }
-  };
+  const { settings, errors, save } = useSettingsEditor();
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
+        <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/setup" />}>
+          <ListChecks /> Run setup again
+        </Button>
+      </header>
       {!settings ? (
         <Skeleton className="h-72" />
       ) : (
@@ -83,10 +63,10 @@ export function SettingsPage() {
 
 interface SectionProps {
   settings: Settings;
-  save(patch: Partial<Settings>): Promise<void>;
+  save(patch: Partial<Settings>): Promise<boolean>;
 }
 
-function General({ settings, errors, save }: SectionProps & { errors: Errors }) {
+function General({ settings, errors, save }: SectionProps & { errors: SettingsErrors }) {
   return (
     <GlassCard title="llama-server">
       <div className="grid gap-5 md:grid-cols-2">
@@ -123,42 +103,6 @@ function General({ settings, errors, save }: SectionProps & { errors: Errors }) 
         />
       </div>
     </GlassCard>
-  );
-}
-
-function TextField(props: {
-  id: string;
-  label: string;
-  hint?: string;
-  value: string;
-  error?: string;
-  inputMode?: 'numeric';
-  onCommit(v: string): void;
-}) {
-  const [draft, setDraft] = useState(props.value);
-  useEffect(() => setDraft(props.value), [props.value]);
-  const commit = () => {
-    if (draft.trim() !== props.value) props.onCommit(draft.trim());
-  };
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={props.id}>{props.label}</Label>
-      <Input
-        id={props.id}
-        value={draft}
-        inputMode={props.inputMode}
-        className="font-mono"
-        aria-invalid={!!props.error}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === 'Enter' && commit()}
-      />
-      {props.error ? (
-        <p className="text-xs text-destructive">{props.error}</p>
-      ) : (
-        props.hint && <p className="text-xs text-muted-foreground">{props.hint}</p>
-      )}
-    </div>
   );
 }
 
@@ -238,40 +182,14 @@ function Monitoring({ settings, save }: SectionProps) {
           {!info ? (
             <Skeleton className="h-24" />
           ) : (
-            info.gpus.map((g) => {
-              const hidden = settings.hiddenGpus.includes(g.busId);
-              return (
-                <SwitchRow
-                  key={g.busId}
-                  id={`gpu-${g.busId}`}
-                  label={g.name}
-                  hint={`${g.busId}${g.vramTotalBytes > 0 ? `, ${formatBytes(g.vramTotalBytes, 0)}` : ''}`}
-                  checked={!hidden}
-                  onChange={(on) =>
-                    save({
-                      hiddenGpus: on
-                        ? settings.hiddenGpus.filter((b) => b !== g.busId)
-                        : [...settings.hiddenGpus, g.busId],
-                    })
-                  }
-                />
-              );
-            })
+            <GpuSwitches
+              gpus={info.gpus}
+              hidden={settings.hiddenGpus}
+              onChange={(hiddenGpus) => save({ hiddenGpus })}
+            />
           )}
         </div>
       </GlassCard>
-    </div>
-  );
-}
-
-function SwitchRow(props: { id: string; label: string; hint?: string; checked: boolean; onChange(on: boolean): void }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex flex-col gap-0.5">
-        <Label htmlFor={props.id}>{props.label}</Label>
-        {props.hint && <p className="text-xs text-muted-foreground">{props.hint}</p>}
-      </div>
-      <Switch id={props.id} checked={props.checked} onCheckedChange={props.onChange} />
     </div>
   );
 }

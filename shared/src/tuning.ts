@@ -163,6 +163,19 @@ export interface Check {
   impact: string;
 }
 
+/**
+ * Checks that make sense on the first-run checklist: those that need neither a model (memory estimate, model disk)
+ * nor a running server (PCIe link under load, `system_info` log line).
+ */
+const NEEDS_MODEL_OR_SERVER = [
+  /^cpu\.(memlock|swappiness)$/,
+  /^kernel\.(disk|disk-speed|swap)$/,
+  /^(nvidia|amd)\.pcie\./,
+  /^build\.simd$/,
+];
+
+export const isSetupCheck = (id: string) => !NEEDS_MODEL_OR_SERVER.some((re) => re.test(id));
+
 export interface ChecksReport {
   checks: Check[];
   summary: { warn: number; ok: number; unknown: number; na: number };

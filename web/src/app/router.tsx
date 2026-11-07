@@ -1,11 +1,10 @@
 import type { ComponentType } from 'react';
 import { createBrowserRouter } from 'react-router';
-import { HomePage } from '@/features/home/HomePage';
 import { AppLayout } from './AppLayout';
 import { MILESTONE_BY_PATH, ROUTES } from './routes';
 
 /**
- * Each page is a chunk loaded on first visit (the initial bundle only holds the shell and the home page).
+ * Each page is a chunk loaded on first visit (the initial bundle only holds the shell).
  * `load` must stay a literal import() so the bundler can split it.
  */
 const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) => ({
@@ -30,7 +29,8 @@ export const router = createBrowserRouter([
     // First load of a deep URL (/bench reloaded): the shell right away, the page next.
     hydrateFallbackElement: <AppLayout loading />,
     children: [
-      { index: true, element: <HomePage /> },
+      { index: true, ...page(() => import('@/features/home/HomePage'), 'HomePage') },
+      { path: 'setup', ...page(() => import('@/features/home/HomePage'), 'SetupPage') },
       { path: 'dashboard', ...page(() => import('@/features/dashboard/DashboardPage'), 'DashboardPage') },
       { path: 'server', ...page(() => import('@/features/server/ServerPage'), 'ServerPage') },
       { path: 'profiles', ...page(() => import('@/features/profiles/ProfilesPage'), 'ProfilesPage') },
