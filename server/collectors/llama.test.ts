@@ -184,8 +184,9 @@ describe('context usage and recent requests', () => {
     nRemain: null,
   });
 
-  test('kvUsage sums slots', () => {
-    expect(kvUsage([slot(100, 20, 1000), slot(0, 0, 1000)])).toEqual({ usedTokens: 120, totalTokens: 2000 });
+  test('kvUsage sums slots; generated tokens are already in n_prompt_tokens', () => {
+    // Real slot mid-generation: a 29-token prompt, 1110 generated, n_prompt_tokens 1142.
+    expect(kvUsage([slot(1142, 1110, 64512), slot(0, 0, 64512)])).toEqual({ usedTokens: 1142, totalTokens: 129024 });
     expect(kvUsage([])).toBeNull();
     expect(kvUsage(null)).toBeNull();
     expect(kvUsage([slot(0, 0, 0)])).toBeNull();
