@@ -1,4 +1,4 @@
-import type { Snapshot } from '@llama-webui/shared';
+import { type Snapshot, slotContextTokens } from '@llama-webui/shared';
 import { Layers } from 'lucide-react';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ export function ContextCard({ snapshot }: { snapshot: Snapshot }) {
           <p className="text-sm text-muted-foreground">/slots indisponible pour ce serveur.</p>
         ) : (
           slots.map((s) => {
-            const used = s.nPromptTokens + s.nDecoded;
+            const used = slotContextTokens(s);
             const pct = s.nCtx > 0 ? (100 * used) / s.nCtx : 0;
             return (
               <div key={s.id} className="flex flex-col gap-1.5">

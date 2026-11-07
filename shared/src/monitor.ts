@@ -75,6 +75,12 @@ export interface SlotView {
   nRemain: number | null;
 }
 
+/**
+ * Tokens occupés dans le contexte d'un slot. `n_prompt_tokens` est déjà tout le contexte : le prompt plus les tokens
+ * générés jusqu'ici (gardés en cache une fois la requête finie). Y ajouter `n_decoded` compterait la sortie deux fois.
+ */
+export const slotContextTokens = (s: SlotView): number => s.nPromptTokens;
+
 export type Health = 'ok' | 'loading' | 'error' | 'down';
 
 export interface RequestStats {

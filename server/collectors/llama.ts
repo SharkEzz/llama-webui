@@ -1,4 +1,11 @@
-import type { Health, RequestRecord, RequestStats, SlotView, SpecStats } from '@llama-webui/shared';
+import {
+  type Health,
+  type RequestRecord,
+  type RequestStats,
+  type SlotView,
+  type SpecStats,
+  slotContextTokens,
+} from '@llama-webui/shared';
 import { parsePrometheus } from './prometheus';
 
 export type { Health, RequestRecord, RequestStats, SlotView, SpecStats };
@@ -98,16 +105,13 @@ export function lastRequestStats(prev: Map<string, number>, cur: Map<string, num
   };
 }
 
-/**
- * Context occupancy across slots (this llama.cpp build has no kv_cache_* metrics). `n_prompt_tokens` is the slot's
- * whole context: the prompt plus the tokens generated so far (and kept, cached, once the request is done).
- */
+/** Context occupancy across slots (this llama.cpp build has no kv_cache_* metrics). */
 export function kvUsage(slots: SlotView[] | null): { usedTokens: number; totalTokens: number } | null {
   if (!slots || slots.length === 0) return null;
   let usedTokens = 0;
   let totalTokens = 0;
   for (const s of slots) {
-    usedTokens += s.nPromptTokens;
+    usedTokens += slotContextTokens(s);
     totalTokens += s.nCtx;
   }
   return totalTokens > 0 ? { usedTokens, totalTokens } : null;
