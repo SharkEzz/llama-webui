@@ -51,9 +51,14 @@ export function BenchLiveCard() {
       title="En cours"
       icon={Activity}
       actions={
-        <Button variant="outline" size="sm" onClick={() => void useBench.getState().cancel()}>
-          <Square /> Annuler
-        </Button>
+        // Pendant la relance du serveur le run est fini : plus rien à annuler.
+        live.phase === "restarting-server" ? (
+          <span className="text-sm text-muted-foreground">Relance du serveur…</span>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => void useBench.getState().cancel()}>
+            <Square /> Annuler
+          </Button>
+        )
       }
     >
       <div className="flex flex-col gap-4">

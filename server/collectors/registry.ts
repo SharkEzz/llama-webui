@@ -67,6 +67,11 @@ export class Collectors {
     return c;
   }
 
+  /** Pilote NVIDIA lu par NVML (null avec nvidia-smi ou avant la première lecture). */
+  get nvmlSystem(): { driver: string | null; cudaDriver: number | null } | null {
+    return this.smi ? null : (this.nvidia as NvmlMonitor).system;
+  }
+
   /** Source NVIDIA effective (affichée dans Système). */
   get nvidiaSource(): "nvml" | "nvidia-smi" {
     return this.smi ? "nvidia-smi" : "nvml";

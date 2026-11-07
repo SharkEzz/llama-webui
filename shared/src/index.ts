@@ -10,3 +10,5 @@ export * from "./models";
 export * from "./chat";
 export * from "./sse";
 export * from "./bench";
+export * from "./tuning";
+export * from "./sweep";

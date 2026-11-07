@@ -79,8 +79,8 @@ llama-webui/
 - `settings(key, value_json)` : binary, host, port par défaut, `models_dir` (défaut `~/Modèles`), `poll_interval_ms`, `history_seconds`, `hidden_gpus[]`, préférences d'affichage.
 - `profiles(id, name UNIQUE, model_path, mmproj_path, cwd, host, port, args_json, env_json, created_at, updated_at, source)` — mêmes champs que llama-tui ; `args` valide les flags réservés (`--host --port --metrics --slots --props -m -mm`), catalogue via `llama-server --help`.
 - `conversations(id, title, profile_id, model_path, sampling_json, system_prompt, created_at, updated_at)` ; `messages(id, conversation_id, role, content, stats_json, created_at)` (stats : ttft_ms, prompt_tokens, gen_tokens, pp_tps, tg_tps, draft_accept).
-- `bench_runs(id, kind 'bench'|'server'|'sweep-item', model_path, args_json, hardware_json, pp_tps, tg_tps, vram_mib_json, status, error, log_excerpt, duration_ms, sweep_id, created_at)`.
-- `sweeps(id, name, model_path, space_json, status, best_run_id, created_at, finished_at)`.
+- `bench_runs(id AUTOINCREMENT, kind 'bench'|'server', model_path, args_json, hardware_json, pp_tps, tg_tps, vram_mib_json, status, error, log_excerpt, duration_ms, sweep_id, sweep_label, fit, created_at)` — `kind` = l'outil qui a mesuré ; l'appartenance à un sweep se lit dans `sweep_id` (dans un sweep, les runs `bench` explorent, les runs `server` valident). *(Révisé en J6 : pas de kind `sweep-item`.)*
+- `sweeps(id AUTOINCREMENT, name, model_path, profile_id, spec_json (préréglage, base, espace, p/n/r, autres flags serveur), status, best_run_id, created_at, finished_at)`.
 
 ---
 

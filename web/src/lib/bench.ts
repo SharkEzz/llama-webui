@@ -172,7 +172,12 @@ export interface BenchFilters {
   kind: BenchKind | "all"
   model: string
   status: BenchStatus | "all"
+  /** « none » : runs ponctuels seulement (défaut) ; « all » : avec les runs de sweep. */
+  sweeps: "none" | "all"
 }
+
+/** Runs chargés au plus (le serveur plafonne aussi). */
+const HISTORY_LIMIT = 500
 
 interface BenchState {
   runs: BenchRun[]
@@ -206,7 +211,7 @@ export const useBench = create<BenchState>()((set, get) => ({
   live: null,
   loaded: false,
   devices: null,
-  filters: { kind: "all", model: "all", status: "all" },
+  filters: { kind: "all", model: "all", status: "all", sweeps: "none" },
   form: EMPTY_FORM,
   errors: {},
   selected: [],
@@ -214,7 +219,7 @@ export const useBench = create<BenchState>()((set, get) => ({
 
   async load() {
     try {
-      const { runs, live } = await api<{ runs: BenchRun[]; live: BenchLive | null }>("/bench/runs")
+      const { runs, live } = await api<{ runs: BenchRun[]; live: BenchLive | null }>(`/bench/runs?sweep=${get().filters.sweeps}&limit=${HISTORY_LIMIT}`)
       set({ runs, live, loaded: true, selected: get().selected.filter((id) => runs.some((r) => r.id === id)) })
     } catch (e) {
       fail(e)
@@ -229,7 +234,11 @@ export const useBench = create<BenchState>()((set, get) => ({
     }
   },
 
-  setFilters: (f) => set({ filters: { ...get().filters, ...f } }),
+  setFilters(f) {
+    const prev = get().filters
+    set({ filters: { ...prev, ...f } })
+    if (f.sweeps && f.sweeps !== prev.sweeps) void get().load()
+  },
 
   setForm(patch) {
     const errors = { ...get().errors }
@@ -332,9 +341,15 @@ export function startBenchSync(): void {
   started = true
   onWs("bench-progress", (m) => useBench.setState({ live: m.payload }))
   onWs("bench-run", ({ payload: run }) => {
-    const runs = useBench.getState().runs
+    const { runs, filters } = useBench.getState()
+    if (run.sweepId !== null && filters.sweeps === "none") return
     const i = runs.findIndex((r) => r.id === run.id)
     useBench.setState({ runs: i === -1 ? [run, ...runs] : runs.map((r) => (r.id === run.id ? run : r)) })
+  })
+  onWs("bench-deleted", ({ payload: { ids } }) => {
+    const gone = new Set(ids)
+    const { runs, selected } = useBench.getState()
+    useBench.setState({ runs: runs.filter((r) => !gone.has(r.id)), selected: selected.filter((id) => !gone.has(id)) })
   })
   useWs.subscribe((s, prev) => {
     if (s.status === "open" && prev.status !== "open") void useBench.getState().load()
@@ -352,6 +367,7 @@ export const PHASE_LABEL: Record<BenchLive["phase"], string> = {
 }
 
 export const STATUS_LABEL: Record<BenchStatus, string> = {
+  queued: "en attente",
   running: "en cours",
   ok: "terminé",
   failed: "échec",

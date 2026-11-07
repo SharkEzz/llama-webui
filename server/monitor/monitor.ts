@@ -75,6 +75,10 @@ export class Monitor {
     return this.collectors.nvidiaSource;
   }
 
+  get nvmlSystem(): { driver: string | null; cudaDriver: number | null } | null {
+    return this.collectors.nvmlSystem;
+  }
+
   /** Chemin absolu du modèle d'un profil (disque du modèle) ; fourni par le module serveur, rechargé à chaud. */
   setModelPathResolver(fn: (profileId: number) => string | null): void {
     this.modelPathFor = fn;

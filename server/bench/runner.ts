@@ -1,428 +1,313 @@
-import {
-  type BenchHardware,
-  type BenchLive,
-  type BenchPhase,
-  type BenchRun,
-  type BenchSpec,
-  benchArgs,
-  type GpuSample,
-  type Profile,
-  serverArgs,
-  type ServerState,
-  type Settings,
-  shellQuote,
-} from "@llama-webui/shared";
+import { type BenchHardware, type BenchLive, type BenchRun, type BenchSpec, rankRuns, type Sweep, type SweepLive, sweepCtx } from "@llama-webui/shared";
 import type { BenchFinish, BenchRunsRepo } from "../db/benchRuns";
-import { HttpError } from "../http";
-import type { LogBuffer } from "../logs/buffer";
-import { LineSplitter } from "../logs/lines";
-import { dirname } from "node:path";
-import { type BuiltCommand, buildCommand } from "../supervisor/args";
-import { benchBinary, benchFailure, parseBenchJson, parseBenchProgress } from "./parse";
-import { runServerTrial, TrialCancelled } from "./server";
-import { VramProbe } from "./vram";
+import type { SweepsRepo } from "../db/sweeps";
+import { HttpError, notFound } from "../http";
+import type { RunExecutor } from "./execute";
+import type { BenchGate } from "./gate";
 
-/** Ce que le runner attend du superviseur : arrêter le serveur géré avant un run, le relancer après. */
-export interface ServerControl {
-  readonly state: ServerState;
-  readonly lastCommand: BuiltCommand | null;
-  stop(): Promise<void>;
-  start(cmd: BuiltCommand): Promise<void>;
-}
+export type { ServerControl } from "./gate";
 
 export interface BenchRunnerDeps {
   repo: BenchRunsRepo;
-  settings(): Settings;
-  server: ServerControl;
-  logs: LogBuffer;
-  /** GPU vues par le Monitor (toutes, masquées comprises). */
-  gpus(): GpuSample[];
+  sweeps: SweepsRepo;
+  /** La garde du serveur, dans le runtime (survit aux rechargements). */
+  gate: BenchGate;
+  executor: RunExecutor;
   hardware(): Promise<BenchHardware>;
   onLive(l: BenchLive | null): void;
   onRun(r: BenchRun): void;
-  /** Dossier et variables d'environnement du profil d'origine (null si le profil n'existe plus). */
-  profile?(id: number): Pick<Profile, "cwd" | "env"> | null;
-  fetch?: typeof fetch;
+  onSweep(s: Sweep): void;
+  onSweepLive(l: SweepLive | null): void;
   now?: () => number;
-  killTimeoutMs?: number;
+  /** Pause entre deux éléments d'un sweep, le temps que la VRAM se libère (1 s). */
+  pauseMs?: number;
 }
 
-type Child = ReturnType<typeof Bun.spawn>;
-
-interface Job {
+interface Current {
   run: BenchRun;
   spec: BenchSpec;
-  argv: string[];
-  /** Run serveur : la commande llama-server mesurée. */
-  cmd: BuiltCommand | null;
-  /** Dernière diffusion de la carte en direct (les lignes de log sont regroupées). */
-  liveAt: number;
-  /** Commande du serveur géré arrêté pour ce run, à relancer à la fin. */
-  stopped: BuiltCommand | null;
-  /** Arrêt du serveur géré en cours (le superviseur refuse de le relancer avant la fin). */
-  stopping: Promise<void> | null;
+  sweepId: number | null;
   live: BenchLive;
-  tail: string[];
-  peaks: Map<string, { name: string; bytes: number }>;
-  proc: Child | null;
-  abort: AbortController;
   cancelled: boolean;
-  /** Rechargement ou arrêt de Bun : le run est déjà enregistré « interrupted », plus rien ne doit écrire. */
-  disposed: boolean;
   /** Résultat enregistré (il ne reste que la relance du serveur). */
   finished: boolean;
 }
 
-const TAIL = 50;
-const LIVE_LINES = 20;
-const VRAM_SAMPLE_MS = 500;
-const MIB = 1024 * 1024;
-const LIVE_THROTTLE_MS = 250;
+const INTERRUPTED = "interrompu (rechargement ou arrêt de llama-webui)";
 
 /**
- * Un benchmark à la fois, hors superviseur. Arrête le serveur géré (après confirmation du client), exécute le run,
- * enregistre le résultat, puis relance le serveur avec la même commande quelle que soit l'issue.
- * Pas dans le runtime : un rechargement `bun --hot` l'arrête (dispose).
+ * Les benchmarks : runs ponctuels et sweeps, un à la fois. La garde (gate) arrête le serveur géré une fois et le relance
+ * une fois ; l'exécuteur lance chaque run. Recréé à chaque rechargement `bun --hot` : dispose() rend la main et le
+ * nouveau runner reprend un sweep en cours (resume).
  */
 export class BenchRunner {
-  private job: Job | null = null;
-  /** Vrai entre l'acceptation d'un run et la création de son job (await du matériel). */
+  private current: Current | null = null;
+  private sweep: { id: number; cancelled: boolean } | null = null;
+  private sweepLiveV: SweepLive | null = null;
+  /** Vrai entre l'acceptation d'un run et son lancement (await du matériel, de la garde). */
   private claimed = false;
+  private disposed = false;
   private readonly now: () => number;
-  private readonly killTimeoutMs: number;
 
   constructor(private readonly deps: BenchRunnerDeps) {
     this.now = deps.now ?? Date.now;
-    this.killTimeoutMs = deps.killTimeoutMs ?? 5000;
   }
 
   get busy(): boolean {
-    return this.claimed || this.job !== null;
+    return this.claimed || this.current !== null || this.sweep !== null || this.deps.gate.held;
   }
 
   get live(): BenchLive | null {
-    return this.job?.live ?? null;
+    return this.current?.live ?? null;
   }
 
-  /** Crée le run et le lance en arrière-plan ; renvoie le run créé (statut « running »). */
+  get sweepLive(): SweepLive | null {
+    return this.sweepLiveV;
+  }
+
+  private setLive(cur: Current, patch: Partial<BenchLive>): void {
+    if (this.disposed || this.current !== cur) return;
+    cur.live = { ...cur.live, ...patch };
+    this.deps.onLive(cur.live);
+  }
+
+  private setSweepLive(l: SweepLive | null): void {
+    if (this.disposed) return;
+    this.sweepLiveV = l;
+    this.deps.onSweepLive(l);
+  }
+
+  private async checkFiles(spec: Pick<BenchSpec, "modelPath" | "mmprojPath">): Promise<void> {
+    if (!(await Bun.file(spec.modelPath).exists())) throw new HttpError(400, `Modèle introuvable : ${spec.modelPath}`);
+    if (spec.mmprojPath && !(await Bun.file(spec.mmprojPath).exists())) throw new HttpError(400, `Projecteur introuvable : ${spec.mmprojPath}`);
+  }
+
+  /** Run ponctuel : créé puis lancé en arrière-plan ; renvoie le run créé (statut « running »). */
   async start(spec: BenchSpec, o: { stopServer: boolean }): Promise<BenchRun> {
     if (this.busy) throw new HttpError(409, "Un benchmark est en cours");
-    const s = this.deps.server.state;
-    if (s.kind === "external") throw new HttpError(409, `Un llama-server externe tourne sur le port ${s.port} : arrêtez-le d'abord`);
-    let stopped: BuiltCommand | null = null;
-    if (s.kind === "starting" || s.kind === "ready") {
-      if (!o.stopServer)
-        throw new HttpError(409, `llama-server tourne (profil ${s.profile}) : il sera arrêté pendant le benchmark puis relancé`, "server-running");
-      stopped = this.deps.server.lastCommand;
-    }
     this.claimed = true;
     try {
-      if (!(await Bun.file(spec.modelPath).exists())) throw new HttpError(400, `Modèle introuvable : ${spec.modelPath}`);
-      if (spec.mmprojPath && !(await Bun.file(spec.mmprojPath).exists())) throw new HttpError(400, `Projecteur introuvable : ${spec.mmprojPath}`);
-      const cmd = spec.kind === "server" ? this.serverCommand(spec) : null;
-      const argv = cmd ? cmd.argv : this.benchArgv(spec);
-      const hardware = await this.deps.hardware();
-      const run = this.deps.repo.create(spec, cmd ? cmd.display : shellQuote(argv.slice(4)), hardware);
-      const job: Job = {
-        run,
-        spec,
-        argv,
-        cmd,
-        liveAt: 0,
-        stopped,
-        stopping: null,
-        live: { runId: run.id, kind: spec.kind, phase: stopped ? "stopping-server" : "loading", step: null, startedAt: this.now(), lines: [] },
-        tail: [],
-        peaks: new Map(),
-        proc: null,
-        abort: new AbortController(),
-        cancelled: false,
-        disposed: false,
-        finished: false,
-      };
-      this.job = job;
-      this.deps.onRun(run);
-      this.deps.onLive(job.live);
-      void this.execute(job);
-      return run;
+      await this.checkFiles(spec);
+      await this.deps.gate.acquire(o);
+      try {
+        const hardware = await this.deps.hardware();
+        const run = this.deps.repo.create(spec, this.deps.executor.commandOf(spec).display, hardware);
+        this.deps.onRun(run);
+        void this.oneOff(run, spec);
+        return run;
+      } catch (e) {
+        await this.deps.gate.release().catch(() => {});
+        throw e;
+      }
     } finally {
       this.claimed = false;
     }
   }
 
-  private source(spec: BenchSpec): Pick<Profile, "cwd" | "env"> | null {
-    return spec.profileId !== null ? (this.deps.profile?.(spec.profileId) ?? null) : null;
-  }
-
-  /**
-   * llama-server pour un run serveur : modèle, projecteur, flags des champs puis autres flags, sur 127.0.0.1 et le port des
-   * réglages, dans le dossier et avec l'environnement du profil d'origine (ses flags peuvent viser des chemins relatifs).
-   */
-  private serverCommand(spec: BenchSpec): BuiltCommand {
-    const source = this.source(spec);
-    const profile: Profile = {
-      id: spec.profileId ?? 0,
-      name: "bench",
-      model: spec.modelPath,
-      ...(spec.mmprojPath ? { mmproj: spec.mmprojPath } : {}),
-      cwd: source?.cwd ?? dirname(spec.modelPath),
-      host: "127.0.0.1",
-      args: [...serverArgs(spec.params), ...spec.serverArgs],
-      env: source?.env ?? {},
-      source: "ui",
-      createdAt: 0,
-      updatedAt: 0,
+  private newCurrent(run: BenchRun, sweepId: number | null, spec: BenchSpec = run.spec): Current {
+    const phase = this.deps.gate.isStopping ? "stopping-server" : "loading";
+    const cur: Current = {
+      run,
+      spec,
+      sweepId,
+      live: { runId: run.id, kind: run.kind, phase, step: null, startedAt: this.now(), lines: [] },
+      cancelled: false,
+      finished: false,
     };
-    return buildCommand(profile, this.deps.settings());
+    this.current = cur;
+    this.deps.onLive(cur.live);
+    return cur;
   }
 
-  private benchArgv(spec: BenchSpec): string[] {
-    const bin = benchBinary(this.deps.settings().binary);
-    return [
-      "setpriv",
-      "--pdeathsig",
-      "KILL",
-      "--",
-      bin,
-      "-m",
-      spec.modelPath,
-      "-o",
-      "json",
-      "--progress",
-      "-r",
-      String(spec.r),
-      "-p",
-      String(spec.p),
-      "-n",
-      String(spec.n),
-      ...benchArgs(spec.params),
-    ];
-  }
-
-  private setLive(job: Job, patch: Partial<BenchLive>): void {
-    if (job.disposed) return;
-    job.live = { ...job.live, ...patch };
-    job.liveAt = this.now();
-    this.deps.onLive(job.live);
-  }
-
-  /** Nouvelles lignes : diffusées au plus toutes les 250 ms (llama-server en écrit des centaines au chargement). */
-  private touchLive(job: Job): void {
-    if (this.now() - job.liveAt >= LIVE_THROTTLE_MS) this.setLive(job, {});
-  }
-
-  private line(job: Job, l: string): void {
-    this.deps.logs.push(`[bench] ${l}`);
-    job.tail.push(l);
-    if (job.tail.length > TAIL) job.tail.shift();
-    job.live.lines = job.tail.slice(-LIVE_LINES);
-  }
-
-  private async execute(job: Job): Promise<void> {
-    const t0 = this.now();
+  /** Exécute le run courant (après l'arrêt du serveur) et enregistre son résultat ; null si le runner a été libéré. */
+  private async execute(cur: Current): Promise<BenchRun | null> {
     let result: BenchFinish;
     try {
-      if (job.stopped) {
-        this.line(job, "arrêt de llama-server pendant le benchmark");
-        job.stopping = this.deps.server.stop();
-        await job.stopping;
-      }
-      result = job.cancelled ? { status: "cancelled" } : job.cmd ? await this.runServer(job, job.cmd) : await this.runBench(job);
+      await this.deps.gate.ready();
+      result = cur.cancelled
+        ? { status: "cancelled" }
+        : await this.deps.executor.run(cur.run, { onLive: (l) => this.setLive(cur, l), startedAt: cur.live.startedAt, spec: cur.spec });
     } catch (e) {
-      result = job.cancelled ? { status: "cancelled" } : { status: "failed", error: (e as Error).message };
+      result = cur.cancelled ? { status: "cancelled" } : { status: "failed", error: `arrêt de llama-server impossible : ${(e as Error).message}` };
     }
-    if (job.disposed) return;
-    const vramPeak = [...job.peaks].map(([key, p]) => ({ key, name: p.name, mib: Math.round(p.bytes / MIB) })).filter((p) => p.mib > 0);
-    const finished = this.deps.repo.finish(job.run.id, {
-      error: null,
-      ...result,
-      vramPeak,
-      logExcerpt: job.tail.join("\n"),
-      durationMs: this.now() - t0,
-    });
-    job.finished = true;
+    if (this.disposed) return null;
+    const finished = this.deps.repo.finish(cur.run.id, { error: null, ...result });
+    cur.finished = true;
     this.deps.onRun(finished);
-    if (job.stopped) {
-      this.setLive(job, { phase: "restarting-server", step: null });
-      await this.restart(job, job.stopped);
+    return finished;
+  }
+
+  /** Relance le serveur ; un échec est noté sur `runId` (carte « Dernier run », historique). */
+  private async release(cur: Current | null, runId: number | null): Promise<void> {
+    if (cur && this.deps.gate.stoppedCommand) this.setLive(cur, { phase: "restarting-server", step: null });
+    try {
+      await this.deps.gate.release();
+    } catch (e) {
+      if (this.disposed || runId === null) return;
+      const prev = this.deps.repo.get(runId);
+      if (prev) this.deps.onRun(this.deps.repo.finish(runId, { error: prev.error ? `${prev.error} ; ${(e as Error).message}` : (e as Error).message }));
     }
-    if (job.disposed) return;
-    this.job = null;
+  }
+
+  private async oneOff(run: BenchRun, spec: BenchSpec): Promise<void> {
+    const cur = this.newCurrent(run, null, spec);
+    if (!(await this.execute(cur))) return;
+    await this.release(cur, run.id);
+    if (this.disposed) return;
+    this.current = null;
     this.deps.onLive(null);
   }
 
-  private async restart(job: Job, cmd: BuiltCommand): Promise<void> {
-    this.deps.logs.push(`[bench] relance de llama-server (${cmd.profileName})`);
+  /**
+   * Lance un sweep : la garde est prise une fois, puis ses éléments en attente s'enchaînent. `target` : l'id d'un sweep
+   * existant, ou la fonction qui le crée (appelée seulement une fois la garde prise : un refus 409 n'écrit rien).
+   */
+  async startSweep(target: number | (() => number), o: { stopServer: boolean }): Promise<Sweep> {
+    if (this.busy) throw new HttpError(409, "Un benchmark est en cours");
+    this.claimed = true;
     try {
-      await this.deps.server.start(cmd);
-    } catch (e) {
-      const msg = `relance de llama-server impossible : ${(e as Error).message}`;
-      this.line(job, msg);
-      if (job.disposed) return;
-      // Noté sur le run (carte « Dernier run », historique) : la carte en direct disparaît juste après.
-      const cur = this.deps.repo.get(job.run.id);
-      this.deps.onRun(this.deps.repo.finish(job.run.id, { error: cur?.error ? `${cur.error} ; ${msg}` : msg }));
+      if (typeof target === "number") {
+        const sw = this.deps.sweeps.get(target);
+        if (!sw) throw notFound("Sweep");
+        await this.checkFiles(sw.spec);
+      }
+      await this.deps.gate.acquire(o);
+      let id: number;
+      try {
+        id = typeof target === "number" ? target : target();
+      } catch (e) {
+        await this.deps.gate.release().catch(() => {});
+        throw e;
+      }
+      return this.begin(id);
+    } finally {
+      this.claimed = false;
     }
+  }
+
+  private begin(id: number, after: Promise<void> | null = null): Sweep {
+    this.sweep = { id, cancelled: false };
+    const sw = this.deps.sweeps.setStatus(id, "running", { finishedAt: null });
+    this.deps.onSweep(sw);
+    void this.loop(id, after);
+    return sw;
   }
 
   /**
-   * Pic de VRAM au-dessus de ce que chaque carte tenait au lancement : relevé rapide (VramProbe, 100 ms) et, en secours,
-   * les snapshots du Monitor (1 s par défaut : un pic court peut leur échapper).
+   * Nouveau module (rechargement) : reprend le sweep en cours avec la garde laissée par l'ancien, une fois sorti le process
+   * qu'il a tué (sinon l'élément rejoué partage les cartes avec lui : VRAM de départ faussée, OOM possible).
    */
-  private sampler(job: Job): () => Promise<void> {
-    const gpus = this.deps.gpus();
-    const before = new Map(gpus.map((g) => [g.key, g.vramUsedBytes]));
-    const probe = new VramProbe(gpus);
-    const note = (key: string, name: string, bytes: number) => {
-      const prev = job.peaks.get(key);
-      if (!prev || bytes > prev.bytes) job.peaks.set(key, { name, bytes });
-    };
-    const sample = () => {
-      for (const g of this.deps.gpus()) note(g.key, g.name, Math.max(0, g.vramUsedBytes - (before.get(g.key) ?? 0)));
-    };
-    const timer = setInterval(sample, VRAM_SAMPLE_MS);
-    return async () => {
-      sample();
-      clearInterval(timer);
-      await probe.stop();
-      for (const g of gpus) {
-        const p = probe.get(g.key);
-        if (p) note(g.key, g.name, Math.max(0, p.max - p.first));
-      }
-    };
+  async resume(): Promise<void> {
+    const sw = this.deps.sweeps.running();
+    if (!sw || this.claimed || this.current || this.sweep) return;
+    const after = this.deps.gate.adopt();
+    if (after) return void this.begin(sw.id, after);
+    // Garde encore tenue mais plus à reprendre (l'ancien module la libère déjà : rechargement plus long que le délai de grâce),
+    // donc index.ts n'a pas rangé les orphelins : personne ne fera tourner ce sweep, il devient « interrompu » (bouton Reprendre).
+    this.deps.repo.stopOrphans();
+    this.deps.onSweep(this.deps.sweeps.setStatus(sw.id, "interrupted"));
   }
 
-  private async runBench(job: Job): Promise<BenchFinish> {
-    this.setLive(job, { phase: "loading", step: null });
-    this.deps.logs.push(`[bench] ${job.run.command}`);
-    const stopSampling = this.sampler(job);
-    let proc: Child;
-    try {
-      // Environnement du profil d'origine (CUDA_VISIBLE_DEVICES… : mêmes cartes que le serveur).
-      proc = Bun.spawn(job.argv, { env: { ...process.env, ...this.source(job.spec)?.env }, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
-    } catch (e) {
-      await stopSampling();
-      return { status: "failed", error: (e as Error).message };
+  private async loop(id: number, after: Promise<void> | null = null): Promise<void> {
+    const state = this.sweep!;
+    if (after) await after;
+    let lastRun: number | null = null;
+    while (!this.disposed && !state.cancelled) {
+      const next = this.deps.repo.nextQueued(id);
+      if (!next) break;
+      const { counts } = this.deps.sweeps.get(id)!;
+      this.setSweepLive({ sweepId: id, runId: next.id, index: counts.total - counts.queued + 1, total: counts.total, stage: next.kind === "server" ? "validate" : "explore" });
+      const done = await this.item(next, id);
+      if (!done) return;
+      lastRun = done.id;
+      this.deps.onSweep(this.deps.sweeps.get(id)!);
+      if (this.deps.pauseMs !== 0 && this.deps.repo.nextQueued(id)) await Bun.sleep(this.deps.pauseMs ?? 1000);
     }
-    job.proc = proc;
-    if (job.cancelled) this.kill(proc);
-    const stdout = new Response(proc.stdout as ReadableStream<Uint8Array>).text();
-    const stderr = this.pipe(proc.stderr as ReadableStream<Uint8Array>, (l) => {
-      this.line(job, l);
-      const p = parseBenchProgress(l);
-      if (p) {
-        const runs = p.runs ?? job.spec.r;
-        const step = { index: (p.test - 1) * runs + (p.run ?? 0), total: p.tests * runs };
-        this.setLive(job, { phase: p.phase, step });
-      } else this.touchLive(job);
-    });
-    await proc.exited;
-    const [out] = await Promise.all([stdout.catch(() => ""), stderr]);
-    await stopSampling();
-    job.proc = null;
-    if (job.cancelled) return { status: "cancelled" };
-    const parsed = proc.exitCode === 0 ? parseBenchJson(out) : null;
-    if (parsed && (parsed.pp || parsed.tg)) return { status: "ok", pp: parsed.pp, tg: parsed.tg };
-    return { status: "failed", error: benchFailure(job.tail, proc.exitCode ?? proc.signalCode ?? "?").message };
+    if (this.disposed) return;
+    const sw = this.deps.sweeps.setStatus(id, state.cancelled ? "cancelled" : "done", { bestRunId: this.best(id), finishedAt: this.now() });
+    this.deps.onSweep(sw);
+    if (this.current) this.setLive(this.current, {});
+    await this.release(null, lastRun);
+    if (this.disposed) return;
+    this.sweep = null;
+    this.setSweepLive(null);
   }
 
-  private async runServer(job: Job, cmd: BuiltCommand): Promise<BenchFinish> {
-    this.deps.logs.push(`[bench] ${cmd.display}`);
-    const stopSampling = this.sampler(job);
+  /** Un élément : figé (commande, matériel), exécuté, enregistré. Un échec (OOM compris) n'arrête pas le sweep. */
+  private async item(queued: BenchRun, sweepId: number): Promise<BenchRun | null> {
+    let hardware: BenchHardware;
     try {
-      const r = await runServerTrial({
-        cmd,
-        p: job.spec.p,
-        n: job.spec.n,
-        r: job.spec.r,
-        signal: job.abort.signal,
-        onPhase: (phase, step) => this.setLive(job, { phase, step: step ?? null }),
-        onLine: (l) => {
-          this.line(job, l);
-          this.touchLive(job);
-        },
-        onSpawn: (proc) => {
-          job.proc = proc;
-        },
-        fetch: this.deps.fetch,
-        now: this.now,
-      });
-      return { status: "ok", pp: r.pp, tg: r.tg, draftAcceptPct: r.draftAcceptPct };
-    } catch (e) {
-      if (e instanceof TrialCancelled || job.cancelled) return { status: "cancelled" };
-      return { status: "failed", error: (e as Error).message };
-    } finally {
-      await stopSampling();
-      job.proc = null;
+      hardware = await this.deps.hardware();
+    } catch {
+      hardware = { cpu: "", gpus: [], build: null };
     }
+    if (this.disposed) return null;
+    const run = this.deps.repo.begin(queued.id, { command: this.deps.executor.commandOf(queued.spec).display, hardware });
+    this.deps.onRun(run);
+    const cur = this.newCurrent(run, sweepId);
+    const done = await this.execute(cur);
+    if (!done) return null;
+    this.current = null;
+    this.deps.onLive(null);
+    return done;
   }
 
-  private async pipe(stream: ReadableStream<Uint8Array>, push: (line: string) => void): Promise<void> {
-    const split = new LineSplitter();
-    const dec = new TextDecoder();
-    try {
-      for await (const chunk of stream) for (const l of split.push(dec.decode(chunk, { stream: true }))) push(l);
-    } catch {}
-    for (const l of split.flush()) push(l);
+  /** Le meilleur run du sweep : parmi les validations serveur s'il y en a de réussies, sinon parmi l'exploration. */
+  private best(id: number): number | null {
+    const sw = this.deps.sweeps.get(id);
+    if (!sw) return null;
+    const runs = this.deps.repo.list({ sweepId: id });
+    const validated = runs.some((r) => r.kind === "server" && r.status === "ok");
+    const top = rankRuns(runs.filter((r) => r.kind === (validated ? "server" : "bench")), sw.spec.preset, sweepCtx(sw.spec))[0];
+    return top?.rank ? top.run.id : null;
   }
 
-  private kill(proc: Child): void {
-    try {
-      proc.kill("SIGTERM");
-    } catch {}
-    const timer = setTimeout(() => {
-      try {
-        proc.kill("SIGKILL");
-      } catch {}
-    }, this.killTimeoutMs);
-    void proc.exited.then(() => clearTimeout(timer));
-  }
-
-  /** Annule le run en cours (s'il porte cet id) ; le serveur arrêté est relancé comme après un run normal. */
+  /** Annule le run en cours (s'il porte cet id) ; dans un sweep, on passe à l'élément suivant. */
   cancel(id: number): boolean {
-    const job = this.job;
-    if (!job || job.run.id !== id || job.cancelled) return false;
-    job.cancelled = true;
-    job.abort.abort();
-    if (job.proc) this.kill(job.proc);
-    this.line(job, "annulation demandée");
-    this.setLive(job, {});
+    const cur = this.current;
+    if (!cur || cur.run.id !== id || cur.cancelled || cur.finished) return false;
+    cur.cancelled = true;
+    this.deps.executor.cancel();
+    this.setLive(cur, {});
+    return true;
+  }
+
+  /** Annule le sweep : sa file passe « cancelled », le run en cours est arrêté, le serveur relancé. */
+  cancelSweep(id: number): boolean {
+    const state = this.sweep;
+    if (!state || state.id !== id || state.cancelled) return false;
+    state.cancelled = true;
+    this.deps.repo.cancelQueued(id);
+    const cur = this.current;
+    if (cur && !cur.finished) {
+      cur.cancelled = true;
+      this.deps.executor.cancel();
+    }
+    this.deps.onSweep(this.deps.sweeps.get(id)!);
     return true;
   }
 
   /**
-   * Rechargement (`restart: true`) ou arrêt de Bun : l'enfant est tué, le run marqué « interrupted ».
-   * Au rechargement, le serveur arrêté pour ce run est relancé une fois l'enfant sorti.
+   * Rechargement (`restart: true`) ou arrêt de Bun. L'enfant est tué. Un run ponctuel est « interrupted » ; un élément de
+   * sweep repasse en attente au rechargement (le nouveau runner le rejoue) et le sweep reste « running ». La garde est
+   * rendue plus tard : le nouveau module la reprend, sinon elle relance le serveur.
    */
   dispose(o: { restart: boolean }): void {
-    const job = this.job;
-    if (!job) return;
-    job.disposed = true;
-    this.job = null;
-    // Run déjà enregistré : seule la relance du serveur était en cours, elle continue dans le superviseur.
-    if (job.finished) return;
-    job.cancelled = true;
-    job.abort.abort();
-    const proc = job.proc;
+    if (this.disposed) return;
+    this.disposed = true;
+    const cur = this.current;
+    const sweep = this.sweep;
+    this.current = null;
+    this.sweep = null;
+    const killed = this.deps.executor.killNow();
+    const { repo } = this.deps;
     try {
-      proc?.kill("SIGKILL");
+      if (cur && !cur.finished) {
+        if (cur.sweepId !== null && o.restart) repo.requeue(cur.run.id);
+        else repo.finish(cur.run.id, { status: "interrupted", error: INTERRUPTED, durationMs: this.now() - cur.live.startedAt });
+      }
+      if (sweep && !o.restart) this.deps.sweeps.setStatus(sweep.id, "interrupted");
     } catch {}
-    try {
-      this.deps.repo.finish(job.run.id, {
-        status: "interrupted",
-        error: "interrompu (rechargement ou arrêt de llama-webui)",
-        logExcerpt: job.tail.join("\n"),
-        durationMs: this.now() - job.live.startedAt,
-      });
-    } catch {}
-    const cmd = job.stopped;
-    if (o.restart && cmd) {
-      const server = this.deps.server;
-      const logs = this.deps.logs;
-      // Après l'arrêt en cours (le superviseur refuserait « opération en cours ») et la sortie de l'enfant.
-      void Promise.allSettled([job.stopping, proc?.exited])
-        .then(() => server.start(cmd))
-        .catch((e) => logs.push(`[bench] relance de llama-server impossible : ${(e as Error).message}`));
-    }
+    if (o.restart) this.deps.gate.releaseLater(killed);
   }
 }

@@ -5,6 +5,7 @@ import type { BenchRunsRepo } from "./db/benchRuns";
 import type { ConversationsRepo } from "./db/conversations";
 import type { ProfilesRepo } from "./db/profiles";
 import type { SettingsRepo } from "./db/settings";
+import type { SweepsRepo } from "./db/sweeps";
 import type { Monitor } from "./monitor/monitor";
 import { benchRoutes } from "./routes/bench";
 import { chatRoutes } from "./routes/chat";
@@ -12,6 +13,8 @@ import { modelRoutes } from "./routes/models";
 import { monitorRoutes } from "./routes/monitor";
 import { profileRoutes } from "./routes/profiles";
 import { serverRoutes } from "./routes/server";
+import { sweepRoutes } from "./routes/sweeps";
+import { tuningRoutes } from "./routes/tuning";
 import type { Runtime } from "./runtime";
 import type { WsHub } from "./ws/hub";
 import pkg from "./package.json";
@@ -26,6 +29,7 @@ export interface AppDeps {
   chatRuns: ChatRuns;
   benchRuns: BenchRunsRepo;
   benchRunner: BenchRunner;
+  sweeps: SweepsRepo;
   activeProfileId: () => number | null;
   runtime: Runtime;
   monitor: Monitor;
@@ -62,6 +66,8 @@ export function createApp(deps: AppDeps) {
       ...modelRoutes(deps),
       ...chatRoutes(deps),
       ...benchRoutes(deps),
+      ...sweepRoutes(deps),
+      ...tuningRoutes(deps),
       "/api/*": guarded(() => Response.json({ error: "Route inconnue" }, { status: 404 })),
       "/ws": guarded((req, server) => {
         if (server.upgrade(req)) return undefined;

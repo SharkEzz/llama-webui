@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { reservedFlag, reservedFlagMessage } from "./profile";
+import type { FitVerdict } from "./tuning";
 
 export const CACHE_TYPES = ["f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1"] as const;
+export type CacheType = (typeof CACHE_TYPES)[number];
 export const SPLIT_MODES = ["none", "layer", "row", "tensor"] as const;
 export const FLASH_ATTN = ["on", "off", "auto"] as const;
 
@@ -45,37 +47,48 @@ const FIELDS: { key: Key; short: string; long: string[] }[] = [
   { key: "b", short: "-b", long: ["--batch-size"] },
   { key: "ub", short: "-ub", long: ["--ubatch-size"] },
 ];
+/** Ordre fixe des champs (traduction, produit cartésien d'un sweep, étiquettes). */
+export const FIELD_ORDER: readonly Key[] = FIELDS.map((f) => f.key);
 const BY_FLAG = new Map(FIELDS.flatMap((f) => [f.short, ...f.long].map((flag) => [flag, f] as const)));
 
 export type BenchKind = "bench" | "server";
-export type BenchStatus = "running" | "ok" | "failed" | "cancelled" | "interrupted";
+/** « queued » : élément d'un sweep en attente. */
+export type BenchStatus = "queued" | "running" | "ok" | "failed" | "cancelled" | "interrupted";
 
-export const BenchSpecSchema = z.strictObject({
-  kind: z.enum(["bench", "server"], { error: "« bench » ou « server »" }),
+/** « Autres flags serveur » : refuse les flags réservés et ceux couverts par un champ, à l'index fautif. */
+export const serverArgsField = z
+  .array(z.string())
+  .default([])
+  .superRefine((args, ctx) => {
+    args.forEach((arg, i) => {
+      const flag = arg.split("=")[0]!;
+      const reserved = reservedFlag(arg);
+      if (reserved) ctx.addIssue({ code: "custom", path: [i], message: reservedFlagMessage(reserved) });
+      else {
+        const field = BY_FLAG.get(flag);
+        if (field) ctx.addIssue({ code: "custom", path: [i], message: `${flag} : utilisez le champ ${field.short}` });
+      }
+    });
+  });
+
+/** Champs communs à un run et à un sweep. */
+export const benchSpecBase = {
   modelPath: z
     .string({ error: "obligatoire" })
     .refine((p) => p.startsWith("/"), "chemin absolu attendu")
     .refine((p) => p.endsWith(".gguf"), "fichier .gguf attendu"),
   mmprojPath: z.string().nullable().default(null),
   profileId: z.number().int().nullable().default(null),
-  params: BenchParamsSchema.default({}),
-  serverArgs: z
-    .array(z.string())
-    .default([])
-    .superRefine((args, ctx) => {
-      args.forEach((arg, i) => {
-        const flag = arg.split("=")[0]!;
-        const reserved = reservedFlag(arg);
-        if (reserved) ctx.addIssue({ code: "custom", path: [i], message: reservedFlagMessage(reserved) });
-        else {
-          const field = BY_FLAG.get(flag);
-          if (field) ctx.addIssue({ code: "custom", path: [i], message: `${flag} : utilisez le champ ${field.short}` });
-        }
-      });
-    }),
   p: int(1, 32_768).default(512),
   n: int(1, 4096).default(128),
   r: int(1, 20).default(3),
+};
+
+export const BenchSpecSchema = z.strictObject({
+  kind: z.enum(["bench", "server"], { error: "« bench » ou « server »" }),
+  ...benchSpecBase,
+  params: BenchParamsSchema.default({}),
+  serverArgs: serverArgsField,
 });
 export type BenchSpec = z.infer<typeof BenchSpecSchema>;
 export type BenchSpecInput = z.input<typeof BenchSpecSchema>;
@@ -106,6 +119,13 @@ export interface BenchRun {
   error: string | null;
   logExcerpt: string;
   durationMs: number | null;
+  /** Débit de lecture du disque du modèle au plus haut pendant le run (octets/s), si mesuré. */
+  diskReadPeakBps: number | null;
+  sweepId: number | null;
+  /** Étiquette de l'élément dans son sweep (« -ncmoe 8 · -dev CUDA0,CUDA1 »). */
+  sweepLabel: string | null;
+  /** Verdict de l'estimateur au moment du plan. */
+  fit: FitVerdict | null;
   createdAt: number;
 }
 
@@ -125,6 +145,9 @@ export interface BenchDevice {
   id: string;
   name: string;
   totalMib: number;
+  freeMib: number;
+  /** Lettres de l'id : "CUDA", "Vulkan", "BLAS"… */
+  backend: string;
 }
 
 /** Valeur lue pour un champ, ou undefined si elle n'est pas lisible (le flag reste alors dans `rest`). */

@@ -1,5 +1,8 @@
-// Imite llama-bench : progression sur stderr (--progress), JSON réel sur stdout ; FAKE_BENCH_OOM=1 reproduit un échec de chargement.
+// Imite llama-bench : progression sur stderr (--progress), JSON réel sur stdout.
+// FAKE_BENCH_OOM=1 ou FAKE_BENCH_OOM_ARG=<fragment de l'argv> reproduisent un échec de chargement ;
+// FAKE_PP / FAKE_TG remplacent les débits ; FAKE_TG_BY_ARG="-ncmoe 8=30;-dev CUDA0/CUDA1=55" : premier fragment présent → ce tg.
 const args = process.argv.slice(2);
+const joined = args.join(" ");
 const dir = `${import.meta.dir}/../llama-bench`;
 const fixture = (name: string) => Bun.file(`${dir}/${name}`).text();
 const err = (s: string) => process.stderr.write(`${s}\n`);
@@ -11,8 +14,9 @@ if (args.includes("--list-devices")) {
 process.on("SIGTERM", () => process.exit(143));
 const step = Number(process.env.FAKE_BENCH_STEP_MS ?? 100);
 const r = Number(args[args.indexOf("-r") + 1] ?? 5) || 5;
+const oomArg = process.env.FAKE_BENCH_OOM_ARG;
 
-if (process.env.FAKE_BENCH_OOM === "1") {
+if (process.env.FAKE_BENCH_OOM === "1" || (oomArg && joined.includes(oomArg))) {
   for (const l of (await fixture("oom-stderr.txt")).split("\n")) if (l) err(l);
   process.stdout.write("[\n");
   process.exit(1);
@@ -26,4 +30,15 @@ for (const [i, kind] of [[1, "prompt"], [2, "generation"]] as const) {
     err(`llama-bench: benchmark ${i}/2: ${kind} run ${k}/${r}`);
   }
 }
-process.stdout.write(await fixture("ok.json"));
+const byArg = (process.env.FAKE_TG_BY_ARG ?? "")
+  .split(";")
+  .map((p) => p.split("="))
+  .find(([frag]) => frag && joined.includes(frag.replaceAll("/", ",")));
+const pp = process.env.FAKE_PP ? Number(process.env.FAKE_PP) : null;
+const tg = byArg ? Number(byArg[1]) : process.env.FAKE_TG ? Number(process.env.FAKE_TG) : null;
+const out = JSON.parse(await fixture("ok.json")) as { n_prompt: number; n_gen: number; avg_ts: number; stddev_ts: number }[];
+for (const t of out) {
+  const v = t.n_gen > 0 ? tg : pp;
+  if (v !== null) Object.assign(t, { avg_ts: v, stddev_ts: v / 100 });
+}
+process.stdout.write(JSON.stringify(out, null, 2));

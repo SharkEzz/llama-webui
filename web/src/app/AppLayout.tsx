@@ -7,10 +7,12 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { useHealth } from "@/lib/health"
 import { cn } from "@/lib/utils"
 import { useWs } from "@/lib/ws"
+import { PageSkeleton } from "./PageSkeleton"
 import { Sidebar } from "./Sidebar"
 import { StatusBar } from "./StatusBar"
 
-export function AppLayout() {
+/** `loading` : premier chargement d'une page (son code n'est pas encore là), la coquille avec un squelette. */
+export function AppLayout({ loading = false }: { loading?: boolean }) {
   const status = useWs((s) => s.status)
   const refreshHealth = useHealth((s) => s.refresh)
   // Le chat prend toute la largeur : le fil et la liste en ont besoin.
@@ -29,9 +31,7 @@ export function AppLayout() {
         <ScrollArea className="h-dvh">
           <div className={cn("mx-auto flex flex-col", wide ? "max-w-none gap-3 px-3 pt-3 pb-3 lg:px-3" : "max-w-6xl gap-6 px-6 pt-4 pb-10 lg:px-10")}>
             <StatusBar />
-            <main>
-              <Outlet />
-            </main>
+            <main>{loading ? <PageSkeleton /> : <Outlet />}</main>
           </div>
         </ScrollArea>
       </div>

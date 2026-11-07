@@ -53,6 +53,9 @@ export function BenchForm() {
     return Array.isArray(split) ? ignoredByBench(split) : []
   }, [form.serverArgs])
   const gpuDevices = (devices ?? []).filter((d) => d.totalMib > 0)
+  // Un -dev du formulaire (profil, run relancé) absent de --list-devices reste affiché, coché, pour qu'on puisse le retirer.
+  const missing = form.dev.filter((id) => !gpuDevices.some((d) => d.id === id))
+  const shownDevices = [...gpuDevices.map((d) => ({ id: d.id, label: `${d.name} · ${Math.round(d.totalMib / 102.4) / 10} Gio` })), ...missing.map((id) => ({ id, label: "absent de --list-devices" }))]
 
   const launch = async (stopServer = false) => {
     const r = await useBench.getState().launch(stopServer)
@@ -143,11 +146,11 @@ export function BenchForm() {
           <legend className="mb-1.5 text-sm font-medium">-dev et -ts</legend>
           {devices === null ? (
             <p className="text-xs text-muted-foreground">Lecture des devices…</p>
-          ) : gpuDevices.length === 0 ? (
+          ) : shownDevices.length === 0 ? (
             <p className="text-xs text-muted-foreground">Aucun device lu (llama-bench introuvable ?) : le choix reste automatique.</p>
           ) : (
             <div className="grid gap-x-6 gap-y-2 md:grid-cols-2">
-              {gpuDevices.map((d) => {
+              {shownDevices.map((d) => {
                 const on = form.dev.includes(d.id)
                 return (
                   <div key={d.id} className="flex items-center gap-3">
@@ -158,8 +161,8 @@ export function BenchForm() {
                     />
                     <Label htmlFor={`dev-${d.id}`} className="min-w-0 flex-1 font-normal">
                       <span className="font-mono text-xs">{d.id}</span>
-                      <span className="truncate text-muted-foreground">
-                        {d.name} · {Math.round(d.totalMib / 102.4) / 10} Gio
+                      <span className="truncate text-muted-foreground" title={d.label}>
+                        {d.label}
                       </span>
                     </Label>
                     {on && (

@@ -22,7 +22,7 @@ export function tensorBytes(tensors: Array<{ offset: number }>, dataOffset: numb
 
 const LAYER = /^blk\.(\d+)\./;
 /** What --n-cpu-moe moves to the CPU (llama.cpp: ffn_(up|down|gate)_(ch|)exps); shared experts (_shexp) stay. */
-const EXPERTS = /ffn_(gate|up|down)_(ch)?exps/;
+export const EXPERTS = /ffn_(gate|up|down)_(ch)?exps/;
 
 /** Groups tensor bytes by layer (experts apart), embedding, output and the rest. */
 export function weightSizes(tensors: TensorInfo[]): WeightSizes {

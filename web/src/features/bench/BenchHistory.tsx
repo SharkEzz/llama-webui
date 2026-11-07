@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { useNavigate } from "react-router"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useNavigate, useSearchParams } from "react-router"
 import { Copy, GitCompare, History, MoreHorizontal, RotateCcw, Trash2, UserPlus } from "lucide-react"
 import type { BenchRun, BenchStatus, Measure } from "@llama-webui/shared"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
@@ -24,12 +24,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { type BenchFilters, KIND_LABEL, STATUS_LABEL, useBench } from "@/lib/bench"
 import { copyText } from "@/lib/clipboard"
+import { cn } from "@/lib/utils"
 import { formatDuration, formatRate } from "@/lib/format"
 import { BenchCompareDialog } from "./BenchCompareDialog"
 import { dateFmt, flagsOf, formatAccept, formatMib, modelName, vramTotal } from "./format"
 
 const MAX_COMPARE = 4
 const STATUS_VARIANT: Record<BenchStatus, "secondary" | "outline" | "destructive"> = {
+  queued: "outline",
   running: "secondary",
   ok: "outline",
   failed: "destructive",
@@ -47,6 +49,19 @@ export function BenchHistory() {
   const [comparing, setComparing] = useState(false)
   const [deleting, setDeleting] = useState<BenchRun | null>(null)
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
+  const focus = Number(params.get("run")) || null
+
+  // ?run=<id> (depuis Tuning) : historique avec les sweeps, ligne sélectionnée et ramenée à l'écran, puis le paramètre est retiré.
+  useEffect(() => {
+    if (focus === null) return
+    if (filters.sweeps !== "all") return setFilters({ sweeps: "all" })
+    if (!runs.some((r) => r.id === focus)) return
+    if (!selected.includes(focus)) toggle(focus)
+    // Après la mise en page du formulaire (devices chargés en différé), sinon le défilement vise une position périmée.
+    setTimeout(() => document.getElementById(`bench-run-${focus}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 400)
+    setParams({}, { replace: true })
+  }, [focus, filters.sweeps, runs])
 
   const models = useMemo(() => [...new Set(runs.map((r) => r.spec.modelPath))].sort(), [runs])
   const shown = runs.filter(
@@ -107,6 +122,12 @@ export function BenchHistory() {
             items={[{ value: "all", label: "Tous les statuts" }, ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label }))]}
             onChange={(v) => setFilters({ status: v as BenchFilters["status"] })}
           />
+          <FilterSelect
+            label="Sweeps"
+            value={filters.sweeps}
+            items={[{ value: "none", label: "Sans les sweeps" }, { value: "all", label: "Avec les sweeps" }]}
+            onChange={(v) => setFilters({ sweeps: v as BenchFilters["sweeps"] })}
+          />
         </div>
 
         {!loaded ? (
@@ -126,6 +147,7 @@ export function BenchHistory() {
                 <TableHead>Outil</TableHead>
                 <TableHead>Modèle</TableHead>
                 <TableHead>Flags</TableHead>
+                {filters.sweeps === "all" && <TableHead>Sweep</TableHead>}
                 <TableHead className="text-right">Prompt</TableHead>
                 <TableHead className="text-right">Génération</TableHead>
                 <TableHead className="text-right">MTP</TableHead>
@@ -141,7 +163,7 @@ export function BenchHistory() {
               {shown.map((r) => {
                 const checked = selected.includes(r.id)
                 return (
-                  <TableRow key={r.id} data-state={checked ? "selected" : undefined}>
+                  <TableRow key={r.id} id={`bench-run-${r.id}`} data-state={checked ? "selected" : undefined}>
                     <TableCell>
                       <Checkbox
                         checked={checked}
@@ -157,10 +179,10 @@ export function BenchHistory() {
                     <TableCell>
                       <Badge variant="secondary">{KIND_LABEL[r.kind]}</Badge>
                     </TableCell>
-                    <TableCell className="max-w-36 truncate font-mono text-xs" title={r.spec.modelPath}>
+                    <TableCell className={cn("truncate font-mono text-xs", filters.sweeps === "all" ? "max-w-28" : "max-w-36")} title={r.spec.modelPath}>
                       {modelName(r.spec.modelPath)}
                     </TableCell>
-                    <TableCell className="max-w-36">
+                    <TableCell className={filters.sweeps === "all" ? "max-w-28" : "max-w-36"}>
                       <Tooltip>
                         <TooltipTrigger render={<span />} className="block truncate font-mono text-xs text-muted-foreground">
                           {flagsOf(r)}
@@ -168,6 +190,17 @@ export function BenchHistory() {
                         <TooltipContent className="max-w-md font-mono">{r.command}</TooltipContent>
                       </Tooltip>
                     </TableCell>
+                    {filters.sweeps === "all" && (
+                      <TableCell className="max-w-20 text-xs">
+                        {r.sweepId === null ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <Link to={`/tuning?sweep=${r.sweepId}`} className="block truncate underline-offset-4 hover:underline" title={r.sweepLabel ?? undefined}>
+                            #{r.sweepId} <span className="font-mono text-muted-foreground">{r.sweepLabel}</span>
+                          </Link>
+                        )}
+                      </TableCell>
+                    )}
                     <MeasureCell m={r.pp} />
                     <MeasureCell m={r.tg} />
                     <TableCell className="num text-right text-xs">{formatAccept(r.draftAcceptPct)}</TableCell>
