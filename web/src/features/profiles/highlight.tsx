@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 const isFlag = (t: string) => t.length > 1 && t.startsWith('-') && !/^-\d/.test(t);
 
-/** Arguments : flags connus en violet, réservés en rose, inconnus en ambre souligné ; valeurs entre guillemets en vert. */
+/** Arguments : flags connus en bleu, réservés en rose, inconnus en ambre souligné ; valeurs entre guillemets en vert. */
 export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactNode {
   return text.split(/(\s+)/).map((tok, i) => {
     if (!tok || /^\s+$/.test(tok)) return tok;
@@ -14,7 +14,7 @@ export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactN
         ? 'text-tone-rose underline decoration-wavy decoration-tone-rose/70'
         : catalog && !flagOf(catalog, tok)
           ? 'text-tone-amber underline decoration-dotted decoration-tone-amber/70'
-          : 'text-tone-violet';
+          : 'text-tone-blue';
       return (
         // biome-ignore lint/suspicious/noArrayIndexKey: jetons positionnels recalculés à chaque rendu
         <span key={i}>
@@ -39,7 +39,7 @@ export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactN
   });
 }
 
-/** Variables : CLÉ en cyan, « = » discret, valeur normale ; ligne mal formée soulignée en rose. */
+/** Variables : CLÉ en teal, « = » discret, valeur normale ; ligne mal formée soulignée en rose. */
 export function highlightEnv(text: string): ReactNode {
   return text.split('\n').map((line, i, all) => {
     const nl = i < all.length - 1 ? '\n' : '';
@@ -58,7 +58,7 @@ export function highlightEnv(text: string): ReactNode {
     return (
       // biome-ignore lint/suspicious/noArrayIndexKey: jetons positionnels recalculés à chaque rendu
       <span key={i}>
-        <span className="text-tone-cyan">{key}</span>
+        <span className="text-tone-teal">{key}</span>
         <span className="text-muted-foreground">=</span>
         <span className="text-foreground/90">{line.slice(eq + 1)}</span>
         {nl}

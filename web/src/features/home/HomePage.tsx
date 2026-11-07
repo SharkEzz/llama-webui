@@ -41,14 +41,14 @@ export function HomePage() {
         <StatTile
           label="Connexion temps réel"
           value={WS_STATUS_UI[status].label}
-          tone={online ? 'cyan' : 'rose'}
+          tone={online ? 'teal' : 'rose'}
           mono={false}
           hint={online ? 'WebSocket ouvert' : 'Nouvelle tentative automatique'}
         />
         <StatTile
           label="Version de l'API"
           value={health?.version ?? '—'}
-          tone="violet"
+          tone="blue"
           hint={error && !online ? error : undefined}
         />
         <StatTile label="Serveur lancé depuis" value={uptime} tone="amber" />

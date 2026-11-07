@@ -13,8 +13,8 @@ export function ThroughputCard() {
         aria-label="Débit de génération et de prompt en tokens par seconde"
         height={200}
         series={[
-          { key: SERIES.genTps, label: 'Génération', tone: 'violet' },
-          { key: SERIES.ppTps, label: 'Prompt', tone: 'cyan' },
+          { key: SERIES.genTps, label: 'Génération', tone: 'blue' },
+          { key: SERIES.ppTps, label: 'Prompt', tone: 'teal' },
         ]}
         format={tps}
       />

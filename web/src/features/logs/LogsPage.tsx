@@ -126,7 +126,7 @@ export function LogsPage() {
         <section
           ref={scroller}
           aria-label="Journaux"
-          className="h-full overflow-auto p-3"
+          className="h-full overflow-auto bg-well inset-shadow-well p-3"
           // Le suivi ne se coupe que sur un geste de l'utilisateur : un filtre qui change la hauteur ne doit pas l'arrêter.
           onWheel={(e) => {
             if (e.deltaY < 0) userScroll.current = true;

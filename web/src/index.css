@@ -7,72 +7,82 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Thèmes à la shadcn : :root = clair (verre clair + bulles pastel), .dark = sombre.
+ * Thèmes à la shadcn : :root = clair, .dark = sombre. Direction « Verre raffiné · bleu électrique » :
+ * graphite quasi neutre (teinte 250, chroma ≤ 0.01), verre qui s'éclaircit en montant (page < sidebar < carte < popover),
+ * reflet interne en haut de chaque surface, un seul accent bleu, deux lueurs d'ambiance très diffuses.
  * Les composants n'emploient que les classes sémantiques exposées par @theme inline.
  */
 :root {
   color-scheme: light;
 
-  /* page : brume lavande froide, encre indigo profond */
-  --page-from: oklch(0.985 0.008 290);
-  --page-to: oklch(0.94 0.02 285);
-  --background: oklch(0.965 0.012 290);
-  --foreground: oklch(0.24 0.045 285);
+  /* page : gris froid quasi neutre, halo plus clair en haut */
+  --page-from: oklch(0.975 0.004 250);
+  --page-to: oklch(0.955 0.004 250);
+  --background: oklch(0.955 0.004 250);
+  --foreground: oklch(0.22 0.01 250);
 
-  /* verre : blanc translucide, bordure d'encre très légère */
-  --surface: oklch(1 0 0 / 50%);
-  --surface-blur: 22px;
+  /* verre : de plus en plus blanc et opaque en montant ; reflet blanc en haut, ombre douce en deux couches */
+  --surface: oklch(1 0 0 / 75%);
+  --surface-blur: 20px;
   --surface-foreground: var(--foreground);
-  --surface-border: oklch(0.3 0.04 285 / 11%);
-  --surface-shadow: oklch(0.35 0.06 285 / 10%);
-  --well: oklch(0.3 0.05 285 / 5%);
+  --surface-border: oklch(0.25 0.01 250 / 10%);
+  --surface-highlight: oklch(1 0 0 / 85%);
+  --surface-shadow: oklch(0.3 0.02 250 / 8%);
+  --surface-elevation: 0 1px 2px oklch(0.3 0.02 250 / 6%), 0 10px 30px oklch(0.3 0.02 250 / 8%);
+  --well: oklch(0.25 0.01 250 / 4%);
+  /* zones encastrées (code, logs) : creusées par une ombre intérieure */
+  --well-shadow: inset 0 1px 2px oklch(0.3 0.02 250 / 6%);
 
   --card: var(--surface);
   --card-foreground: var(--surface-foreground);
-  --popover: oklch(0.995 0.004 290 / 96%);
+  --popover: oklch(1 0 0 / 96%);
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.52 0.2 295);
-  --primary-foreground: oklch(0.99 0.005 290);
-  --secondary: oklch(0.3 0.05 285 / 7%);
+  /* bleu électrique assombri pour rester AA sur blanc */
+  --primary: oklch(0.55 0.2 258);
+  --primary-foreground: oklch(0.99 0 0);
+  /* accent en texte ou icône (liens, sidebar, lignes de l'app) : en clair, le même bleu */
+  --primary-ink: var(--primary);
+  --secondary: oklch(0.25 0.01 250 / 6%);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.3 0.05 285 / 5%);
-  --muted-foreground: oklch(0.46 0.035 285);
+  --muted: oklch(0.25 0.01 250 / 4%);
+  --muted-foreground: oklch(0.48 0.012 250);
+  /* décoratif seulement (numéros de ligne, debug) : sous 4.5:1 */
+  --faint-foreground: oklch(0.56 0.01 250);
   /* shadcn : « accent » = fond de survol/sélection des menus, pas une couleur de marque. */
-  --accent: oklch(0.3 0.05 285 / 7%);
+  --accent: oklch(0.25 0.01 250 / 5%);
   --accent-foreground: var(--foreground);
-  --destructive: oklch(0.55 0.21 25);
+  --destructive: oklch(0.56 0.21 25);
   --border: var(--surface-border);
-  --input: oklch(0.3 0.04 285 / 18%);
-  --ring: oklch(0.52 0.2 295 / 60%);
+  --input: oklch(0.25 0.01 250 / 16%);
+  --ring: oklch(0.55 0.2 258 / 50%);
   --radius: 1rem;
 
-  /* tons de données : assez sombres pour du texte sur verre clair (AA) */
-  --tone-violet: oklch(0.53 0.2 298);
-  --tone-cyan: oklch(0.55 0.12 215);
-  --tone-amber: oklch(0.6 0.15 60);
-  --tone-rose: oklch(0.56 0.21 355);
-  --success: oklch(0.55 0.14 160);
+  /* tons de données (ordre fixe 1→4) : assez sombres pour du texte sur verre clair (AA) */
+  --tone-blue: oklch(0.55 0.2 258);
+  --tone-teal: oklch(0.58 0.11 190);
+  --tone-amber: oklch(0.66 0.15 65);
+  --tone-rose: oklch(0.58 0.2 12);
+  --success: oklch(0.56 0.14 155);
   --warning: var(--tone-amber);
 
-  /* bulles pastel : mêmes teintes, chroma réduite, multipliées sur le fond clair */
-  --bubble-violet: oklch(0.8 0.11 300);
-  --bubble-cyan: oklch(0.85 0.08 205);
-  --bubble-amber: oklch(0.89 0.09 75);
-  --bubble-rose: oklch(0.83 0.1 350);
-  --bubble-opacity: 0.6;
-  --bubble-blend: multiply;
+  /* lueurs d'ambiance : accent en haut à gauche, teal en bas à droite */
+  --glow-1: var(--primary-ink);
+  --glow-2: var(--tone-teal);
+  --glow-1-opacity: 0.1;
+  --glow-2-opacity: 0.07;
 
-  --chart-1: var(--tone-violet);
-  --chart-2: var(--tone-cyan);
+  /* séries de graphes = tons (validés : dataviz validate_palette --pairs all sur la carte claire) */
+  --chart-1: var(--tone-blue);
+  --chart-2: var(--tone-teal);
   --chart-3: var(--tone-amber);
   --chart-4: var(--tone-rose);
   --chart-5: var(--success);
 
-  --sidebar: var(--surface);
+  --sidebar: oklch(1 0 0 / 55%);
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
+  --sidebar-primary: var(--primary-ink);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.3 0.05 285 / 8%);
+  --sidebar-accent: oklch(0.25 0.01 250 / 5%);
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
@@ -81,58 +91,61 @@
 .dark {
   color-scheme: dark;
 
-  --page-from: oklch(0.18 0.03 280);
-  --page-to: oklch(0.11 0.02 280);
-  --background: oklch(0.13 0.02 280);
-  --foreground: oklch(0.95 0.01 280);
+  --page-from: oklch(0.185 0.008 250);
+  --page-to: oklch(0.155 0.006 250);
+  --background: oklch(0.155 0.006 250);
+  --foreground: oklch(0.96 0.003 250);
 
-  --surface: oklch(0.1 0.02 280 / 42%);
-  --surface-blur: 16px;
+  /* verre plus clair que le fond : sidebar 0.19 < carte 0.215 < popover 0.25 */
+  --surface: oklch(0.215 0.007 250 / 72%);
+  --surface-blur: 20px;
   --surface-foreground: var(--foreground);
-  --surface-border: oklch(1 0 0 / 10%);
-  --surface-shadow: oklch(0 0 0 / 30%);
-  --well: oklch(0.06 0.02 280 / 45%);
+  --surface-border: oklch(1 0 0 / 8%);
+  --surface-highlight: oklch(1 0 0 / 7%);
+  --surface-shadow: oklch(0 0 0 / 35%);
+  --surface-elevation: 0 10px 30px oklch(0 0 0 / 35%);
+  --well: oklch(0.13 0.005 250 / 80%);
+  --well-shadow: inset 0 2px 4px oklch(0 0 0 / 30%);
 
   --card: var(--surface);
   --card-foreground: var(--surface-foreground);
-  --popover: oklch(0.19 0.03 280 / 96%);
+  --popover: oklch(0.25 0.008 250 / 96%);
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.72 0.18 300);
-  --primary-foreground: oklch(0.15 0.03 290);
-  --secondary: oklch(1 0 0 / 8%);
+  /* remplissage (boutons, progression, interrupteurs) : assez foncé pour du texte blanc AA (4.7:1) */
+  --primary: oklch(0.56 0.19 255);
+  --primary-foreground: oklch(0.99 0 0);
+  /* accent en texte ou icône sur le verre sombre : plus clair (≈ 6:1 sur une carte) */
+  --primary-ink: oklch(0.68 0.19 255);
+  --secondary: oklch(1 0 0 / 7%);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(1 0 0 / 6%);
-  --muted-foreground: oklch(0.72 0.02 280);
-  --accent: oklch(1 0 0 / 8%);
+  --muted: oklch(1 0 0 / 5%);
+  --muted-foreground: oklch(0.74 0.01 250);
+  --faint-foreground: oklch(0.62 0.01 250);
+  --accent: oklch(1 0 0 / 6%);
   --accent-foreground: var(--foreground);
-  --destructive: oklch(0.7 0.2 22);
+  --destructive: oklch(0.7 0.19 22);
   --border: var(--surface-border);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.72 0.18 300 / 70%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.68 0.19 255 / 55%);
 
-  --tone-violet: oklch(0.72 0.18 300);
-  --tone-cyan: oklch(0.78 0.14 200);
-  --tone-amber: oklch(0.8 0.16 70);
-  --tone-rose: oklch(0.7 0.22 350);
-  --success: oklch(0.79 0.16 160);
+  --tone-blue: oklch(0.68 0.19 255);
+  --tone-teal: oklch(0.78 0.12 185);
+  --tone-amber: oklch(0.82 0.15 75);
+  --tone-rose: oklch(0.72 0.18 10);
+  --success: oklch(0.78 0.15 155);
   --warning: var(--tone-amber);
 
-  --bubble-violet: oklch(0.6 0.25 300);
-  --bubble-cyan: oklch(0.75 0.15 200);
-  --bubble-amber: oklch(0.8 0.16 70);
-  --bubble-rose: oklch(0.7 0.22 350);
-  --bubble-opacity: 0.35;
-  --bubble-blend: screen;
+  --glow-1-opacity: 0.12;
+  --glow-2-opacity: 0.07;
 
-  /* séries de graphes : steps validés (dataviz validate_palette, bande L 0.48–0.67 sur fond sombre) */
-  --chart-1: oklch(0.66 0.19 300);
-  --chart-2: oklch(0.66 0.12 205);
-  --chart-3: oklch(0.67 0.15 65);
-  --chart-4: oklch(0.63 0.22 355);
+  /* séries de graphes : mêmes teintes, steps validés (dataviz validate_palette --pairs all, bande L 0.48–0.67 sur la carte) */
+  --chart-1: oklch(0.58 0.2 258);
+  --chart-2: oklch(0.665 0.12 180);
+  --chart-3: oklch(0.665 0.15 72);
+  --chart-4: oklch(0.54 0.21 12);
 
-  /* légèrement plus sombre que le fond : la navigation se met en retrait */
-  --sidebar: oklch(0.08 0.02 280 / 22%);
-  --sidebar-accent: oklch(1 0 0 / 7%);
+  --sidebar: oklch(0.19 0.006 250 / 70%);
+  --sidebar-accent: oklch(1 0 0 / 6%);
 }
 
 @theme inline {
@@ -140,8 +153,8 @@
   --font-heading: var(--font-sans);
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
 
-  --color-tone-violet: var(--tone-violet);
-  --color-tone-cyan: var(--tone-cyan);
+  --color-tone-blue: var(--tone-blue);
+  --color-tone-teal: var(--tone-teal);
   --color-tone-amber: var(--tone-amber);
   --color-tone-rose: var(--tone-rose);
   --color-success: var(--success);
@@ -150,6 +163,11 @@
   --color-surface-foreground: var(--surface-foreground);
   --color-surface-border: var(--surface-border);
   --color-surface-shadow: var(--surface-shadow);
+  --color-faint-foreground: var(--faint-foreground);
+  /* élévation du verre : ombre portée (shadow-surface) + reflet interne en haut (inset-shadow-highlight) */
+  --shadow-surface: var(--surface-elevation);
+  --inset-shadow-highlight: inset 0 1px 0 var(--surface-highlight);
+  --inset-shadow-well: var(--well-shadow);
   --color-well: var(--well);
 
   --color-sidebar-ring: var(--sidebar-ring);
@@ -177,6 +195,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -216,14 +235,16 @@
   }
 }
 
-/* Surfaces flottantes (listes de Select, menus, popovers) : même flou que le verre (GLASS), sinon le texte derrière
-   transparaît à travers --popover. Ciblées par data-slot : components/ui (shadcn) reste d'origine. */
+/* Surfaces flottantes (listes de Select, menus, popovers) : même flou et même reflet interne en haut que le verre (GLASS),
+   sinon le texte derrière transparaît à travers --popover. Ciblées par data-slot : components/ui (shadcn) reste d'origine.
+   Le reflet passe par --tw-inset-shadow, que les utilitaires shadow-* et ring-* de shadcn composent sans l'écraser. */
 @layer components {
   [data-slot="select-content"],
   [data-slot="dropdown-menu-content"],
   [data-slot="dropdown-menu-sub-content"],
   [data-slot="popover-content"] {
     backdrop-filter: blur(var(--surface-blur));
+    --tw-inset-shadow: inset 0 1px 0 var(--surface-highlight);
   }
 }
 
@@ -234,7 +255,7 @@
   font-feature-settings: "zero";
 }
 
-/* ---- Fond animé : 4 bulles radiales floutées ---- */
+/* ---- Fond animé : deux lueurs très diffuses (ambiance, jamais des taches) ---- */
 .aurora {
   position: fixed;
   inset: 0;
@@ -243,47 +264,31 @@
   pointer-events: none;
 }
 
-.bubble {
+.glow {
   position: absolute;
-  width: 55vmax;
-  height: 55vmax;
+  width: 70vmax;
+  height: 70vmax;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: var(--bubble-opacity);
-  mix-blend-mode: var(--bubble-blend);
+  filter: blur(140px);
   will-change: transform;
   animation: var(--drift) var(--d) ease-in-out infinite alternate;
 }
 
-.bubble-violet {
+.glow-1 {
   --drift: drift-1;
-  --d: 80s;
-  top: -20vmax;
-  left: -15vmax;
-  background: radial-gradient(circle at center, var(--bubble-violet), transparent 65%);
+  --d: 120s;
+  top: -35vmax;
+  left: -25vmax;
+  opacity: var(--glow-1-opacity);
+  background: radial-gradient(circle at center, var(--glow-1), transparent 70%);
 }
-.bubble-cyan {
+.glow-2 {
   --drift: drift-2;
-  --d: 110s;
-  top: -18vmax;
-  right: -20vmax;
-  background: radial-gradient(circle at center, var(--bubble-cyan), transparent 65%);
-}
-.bubble-amber {
-  --drift: drift-3;
-  --d: 140s;
-  bottom: -25vmax;
-  left: -10vmax;
-  opacity: calc(var(--bubble-opacity) * 0.63);
-  background: radial-gradient(circle at center, var(--bubble-amber), transparent 65%);
-}
-.bubble-rose {
-  --drift: drift-4;
-  --d: 180s;
-  bottom: -22vmax;
-  right: -15vmax;
-  opacity: calc(var(--bubble-opacity) * 0.8);
-  background: radial-gradient(circle at center, var(--bubble-rose), transparent 65%);
+  --d: 160s;
+  right: -30vmax;
+  bottom: -40vmax;
+  opacity: var(--glow-2-opacity);
+  background: radial-gradient(circle at center, var(--glow-2), transparent 70%);
 }
 
 @keyframes drift-1 {
@@ -291,7 +296,7 @@
     transform: translate(0, 0) scale(1);
   }
   to {
-    transform: translate(25%, 20%) scale(1.15);
+    transform: translate(12%, 10%) scale(1.08);
   }
 }
 @keyframes drift-2 {
@@ -299,28 +304,12 @@
     transform: translate(0, 0) scale(1.05);
   }
   to {
-    transform: translate(-22%, 25%) scale(0.9);
-  }
-}
-@keyframes drift-3 {
-  from {
-    transform: translate(0, 0) scale(0.95);
-  }
-  to {
-    transform: translate(25%, -20%) scale(1.12);
-  }
-}
-@keyframes drift-4 {
-  from {
-    transform: translate(0, 0) scale(1.1);
-  }
-  to {
-    transform: translate(-25%, -18%) scale(0.92);
+    transform: translate(-10%, -12%) scale(0.95);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bubble {
+  .glow {
     animation: none;
   }
 }

@@ -7,7 +7,7 @@ const UI: Record<ServerState['kind'], { label: string; dot: string; text: string
   ready: { label: 'Prêt', dot: 'bg-success shadow-[0_0_10px] shadow-success/60', text: 'text-success' },
   stopping: { label: 'Arrêt…', dot: 'bg-tone-amber animate-pulse', text: 'text-tone-amber' },
   crashed: { label: 'Planté', dot: 'bg-destructive', text: 'text-destructive' },
-  external: { label: 'Externe', dot: 'bg-tone-cyan', text: 'text-tone-cyan' },
+  external: { label: 'Externe', dot: 'bg-tone-teal', text: 'text-tone-teal' },
 };
 
 /** Détail d'un arrêt anormal, pour l'infobulle. */

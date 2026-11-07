@@ -5,7 +5,7 @@ import { KIND_LABEL } from '@/lib/bench';
 import { formatMeasure } from './format';
 
 /** Ordre fixe des tons : la couleur suit la position du run dans la comparaison, jamais son rang. */
-export const RUN_TONES: Tone[] = ['violet', 'cyan', 'amber', 'rose'];
+export const RUN_TONES: Tone[] = ['blue', 'teal', 'amber', 'rose'];
 
 /** Débits pp et tg des runs comparés : deux petits graphes en barres, chacun sur sa propre échelle (pas de double axe). */
 export function BenchBars({ runs }: { runs: BenchRun[] }) {

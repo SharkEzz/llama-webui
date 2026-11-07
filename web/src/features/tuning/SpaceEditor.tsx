@@ -70,7 +70,9 @@ export function SpaceEditor() {
               <span className="text-muted-foreground">aucun flag (défauts de llama-bench)</span>
             ) : (
               <>
-                <code className="rounded-md bg-well px-2 py-1 font-mono text-xs">{baseArgs.join(' ')}</code>
+                <code className="rounded-md bg-well inset-shadow-well px-2 py-1 font-mono text-xs">
+                  {baseArgs.join(' ')}
+                </code>
                 <Button variant="ghost" size="xs" onClick={() => setBase({})}>
                   Vider
                 </Button>

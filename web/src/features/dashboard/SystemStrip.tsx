@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { formatBps, formatBytes } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-const TONES: Tone[] = ['violet', 'cyan', 'amber', 'rose'];
+const TONES: Tone[] = ['blue', 'teal', 'amber', 'rose'];
 const short = (name: string) => name.replace(/^NVIDIA GeForce /, '').replace(/^Radeon /, '');
 
 /** Bandeau système compact : CPU, RAM, VRAM des GPU du serveur (toutes les GPU lues sans serveur), disque du modèle. */
@@ -25,12 +25,12 @@ export function SystemStrip({ snapshot }: { snapshot: Snapshot | null }) {
   return (
     <Card size="sm" className={cn(GLASS, 'flex-row flex-wrap items-start justify-around gap-x-6 gap-y-4 px-4 py-4')}>
       <Link to="/system" className="contents" aria-label="Voir la page Système">
-        <Gauge label="CPU" value={round(sys?.cpuPct)} size={84} tone="violet" />
+        <Gauge label="CPU" value={round(sys?.cpuPct)} size={84} tone="blue" />
         <Gauge
           label={mem ? `RAM ${formatBytes(memUsed, 0)} / ${formatBytes(mem.totalBytes, 0)}` : 'RAM'}
           value={mem && mem.totalBytes > 0 ? round((100 * memUsed) / mem.totalBytes) : 0}
           size={84}
-          tone="cyan"
+          tone="teal"
         />
         {gpus.map((g, i) => (
           <Gauge

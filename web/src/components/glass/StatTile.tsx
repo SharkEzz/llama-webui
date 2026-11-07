@@ -15,7 +15,7 @@ interface StatTileProps {
 }
 
 /** Tuile chiffre : libellé, valeur en mono tabulaire, unité et indice optionnels. */
-export function StatTile({ label, value, unit, hint, tone = 'violet', mono = true, className }: StatTileProps) {
+export function StatTile({ label, value, unit, hint, tone = 'blue', mono = true, className }: StatTileProps) {
   return (
     <Card size="sm" className={cn(GLASS, 'min-w-0 gap-2 rounded-md px-4 py-4', className)}>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">

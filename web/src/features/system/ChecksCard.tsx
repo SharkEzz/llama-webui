@@ -239,7 +239,7 @@ function CheckRow({ check: c }: { check: Check }) {
         <p className="text-muted-foreground">{c.detail}</p>
         {c.state === 'warn' && <p className="text-xs text-muted-foreground">Impact : {c.impact}</p>}
         {c.command && (
-          <div className="flex items-start gap-1.5 rounded-md bg-well py-1 pr-1 pl-2.5">
+          <div className="flex items-start gap-1.5 rounded-md bg-well inset-shadow-well py-1 pr-1 pl-2.5">
             <code className="min-w-0 flex-1 py-0.5 font-mono text-xs break-all">{c.command}</code>
             <Button
               variant="ghost"
