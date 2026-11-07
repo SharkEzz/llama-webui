@@ -12,7 +12,7 @@ import { SettingsRepo } from './db/settings';
 import { SweepsRepo } from './db/sweeps';
 import { PlacementTracker } from './monitor/placement';
 import { dbPath } from './paths';
-import { buildWebRoutes } from './routes/web';
+import { buildWebRoutes, unavailableWebRoutes } from './routes/web';
 import { activeProfileId, getRuntime, serverView, startMonitor } from './runtime';
 import { profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
@@ -49,7 +49,13 @@ const chatRuns = new ChatRuns({
 const { supervisor, logs } = runtime;
 const development = process.env.NODE_ENV !== 'production';
 // Production : front construit (et découpé par page) une fois, au démarrage ; développement : import HTML avec HMR.
-const web = development ? { '/*': index } : await buildWebRoutes(`${import.meta.dir}/../web/index.html`);
+// Un front qui ne se construit pas n'empêche pas l'API ni le pilotage de llama-server.
+const web = development
+  ? { '/*': index }
+  : await buildWebRoutes(`${import.meta.dir}/../web/index.html`).catch((err: unknown) => {
+      console.error('[llama-webui] interface web indisponible :', err);
+      return unavailableWebRoutes(err);
+    });
 const monitor = await startMonitor(runtime, settings.get());
 const benchRuns = new BenchRunsRepo(db);
 const sweeps = new SweepsRepo(db);

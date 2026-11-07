@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
-import { buildWebRoutes } from './web';
+import { tempDir } from '../testing/tempDir';
+import { buildWebRoutes, unavailableWebRoutes } from './web';
 
 test('buildWebRoutes: the real UI, split per page, absolute paths, three.js only in the Topology chunks', async () => {
   const routes = await buildWebRoutes(`${import.meta.dir}/../../web/index.html`);
@@ -27,4 +28,17 @@ test('buildWebRoutes: the real UI, split per page, absolute paths, three.js only
   }
   expect(withThree.length).toBeGreaterThan(0);
   expect((routes[entry] as Response).headers.get('Cache-Control')).toContain('immutable');
+}, 30_000);
+
+test('buildWebRoutes: a broken front rejects; unavailableWebRoutes then answers every page with the error', async () => {
+  using dir = tempDir('lw-web-');
+  await Bun.write(`${dir.path}/index.html`, '<html><body><script type="module" src="./app.ts"></script></body></html>');
+  await Bun.write(`${dir.path}/app.ts`, "import './missing';\n");
+  const err = await buildWebRoutes(`${dir.path}/index.html`).catch((e: unknown) => e);
+  expect(err).toBeInstanceOf(AggregateError);
+  const page = unavailableWebRoutes(err)['/*'] as Response;
+  expect(page.status).toBe(503);
+  const text = await page.clone().text();
+  expect(text).toContain('interface web indisponible');
+  expect(text).toContain('missing');
 }, 30_000);

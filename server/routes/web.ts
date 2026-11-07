@@ -45,3 +45,17 @@ export async function buildWebRoutes(entry: string): Promise<WebRoutes> {
   });
   return routes;
 }
+
+/**
+ * Construction impossible (import cassé, plugin en échec) : l'API, le WebSocket et le superviseur restent servis ;
+ * toute page répond 503 avec l'erreur, jusqu'au prochain démarrage.
+ */
+export function unavailableWebRoutes(err: unknown): WebRoutes {
+  const detail = err instanceof AggregateError ? [err.message, ...err.errors.map(String)] : [String(err)];
+  return {
+    '/*': new Response(`llama-webui : interface web indisponible.\n\n${detail.join('\n')}\n`, {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-store' },
+    }),
+  };
+}
