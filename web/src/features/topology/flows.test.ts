@@ -98,7 +98,13 @@ const snapshot = {
       swapUsedBytes: 0,
     },
   },
-  disk: { readBps: 900e6, writeBps: 5e6, model: { disk: 'nvme0n1', readBps: 850e6 } },
+  // nvme0n1 holds the model; sda (SATA) adds its own traffic to the machine total.
+  disk: {
+    readBps: 900e6,
+    writeBps: 25e6,
+    perDisk: { nvme0n1: { readBps: 850e6, writeBps: 5e6 }, sda: { readBps: 50e6, writeBps: 20e6 } },
+    model: { disk: 'nvme0n1', readBps: 850e6 },
+  },
 } as unknown as Snapshot;
 
 const placement: ModelPlacement = {
@@ -125,9 +131,10 @@ test('linkFlows: GPU links carry NVML PCIe rates, host → GPU forward; capacity
   expect(f.get('d')).toMatchObject({ fwdBps: null, backBps: null, capacityBps: 4 * 1.969e9 });
 });
 
-test('linkFlows: the model disk feeds its NVMe link; chipset sums what sits behind it; memory shows activity only', () => {
+test('linkFlows: an NVMe link carries its own disk (writes forward, reads back); chipset sums what sits behind it; memory shows activity only', () => {
   const f = linkFlows(graph, snapshot);
-  expect(f.get('b')).toMatchObject({ fwdBps: 850e6, backBps: 5e6, capacityBps: 4 * 1.969e9 });
+  // Reads flow NVMe → CPU (back), writes CPU → NVMe (forward); the SATA disk's traffic is not on it.
+  expect(f.get('b')).toMatchObject({ fwdBps: 5e6, backBps: 850e6, capacityBps: 4 * 1.969e9 });
   expect(f.get('c')).toMatchObject({ fwdBps: null, backBps: null }); // nothing measurable behind it
   expect(f.get('cpu-ram')).toMatchObject({ fwdBps: null, backBps: null, capacityBps: null });
   expect(f.get('e')).toMatchObject({ fwdBps: null, backBps: null, activity: null, capacityBps: null });
@@ -169,10 +176,18 @@ test('linkFlows / nodeLive: with perf, the memory link carries measured DRAM tra
 test('linkFlows: without a snapshot every flow is unknown, capacities still known', () => {
   const f = linkFlows(graph, null);
   expect(f.get('a')).toMatchObject({ fwdBps: null, backBps: null, capacityBps: 8 * 0.25e9, maxBps: 8 * 3.938e9 });
-  // A disk not holding the model, alone on the machine: total disk rates.
-  const alone = { ...graph, nodes: graph.nodes.filter((n) => n.kind !== 'gpu' || n.busId === '0000:01:00.0') };
-  const s = { ...snapshot, disk: { readBps: 900e6, writeBps: 5e6, model: null } } as Snapshot;
-  expect(linkFlows(alone, s).get('b')).toMatchObject({ fwdBps: 900e6, backBps: 5e6 });
+  // The only NVMe, model elsewhere (SATA): its own rates, not the machine total.
+  const s = {
+    ...snapshot,
+    disk: {
+      ...snapshot.disk!,
+      perDisk: { nvme0n1: { readBps: 0, writeBps: 1e6 }, sda: { readBps: 400e6, writeBps: 0 } },
+    },
+  } as Snapshot;
+  expect(linkFlows(graph, s).get('b')).toMatchObject({ fwdBps: 1e6, backBps: 0 });
+  // A disk the sampler does not know: unknown, not borrowed from the total.
+  const unknown = { ...snapshot, disk: { ...snapshot.disk!, perDisk: {} } } as Snapshot;
+  expect(linkFlows(graph, unknown).get('b')).toMatchObject({ fwdBps: null, backBps: null });
 });
 
 test('nodeLive: GPU facts, load and dimming', () => {
@@ -208,7 +223,14 @@ test('nodeLive: CPU, RAM, NVMe and chipset', () => {
   expect(ram.fillPct).toBe(37.5);
   expect(ram.facts.find((f) => f.label === 'Modèle en RAM')!.value).toBe('25,1 Go');
   expect(ram.facts.find((f) => f.label === 'Barrettes')!.value).toBe('2 · 29,5 °C');
-  expect(live.get('pci:0000:02:00.0')).toMatchObject({ headline: '810,6 Mo/s' });
+  // NVMe headline: reads + writes of its own disk; facts keep them apart.
+  const nvme = live.get('pci:0000:02:00.0')!;
+  expect(nvme.headline).toBe('815,4 Mo/s');
+  expect(nvme.facts.filter((f) => f.label === 'Lecture' || f.label === 'Écriture').map((f) => f.value)).toEqual([
+    '810,6 Mo/s',
+    '4,8 Mo/s',
+  ]);
+  expect(nvme.facts.find((f) => f.label === 'Rôle')!.value).toBe('Disque du modèle');
   expect(live.get('chipset:0000:04:00.0')).toMatchObject({ loadPct: null, headline: 'Gen4 x4' });
 });
 

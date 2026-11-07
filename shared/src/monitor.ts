@@ -58,9 +58,14 @@ export interface SystemSample {
   memBw?: MemBandwidth | null;
 }
 
-export interface DiskSample {
+export interface DiskRates {
   readBps: number;
   writeBps: number;
+}
+
+/** Disques physiques de la machine : leur total, chacun (par nom de bloc, `nvme0n1`) et celui du modèle. */
+export interface DiskSample extends DiskRates {
+  perDisk: Record<string, DiskRates>;
   model: { disk: string; readBps: number } | null;
 }
 

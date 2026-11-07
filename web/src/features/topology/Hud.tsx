@@ -72,7 +72,7 @@ export function Hud({ phase, snapshot, graph, placement, flows, tones, reducedMo
       if (kind === 'gpu') {
         if (f.fwdBps !== null) toGpu = (toGpu ?? 0) + f.fwdBps;
         if (f.backBps !== null) fromGpu = (fromGpu ?? 0) + f.backBps;
-      } else if (kind === 'nvme' && f.fwdBps !== null) nvme = (nvme ?? 0) + f.fwdBps;
+      } else if (kind === 'nvme' && f.backBps !== null) nvme = (nvme ?? 0) + f.backBps; // lectures : NVMe → CPU
     }
   }
 

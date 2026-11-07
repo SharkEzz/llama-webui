@@ -32,7 +32,8 @@ serveur (chargement, prompt, génération) et répartition du modèle entre les 
   riser) n'en est pas un : ses périphériques restent reliés au CPU. Les bridges du périphérique lui-même (switch d'une
   Radeon) ne comptent pas.
 - **Valeurs live** : le client projette le `Snapshot` (`web/src/features/topology/flows.ts`) : `pcieRxBps/pcieTxBps`
-  (NVML) sur les liens GPU, `disk.model.readBps` sur le NVMe du modèle, `system.memBw` (perf) sur le lien CPU ↔ RAM.
+  (NVML) sur les liens GPU, `disk.perDisk[bloc]` sur chaque NVMe (écritures vers le disque, lectures vers le CPU ; le
+  total machine compte aussi les SATA/USB et n'est jamais prêté à un NVMe), `system.memBw` (perf) sur le lien CPU ↔ RAM.
   Sans mesure DRAM, ce lien porte une _activité_ : le CPU de llama-server ramené au nombre de threads (0–100 % de la
   machine), sinon le CPU système. Un chipset porte la somme de ce qui passe derrière lui.
 - **Placement** (`PlacementTracker`) : rejoue le ring de logs (qui survit à `bun --hot`) et suit `supervisor.subscribe` ;
@@ -42,7 +43,10 @@ serveur (chargement, prompt, génération) et répartition du modèle entre les 
   - `X model|KV|RS|compute buffer size = N MiB` : `RS` (état récurrent d'un modèle hybride) compte avec le cache KV ;
     le compute se compte **par contexte** (`llama_context: constructing llama_context` en ouvre un, celui d'un MTP
     s'ajoute au principal) et une nouvelle réservation (`sched_reserve: reserving`) remplace la précédente ;
-  - les buffers du mmproj (fonctions de `clip.cpp`, estimés avant même le modèle) sont ignorés.
+  - les buffers du mmproj (fonctions de `clip.cpp`, estimés avant même le modèle) sont ignorés ;
+  - les sondes de l'ajustement mémoire (`-fit`), entre « fitting params to device memory » et « fitting params to free
+    memory took », sont sautées : à `-lv 5` elles écrivent leurs couches, buffers à 0 MiB et contextes avant le vrai
+    chargement (fixture `testdata/llama-server-load-mtp-lv5.txt`).
 
   Nul pour un serveur externe, `idle` ou `crashed`. Le dernier placement lu est gardé avec le PID du serveur (sur
   `globalThis`) : il reste valable une fois la ligne de lancement évincée du ring, ou après un rechargement de Bun, tant

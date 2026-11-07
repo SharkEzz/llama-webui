@@ -104,12 +104,15 @@ export class DiskSampler {
     };
     let readBps = 0;
     let writeBps = 0;
+    const perDisk: DiskSample['perDisk'] = {};
     for (const d of this.disks) {
-      readBps += rate(d, 'readBytes');
-      writeBps += rate(d, 'writeBytes');
+      const r = { readBps: rate(d, 'readBytes'), writeBps: rate(d, 'writeBytes') };
+      perDisk[d] = r;
+      readBps += r.readBps;
+      writeBps += r.writeBps;
     }
     const model =
       modelDisk && counters.has(modelDisk) ? { disk: modelDisk, readBps: rate(modelDisk, 'readBytes') } : null;
-    return { readBps, writeBps, model };
+    return { readBps, writeBps, perDisk, model };
   }
 }

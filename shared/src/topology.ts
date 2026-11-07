@@ -14,7 +14,7 @@ export interface TopologyNode {
   /** Adresse PCI sysfs (`0000:01:00.0`), même format que `GpuSample.busId` et le réglage `hiddenGpus`. */
   busId?: string;
   vendor?: 'nvidia' | 'amd' | 'intel' | 'other';
-  /** Périphérique bloc d'un NVMe (`nvme0n1`) : relie le nœud à `DiskSample.model.disk`. */
+  /** Périphérique bloc d'un NVMe (`nvme0n1`) : relie le nœud à `DiskSample.perDisk` et `model.disk`. */
   block?: string;
   /** Faits statiques affichés dans l'infobulle (modèle, cœurs, taille…) ; null = inconnu. */
   detail: Record<string, string | number | null>;

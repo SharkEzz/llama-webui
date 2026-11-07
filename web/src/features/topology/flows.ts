@@ -3,6 +3,7 @@ import {
   hostDevice,
   type ModelPlacement,
   pcieBps,
+  placementTotals,
   type Snapshot,
   type TopologyGraph,
   type TopologyLink,
@@ -17,9 +18,12 @@ import { formatBps, formatBytes, formatPct } from '@/lib/format';
  */
 
 export interface LinkFlow {
-  /** Octets/s dans le sens amont → aval (hôte → GPU, NVMe → CPU…) ; null = non mesurable. */
+  /**
+   * Octets/s dans le sens du lien, amont → aval (`from` → `to`) : hôte → GPU, écritures CPU → RAM et CPU → NVMe ;
+   * null = non mesurable.
+   */
   fwdBps: number | null;
-  /** Octets/s dans le sens aval → amont. */
+  /** Octets/s dans le sens aval → amont : GPU → hôte, lectures RAM → CPU et NVMe → CPU. */
   backBps: number | null;
   /**
    * Lien mémoire sans mesure perf : activité CPU en % de la machine (0–100), celle de llama-server ramenée au nombre de
@@ -71,8 +75,7 @@ const gpuOf = (snapshot: Snapshot | null, node: TopologyNode): GpuSample | undef
 export function linkFlows(graph: TopologyGraph, snapshot: Snapshot | null): Map<string, LinkFlow> {
   const out = new Map<string, LinkFlow>();
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
-  const nvmeCount = graph.nodes.filter((n) => n.kind === 'nvme').length;
-  const disk = snapshot?.disk ?? null;
+  const perDisk = snapshot?.disk?.perDisk;
 
   const base = (l: TopologyLink, gen = l.genCur, width = l.widthCur): LinkFlow => ({
     fwdBps: null,
@@ -103,13 +106,9 @@ export function linkFlows(graph: TopologyGraph, snapshot: Snapshot | null): Map<
         backBps: g?.pcieTxBps ?? null,
       });
     } else if (to.kind === 'nvme') {
-      const model = disk?.model && disk.model.disk === to.block ? disk.model : null;
-      const alone = nvmeCount === 1;
-      out.set(l.id, {
-        ...base(l),
-        fwdBps: model ? model.readBps : alone ? (disk?.readBps ?? null) : null,
-        backBps: alone ? (disk?.writeBps ?? null) : null,
-      });
+      // Compteurs du bloc de ce NVMe : CPU → NVMe, les écritures ; NVMe → CPU, les lectures.
+      const rates = to.block ? perDisk?.[to.block] : undefined;
+      out.set(l.id, { ...base(l), fwdBps: rates?.writeBps ?? null, backBps: rates?.readBps ?? null });
     } else out.set(l.id, base(l));
   }
   // Un chipset porte la somme de ce qui passe derrière lui.
@@ -195,9 +194,7 @@ export function nodeLive(
     } else if (n.kind === 'ram') {
       const mem = snapshot?.system?.mem ?? null;
       const used = mem ? mem.totalBytes - mem.availableBytes : null;
-      const host = placement
-        ? placement.buffers.filter((b) => hostDevice(b.device)).reduce((s, b) => s + b.modelBytes, 0)
-        : 0;
+      const host = placement ? placementTotals(placement).hostModelBytes : 0;
       const bw = snapshot?.system?.memBw ?? null;
       if (mem && used !== null) add('Utilisée', `${formatBytes(used)} / ${formatBytes(mem.totalBytes)}`);
       if (bw) add('Lecture', formatBps(bw.readBps));
@@ -220,16 +217,19 @@ export function nodeLive(
         facts,
       });
     } else if (n.kind === 'nvme') {
-      add('Lecture', flow?.fwdBps != null ? formatBps(flow.fwdBps) : null);
-      add('Écriture', flow?.backBps != null ? formatBps(flow.backBps) : null);
+      const read = flow?.backBps ?? null;
+      const write = flow?.fwdBps ?? null;
+      const total = read === null && write === null ? null : (read ?? 0) + (write ?? 0);
+      add('Lecture', read !== null ? formatBps(read) : null);
+      add('Écriture', write !== null ? formatBps(write) : null);
       if (n.detail.sizeBytes != null) add('Capacité', formatBytes(Number(n.detail.sizeBytes)));
       add('Lien PCIe', linkLabel(link?.genCur, link?.widthCur));
       if (snapshot?.disk?.model?.disk === n.block) add('Rôle', 'Disque du modèle');
       out.set(n.id, {
-        loadPct: flow?.fwdBps != null && flow.capacityBps ? pct(flow.fwdBps, flow.capacityBps) : null,
+        loadPct: total !== null && flow?.capacityBps ? pct(total, flow.capacityBps) : null,
         fillPct: null,
         dim: false,
-        headline: flow?.fwdBps != null ? formatBps(flow.fwdBps) : '—',
+        headline: total !== null ? formatBps(total) : '—',
         facts,
       });
     } else {
@@ -272,7 +272,7 @@ export function placementSeries(graph: TopologyGraph, placement: ModelPlacement 
     .filter((b) => !hostDevice(b.device) && b.modelBytes > 0)
     .sort((a, b) => order(a) - order(b))
     .map((b) => ({ label: b.device, bytes: b.modelBytes, nodeId: gpus.find((n) => n.busId === b.busId)?.id ?? null }));
-  const host = placement.buffers.filter((b) => hostDevice(b.device)).reduce((s, b) => s + b.modelBytes, 0);
+  const host = placementTotals(placement).hostModelBytes;
   if (host > 0) slices.push({ label: 'Hôte (RAM)', bytes: host, nodeId: 'ram' });
   return slices;
 }
