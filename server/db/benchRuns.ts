@@ -227,6 +227,21 @@ export class BenchRunsRepo {
       .map(toRun);
   }
 
+  /**
+   * The latest successful one-off run of each profile (sweep items are left out: they test other settings than the
+   * profile's own).
+   */
+  lastOkByProfile(): Map<number, BenchRun> {
+    const rows = this.db
+      .query<Row, []>(
+        `SELECT * FROM bench_runs b WHERE b.id = (
+           SELECT id FROM bench_runs WHERE profile_id = b.profile_id AND status = 'ok' AND sweep_id IS NULL
+           ORDER BY created_at DESC, id DESC LIMIT 1)`,
+      )
+      .all();
+    return new Map(rows.map((r) => [r.profile_id!, toRun(r)]));
+  }
+
   get(id: number): BenchRun | null {
     const row = this.db.query<Row, [number]>('SELECT * FROM bench_runs WHERE id = ?').get(id);
     return row ? toRun(row) : null;

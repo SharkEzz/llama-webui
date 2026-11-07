@@ -232,6 +232,21 @@ export function paramsFromServerArgs(args: string[]): { params: BenchParams; res
   return { params, rest };
 }
 
+/** The context size set by a profile's args (`-c`, `--ctx-size`, `=` form); undefined when absent or invalid. */
+export function ctxFromArgs(args: string[]): number | undefined {
+  let out: number | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    let raw: string | undefined;
+    if (arg === '-c' || arg === '--ctx-size') raw = args[++i];
+    else if (arg.startsWith('--ctx-size=') || arg.startsWith('-c=')) raw = arg.slice(arg.indexOf('=') + 1);
+    if (raw === undefined) continue;
+    const n = Number(raw);
+    out = Number.isInteger(n) && n > 0 ? n : undefined;
+  }
+  return out;
+}
+
 function toArgs(p: BenchParams, tool: BenchKind): string[] {
   const out: string[] = [];
   const sep = tool === 'bench' ? '/' : ',';

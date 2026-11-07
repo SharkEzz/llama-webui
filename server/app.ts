@@ -16,6 +16,7 @@ import { modelRoutes } from './routes/models';
 import { monitorRoutes } from './routes/monitor';
 import { profileRoutes } from './routes/profiles';
 import { serverRoutes } from './routes/server';
+import { setupRoutes } from './routes/setup';
 import { sweepRoutes } from './routes/sweeps';
 import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
@@ -74,6 +75,7 @@ export function createApp(deps: AppDeps) {
       ...sweepRoutes(deps),
       ...tuningRoutes(deps),
       ...topologyRoutes(deps),
+      ...setupRoutes(deps),
       '/api/*': guarded(() => Response.json({ error: 'Unknown route' }, { status: 404 })),
       '/ws': guarded((req, server) => {
         if (server.upgrade(req)) return undefined;

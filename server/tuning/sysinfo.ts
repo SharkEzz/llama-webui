@@ -60,7 +60,8 @@ async function listDir(path: string): Promise<string[] | null> {
   }
 }
 
-async function resolveBinary(binary: string): Promise<string | null> {
+/** Absolute, symlink-free path of a binary (bare name looked up in the PATH); null when not found. */
+export async function resolveBinary(binary: string): Promise<string | null> {
   const p = binary.includes('/') ? binary : Bun.which(binary);
   if (!p) return null;
   try {

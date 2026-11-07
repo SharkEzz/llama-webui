@@ -178,7 +178,8 @@ export function ChecksCard() {
   );
 }
 
-function CheckList({ checks }: { checks: Check[] }) {
+/** Checks grouped by family: issues first, passing ones folded. */
+export function CheckList({ checks }: { checks: Check[] }) {
   const families = (Object.keys(FAMILY) as CheckFamily[])
     .map((f) => ({ family: f, checks: checks.filter((c) => c.family === f) }))
     .filter((g) => g.checks.length > 0);

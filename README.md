@@ -49,6 +49,8 @@ one dashboard designed for a **single machine you own**:
 
 ### 🚀 Server and profiles
 
+- **First-run setup checklist**, then a **launch pad** on Home: every profile with its model, quantization, last
+  benchmark and estimated memory fit, started (or switched to) in one click.
 - Start, stop, restart or switch `llama-server` in one click; states are tracked live (_starting → ready → stopping_,
   crash detection, externally launched servers detected through `/proc`).
 - **Profiles** store a model, an optional multimodal projector, a working directory, `llama-server` arguments and
@@ -171,13 +173,11 @@ bun run start
 
 Then open **<http://127.0.0.1:7860>**.
 
-On first launch:
-
-1. Open **Settings** and set the path to your `llama-server` binary (just `llama-server` if it is on your
-   `PATH`) and your **models folder**.
-2. Go to **Profiles** and create a profile: pick a GGUF model, add your usual `llama-server` arguments.
-   If you used llama-tui, llama-webui offers to import its profiles from `~/.config/llama-tui/config.json`.
-3. Start it from the **Server** page, then open the **Dashboard** or the **Chat**.
+On first launch, Home opens a **setup checklist**: it finds your `llama-server` binary (or asks for its path), checks
+the models folder, lists what `llama-bench` and the GPU telemetry can see, and reviews the machine configuration with
+the exact commands to run. Only the binary and the models folder are required; you can reopen the checklist later from
+**Settings**. Once it is done, Home becomes a **launch pad**: one card per profile, with its model, last benchmark and
+memory fit, started in one click.
 
 > [!TIP]
 > Not sure which flags to use? Open **Tuning**, pick your model and a goal, and click _Create profile_ from the
