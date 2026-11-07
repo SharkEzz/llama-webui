@@ -1,4 +1,4 @@
-// Dossiers : node:fs, comme le recommande Bun (Bun.file et Bun.write ne traitent que des fichiers).
+// Directories: node:fs, as Bun recommends (Bun.file and Bun.write only handle files).
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,8 +8,8 @@ export interface TempDir extends Disposable {
 }
 
 /**
- * Dossier temporaire pour un test, supprimé à la sortie de sa portée (`using dir = tempDir('lw-')`), y compris quand le
- * test échoue. Au niveau d'un module (`using` y libérerait avant les tests) : `afterAll(() => dir[Symbol.dispose]())`.
+ * Temporary directory for a test, deleted when it goes out of scope (`using dir = tempDir('lw-')`), even when the
+ * test fails. At module level (`using` would release it before the tests): `afterAll(() => dir[Symbol.dispose]())`.
  */
 export function tempDir(prefix: string): TempDir {
   const path = mkdtempSync(join(tmpdir(), prefix));

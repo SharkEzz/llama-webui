@@ -1,17 +1,17 @@
-/** Écart à la cible sous lequel une valeur lissée est arrivée (invisible : moins d'un niveau de couleur sur 8 bits). */
+/** Distance to the target below which a smoothed value has arrived (invisible: less than one 8-bit color level). */
 const SETTLED = 2e-3;
 /**
- * Pas de temps maximal (s) d'une image. La scène peut rester sans image (rien ne bouge) : la suivante arrive avec un
- * `dt` de toute la pause, qui ferait sauter la valeur à sa cible au lieu de l'en approcher.
+ * Maximum time step (s) of a frame. The scene may go without frames (nothing moves): the next one then arrives with a
+ * `dt` spanning the whole pause, which would make the value jump to its target instead of easing toward it.
  */
 export const MAX_DT = 0.1;
 
-/** Lissage exponentiel par clé, pour que les valeurs du tick (1 s) n'avancent pas par sauts dans la boucle de rendu. */
+/** Per-key exponential smoothing, so tick values (1 s) do not advance in jumps in the render loop. */
 export class Smoother {
   private v = new Map<string, number>();
   private moving = false;
 
-  /** `tau` : constante de temps (s) ; après `tau`, 63 % du chemin vers la cible est fait. */
+  /** `tau`: time constant (s); after `tau`, 63% of the way to the target is covered. */
   constructor(private readonly tau = 0.35) {}
 
   step(key: string, target: number | null, dt: number): number {
@@ -27,7 +27,7 @@ export class Smoother {
     return next;
   }
 
-  /** Une valeur n'avait pas encore rejoint sa cible depuis le dernier appel : l'animation doit continuer. */
+  /** A value had not yet reached its target since the last call: the animation must go on. */
   takeMoving(): boolean {
     const m = this.moving;
     this.moving = false;
@@ -41,8 +41,8 @@ const RANGE = Math.log10(CEIL_BPS / FLOOR_BPS);
 export const MAX_PARTICLES = 64;
 
 /**
- * Traduction d'un débit en paramètres visuels, en échelle log : 50 Mo/s doivent rester visibles à côté de 20 Go/s.
- * `particles` : nombre de particules sur le lien ; `speed` : fraction du lien parcourue par seconde ; `glow` : 0..1.
+ * Maps a throughput to visual parameters, on a log scale: 50 MiB/s must stay visible next to 20 GiB/s.
+ * `particles`: number of particles on the link; `speed`: fraction of the link covered per second; `glow`: 0..1.
  */
 export function flowVisual(bps: number | null): { particles: number; speed: number; glow: number } {
   if (bps === null || !(bps >= FLOOR_BPS)) return { particles: 0, speed: 0, glow: 0 };

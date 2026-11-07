@@ -5,8 +5,8 @@ import { formatPct } from '@/lib/format';
 const STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
 /**
- * Une case par cœur logique, remplie de bas en haut (--chart-1) selon la charge. Chaque case est un bouton (le tooltip s'ouvre
- * aussi au clavier), en roving tabindex : un seul arrêt Tab pour toute la grille, les flèches et Début/Fin la parcourent.
+ * One cell per logical core, filled bottom-up (--chart-1) by its load. Each cell is a button (the tooltip also opens from the
+ * keyboard), with a roving tabindex: a single Tab stop for the whole grid, arrows and Home/End move through it.
  */
 export function CoreHeatmap({ cores }: { cores: number[] }) {
   const [active, setActive] = useState(0);
@@ -29,18 +29,18 @@ export function CoreHeatmap({ cores }: { cores: number[] }) {
     <ul
       ref={list}
       className="grid grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1"
-      aria-label="Charge par cœur"
+      aria-label="Load per core"
       onKeyDown={onKeyDown}
     >
       {cores.map((pct, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: une case par cœur, l'index est l'identité du cœur
+        // biome-ignore lint/suspicious/noArrayIndexKey: one cell per core, the index is the core's identity
         <li key={i}>
           <Tooltip>
             <TooltipTrigger
               tabIndex={i === current ? 0 : -1}
               onFocus={() => setActive(i)}
               className="relative flex h-9 w-full items-center justify-center overflow-hidden rounded-md border border-border text-[0.65rem] text-muted-foreground outline-none num focus-visible:ring-3 focus-visible:ring-ring/50"
-              aria-label={`Cœur ${i} : ${formatPct(pct)}`}
+              aria-label={`Core ${i}: ${formatPct(pct)}`}
             >
               <span
                 aria-hidden="true"
@@ -50,7 +50,7 @@ export function CoreHeatmap({ cores }: { cores: number[] }) {
               <span className="relative">{i}</span>
             </TooltipTrigger>
             <TooltipContent>
-              Cœur {i} : {formatPct(pct)}
+              Core {i}: {formatPct(pct)}
             </TooltipContent>
           </Tooltip>
         </li>

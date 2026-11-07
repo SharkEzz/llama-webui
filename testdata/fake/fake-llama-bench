@@ -1,3 +1,3 @@
 #!/bin/sh
-# llama-bench stand-in (à côté de fake-llama-server, comme llama-bench à côté de llama-server).
+# llama-bench stand-in (next to fake-llama-server, as llama-bench sits next to llama-server).
 exec "${BUN_PATH:-bun}" "$(dirname "$0")/fake-llama-bench.ts" "$@"

@@ -5,9 +5,9 @@ export interface ApiIssue {
 
 export class ApiError extends Error {
   readonly status: number;
-  /** Détail zod renvoyé par l'API pour un 400 (champ par champ). */
+  /** Zod details returned by the API on a 400 (field by field). */
   readonly issues: ApiIssue[];
-  /** Raison renvoyée par l'API pour certains refus (ex. « server-running »). */
+  /** Reason returned by the API for some refusals (e.g. “server-running”). */
   readonly code: string | null;
   constructor(status: number, message: string, issues: ApiIssue[] = [], code: string | null = null) {
     super(message);
@@ -18,7 +18,7 @@ export class ApiError extends Error {
   }
 }
 
-/** Appel JSON vers /api ; lève ApiError si la réponse n'est pas 2xx. */
+/** JSON call to /api; throws ApiError if the response is not 2xx. */
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.body !== undefined && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -26,7 +26,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`/api${path}`, { ...init, headers });
   } catch {
-    throw new ApiError(0, 'Serveur llama-webui injoignable');
+    throw new ApiError(0, 'llama-webui server unreachable');
   }
   const text = await res.text();
   let body: unknown;
@@ -41,7 +41,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const message =
       typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string'
         ? body.error
-        : `Erreur HTTP ${res.status}`;
+        : `HTTP error ${res.status}`;
     const issues =
       typeof body === 'object' && body !== null && 'issues' in body && Array.isArray(body.issues)
         ? (body.issues as ApiIssue[])

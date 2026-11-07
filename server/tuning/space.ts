@@ -12,7 +12,7 @@ import {
 import type { ModelInfo } from '../models/gguf';
 import { fitOf } from './placement';
 
-/** Les éléments d'un sweep, chacun avec le verdict de l'estimateur ; ceux qui ne tiennent pas retirés sauf `includeUnfit`. */
+/** The items of a sweep, each with the estimator's verdict; those that don't fit are dropped unless `includeUnfit`. */
 export function planSweep(o: {
   model: ModelInfo;
   hw: TuningHardware;

@@ -15,7 +15,7 @@ const BACKOFF_MAX_MS = 10_000;
 type Listener = (msg: WsMessage) => void;
 const listeners = new Map<WsMessage['type'], Set<Listener>>();
 
-/** Abonnement aux messages WS d'un type donné. */
+/** Subscribes to WS messages of a given type. */
 export function onWs<T extends WsMessage['type']>(
   type: T,
   fn: (msg: Extract<WsMessage, { type: T }>) => void,
@@ -39,11 +39,11 @@ function wsUrl(): string {
   return `${proto}://${location.host}/ws`;
 }
 
-/** Connexion WebSocket unique, reconnexion automatique (backoff 500 ms × 2, plafond 10 s). */
+/** Single WebSocket connection with automatic reconnect (backoff 500 ms × 2, capped at 10 s). */
 export const useWs = create<WsState>()((set, get) => {
   const open = () => {
     retryTimer = undefined;
-    // Après une première coupure on reste « closed » pendant les tentatives, pour ne pas clignoter.
+    // After the first drop we stay “closed” while retrying, to avoid flickering.
     if (get().status !== 'closed') set({ status: 'connecting' });
     const ws = new WebSocket(wsUrl());
     socket = ws;
@@ -71,7 +71,7 @@ export const useWs = create<WsState>()((set, get) => {
       retryTimer = setTimeout(open, backoff);
       backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
     };
-    // onerror est toujours suivi de onclose : rien à faire ici.
+    // onerror is always followed by onclose: nothing to do here.
   };
 
   return {
@@ -84,14 +84,14 @@ export const useWs = create<WsState>()((set, get) => {
   };
 });
 
-/** Libellé et couleur de la pastille d'état. */
+/** Label and color of the status dot. */
 export const WS_STATUS_UI: Record<WsStatus, { label: string; tone: 'ok' | 'wait' | 'down' }> = {
-  open: { label: 'Connecté', tone: 'ok' },
-  connecting: { label: 'Connexion…', tone: 'wait' },
-  closed: { label: 'Déconnecté', tone: 'down' },
+  open: { label: 'Connected', tone: 'ok' },
+  connecting: { label: 'Connecting…', tone: 'wait' },
+  closed: { label: 'Disconnected', tone: 'down' },
 };
 
-// Évite les sockets fantômes lors du rechargement à chaud de Vite.
+// Avoids ghost sockets on hot reload.
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     if (retryTimer) clearTimeout(retryTimer);

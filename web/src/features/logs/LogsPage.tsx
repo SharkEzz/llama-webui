@@ -11,15 +11,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { copyText } from '@/lib/clipboard';
+import { formatInt, plural } from '@/lib/format';
 import { hideCurrentLogs, useLogs } from '@/lib/logs';
 import { cn } from '@/lib/utils';
 import { LogRow } from './LogRow';
 
 const LEVELS: { value: LogLevel; label: string }[] = [
-  { value: 'debug', label: 'Debug et plus' },
-  { value: 'info', label: 'Info et plus' },
-  { value: 'warn', label: 'Avertissements et erreurs' },
-  { value: 'error', label: 'Erreurs seulement' },
+  { value: 'debug', label: 'Debug and above' },
+  { value: 'info', label: 'Info and above' },
+  { value: 'warn', label: 'Warnings and errors' },
+  { value: 'error', label: 'Errors only' },
 ];
 
 const BOTTOM_SLACK_PX = 40;
@@ -56,12 +57,11 @@ export function LogsPage() {
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-3xl font-semibold tracking-tight">Logs</h1>
         <span className="text-sm text-muted-foreground">
-          <span className="num text-foreground/80">{lines.length.toLocaleString('fr-FR')}</span> ligne
-          {lines.length > 1 ? 's' : ''}
+          <span className="num text-foreground/80">{formatInt(lines.length)}</span> {plural(lines.length, 'line')}
           {lines.length !== all.length && (
             <>
               {' '}
-              sur <span className="num">{all.length.toLocaleString('fr-FR')}</span>
+              of <span className="num">{formatInt(all.length)}</span>
             </>
           )}
         </span>
@@ -69,7 +69,7 @@ export function LogsPage() {
 
       <div className={cn(GLASS, 'flex flex-wrap items-center gap-3 p-3')}>
         <Select items={LEVELS} value={minLevel} onValueChange={(v) => v && setMinLevel(v as LogLevel)}>
-          <SelectTrigger className="w-56" aria-label="Niveau minimal">
+          <SelectTrigger className="w-56" aria-label="Minimum level">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -88,9 +88,9 @@ export function LogsPage() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher"
+            placeholder="Search"
             className="pl-8"
-            aria-label="Rechercher dans les logs"
+            aria-label="Search the logs"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -102,7 +102,7 @@ export function LogsPage() {
               setFollow(on);
             }}
           />
-          <Label htmlFor="follow">Suivi auto</Label>
+          <Label htmlFor="follow">Auto-follow</Label>
         </div>
         <Button
           variant="ghost"
@@ -110,24 +110,24 @@ export function LogsPage() {
           disabled={lines.length === 0}
           onClick={() =>
             copyText(lines.map((l) => l.text).join('\n')).then(
-              () => toast.success(`${lines.length} lignes copiées`),
+              () => toast.success(`${lines.length} ${plural(lines.length, 'line')} copied`),
               (e: Error) => toast.error(e.message),
             )
           }
         >
-          <Copy /> Copier
+          <Copy /> Copy
         </Button>
         <Button variant="ghost" size="sm" disabled={lines.length === 0} onClick={hideCurrentLogs}>
-          <Eraser /> Vider l'affichage
+          <Eraser /> Clear view
         </Button>
       </div>
 
       <div className={cn(GLASS, 'relative min-h-0 flex-1 overflow-hidden')}>
         <section
           ref={scroller}
-          aria-label="Journaux"
+          aria-label="Logs"
           className="h-full overflow-auto bg-well inset-shadow-well p-3"
-          // Le suivi ne se coupe que sur un geste de l'utilisateur : un filtre qui change la hauteur ne doit pas l'arrêter.
+          // Following only stops on a user gesture: a filter that changes the height must not stop it.
           onWheel={(e) => {
             if (e.deltaY < 0) userScroll.current = true;
           }}
@@ -143,17 +143,17 @@ export function LogsPage() {
             else if (!atBottom && follow && userScroll.current) setFollow(false);
             if (atBottom) userScroll.current = false;
           }}
-          // biome-ignore lint/a11y/noNoninteractiveTabindex: la zone défilante doit être atteignable au clavier
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: the scrolling area must be reachable from the keyboard
           tabIndex={0}
         >
           {lines.length === 0 ? (
             <Alert>
               <ScrollText />
-              <AlertTitle>{all.length === 0 ? 'Aucun log' : 'Aucune ligne ne correspond aux filtres'}</AlertTitle>
+              <AlertTitle>{all.length === 0 ? 'No logs' : 'No lines match the filters'}</AlertTitle>
               <AlertDescription>
                 {all.length === 0
-                  ? 'Démarrez llama-server depuis la page Serveur.'
-                  : 'Baissez le niveau minimal ou changez la recherche.'}
+                  ? 'Start llama-server from the Server page.'
+                  : 'Lower the minimum level or change the search.'}
               </AlertDescription>
             </Alert>
           ) : (
@@ -181,7 +181,7 @@ export function LogsPage() {
               setFollow(true);
             }}
           >
-            <ArrowDownToLine /> Reprendre le suivi
+            <ArrowDownToLine /> Resume following
           </Button>
         )}
       </div>

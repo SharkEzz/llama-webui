@@ -23,10 +23,10 @@ import {
 } from './actions';
 import { MemoryBars } from './MemoryBars';
 
-/** Débit de génération pris pour chiffrer la lecture disque d'un modèle qui déborde. */
+/** Generation throughput used to quantify the disk reads of a model that overflows RAM. */
 const REF_TPS = 10;
 
-/** La configuration recommandée, flag par flag, avec ses budgets mémoire ; chaque valeur peut être imposée. */
+/** The recommended configuration, flag by flag, with its memory budgets; each value can be pinned. */
 export function RecommendationCard() {
   const modelPath = useTuning((s) => s.modelPath);
   const estimate = useTuning((s) => s.estimate);
@@ -41,7 +41,7 @@ export function RecommendationCard() {
 
   return (
     <GlassCard
-      title="Recommandation (estimation)"
+      title="Recommendation (estimate)"
       icon={Wand2}
       actions={
         estimate?.ok && (
@@ -54,7 +54,7 @@ export function RecommendationCard() {
                 navigate('/bench');
               }}
             >
-              <Gauge /> Lancer un bench
+              <Gauge /> Run a benchmark
             </Button>
             <Button
               size="sm"
@@ -63,7 +63,7 @@ export function RecommendationCard() {
                 if (p) navigate(`/profiles?id=${p.id}`);
               }}
             >
-              <UserPlus /> Créer un profil
+              <UserPlus /> Create profile
             </Button>
           </>
         )
@@ -71,12 +71,12 @@ export function RecommendationCard() {
     >
       {!modelPath ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          Choisissez un modèle ou un profil : la recommandation s'affiche ici.
+          Pick a model or a profile: the recommendation shows up here.
         </p>
       ) : error ? (
         <Alert variant="destructive">
           <TriangleAlert />
-          <AlertTitle>Estimation impossible</AlertTitle>
+          <AlertTitle>Estimate failed</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : !estimate ? (
@@ -85,7 +85,7 @@ export function RecommendationCard() {
         <div className="flex flex-col gap-5" aria-busy={estimating}>
           {pins.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Imposé :</span>
+              <span className="text-muted-foreground">Pinned:</span>
               {pins.map(([k, v]) => (
                 <Badge key={k} variant="secondary" className="gap-1 pr-0.5 font-mono">
                   {PIN_LABEL[k]} {pinValue(v)}
@@ -94,7 +94,7 @@ export function RecommendationCard() {
                     size="icon-xs"
                     className="size-4"
                     onClick={() => useTuning.getState().unpin(k)}
-                    aria-label={`Ne plus imposer ${PIN_LABEL[k]}`}
+                    aria-label={`Unpin ${PIN_LABEL[k]}`}
                   >
                     <X />
                   </Button>
@@ -105,7 +105,7 @@ export function RecommendationCard() {
           {!estimate.ok && (
             <Alert variant="destructive">
               <TriangleAlert />
-              <AlertTitle>Ne tient pas</AlertTitle>
+              <AlertTitle>Does not fit</AlertTitle>
               <AlertDescription>{estimate.reason}</AlertDescription>
             </Alert>
           )}
@@ -121,16 +121,16 @@ export function RecommendationCard() {
               <MemoryBars fit={estimate.fit} names={names} ramTotalBytes={hw?.ramTotalBytes ?? 0} />
               {estimate.ramOverflowBytes > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  Débordement de <span className="num text-foreground">{formatBytes(estimate.ramOverflowBytes)}</span> :
-                  à {REF_TPS} t/s, lecture NVMe ≈{' '}
+                  Overflow of <span className="num text-foreground">{formatBytes(estimate.ramOverflowBytes)}</span>: at{' '}
+                  {REF_TPS} t/s, NVMe reads ≈{' '}
                   <span className="num text-foreground">{formatBps(estimate.diskReadBytesPerToken * REF_TPS)}</span>
                   {diskSpeed && diskSpeed.path === modelPath ? (
                     <>
                       {' '}
-                      (mesuré : <span className="num text-foreground">{formatBps(diskSpeed.bytesPerSec)}</span>)
+                      (measured: <span className="num text-foreground">{formatBps(diskSpeed.bytesPerSec)}</span>)
                     </>
                   ) : (
-                    ' (débit du disque : page Système, « Mesurer le disque »)'
+                    ' (disk bandwidth: System page, “Measure disk”)'
                   )}
                   .
                 </p>
@@ -141,7 +141,7 @@ export function RecommendationCard() {
             <ul className="flex flex-col gap-1.5">
               {estimate.warnings.map((w) => (
                 <li key={w} className="flex items-start gap-2 text-sm">
-                  <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-label="Attention" />
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-label="Warning" />
                   {w}
                 </li>
               ))}
@@ -159,8 +159,8 @@ function RowsTable({ estimate, pinned }: { estimate: Estimate; pinned: Partial<B
       <TableHeader>
         <TableRow>
           <TableHead>Flag</TableHead>
-          <TableHead>Valeur</TableHead>
-          <TableHead>Pourquoi</TableHead>
+          <TableHead>Value</TableHead>
+          <TableHead>Why</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -173,7 +173,7 @@ function RowsTable({ estimate, pinned }: { estimate: Estimate; pinned: Partial<B
               <TableCell className="font-mono text-xs">
                 <span className="flex items-center gap-1">
                   {r.value || '—'}
-                  {isPinned && <Lock className="size-3 text-muted-foreground" aria-label="imposé" />}
+                  {isPinned && <Lock className="size-3 text-muted-foreground" aria-label="pinned" />}
                   {key && <PinEditor pin={key} flag={r.flag} initial={r.value.split(' / ').at(-1) ?? r.value} />}
                 </span>
               </TableCell>
@@ -209,7 +209,7 @@ function PinEditor({ pin, flag, initial }: { pin: PinKey; flag: string; initial:
         }
       }}
     >
-      <PopoverTrigger render={<Button variant="ghost" size="icon-xs" aria-label={`Imposer ${flag}`} />}>
+      <PopoverTrigger render={<Button variant="ghost" size="icon-xs" aria-label={`Pin ${flag}`} />}>
         <Pencil />
       </PopoverTrigger>
       <PopoverContent className="w-64">
@@ -221,7 +221,7 @@ function PinEditor({ pin, flag, initial }: { pin: PinKey; flag: string; initial:
           }}
         >
           <span className="text-sm font-medium">
-            Imposer <span className="font-mono">{pin === 'ub' ? '-ub' : flag}</span>
+            Pin <span className="font-mono">{pin === 'ub' ? '-ub' : flag}</span>
           </span>
           <Input
             autoFocus
@@ -235,10 +235,10 @@ function PinEditor({ pin, flag, initial }: { pin: PinKey; flag: string; initial:
           />
           {error && <span className="text-xs text-destructive">{error}</span>}
           <span className="text-xs text-muted-foreground">
-            L'estimateur cherche le meilleur placement avec cette valeur.
+            The estimator looks for the best placement with this value.
           </span>
           <Button type="submit" size="sm">
-            Imposer
+            Pin
           </Button>
         </form>
       </PopoverContent>

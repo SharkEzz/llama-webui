@@ -1,10 +1,10 @@
 export type ModelKind = 'model' | 'mmproj';
 
-/** Résumé d'un GGUF (en-tête seulement), mis en cache en base. */
+/** Summary of a GGUF (header only), cached in the database. */
 export interface ModelSummary {
-  /** Chemin absolu du fichier (le premier shard d'un modèle découpé). */
+  /** Absolute path of the file (the first shard of a split model). */
   path: string;
-  /** Chemin relatif au dossier des modèles. */
+  /** Path relative to the models directory. */
   relPath: string;
   files: string[];
   fileBytes: number;
@@ -17,7 +17,7 @@ export interface ModelSummary {
   contextLength: number;
   embeddingLength: number;
   headCount: number;
-  /** Maximum sur les couches. */
+  /** Maximum across layers. */
   headCountKv: number;
   expertCount: number;
   expertUsedCount: number;
@@ -32,9 +32,9 @@ export type ModelEntry =
   | { ok: false; path: string; relPath: string; files: string[]; fileBytes: number; error: string };
 
 export interface ModelList {
-  /** Dossier des modèles développé (absolu). */
+  /** Models directory, expanded (absolute). */
   dir: string;
-  /** Dossier des modèles tel que saisi dans les réglages (`~` compris). */
+  /** Models directory as entered in the settings (`~` included). */
   setting: string;
   home: string;
   scannedAt: number;
@@ -56,15 +56,15 @@ export interface ModelDetail extends ModelSummary {
 const expand = (p: string, home: string) => (p === '~' ? home : p.startsWith('~/') ? `${home}/${p.slice(2)}` : p);
 const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
 
-/** `abs` relatif à `dir` s'il est dedans, sinon null. */
+/** `abs` relative to `dir` if inside it, otherwise null. */
 function relativeTo(abs: string, dir: string): string | null {
   const d = trimSlash(dir);
   return abs.startsWith(`${d}/`) ? abs.slice(d.length + 1) : null;
 }
 
 /**
- * Chemin de modèle à écrire dans un profil : sans dossier de travail, celui des modèles est pris (tel que saisi) et le
- * chemin lui est relatif ; sous le dossier de travail, relatif ; ailleurs, absolu.
+ * Model path to write into a profile: without a working directory, the models directory is used (as entered) and the
+ * path is relative to it; under the working directory, relative; elsewhere, absolute.
  */
 export function profileModelPath(
   abs: string,

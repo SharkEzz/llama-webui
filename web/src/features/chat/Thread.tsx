@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { useChat } from '@/lib/chat';
 import { Message } from './Message';
 
-/** Fil de la conversation ; reste collé en bas tant que l'utilisateur n'est pas remonté le lire. */
+/** Conversation thread; stays pinned to the bottom unless the user scrolls up to read. */
 export function Thread({ canSend }: { canSend: boolean }) {
   const current = useChat((s) => s.current);
   const streaming = useChat((s) => s.streaming);
@@ -15,7 +15,7 @@ export function Thread({ canSend }: { canSend: boolean }) {
     const el = box.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id est un déclencheur : on recolle en bas à chaque changement de conversation
+  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id is a trigger: re-pin to the bottom on every conversation change
   useLayoutEffect(() => {
     stick.current = true;
   }, [current?.id]);
@@ -35,7 +35,7 @@ export function Thread({ canSend }: { canSend: boolean }) {
         <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
           <MessageSquare className="size-8" />
           <p className="text-sm">
-            {current ? 'Écrivez le premier message.' : 'Choisissez une conversation ou écrivez pour en commencer une.'}
+            {current ? 'Write the first message.' : 'Pick a conversation or start typing to begin one.'}
           </p>
         </div>
       ) : (

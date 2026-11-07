@@ -17,9 +17,9 @@ const PING_MS = 15_000;
 const enc = new TextEncoder();
 
 /**
- * Événements d'une génération en SSE. Bun coupe une connexion muette au bout de 10 s : pas de limite pour celle-ci, et un
- * commentaire « : ping » régulier (un long prompt peut se traiter sans rien envoyer). Le client qui part ne fait que se
- * désabonner : la génération continue.
+ * Generation events over SSE. Bun drops a silent connection after 10 s: no limit for this one, plus a regular
+ * “: ping” comment (a long prompt can be processed without sending anything). A client that leaves only
+ * unsubscribes: the generation goes on.
  */
 function sse(req: Request, server: Server<undefined>, run: ChatRun): Response {
   server.timeout(req, 0);
@@ -66,9 +66,9 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
       POST: guarded(async (req) => {
         const body = await jsonObject(req);
         const id = body.profileId === undefined ? activeProfileId() : Number(body.profileId);
-        if (id !== null && !Number.isInteger(id)) throw new HttpError(400, 'profileId : entier attendu');
+        if (id !== null && !Number.isInteger(id)) throw new HttpError(400, 'profileId: expected an integer');
         const profile = id !== null ? profiles.get(id) : null;
-        if (id !== null && !profile) throw notFound('Profil');
+        if (id !== null && !profile) throw notFound('Profile');
         const c = conversations.create({
           profileId: profile?.id ?? null,
           modelPath: profile ? profilePaths(profile).model : null,
@@ -98,7 +98,7 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
       POST: guarded(async (req, server) => {
         const id = idParam(req, 'Conversation');
         const { content } = await jsonObject(req);
-        if (typeof content !== 'string') throw new HttpError(400, 'content : texte attendu');
+        if (typeof content !== 'string') throw new HttpError(400, 'content: expected a string');
         return sse(req, server, chatRuns.send(id, content));
       }),
     },
@@ -107,7 +107,7 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
     },
     '/api/chat/:id/stop': {
       POST: guarded((req) => {
-        if (!chatRuns.stop(idParam(req, 'Conversation'))) throw new HttpError(409, 'Aucune réponse en cours');
+        if (!chatRuns.stop(idParam(req, 'Conversation'))) throw new HttpError(409, 'No reply in progress');
         return new Response(null, { status: 204 });
       }),
     },

@@ -1,4 +1,4 @@
-[llama-webui] lancement: llama-server -m Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf -mm mmproj-Qwen3.8-27B-BF16.gguf -c 64500 --spec-type draft-mtp -lv 5 -np 1 -fa on --host 0.0.0.0 --port 8080 --metrics --slots --props
+[llama-webui] launch: llama-server -m Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf -mm mmproj-Qwen3.8-27B-BF16.gguf -c 64500 --spec-type draft-mtp -lv 5 -np 1 -fa on --host 0.0.0.0 --port 8080 --metrics --slots --props
 0.00.650.517 I srv    load_model: loading model 'Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf'
 0.00.650.517 I srv    load_model: local path 'Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf'
 0.00.659.077 I srv    load_model: [mtmd] estimated worst-case memory usage of mmproj is 1161.02 MiB (took 8.54 ms)

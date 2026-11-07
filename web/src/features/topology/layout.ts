@@ -3,9 +3,9 @@ import type { TopologyGraph, TopologyNode } from '@llama-webui/shared';
 export type Vec3 = [number, number, number];
 
 export interface Placed {
-  /** Centre du bloc (y = 0 : posé sur le sol). */
+  /** Block center (y = 0: resting on the floor). */
   pos: Vec3;
-  /** Largeur (x), hauteur (y), profondeur (z). */
+  /** Width (x), height (y), depth (z). */
   size: Vec3;
 }
 
@@ -22,10 +22,10 @@ export interface Layout {
 }
 
 export const FOV_DEG = 32;
-/** Part du cadre que la scène peut occuper : les cartes HUD tiennent les coins (≈ 20 % de large, 35 % de haut). */
+/** Share of the frame the scene may use: the HUD cards hold the corners (≈ 20% wide, 35% tall). */
 const FIT_X = 0.6;
 const FIT_Y = 0.74;
-/** Hauteur à garder libre au-dessus des blocs (étiquettes). */
+/** Height to keep clear above the blocks (labels). */
 const CLEARANCE = 1.3;
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -40,7 +40,7 @@ const norm = (a: Vec3): Vec3 => {
   return [a[0] / l, a[1] / l, a[2] / l];
 };
 
-/** Coordonnées normalisées (-1..1) d'un point vu par une caméra en `pos` regardant `target`. */
+/** Normalized coordinates (-1..1) of a point seen by a camera at `pos` looking at `target`. */
 export function project(p: Vec3, pos: Vec3, target: Vec3, aspect: number): [number, number] {
   const f = norm(sub(target, pos));
   const r = norm(cross(f, [0, 1, 0]));
@@ -55,9 +55,9 @@ const corners = (b: Bounds): Vec3[] =>
   [b.minX, b.maxX].flatMap((x) => [b.minZ, b.maxZ].flatMap((z) => [[x, 0, z] as Vec3, [x, CLEARANCE, z] as Vec3]));
 
 /**
- * Caméra fixe en vue 3/4 plongeante, reculée jusqu'à ce que la boîte de la scène (et l'espace des étiquettes) tienne
- * dans la part du cadre laissée libre par les cartes HUD, puis centrée verticalement. Recalculée quand le cadre
- * change de proportions.
+ * Fixed camera in a downward 3/4 view, pulled back until the scene's box (and the label space) fits in the share of the
+ * frame left free by the HUD cards, then centered vertically. Recomputed when the frame's aspect ratio
+ * changes.
  */
 export function fitCamera(b: Bounds, aspect: number, elevationDeg = 50): { position: Vec3; target: Vec3 } {
   const el = (elevationDeg * Math.PI) / 180;
@@ -78,7 +78,7 @@ export function fitCamera(b: Bounds, aspect: number, elevationDeg = 50): { posit
       maxY = Math.max(maxY, y);
     }
     const ratio = Math.max(maxX / FIT_X, (maxY - minY) / (2 * FIT_Y));
-    // Recentre verticalement : décale la cible le long du « haut » de la caméra, à la profondeur de la cible.
+    // Recenter vertically: shift the target along the camera's “up”, at the target's depth.
     const mid = (maxY + minY) / 2;
     const tanH = Math.tan((FOV_DEG * Math.PI) / 360);
     const f = norm(sub(target, position));
@@ -92,7 +92,7 @@ export function fitCamera(b: Bounds, aspect: number, elevationDeg = 50): { posit
   return { position, target };
 }
 
-/** Encombrement par nature de composant (unités de scène ; le CPU fait ~2,2). */
+/** Footprint per component kind (scene units; the CPU is ~2.2). */
 export const SIZE: Record<TopologyNode['kind'], Vec3> = {
   cpu: [2.2, 0.45, 2.2],
   ram: [3.6, 0.35, 0.9],
@@ -107,7 +107,7 @@ const ROW_Z = 3.4;
 const ROW_STEP = 2.8;
 const KIND_ORDER: Record<TopologyNode['kind'], number> = { gpu: 0, nvme: 1, chipset: 2, cpu: 3, ram: 3 };
 
-/** Place une rangée de nœuds côte à côte, centrée sur `cx`, et renvoie leurs positions. */
+/** Lays out a row of nodes side by side, centered on `cx`, and returns their total width. */
 function row(nodes: TopologyNode[], cx: number, z: number, out: Map<string, Placed>) {
   const total = nodes.reduce((s, n) => s + SIZE[n.kind][0], 0) + GAP * Math.max(0, nodes.length - 1);
   let x = cx - total / 2;
@@ -123,8 +123,8 @@ const byKindThenBus = (a: TopologyNode, b: TopologyNode) =>
   KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || (a.busId ?? a.id).localeCompare(b.busId ?? b.id);
 
 /**
- * Disposition déterministe : CPU à l'origine, mémoire derrière, devices des ports racine en rangée devant (GPU, puis
- * NVMe, puis chipset à droite), devices de chaque chipset une rangée plus loin, centrés sous lui.
+ * Deterministic layout: CPU at the origin, memory behind, root-port devices in a row in front (GPUs, then NVMe, then
+ * chipset on the right), each chipset's devices one row further, centered under it.
  */
 export function layoutGraph(graph: TopologyGraph): Layout {
   const nodes = new Map<string, Placed>();
@@ -143,8 +143,8 @@ export function layoutGraph(graph: TopologyGraph): Layout {
   const front = children('cpu');
   row(front, 0, ROW_Z, nodes);
 
-  // Les devices derrière un chipset : une rangée plus loin, centrés sous lui ; plusieurs chipsets se répartissent
-  // de part et d'autre sans se chevaucher (rare : on décale la rangée suivante vers la droite au besoin).
+  // Devices behind a chipset: one row further, centered under it; several chipsets spread out on either side without
+  // overlapping (rare: the next row is shifted to the right when needed).
   let nextFree = Number.NEGATIVE_INFINITY;
   for (const c of front.filter((n) => n.kind === 'chipset')) {
     const kids = children(c.id);
@@ -155,7 +155,7 @@ export function layoutGraph(graph: TopologyGraph): Layout {
     row(kids, start, ROW_Z + ROW_STEP, nodes);
     nextFree = start + width / 2;
   }
-  // Un nœud non relié (graphe incohérent) : posé au bout de la rangée pour rester visible.
+  // An unlinked node (inconsistent graph): placed at the end of the row so it stays visible.
   for (const n of graph.nodes) {
     if (nodes.has(n.id)) continue;
     const maxX = Math.max(...[...nodes.values()].map((p) => p.pos[0] + p.size[0] / 2), 0);

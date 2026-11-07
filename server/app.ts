@@ -36,9 +36,9 @@ export interface AppDeps {
   activeProfileId: () => number | null;
   runtime: Runtime;
   monitor: Monitor;
-  /** Répartition du modèle chargé (logs de llama-server), pour la page Topologie. */
+  /** Placement of the loaded model (from llama-server logs), for the Topology page. */
   placement: PlacementTracker;
-  /** Interface web : import HTML (développement, HMR) ou fichiers construits au démarrage (production). */
+  /** Web UI: HTML import (development, HMR) or files built at startup (production). */
   web: WebRoutes;
   hostname: string;
   port: number;
@@ -74,12 +74,12 @@ export function createApp(deps: AppDeps) {
       ...sweepRoutes(deps),
       ...tuningRoutes(deps),
       ...topologyRoutes(deps),
-      '/api/*': guarded(() => Response.json({ error: 'Route inconnue' }, { status: 404 })),
+      '/api/*': guarded(() => Response.json({ error: 'Unknown route' }, { status: 404 })),
       '/ws': guarded((req, server) => {
         if (server.upgrade(req)) return undefined;
-        return new Response('Upgrade WebSocket attendu', { status: 426 });
+        return new Response('WebSocket upgrade expected', { status: 426 });
       }),
-      // Toute autre adresse sert l'application (fallback SPA `/*` : /chat rechargé fonctionne).
+      // Any other path serves the app (SPA fallback `/*`: reloading /chat works).
       ...deps.web,
     },
     websocket: {

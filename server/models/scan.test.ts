@@ -39,7 +39,7 @@ test('scanModels skips hidden dirs, classifies mmproj, reports unreadable files 
   );
   mkdirSync(join(dir, '.cache'));
   await writeGguf(join(dir, '.cache', 'x.gguf'), { 'general.architecture': str('llama') }, tensors);
-  await Bun.write(join(dir, 'bad.gguf'), 'pas un gguf');
+  await Bun.write(join(dir, 'bad.gguf'), 'not a gguf');
   await Bun.write(join(dir, 'notes.txt'), 'rien');
 
   const cache = new ModelCacheRepo(openDb(':memory:'));
@@ -55,7 +55,7 @@ test('scanModels skips hidden dirs, classifies mmproj, reports unreadable files 
     ['mm.gguf', true, 'mmproj'],
     ['model.gguf', true, 'model'],
   ]);
-  expect(first[0]!.ok ? '' : first[0]!.error).toContain('GGUF illisible');
+  expect(first[0]!.ok ? '' : first[0]!.error).toContain('unreadable GGUF');
 
   reads = 0;
   const second = await scanModels(dir, { cache, read });

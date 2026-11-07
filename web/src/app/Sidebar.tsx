@@ -44,7 +44,7 @@ export function Sidebar() {
         <LlamaMark />
         <span className="hidden text-[0.9375rem] font-semibold tracking-tight md:inline">llama-webui</span>
       </div>
-      <nav aria-label="Navigation principale" className="mt-4 flex flex-1 flex-col gap-0.5">
+      <nav aria-label="Main navigation" className="mt-4 flex flex-1 flex-col gap-0.5">
         {main.map((r) => (
           <Item key={r.path} route={r} />
         ))}
@@ -56,7 +56,7 @@ export function Sidebar() {
   );
 }
 
-/** Monogramme : trois barres de hauteur croissante, comme un débit qui monte. */
+/** Monogram: three bars of increasing height, like rising throughput. */
 function LlamaMark() {
   return (
     <svg viewBox="0 0 20 20" className="size-5 shrink-0" aria-hidden="true">

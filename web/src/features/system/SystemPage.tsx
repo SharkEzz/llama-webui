@@ -25,10 +25,10 @@ export function SystemPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-3xl font-semibold tracking-tight">Système</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">System</h1>
         {info && (
           <span className="text-sm text-muted-foreground">
-            Source NVIDIA : {info.nvidiaSource === 'nvml' ? 'NVML' : 'nvidia-smi'}
+            NVIDIA source: {info.nvidiaSource === 'nvml' ? 'NVML' : 'nvidia-smi'}
           </span>
         )}
       </header>

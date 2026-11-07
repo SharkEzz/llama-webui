@@ -1,40 +1,40 @@
-/** Cadence quand quelque chose s'anime (particules, pulsation, transitions, caméra manipulée). */
+/** Frame rate while something animates (particles, pulse, transitions, camera being handled). */
 export const ACTIVE_FPS = 60;
-/** Cadence quand seule la dérive de la caméra bouge (moins de 0,1 unité/s : 20 i/s suffisent). */
+/** Frame rate when only the camera drift moves (under 0.1 unit/s: 20 fps is enough). */
 export const DRIFT_FPS = 20;
-/** Marge (ms) : un rAF un peu en avance compte, à 120 Hz 60 i/s font bien une image sur deux. */
+/** Slack (ms): a slightly early rAF still counts, so at 120 Hz 60 fps really is every other frame. */
 const SLACK_MS = 4;
 
 /**
- * Cadence de rendu de la scène (frameloop « never ») : redessiner à la fréquence de l'écran (120 Hz et plus) coûte sans
- * rien apporter, et redessiner une scène immobile ne sert à rien. Ce qui s'anime le signale pendant l'image ; la
- * suivante vient à `ACTIVE_FPS`, à `DRIFT_FPS` pour la seule dérive, ou jamais tant que rien ne la demande.
+ * Scene render pacing (frameloop “never”): redrawing at the display's refresh rate (120 Hz and up) costs without adding
+ * anything, and redrawing a still scene is pointless. Whatever animates flags it during the frame; the next one comes at
+ * `ACTIVE_FPS`, at `DRIFT_FPS` for drift alone, or never as long as nothing asks for it.
  */
 export class FramePacer {
-  /** Une animation a besoin de l'image suivante (signalé pendant l'image, remis à zéro après). */
+  /** An animation needs the next frame (flagged during the frame, reset afterwards). */
   active = false;
-  /** La caméra dérive (tenu à jour à chaque image). */
+  /** The camera is drifting (kept up to date every frame). */
   drift = false;
-  /** Une image au plus tôt : une entrée a changé (snapshot, survol, thème, taille). */
+  /** A frame as soon as possible: an input changed (snapshot, hover, theme, size). */
   requested = true;
-  /** L'utilisateur manipule la caméra (entre le début et la fin du geste). */
+  /** The user is handling the camera (between the start and end of the gesture). */
   interacting = false;
   private activeUntil = 0;
   private fps = 0;
   private last = Number.NEGATIVE_INFINITY;
 
-  /** Garde la pleine cadence pendant `ms` (amortissement de la caméra après un geste). */
+  /** Keeps the full frame rate for `ms` (camera damping after a gesture). */
   hold(now: number, ms: number): void {
     this.activeUntil = Math.max(this.activeUntil, now + ms);
   }
 
-  /** À chaque rAF (`now` en ms) : faut-il dessiner cette image ? */
+  /** On every rAF (`now` in ms): should this frame be drawn? */
   shouldRender(now: number): boolean {
     const fps = this.requested || this.interacting || now < this.activeUntil ? ACTIVE_FPS : this.fps;
     return fps > 0 && now - this.last >= 1000 / fps - SLACK_MS;
   }
 
-  /** Après une image : cadence de la suivante d'après ce qui a bougé pendant celle-ci. */
+  /** After a frame: pace of the next one, based on what moved during this one. */
   rendered(now: number, moving: boolean): void {
     this.last = now;
     this.requested = false;

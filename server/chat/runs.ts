@@ -2,7 +2,7 @@ import {
   autoTitle,
   type ChatEvent,
   type ChatMessage,
-  DEFAULT_TITLE,
+  isDefaultTitle,
   type LlamaTimings,
   SseParser,
   statsFromTimings,
@@ -19,24 +19,24 @@ export interface ChatTarget {
 
 export interface ChatRunsDeps {
   repo: ConversationsRepo;
-  /** llama-server prêt à répondre, sinon null. */
+  /** llama-server ready to answer, otherwise null. */
   target(): ChatTarget | null;
   fetch?: typeof fetch;
   now?: () => number;
-  /** Écriture en base du texte en cours au plus toutes les `flushMs`. */
+  /** Writes the text so far to the DB at most every `flushMs`. */
   flushMs?: number;
 }
 
 export interface ChatRun {
-  /** Rejoue ce qui est déjà écrit puis suit le direct ; se désabonner ne coupe jamais la génération. */
+  /** Replays what is already written then follows live; unsubscribing never stops the generation. */
   subscribe(listener: (e: ChatEvent) => void): () => void;
   done: Promise<void>;
 }
 
-/** Erreur déjà mise en mots (réponse de llama-server). */
+/** Error already worded (llama-server response). */
 class LlamaFailure extends Error {}
 
-const CUT = 'llama-server a coupé la réponse (arrêté ou planté)';
+const CUT = 'llama-server cut the reply short (stopped or crashed)';
 
 class Run implements ChatRun {
   private listeners = new Set<(e: ChatEvent) => void>();
@@ -45,7 +45,7 @@ class Run implements ChatRun {
   private final: ChatMessage | null = null;
   private readonly abort = new AbortController();
   private stopped = false;
-  /** Base fermée (rechargement de Bun) : plus aucune écriture. */
+  /** DB closed (Bun reload): no more writes. */
   private detached = false;
   readonly done: Promise<void>;
 
@@ -82,8 +82,8 @@ class Run implements ChatRun {
   }
 
   /**
-   * Arrêt immédiat avant fermeture de la base : la réponse est enregistrée « interrompue » tout de suite et les abonnés
-   * reçoivent `done` (leurs flux SSE se ferment, sinon ils resteraient ouverts après un rechargement de Bun).
+   * Immediate stop before the DB closes: the reply is saved as “interrupted” right away and subscribers receive
+   * `done` (their SSE streams close; otherwise they would stay open after a Bun reload).
    */
   detach(): void {
     this.stop();
@@ -116,7 +116,7 @@ class Run implements ChatRun {
     let lastFlush = started;
     let status: ChatMessage['status'] = 'done';
     let error: string | null = null;
-    /** La réponse HTTP a commencé : une coupure ensuite vient de llama-server, pas d'une connexion impossible. */
+    /** The HTTP response has started: a later cut comes from llama-server, not from a failed connection. */
     let receiving = false;
     let finished = false;
     try {
@@ -133,7 +133,7 @@ class Run implements ChatRun {
           err = JSON.parse(text)?.error;
         } catch {}
         throw new LlamaFailure(
-          err ? llamaErrorMessage(err) : `llama-server : HTTP ${res.status}${text ? ` — ${text}` : ''}`,
+          err ? llamaErrorMessage(err) : `llama-server: HTTP ${res.status}${text ? ` — ${text}` : ''}`,
         );
       }
       receiving = true;
@@ -185,7 +185,7 @@ class Run implements ChatRun {
             ? e.message
             : receiving
               ? CUT
-              : `llama-server injoignable : ${e instanceof Error ? e.message : String(e)}`;
+              : `llama-server unreachable: ${e instanceof Error ? e.message : String(e)}`;
       }
     }
     if (this.detached) return;
@@ -198,7 +198,7 @@ class Run implements ChatRun {
         stats: timings ? statsFromTimings(timings, ttft, now() - started) : null,
       });
     } catch {
-      // Conversation supprimée pendant la génération.
+      // Conversation deleted during the generation.
       this.final = { ...this.assistant, content: this.content, reasoning: this.reasoning, status, error };
     }
     this.emit({ type: 'done', message: this.final });
@@ -206,7 +206,7 @@ class Run implements ChatRun {
   }
 }
 
-/** Générations en cours, une au plus par conversation ; elles continuent sans client et s'enregistrent au fil de l'eau. */
+/** Running generations, at most one per conversation; they go on without a client and are saved as they go. */
 export class ChatRuns {
   private readonly runs = new Map<number, Run>();
   private readonly deps: Required<Omit<ChatRunsDeps, 'target'>>;
@@ -217,22 +217,22 @@ export class ChatRuns {
 
   send(conversationId: number, content: string): ChatRun {
     const text = content.trim();
-    if (!text) throw new HttpError(400, 'Message vide');
+    if (!text) throw new HttpError(400, 'Empty message');
     const { conv, target } = this.prepare(conversationId);
     const repo = this.deps.repo;
     const user = repo.addMessage(conversationId, { role: 'user', content: text, status: 'done' });
-    if (conv.title === DEFAULT_TITLE && repo.messages(conversationId).filter((m) => m.role === 'user').length === 1)
+    if (isDefaultTitle(conv.title) && repo.messages(conversationId).filter((m) => m.role === 'user').length === 1)
       repo.setTitle(conversationId, autoTitle(text));
     return this.start(conversationId, target, user);
   }
 
-  /** Relance la dernière réponse : elle (et ce qui suit le dernier message de l'utilisateur) est remplacée. */
+  /** Regenerates the last reply: it (and whatever follows the user's last message) is replaced. */
   regenerate(conversationId: number): ChatRun {
     const { target } = this.prepare(conversationId);
     const repo = this.deps.repo;
     const messages = repo.messages(conversationId);
     const lastUser = messages.findLastIndex((m) => m.role === 'user');
-    if (lastUser < 0) throw new HttpError(409, 'Rien à régénérer');
+    if (lastUser < 0) throw new HttpError(409, 'Nothing to regenerate');
     const after = messages[lastUser + 1];
     if (after) repo.deleteFrom(conversationId, after.id);
     return this.start(conversationId, target, null);
@@ -253,7 +253,7 @@ export class ChatRuns {
     return [...this.runs.keys()];
   }
 
-  /** Avant fermeture de la base : tout s'arrête, chaque réponse en cours est enregistrée « interrompue ». */
+  /** Before the DB closes: everything stops, each running reply is saved as “interrupted”. */
   dispose(): void {
     for (const run of this.runs.values()) run.detach();
     this.runs.clear();
@@ -262,16 +262,15 @@ export class ChatRuns {
   private prepare(conversationId: number) {
     const conv = this.deps.repo.conversation(conversationId);
     if (!conv) throw notFound('Conversation');
-    if (this.runs.has(conversationId))
-      throw new HttpError(409, 'Une réponse est déjà en cours dans cette conversation');
+    if (this.runs.has(conversationId)) throw new HttpError(409, 'A reply is already in progress in this conversation');
     const target = this.o.target();
-    if (!target) throw new HttpError(409, "llama-server n'est pas prêt");
+    if (!target) throw new HttpError(409, 'llama-server is not ready');
     return { conv, target };
   }
 
   private start(conversationId: number, target: ChatTarget, user: ChatMessage | null): ChatRun {
     const repo = this.deps.repo;
-    // La conversation garde le modèle avec lequel elle a commencé ; chaque réponse note le sien.
+    // The conversation keeps the model it started with; each reply records its own.
     if (repo.conversation(conversationId)!.modelPath === null && target.modelPath !== null)
       repo.setModel(conversationId, target.profileId, target.modelPath);
     const conv = repo.conversation(conversationId)!;

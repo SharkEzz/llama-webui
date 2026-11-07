@@ -46,7 +46,7 @@ const toRun = (r: Row): BenchRun => {
     id: r.id,
     kind: r.kind,
     status: r.status,
-    // Le profil d'origine peut avoir été supprimé depuis (profile_id ON DELETE SET NULL).
+    // The source profile may have been deleted since (profile_id ON DELETE SET NULL).
     spec: { ...JSON.parse(r.args_json), profileId: r.profile_id },
     command: r.command,
     hardware: r.hardware_json === '{}' ? NO_HARDWARE : JSON.parse(r.hardware_json),
@@ -76,15 +76,15 @@ export interface BenchFilter {
   kind?: BenchKind;
   modelPath?: string;
   status?: BenchStatus;
-  /** "none" (défaut) : hors sweeps ; "all" : tous ; un id : ce sweep. */
+  /** "none" (default): outside sweeps; "all": all of them; an id: that sweep. */
   sweepId?: number | 'none' | 'all';
-  /** 200 par défaut. */
+  /** 200 by default. */
   limit?: number;
 }
 
 const ENDED_BADLY = "('failed', 'cancelled', 'interrupted')";
 
-/** Les runs de benchmark (`bench_runs`), ponctuels ou éléments d'un sweep. */
+/** The benchmark runs (`bench_runs`), one-off or sweep items. */
 export class BenchRunsRepo {
   constructor(
     private readonly db: Database,
@@ -109,7 +109,7 @@ export class BenchRunsRepo {
     return toRun(row);
   }
 
-  /** Les éléments d'un sweep, en attente (« queued »), dans l'ordre donné. */
+  /** A sweep's items, queued (“queued”), in the given order. */
   enqueue(sweepId: number, items: { spec: BenchSpec; label: string; fit: FitVerdict }[]): BenchRun[] {
     const q = this.db.query<Row, (string | number | null)[]>(
       `INSERT INTO bench_runs(kind, status, model_path, profile_id, args_json, command, hardware_json, vram_mib_json, sweep_id, sweep_label, fit, created_at)
@@ -133,7 +133,7 @@ export class BenchRunsRepo {
     )();
   }
 
-  /** Un élément en attente commence : commande et matériel figés, date du lancement. */
+  /** A queued item starts: command and hardware frozen, launch date. */
   begin(id: number, o: { command: string; hardware: BenchHardware }): BenchRun {
     this.db.run(
       "UPDATE bench_runs SET status = 'running', command = ?, hardware_json = ?, created_at = ? WHERE id = ?",
@@ -149,7 +149,7 @@ export class BenchRunsRepo {
     return row ? toRun(row) : null;
   }
 
-  /** Remet un élément en attente (rechargement de Bun pendant son exécution : il sera rejoué). */
+  /** Puts an item back in the queue (Bun reloaded while it was running: it will be replayed). */
   requeue(id: number): void {
     this.db.run(
       "UPDATE bench_runs SET status = 'queued', error = NULL, stats_json = NULL, pp_tps = NULL, tg_tps = NULL, vram_mib_json = '[]', log_excerpt = '', duration_ms = NULL WHERE id = ?",
@@ -172,7 +172,7 @@ export class BenchRunsRepo {
 
   finish(id: number, patch: BenchFinish): BenchRun {
     const cur = this.get(id);
-    if (!cur) throw new Error(`run ${id} introuvable`);
+    if (!cur) throw new Error(`run ${id} not found`);
     const next = { ...cur, ...patch };
     const stats: Stats = {
       pp: next.pp,
@@ -236,7 +236,7 @@ export class BenchRunsRepo {
     return this.db.run('DELETE FROM bench_runs WHERE id = ?', [id]).changes > 0;
   }
 
-  /** Supprime les runs ponctuels en échec, annulés ou interrompus ; renvoie leurs ids (ceux des sweeps restent). */
+  /** Deletes failed, cancelled or interrupted one-off runs; returns their ids (sweep runs stay). */
   deleteFailed(): number[] {
     return this.db
       .query<{ id: number }, []>(
@@ -246,10 +246,10 @@ export class BenchRunsRepo {
       .map((r) => r.id);
   }
 
-  /** Au démarrage : un run resté « running » (Bun arrêté brutalement) devient « interrupted ». */
+  /** On startup: a run left “running” (Bun stopped abruptly) becomes “interrupted”. */
   stopOrphans(): number {
     return this.db.run(
-      "UPDATE bench_runs SET status = 'interrupted', error = COALESCE(error, 'interrompu (arrêt de llama-webui)') WHERE status = 'running'",
+      "UPDATE bench_runs SET status = 'interrupted', error = COALESCE(error, 'interrupted (llama-webui stopped)') WHERE status = 'running'",
     ).changes;
   }
 }

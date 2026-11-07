@@ -35,13 +35,13 @@ function fromRow(r: Row): Profile {
   return p;
 }
 
-/** Le profil au format llama-tui (sans id, source ni dates). */
+/** The profile in llama-tui format (no id, source or dates). */
 export function toInput(p: Profile): ProfileInput {
   const { id: _id, source: _s, createdAt: _c, updatedAt: _u, ...input } = p;
   return input;
 }
 
-const conflict = (name: string) => new HttpError(409, `Un profil « ${name} » existe déjà`);
+const conflict = (name: string) => new HttpError(409, `A profile named “${name}” already exists`, 'name-taken');
 
 export class ProfilesRepo {
   constructor(
@@ -75,7 +75,7 @@ export class ProfilesRepo {
     ] as const;
   }
 
-  /** Valide (ZodError si invalide) ; 409 si le nom est pris. */
+  /** Validates (ZodError if invalid); 409 if the name is taken. */
   create(input: unknown, source: ProfileSource = 'ui'): Profile {
     const p = ProfileInputSchema.parse(input);
     if (this.idOfName(p.name) !== null) throw conflict(p.name);
@@ -90,7 +90,7 @@ export class ProfilesRepo {
   }
 
   update(id: number, input: unknown): Profile {
-    if (!this.get(id)) throw notFound('Profil');
+    if (!this.get(id)) throw notFound('Profile');
     const p = ProfileInputSchema.parse(input);
     const other = this.idOfName(p.name);
     if (other !== null && other !== id) throw conflict(p.name);
@@ -104,20 +104,20 @@ export class ProfilesRepo {
   }
 
   remove(id: number): void {
-    if (!this.get(id)) throw notFound('Profil');
+    if (!this.get(id)) throw notFound('Profile');
     this.db.query('DELETE FROM profiles WHERE id = ?').run(id);
   }
 
-  /** Copie nommée « <nom> (copie) », puis « (copie 2) »… */
+  /** Copy named “<name> (copy)”, then “(copy 2)”… */
   duplicate(id: number): Profile {
     const src = this.get(id);
-    if (!src) throw notFound('Profil');
-    let name = `${src.name} (copie)`;
-    for (let n = 2; this.idOfName(name) !== null; n++) name = `${src.name} (copie ${n})`;
+    if (!src) throw notFound('Profile');
+    let name = `${src.name} (copy)`;
+    for (let n = 2; this.idOfName(name) !== null; n++) name = `${src.name} (copy ${n})`;
     return this.create({ ...toInput(src), name }, src.source === 'llama-tui' ? 'import' : src.source);
   }
 
-  /** N'écrase jamais : un nom déjà en base est ignoré. */
+  /** Never overwrites: a name already in the database is skipped. */
   importMany(
     inputs: ProfileInput[],
     source: ProfileSource,
@@ -126,7 +126,7 @@ export class ProfilesRepo {
     const skipped: { name: string; reason: string }[] = [];
     this.db.transaction(() => {
       for (const input of inputs) {
-        if (this.idOfName(input.name) !== null) skipped.push({ name: input.name, reason: 'existe déjà' });
+        if (this.idOfName(input.name) !== null) skipped.push({ name: input.name, reason: 'already exists' });
         else imported.push(this.create(input, source));
       }
     })();

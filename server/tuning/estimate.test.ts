@@ -53,7 +53,7 @@ test('pinned values are kept, and -ncmoe on a dense model warns', () => {
   });
   expect(e.params.dev).toEqual(['CUDA1']);
   expect(e.params.ncmoe).toBe(4);
-  expect(e.warnings.some((w) => w.includes('modèle dense'))).toBe(true);
+  expect(e.warnings.some((w) => w.includes('dense model'))).toBe(true);
 });
 
 test('planSweep crosses -ncmoe with device sets and drops what does not fit unless asked', () => {
@@ -66,7 +66,7 @@ test('planSweep crosses -ncmoe with device sets and drops what does not fit unle
     space: { ncmoe: [0, 8, 16], dev: [['CUDA0'], ['CUDA0', 'CUDA1']] },
   });
   const plan = planSweep({ model, hw: hw3(), spec, mmprojBytes: 0 });
-  expect(plan.items).toHaveLength(4); // CUDA0 seule : -ncmoe 0 et 8 ne tiennent pas
+  expect(plan.items).toHaveLength(4); // CUDA0 alone: -ncmoe 0 and 8 do not fit
   expect(plan.excluded).toBe(2);
   expect(plan.items[0]!.label).toBe('-ncmoe 0 · -dev CUDA0,CUDA1');
   expect(plan.estimatedSeconds).toBeGreaterThan(0);

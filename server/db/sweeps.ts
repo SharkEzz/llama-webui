@@ -16,7 +16,7 @@ interface Row {
 type Counts = Sweep['counts'];
 const ZERO: Counts = { total: 0, queued: 0, running: 0, ok: 0, failed: 0, cancelled: 0, interrupted: 0 };
 
-/** Les sweeps (`sweeps`) ; leurs éléments sont des runs de `bench_runs` (sweep_id). */
+/** The sweeps (`sweeps`); their items are `bench_runs` runs (sweep_id). */
 export class SweepsRepo {
   constructor(
     private readonly db: Database,
@@ -98,7 +98,7 @@ export class SweepsRepo {
     return this.get(id)!;
   }
 
-  /** Supprime le sweep et ses runs (cascade) ; renvoie les ids des runs supprimés. */
+  /** Deletes the sweep and its runs (cascade); returns the ids of the deleted runs. */
   delete(id: number): number[] {
     return this.db.transaction(() => {
       const ids = this.db
@@ -110,13 +110,13 @@ export class SweepsRepo {
     })();
   }
 
-  /** Le sweep en cours d'exécution, s'il y en a un. */
+  /** The running sweep, if there is one. */
   running(): Sweep | null {
     const row = this.db.query<Row, []>("SELECT * FROM sweeps WHERE status = 'running' ORDER BY id DESC LIMIT 1").get();
     return row ? this.toSweep(row) : null;
   }
 
-  /** Au démarrage à froid : un sweep resté « running » devient « interrupted » (bouton Reprendre). */
+  /** On cold start: a sweep left “running” becomes “interrupted” (Resume button). */
   stopOrphans(): number {
     return this.db.run("UPDATE sweeps SET status = 'interrupted' WHERE status = 'running'").changes;
   }

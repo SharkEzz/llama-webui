@@ -36,7 +36,7 @@ const EstimateRequest = z.strictObject({
   ctx: z.number().int().min(512).max(10_000_000).optional(),
 });
 
-/** Dernières mesures du disque et estimations, par modèle (en mémoire : perdues au rechargement, sans gravité). */
+/** Latest disk measurements and estimates, per model (in memory: lost on reload, which is harmless). */
 const diskSpeeds = new Map<string, DiskSpeed>();
 const lastEstimates = new Map<string, Estimate>();
 
@@ -107,7 +107,7 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
     '/api/tuning/disk-speed': {
       POST: guarded(async (req) => {
         const { modelPath } = z.strictObject({ modelPath: z.string().min(1) }).parse(await jsonObject(req));
-        if (benchRunner.busy) throw new HttpError(409, 'Un benchmark est en cours : la mesure serait faussée');
+        if (benchRunner.busy) throw new HttpError(409, 'A benchmark is running: the measurement would be skewed');
         await loadModel(modelPath);
         const d = await measureDiskSpeed(modelPath);
         diskSpeeds.set(modelPath, d);

@@ -17,7 +17,7 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   destructive?: boolean;
   onConfirm(): unknown;
-  /** Élément déclencheur (un bouton). */
+  /** Trigger element (a button). */
   trigger: ReactElement;
 }
 
@@ -39,7 +39,7 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Annuler</AlertDialogCancel>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             variant={destructive ? 'destructive' : 'default'}
             onClick={() => {

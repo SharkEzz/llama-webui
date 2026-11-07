@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-/** Liste de faits libellé / valeur, valeurs en mono à droite. */
+/** Label / value fact list, values in mono on the right. */
 export function Facts({ rows }: { rows: [string, ReactNode][] }) {
   return (
     <dl className="divide-y divide-border text-sm">

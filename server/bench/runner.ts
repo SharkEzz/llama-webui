@@ -20,7 +20,7 @@ export type { ServerControl } from './gate';
 export interface BenchRunnerDeps {
   repo: BenchRunsRepo;
   sweeps: SweepsRepo;
-  /** La garde du serveur, dans le runtime (survit aux rechargements). */
+  /** The server gate, in the runtime (survives reloads). */
   gate: BenchGate;
   executor: RunExecutor;
   hardware(): Promise<BenchHardware>;
@@ -29,7 +29,7 @@ export interface BenchRunnerDeps {
   onSweep(s: Sweep): void;
   onSweepLive(l: SweepLive | null): void;
   now?: () => number;
-  /** Pause entre deux éléments d'un sweep, le temps que la VRAM se libère (1 s). */
+  /** Pause between two sweep items, while the VRAM is freed (1 s). */
   pauseMs?: number;
 }
 
@@ -39,22 +39,22 @@ interface Current {
   sweepId: number | null;
   live: BenchLive;
   cancelled: boolean;
-  /** Résultat enregistré (il ne reste que la relance du serveur). */
+  /** Result saved (only the server restart is left). */
   finished: boolean;
 }
 
-const INTERRUPTED = 'interrompu (rechargement ou arrêt de llama-webui)';
+const INTERRUPTED = 'interrupted (llama-webui reloaded or stopped)';
 
 /**
- * Les benchmarks : runs ponctuels et sweeps, un à la fois. La garde (gate) arrête le serveur géré une fois et le relance
- * une fois ; l'exécuteur lance chaque run. Recréé à chaque rechargement `bun --hot` : dispose() rend la main et le
- * nouveau runner reprend un sweep en cours (resume).
+ * The benchmarks: one-off runs and sweeps, one at a time. The gate stops the managed server once and restarts it
+ * once; the executor runs each run. Recreated on every `bun --hot` reload: dispose() hands over and the
+ * new runner resumes a running sweep (resume).
  */
 export class BenchRunner {
   private current: Current | null = null;
   private sweep: { id: number; cancelled: boolean } | null = null;
   private sweepLiveV: SweepLive | null = null;
-  /** Vrai entre l'acceptation d'un run et son lancement (await du matériel, de la garde). */
+  /** True between accepting a run and starting it (awaiting the hardware, the gate). */
   private claimed = false;
   private disposed = false;
   private readonly now: () => number;
@@ -88,14 +88,14 @@ export class BenchRunner {
   }
 
   private async checkFiles(spec: Pick<BenchSpec, 'modelPath' | 'mmprojPath'>): Promise<void> {
-    if (!(await Bun.file(spec.modelPath).exists())) throw new HttpError(400, `Modèle introuvable : ${spec.modelPath}`);
+    if (!(await Bun.file(spec.modelPath).exists())) throw new HttpError(400, `Model not found: ${spec.modelPath}`);
     if (spec.mmprojPath && !(await Bun.file(spec.mmprojPath).exists()))
-      throw new HttpError(400, `Projecteur introuvable : ${spec.mmprojPath}`);
+      throw new HttpError(400, `Projector not found: ${spec.mmprojPath}`);
   }
 
-  /** Run ponctuel : créé puis lancé en arrière-plan ; renvoie le run créé (statut « running »). */
+  /** One-off run: created then started in the background; returns the created run (status “running”). */
   async start(spec: BenchSpec, o: { stopServer: boolean }): Promise<BenchRun> {
-    if (this.busy) throw new HttpError(409, 'Un benchmark est en cours');
+    if (this.busy) throw new HttpError(409, 'A benchmark is running');
     this.claimed = true;
     using _claim = defer(() => (this.claimed = false));
     await this.checkFiles(spec);
@@ -127,7 +127,7 @@ export class BenchRunner {
     return cur;
   }
 
-  /** Exécute le run courant (après l'arrêt du serveur) et enregistre son résultat ; null si le runner a été libéré. */
+  /** Executes the current run (after the server stop) and saves its result; null if the runner was disposed. */
   private async execute(cur: Current): Promise<BenchRun | null> {
     let result: BenchFinish;
     try {
@@ -142,7 +142,7 @@ export class BenchRunner {
     } catch (e) {
       result = cur.cancelled
         ? { status: 'cancelled' }
-        : { status: 'failed', error: `arrêt de llama-server impossible : ${(e as Error).message}` };
+        : { status: 'failed', error: `could not stop llama-server: ${(e as Error).message}` };
     }
     if (this.disposed) return null;
     const finished = this.deps.repo.finish(cur.run.id, { error: null, ...result });
@@ -151,7 +151,7 @@ export class BenchRunner {
     return finished;
   }
 
-  /** Relance le serveur ; un échec est noté sur `runId` (carte « Dernier run », historique). */
+  /** Restarts the server; a failure is recorded on `runId` (“Last run” card, history). */
   private async release(cur: Current | null, runId: number | null): Promise<void> {
     if (cur && this.deps.gate.stoppedCommand) this.setLive(cur, { phase: 'restarting-server', step: null });
     try {
@@ -162,7 +162,7 @@ export class BenchRunner {
       if (prev)
         this.deps.onRun(
           this.deps.repo.finish(runId, {
-            error: prev.error ? `${prev.error} ; ${(e as Error).message}` : (e as Error).message,
+            error: prev.error ? `${prev.error}; ${(e as Error).message}` : (e as Error).message,
           }),
         );
     }
@@ -178,11 +178,11 @@ export class BenchRunner {
   }
 
   /**
-   * Lance un sweep : la garde est prise une fois, puis ses éléments en attente s'enchaînent. `target` : l'id d'un sweep
-   * existant, ou la fonction qui le crée (appelée seulement une fois la garde prise : un refus 409 n'écrit rien).
+   * Starts a sweep: the gate is taken once, then its queued items run one after another. `target`: the id of an existing
+   * sweep, or the function that creates it (called only once the gate is taken: a 409 refusal writes nothing).
    */
   async startSweep(target: number | (() => number), o: { stopServer: boolean }): Promise<Sweep> {
-    if (this.busy) throw new HttpError(409, 'Un benchmark est en cours');
+    if (this.busy) throw new HttpError(409, 'A benchmark is running');
     this.claimed = true;
     using _claim = defer(() => (this.claimed = false));
     if (typeof target === 'number') {
@@ -210,16 +210,16 @@ export class BenchRunner {
   }
 
   /**
-   * Nouveau module (rechargement) : reprend le sweep en cours avec la garde laissée par l'ancien, une fois sorti le process
-   * qu'il a tué (sinon l'élément rejoué partage les cartes avec lui : VRAM de départ faussée, OOM possible).
+   * New module (reload): resumes the running sweep with the gate left by the old one, once the process it killed has
+   * exited (otherwise the replayed item shares the cards with it: skewed starting VRAM, possible OOM).
    */
   async resume(): Promise<void> {
     const sw = this.deps.sweeps.running();
     if (!sw || this.claimed || this.current || this.sweep) return;
     const after = this.deps.gate.adopt();
     if (after) return void this.begin(sw.id, after);
-    // Garde encore tenue mais plus à reprendre (l'ancien module la libère déjà : rechargement plus long que le délai de grâce),
-    // donc index.ts n'a pas rangé les orphelins : personne ne fera tourner ce sweep, il devient « interrompu » (bouton Reprendre).
+    // Gate still held but no longer up for grabs (the old module is already releasing it: reload longer than the grace period),
+    // so index.ts did not clean up the orphans: nobody will run this sweep, it becomes “interrupted” (Resume button).
     this.deps.repo.stopOrphans();
     this.deps.onSweep(this.deps.sweeps.setStatus(sw.id, 'interrupted'));
   }
@@ -258,7 +258,7 @@ export class BenchRunner {
     this.setSweepLive(null);
   }
 
-  /** Un élément : figé (commande, matériel), exécuté, enregistré. Un échec (OOM compris) n'arrête pas le sweep. */
+  /** One item: frozen (command, hardware), executed, saved. A failure (OOM included) does not stop the sweep. */
   private async item(queued: BenchRun, sweepId: number): Promise<BenchRun | null> {
     let hardware: BenchHardware;
     try {
@@ -280,7 +280,7 @@ export class BenchRunner {
     return done;
   }
 
-  /** Le meilleur run du sweep : parmi les validations serveur s'il y en a de réussies, sinon parmi l'exploration. */
+  /** The sweep's best run: among the server validations if some succeeded, otherwise among the exploration. */
   private best(id: number): number | null {
     const sw = this.deps.sweeps.get(id);
     if (!sw) return null;
@@ -294,7 +294,7 @@ export class BenchRunner {
     return top?.rank ? top.run.id : null;
   }
 
-  /** Annule le run en cours (s'il porte cet id) ; dans un sweep, on passe à l'élément suivant. */
+  /** Cancels the running run (if it has this id); in a sweep, moves on to the next item. */
   cancel(id: number): boolean {
     const cur = this.current;
     if (!cur || cur.run.id !== id || cur.cancelled || cur.finished) return false;
@@ -304,7 +304,7 @@ export class BenchRunner {
     return true;
   }
 
-  /** Annule le sweep : sa file passe « cancelled », le run en cours est arrêté, le serveur relancé. */
+  /** Cancels the sweep: its queue becomes “cancelled”, the running run is stopped, the server restarted. */
   cancelSweep(id: number): boolean {
     const state = this.sweep;
     if (!state || state.id !== id || state.cancelled) return false;
@@ -320,9 +320,9 @@ export class BenchRunner {
   }
 
   /**
-   * Rechargement (`restart: true`) ou arrêt de Bun. L'enfant est tué. Un run ponctuel est « interrupted » ; un élément de
-   * sweep repasse en attente au rechargement (le nouveau runner le rejoue) et le sweep reste « running ». La garde est
-   * rendue plus tard : le nouveau module la reprend, sinon elle relance le serveur.
+   * Reload (`restart: true`) or Bun shutdown. The child is killed. A one-off run is “interrupted”; a sweep item goes
+   * back to the queue on reload (the new runner replays it) and the sweep stays “running”. The gate is handed back
+   * later: the new module takes it over, otherwise it restarts the server.
    */
   dispose(o: { restart: boolean }): void {
     if (this.disposed) return;

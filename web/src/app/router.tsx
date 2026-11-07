@@ -5,17 +5,17 @@ import { AppLayout } from './AppLayout';
 import { MILESTONE_BY_PATH, ROUTES } from './routes';
 
 /**
- * Chaque page est un chunk chargé à la première visite (le bundle initial ne contient que la coquille et l'accueil).
- * `load` doit rester un import() littéral pour que le bundler découpe.
+ * Each page is a chunk loaded on first visit (the initial bundle only holds the shell and the home page).
+ * `load` must stay a literal import() so the bundler can split it.
  */
 const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) => ({
-  // biome-ignore lint/correctness/noComponentHookFactories: `lazy.Component` du routeur (chargement à la demande), pas une fabrique de composant React
+  // biome-ignore lint/correctness/noComponentHookFactories: the router's `lazy.Component` (loaded on demand), not a React component factory
   lazy: { Component: async () => (await load())[name] },
 });
 
 const placeholder = (title: string) => ({
   lazy: {
-    // biome-ignore lint/correctness/noComponentHookFactories: `lazy.Component` du routeur (chargement à la demande), pas une fabrique de composant React
+    // biome-ignore lint/correctness/noComponentHookFactories: the router's `lazy.Component` (loaded on demand), not a React component factory
     Component: async () => {
       const { PlaceholderPage } = await import('@/features/_placeholder/PlaceholderPage');
       return () => <PlaceholderPage title={title} />;
@@ -27,7 +27,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <AppLayout />,
-    // Premier chargement d'une adresse profonde (/bench rechargé) : la coquille tout de suite, la page ensuite.
+    // First load of a deep URL (/bench reloaded): the shell right away, the page next.
     hydrateFallbackElement: <AppLayout loading />,
     children: [
       { index: true, element: <HomePage /> },
@@ -47,7 +47,7 @@ export const router = createBrowserRouter([
         path: r.path.slice(1),
         ...placeholder(r.label),
       })),
-      { path: '*', ...placeholder('Page introuvable') },
+      { path: '*', ...placeholder('Page not found') },
     ],
   },
 ]);

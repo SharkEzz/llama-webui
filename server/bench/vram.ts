@@ -4,21 +4,21 @@ import { LineSplitter } from '../logs/lines';
 
 const MIB = 1024 * 1024;
 
-/** Une ligne de `nvidia-smi --query-gpu=uuid,memory.used --format=csv,noheader,nounits -lms N`, avec la clé du Monitor. */
+/** A line of `nvidia-smi --query-gpu=uuid,memory.used --format=csv,noheader,nounits -lms N`, with the Monitor's key. */
 export function parseSmiLine(line: string): { key: string; bytes: number } | null {
   const m = /^\s*(GPU-[\w-]+),\s*(\d+)\s*$/.exec(line);
   return m ? { key: `nvidia:${m[1]}`, bytes: Number(m[2]) * MIB } : null;
 }
 
 export interface VramPeaks {
-  /** Par clé de GPU : première mesure et maximum vu. */
+  /** Per GPU key: first measurement and maximum seen. */
   get(key: string): { first: number; max: number } | undefined;
 }
 
 /**
- * Relevé rapide de la VRAM pendant un run (le Monitor ne mesure qu'à son intervalle, 1 s par défaut, et rate les pics
- * courts) : `nvidia-smi -lms` pour les cartes NVIDIA, sysfs `mem_info_vram_used` pour les AMD. Chaque source qui échoue
- * est ignorée ; le runner garde les snapshots du Monitor en secours.
+ * Fast VRAM sampling during a run (the Monitor only measures at its interval, 1 s by default, and misses short
+ * peaks): `nvidia-smi -lms` for NVIDIA cards, sysfs `mem_info_vram_used` for AMD. Each source that fails is
+ * ignored; the runner keeps the Monitor's snapshots as a fallback.
  */
 export class VramProbe implements VramPeaks {
   private readonly seen = new Map<string, { first: number; max: number }>();

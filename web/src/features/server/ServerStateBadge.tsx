@@ -2,15 +2,15 @@ import type { ServerState } from '@llama-webui/shared';
 import { cn } from '@/lib/utils';
 
 const UI: Record<ServerState['kind'], { label: string; dot: string; text: string }> = {
-  idle: { label: 'Arrêté', dot: 'bg-muted-foreground/60', text: 'text-muted-foreground' },
-  starting: { label: 'Démarrage…', dot: 'bg-tone-amber animate-pulse', text: 'text-tone-amber' },
-  ready: { label: 'Prêt', dot: 'bg-success shadow-[0_0_10px] shadow-success/60', text: 'text-success' },
-  stopping: { label: 'Arrêt…', dot: 'bg-tone-amber animate-pulse', text: 'text-tone-amber' },
-  crashed: { label: 'Planté', dot: 'bg-destructive', text: 'text-destructive' },
-  external: { label: 'Externe', dot: 'bg-tone-teal', text: 'text-tone-teal' },
+  idle: { label: 'Stopped', dot: 'bg-muted-foreground/60', text: 'text-muted-foreground' },
+  starting: { label: 'Starting…', dot: 'bg-tone-amber animate-pulse', text: 'text-tone-amber' },
+  ready: { label: 'Ready', dot: 'bg-success shadow-[0_0_10px] shadow-success/60', text: 'text-success' },
+  stopping: { label: 'Stopping…', dot: 'bg-tone-amber animate-pulse', text: 'text-tone-amber' },
+  crashed: { label: 'Crashed', dot: 'bg-destructive', text: 'text-destructive' },
+  external: { label: 'External', dot: 'bg-tone-teal', text: 'text-tone-teal' },
 };
 
-/** Détail d'un arrêt anormal, pour l'infobulle. */
+/** Details of an abnormal exit, for the tooltip. */
 export function crashDetail(s: ServerState): string | undefined {
   if (s.kind !== 'crashed') return undefined;
   const parts = [s.message, s.exitCode !== null ? `code ${s.exitCode}` : null, s.signal ? `signal ${s.signal}` : null];

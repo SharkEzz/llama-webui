@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { Tone } from '@/components/glass/tones';
+import { formatTime, num } from '@/lib/format';
 import { useMonitor } from '@/lib/monitor';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -16,22 +17,21 @@ export interface ChartSeries {
 interface TimeSeriesChartProps {
   series: ChartSeries[];
   height?: number;
-  /** Borne haute fixe (100 pour un pourcentage) ; sinon suit les données. */
+  /** Fixed upper bound (100 for a percentage); otherwise follows the data. */
   yMax?: number;
-  /** Valeurs de l'axe Y et de la légende. */
+  /** Y axis and legend values. */
   format?(v: number): string;
-  /** Version compacte (sparkline) : ni axes ni légende. */
+  /** Compact version (sparkline): no axes, no legend. */
   compact?: boolean;
   className?: string;
   'aria-label'?: string;
 }
 
-const timeFmt = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-const defaultFormat = (v: number) => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(v);
+const defaultFormat = (v: number) => num(1, 0).format(v);
 
 /**
- * Série temporelle de l'historique de monitoring (uPlot). Le graphe est créé une fois par jeu de séries et par thème,
- * puis seulement alimenté (setData) à chaque tick ; null = trou. Légende vivante = valeurs sous le curseur.
+ * Time series from the monitoring history (uPlot). The chart is created once per series set and theme, then only
+ * fed (setData) on each tick; null = gap. Live legend = values under the cursor.
  */
 export function TimeSeriesChart({
   series,
@@ -50,18 +50,18 @@ export function TimeSeriesChart({
   const fmt = useRef(format);
   fmt.current = format;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: version déclenche la relecture de l'historique (lu hors closure) ; signature résume `series`
+  // biome-ignore lint/correctness/useExhaustiveDependencies: version triggers the history reread (read outside the closure); signature sums up `series`
   const data = useMemo((): uPlot.AlignedData => {
     const { times, series: all } = useMonitor.getState().history;
     return [times, ...series.map((s) => all.get(s.key) ?? new Array<number | null>(times.length).fill(null))];
   }, [version, signature]);
 
-  // Séries et données courantes, lues à la création sans la relancer : les données sont poussées par l'effet suivant
-  // (pas de recréation à chaque tick), les séries sont résumées par `signature`.
+  // Current series and data, read at creation without rerunning it: data is pushed by the next effect
+  // (no re-creation on every tick), series are summed up by `signature`.
   const latest = useEffectEvent(() => ({ series, data }));
 
-  // Création : par jeu de séries, thème (couleurs lues des variables CSS) et forme.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: signature et resolved sont des déclencheurs (séries lues via latest, couleurs via readChartTheme)
+  // Creation: per series set, theme (colors read from CSS variables) and shape.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: signature and resolved are triggers (series read via latest, colors via readChartTheme)
   useEffect(() => {
     const el = host.current;
     if (!el) return;
@@ -88,11 +88,11 @@ export function TimeSeriesChart({
       axes: compact
         ? [{ show: false }, { show: false }]
         : [
-            { ...axis, values: (_u, splits) => splits.map((s) => timeFmt.format(s * 1000)), space: 80 },
+            { ...axis, values: (_u, splits) => splits.map((s) => formatTime(s * 1000)), space: 80 },
             { ...axis, values: (_u, splits) => splits.map((v) => fmt.current(v)), size: 64, space: 32 },
           ],
       series: [
-        { label: 'Heure', value: (_u, v) => (v == null ? '—' : timeFmt.format(v * 1000)) },
+        { label: 'Time', value: (_u, v) => (v == null ? '—' : formatTime(v * 1000)) },
         ...series.map(
           (s): uPlot.Series => ({
             label: s.label,

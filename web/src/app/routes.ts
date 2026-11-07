@@ -14,21 +14,21 @@ import {
 } from 'lucide-react';
 
 export const ROUTES = [
-  { path: '/', label: 'Accueil', icon: Home },
+  { path: '/', label: 'Home', icon: Home },
   { path: '/dashboard', label: 'Dashboard', icon: Activity },
-  { path: '/server', label: 'Serveur', icon: Server },
-  { path: '/profiles', label: 'Profils', icon: SlidersHorizontal },
+  { path: '/server', label: 'Server', icon: Server },
+  { path: '/profiles', label: 'Profiles', icon: SlidersHorizontal },
   { path: '/logs', label: 'Logs', icon: ScrollText },
-  { path: '/system', label: 'Système', icon: Cpu },
-  { path: '/topology', label: 'Topologie', icon: Network },
-  { path: '/models', label: 'Modèles', icon: Boxes },
+  { path: '/system', label: 'System', icon: Cpu },
+  { path: '/topology', label: 'Topology', icon: Network },
+  { path: '/models', label: 'Models', icon: Boxes },
   { path: '/chat', label: 'Chat', icon: MessageSquare },
   { path: '/bench', label: 'Benchmark', icon: Gauge },
   { path: '/tuning', label: 'Tuning', icon: Wand2 },
-  { path: '/settings', label: 'Réglages', icon: Settings },
+  { path: '/settings', label: 'Settings', icon: Settings },
 ] as const;
 
 export type AppRoute = (typeof ROUTES)[number];
 
-/** Jalon qui livrera chaque page encore vide. */
+/** Milestone that will deliver each still-empty page. */
 export const MILESTONE_BY_PATH: Record<string, string> = {};

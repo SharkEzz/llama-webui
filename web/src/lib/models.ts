@@ -6,7 +6,7 @@ interface ModelsState {
   list: ModelList | null;
   error: string | null;
   loading: boolean;
-  /** Rescanne le dossier des modèles (le serveur ne relit que les fichiers changés). */
+  /** Rescans the models folder (the server only rereads changed files). */
   refresh(): Promise<void>;
 }
 
@@ -28,12 +28,12 @@ export const useModels = create<ModelsState>((set, get) => ({
 
 export const readable = (e: ModelEntry): e is { ok: true } & ModelSummary => e.ok;
 
-/** Nom de fichier sans dossier ni extension. */
+/** File name without folder or extension. */
 export const stem = (path: string) => path.replace(/^.*\//, '').replace(/(-\d{5}-of-\d{5})?\.gguf$/, '');
 
 const QUANT = /^(b?f\d+|q\d\w*|iq\d\w*|mxfp\d+)$/i;
 
-/** Base du nom d'un projecteur : « mmproj-Qwen3.8-27B-BF16 » → « qwen3.8-27b ». */
+/** Base name of a projector: “mmproj-Qwen3.8-27B-BF16” → “qwen3.8-27b”. */
 function projectorBase(path: string): string {
   const parts = stem(path)
     .replace(/^mmproj[-_.]?/i, '')
@@ -43,7 +43,7 @@ function projectorBase(path: string): string {
   return parts.join('-').toLowerCase();
 }
 
-/** Le projecteur du même dossier dont le nom correspond au modèle, s'il y en a un seul. */
+/** The projector in the same folder whose name matches the model, if there is exactly one. */
 export function matchingProjector(modelPath: string, models: ModelEntry[]): string | null {
   const dir = modelPath.slice(0, modelPath.lastIndexOf('/'));
   const name = stem(modelPath).toLowerCase();

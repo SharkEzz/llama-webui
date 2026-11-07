@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
-/** Réflexion du modèle : repliée, ouverte d'office tant qu'elle s'écrit sans réponse. */
+/** Model reasoning: collapsed, open by default while it is being written without a reply. */
 export function Reasoning({ text, writing }: { text: string; writing: boolean }) {
   const [open, setOpen] = useState<boolean | null>(null);
   const isOpen = open ?? writing;
@@ -13,7 +13,7 @@ export function Reasoning({ text, writing }: { text: string; writing: boolean })
       <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" />}>
         <ChevronRight className={cn('transition-transform', isOpen && 'rotate-90')} />
         <Brain />
-        {writing ? 'Réflexion en cours…' : 'Réflexion'}
+        {writing ? 'Thinking…' : 'Reasoning'}
       </CollapsibleTrigger>
       <CollapsibleContent>
         <p className="mt-1 border-l-2 border-border pl-3 text-sm leading-6 whitespace-pre-wrap text-muted-foreground">

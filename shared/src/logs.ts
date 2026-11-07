@@ -8,6 +8,9 @@ export interface LogLine {
   kind: LogKind;
 }
 
+/** Log line written by llama-webui before each llama-server launch; the model placement is read from the next lines. */
+export const LAUNCH_LOG_PREFIX = '[llama-webui] launch:';
+
 export const LEVEL_ORDER: LogLevel[] = ['debug', 'info', 'warn', 'error'];
 
 // llama.cpp format: "<m.ss.mmm.uuu> <L> <tag> <func>: message"
@@ -34,27 +37,27 @@ export function filterLogs(lines: readonly LogLine[], opts: { minLevel: LogLevel
   return lines.filter((l) => LEVEL_ORDER.indexOf(l.level) >= min && (q === '' || l.text.toLowerCase().includes(q)));
 }
 
-/** Logs tenus par le client, rattachés à un démarrage de llama-webui (la numérotation repart de 0 à chaque démarrage). */
+/** Logs held by the client, tied to one llama-webui boot (numbering restarts from 0 on every boot). */
 export interface LogView {
   lines: LogLine[];
-  /** Numéro de la prochaine ligne attendue. */
+  /** Number of the next expected line. */
   seq: number;
-  /** Démarrage du serveur dont viennent les lignes (null avant le premier hello). */
+  /** Server boot the lines come from (null before the first hello). */
   bootId: string | null;
-  /** « Vider l'affichage » : lignes de numéro inférieur masquées (-1 : rien). */
+  /** “Clear view”: lines with a lower number are hidden (-1: none). */
   hiddenBefore: number;
 }
 
 export const EMPTY_LOG_VIEW: LogView = { lines: [], seq: 0, bootId: null, hiddenBefore: -1 };
 
-/** Nouveau démarrage du serveur : les lignes et le masquage de l'ancien n'ont plus de sens. */
+/** New server boot: the previous boot's lines and hiding no longer mean anything. */
 export function onBoot(view: LogView, bootId: string): LogView {
   if (view.bootId === bootId) return view;
   if (view.bootId === null) return { ...view, bootId };
   return { lines: [], seq: 0, bootId, hiddenBefore: -1 };
 }
 
-/** Fusionne par numéro (dédoublonné, trié) et garde les `max` dernières lignes. */
+/** Merges by number (deduplicated, sorted) and keeps the last `max` lines. */
 export function mergeLogs(view: LogView, incoming: LogLine[], max: number): LogView {
   if (incoming.length === 0) return view;
   const last = view.lines.at(-1)?.seq ?? -1;

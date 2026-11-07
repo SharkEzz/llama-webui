@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 const QUERY = '(prefers-reduced-motion: reduce)';
 
-/** Préférence système « réduire les animations », suivie en direct. */
+/** System “reduce motion” preference, tracked live. */
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => window.matchMedia(QUERY).matches);
   useEffect(() => {

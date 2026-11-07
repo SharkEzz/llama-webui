@@ -1,19 +1,19 @@
 import { type ComponentProps, type ReactNode, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
-// Boîte commune au textarea et à son calque coloré : mêmes bordure, marges, police et retours à la ligne.
+// Box shared by the textarea and its highlighted layer: same border, padding, font and line wrapping.
 const BOX = 'rounded-lg border px-2.5 py-2 font-mono text-xs leading-5 whitespace-pre-wrap break-words';
 
 interface CodeTextareaProps extends Omit<ComponentProps<'textarea'>, 'value' | 'onChange'> {
   value: string;
   onChange(value: string, el: HTMLTextAreaElement): void;
-  /** Rendu coloré du texte (mêmes caractères, dans le même ordre). */
+  /** Highlighted rendering of the text (same characters, in the same order). */
   highlight(text: string): ReactNode;
 }
 
 /**
- * Textarea à coloration syntaxique : le texte réel est transparent, un <pre> coloré identique est dessiné dessous.
- * L'édition reste native (curseur, sélection, presse-papiers, annuler).
+ * Syntax-highlighted textarea: the real text is transparent, an identical highlighted <pre> is drawn underneath.
+ * Editing stays native (caret, selection, clipboard, undo).
  */
 export function CodeTextarea({ value, onChange, highlight, className, ref, onScroll, ...props }: CodeTextareaProps) {
   const pre = useRef<HTMLPreElement>(null);
@@ -28,7 +28,7 @@ export function CodeTextarea({ value, onChange, highlight, className, ref, onScr
         )}
       >
         {highlight(value)}
-        {/* une dernière ligne vide doit aussi occuper sa hauteur */}
+        {/* a trailing empty line must take up its height too */}
         {'\n'}
       </pre>
       <textarea

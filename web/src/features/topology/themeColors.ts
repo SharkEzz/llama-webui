@@ -7,14 +7,14 @@ export interface SceneColors {
   dark: boolean;
   tone: Record<Tone, Color>;
   primary: Color;
-  /** Lueur neutre des composants sans ton (RAM, NVMe, chipset). */
+  /** Neutral glow of components without a tone (RAM, NVMe, chipset). */
   neutral: Color;
-  /** Corps des blocs et des tubes. */
+  /** Body of the blocks and tubes. */
   slab: Color;
   tube: Color;
 }
 
-/** Couleur CSS quelconque (y compris `oklch()`, que Three ne lit pas) → `#rrggbb`, via le canvas 2D du navigateur. */
+/** Any CSS color (including `oklch()`, which Three cannot read) → `#rrggbb`, via the browser's 2D canvas. */
 export function cssToHex(value: string): string | null {
   const canvas = document.createElement('canvas');
   canvas.width = 1;
@@ -28,7 +28,7 @@ export function cssToHex(value: string): string | null {
   return `#${[r, g, b].map((v) => (v ?? 0).toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** Valeur d'un token de couleur du thème, résolue par le navigateur sur l'élément racine. */
+/** Value of a theme color token, resolved by the browser on the root element. */
 export function cssVarColor(name: string, fallback: string): Color {
   const probe = document.createElement('span');
   probe.style.color = `var(${name})`;
@@ -38,7 +38,7 @@ export function cssVarColor(name: string, fallback: string): Color {
   return new Color(cssToHex(resolved) ?? fallback);
 }
 
-/** Couleurs de la scène, recalculées au changement de thème. */
+/** Scene colors, recomputed when the theme changes. */
 export function useSceneColors(): SceneColors {
   const resolved = useTheme((s) => s.resolved);
   return useMemo(() => {

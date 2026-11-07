@@ -4,6 +4,8 @@ import {
   BenchSpecSchema,
   benchArgs,
   ignoredByBench,
+  isOomError,
+  OOM_ERROR,
   paramsFromServerArgs,
   serverArgs,
 } from './bench';
@@ -103,5 +105,12 @@ test('BenchSpecSchema refuses managed flags in serverArgs at their index', () =>
     ['serverArgs', 1],
     ['serverArgs', 3],
   ]);
-  expect(r.error!.issues[0]!.message).toBe('-ngl : utilisez le champ -ngl');
+  expect(r.error!.issues[0]!.message).toBe('-ngl: use the -ngl field');
+});
+
+test('isOomError recognizes the current and the legacy out-of-memory errors', () => {
+  expect(isOomError(`${OOM_ERROR}: unable to allocate CUDA1 buffer`)).toBe(true);
+  expect(isOomError('Mémoire insuffisante : unable to allocate CUDA1 buffer')).toBe(true);
+  expect(isOomError('llama-bench exited (code 2)')).toBe(false);
+  expect(isOomError(null)).toBe(false);
 });

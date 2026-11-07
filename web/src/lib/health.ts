@@ -3,7 +3,7 @@ import { getHealth, type Health } from './api';
 
 interface HealthState {
   health?: Health;
-  /** Date.now() au moment de la réponse, pour faire avancer l'uptime localement. */
+  /** Date.now() when the response arrived, to advance the uptime locally. */
   fetchedAt?: number;
   error?: string;
   refresh(): Promise<void>;

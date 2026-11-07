@@ -12,50 +12,50 @@ export function MemoryCard({ sample }: { sample: SystemSample | null }) {
   const used = mem ? mem.totalBytes - mem.availableBytes : 0;
   const pct = mem && mem.totalBytes > 0 ? (100 * used) / mem.totalBytes : 0;
   return (
-    <GlassCard title="Mémoire" icon={MemoryStick}>
+    <GlassCard title="Memory" icon={MemoryStick}>
       {!mem ? (
-        <p className="text-sm text-muted-foreground">Collecteur système désactivé dans les réglages.</p>
+        <p className="text-sm text-muted-foreground">System collector disabled in Settings.</p>
       ) : (
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <div className="flex items-baseline justify-between text-sm">
               <span>
                 <span className="num">{formatBytes(used)}</span>{' '}
-                <span className="text-muted-foreground">sur {formatBytes(mem.totalBytes)}</span>
+                <span className="text-muted-foreground">of {formatBytes(mem.totalBytes)}</span>
               </span>
               <span className="num text-muted-foreground">{formatPct(pct)}</span>
             </div>
-            <Progress value={pct} aria-label="RAM utilisée" />
+            <Progress value={pct} aria-label="RAM used" />
           </div>
           <Facts
             rows={[
-              ['Disponible', formatBytes(mem.availableBytes)],
+              ['Available', formatBytes(mem.availableBytes)],
               ['Cache', formatBytes(mem.cachedBytes)],
               [
                 'Swap',
                 mem.swapTotalBytes > 0
                   ? `${formatBytes(mem.swapUsedBytes)} / ${formatBytes(mem.swapTotalBytes)}`
-                  : 'aucun',
+                  : 'none',
               ],
               [
-                'Bande passante DRAM',
-                bw ? `↓ ${formatBps(bw.readBps)} · ↑ ${formatBps(bw.writeBps)}` : 'non mesurée (perf)',
+                'DRAM bandwidth',
+                bw ? `↓ ${formatBps(bw.readBps)} · ↑ ${formatBps(bw.writeBps)}` : 'not measured (perf)',
               ],
             ]}
           />
           {bw && (
             <TimeSeriesChart
-              aria-label="Bande passante DRAM"
+              aria-label="DRAM bandwidth"
               height={120}
               format={formatBps}
               series={[
-                { key: SERIES.memRead, label: 'Lecture', tone: 'blue' },
-                { key: SERIES.memWrite, label: 'Écriture', tone: 'teal' },
+                { key: SERIES.memRead, label: 'Read', tone: 'blue' },
+                { key: SERIES.memWrite, label: 'Write', tone: 'teal' },
               ]}
             />
           )}
           <TimeSeriesChart
-            aria-label="RAM utilisée"
+            aria-label="RAM used"
             height={120}
             yMax={100}
             format={formatPct}

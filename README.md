@@ -32,9 +32,6 @@
   <img src="docs/assets/screenshots/dashboard.jpg" alt="Dashboard: live generation speed, speculative acceptance, context usage, CPU/RAM/VRAM gauges and throughput chart" width="100%">
 </p>
 
-> [!NOTE]
-> The interface is in **French**. Page names are given below as _English (Français)_ so you can find your way around.
-
 ## Why llama-webui?
 
 `llama-server` is fast and flexible, but running it day to day means juggling long command lines, `nvidia-smi` in
@@ -73,7 +70,7 @@ one dashboard designed for a **single machine you own**:
 
 - **Dashboard**: generation and prompt tokens/s, speculative-decoding acceptance (draft model or MTP), context usage
   per slot, CPU/RAM/VRAM gauges, model disk reads and a rolling throughput chart.
-- **System (Système)**: one card per GPU with utilization, VRAM, PCIe link and traffic, power, clocks, temperature and
+- **System**: one card per GPU with utilization, VRAM, PCIe link and traffic, power, clocks, temperature and
   fans, plus CPU, memory and disk. NVIDIA through NVML (falls back to `nvidia-smi`), AMD through sysfs.
 - **Logs**: 10,000-line live ring buffer with level filter, search and auto-follow.
 
@@ -83,7 +80,7 @@ one dashboard designed for a **single machine you own**:
 
 ### 🧭 3D hardware topology
 
-The **Topology (Topologie)** page draws your machine as an interactive 3D scene (react-three-fiber): CPU, memory,
+The **Topology** page draws your machine as an interactive 3D scene (react-three-fiber): CPU, memory,
 NVMe drives, GPUs and chipset, discovered automatically from sysfs. Particles flow along each link according to
 **measured** PCIe, NVMe and DRAM traffic (DRAM through `perf` on AMD Zen 4/5), and HUD cards show the current phase
 (loading, prompt, generation) and **how the model is split across devices**, parsed from `llama-server`'s startup logs.
@@ -95,7 +92,7 @@ NVMe drives, GPUs and chipset, discovered automatically from sysfs. Particles fl
 ### 💬 Chat
 
 - Streaming responses with Markdown, GFM tables and syntax-highlighted code blocks (Shiki) with copy buttons.
-- Collapsible reasoning (_Réflexion_) for thinking models.
+- Collapsible reasoning for thinking models.
 - Per-conversation sampling settings and system prompt, stop and regenerate.
 - **Stats under every answer**: time to first token, prompt and generation speed, token count, MTP/draft acceptance.
 - Conversations are persisted in SQLite and generation keeps running server-side if you leave the page.
@@ -176,15 +173,15 @@ Then open **<http://127.0.0.1:7860>**.
 
 On first launch:
 
-1. Open **Settings (Réglages)** and set the path to your `llama-server` binary (just `llama-server` if it is on your
+1. Open **Settings** and set the path to your `llama-server` binary (just `llama-server` if it is on your
    `PATH`) and your **models folder**.
-2. Go to **Profiles (Profils)** and create a profile: pick a GGUF model, add your usual `llama-server` arguments.
+2. Go to **Profiles** and create a profile: pick a GGUF model, add your usual `llama-server` arguments.
    If you used llama-tui, llama-webui offers to import its profiles from `~/.config/llama-tui/config.json`.
-3. Start it from the **Server (Serveur)** page, then open the **Dashboard** or the **Chat**.
+3. Start it from the **Server** page, then open the **Dashboard** or the **Chat**.
 
 > [!TIP]
-> Not sure which flags to use? Open **Tuning**, pick your model and a goal, and click _Create a profile_ (_Créer un
-> profil_) from the recommendation, or _Run a bench_ (_Lancer un bench_) to measure it first.
+> Not sure which flags to use? Open **Tuning**, pick your model and a goal, and click _Create profile_ from the
+> recommendation, or _Run a benchmark_ to measure it first.
 
 ## Configuration
 
@@ -288,7 +285,7 @@ Every `/api/*` route goes through `guarded()` (`server/http.ts`), which applies 
 
 ### Conventions
 
-- Code comments and UI strings are in **French**.
+- Code comments, UI strings, commit messages and pull requests are in **English**.
 - Before committing or opening a PR, `bun run lint`, `bun run check` and `bun run test` must all pass, with zero Biome
   errors or warnings. Do not disable or downgrade a rule; use a targeted `// biome-ignore` with a reason for a genuine
   false positive.

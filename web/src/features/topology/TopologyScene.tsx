@@ -18,10 +18,10 @@ import { flowVisual, MAX_PARTICLES, Smoother } from './smooth';
 import type { SceneColors } from './themeColors';
 
 /*
- * Scène 3D : dalles translucides (composants) reliées par des tubes (liens) parcourus de particules (débit mesuré).
- * Les étiquettes et l'infobulle sont du DOM (couche <Labels>, hors canvas) : typographie, tokens et contraste du
- * thème. La scène les positionne elle-même à chaque image (<Projector>) : pas de portail par étiquette (drei <Html>
- * perd le premier sous React 19 en mode strict).
+ * 3D scene: translucent slabs (components) joined by tubes (links) carrying particles (measured throughput).
+ * Labels and the tooltip are DOM (the <Labels> layer, outside the canvas): theme typography, tokens and contrast.
+ * The scene positions them itself on every frame (<Projector>): no portal per label (drei <Html> loses the first one
+ * under React 19 in strict mode).
  */
 
 export interface TopologySceneProps {
@@ -34,22 +34,22 @@ export interface TopologySceneProps {
   reducedMotion: boolean;
   hovered: string | null;
   onHover: (id: string | null) => void;
-  /** Couche DOM des étiquettes (éléments `data-node`), déplacée à chaque image. */
+  /** DOM label layer (`data-node` elements), moved on every frame. */
   labelLayer: RefObject<HTMLDivElement | null>;
-  /** Rempli par la scène : recentrage de la caméra. */
+  /** Filled in by the scene: camera recentering. */
   view: RefObject<SceneView | null>;
-  /** La caméra a quitté (true) ou retrouvé (false) son cadrage initial. */
+  /** The camera left (true) or returned to (false) its initial framing. */
   onViewMoved: (moved: boolean) => void;
 }
 
-/** Capacité de référence pour l'épaisseur des tubes : Gen5 x16. */
+/** Reference capacity for tube thickness: Gen5 x16. */
 const REF_BPS = 16 * 3.938e9;
 
 export function TopologyScene(p: TopologySceneProps) {
   const smoother = useMemo(() => new Smoother(0.4), []);
   const pacer = useMemo(() => new FramePacer(), []);
-  // Une entrée a changé : une image au plus tôt, puis les lissages en cours gardent la cadence (voir FramePacer).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: déclencheurs, la scène lit ces valeurs à l'image suivante
+  // An input changed: a frame as soon as possible, then running smoothings keep the pace (see FramePacer).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: triggers, the scene reads these values on the next frame
   useEffect(() => {
     pacer.requested = true;
   }, [pacer, p.flows, p.live, p.tones, p.colors, p.hovered, p.layout, p.reducedMotion]);
@@ -124,18 +124,18 @@ export function TopologyScene(p: TopologySceneProps) {
   );
 }
 
-/** Amortissement de la caméra après un geste : il s'éteint en moins d'une seconde (facteur 0,12 par image). */
+/** Camera damping after a gesture: it dies out in under a second (factor 0.12 per frame). */
 const DAMPING_MS = 1000;
 
 /**
- * Boucle de rendu (frameloop « never ») : à chaque rAF, une image seulement si le pacer la demande. Un onglet caché ne
- * reçoit plus de rAF : rien n'est dessiné.
+ * Render loop (frameloop “never”): on every rAF, a frame only if the pacer asks for one. A hidden tab no longer gets
+ * rAFs: nothing is drawn.
  */
 function FrameDriver({ pacer, smoother }: { pacer: FramePacer; smoother: Smoother }) {
   const get = useThree((s) => s.get);
   const size = useThree((s) => s.size);
-  // Redimensionner efface le canvas : une image tout de suite.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `size` est le déclencheur
+  // Resizing clears the canvas: draw a frame right away.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `size` is the trigger
   useEffect(() => {
     pacer.requested = true;
   }, [pacer, size]);
@@ -143,7 +143,7 @@ function FrameDriver({ pacer, smoother }: { pacer: FramePacer; smoother: Smoothe
     let raf = requestAnimationFrame(function tick(now) {
       raf = requestAnimationFrame(tick);
       if (!pacer.shouldRender(now)) return;
-      // En frameloop « never », l'horloge de la scène suit le temps passé ici, en secondes.
+      // With frameloop “never”, the scene clock follows the time passed in here, in seconds.
       advance(now / 1000, true, get());
       pacer.rendered(now, smoother.takeMoving());
     });
@@ -152,12 +152,12 @@ function FrameDriver({ pacer, smoother }: { pacer: FramePacer; smoother: Smoothe
   return null;
 }
 
-/** Pilotage de la caméra depuis le DOM (bouton « Recentrer »). */
+/** Camera control from the DOM (the “Recenter view” button). */
 export interface SceneView {
   reset: () => void;
 }
 
-/** Durée du retour au cadrage initial (s). */
+/** Duration of the return to the initial framing (s). */
 const RESET_S = 0.6;
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
@@ -170,9 +170,9 @@ interface RigProps {
 }
 
 /**
- * Caméra en vue 3/4 ajustée au cadre, à dérive très lente (désactivée sous prefers-reduced-motion). Glisser pivote,
- * clic droit (ou deux doigts) déplace, la molette zoome : dès que l'utilisateur la prend en main, la caméra reste où il
- * l'a laissée (ni dérive ni recadrage au redimensionnement) jusqu'au « Recentrer », qui la ramène en douceur.
+ * 3/4-view camera fitted to the frame, with a very slow drift (disabled under prefers-reduced-motion). Drag rotates,
+ * right-click (or two fingers) pans, the wheel zooms: once the user takes over, the camera stays where they left it
+ * (no drift, no refit on resize) until “Recenter view”, which eases it back.
  */
 function Rig({ bounds, drift, view, onMovedChange, pacer }: RigProps) {
   const { camera, size } = useThree();
@@ -180,7 +180,7 @@ function Rig({ bounds, drift, view, onMovedChange, pacer }: RigProps) {
   const cam = useMemo(() => fitCamera(bounds, size.width / Math.max(1, size.height)), [bounds, size]);
   const fitDist = useMemo(() => Math.hypot(...sub3(cam.position, cam.target)), [cam]);
   const moved = useRef(false);
-  // Retour animé : pose de départ et progression (0 → 1), null hors animation.
+  // Animated return: starting pose and progress (0 → 1), null when not animating.
   const back = useRef<{ pos: Vector3; target: Vector3; t: number } | null>(null);
 
   useEffect(() => {
@@ -199,8 +199,8 @@ function Rig({ bounds, drift, view, onMovedChange, pacer }: RigProps) {
     };
   }, [view, camera, drift, onMovedChange, pacer]);
 
-  // Après les contrôles (priorité -1, qui appliquent l'amortissement) : la pose de repos l'emporte tant que
-  // l'utilisateur n'a pas pris la main.
+  // After the controls (priority -1, which apply the damping): the resting pose wins as long as the user has not
+  // taken over.
   useFrame(({ clock }, dt) => {
     const c = controls.current;
     pacer.drift = drift && !moved.current;
@@ -234,7 +234,7 @@ function Rig({ bounds, drift, view, onMovedChange, pacer }: RigProps) {
       dampingFactor={0.12}
       minDistance={fitDist * 0.25}
       maxDistance={fitDist * 2.5}
-      // Reste au-dessus du sol : on ne passe pas sous les dalles.
+      // Stay above the floor: never go under the slabs.
       maxPolarAngle={Math.PI / 2 - 0.05}
       onStart={() => {
         pacer.interacting = true;
@@ -258,7 +258,7 @@ const sub3 = (a: readonly number[], b: readonly number[]) => a.map((v, i) => v -
 
 const projected = new Vector3();
 
-/** Projette le sommet de chaque bloc sur l'écran et y ancre son étiquette DOM (sans passer par React, à chaque image). */
+/** Projects the top of each block onto the screen and anchors its DOM label there (bypassing React, every frame). */
 function Projector({ layout, layer }: { layout: Layout; layer: RefObject<HTMLDivElement | null> }) {
   const { camera, size } = useThree();
   const els = useRef(new Map<string, HTMLElement>());
@@ -277,7 +277,7 @@ function Projector({ layout, layer }: { layout: Layout; layer: RefObject<HTMLDiv
       const y = (0.5 - projected.y * 0.5) * size.height;
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
       el.style.visibility = projected.z < 1 ? 'visible' : 'hidden';
-      // Trop près du bord haut : l'infobulle passe sous l'étiquette (voir Labels).
+      // Too close to the top edge: the tooltip moves below the label (see Labels).
       el.classList.toggle('tip-below', y < 230);
     }
   });
@@ -312,7 +312,7 @@ function NodeBlock({ node, placed, live, color, colors, hovered, onHover, smooth
   });
   const [w, h, d] = placed.size;
   const [x, , z] = placed.pos;
-  // Le corps du bloc prend un peu de son ton (davantage en thème clair, où l'émission seule se voit peu).
+  // The block body takes on a bit of its tone (more in the light theme, where emission alone barely shows).
   const body = useMemo(() => colors.slab.clone().lerp(color, colors.dark ? 0.2 : 0.45), [colors, color]);
   return (
     <group position={[x, h / 2, z]}>
@@ -356,8 +356,8 @@ interface LinkProps {
 function Link({ link, from, to, flow, color, colors, reducedMotion, smoother, pacer }: LinkProps) {
   const neutral = color === colors.neutral;
   const curve = useMemo(() => {
-    // Les tubes partent des flancs qui se font face (pas du dessus : les faces supérieures et les étiquettes restent
-    // libres) et passent en arc au-dessus du sol.
+    // Tubes leave from the facing sides (not the top: the top faces and the labels stay clear) and arc above the
+    // floor.
     const a = new Vector3(from.pos[0], from.size[1] * 0.5, from.pos[2]);
     const b = new Vector3(to.pos[0], to.size[1] * 0.5, to.pos[2]);
     const dir = b.clone().sub(a);
@@ -392,7 +392,7 @@ function Link({ link, from, to, flow, color, colors, reducedMotion, smoother, pa
     const f = flowRef.current;
     let target: number;
     if (link.kind === 'memory' && f.fwdBps === null && f.backBps === null) {
-      // Sans mesure DRAM : pulsation dont la cadence suit l'activité CPU (0–100) ; sans animation, une intensité fixe.
+      // Without a DRAM measurement: a pulse whose rate follows CPU activity (0–100); without animation, a fixed intensity.
       const a = Math.min(1, (f.activity ?? 0) / 100);
       if (!reducedMotion && a > 0) pacer.active = true;
       target = reducedMotion
@@ -452,9 +452,9 @@ interface ParticlesProps {
   curve: QuadraticBezierCurve3;
   bps: number | null;
   color: Color;
-  /** Sens aval → amont. */
+  /** Downstream → upstream direction. */
   reverse: boolean;
-  /** Décalage latéral (unités) pour que les deux sens ne se superposent pas. */
+  /** Lateral offset (units) so the two directions do not overlap. */
   side: number;
   smoother: Smoother;
   pacer: FramePacer;
@@ -463,11 +463,11 @@ interface ParticlesProps {
 const tmpPoint = new Vector3();
 const tmpTangent = new Vector3();
 
-/** Particules le long d'un lien : nombre et vitesse en échelle log du débit (voir flowVisual), lissés. */
+/** Particles along a link: count and speed on a log scale of the throughput (see flowVisual), smoothed. */
 function Particles({ id, curve, bps, color, reverse, side, smoother, pacer }: ParticlesProps) {
   const mesh = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
-  // Décalage initial de chaque particule, déterministe (suite de Weyl).
+  // Initial offset of each particle, deterministic (Weyl sequence).
   const offsets = useMemo(() => Array.from({ length: MAX_PARTICLES }, (_, i) => (i * 0.6180339887) % 1), []);
   const bpsRef = useRef(bps);
   const phase = useRef(0);
@@ -488,7 +488,7 @@ function Particles({ id, curve, bps, color, reverse, side, smoother, pacer }: Pa
       if (reverse) u = 1 - u;
       curve.getPointAt(u, tmpPoint);
       curve.getTangentAt(u, tmpTangent);
-      // Perpendiculaire horizontale à la tangente : les deux sens circulent côte à côte.
+      // Horizontal perpendicular to the tangent: the two directions run side by side.
       const len = Math.hypot(tmpTangent.x, tmpTangent.z) || 1;
       dummy.position.set(
         tmpPoint.x + (tmpTangent.z / len) * side,

@@ -8,7 +8,7 @@ const LEVEL: Record<LogLine['level'], string> = {
   debug: 'text-faint-foreground',
 };
 
-/** Une ligne de log : couleur par niveau, lignes de llama-webui en couleur d'accent, correspondance de recherche surlignée. */
+/** A log line: color per level, llama-webui lines in the accent color, search match highlighted. */
 export function LogRow({ line, query, className }: { line: LogLine; query?: string; className?: string }) {
   const own = line.text.startsWith('[llama-webui]');
   return (

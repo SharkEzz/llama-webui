@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import type { ModelSummary } from '@llama-webui/shared';
 
-/** Résumés GGUF déjà lus ; une entrée vaut tant que le stamp (mtime et taille de chaque partie) n'a pas changé. */
+/** GGUF summaries already read; an entry holds as long as the stamp (mtime and size of each part) has not changed. */
 export class ModelCacheRepo {
   constructor(
     private readonly db: Database,
@@ -26,7 +26,7 @@ export class ModelCacheRepo {
     ]);
   }
 
-  /** Oublie les fichiers qui ne sont plus là. */
+  /** Forgets files that are no longer there. */
   prune(keep: Set<string>): void {
     const paths = this.db.query<{ path: string }, []>('SELECT path FROM model_cache').all();
     const drop = this.db.prepare('DELETE FROM model_cache WHERE path = ?');

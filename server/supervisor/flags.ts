@@ -20,7 +20,7 @@ export async function loadFlags(binary: string, timeoutMs = 5000): Promise<FlagC
 
 const cache = new Map<string, Promise<Flag[] | null>>();
 
-/** Les flags de `binary`, lus une fois par binaire ; un échec n'est pas mis en cache. */
+/** The flags of `binary`, read once per binary; a failure is not cached. */
 export function getFlags(binary: string): Promise<Flag[] | null> {
   let p = cache.get(binary);
   if (!p) {

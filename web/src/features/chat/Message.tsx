@@ -10,7 +10,7 @@ import { Reasoning } from './Reasoning';
 
 interface MessageProps {
   message: ChatMessage;
-  /** Texte en cours d'écriture (réponse en streaming). */
+  /** Text being written (streaming reply). */
   live?: { content: string; reasoning: string };
   canRegenerate: boolean;
   onRegenerate(): void;
@@ -38,13 +38,13 @@ export function Message({ message, live, canRegenerate, onRegenerate }: MessageP
       )}
       {message.status === 'stopped' && (
         <Badge variant="outline" className="w-fit">
-          interrompue
+          stopped
         </Badge>
       )}
       {message.status === 'error' && (
         <p className="flex items-start gap-2 text-destructive">
           <Badge variant="destructive" className="shrink-0">
-            erreur
+            error
           </Badge>
           <span>{message.error}</span>
         </p>
@@ -57,7 +57,7 @@ export function Message({ message, live, canRegenerate, onRegenerate }: MessageP
               <Button
                 variant="ghost"
                 size="icon-xs"
-                aria-label="Copier la réponse"
+                aria-label="Copy the reply"
                 onClick={() =>
                   copyText(content).then(() => {
                     setCopied(true);
@@ -69,7 +69,7 @@ export function Message({ message, live, canRegenerate, onRegenerate }: MessageP
               </Button>
             )}
             {canRegenerate && (
-              <Button variant="ghost" size="icon-xs" aria-label="Régénérer la réponse" onClick={onRegenerate}>
+              <Button variant="ghost" size="icon-xs" aria-label="Regenerate the reply" onClick={onRegenerate}>
                 <RotateCcw />
               </Button>
             )}

@@ -5,9 +5,9 @@ import { tempDir } from '../testing/tempDir';
 import { openDb } from './open';
 import { SettingsRepo } from './settings';
 
-test('settings: défauts puis patch persisté', () => {
+test('settings: defaults, then a persisted patch', () => {
   using dir = tempDir('lw-');
-  using db = openDb(join(dir.path, 'sub', 't.sqlite')); // sous-dossier inexistant
+  using db = openDb(join(dir.path, 'sub', 't.sqlite')); // missing subdirectory
   const repo = new SettingsRepo(db);
   expect(repo.get()).toEqual(DEFAULT_SETTINGS);
   expect(repo.patch({ port: 9000 }).port).toBe(9000);
@@ -15,7 +15,7 @@ test('settings: défauts puis patch persisté', () => {
   expect(() => repo.patch({ pollIntervalMs: 10 })).toThrow();
 });
 
-test('settings: une valeur stockée devenue invalide retombe sur le défaut et reste réparable', () => {
+test('settings: a stored value that became invalid falls back to the default and can be repaired', () => {
   using dir = tempDir('lw-');
   using db = openDb(join(dir.path, 't.sqlite'));
   db.run("INSERT INTO settings(key, value_json) VALUES ('port', '\"bad\"'), ('pollIntervalMs', '10')");

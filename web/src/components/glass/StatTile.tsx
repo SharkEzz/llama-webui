@@ -9,12 +9,12 @@ interface StatTileProps {
   unit?: string;
   hint?: string;
   tone?: Tone;
-  /** Valeur en mono tabulaire (chiffres). Mettre false pour une valeur textuelle. */
+  /** Value in tabular mono (digits). Set to false for a text value. */
   mono?: boolean;
   className?: string;
 }
 
-/** Tuile chiffre : libellé, valeur en mono tabulaire, unité et indice optionnels. */
+/** Number tile: label, value in tabular mono, optional unit and hint. */
 export function StatTile({ label, value, unit, hint, tone = 'blue', mono = true, className }: StatTileProps) {
   return (
     <Card size="sm" className={cn(GLASS, 'min-w-0 gap-2 rounded-md px-4 py-4', className)}>

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 const TONES: Tone[] = ['blue', 'teal', 'amber', 'rose'];
 const short = (name: string) => name.replace(/^NVIDIA GeForce /, '').replace(/^Radeon /, '');
 
-/** Bandeau système compact : CPU, RAM, VRAM des GPU du serveur (toutes les GPU lues sans serveur), disque du modèle. */
+/** Compact system strip: CPU, RAM, VRAM of the server's GPUs (every GPU read when no server), model disk. */
 export function SystemStrip({ snapshot }: { snapshot: Snapshot | null }) {
   const sys = snapshot?.system;
   const mem = sys?.mem;
@@ -24,7 +24,7 @@ export function SystemStrip({ snapshot }: { snapshot: Snapshot | null }) {
 
   return (
     <Card size="sm" className={cn(GLASS, 'flex-row flex-wrap items-start justify-around gap-x-6 gap-y-4 px-4 py-4')}>
-      <Link to="/system" className="contents" aria-label="Voir la page Système">
+      <Link to="/system" className="contents" aria-label="View the System page">
         <Gauge label="CPU" value={round(sys?.cpuPct)} size={84} tone="blue" />
         <Gauge
           label={mem ? `RAM ${formatBytes(memUsed, 0)} / ${formatBytes(mem.totalBytes, 0)}` : 'RAM'}
@@ -44,10 +44,10 @@ export function SystemStrip({ snapshot }: { snapshot: Snapshot | null }) {
       </Link>
       <div className="flex min-w-36 flex-col gap-1 self-center text-sm">
         <span className="text-xs text-muted-foreground">
-          Disque{disk?.model ? ` du modèle (${disk.model.disk})` : ''}
+          {disk?.model ? `Model disk (${disk.model.disk})` : 'Disk'}
         </span>
         <span className="num">{disk ? formatBps(disk.model?.readBps ?? disk.readBps) : '—'}</span>
-        <span className="text-xs text-muted-foreground">en lecture</span>
+        <span className="text-xs text-muted-foreground">read</span>
       </div>
     </Card>
   );

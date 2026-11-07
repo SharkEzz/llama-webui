@@ -5,14 +5,13 @@ import { GlassCard } from '@/components/glass/GlassCard';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { dateFmt, modelName } from '@/features/bench/format';
+import { modelName } from '@/features/bench/format';
+import { formatRate, formatShortDate } from '@/lib/format';
 import { useTuning } from '@/lib/tuning';
 import { cn } from '@/lib/utils';
 import { SWEEP_STATUS } from './SweepCard';
 
-const nf = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
-
-/** Tous les sweeps ; une ligne ouvre le sweep (?sweep=<id>). */
+/** Every sweep; clicking a row opens it (?sweep=<id>). */
 export function SweepHistory() {
   const sweeps = useTuning((s) => s.sweeps);
   const loaded = useTuning((s) => s.sweepsLoaded);
@@ -25,19 +24,17 @@ export function SweepHistory() {
       {!loaded ? (
         <Skeleton className="h-24" />
       ) : sweeps.length === 0 ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">
-          Aucun sweep : composez un espace de recherche puis lancez-le.
-        </p>
+        <p className="py-6 text-center text-sm text-muted-foreground">No sweeps: build a search space, then run it.</p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nom</TableHead>
-              <TableHead>Modèle</TableHead>
-              <TableHead>Préréglage</TableHead>
-              <TableHead className="text-right">ok / échecs / total</TableHead>
-              <TableHead>Meilleur</TableHead>
-              <TableHead>Statut</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Model</TableHead>
+              <TableHead>Preset</TableHead>
+              <TableHead className="text-right">ok / failed / total</TableHead>
+              <TableHead>Best</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">Date</TableHead>
             </TableRow>
           </TableHeader>
@@ -68,10 +65,8 @@ export function SweepHistory() {
                   {s.best ? (
                     <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                       <span className="font-mono">{s.best.label?.replace(/^validation · /, '') ?? '—'}</span>
-                      <span className="num shrink-0">
-                        {s.best.tgTps === null ? '—' : `${nf.format(s.best.tgTps)} tok/s`}
-                      </span>
-                      {s.best.kind === 'server' && <Badge variant="secondary">serveur</Badge>}
+                      <span className="num shrink-0">{formatRate(s.best.tgTps)}</span>
+                      {s.best.kind === 'server' && <Badge variant="secondary">server</Badge>}
                     </span>
                   ) : (
                     <span className="text-muted-foreground">—</span>
@@ -81,7 +76,7 @@ export function SweepHistory() {
                   <Badge variant={SWEEP_STATUS[s.status].variant}>{SWEEP_STATUS[s.status].label}</Badge>
                 </TableCell>
                 <TableCell className="num text-right text-xs whitespace-nowrap">
-                  {dateFmt.format(s.createdAt)}
+                  {formatShortDate(s.createdAt)}
                 </TableCell>
               </TableRow>
             ))}

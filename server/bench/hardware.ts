@@ -7,7 +7,7 @@ const builds = new Map<string, Promise<string | null>>();
 const devices = new Map<string, Promise<BenchDevice[]>>();
 let cpu: Promise<string> | null = null;
 
-/** Sortie d'une commande courte (stdout + stderr), tuée après `timeoutMs`. */
+/** Output of a short command (stdout + stderr), killed after `timeoutMs`. */
 async function output(argv: string[], timeoutMs = 5000): Promise<string> {
   const proc = Bun.spawn(argv, {
     stdin: 'ignore',
@@ -21,7 +21,7 @@ async function output(argv: string[], timeoutMs = 5000): Promise<string> {
   return `${out}\n${err}`;
 }
 
-/** « b12119 (6f1e65437) » d'après `<binaire> --version`, mis en cache par binaire et date de modification (une recompilation est relue) ; null si illisible. */
+/** “b12119 (6f1e65437)” from `<binary> --version`, cached per binary and modification time (a rebuild is read again); null if unreadable. */
 export async function buildOf(binary: string): Promise<string | null> {
   const path = Bun.which(binary) ?? binary;
   const mtime = await Bun.file(path)
@@ -45,7 +45,7 @@ export async function buildOf(binary: string): Promise<string | null> {
   return p;
 }
 
-/** Le matériel au moment du run, figé dans `hardware_json`. */
+/** The hardware at the time of the run, frozen in `hardware_json`. */
 export async function readHardware(binary: string, gpus: GpuSample[]): Promise<BenchHardware> {
   cpu ??= readCpuInfo().then(
     (c) => c.model,
@@ -58,7 +58,7 @@ export async function readHardware(binary: string, gpus: GpuSample[]): Promise<B
   };
 }
 
-/** `llama-bench --list-devices`, mis en cache par binaire ; [] si l'outil manque ou échoue (pas mis en cache). */
+/** `llama-bench --list-devices`, cached per binary; [] if the tool is missing or fails (not cached). */
 export function listDevices(benchBinary: string): Promise<BenchDevice[]> {
   let p = devices.get(benchBinary);
   if (!p) {

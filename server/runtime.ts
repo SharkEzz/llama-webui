@@ -7,21 +7,21 @@ import { Supervisor } from './supervisor/supervisor';
 export interface Runtime {
   supervisor: Supervisor;
   logs: LogBuffer;
-  /** Identifiant de ce démarrage de llama-webui (stable à travers bun --hot) : le client y rattache la numérotation des logs. */
+  /** ID of this llama-webui boot (stable across bun --hot): the client ties log numbering to it. */
   bootId: string;
-  /** Monitoring permanent, démarré une fois par startMonitor() (survit lui aussi à bun --hot). */
+  /** Always-on monitoring, started once by startMonitor() (also survives bun --hot). */
   monitor: Promise<Monitor> | null;
-  /** Garde du serveur pendant les benchmarks : tenue à travers un rechargement, un sweep reprend sans relance. */
+  /** Server gate during benchmarks: held across a reload, so a sweep resumes without a restart. */
   benchGate: BenchGate;
 }
 
 const g = globalThis as { __llamaWebuiRuntime?: Runtime };
 
 /**
- * Superviseur et ring de logs uniques pour tout le process. Ils vivent sur globalThis pour survivre à `bun --hot`
- * (un rechargement de code ne doit ni tuer ni orpheliner llama-server). Les signaux d'arrêt sont installés une seule fois.
- * Conséquence : modifier supervisor.ts, logs/buffer.ts, bench/gate.ts, server/monitor/**, server/collectors/** ou ce fichier demande un
- * redémarrage complet de Bun.
+ * Single supervisor and log ring for the whole process. They live on globalThis to survive `bun --hot`
+ * (a code reload must neither kill nor orphan llama-server). Shutdown signal handlers are installed only once.
+ * Consequence: changing supervisor.ts, logs/buffer.ts, bench/gate.ts, server/monitor/**, server/collectors/** or this file
+ * requires a full Bun restart.
  */
 export function getRuntime(): Runtime {
   if (g.__llamaWebuiRuntime) return g.__llamaWebuiRuntime;
@@ -40,7 +40,7 @@ export function getRuntime(): Runtime {
   const shutdown = async (signal: string) => {
     if (stopping) return;
     stopping = true;
-    if (supervisor.managedPid !== null) console.log(`[llama-webui] ${signal} : arrêt de llama-server…`);
+    if (supervisor.managedPid !== null) console.log(`[llama-webui] ${signal}: stopping llama-server…`);
     if (rt.monitor) await rt.monitor.then((m) => m.stop()).catch(() => {});
     await supervisor.stop().catch(() => {});
     process.exit(0);
@@ -51,7 +51,7 @@ export function getRuntime(): Runtime {
   return rt;
 }
 
-/** Le Monitor du process, démarré au premier appel avec ces réglages ; les appels suivants le renvoient tel quel. */
+/** The process Monitor, started on the first call with these settings; later calls return it as is. */
 export function startMonitor(rt: Runtime, settings: MonitorSettings): Promise<Monitor> {
   rt.monitor ??= Monitor.start({ supervisor: rt.supervisor, settings });
   return rt.monitor;
@@ -67,7 +67,7 @@ export function serverView(supervisor: Supervisor): ServerView {
   };
 }
 
-/** Profil du serveur géré tant qu'il tourne (pas après un crash). */
+/** Profile of the managed server while it runs (not after a crash). */
 export function activeProfileId(supervisor: Supervisor): number | null {
   const s = supervisor.state;
   return s.kind === 'starting' || s.kind === 'ready' || s.kind === 'stopping' ? s.profileId : null;

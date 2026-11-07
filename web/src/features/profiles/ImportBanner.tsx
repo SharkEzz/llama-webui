@@ -4,9 +4,10 @@ import { toast } from 'sonner';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import { plural } from '@/lib/format';
 import { importLlamaTui, importSummary, type LlamaTuiStatus, llamaTuiStatus } from '@/lib/profiles';
 
-/** Proposé quand aucun profil n'existe et qu'une config llama-tui est présente. */
+/** Offered when no profile exists and a llama-tui config is present. */
 export function ImportBanner({ profileCount, onImported }: { profileCount: number; onImported(): void }) {
   const [status, setStatus] = useState<LlamaTuiStatus | null>(null);
 
@@ -19,9 +20,9 @@ export function ImportBanner({ profileCount, onImported }: { profileCount: numbe
   const n = status.names.length;
 
   return (
-    <GlassCard title="Profils llama-tui trouvés" icon={Import}>
+    <GlassCard title="llama-tui profiles found" icon={Import}>
       <p className="text-sm text-muted-foreground">
-        {n} profil{n > 1 ? 's' : ''} dans <span className="font-mono text-xs">{status.path}</span> :{' '}
+        {n} {plural(n, 'profile')} in <span className="font-mono text-xs">{status.path}</span>:{' '}
         {status.names.join(', ')}.
       </p>
       <div className="mt-4 flex gap-2">
@@ -36,7 +37,7 @@ export function ImportBanner({ profileCount, onImported }: { profileCount: numbe
             )
           }
         >
-          Importer
+          Import
         </Button>
         <Button
           variant="ghost"
@@ -47,7 +48,7 @@ export function ImportBanner({ profileCount, onImported }: { profileCount: numbe
             )
           }
         >
-          Ignorer
+          Dismiss
         </Button>
       </div>
     </GlassCard>

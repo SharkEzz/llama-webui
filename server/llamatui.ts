@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { type ProfileImport, parseProfileImport } from '@llama-webui/shared';
 
-/** Chemin de la config llama-tui (même règle que llama-tui). */
+/** Path of the llama-tui config (same rule as llama-tui). */
 export function llamaTuiConfigPath(env: Record<string, string | undefined> = process.env): string {
   const base = env.XDG_CONFIG_HOME || join(env.HOME || homedir(), '.config');
   return join(base, 'llama-tui', 'config.json');
@@ -15,7 +15,7 @@ export interface LlamaTuiConfig extends ProfileImport {
   error?: string;
 }
 
-/** Profils de la config llama-tui ; fichier absent → `exists: false`, JSON illisible → `error`. */
+/** Profiles from the llama-tui config; missing file → `exists: false`, unreadable JSON → `error`. */
 export async function readLlamaTuiProfiles(path = llamaTuiConfigPath()): Promise<LlamaTuiConfig> {
   const file = Bun.file(path);
   const empty = { path, profiles: [], rejected: [], defaultProfile: null };
@@ -24,7 +24,7 @@ export async function readLlamaTuiProfiles(path = llamaTuiConfigPath()): Promise
   try {
     raw = JSON.parse(await file.text());
   } catch (e) {
-    return { ...empty, exists: true, error: `JSON invalide : ${(e as Error).message}` };
+    return { ...empty, exists: true, error: `Invalid JSON: ${(e as Error).message}` };
   }
   const defaultProfile =
     typeof raw === 'object' && raw !== null && 'defaultProfile' in raw && typeof raw.defaultProfile === 'string'

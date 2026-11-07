@@ -1,12 +1,12 @@
 import type { MemBandwidth } from '@llama-webui/shared';
 
 /*
- * Bande passante DRAM par `perf stat`, sans root quand perf_event_paranoid ≤ 0 (ou CAP_PERFMON sur perf) :
- * - système entier : PMU du contrôleur mémoire AMD (`umc_cas_cmd.rd/wr`, une commande CAS = 64 octets), qui voit tout
- *   ce qui touche la DRAM (CPU, DMA des GPU en PCIe, NVMe) ;
- * - llama-server seul : événement cœur `ls_any_fills_from_sys.dram_io_all` (lignes de 64 octets ramenées de la DRAM),
- *   attaché à son PID.
- * Tout échec (perf absent, événement inconnu sur ce CPU, droits insuffisants) dégrade en « inconnu ».
+ * DRAM bandwidth through `perf stat`, without root when perf_event_paranoid ≤ 0 (or CAP_PERFMON on perf):
+ * - whole system: AMD memory controller PMU (`umc_cas_cmd.rd/wr`, one CAS command = 64 bytes), which sees everything
+ *   that touches DRAM (CPU, GPU DMA over PCIe, NVMe);
+ * - llama-server alone: core event `ls_any_fills_from_sys.dram_io_all` (64-byte lines fetched from DRAM),
+ *   attached to its PID.
+ * Any failure (perf missing, event unknown on this CPU, insufficient permissions) degrades to “unknown”.
  */
 
 type Spawned = {
@@ -17,20 +17,20 @@ type Spawned = {
 
 export const SYSTEM_EVENTS = { read: 'umc_cas_cmd.rd', write: 'umc_cas_cmd.wr' } as const;
 export const PROC_EVENT = 'ls_any_fills_from_sys.dram_io_all';
-/** Une commande CAS ou un remplissage de ligne = 64 octets. */
+/** One CAS command or one line fill = 64 bytes. */
 export const BYTES_PER_EVENT = 64;
-/** Après un échec, nouvel essai au plus tôt après ce délai (pas de boucle de spawn). */
+/** After a failure, retry no sooner than this delay (no spawn loop). */
 const RETRY_MS = 60_000;
 
 export interface PerfLine {
-  /** Secondes depuis le lancement de perf. */
+  /** Seconds since perf was started. */
   time: number;
-  /** null : « <not supported> » ou « <not counted> ». */
+  /** null: “<not supported>” or “<not counted>”. */
   count: number | null;
   event: string;
 }
 
-/** Ligne CSV de `perf stat -I … -x,` : « 1.005,1072663,,umc_cas_cmd.rd,2010102242,100,00,, ». */
+/** CSV line of `perf stat -I … -x,`: “1.005,1072663,,umc_cas_cmd.rd,2010102242,100,00,,”. */
 export function parsePerfLine(line: string): PerfLine | null {
   const f = line.split(',');
   if (f.length < 4) return null;
@@ -49,15 +49,15 @@ interface StreamOptions {
   now: () => number;
 }
 
-/** Un `perf stat` qui tourne : débit (événements/s) par événement, d'après le compte de chaque intervalle. */
+/** A running `perf stat`: rate (events/s) per event, from each interval's count. */
 class PerfStream {
   private proc: Spawned | null = null;
   private prevTime = new Map<string, number>();
   private rates = new Map<string, number>();
   private lastAt = 0;
-  /** Moment où perf s'est arrêté (ou a refusé de démarrer) ; null tant qu'il tourne ou s'il a été arrêté par stop(). */
+  /** When perf exited (or refused to start); null while it runs or if it was stopped by stop(). */
   diedAt: number | null = null;
-  /** perf a refusé de démarrer ou s'est arrêté sans jamais rien donner. */
+  /** perf refused to start or exited without ever reporting anything. */
   failed = false;
   gotData = false;
 
@@ -91,7 +91,7 @@ class PerfStream {
         }
       }
     } catch {
-      // flux coupé : on garde les dernières valeurs, elles périmeront
+      // stream cut: keep the last values, they will go stale
     }
     if (this.proc !== proc) return;
     this.proc = null;
@@ -118,7 +118,7 @@ class PerfStream {
     this.lastAt = this.o.now();
   }
 
-  /** Débit d'un événement (par seconde) s'il a été mis à jour il y a moins de `maxAgeMs`. */
+  /** Rate of an event (per second) if it was updated less than `maxAgeMs` ago. */
   rate(event: string, maxAgeMs: number): number | null {
     if (this.o.now() - this.lastAt > maxAgeMs) return null;
     return this.rates.get(event) ?? null;
@@ -167,12 +167,12 @@ export class MemBandwidthSampler implements Disposable {
     return s;
   }
 
-  /** Un flux mort peut être relancé : RETRY_MS après sa mort (pas de boucle de spawn si perf échoue à chaque fois). */
+  /** A dead stream can be restarted RETRY_MS after it died (no spawn loop if perf fails every time). */
   private canRetry(s: PerfStream): boolean {
     return s.diedAt !== null && this.now() - s.diedAt >= RETRY_MS;
   }
 
-  /** Lance la mesure système (idempotent) ; si perf s'arrête, le relance au plus toutes les `RETRY_MS`. */
+  /** Starts the system measurement (idempotent); if perf exits, restarts it at most every `RETRY_MS`. */
   start(): void {
     const s = this.system;
     if (s && !this.canRetry(s)) return;
@@ -180,7 +180,7 @@ export class MemBandwidthSampler implements Disposable {
     this.system = this.stream(['-a', '-e', `${SYSTEM_EVENTS.read},${SYSTEM_EVENTS.write}`]);
   }
 
-  /** Nouvelle cadence : les flux repartent (perf fixe son intervalle au lancement). */
+  /** New interval: the streams restart (perf sets its interval at launch). */
   configure(intervalMs: number): void {
     if (intervalMs === this.intervalMs) return;
     this.intervalMs = intervalMs;
@@ -193,8 +193,8 @@ export class MemBandwidthSampler implements Disposable {
   }
 
   /**
-   * Process à suivre (llama-server) ; null : aucun. Appelé à chaque tick : un PID auquel perf n'a jamais pu s'attacher
-   * n'est pas réessayé, un flux mort après avoir donné des valeurs est relancé au plus toutes les `RETRY_MS`.
+   * Process to follow (llama-server); null: none. Called on every tick: a PID perf could never attach to is not
+   * retried, a stream that died after reporting values is restarted at most every `RETRY_MS`.
    */
   setPid(pid: number | null): void {
     if (pid !== this.procPid) {
@@ -212,7 +212,7 @@ export class MemBandwidthSampler implements Disposable {
     return this.intervalMs * 3;
   }
 
-  /** Bande passante DRAM de la machine ; null si perf ne la donne pas (ou plus). */
+  /** Machine DRAM bandwidth; null if perf doesn't report it (or no longer does). */
   sample(): MemBandwidth | null {
     const s = this.system;
     if (!s) return null;
@@ -226,7 +226,7 @@ export class MemBandwidthSampler implements Disposable {
     return { readBps: (read ?? 0) * BYTES_PER_EVENT, writeBps: (write ?? 0) * BYTES_PER_EVENT };
   }
 
-  /** Octets/s ramenés de la DRAM par le process suivi ; null si inconnu. */
+  /** Bytes/s fetched from DRAM by the followed process; null if unknown. */
   procSample(): number | null {
     const p = this.proc;
     if (!p || p.dead) return null;
@@ -242,7 +242,7 @@ export class MemBandwidthSampler implements Disposable {
     this.procPid = null;
   }
 
-  /** `using s = new MemBandwidthSampler()` : les perf sont arrêtés à la sortie de la portée. */
+  /** `using s = new MemBandwidthSampler()`: the perf processes are stopped when leaving the scope. */
   [Symbol.dispose](): void {
     this.stop();
   }

@@ -13,7 +13,7 @@ import { stem, useModels } from '@/lib/models';
 import { createProfile, useProfiles } from '@/lib/profiles';
 import { useTuning } from '@/lib/tuning';
 
-/** Les autres flags du profil sans ceux que l'estimation fixe déjà (-c, --fit, --mlock, --numa…), valeur comprise. */
+/** The profile's other flags minus those the estimate already sets (-c, --fit, --mlock, --numa…), values included. */
 export function mergeArgs(estimateArgs: string[], rest: string[]): string[] {
   const fixed = new Set(estimateArgs.filter((a) => a.startsWith('-')));
   if (fixed.has('-c')) fixed.add('--ctx-size');
@@ -31,12 +31,12 @@ export function mergeArgs(estimateArgs: string[], rest: string[]): string[] {
   return [...estimateArgs, ...out];
 }
 
-/** Profil tiré de l'estimation (flags de l'estimation + autres flags du profil d'origine, son environnement). */
+/** Profile built from the estimate (the estimate's flags + the source profile's other flags and its environment). */
 export async function profileFromEstimate(e: Estimate): Promise<Profile | null> {
   const { modelPath, mmprojPath, profileId, serverArgs } = useTuning.getState();
   const list = useModels.getState().list;
   if (!modelPath) return null;
-  const opts = { modelsDir: list?.setting ?? '~/Modèles', home: list?.home ?? '' };
+  const opts = { modelsDir: list?.setting ?? '~/models', home: list?.home ?? '' };
   const placed = profileModelPath(modelPath, opts);
   const mmproj = mmprojPath ? profileModelPath(mmprojPath, { ...opts, cwd: placed.cwd }).model : undefined;
   const origin = profileId !== null ? useProfiles.getState().profiles.find((p) => p.id === profileId) : undefined;
@@ -51,11 +51,11 @@ export async function profileFromEstimate(e: Estimate): Promise<Profile | null> 
         args: mergeArgs(e.serverArgs, serverArgs),
         env: origin?.env ?? {},
       });
-      toast.success(`Profil « ${p.name} » créé`);
+      toast.success(`Profile “${p.name}” created`);
       void useProfiles.getState().reload();
       return p;
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409 && err.message.includes('existe déjà')) continue;
+      if (err instanceof ApiError && err.status === 409 && err.code === 'name-taken') continue;
       toast.error(err instanceof Error ? err.message : String(err));
       return null;
     }
@@ -63,7 +63,7 @@ export async function profileFromEstimate(e: Estimate): Promise<Profile | null> 
   return null;
 }
 
-/** Prérempli le formulaire de Benchmark avec l'estimation (llama-bench ; « Serveur » reprend le -c et les autres flags). */
+/** Prefills the Benchmark form with the estimate (llama-bench; “Server” keeps the -c and the other flags). */
 export function benchFromEstimate(e: Estimate): void {
   const { modelPath, mmprojPath, profileId, serverArgs } = useTuning.getState();
   if (!modelPath) return;
@@ -76,7 +76,7 @@ export function benchFromEstimate(e: Estimate): void {
 
 export type PinKey = 'ngl' | 'ncmoe' | 'dev' | 'ts' | 'kv' | 't' | 'ub';
 
-/** Valeur saisie pour imposer un flag → patch de BenchParams, ou un message d'erreur. */
+/** Value typed to pin a flag → BenchParams patch, or an error message. */
 export function parsePin(key: PinKey, text: string): Partial<BenchParams> | string {
   const t = text.trim();
   const int = (v: string) => (/^\d+$/.test(v) ? Number(v) : null);
@@ -84,33 +84,33 @@ export function parsePin(key: PinKey, text: string): Partial<BenchParams> | stri
     case 'ngl': {
       if (t === 'all') return { ngl: 'all' };
       const n = int(t);
-      return n === null ? 'un nombre de couches ou « all »' : { ngl: n };
+      return n === null ? 'a number of layers or “all”' : { ngl: n };
     }
     case 'ncmoe':
     case 't':
     case 'ub': {
       const n = int(t);
-      return n === null || (key !== 'ncmoe' && n === 0) ? 'un entier' : { [key]: n };
+      return n === null || (key !== 'ncmoe' && n === 0) ? 'an integer' : { [key]: n };
     }
     case 'dev': {
       const ids = t.split(/[\s,/]+/).filter(Boolean);
-      return ids.length === 0 ? 'au moins un device (CUDA0,Vulkan3)' : { dev: ids };
+      return ids.length === 0 ? 'at least one device (CUDA0,Vulkan3)' : { dev: ids };
     }
     case 'ts': {
       const xs = t
         .split(/[\s,/]+/)
         .filter(Boolean)
         .map(Number);
-      return xs.length < 2 || xs.some((x) => !Number.isFinite(x) || x < 0) ? 'des proportions (3,1)' : { ts: xs };
+      return xs.length < 2 || xs.some((x) => !Number.isFinite(x) || x < 0) ? 'proportions (3,1)' : { ts: xs };
     }
     case 'kv':
       return (CACHE_TYPES as readonly string[]).includes(t)
         ? { ctk: t as BenchParams['ctk'], ctv: t as BenchParams['ctv'] }
-        : `un type parmi ${CACHE_TYPES.join(', ')}`;
+        : `one of ${CACHE_TYPES.join(', ')}`;
   }
 }
 
-/** Flag imposable d'une ligne de la recommandation. */
+/** Pinnable flag of a recommendation row. */
 export const PIN_OF_ROW: Record<string, PinKey> = {
   '-ngl': 'ngl',
   '-ncmoe': 'ncmoe',

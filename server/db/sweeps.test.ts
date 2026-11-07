@@ -72,7 +72,7 @@ test('a sweep counts its queued items, cascades on delete and forgets a deleted 
   });
   sweeps.setStatus(s.id, 'running', { bestRunId: queued[0]!.id });
   expect(sweeps.get(s.id)!.best).toEqual({ label: '-ncmoe 0', kind: 'bench', ppTps: 900, tgTps: 50 });
-  expect(runs.list({}).map((r) => r.id)).toEqual([]); // les runs de sweep sont masqués par défaut
+  expect(runs.list({}).map((r) => r.id)).toEqual([]); // sweep runs are hidden by default
   runs.delete(queued[0]!.id);
   expect(sweeps.get(s.id)!.bestRunId).toBeNull();
   expect(sweeps.get(s.id)!.best).toBeNull();

@@ -6,14 +6,14 @@ export class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
-    /** Raison lisible par le client (ex. « server-running »), renvoyée dans le corps JSON. */
+    /** Machine-readable reason (e.g. “server-running”), returned in the JSON body. */
     readonly code?: string,
   ) {
     super(message);
   }
 }
 
-export const notFound = (what: string) => new HttpError(404, `${what} introuvable`);
+export const notFound = (what: string) => new HttpError(404, `${what} not found`);
 
 export function errorResponse(err: unknown): Response {
   if (err instanceof HttpError)
@@ -24,13 +24,13 @@ export function errorResponse(err: unknown): Response {
     const first = err.issues[0];
     const where = first && first.path.length > 0 ? ` (${first.path.join('.')})` : '';
     return Response.json(
-      { error: `Données invalides : ${first?.message ?? '?'}${where}`, issues: err.issues },
+      { error: `Invalid data: ${first?.message ?? '?'}${where}`, issues: err.issues },
       { status: 400 },
     );
   }
-  if (err instanceof SyntaxError) return Response.json({ error: 'JSON invalide' }, { status: 400 });
+  if (err instanceof SyntaxError) return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   console.error(err);
-  return Response.json({ error: 'Erreur interne' }, { status: 500 });
+  return Response.json({ error: 'Internal error' }, { status: 500 });
 }
 
 export type Handler = (
@@ -38,7 +38,7 @@ export type Handler = (
   server: Server<undefined>,
 ) => Response | undefined | Promise<Response | undefined>;
 
-/** Applique le garde (hôte, origine, JSON) puis le handler ; toute exception devient une réponse JSON. */
+/** Applies the guard (host, origin, JSON) then the handler; any exception becomes a JSON response. */
 export function guarded(handler: Handler): Handler {
   return async (req, server) => {
     const refused = guard(req);
@@ -51,7 +51,7 @@ export function guarded(handler: Handler): Handler {
   };
 }
 
-/** Paramètre de route entier positif (`:id`), sinon 404. */
+/** Positive integer route parameter (`:id`), otherwise 404. */
 export function idParam(req: BunRequest<string>, what: string): number {
   const raw = (req.params as Record<string, string>).id;
   const id = Number(raw);
@@ -59,9 +59,10 @@ export function idParam(req: BunRequest<string>, what: string): number {
   return id;
 }
 
-/** Corps JSON objet, sinon 400. */
+/** JSON object body, otherwise 400. */
 export async function jsonObject(req: Request): Promise<Record<string, unknown>> {
   const body: unknown = await req.json();
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new HttpError(400, 'Objet JSON attendu');
+  if (typeof body !== 'object' || body === null || Array.isArray(body))
+    throw new HttpError(400, 'JSON object expected');
   return body as Record<string, unknown>;
 }

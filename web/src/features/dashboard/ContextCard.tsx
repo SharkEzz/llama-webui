@@ -5,14 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatInt, formatPct } from '@/lib/format';
 
-/** Slots (contexte occupé par slot) et file de requêtes. */
+/** Slots (context used per slot) and request queue. */
 export function ContextCard({ snapshot }: { snapshot: Snapshot }) {
   const { slots, queue } = snapshot;
   return (
-    <GlassCard title="Slots et contexte" icon={Layers}>
+    <GlassCard title="Slots and context" icon={Layers}>
       <div className="flex flex-col gap-4">
         {!slots || slots.length === 0 ? (
-          <p className="text-sm text-muted-foreground">/slots indisponible pour ce serveur.</p>
+          <p className="text-sm text-muted-foreground">/slots unavailable for this server.</p>
         ) : (
           slots.map((s) => {
             const used = slotContextTokens(s);
@@ -23,26 +23,26 @@ export function ContextCard({ snapshot }: { snapshot: Snapshot }) {
                   <span className="font-medium">Slot {s.id}</span>
                   {s.processing ? (
                     <Badge variant="secondary" className="text-success">
-                      en cours
+                      busy
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-muted-foreground">
-                      libre
+                      free
                     </Badge>
                   )}
                   <span className="ml-auto num text-xs text-muted-foreground">
                     {formatInt(used)} / {formatInt(s.nCtx)} ({formatPct(pct)})
                   </span>
                 </div>
-                <Progress value={Math.min(100, pct)} aria-label={`Contexte du slot ${s.id}`} />
+                <Progress value={Math.min(100, pct)} aria-label={`Slot ${s.id} context`} />
               </div>
             );
           })
         )}
         <dl className="grid grid-cols-3 gap-2 border-t border-border pt-4 text-sm">
-          <QueueStat label="En cours" value={queue?.processing} />
-          <QueueStat label="En attente" value={queue?.deferred} />
-          <QueueStat label="Slots occupés" value={queue?.busySlots} />
+          <QueueStat label="Processing" value={queue?.processing} />
+          <QueueStat label="Queued" value={queue?.deferred} />
+          <QueueStat label="Busy slots" value={queue?.busySlots} />
         </dl>
       </div>
     </GlassCard>

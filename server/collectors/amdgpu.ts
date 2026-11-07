@@ -9,7 +9,7 @@ export interface AmdCard {
   devicePath: string;
   hwmonPath: string | null;
   name: string;
-  /** Nœuds DRM de la carte (« card1 », « renderD128 ») : relient un descripteur ouvert à sa carte sans lire son fdinfo. */
+  /** The card's DRM nodes (“card1”, “renderD128”): tie an open descriptor to its card without reading its fdinfo. */
   nodes?: string[];
   /** PCI device whose link is the card's slot link: the upstream port of the card's own PCIe switch, or the GPU itself. */
   linkPath?: string;
@@ -38,8 +38,8 @@ export function parseFdinfo(
 }
 
 /**
- * VRAM AMD d'un process, par carte, d'après ses fdinfo. Les descripteurs ouverts sur un nœud de `skipNodes` (carte masquée
- * ou en veille) sont reconnus par la cible de leur lien /proc/<pid>/fd/N et leur fdinfo n'est pas lu.
+ * AMD VRAM of a process, per card, from its fdinfo. Descriptors open on a `skipNodes` node (hidden or suspended card)
+ * are recognized by the target of their /proc/<pid>/fd/N link and their fdinfo is not read.
  */
 export async function readProcAmdVram(
   pid: number,
@@ -80,7 +80,7 @@ export async function readProcAmdVram(
   return out;
 }
 
-/** Nom d'une carte AMD d'après pci.ids ; repli « AMD GPU <pdev> ». */
+/** Name of an AMD card from pci.ids; falls back to “AMD GPU <pdev>”. */
 export const pciIdsName = (pdev: string, pciRoot?: string, idsPaths?: readonly string[]): Promise<string> =>
   pciName(pdev, pciRoot, idsPaths, `AMD GPU ${pdev}`);
 

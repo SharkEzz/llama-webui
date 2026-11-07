@@ -3,7 +3,7 @@ import { guard } from './security';
 
 const req = (url: string, init: RequestInit & { headers?: Record<string, string> } = {}) => new Request(url, init);
 
-test('guard: hôte localhost ou IP accepté, nom de domaine refusé (DNS rebinding)', () => {
+test('guard: localhost or IP host accepted, domain name rejected (DNS rebinding)', () => {
   expect(guard(req('http://127.0.0.1:7860/api/health'))).toBeUndefined();
   expect(guard(req('http://localhost:7860/api/health'))).toBeUndefined();
   expect(guard(req('http://192.168.0.20:7860/api/health'))).toBeUndefined();
@@ -11,14 +11,14 @@ test('guard: hôte localhost ou IP accepté, nom de domaine refusé (DNS rebindi
   expect(guard(req('http://evil.example:7860/api/health'))?.status).toBe(403);
 });
 
-test("guard: Origin d'un autre site refusé, même origine acceptée", () => {
+test('guard: Origin from another site rejected, same origin accepted', () => {
   const h = (origin: string) => ({ headers: { origin } });
   expect(guard(req('http://127.0.0.1:7860/ws', h('http://127.0.0.1:7860')))).toBeUndefined();
   expect(guard(req('http://127.0.0.1:7860/ws', h('https://evil.example')))?.status).toBe(403);
   expect(guard(req('http://127.0.0.1:7860/ws', h('http://localhost:7860')))?.status).toBe(403);
 });
 
-test('guard: écriture sans JSON refusée (CSRF par requête simple)', () => {
+test('guard: write without JSON rejected (simple request CSRF)', () => {
   const body = '{"port":1}';
   expect(
     guard(
@@ -35,5 +35,5 @@ test('guard: écriture sans JSON refusée (CSRF par requête simple)', () => {
       }),
     ),
   ).toBeUndefined();
-  expect(guard(req('http://127.0.0.1:7860/api/server/stop', { method: 'POST' }))).toBeUndefined(); // sans corps
+  expect(guard(req('http://127.0.0.1:7860/api/server/stop', { method: 'POST' }))).toBeUndefined(); // no body
 });

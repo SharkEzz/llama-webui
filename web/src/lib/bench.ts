@@ -14,9 +14,10 @@ import {
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { ApiError, api } from './api';
+import { plural } from './format';
 import { onWs, useWs } from './ws';
 
-/** Le formulaire tel qu'il se saisit : tout en texte, converti à l'envoi (le serveur valide et renvoie les erreurs par champ). */
+/** The form as typed: all text, converted on submit (the server validates and returns per-field errors). */
 export interface BenchForm {
   kind: BenchKind;
   modelPath: string;
@@ -28,15 +29,15 @@ export interface BenchForm {
   b: string;
   ub: string;
   dev: string[];
-  /** Proportion par device coché. */
+  /** Split per checked device. */
   ts: Record<string, string>;
-  /** -ts sans device coché (« 57,50 ») : proportions dans l'ordre des devices de l'outil. */
+  /** -ts without a checked device (“57,50”): splits in the tool's device order. */
   tsAll: string;
   sm: string;
   fa: string;
   ctk: string;
   ctv: string;
-  /** Une règle -ot par ligne. */
+  /** One -ot rule per line. */
   ot: string;
   p: string;
   n: string;
@@ -72,7 +73,7 @@ export const EMPTY_FORM: BenchForm = {
 
 const str = (v: number | string | undefined) => (v === undefined ? '' : String(v));
 
-/** Les champs d'un BenchSpec (ou d'un brouillon tiré d'un profil). */
+/** The fields of a BenchSpec (or of a draft derived from a profile). */
 export function formFromSpec(
   s: Pick<BenchSpec, 'modelPath' | 'mmprojPath' | 'profileId' | 'params' | 'serverArgs'> &
     Partial<Pick<BenchSpec, 'kind' | 'p' | 'n' | 'r'>>,
@@ -106,17 +107,17 @@ export function formFromSpec(
   };
 }
 
-/** Flags d'une zone de texte : les sauts de ligne séparent comme des espaces. */
+/** Flags from a textarea: line breaks separate like spaces. */
 export const splitArgs = (text: string) => shellSplit(text.replace(/\r?\n/g, ' '));
 
-/** Nombre saisi (vide = absent ; texte illisible envoyé tel quel pour que le serveur explique). */
+/** Typed number (empty = absent; unparsable text is sent as is so the server explains). */
 const num = (v: string): number | string | undefined => {
   const t = v.trim();
   if (t === '') return undefined;
   return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : t;
 };
 
-/** Le corps `spec` de POST /api/bench/run ; `serverArgs` illisible → erreur locale. */
+/** The `spec` body of POST /api/bench/run; unparsable `serverArgs` → local error. */
 export function specFromForm(f: BenchForm): { spec: Record<string, unknown> } | { field: FormField; error: string } {
   const split = splitArgs(f.serverArgs);
   if (!Array.isArray(split)) return { field: 'serverArgs', error: split.error };
@@ -159,7 +160,7 @@ export function specFromForm(f: BenchForm): { spec: Record<string, unknown> } | 
     spec: {
       kind: f.kind,
       modelPath: f.modelPath.trim(),
-      // Gardé aussi pour llama-bench (qui l'ignore) : « Créer un profil » ou « Relancer » en Serveur en ont besoin.
+      // Kept for llama-bench too (which ignores it): “Create profile” or “Restart” as a server need it.
       mmprojPath: f.mmprojPath.trim() || null,
       profileId: f.profileId,
       params,
@@ -171,7 +172,7 @@ export function specFromForm(f: BenchForm): { spec: Record<string, unknown> } | 
   };
 }
 
-/** Champ du formulaire visé par un chemin d'erreur zod du spec (`["params", "ngl"]` → « ngl », `["serverArgs", 2]` → « serverArgs »). */
+/** Form field targeted by a zod error path of the spec (`["params", "ngl"]` → “ngl”, `["serverArgs", 2]` → “serverArgs”). */
 function fieldOf(path: (string | number)[]): FormField {
   const [a, b] = path;
   if (a === 'params' && typeof b === 'string') return b as FormField;
@@ -182,11 +183,11 @@ export interface BenchFilters {
   kind: BenchKind | 'all';
   model: string;
   status: BenchStatus | 'all';
-  /** « none » : runs ponctuels seulement (défaut) ; « all » : avec les runs de sweep. */
+  /** “none”: one-off runs only (default); “all”: including sweep runs. */
   sweeps: 'none' | 'all';
 }
 
-/** Runs chargés au plus (le serveur plafonne aussi). */
+/** Maximum number of runs loaded (the server caps it too). */
 const HISTORY_LIMIT = 500;
 
 interface BenchState {
@@ -205,7 +206,7 @@ interface BenchState {
   setForm(patch: Partial<BenchForm>): void;
   fromProfile(id: number | null): Promise<void>;
   rerun(run: BenchRun): void;
-  /** « confirm » : le serveur géré tourne, le client doit demander avant de relancer avec stopServer. */
+  /** “confirm”: the managed server is running, the client must ask before retrying with stopServer. */
   launch(stopServer?: boolean): Promise<'ok' | 'confirm' | 'error'>;
   cancel(): Promise<void>;
   remove(id: number): Promise<void>;
@@ -326,11 +327,7 @@ export const useBench = create<BenchState>()((set, get) => ({
   async removeFailed() {
     try {
       const { deleted } = await api<{ deleted: number }>('/bench/runs?failed=1', { method: 'DELETE' });
-      toast.success(
-        deleted === 0
-          ? 'Aucun run en échec'
-          : `${deleted} run${deleted > 1 ? 's' : ''} supprimé${deleted > 1 ? 's' : ''}`,
-      );
+      toast.success(deleted === 0 ? 'No failed runs' : `${deleted} ${plural(deleted, 'run')} deleted`);
       await get().load();
     } catch (e) {
       fail(e);
@@ -340,7 +337,7 @@ export const useBench = create<BenchState>()((set, get) => ({
   async toProfile(id) {
     try {
       const p = await api<Profile>(`/bench/${id}/to-profile`, { method: 'POST', body: '{}' });
-      toast.success(`Profil « ${p.name} » créé`);
+      toast.success(`Profile “${p.name}” created`);
       return p;
     } catch (e) {
       fail(e);
@@ -355,7 +352,7 @@ export const useBench = create<BenchState>()((set, get) => ({
 }));
 
 let started = false;
-/** Abonnement WS (une fois) : progression, runs créés ou finis ; relecture à chaque (re)connexion. */
+/** WS subscription (once): progress, created or finished runs; reload on every (re)connect. */
 export function startBenchSync(): void {
   if (started) return;
   started = true;
@@ -377,22 +374,22 @@ export function startBenchSync(): void {
 }
 
 export const PHASE_LABEL: Record<BenchLive['phase'], string> = {
-  'stopping-server': 'Arrêt du serveur',
-  loading: 'Chargement',
-  warmup: 'Échauffement',
+  'stopping-server': 'Stopping server',
+  loading: 'Loading',
+  warmup: 'Warming up',
   prompt: 'Prompt',
-  generation: 'Génération',
-  measure: 'Mesure',
-  'restarting-server': 'Relance du serveur',
+  generation: 'Generating',
+  measure: 'Measuring',
+  'restarting-server': 'Restarting server',
 };
 
 export const STATUS_LABEL: Record<BenchStatus, string> = {
-  queued: 'en attente',
-  running: 'en cours',
-  ok: 'terminé',
-  failed: 'échec',
-  cancelled: 'annulé',
-  interrupted: 'interrompu',
+  queued: 'Queued',
+  running: 'Running',
+  ok: 'Done',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  interrupted: 'Interrupted',
 };
 
-export const KIND_LABEL: Record<BenchKind, string> = { bench: 'llama-bench', server: 'serveur' };
+export const KIND_LABEL: Record<BenchKind, string> = { bench: 'llama-bench', server: 'server' };

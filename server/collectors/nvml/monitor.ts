@@ -24,7 +24,7 @@ export class NvmlMonitor {
   private procs: NvmlProc[] = [];
   private sys: NvmlSystem | null = null;
   private lastSampleAt = 0;
-  /** Cadence qui juge la fraîcheur : l'ancienne reste valable tant que le worker n'a pas échantillonné à la nouvelle. */
+  /** Interval used to judge freshness: the old one stays valid until the worker has sampled at the new one. */
   private freshIntervalMs: number;
 
   private constructor(
@@ -90,7 +90,7 @@ export class NvmlMonitor {
   /** New sampling interval and what to read, from the next round on. */
   configure(o: { intervalMs: number; needs: GpuNeeds }): void {
     this.intervalMs = o.intervalMs;
-    // Le tour déjà programmé par le worker tourne encore à l'ancienne cadence : ne pas déclarer périmé ce qu'il va remplacer.
+    // The round the worker already scheduled still runs at the old interval: don't mark stale what it is about to replace.
     this.freshIntervalMs = Math.max(this.freshIntervalMs, o.intervalMs);
     this.worker.postMessage({ type: 'configure', intervalMs: o.intervalMs, needs: o.needs });
   }

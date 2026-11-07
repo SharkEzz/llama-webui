@@ -6,7 +6,7 @@ const KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
 export class SettingsRepo {
   constructor(private readonly db: Database) {}
 
-  /** Réglages courants ; une valeur stockée invalide (schéma durci, JSON abîmé) retombe sur son défaut. */
+  /** Current settings; an invalid stored value (stricter schema, corrupt JSON) falls back to its default. */
   get(): Settings {
     const rows = this.db.query<{ key: string; value_json: string }, []>('SELECT key, value_json FROM settings').all();
     const merged: Record<string, unknown> = { ...DEFAULT_SETTINGS };
@@ -17,16 +17,16 @@ export class SettingsRepo {
       try {
         value = JSON.parse(r.value_json);
       } catch {
-        console.warn(`[llama-webui] réglage « ${key} » illisible, valeur par défaut utilisée`);
+        console.warn(`[llama-webui] setting “${key}” unreadable, using the default value`);
         continue;
       }
       if (SettingsSchema.shape[key].safeParse(value).success) merged[key] = value;
-      else console.warn(`[llama-webui] réglage « ${key} » invalide, valeur par défaut utilisée`);
+      else console.warn(`[llama-webui] setting “${key}” invalid, using the default value`);
     }
     return SettingsSchema.parse(merged);
   }
 
-  /** Valide la fusion complète avant d'écrire ; lève une ZodError si invalide. */
+  /** Validates the full merge before writing; throws a ZodError if invalid. */
   patch(partial: Partial<Settings>): Settings {
     const next = SettingsSchema.parse({ ...this.get(), ...partial });
     const upsert = this.db.prepare('INSERT OR REPLACE INTO settings(key, value_json) VALUES (?, ?)');

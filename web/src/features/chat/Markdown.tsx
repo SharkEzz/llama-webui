@@ -34,7 +34,7 @@ const components: Components = {
   td: ({ children }) => <TableCell>{children}</TableCell>,
 };
 
-/** Markdown d'une réponse : GFM (tableaux, listes de tâches), sans HTML brut (affiché comme texte). */
+/** Markdown of a reply: GFM (tables, task lists), no raw HTML (shown as text). */
 export const Markdown = memo(function Markdown({ text }: { text: string }) {
   return (
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>

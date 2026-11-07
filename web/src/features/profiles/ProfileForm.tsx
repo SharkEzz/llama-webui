@@ -54,7 +54,7 @@ interface ProfileFormProps {
   settings: Settings | null;
   onSaved(p: Profile): void;
   onDeleted(): void;
-  /** Valeurs de départ d'un nouveau profil (« Créer un profil » depuis la page Modèles). */
+  /** Initial values of a new profile (“Create profile” from the Models page). */
   initial?: Partial<Draft>;
 }
 
@@ -71,7 +71,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
     setDraft((d) => ({ ...d, [k]: e.target.value }));
   const args = parseArgs(draft.args);
   const env = parseEnv(draft.env);
-  // Flags réservés : l'éditeur les signale déjà, l'API les refuserait.
+  // Reserved flags: the editor already flags them, the API would reject them.
   const blocked = !Array.isArray(args) || args.some((a) => reservedFlag(a)) || 'error' in env;
 
   const save = async () => {
@@ -92,7 +92,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
     try {
       const saved = profile ? await updateProfile(profile.id, input) : await createProfile(input);
       setErrors({});
-      toast.success(profile ? 'Profil enregistré' : 'Profil créé');
+      toast.success(profile ? 'Profile saved' : 'Profile created');
       onSaved(saved);
     } catch (e) {
       if (e instanceof ApiError && e.issues.length > 0) {
@@ -104,9 +104,9 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
     }
   };
 
-  /** Fichier choisi dans le sélecteur : dossier de travail rempli s'il est vide, chemin relatif quand c'est possible. */
+  /** File chosen in the picker: fills the working directory if empty, relative path when possible. */
   const pick = (k: 'model' | 'mmproj') => (abs: string) => {
-    const modelsDir = models?.setting ?? settings?.modelsDir ?? '~/Modèles';
+    const modelsDir = models?.setting ?? settings?.modelsDir ?? '~/models';
     const { cwd, model } = profileModelPath(abs, { cwd: draft.cwd, modelsDir, home: models?.home ?? '' });
     setDraft((d) => ({ ...d, cwd: cwd ?? d.cwd, [k]: model }));
   };
@@ -161,34 +161,34 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
       }}
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        {field('name', 'Nom')}
-        {field('cwd', 'Dossier de travail', {
-          placeholder: '~/Modèles',
-          hint: "Les chemins relatifs du modèle partent d'ici.",
+        {field('name', 'Name')}
+        {field('cwd', 'Working directory', {
+          placeholder: '~/models',
+          hint: 'Relative model paths start from here.',
           mono: true,
         })}
-        {fileField('model', 'model', 'Modèle (GGUF)', 'Qwen3.8-27B-IQ3_S.gguf')}
-        {fileField('mmproj', 'mmproj', 'Projecteur multimodal', 'facultatif')}
-        {field('host', 'Hôte', {
+        {fileField('model', 'model', 'Model (GGUF)', 'Qwen3.8-27B-IQ3_S.gguf')}
+        {fileField('mmproj', 'mmproj', 'Multimodal projector', 'optional')}
+        {field('host', 'Host', {
           placeholder: settings?.host ?? '0.0.0.0',
-          hint: 'Vide : valeur des réglages.',
+          hint: 'Empty: value from settings.',
           mono: true,
         })}
         {field('port', 'Port', {
           placeholder: String(settings?.port ?? 8080),
-          hint: 'Vide : valeur des réglages.',
+          hint: 'Empty: value from settings.',
           mono: true,
         })}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="pf-args">Arguments de llama-server</Label>
+        <Label htmlFor="pf-args">llama-server arguments</Label>
         <ArgsEditor id="pf-args" value={draft.args} onChange={(args) => setDraft((d) => ({ ...d, args }))} />
         {errors.args && <p className="text-sm text-destructive">{errors.args}</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="pf-env">Variables d'environnement</Label>
+        <Label htmlFor="pf-env">Environment variables</Label>
         <CodeTextarea
           id="pf-env"
           value={draft.env}
@@ -200,13 +200,13 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
         {'error' in env ? (
           <p className="text-sm text-destructive">{String(env.error)}</p>
         ) : (
-          <p className="text-xs text-muted-foreground">Une variable par ligne, CLÉ=valeur.</p>
+          <p className="text-xs text-muted-foreground">One variable per line, KEY=value.</p>
         )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-5">
         <Button type="submit" disabled={saving || !dirty || blocked}>
-          <Save /> {profile ? 'Enregistrer' : 'Créer le profil'}
+          <Save /> {profile ? 'Save' : 'Create profile'}
         </Button>
         {profile && (
           <>
@@ -216,14 +216,14 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
               disabled={dirty || isRunning(view) || view?.state.kind === 'external'}
               title={
                 dirty
-                  ? "Enregistrez d'abord"
+                  ? 'Save first'
                   : isRunning(view)
-                    ? 'Un serveur tourne déjà : utilisez Basculer sur la page Serveur'
+                    ? 'A server is already running: use Switch on the Server page'
                     : undefined
               }
               onClick={() => void startProfile(profile.id)}
             >
-              <Play /> Démarrer ce profil
+              <Play /> Start this profile
             </Button>
             <Button
               type="button"
@@ -231,14 +231,14 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
               onClick={() =>
                 duplicateProfile(profile.id).then(
                   (p) => {
-                    toast.success(`Copie créée : ${p.name}`);
+                    toast.success(`Copy created: ${p.name}`);
                     onSaved(p);
                   },
                   (e: Error) => toast.error(e.message),
                 )
               }
             >
-              <Copy /> Dupliquer
+              <Copy /> Duplicate
             </Button>
             <Button
               type="button"
@@ -246,18 +246,18 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
               nativeButton={false}
               render={<a href={`/api/profiles/${profile.id}/export`} download />}
             >
-              <Download /> Exporter
+              <Download /> Export
             </Button>
             <div className="ml-auto">
               <ConfirmDialog
-                title={`Supprimer « ${profile.name} » ?`}
-                description="Le profil sera définitivement supprimé. Exportez-le d'abord si vous voulez le garder."
-                confirmLabel="Supprimer"
+                title={`Delete “${profile.name}”?`}
+                description="The profile will be permanently deleted. Export it first if you want to keep it."
+                confirmLabel="Delete"
                 destructive
                 onConfirm={() =>
                   deleteProfile(profile.id).then(
                     () => {
-                      toast.success('Profil supprimé');
+                      toast.success('Profile deleted');
                       onDeleted();
                     },
                     (e: Error) => toast.error(e.message),
@@ -268,9 +268,9 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
                     type="button"
                     variant="destructive"
                     disabled={isActive}
-                    title={isActive ? "Arrêtez d'abord le serveur" : undefined}
+                    title={isActive ? 'Stop the server first' : undefined}
                   >
-                    <Trash2 /> Supprimer
+                    <Trash2 /> Delete
                   </Button>
                 }
               />

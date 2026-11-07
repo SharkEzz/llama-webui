@@ -59,7 +59,7 @@ type Spawned = {
   kill(signal?: NodeJS.Signals | number): void;
 };
 
-/** `reached` se résout à null après `ms` ; le minuteur est annulé à la sortie de la portée (`using`). */
+/** `reached` resolves to null after `ms`; the timer is cleared when leaving the scope (`using`). */
 function timeoutAfter(ms: number): { reached: Promise<null> } & Disposable {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const reached = new Promise<null>((resolve) => {

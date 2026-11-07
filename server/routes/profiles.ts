@@ -8,7 +8,7 @@ import { readLlamaTuiProfiles } from '../llamatui';
 export interface ProfileRouteDeps {
   profiles: ProfilesRepo;
   settings: SettingsRepo;
-  /** Profil du serveur en cours (on ne le supprime pas sous ses pieds). */
+  /** Profile of the running server (not deleted from under its feet). */
   activeProfileId: () => number | null;
 }
 
@@ -25,7 +25,7 @@ export function profileRoutes({ profiles, settings, activeProfileId }: ProfileRo
   const mustGet = (id: number) =>
     profiles.get(id) ??
     (() => {
-      throw notFound('Profil');
+      throw notFound('Profile');
     })();
 
   return {
@@ -57,8 +57,8 @@ export function profileRoutes({ profiles, settings, activeProfileId }: ProfileRo
       }),
       POST: guarded(async () => {
         const cfg = await readLlamaTuiProfiles();
-        if (!cfg.exists) throw new HttpError(404, `Config llama-tui introuvable (${cfg.path})`);
-        if (cfg.error) throw new HttpError(400, `Config llama-tui illisible : ${cfg.error}`);
+        if (!cfg.exists) throw new HttpError(404, `llama-tui config not found (${cfg.path})`);
+        if (cfg.error) throw new HttpError(400, `Unreadable llama-tui config: ${cfg.error}`);
         const { imported, skipped } = profiles.importMany(cfg.profiles, 'llama-tui');
         if (settings.get().defaultProfileId === null && cfg.defaultProfile) {
           const def = profiles.list().find((p) => p.name === cfg.defaultProfile);
@@ -68,23 +68,23 @@ export function profileRoutes({ profiles, settings, activeProfileId }: ProfileRo
       }),
     },
     '/api/profiles/:id': {
-      GET: guarded((req) => Response.json(mustGet(idParam(req, 'Profil')))),
-      PUT: guarded(async (req) => Response.json(profiles.update(idParam(req, 'Profil'), await req.json()))),
+      GET: guarded((req) => Response.json(mustGet(idParam(req, 'Profile')))),
+      PUT: guarded(async (req) => Response.json(profiles.update(idParam(req, 'Profile'), await req.json()))),
       DELETE: guarded((req) => {
-        const id = idParam(req, 'Profil');
+        const id = idParam(req, 'Profile');
         if (activeProfileId() === id)
-          throw new HttpError(409, "Ce profil est celui du serveur en cours : arrêtez-le d'abord");
+          throw new HttpError(409, 'This profile belongs to the running server: stop it first');
         profiles.remove(id);
         if (settings.get().defaultProfileId === id) settings.patch({ defaultProfileId: null });
         return new Response(null, { status: 204 });
       }),
     },
     '/api/profiles/:id/duplicate': {
-      POST: guarded((req) => Response.json(profiles.duplicate(idParam(req, 'Profil')), { status: 201 })),
+      POST: guarded((req) => Response.json(profiles.duplicate(idParam(req, 'Profile')), { status: 201 })),
     },
     '/api/profiles/:id/export': {
       GET: guarded((req) => {
-        const p = mustGet(idParam(req, 'Profil'));
+        const p = mustGet(idParam(req, 'Profile'));
         return attachment(`${p.name}.json`, toInput(p));
       }),
     },

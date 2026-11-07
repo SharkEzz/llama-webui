@@ -1,4 +1,4 @@
-// Types de monitoring sérialisables (copiés de llama-tui, sans Map), partagés par le serveur et l'UI.
+// Serializable monitoring types (copied from llama-tui, without Map), shared by the server and the UI.
 
 export interface GpuSample {
   key: string; // "nvidia:<uuid>" | "amd:<pdev>"
@@ -11,11 +11,11 @@ export interface GpuSample {
   tempC: number | null;
   powerW: number | null;
   procVramBytes: number;
-  // Champs détaillés : absent ou null = inconnu (non fourni par ce vendeur ou cette carte).
+  // Detailed fields: missing or null = unknown (not provided by this vendor or card).
   memUtilPct?: number | null;
   fanPct?: number | null;
   powerLimitW?: number | null;
-  /** Limite de puissance d'usine (NVIDIA) ; diffère de `powerLimitW` si l'utilisateur l'a baissée. */
+  /** Factory power limit (NVIDIA); differs from `powerLimitW` if the user lowered it. */
   powerDefaultLimitW?: number | null;
   persistence?: boolean | null;
   clockGrMhz?: number | null;
@@ -27,9 +27,9 @@ export interface GpuSample {
   pcieWidthMax?: number | null;
   pcieRxBps?: number | null;
   pcieTxBps?: number | null;
-  /** Carte en veille (runtime-suspended) volontairement non lue : toute lecture la réveillerait. */
+  /** Sleeping card (runtime-suspended), deliberately not read: any read would wake it up. */
   suspended?: boolean;
-  /** Carte masquée (réglage hiddenGpus) : listée mais non lue. */
+  /** Hidden card (hiddenGpus setting): listed but not read. */
   hidden?: boolean;
 }
 
@@ -41,7 +41,7 @@ export interface MemInfo {
   swapUsedBytes: number;
 }
 
-/** Bande passante DRAM de la machine (contrôleur mémoire, via perf) : tout ce qui touche la RAM, CPU, GPU et NVMe compris. */
+/** The machine's DRAM bandwidth (memory controller, via perf): everything that touches RAM, CPU, GPU and NVMe included. */
 export interface MemBandwidth {
   readBps: number;
   writeBps: number;
@@ -54,7 +54,7 @@ export interface SystemSample {
   tempC: number | null;
   load: [number, number, number] | null;
   mem: MemInfo | null;
-  /** Absent ou null : non mesurable (perf absent, PMU inconnu, droits). */
+  /** Missing or null: not measurable (no perf, unknown PMU, permissions). */
   memBw?: MemBandwidth | null;
 }
 
@@ -63,7 +63,7 @@ export interface DiskRates {
   writeBps: number;
 }
 
-/** Disques physiques de la machine : leur total, chacun (par nom de bloc, `nvme0n1`) et celui du modèle. */
+/** The machine's physical disks: their total, each one (by block name, `nvme0n1`) and the model's. */
 export interface DiskSample extends DiskRates {
   perDisk: Record<string, DiskRates>;
   model: { disk: string; readBps: number } | null;
@@ -81,8 +81,8 @@ export interface SlotView {
 }
 
 /**
- * Tokens occupés dans le contexte d'un slot. `n_prompt_tokens` est déjà tout le contexte : le prompt plus les tokens
- * générés jusqu'ici (gardés en cache une fois la requête finie). Y ajouter `n_decoded` compterait la sortie deux fois.
+ * Tokens used in a slot's context. `n_prompt_tokens` is already the whole context: the prompt plus the tokens generated
+ * so far (kept in cache once the request is done). Adding `n_decoded` would count the output twice.
  */
 export const slotContextTokens = (s: SlotView): number => s.nPromptTokens;
 
@@ -123,7 +123,7 @@ export interface CpuInfo {
   numaNodes: number;
 }
 
-/** Clés des séries d'historique. */
+/** Keys of the history series. */
 export const SERIES = {
   genTps: 'llama.genTps',
   ppTps: 'llama.ppTps',
@@ -150,11 +150,11 @@ export const SERIES = {
   busySlots: 'llama.busySlots',
 } as const;
 
-/** État de monitoring poussé à chaque tick sur le WebSocket. */
+/** Monitoring state pushed on every tick over the WebSocket. */
 export interface Snapshot {
   at: number;
   tick: number;
-  /** null : aucun serveur actif. */
+  /** null: no active server. */
   health: Health | null;
   rates: { genTps: number; ppTps: number };
   slots: SlotView[] | null;
@@ -162,29 +162,29 @@ export interface Snapshot {
   queue: { processing: number; deferred: number; busySlots: number } | null;
   lastRequest: RequestStats | null;
   spec: SpecStats | null;
-  /** Plus récente d'abord. */
+  /** Most recent first. */
   recentRequests: RequestRecord[];
-  /** GPU utilisées par le serveur (VRAM > 64 Mio). */
+  /** GPUs used by the server (VRAM > 64 MiB). */
   gpus: GpuSample[];
-  /** Toutes les GPU, triées par busId, masquées et en veille comprises (non lues). */
+  /** All GPUs, sorted by busId, hidden and sleeping ones included (not read). */
   allGpus: GpuSample[];
-  /** `dramBps` : octets/s ramenés de la DRAM par llama-server (perf, événement cœur) ; null = inconnu. */
+  /** `dramBps`: bytes/s fetched from DRAM by llama-server (perf, core event); null = unknown. */
   proc: { cpuPct: number; rssBytes: number; dramBps?: number | null } | null;
   system: SystemSample | null;
   disk: DiskSample | null;
-  /** Valeurs ajoutées à l'historique à ce tick (NaN → null). */
+  /** Values appended to the history on this tick (NaN → null). */
   points: Record<string, number | null>;
-  /** Forme de l'historique : un changement (réglages) invalide celui du client. */
+  /** Shape of the history: a change (settings) invalidates the client's copy. */
   history: { intervalMs: number; capacity: number };
 }
 
-/** Historique complet : une valeur par tick, la plus ancienne d'abord, `null` = trou. */
+/** Full history: one value per tick, oldest first, `null` = gap. */
 export interface HistoryDump {
   intervalMs: number;
   capacity: number;
-  /** Instant du dernier point. */
+  /** Time of the last point. */
   at: number;
-  /** Instant de chaque point (ms), même longueur que chaque série. */
+  /** Time of each point (ms), same length as each series. */
   times: number[];
   series: Record<string, (number | null)[]>;
 }

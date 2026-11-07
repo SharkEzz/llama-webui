@@ -41,9 +41,9 @@ const isActive = (s: ServerState) =>
   s.kind === 'starting' || s.kind === 'ready' || s.kind === 'stopping' || s.kind === 'external';
 
 /**
- * Échantillonnage permanent (le Poller de llama-tui) : un tick toutes les `pollIntervalMs`, que des onglets soient
- * ouverts ou non. Chaque tick produit un Snapshot (diffusé aux abonnés) et ajoute un point à chaque série de l'historique.
- * Vit dans le runtime (survit à bun --hot).
+ * Permanent sampling (llama-tui's Poller): one tick every `pollIntervalMs`, whether tabs are open or not. Each tick
+ * produces a Snapshot (broadcast to subscribers) and adds a point to every history series.
+ * Lives in the runtime (survives bun --hot).
  */
 export class Monitor {
   private history: History;
@@ -61,7 +61,7 @@ export class Monitor {
   private current: Snapshot | null = null;
   private listeners = new Set<(s: Snapshot) => void>();
   private modelPathFor: (profileId: number) => string | null = () => null;
-  /** Par profil : le disque d'où son modèle est lu (null : pas encore trouvé) et l'heure de la dernière recherche. */
+  /** Per profile: the disk its model is read from (null: not found yet) and the time of the last lookup. */
   private modelDisks = new Map<number, { disk: string | null; at: number; pending: boolean }>();
 
   private constructor(
@@ -91,13 +91,13 @@ export class Monitor {
     return this.collectors.nvmlSystem;
   }
 
-  /** Chemin absolu du modèle d'un profil (disque du modèle) ; fourni par le module serveur, rechargé à chaud. */
+  /** Absolute model path of a profile (model disk); provided by the server module, which is hot-reloaded. */
   setModelPathResolver(fn: (profileId: number) => string | null): void {
     this.modelPathFor = fn;
     this.modelDisks.clear();
   }
 
-  /** Suit les réglages : collecteurs, taille de l'historique (points récents gardés), cadence. */
+  /** Follows the settings: collectors, history size (recent points kept), interval. */
   async configure(next: MonitorSettings): Promise<void> {
     const prev = this.settings;
     this.settings = next;
@@ -142,21 +142,21 @@ export class Monitor {
         try {
           fn(snap);
         } catch (err) {
-          console.error('[llama-webui] abonné du monitoring :', err);
+          console.error('[llama-webui] monitoring subscriber:', err);
         }
       }
     } catch (err) {
-      console.error('[llama-webui] tick de monitoring :', err);
+      console.error('[llama-webui] monitoring tick:', err);
     }
   }
 
-  /** Ajoute la valeur du tick à une série (NaN = trou) et la note dans `points`. */
+  /** Adds the tick's value to a series (NaN = gap) and records it in `points`. */
   private push(key: string, v: number): void {
     this.history.series(key).push(v);
     this.points[key] = Number.isFinite(v) ? v : null;
   }
 
-  /** Ajoute v seulement si la série existe déjà ou si v est connu : une série commence à sa première valeur. */
+  /** Adds v only if the series already exists or v is known: a series starts at its first value. */
   private known(key: string, v: number | null | undefined): void {
     if (typeof v === 'number' && Number.isFinite(v)) this.push(key, v);
     else if (this.history.has(key)) this.push(key, NaN);
@@ -171,7 +171,7 @@ export class Monitor {
     this.tickNo++;
 
     if (pid !== this.lastPid) {
-      // Nouveau process (redémarrage, autre profil) : les compteurs repartent de zéro, pas de delta avec l'ancien.
+      // New process (restart, other profile): the counters start over from zero, no delta with the old one.
       this.lastPid = pid;
       this.prevRaw = null;
       this.prevMetrics = null;
@@ -280,7 +280,7 @@ export class Monitor {
     });
   }
 
-  /** Une série existante non alimentée à ce tick reçoit un trou : toutes avancent ensemble, alignées sur les instants. */
+  /** An existing series not fed on this tick gets a gap: they all move together, aligned on the timestamps. */
   private finish(snap: Omit<Snapshot, 'points' | 'history'>): Snapshot {
     for (const key of this.history.keys()) if (!(key in this.points)) this.push(key, NaN);
     return {
@@ -290,7 +290,7 @@ export class Monitor {
     };
   }
 
-  /** Séries de chaque GPU de la machine, utilisée ou non par le serveur. */
+  /** Series of every GPU in the machine, whether the server uses it or not. */
   private pushGpuSeries(all: GpuSample[]): void {
     for (const g of all) {
       this.push(SERIES.gpuUtil(g.key), g.suspended || g.hidden ? NaN : (g.utilPct ?? 0));
@@ -302,7 +302,7 @@ export class Monitor {
     }
   }
 
-  /** CPU/mémoire et disques avec leurs séries ; ne lève jamais. Collecteur coupé : trou dans ses séries. */
+  /** CPU/memory and disks with their series; never throws. Collector off: gap in its series. */
   private async sampleMachine(state: ServerState): Promise<{ system: SystemSample | null; disk: DiskSample | null }> {
     const sys = this.collectors.system;
     const dsk = this.collectors.disk;
@@ -332,8 +332,8 @@ export class Monitor {
   }
 
   /**
-   * Disque du modèle du profil en cours ; null pour un serveur externe et tant que la recherche n'a pas abouti.
-   * La recherche tourne en tâche de fond, une fois par profil : un stat sur un montage NFS mort ne doit jamais bloquer un tick.
+   * Model disk of the current profile; null for an external server and until the lookup has succeeded.
+   * The lookup runs in the background, once per profile: a stat on a dead NFS mount must never block a tick.
    */
   private modelDiskFor(state: ServerState): string | null {
     const disk = this.collectors.disk;
@@ -357,8 +357,8 @@ export class Monitor {
   }
 
   /**
-   * Toutes les GPU, triées par busId ; VRAM du process seulement avec un pid. Les cartes masquées sont listées
-   * sans être lues ; une carte AMD en veille n'est pas lue (la lecture la réveillerait).
+   * All GPUs, sorted by busId; process VRAM only with a pid. Hidden cards are listed without being
+   * read; a suspended AMD card is not read (reading it would wake it up).
    */
   private async collectGpus(pid: number | null): Promise<GpuSample[]> {
     const { nvidia, amd } = this.collectors;
@@ -367,7 +367,7 @@ export class Monitor {
       if (this.ticksForPid === 1) await nvidia.refreshApps().catch(() => {});
       else if (this.ticksForPid % APPS_EVERY === 0) void nvidia.refreshApps().catch(() => {});
     }
-    // Cartes masquées ou en veille : ni sysfs ni fdinfo (leurs nœuds DRM sont sautés dans /proc/<pid>/fd).
+    // Hidden or suspended cards: neither sysfs nor fdinfo (their DRM nodes are skipped in /proc/<pid>/fd).
     const skipNodes = new Set<string>();
     const readAmd = async (c: AmdCard): Promise<GpuReading | null> => {
       const skip = (r: GpuReading) => {

@@ -4,7 +4,7 @@ import { BenchForm } from './BenchForm';
 import { BenchHistory } from './BenchHistory';
 import { BenchLiveCard } from './BenchLiveCard';
 
-/** Benchmark : formulaire et run en cours en haut, historique et comparaison en dessous. */
+/** Benchmark: form and current run at the top, history and comparison below. */
 export function BenchPage() {
   useEffect(() => {
     startBenchSync();

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** Date.now() rafraîchi toutes les `intervalMs`. */
+/** Date.now() refreshed every `intervalMs`. */
 export function useNow(intervalMs = 1000): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

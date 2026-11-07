@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-/** Flags que llama-webui passe lui-même ; un profil ne peut pas les mettre dans `args`. */
+/** Flags llama-webui passes itself; a profile cannot put them in `args`. */
 export const RESERVED_FLAGS = [
   '--host',
   '--port',
@@ -13,19 +13,19 @@ export const RESERVED_FLAGS = [
   '--mmproj',
 ] as const;
 
-/** Le flag réservé que passe `arg` (`--host=…` compte comme `--host`), s'il en passe un. */
+/** The reserved flag `arg` passes (`--host=…` counts as `--host`), if any. */
 export function reservedFlag(arg: string): string | undefined {
   const flag = arg.split('=')[0]!;
   return (RESERVED_FLAGS as readonly string[]).includes(flag) ? flag : undefined;
 }
 
-export const reservedFlagMessage = (flag: string) => `${flag} est géré par llama-webui (utilisez les champs du profil)`;
+export const reservedFlagMessage = (flag: string) => `${flag} is managed by llama-webui (use the profile fields)`;
 
-const required = () => z.string({ error: 'obligatoire' }).min(1, 'ne peut pas être vide');
-const integer = () => z.number({ error: 'nombre attendu' }).int({ error: 'nombre entier attendu' });
-const port = integer().min(1, 'port entre 1 et 65535').max(65535, 'port entre 1 et 65535');
+const required = () => z.string({ error: 'required' }).min(1, 'cannot be empty');
+const integer = () => z.number({ error: 'expected a number' }).int({ error: 'expected an integer' });
+const port = integer().min(1, 'port between 1 and 65535').max(65535, 'port between 1 and 65535');
 
-/** Profil tel que llama-tui l'écrit dans sa config (format d'import/export). */
+/** Profile as llama-tui writes it in its config (import/export format). */
 export const ProfileInputSchema = z
   .strictObject({
     name: required(),
@@ -63,23 +63,23 @@ function firstIssue(error: z.ZodError): string {
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**
- * Lit un JSON d'import : config llama-tui entière (`{ profiles: [...] }`, autres clés ignorées), tableau de profils
- * ou profil seul. Chaque profil est validé isolément : les valides sont gardés, les autres expliqués.
+ * Reads an import JSON: a whole llama-tui config (`{ profiles: [...] }`, other keys ignored), an array of profiles or
+ * a single profile. Each profile is validated on its own: valid ones are kept, the others explained.
  */
 export function parseProfileImport(raw: unknown): ProfileImport {
   let items: unknown[];
   if (Array.isArray(raw)) items = raw;
   else if (isObject(raw) && Array.isArray(raw.profiles)) items = raw.profiles;
   else if (isObject(raw) && ('name' in raw || 'model' in raw)) items = [raw];
-  else return { profiles: [], rejected: [{ name: '(fichier)', reason: 'aucun profil trouvé dans ce JSON' }] };
+  else return { profiles: [], rejected: [{ name: '(file)', reason: 'no profile found in this JSON' }] };
 
   const result: ProfileImport = { profiles: [], rejected: [] };
   const seen = new Set<string>();
   for (const item of items) {
-    const name = isObject(item) && typeof item.name === 'string' && item.name ? item.name : '(sans nom)';
+    const name = isObject(item) && typeof item.name === 'string' && item.name ? item.name : '(unnamed)';
     const parsed = ProfileInputSchema.safeParse(item);
     if (!parsed.success) result.rejected.push({ name, reason: firstIssue(parsed.error) });
-    else if (seen.has(parsed.data.name)) result.rejected.push({ name, reason: 'nom en double dans le fichier' });
+    else if (seen.has(parsed.data.name)) result.rejected.push({ name, reason: 'duplicate name in the file' });
     else {
       seen.add(parsed.data.name);
       result.profiles.push(parsed.data);

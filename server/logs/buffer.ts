@@ -1,6 +1,6 @@
 import { classifyLine, type LogLine } from '@llama-webui/shared';
 
-/** Ring des logs en RAM (pas de persistance). Les abonnés reçoivent les nouvelles lignes par lot (une microtâche). */
+/** In-RAM log ring (no persistence). Subscribers receive new lines in batches (one microtask). */
 export class LogBuffer {
   private buf: LogLine[] = [];
   private next = 0;
@@ -23,13 +23,13 @@ export class LogBuffer {
     }
   }
 
-  /** Lignes encore en mémoire dont le numéro est ≥ `seq`. */
+  /** Lines still in memory whose number is ≥ `seq`. */
   since(seq: number): LogLine[] {
     const first = this.buf[0]?.seq ?? this.next;
     return this.buf.slice(Math.max(0, seq - first));
   }
 
-  /** Numéro de la prochaine ligne. */
+  /** Number of the next line. */
   get seq(): number {
     return this.next;
   }

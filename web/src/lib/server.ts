@@ -6,7 +6,7 @@ import { onWs, useWs } from './ws';
 
 interface ServerStore {
   view: ServerView | null;
-  /** Une action de cycle de vie est en cours côté client. */
+  /** A lifecycle action is in progress on the client. */
   busy: boolean;
 }
 
@@ -17,12 +17,12 @@ async function refresh() {
     const st = await api<{ server: ServerView; logSeq: number }>('/state');
     useServer.setState({ view: st.server });
   } catch {
-    // le WS est ouvert mais l'API ne répond pas : la prochaine reconnexion réessaiera
+    // the WS is open but the API does not answer: the next reconnect will retry
   }
 }
 
 let started = false;
-/** Alimente le store : messages « server-state » + relecture de l'état à chaque (re)connexion. */
+/** Feeds the store: “server-state” messages + a state reread on every (re)connect. */
 export function startServerSync() {
   if (started) return;
   started = true;
@@ -53,5 +53,5 @@ export const switchProfile = (profileId: number) => action('switch', { profileId
 export const restartServer = () => action('restart');
 export const stopServer = () => action('stop');
 
-/** Le serveur tourne (géré) : on peut l'arrêter, le redémarrer ou basculer. */
+/** The (managed) server is running: it can be stopped, restarted or switched. */
 export const isRunning = (v: ServerView | null) => v?.state.kind === 'starting' || v?.state.kind === 'ready';

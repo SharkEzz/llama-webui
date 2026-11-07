@@ -9,22 +9,22 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { modelName } from '@/features/bench/format';
 import { PHASE_LABEL } from '@/lib/bench';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, plural } from '@/lib/format';
 import { useTuning } from '@/lib/tuning';
 import { useNow } from '@/lib/useNow';
 import { RankingTable } from './RankingTable';
 import { StopServerDialog } from './StopServerDialog';
 
 export const SWEEP_STATUS: Record<SweepStatus, { label: string; variant: 'secondary' | 'outline' | 'destructive' }> = {
-  running: { label: 'en cours', variant: 'secondary' },
-  done: { label: 'terminé', variant: 'outline' },
-  cancelled: { label: 'annulé', variant: 'secondary' },
-  interrupted: { label: 'interrompu', variant: 'destructive' },
+  running: { label: 'running', variant: 'secondary' },
+  done: { label: 'done', variant: 'outline' },
+  cancelled: { label: 'cancelled', variant: 'secondary' },
+  interrupted: { label: 'interrupted', variant: 'destructive' },
 };
 
-const VALIDATE_ITEMS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n} meilleur${n > 1 ? 's' : ''}` }));
+const VALIDATE_ITEMS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `Top ${n}` }));
 
-/** Le sweep ouvert : progression, élément en cours, actions (annuler, reprendre, valider, supprimer) et classement. */
+/** The open sweep: progress, current item, actions (cancel, resume, validate, delete) and ranking. */
 export function SweepCard() {
   const current = useTuning((s) => s.current);
   const sweepLive = useTuning((s) => s.sweepLive);
@@ -33,7 +33,7 @@ export function SweepCard() {
   const [confirm, setConfirm] = useState<'resume' | 'validate' | null>(null);
   const now = useNow(1000);
   const logRef = useRef<HTMLPreElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: live.lines est un déclencheur : défilement en bas à chaque lot
+  // biome-ignore lint/correctness/useExhaustiveDependencies: live.lines is a trigger: scroll to the bottom on every batch
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -60,13 +60,13 @@ export function SweepCard() {
 
   return (
     <GlassCard
-      title={running ? 'Sweep en cours' : `Sweep « ${sweep.name} »`}
+      title={running ? 'Sweep running' : `Sweep “${sweep.name}”`}
       icon={ListOrdered}
       actions={
         <>
           <Badge variant={SWEEP_STATUS[sweep.status].variant}>{SWEEP_STATUS[sweep.status].label}</Badge>
           {!running && (
-            <Button variant="ghost" size="icon-sm" onClick={() => void open(null)} aria-label="Fermer le sweep">
+            <Button variant="ghost" size="icon-sm" onClick={() => void open(null)} aria-label="Close sweep">
               <X />
             </Button>
           )}
@@ -88,7 +88,7 @@ export function SweepCard() {
             <span>
               {mine ? (
                 <>
-                  {mine.stage === 'validate' ? 'Validation' : 'Élément'}{' '}
+                  {mine.stage === 'validate' ? 'Validation' : 'Item'}{' '}
                   <span className="num">
                     {mine.index}/{mine.total}
                   </span>
@@ -97,19 +97,19 @@ export function SweepCard() {
                 </>
               ) : (
                 <>
-                  <span className="num">{done}</span> / <span className="num">{c.total}</span> exécutés
+                  <span className="num">{done}</span> / <span className="num">{c.total}</span> done
                 </>
               )}
             </span>
             <span className="num text-xs text-muted-foreground">
-              {c.ok} ok · {c.failed} échec{c.failed > 1 ? 's' : ''}
-              {c.cancelled > 0 && ` · ${c.cancelled} annulé${c.cancelled > 1 ? 's' : ''}`}
-              {c.interrupted > 0 && ` · ${c.interrupted} interrompu${c.interrupted > 1 ? 's' : ''}`}
+              {c.ok} ok · {c.failed} failed
+              {c.cancelled > 0 && ` · ${c.cancelled} cancelled`}
+              {c.interrupted > 0 && ` · ${c.interrupted} interrupted`}
               {running && ` · ${formatDuration(now - sweep.createdAt)}`}
-              {running && left !== null && ` · reste ≈ ${formatDuration(left)}`}
+              {running && left !== null && ` · ≈ ${formatDuration(left)} left`}
             </span>
           </div>
-          <Progress value={c.total ? (done / c.total) * 100 : 0} aria-label="Progression du sweep" />
+          <Progress value={c.total ? (done / c.total) * 100 : 0} aria-label="Sweep progress" />
         </div>
 
         {itemLive && (
@@ -124,27 +124,27 @@ export function SweepCard() {
         <div className="flex flex-wrap items-center gap-2">
           {running && (
             <ConfirmDialog
-              title="Annuler le sweep ?"
-              description="L'élément en cours est arrêté et les éléments en attente sont annulés ; le serveur est relancé s'il avait été arrêté."
-              confirmLabel="Annuler le sweep"
+              title="Cancel the sweep?"
+              description="The current item is stopped and queued items are cancelled; the server is restarted if it was stopped."
+              confirmLabel="Cancel sweep"
               destructive
               onConfirm={() => cancelSweep(sweep.id)}
               trigger={
                 <Button variant="outline" size="sm">
-                  <Square /> Annuler le sweep
+                  <Square /> Cancel sweep
                 </Button>
               }
             />
           )}
           {sweep.status === 'interrupted' && (
             <Button size="sm" onClick={() => void act('resume')}>
-              <Play /> Reprendre
+              <Play /> Resume
             </Button>
           )}
           {!running && (
             <div className="flex items-center gap-2">
               <Select items={VALIDATE_ITEMS} value={n} onValueChange={(v) => v && setN(v)}>
-                <SelectTrigger size="sm" className="w-36" aria-label="Nombre de configurations à valider">
+                <SelectTrigger size="sm" className="w-36" aria-label="Number of configurations to validate">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -159,23 +159,23 @@ export function SweepCard() {
                 size="sm"
                 variant="outline"
                 disabled={!explored}
-                title={explored ? undefined : "aucun run d'exploration réussi"}
+                title={explored ? undefined : 'no successful exploration run'}
                 onClick={() => void act('validate')}
               >
-                <CheckCheck /> Valider sur le serveur
+                <CheckCheck /> Validate on the server
               </Button>
             </div>
           )}
           {!running && (
             <ConfirmDialog
-              title={`Supprimer le sweep « ${sweep.name} » ?`}
-              description={`Ses ${c.total} runs seront définitivement supprimés, de l'historique Benchmark aussi.`}
-              confirmLabel="Supprimer"
+              title={`Delete sweep “${sweep.name}”?`}
+              description={`Its ${c.total} ${plural(c.total, 'run')} will be permanently deleted, from the Benchmark history too.`}
+              confirmLabel="Delete"
               destructive
               onConfirm={() => removeSweep(sweep.id)}
               trigger={
                 <Button variant="ghost" size="sm" className="ml-auto">
-                  <Trash2 /> Supprimer le sweep
+                  <Trash2 /> Delete sweep
                 </Button>
               }
             />

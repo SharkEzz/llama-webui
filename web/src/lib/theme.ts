@@ -30,7 +30,7 @@ function apply(mode: ThemeMode): 'light' | 'dark' {
 interface ThemeState {
   mode: ThemeMode;
   resolved: 'light' | 'dark';
-  /** Applique le thème, le garde dans le navigateur et en base. */
+  /** Applies the theme and stores it in the browser and the database. */
   setMode(mode: ThemeMode): void;
 }
 
@@ -46,7 +46,7 @@ export const useTheme = create<ThemeState>((set) => {
   };
 });
 
-/** Suit prefers-color-scheme en mode Système ; la base fait foi au démarrage (choix fait depuis un autre navigateur). */
+/** Follows prefers-color-scheme in System mode; the database wins at startup (choice made from another browser). */
 export function startThemeSync() {
   media.addEventListener('change', () => {
     const { mode } = useTheme.getState();

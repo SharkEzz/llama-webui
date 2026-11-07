@@ -9,7 +9,7 @@ export interface ServerRouteDeps {
   runtime: Runtime;
   profiles: ProfilesRepo;
   settings: SettingsRepo;
-  /** Un benchmark tourne : il a la main sur les GPU (et relance lui-même le serveur qu'il a arrêté). */
+  /** A benchmark is running: it owns the GPUs (and restarts the server it stopped by itself). */
   benchBusy(): boolean;
 }
 
@@ -18,12 +18,12 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
   const view = () => Response.json(serverView(supervisor));
 
   /**
-   * Les refus du superviseur (port occupé, opération en cours…) deviennent des 409. Comparaison par nom et non par
-   * instanceof : le superviseur survit à `bun --hot` et lève la classe de l'ancienne version du module.
+   * Supervisor refusals (port in use, operation in progress…) become 409s. Compared by name rather than with
+   * instanceof: the supervisor survives `bun --hot` and throws the class from the old version of the module.
    */
   const lifecycle = async (fn: () => Promise<void>) => {
     try {
-      if (benchBusy()) throw new HttpError(409, 'Un benchmark est en cours');
+      if (benchBusy()) throw new HttpError(409, 'A benchmark is running');
       await fn();
     } catch (e) {
       if (e instanceof Error && e.name === 'SupervisorError') throw new HttpError(409, e.message);
@@ -34,7 +34,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
   const commandFor = (profileId: unknown) => {
     const id = Number(profileId);
     const profile = Number.isInteger(id) ? profiles.get(id) : null;
-    if (!profile) throw notFound('Profil');
+    if (!profile) throw notFound('Profile');
     return buildCommand(profile, settings.get());
   };
 
@@ -66,8 +66,8 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
     '/api/server/restart': {
       POST: guarded(async () => {
         const id = serverView(supervisor).profileId;
-        if (id === null) throw new HttpError(409, 'Aucun profil à redémarrer');
-        const cmd = commandFor(id); // relu en base : les modifications du profil sont prises en compte
+        if (id === null) throw new HttpError(409, 'No profile to restart');
+        const cmd = commandFor(id); // re-read from the DB: profile changes are taken into account
         await lifecycle(() => supervisor.switchTo(cmd));
         return Response.json(serverView(supervisor), { status: 202 });
       }),
@@ -81,14 +81,14 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
     '/api/server/props': {
       GET: guarded(async () => {
         const s = supervisor.state;
-        if (s.kind !== 'ready' && s.kind !== 'external') throw new HttpError(409, 'Serveur non prêt');
+        if (s.kind !== 'ready' && s.kind !== 'external') throw new HttpError(409, 'Server not ready');
         let r: Response;
         try {
           r = await fetch(`http://127.0.0.1:${s.port}/props`, { signal: AbortSignal.timeout(2000) });
         } catch {
-          throw new HttpError(502, 'llama-server ne répond pas sur /props');
+          throw new HttpError(502, 'llama-server is not responding on /props');
         }
-        if (!r.ok) throw new HttpError(502, `llama-server /props : HTTP ${r.status}`);
+        if (!r.ok) throw new HttpError(502, `llama-server /props: HTTP ${r.status}`);
         return Response.json(await r.json());
       }),
     },
@@ -96,7 +96,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
       GET: guarded(async () => {
         const { binary } = settings.get();
         const flags = await getFlags(binary);
-        if (!flags) throw new HttpError(503, `llama-server --help a échoué (${binary})`);
+        if (!flags) throw new HttpError(503, `llama-server --help failed (${binary})`);
         return Response.json({ flags });
       }),
     },

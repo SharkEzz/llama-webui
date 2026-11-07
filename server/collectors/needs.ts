@@ -1,19 +1,19 @@
 /**
- * Ce que les lecteurs de GPU doivent lire (repris de llama-tui, sans réglages d'affichage) :
- * tout est mesuré, sauf les cartes masquées (réglage hiddenGpus), seulement identifiées.
+ * What the GPU readers must read (taken from llama-tui, without display settings):
+ * everything is measured, except hidden cards (hiddenGpus setting), which are only identified.
  */
 export interface GpuNeeds {
-  /** false : aucune carte n'est lue. */
+  /** false: no card is read. */
   gpus: boolean;
-  /** Débit PCIe (NVML bloque ~50 ms par GPU pour le lire). */
+  /** PCIe bandwidth (NVML blocks ~50 ms per GPU to read it). */
   pcie: boolean;
-  /** Cartes masquées (bus PCI) : non lues. */
+  /** Hidden cards (PCI bus): not read. */
   skipGpus: string[];
 }
 
 export const MEASURE_ALL: GpuNeeds = { gpus: true, pcie: true, skipGpus: [] };
 
-/** Carte à ne pas lire : seulement identifiée. */
+/** Card not to read: only identified. */
 export const gpuSkipped = (n: GpuNeeds, busId: string) => !n.gpus || n.skipGpus.includes(busId);
 
 export const gpuNeeds = (hiddenGpus: string[]): GpuNeeds => ({ gpus: true, pcie: true, skipGpus: hiddenGpus });
