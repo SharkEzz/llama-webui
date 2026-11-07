@@ -68,7 +68,7 @@ export async function slotLink(
 
 export const PCI_IDS = ['/usr/share/hwdata/pci.ids', '/usr/share/misc/pci.ids', '/usr/share/pci.ids'];
 
-/** Noms « vendor:device » → nom, par fichier pci.ids (environ 1,5 Mo : lu et découpé une seule fois par process). */
+/** Noms « vendor:device » → nom complet, par fichier pci.ids (environ 1,5 Mo : lu et découpé une seule fois par process). */
 const pciIdsCache = new Map<string, Promise<Map<string, string> | null>>();
 
 function parsePciIds(text: string): Map<string, string> {
@@ -81,8 +81,7 @@ function parsePciIds(text: string): Map<string, string> {
       if (line.startsWith('C ')) break;
       vendor = line.slice(0, 4).toLowerCase();
     } else if (!line.startsWith('\t\t')) {
-      const name = line.slice(5).trim();
-      names.set(`${vendor}:${line.slice(1, 5).toLowerCase()}`, /\[([^\]]+)\]/.exec(name)?.[1] ?? name);
+      names.set(`${vendor}:${line.slice(1, 5).toLowerCase()}`, line.slice(5).trim());
     }
   }
   return names;
@@ -101,9 +100,28 @@ function loadPciIds(path: string): Promise<Map<string, string> | null> {
   return p;
 }
 
+/** Nom complet d'un périphérique dans pci.ids (« JHL7540 Thunderbolt 3 Bridge [Titan Ridge DD 2018] ») ; null si inconnu. */
+export async function pciIdsEntry(
+  pdev: string,
+  pciRoot = '/sys/bus/pci/devices',
+  idsPaths: readonly string[] = PCI_IDS,
+): Promise<string | null> {
+  const id = async (f: string) => (await readText(join(pciRoot, pdev, f)))?.toLowerCase().replace(/^0x/, '') ?? null;
+  const [vendor, device] = await Promise.all([id('vendor'), id('device')]);
+  if (!vendor || !device) return null;
+  for (const path of idsPaths) {
+    const names = await loadPciIds(path);
+    if (names) return names.get(`${vendor}:${device}`) ?? null;
+  }
+  return null;
+}
+
+/** Le nom entre crochets (« GB203 [GeForce RTX 5070 Ti] ») est préféré au nom de la puce. */
+const displayName = (entry: string) => /\[([^\]]+)\]/.exec(entry)?.[1] ?? entry;
+
 /**
  * Nom d'un périphérique d'après ses identifiants sysfs (`vendor`, `device` : attributs en cache, lus sans réveiller la
- * carte) et la base pci.ids. Le nom entre crochets (« GB203 [GeForce RTX 5070 Ti] ») est préféré au nom de la puce.
+ * carte) et la base pci.ids.
  */
 export async function pciName(
   pdev: string,
@@ -111,14 +129,25 @@ export async function pciName(
   idsPaths: readonly string[] = PCI_IDS,
   fallback: string = pdev,
 ): Promise<string> {
-  const id = async (f: string) => (await readText(join(pciRoot, pdev, f)))?.toLowerCase().replace(/^0x/, '') ?? null;
-  const [vendor, device] = await Promise.all([id('vendor'), id('device')]);
-  if (!vendor || !device) return fallback;
-  for (const path of idsPaths) {
-    const names = await loadPciIds(path);
-    if (names) return names.get(`${vendor}:${device}`) ?? fallback;
-  }
-  return fallback;
+  const entry = await pciIdsEntry(pdev, pciRoot, idsPaths);
+  return entry === null ? fallback : displayName(entry);
+}
+
+/**
+ * Le premier bridge sous un root port est le chipset s'il vient du fabricant de la plateforme (celui du root port :
+ * AMD pour Promontory, X570 et 600 Series). Un switch d'un autre fabricant (PLX/Broadcom, ASMedia, Microchip : carte
+ * NVMe, riser) n'est pas un chipset : ses périphériques restent reliés au CPU. Thunderbolt et USB4, du même fabricant
+ * que le root port sur Intel, n'en sont pas non plus : le noyau marque « removable » ce qui est sous un port externe,
+ * et le nom pci.ids complet le dit.
+ */
+async function isChipset(up: string, root: string, entry: string | null): Promise<boolean> {
+  const [upVendor, rootVendor, removable] = await Promise.all([
+    readText(join(up, 'vendor')),
+    readText(join(root, 'vendor')),
+    readText(join(up, 'removable')),
+  ]);
+  if (upVendor === null || upVendor !== rootVendor) return false;
+  return removable !== 'removable' && !/thunderbolt|usb4/i.test(entry ?? '');
 }
 
 /** « 600 Series Chipset PCIe Switch Upstream Port » → « 600 Series Chipset ». */
@@ -308,15 +337,19 @@ export async function readPciTopology(o: PciTopologyOptions = {}): Promise<Topol
     const cardStart = linkPath === devicePath ? chain.length : chain.indexOf(linkPath);
     const between = chain.slice(1, cardStart);
     let from = 'cpu';
-    if (between.length > 0 && chain[0]) {
-      const up = between[0]!;
+    const up = between[0];
+    const root = chain[0];
+    if (up && root) {
       const upId = basename(up);
-      from = `chipset:${upId}`;
-      if (!chipsets.has(from)) {
-        chipsets.add(from);
-        const name = await pciName(upId, devicesDir, pciIds, '');
-        nodes.push({ id: from, kind: 'chipset', label: chipsetLabel(name || null), busId: upId, detail: {} });
-        links.push(await pcieLink(`cpu-${from}`, 'cpu', from, up, chain[0]));
+      const entry = await pciIdsEntry(upId, devicesDir, pciIds);
+      if (await isChipset(up, root, entry)) {
+        from = `chipset:${upId}`;
+        if (!chipsets.has(from)) {
+          chipsets.add(from);
+          const label = chipsetLabel(entry === null ? null : displayName(entry));
+          nodes.push({ id: from, kind: 'chipset', label, busId: upId, detail: {} });
+          links.push(await pcieLink(`cpu-${from}`, 'cpu', from, up, root));
+        }
       }
     }
 

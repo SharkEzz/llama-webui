@@ -26,15 +26,19 @@ const PCI_IDS = `# fixture
 \t43f4  600 Series Chipset PCIe Switch Upstream Port
 10de  NVIDIA Corporation
 \t2c05  GB203 [GeForce RTX 5070 Ti]
+10b5  Broadcom / PLX
+\t8747  PEX 8747 48-Lane, 5-Port PCI Express Gen 3 (8.0 GT/s) Switch
 2646  Kingston Technology Company, Inc.
 \t5022  OM8PGP4 PCIe 4 NVMe SSD (QLC) (DRAM-less)
+8086  Intel Corporation
+\t15ef  JHL7540 Thunderbolt 3 Bridge [Titan Ridge DD 2018]
 `;
 
 /**
  * A fake sysfs/procfs mirroring the reference machine: two root-port GPUs and an NVMe on the CPU, a Radeon behind a
  * chipset switch (with its own on-card switch), an "internal" bridge device with no link attributes.
  */
-async function machine(): Promise<{ sysRoot: string; procRoot: string; ids: string }> {
+async function machine(extra: Record<string, Dev> = {}): Promise<{ sysRoot: string; procRoot: string; ids: string }> {
   const root = mkdtempSync(join(tmpdir(), 'pci-topo-'));
   tmpDirs.push(root);
   const sys = join(root, 'sys');
@@ -143,7 +147,7 @@ async function machine(): Promise<{ sysRoot: string; procRoot: string; ids: stri
     symlinkSync(p, join(byId, id));
     for (const [cid, c] of Object.entries(d.children ?? {})) await write(p, cid, c);
   };
-  for (const [id, d] of Object.entries(tree)) await write(host, id, d);
+  for (const [id, d] of Object.entries({ ...tree, ...extra })) await write(host, id, d);
 
   // NVMe controller and its block device.
   const ctrl = join(host, '0000:00:01.2', '0000:02:00.0', 'nvme', 'nvme0');
@@ -265,6 +269,68 @@ test('readPciTopology: links, their capacity is the smaller of both ends', async
   // No link attributes: an on-die device.
   expect(link('pci:0000:0d:00.0')).toMatchObject({ from: 'cpu', kind: 'internal', genMax: null, genCur: null });
   expect(g.links).toHaveLength(6);
+});
+
+test('readPciTopology: a third-party switch or a Thunderbolt bridge is not a chipset', async () => {
+  const bridge = (vendor: string, device: string, children: Record<string, Dev>): Dev => ({
+    vendor,
+    device,
+    cls: '0x060400',
+    link: ['8.0 GT/s PCIe', 8, '8.0 GT/s PCIe', 8],
+    children,
+  });
+  const { sysRoot, procRoot, ids } = await machine({
+    // NVMe carrier card: PLX switch in a CPU slot.
+    '0000:00:03.1': bridge('0x1022', '0x14db', {
+      '0000:0a:00.0': bridge('0x10b5', '0x8747', {
+        '0000:0b:00.0': bridge('0x10b5', '0x8747', {
+          '0000:0c:00.0': {
+            vendor: '0x2646',
+            device: '0x5022',
+            cls: '0x010802',
+            link: ['16.0 GT/s PCIe', 4, '8.0 GT/s PCIe', 4],
+          },
+        }),
+      }),
+    }),
+    // eGPU behind a Thunderbolt controller whose vendor is the root port's.
+    '0000:00:07.0': bridge('0x8086', '0x15ef', {
+      '0000:20:00.0': bridge('0x8086', '0x15ef', {
+        '0000:21:00.0': bridge('0x8086', '0x15ef', {
+          '0000:22:00.0': {
+            vendor: '0x10de',
+            device: '0x2c05',
+            cls: '0x030000',
+            link: ['32.0 GT/s PCIe', 16, '8.0 GT/s PCIe', 4],
+          },
+        }),
+      }),
+    }),
+  });
+  // USB4 dock on an AMD root port, unknown to pci.ids: the kernel marks it removable.
+  const dock = join(sysRoot, 'devices', 'pci0000:00', '0000:00:08.3');
+  mkdirSync(join(dock, '0000:30:00.0', '0000:31:00.0'), { recursive: true });
+  for (const [dir, vendor, device, cls] of [
+    [dock, '0x1022', '0x14dd', '0x060400'],
+    [join(dock, '0000:30:00.0'), '0x1022', '0x1234', '0x060400'],
+    [join(dock, '0000:30:00.0', '0000:31:00.0'), '0x2646', '0x5022', '0x010802'],
+  ] as const) {
+    await Bun.write(join(dir, 'vendor'), `${vendor}\n`);
+    await Bun.write(join(dir, 'device'), `${device}\n`);
+    await Bun.write(join(dir, 'class'), `${cls}\n`);
+  }
+  await Bun.write(join(dock, '0000:30:00.0', 'removable'), 'removable\n');
+  const byId = join(sysRoot, 'bus', 'pci', 'devices');
+  symlinkSync(dock, join(byId, '0000:00:08.3'));
+  symlinkSync(join(dock, '0000:30:00.0'), join(byId, '0000:30:00.0'));
+  symlinkSync(join(dock, '0000:30:00.0', '0000:31:00.0'), join(byId, '0000:31:00.0'));
+
+  const g = await readPciTopology({ sysRoot, procRoot, pciIds: [ids] });
+  // Only the real chipset (AMD 600 Series under an AMD root port).
+  expect(g.nodes.filter((n) => n.kind === 'chipset').map((n) => n.busId)).toEqual(['0000:04:00.0']);
+  expect(g.links.find((l) => l.to === 'pci:0000:0c:00.0')?.from).toBe('cpu');
+  expect(g.links.find((l) => l.to === 'pci:0000:22:00.0')?.from).toBe('cpu');
+  expect(g.links.find((l) => l.to === 'pci:0000:31:00.0')?.from).toBe('cpu');
 });
 
 test('readPciTopology: unreadable sysfs still yields CPU and RAM', async () => {
