@@ -20,17 +20,11 @@ bun run check
 bun test
 ```
 
-To lint and format (Biome, installed globally):
+To lint and format (Biome, pinned as a devDependency):
 
 ```bash
 bun run lint       # format + lint + import order, read-only
 bun run lint:fix   # apply the safe fixes
-```
-
-To keep `git blame` useful after the formatting commit:
-
-```bash
-git config blame.ignoreRevsFile .git-blame-ignore-revs
 ```
 
 This project was created using `bun init` in bun v1.4.4. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
