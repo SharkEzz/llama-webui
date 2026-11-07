@@ -7,7 +7,7 @@ export function PlaceholderPage({ title }: { title: string }) {
   const route = ROUTES.find((r) => r.path === pathname);
   const milestone = MILESTONE_BY_PATH[pathname];
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
       <GlassCard icon={route?.icon} title={milestone ? 'Page en construction' : undefined}>
         <p className="text-sm text-muted-foreground">

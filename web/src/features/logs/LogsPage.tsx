@@ -4,11 +4,11 @@ import { ArrowDownToLine, Copy, Eraser, ScrollText, Search } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { GLASS } from '@/components/glass/glass';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { copyText } from '@/lib/clipboard';
 import { hideCurrentLogs, useLogs } from '@/lib/logs';
@@ -52,7 +52,7 @@ export function LogsPage() {
   }, [follow, lines.length, virtualizer]);
 
   return (
-    <div className="flex h-[calc(100dvh-7.5rem)] min-h-96 flex-col gap-4">
+    <div className="flex h-[calc(100dvh-5.5rem)] min-h-96 flex-col gap-4">
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-3xl font-semibold tracking-tight">Logs</h1>
         <span className="text-sm text-muted-foreground">

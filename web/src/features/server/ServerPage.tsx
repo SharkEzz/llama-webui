@@ -5,9 +5,9 @@ import { Link } from 'react-router';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { GlassCard } from '@/components/glass/GlassCard';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LogRow } from '@/features/logs/LogRow';
 import { api } from '@/lib/api';
@@ -45,8 +45,8 @@ export function ServerPage() {
   const items = useMemo(() => profiles.map((p) => ({ value: String(p.id), label: p.name })), [profiles]);
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-wrap items-center gap-4">
+    <div className="flex flex-col gap-4">
+      <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-3xl font-semibold tracking-tight">Serveur</h1>
         <ServerStateBadge state={state} className="text-base" />
       </header>

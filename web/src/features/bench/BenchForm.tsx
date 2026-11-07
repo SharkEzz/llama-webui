@@ -2,6 +2,7 @@ import { CACHE_TYPES, FLASH_ATTN, ignoredByBench, SPLIT_MODES } from '@llama-web
 import { Play, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { GlassCard } from '@/components/glass/GlassCard';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -18,7 +19,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { ModelPicker } from '@/features/models/ModelPicker';
@@ -115,7 +115,7 @@ export function BenchForm() {
           <div className="flex flex-col gap-1.5">
             <Label>Outil</Label>
             <Tabs value={form.kind} onValueChange={(v) => setForm({ kind: v as Form['kind'] })}>
-              <TabsList className="w-full">
+              <TabsList className="h-9 w-full p-1 *:px-3">
                 <TabsTrigger value="bench">llama-bench</TabsTrigger>
                 <TabsTrigger value="server">Serveur</TabsTrigger>
               </TabsList>

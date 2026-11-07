@@ -76,7 +76,7 @@ export function ProfilesPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-3xl font-semibold tracking-tight">Profils</h1>
         <Button onClick={() => select('new')}>

@@ -29,7 +29,7 @@ export function HomePage() {
   const uptime = online && health && fetchedAt ? formatDuration(health.uptimeMs + (now - fetchedAt)) : '—';
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">llama-webui</h1>
         <p className="max-w-prose text-muted-foreground">

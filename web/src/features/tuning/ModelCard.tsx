@@ -2,9 +2,9 @@ import { ignoredByBench, type ModelDetail, shellQuote } from '@llama-webui/share
 import { Box } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { GlassCard } from '@/components/glass/GlassCard';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ModelPicker } from '@/features/models/ModelPicker';
 import { api } from '@/lib/api';

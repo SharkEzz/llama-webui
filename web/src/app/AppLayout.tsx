@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
-import { Outlet, useMatch } from 'react-router';
+import { Outlet } from 'react-router';
 import { AuroraBackground } from '@/components/glass/AuroraBackground';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useHealth } from '@/lib/health';
-import { cn } from '@/lib/utils';
 import { useWs } from '@/lib/ws';
 import { PageSkeleton } from './PageSkeleton';
 import { Sidebar } from './Sidebar';
@@ -15,8 +14,6 @@ import { StatusBar } from './StatusBar';
 export function AppLayout({ loading = false }: { loading?: boolean }) {
   const status = useWs((s) => s.status);
   const refreshHealth = useHealth((s) => s.refresh);
-  // Le chat prend toute la largeur : le fil et la liste en ont besoin.
-  const wide = useMatch('/chat/*') !== null;
 
   // À chaque (re)connexion, on relit l'état du serveur.
   useEffect(() => {
@@ -29,12 +26,9 @@ export function AppLayout({ loading = false }: { loading?: boolean }) {
       <div className="grid h-dvh grid-cols-[4.5rem_minmax(0,1fr)] md:grid-cols-[240px_minmax(0,1fr)]">
         <Sidebar />
         <ScrollArea className="h-dvh">
-          <div
-            className={cn(
-              'mx-auto flex flex-col',
-              wide ? 'max-w-none gap-3 px-3 pt-3 pb-3 lg:px-3' : 'max-w-6xl gap-6 px-6 pt-4 pb-10 lg:px-10',
-            )}
-          >
+          {/* Pleine largeur ; p-4 = la marge de la Sidebar (m-4), même gouttière partout. Le chat et les logs
+              calculent leur hauteur sur p-4 + barre d'état (h-10) + gap-4 : 5.5rem. */}
+          <div className="flex flex-col gap-4 p-4">
             <StatusBar />
             <main>{loading ? <PageSkeleton /> : <Outlet />}</main>
           </div>

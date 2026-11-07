@@ -12,7 +12,7 @@ export function BenchPage() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <h1 className="text-3xl font-semibold tracking-tight">Benchmark</h1>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <BenchForm />

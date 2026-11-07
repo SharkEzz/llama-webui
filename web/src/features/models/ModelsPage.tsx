@@ -36,8 +36,8 @@ export function ModelsPage() {
   );
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Modèles</h1>
           {list && <p className="font-mono text-sm text-muted-foreground">{list.dir}</p>}
@@ -85,7 +85,7 @@ export function ModelsPage() {
                 />
               </InputGroup>
               <Tabs value={kind} onValueChange={(v) => setKind(v as KindFilter)}>
-                <TabsList>
+                <TabsList className="h-9 p-1 *:px-3">
                   <TabsTrigger value="model">Modèles</TabsTrigger>
                   <TabsTrigger value="mmproj">Projecteurs</TabsTrigger>
                   <TabsTrigger value="all">Tous</TabsTrigger>

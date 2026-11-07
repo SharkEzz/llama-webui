@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { GLASS } from '@/components/glass/glass';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -55,13 +55,13 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <h1 className="text-3xl font-semibold tracking-tight">Réglages</h1>
       {!settings ? (
         <Skeleton className="h-72" />
       ) : (
         <Tabs defaultValue="general">
-          <TabsList className={cn(GLASS, 'h-9')}>
+          <TabsList className={cn(GLASS, 'h-9 p-1 *:px-3')}>
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
             <TabsTrigger value="appearance">Apparence</TabsTrigger>
