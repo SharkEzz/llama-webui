@@ -34,6 +34,22 @@ test('parsePlacement: real llama-server start, buffers summed per device, bus id
   expect(by.get('CUDA_Host')).toMatchObject({ busId: null, modelBytes: 0, computeBytes: 63.98 * MiB });
 });
 
+test('parsePlacement: real MTP + mmproj start, compute per context, a context reserved again keeps its last size', async () => {
+  const text = (await Bun.file(`${import.meta.dir}/../../testdata/llama-server-load-mtp.txt`).text()).trimEnd();
+  const p = parsePlacement(lines(text))!;
+  expect(p.layers).toEqual({ offloaded: 66, total: 66 });
+  const by = new Map(p.buffers.map((b) => [b.device, b]));
+  // Main context 504.08; the mmproj's own 248.10 (reserve_compute_meta) left out.
+  expect(by.get('CUDA0')!.computeBytes).toBeCloseTo(504.08 * MiB, 0);
+  expect(by.get('CUDA1')!.computeBytes).toBeCloseTo(414.06 * MiB, 0);
+  // Main context 414.06 + MTP context 454.06, reserved twice: counted once.
+  expect(by.get('ROCm0')!.computeBytes).toBeCloseTo((414.06 + 454.06) * MiB, 0);
+  expect(by.get('CUDA_Host')!.computeBytes).toBeCloseTo((352.09 + 302.07) * MiB, 0);
+  // KV of the MTP context counted with the model's.
+  expect(by.get('ROCm0')!.kvBytes).toBeCloseTo((1260 + 252) * MiB, 0);
+  expect(by.get('ROCm0')!.modelBytes).toBeCloseTo(4530.42 * MiB, 0);
+});
+
 test('parsePlacement: the main model only, not a draft model (-md) nor the mmproj buffers', async () => {
   const main = (await fixture()).split('\n');
   const loaded = main.findIndex((l) => l.includes('model loaded'));

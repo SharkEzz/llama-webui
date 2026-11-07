@@ -14,6 +14,10 @@ const PREFIX = /^(?:\d+\.\d+(?:\.\d+)*\s+[IWEDT]\s+)?/;
 const USING = /using device (\S+) \(.*\) \(([0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f])\)/i;
 const LAYERS = /offloaded (\d+)\/(\d+) layers to GPU/;
 const BUFFER = /(\S+) (model|KV|compute) buffer size =\s*([\d.]+) MiB/;
+/** Un nouveau contexte (le principal, puis celui du draft ou du MTP) : il a ses propres buffers compute. */
+const CONTEXT = /llama_context: constructing llama_context/;
+/** Nouvelle réservation du contexte en cours : ses buffers compute remplacent ceux de la précédente. */
+const RESERVE = /sched_reserve: reserving/;
 /** Buffers du projecteur multimodal (mmproj, clip.cpp) : pas le modèle, et estimés avant même son chargement. */
 const MMPROJ = /^(?:clip\w*|(?:reserve|alloc)_compute_meta):/;
 
@@ -23,7 +27,8 @@ export const RELEVANT = /lancement:|using device|buffer size =|offloaded \d+\/\d
 /**
  * Placement du modèle principal issu du dernier lancement présent dans `lines` ; null sans ligne de lancement (ring
  * vidé ou évincé). llama-server charge le modèle principal (poids, cache KV, compute), puis le draft éventuel (-md),
- * puis le mmproj : le second « offloaded N/M layers » ouvre le draft et clôt la lecture.
+ * puis le mmproj : le second « offloaded N/M layers » ouvre le draft et clôt la lecture. Le compute se compte par
+ * contexte (celui d'un MTP s'ajoute à celui du modèle) et un contexte réservé à nouveau ne garde que sa dernière taille.
  */
 export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null {
   let start = -1;
@@ -37,8 +42,20 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
   const busIds = new Map<string, string>();
   const buffers = new Map<string, PlacementBuffer>();
   let layers: ModelPlacement['layers'] = null;
+  // Compute par contexte puis par device ; un premier contexte implicite pour les logs sans « constructing ».
+  const contexts: Map<string, number>[] = [new Map()];
+  let constructed = false;
   for (let i = start + 1; i < lines.length; i++) {
     const body = lines[i]!.text.replace(PREFIX, '');
+    if (CONTEXT.test(body)) {
+      if (constructed) contexts.push(new Map());
+      constructed = true;
+      continue;
+    }
+    if (RESERVE.test(body)) {
+      contexts.at(-1)!.clear();
+      continue;
+    }
     let m = USING.exec(body);
     if (m) {
       busIds.set(m[1]!, m[2]!.toLowerCase());
@@ -61,8 +78,12 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
     const bytes = Number(m[3]) * MiB;
     if (m[2] === 'model') b.modelBytes += bytes;
     else if (m[2] === 'KV') b.kvBytes += bytes;
-    else b.computeBytes += bytes;
+    else {
+      const ctx = contexts.at(-1)!;
+      ctx.set(device, (ctx.get(device) ?? 0) + bytes);
+    }
   }
+  for (const ctx of contexts) for (const [device, bytes] of ctx) buffers.get(device)!.computeBytes += bytes;
   for (const b of buffers.values()) b.busId = busIds.get(b.device) ?? null;
   return { launchSeq: lines[start]!.seq, layers, buffers: [...buffers.values()] };
 }
