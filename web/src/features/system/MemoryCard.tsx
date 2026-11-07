@@ -43,7 +43,7 @@ export function MemoryCard({ sample }: { sample: SystemSample | null }) {
             height={120}
             yMax={100}
             format={formatPct}
-            series={[{ key: SERIES.sysMemPct, label: 'RAM', tone: 'cyan' }]}
+            series={[{ key: SERIES.sysMemPct, label: 'RAM', tone: 'teal' }]}
           />
         </div>
       )}

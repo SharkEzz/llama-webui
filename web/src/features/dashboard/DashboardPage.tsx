@@ -45,8 +45,8 @@ export function DashboardPage() {
         </Alert>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile label="Génération" value={rate(snapshot.rates.genTps)} unit="tok/s" tone="violet" />
-          <StatTile label="Prompt" value={rate(snapshot.rates.ppTps)} unit="tok/s" tone="cyan" />
+          <StatTile label="Génération" value={rate(snapshot.rates.genTps)} unit="tok/s" tone="blue" />
+          <StatTile label="Prompt" value={rate(snapshot.rates.ppTps)} unit="tok/s" tone="teal" />
           {spec && spec.drafts > 0 && (
             <StatTile
               label="Acceptation spéculative"

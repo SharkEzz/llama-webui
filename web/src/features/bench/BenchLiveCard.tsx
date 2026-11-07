@@ -78,7 +78,7 @@ export function BenchLiveCard() {
         </div>
         <pre
           ref={logRef}
-          className="h-48 overflow-auto rounded-md bg-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground"
+          className="h-48 overflow-auto rounded-md bg-well inset-shadow-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground"
         >
           {live.lines.join('\n') || '…'}
         </pre>

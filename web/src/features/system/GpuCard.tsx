@@ -45,12 +45,12 @@ export function GpuCard({ gpu: g }: { gpu: GpuSample }) {
       ) : (
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-start gap-6">
-            <Gauge label="Utilisation" value={Math.round(g.utilPct ?? 0)} size={88} tone="violet" />
+            <Gauge label="Utilisation" value={Math.round(g.utilPct ?? 0)} size={88} tone="blue" />
             <Gauge
               label={`VRAM ${formatBytes(g.vramUsedBytes, 1)}`}
               value={Math.round(vramPct)}
               size={88}
-              tone="cyan"
+              tone="teal"
             />
             <div className="min-w-56 flex-1">
               <Facts
@@ -81,8 +81,8 @@ export function GpuCard({ gpu: g }: { gpu: GpuSample }) {
             yMax={100}
             format={formatPct}
             series={[
-              { key: SERIES.gpuUtil(g.key), label: 'Utilisation', tone: 'violet' },
-              { key: SERIES.gpuVramPct(g.key), label: 'VRAM', tone: 'cyan' },
+              { key: SERIES.gpuUtil(g.key), label: 'Utilisation', tone: 'blue' },
+              { key: SERIES.gpuVramPct(g.key), label: 'VRAM', tone: 'teal' },
             ]}
           />
         </div>

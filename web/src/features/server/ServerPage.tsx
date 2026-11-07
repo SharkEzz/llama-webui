@@ -63,7 +63,7 @@ export function ServerPage() {
             ) : loaded && profiles.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Aucun profil.{' '}
-                <Link to="/profiles" className="text-primary underline-offset-4 hover:underline">
+                <Link to="/profiles" className="text-primary-ink underline-offset-4 hover:underline">
                   Créez ou importez un profil
                 </Link>{' '}
                 pour lancer llama-server.
@@ -275,7 +275,7 @@ function CommandCard({ command }: { command: string | null }) {
       }
     >
       {command ? (
-        <pre className="overflow-x-auto rounded-md bg-well p-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-foreground/90">
+        <pre className="overflow-x-auto rounded-md bg-well inset-shadow-well p-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-foreground/90">
           {command}
         </pre>
       ) : (
@@ -301,7 +301,7 @@ function RecentLogs() {
       {last.length === 0 ? (
         <p className="text-sm text-muted-foreground">Rien pour l'instant.</p>
       ) : (
-        <div className="flex flex-col rounded-md bg-well p-3">
+        <div className="flex flex-col rounded-md bg-well inset-shadow-well p-3">
           {last.map((l) => (
             <LogRow key={l.seq} line={l} />
           ))}

@@ -16,7 +16,7 @@ function Item({ route }: { route: AppRoute }) {
         cn(
           'group relative flex h-9 items-center gap-3 rounded-md px-3 text-sm transition-colors',
           'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-          isActive && 'bg-sidebar-accent text-sidebar-accent-foreground',
+          isActive && 'bg-sidebar-primary/12 text-sidebar-accent-foreground hover:bg-sidebar-primary/15',
         )
       }
     >
@@ -39,7 +39,7 @@ function Item({ route }: { route: AppRoute }) {
 
 export function Sidebar() {
   return (
-    <aside className="sticky top-4 m-4 mr-0 flex h-[calc(100dvh-2rem)] flex-col rounded-lg border border-sidebar-border bg-sidebar p-3 text-sidebar-foreground shadow-lg shadow-surface-shadow backdrop-blur-(--surface-blur)">
+    <aside className="sticky top-4 m-4 mr-0 flex h-[calc(100dvh-2rem)] flex-col rounded-lg border border-sidebar-border bg-sidebar p-3 text-sidebar-foreground shadow-surface inset-shadow-highlight backdrop-blur-(--surface-blur)">
       <div className="flex h-10 items-center gap-2.5 px-2">
         <LlamaMark />
         <span className="hidden text-[0.9375rem] font-semibold tracking-tight md:inline">llama-webui</span>
@@ -60,9 +60,9 @@ export function Sidebar() {
 function LlamaMark() {
   return (
     <svg viewBox="0 0 20 20" className="size-5 shrink-0" aria-hidden="true">
-      <rect x="2" y="11" width="4" height="7" rx="1.5" fill="var(--tone-cyan)" />
-      <rect x="8" y="7" width="4" height="11" rx="1.5" fill="var(--tone-violet)" />
-      <rect x="14" y="2" width="4" height="16" rx="1.5" fill="var(--tone-rose)" />
+      <rect x="2" y="11" width="4" height="7" rx="1.5" fill="var(--tone-blue)" />
+      <rect x="8" y="7" width="4" height="11" rx="1.5" fill="var(--tone-teal)" />
+      <rect x="14" y="2" width="4" height="16" rx="1.5" fill="var(--tone-amber)" />
     </svg>
   );
 }

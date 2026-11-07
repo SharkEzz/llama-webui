@@ -31,7 +31,7 @@ export function CpuCard({ info, sample }: { info: CpuInfo | null; sample: System
             height={120}
             yMax={100}
             format={formatPct}
-            series={[{ key: SERIES.sysCpu, label: 'CPU', tone: 'violet' }]}
+            series={[{ key: SERIES.sysCpu, label: 'CPU', tone: 'blue' }]}
           />
         </div>
       )}

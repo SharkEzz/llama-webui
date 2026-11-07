@@ -153,7 +153,9 @@ function Ranking({
                   </TableCell>
                   <TableCell className="font-mono text-xs whitespace-normal">
                     <span className="flex items-center gap-1.5">
-                      {best && <Star className="size-3.5 shrink-0 fill-current text-primary" aria-label="meilleur" />}
+                      {best && (
+                        <Star className="size-3.5 shrink-0 fill-current text-primary-ink" aria-label="meilleur" />
+                      )}
                       {r.run.sweepLabel?.replace(/^validation · /, '') ?? `#${r.run.id}`}
                     </span>
                   </TableCell>

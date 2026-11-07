@@ -1,9 +1,9 @@
 import type { Tone } from '@/components/glass/tones';
 
-/** Série de graphe par ton : --chart-N (validés pour chaque thème), dans l'ordre fixe violet, cyan, ambre, rose. */
+/** Série de graphe par ton : --chart-N (validés pour chaque thème), dans l'ordre fixe bleu, teal, ambre, rose. */
 const CHART_VAR: Record<Tone, string> = {
-  violet: '--chart-1',
-  cyan: '--chart-2',
+  blue: '--chart-1',
+  teal: '--chart-2',
   amber: '--chart-3',
   rose: '--chart-4',
 };
@@ -24,8 +24,8 @@ export function readChartTheme(): ChartTheme {
     grid: v('--border'),
     font: `11px "JetBrains Mono Variable", ui-monospace, monospace`,
     series: {
-      violet: v(CHART_VAR.violet),
-      cyan: v(CHART_VAR.cyan),
+      blue: v(CHART_VAR.blue),
+      teal: v(CHART_VAR.teal),
       amber: v(CHART_VAR.amber),
       rose: v(CHART_VAR.rose),
     },

@@ -5,10 +5,10 @@ const LEVEL: Record<LogLine['level'], string> = {
   error: 'text-tone-rose',
   warn: 'text-tone-amber',
   info: 'text-foreground/85',
-  debug: 'text-muted-foreground/70',
+  debug: 'text-faint-foreground',
 };
 
-/** Une ligne de log : couleur par niveau, lignes de llama-webui en violet, correspondance de recherche surlignée. */
+/** Une ligne de log : couleur par niveau, lignes de llama-webui en couleur d'accent, correspondance de recherche surlignée. */
 export function LogRow({ line, query, className }: { line: LogLine; query?: string; className?: string }) {
   const own = line.text.startsWith('[llama-webui]');
   return (
@@ -18,7 +18,7 @@ export function LogRow({ line, query, className }: { line: LogLine; query?: stri
           {line.kind}
         </span>
       )}
-      <span className={cn('min-w-0 whitespace-pre-wrap break-all', own ? 'text-tone-violet' : LEVEL[line.level])}>
+      <span className={cn('min-w-0 whitespace-pre-wrap break-all', own ? 'text-primary-ink' : LEVEL[line.level])}>
         <Highlight text={line.text} query={query} />
       </span>
     </div>

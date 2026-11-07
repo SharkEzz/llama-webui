@@ -127,7 +127,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
             }}
             // garde le focus dans le textarea pendant le clic sur une suggestion
             onMouseDown={(e) => e.preventDefault()}
-            className="absolute inset-x-0 top-full z-20 mt-1 h-auto rounded-lg! border border-border shadow-xl shadow-surface-shadow backdrop-blur-lg"
+            className="absolute inset-x-0 top-full z-20 mt-1 h-auto rounded-lg! border border-border shadow-surface inset-shadow-highlight backdrop-blur-(--surface-blur)"
           >
             <CommandList ref={listRef} aria-label="Flags suggérés">
               {suggestions.map((name) => {
@@ -164,7 +164,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
         <p className="text-sm text-warning">Inconnu de ce llama-server : {problems.unknown.join(', ')}</p>
       )}
       {helpFlag ? (
-        <p className="rounded-md bg-well px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">
+        <p className="rounded-md bg-well inset-shadow-well px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">
           {describeFlag(helpFlag)}
         </p>
       ) : catalogError ? (

@@ -109,7 +109,7 @@ export function ModelCard() {
             <span className="text-xs text-muted-foreground">
               Autres flags du profil (repris par le profil créé et la validation serveur)
             </span>
-            <code className="rounded-md bg-well px-2.5 py-1.5 font-mono text-xs break-all">
+            <code className="rounded-md bg-well inset-shadow-well px-2.5 py-1.5 font-mono text-xs break-all">
               {shellQuote(serverArgs)}
             </code>
             {ignored.length > 0 && (

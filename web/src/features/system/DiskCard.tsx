@@ -27,8 +27,8 @@ export function DiskCard({ sample }: { sample: DiskSample | null }) {
             height={120}
             format={(v) => formatBps(v)}
             series={[
-              { key: SERIES.diskRead, label: 'Lecture', tone: 'violet' },
-              { key: SERIES.diskWrite, label: 'Écriture', tone: 'cyan' },
+              { key: SERIES.diskRead, label: 'Lecture', tone: 'blue' },
+              { key: SERIES.diskWrite, label: 'Écriture', tone: 'teal' },
               { key: SERIES.modelDiskRead, label: 'Disque du modèle', tone: 'amber' },
             ]}
           />

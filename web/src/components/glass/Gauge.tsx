@@ -12,7 +12,7 @@ interface GaugeProps {
 const SWEEP = 0.75; // arc de 270°
 
 /** Jauge circulaire 270°, ouverture en bas, valeur au centre. */
-export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = 'violet' }: GaugeProps) {
+export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = 'blue' }: GaugeProps) {
   const stroke = Math.max(6, Math.round(size / 14));
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;

@@ -12,7 +12,7 @@ const components: Components = {
   },
   code: ({ children }) => <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
   a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-4">
+    <a href={href} target="_blank" rel="noreferrer" className="text-primary-ink underline underline-offset-4">
       {children}
     </a>
   ),
