@@ -82,6 +82,8 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
     if (tail.length > 50) tail.shift();
   };
   const proc = Bun.spawn(cmd.argv, { cwd: cmd.cwd, env: cmd.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  // Arrêté à la sortie de l'essai, quoi qu'il arrive : SIGTERM, puis SIGKILL après killTimeoutMs.
+  await using _server = { [Symbol.asyncDispose]: () => stop(proc, killTimeoutMs, o.onLine) };
   o.onSpawn(proc);
   const piped = Promise.all([
     pipe(proc.stdout as ReadableStream<Uint8Array>, push),
@@ -166,8 +168,6 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
     if (!exited) await Promise.race([proc.exited, Bun.sleep(EXIT_GRACE_MS)]);
     if (exited || proc.exitCode !== null || proc.signalCode !== null) throw await exitError();
     throw e;
-  } finally {
-    await stop(proc, killTimeoutMs, o.onLine);
   }
 }
 

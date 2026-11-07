@@ -221,7 +221,7 @@ export class RunExecutor {
    * Pic de VRAM au-dessus de ce que chaque carte tenait au lancement : relevé rapide (VramProbe, 100 ms) et, en secours,
    * les snapshots du Monitor (1 s par défaut : un pic court peut leur échapper). Pic de lecture du disque du modèle.
    */
-  private sampler(ex: Exec): () => Promise<void> {
+  private sampler(ex: Exec): AsyncDisposable {
     const gpus = this.deps.gpus();
     const before = new Map(gpus.map((g) => [g.key, g.vramUsedBytes]));
     const probe = new VramProbe(gpus);
@@ -235,20 +235,23 @@ export class RunExecutor {
       if (d !== null && (ex.diskPeak === null || d > ex.diskPeak)) ex.diskPeak = d;
     };
     const timer = setInterval(sample, SAMPLE_MS);
-    return async () => {
-      sample();
-      clearInterval(timer);
-      await probe.stop();
-      for (const g of gpus) {
-        const p = probe.get(g.key);
-        if (p) note(g.key, g.name, Math.max(0, p.max - p.first));
-      }
+    // `await using` : dernier relevé, arrêt de la sonde et pics de la sonde rapide, à la sortie du run.
+    return {
+      [Symbol.asyncDispose]: async () => {
+        sample();
+        clearInterval(timer);
+        await probe.stop();
+        for (const g of gpus) {
+          const p = probe.get(g.key);
+          if (p) note(g.key, g.name, Math.max(0, p.max - p.first));
+        }
+      },
     };
   }
 
   private async runBench(ex: Exec, argv: string[]): Promise<BenchFinish> {
     this.deps.logs.push(`[bench] ${ex.run.command}`);
-    const stopSampling = this.sampler(ex);
+    await using _sampling = this.sampler(ex);
     let proc: Child;
     try {
       // Environnement du profil d'origine (CUDA_VISIBLE_DEVICES… : mêmes cartes que le serveur).
@@ -259,7 +262,6 @@ export class RunExecutor {
         stderr: 'pipe',
       });
     } catch (e) {
-      await stopSampling();
       return { status: 'failed', error: (e as Error).message };
     }
     ex.proc = proc;
@@ -278,7 +280,6 @@ export class RunExecutor {
     });
     await proc.exited;
     const [out] = await Promise.all([stdout.catch(() => ''), stderr]);
-    await stopSampling();
     ex.proc = null;
     if (ex.cancelled) return { status: 'cancelled' };
     const parsed = proc.exitCode === 0 ? parseBenchJson(out) : null;
@@ -288,7 +289,7 @@ export class RunExecutor {
 
   private async runServer(ex: Exec, cmd: BuiltCommand): Promise<BenchFinish> {
     this.deps.logs.push(`[bench] ${cmd.display}`);
-    const stopSampling = this.sampler(ex);
+    await using _sampling = this.sampler(ex);
     try {
       const r = await runServerTrial({
         cmd,
@@ -312,7 +313,6 @@ export class RunExecutor {
       if (e instanceof TrialCancelled || ex.cancelled) return { status: 'cancelled' };
       return { status: 'failed', error: (e as Error).message };
     } finally {
-      await stopSampling();
       ex.proc = null;
     }
   }
