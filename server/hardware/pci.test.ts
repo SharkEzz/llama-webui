@@ -1,13 +1,11 @@
 import { afterAll, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
+import { tempDir } from '../testing/tempDir';
 import { chipsetLabel, cpuLabel, findPciIdsEntry, minKnown, parseLinkSpeed, readPciTopology } from './pci';
 
-const tmpDirs: string[] = [];
-afterAll(() => {
-  for (const d of tmpDirs) rmSync(d, { recursive: true, force: true });
-});
+const dirs = new DisposableStack();
+afterAll(() => dirs.dispose());
 
 interface Dev {
   vendor: string;
@@ -39,8 +37,7 @@ const PCI_IDS = `# fixture
  * chipset switch (with its own on-card switch), an "internal" bridge device with no link attributes.
  */
 async function machine(extra: Record<string, Dev> = {}): Promise<{ sysRoot: string; procRoot: string; ids: string }> {
-  const root = mkdtempSync(join(tmpdir(), 'pci-topo-'));
-  tmpDirs.push(root);
+  const root = dirs.use(tempDir('pci-topo-')).path;
   const sys = join(root, 'sys');
   const proc = join(root, 'proc');
   const host = join(sys, 'devices', 'pci0000:00');

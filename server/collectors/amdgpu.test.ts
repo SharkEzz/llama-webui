@@ -1,8 +1,8 @@
 import { afterAll, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, symlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseLinkSpeed } from '../hardware/pci';
+import { tempDir } from '../testing/tempDir';
 import {
   discoverAmdCards,
   isRuntimeSuspended,
@@ -16,16 +16,10 @@ import {
 
 const fx = (n: string) => Bun.file(`${import.meta.dir}/../../testdata/${n}`).text();
 
-const tmpDirs: string[] = [];
+const dirs = new DisposableStack();
+afterAll(() => dirs.dispose());
 /** A fresh temp directory, removed once the file's tests are done. */
-const tmp = (prefix: string) => {
-  const d = mkdtempSync(join(tmpdir(), prefix));
-  tmpDirs.push(d);
-  return d;
-};
-afterAll(() => {
-  for (const d of tmpDirs) rmSync(d, { recursive: true, force: true });
-});
+const tmp = (prefix: string) => dirs.use(tempDir(prefix)).path;
 
 test('parseFdinfo amdgpu', async () => {
   expect(parseFdinfo(await fx('fdinfo-amd-vram.txt'))).toEqual({
@@ -276,7 +270,8 @@ test('a link that is down or retraining (current width 0) has an unknown width, 
 });
 
 test('pciIdsName names a card from sysfs ids and pci.ids, without lspci (which would wake a suspended card)', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'llw-pciids-'));
+  using dir = tempDir('llw-pciids-');
+  const root = dir.path;
   const dev = join(root, 'devices', '0000:08:00.0');
   mkdirSync(dev, { recursive: true });
   await Bun.write(join(dev, 'vendor'), '0x1002\n');
@@ -291,7 +286,6 @@ test('pciIdsName names a card from sysfs ids and pci.ids, without lspci (which w
   );
   await Bun.write(join(dev, 'device'), '0x9999\n');
   expect(await pciIdsName('0000:08:00.0', join(root, 'devices'), [ids])).toBe('AMD GPU 0000:08:00.0');
-  rmSync(root, { recursive: true, force: true });
 });
 
 test("discoverAmdCards lists each card's DRM nodes (card and render), so fds can be matched to a card", async () => {

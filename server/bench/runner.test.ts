@@ -1,6 +1,4 @@
-import { afterEach, expect, test } from 'bun:test';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { afterAll, afterEach, expect, test } from 'bun:test';
 import { join, resolve } from 'node:path';
 import {
   type BenchLive,
@@ -21,13 +19,16 @@ import { LogBuffer } from '../logs/buffer';
 import { sweepRoutes } from '../routes/sweeps';
 import type { BuiltCommand } from '../supervisor/args';
 import { probeHealth } from '../supervisor/health';
+import { tempDir } from '../testing/tempDir';
 import { type ExecutorDeps, RunExecutor } from './execute';
 import { BenchGate, type ServerControl } from './gate';
 import { BenchRunner } from './runner';
 
 const FAKE = resolve(import.meta.dir, '../../testdata/fake/fake-llama-server');
-const MODEL = join(mkdtempSync(join(tmpdir(), 'lw-bench-')), 'a.gguf');
-writeFileSync(MODEL, '');
+const modelDir = tempDir('lw-bench-');
+afterAll(() => modelDir[Symbol.dispose]());
+const MODEL = join(modelDir.path, 'a.gguf');
+await Bun.write(MODEL, '');
 const cmdA = { display: 'cmdA', profileName: 'A', profileId: 1, port: 8080 } as BuiltCommand;
 
 afterEach(() => {
@@ -216,7 +217,8 @@ test("a bench run gets its profile's environment", async () => {
 
 test("a server run runs in its profile's directory", async () => {
   Object.assign(process.env, { FAKE_LOAD_MS: '50' });
-  const cwd = mkdtempSync(join(tmpdir(), 'lw-cwd-'));
+  using dir = tempDir('lw-cwd-');
+  const cwd = dir.path;
   const { runner, runs, end } = setup(18090, undefined, { profile: () => ({ cwd, env: {} }) });
   await runner.start(BenchSpecSchema.parse({ kind: 'server', modelPath: MODEL, profileId: 1, r: 1, p: 16, n: 4 }), {
     stopServer: true,

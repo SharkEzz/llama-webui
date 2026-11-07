@@ -1,7 +1,7 @@
-import { describe, expect, test } from 'bun:test';
-import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { afterAll, describe, expect, test } from 'bun:test';
+import { chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { tempDir } from '../testing/tempDir';
 import { ModelReadError, type ParsedShard, parseModel, readModel, type TensorInfo } from './gguf';
 import { type FakeTensor, type KvValue, writeGguf } from './gguf.fixture';
 import { tensorBytes, weightSizes } from './sizes';
@@ -10,7 +10,9 @@ const t = (name: string, bytes: number): TensorInfo => ({ name, shape: [bytes], 
 const u32 = (value: number): KvValue => ({ type: 'u32', value });
 const str = (value: string): KvValue => ({ type: 'string', value });
 
-const dir = mkdtempSync(join(tmpdir(), 'llt-gguf-'));
+const tmp = tempDir('llt-gguf-');
+afterAll(() => tmp[Symbol.dispose]());
+const dir = tmp.path;
 
 const DENSE_KV: Record<string, KvValue> = {
   'general.architecture': str('llama'),
@@ -167,7 +169,7 @@ describe('readModel', () => {
 
   test('a file that is not a GGUF is a ModelReadError', async () => {
     const path = join(dir, 'junk.gguf');
-    writeFileSync(path, 'hello');
+    await Bun.write(path, 'hello');
     await expect(readModel(path)).rejects.toBeInstanceOf(ModelReadError);
   });
 

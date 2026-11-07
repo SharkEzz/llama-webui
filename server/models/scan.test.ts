@@ -1,15 +1,16 @@
 import { afterAll, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ModelCacheRepo } from '../db/modelCache';
 import { openDb } from '../db/open';
+import { tempDir } from '../testing/tempDir';
 import { readModel } from './gguf';
 import { type KvValue, writeGguf } from './gguf.fixture';
 import { groupGgufFiles, scanModels } from './scan';
 
-const dir = mkdtempSync(join(tmpdir(), 'lw-scan-'));
-afterAll(() => rmSync(dir, { recursive: true, force: true }));
+const tmp = tempDir('lw-scan-');
+afterAll(() => tmp[Symbol.dispose]());
+const dir = tmp.path;
 const str = (value: string): KvValue => ({ type: 'string', value });
 const u32 = (value: number): KvValue => ({ type: 'u32', value });
 
@@ -30,8 +31,8 @@ test('scanModels skips hidden dirs, classifies mmproj, reports unreadable files 
   writeGguf(join(dir, 'mm.gguf'), { 'general.architecture': str('clip'), 'general.type': str('mmproj') }, tensors);
   mkdirSync(join(dir, '.cache'));
   writeGguf(join(dir, '.cache', 'x.gguf'), { 'general.architecture': str('llama') }, tensors);
-  writeFileSync(join(dir, 'bad.gguf'), 'pas un gguf');
-  writeFileSync(join(dir, 'notes.txt'), 'rien');
+  await Bun.write(join(dir, 'bad.gguf'), 'pas un gguf');
+  await Bun.write(join(dir, 'notes.txt'), 'rien');
 
   const cache = new ModelCacheRepo(openDb(':memory:'));
   let reads = 0;

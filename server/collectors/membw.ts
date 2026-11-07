@@ -140,7 +140,7 @@ export interface MemBandwidthOptions {
   now?: () => number;
 }
 
-export class MemBandwidthSampler {
+export class MemBandwidthSampler implements Disposable {
   private readonly bin: string;
   private intervalMs: number;
   private readonly spawn: typeof Bun.spawn;
@@ -245,5 +245,10 @@ export class MemBandwidthSampler {
     this.proc?.stop();
     this.proc = null;
     this.procPid = null;
+  }
+
+  /** `using s = new MemBandwidthSampler()` : les perf sont arrêtés à la sortie de la portée. */
+  [Symbol.dispose](): void {
+    this.stop();
   }
 }
