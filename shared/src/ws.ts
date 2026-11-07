@@ -3,6 +3,7 @@ import type { LogLine } from './logs';
 import type { Snapshot } from './monitor';
 import type { ServerView } from './server';
 import type { Sweep, SweepLive } from './sweep';
+import type { ModelPlacement } from './topology';
 
 /** Messages échangés sur le WebSocket /ws. */
 export type WsMessage =
@@ -17,4 +18,5 @@ export type WsMessage =
   | { type: 'bench-deleted'; payload: { ids: number[] } }
   | { type: 'sweep-progress'; payload: SweepLive | null }
   | { type: 'sweep'; payload: Sweep } // à chaque changement d'un sweep (statut, compteurs, meilleur)
-  | { type: 'sweep-deleted'; payload: { id: number } };
+  | { type: 'sweep-deleted'; payload: { id: number } }
+  | { type: 'placement'; payload: ModelPlacement | null }; // répartition du modèle chargé, à chaque changement

@@ -36,6 +36,7 @@ export const router = createBrowserRouter([
       { path: 'profiles', ...page(() => import('@/features/profiles/ProfilesPage'), 'ProfilesPage') },
       { path: 'logs', ...page(() => import('@/features/logs/LogsPage'), 'LogsPage') },
       { path: 'system', ...page(() => import('@/features/system/SystemPage'), 'SystemPage') },
+      { path: 'topology', ...page(() => import('@/features/topology/TopologyPage'), 'TopologyPage') },
       { path: 'settings', ...page(() => import('@/features/settings/SettingsPage'), 'SettingsPage') },
       { path: 'models', ...page(() => import('@/features/models/ModelsPage'), 'ModelsPage') },
       { path: 'chat', ...page(() => import('@/features/chat/ChatPage'), 'ChatPage') },

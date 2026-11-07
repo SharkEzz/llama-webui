@@ -10,7 +10,9 @@ import { openDb } from './db/open';
 import { ProfilesRepo } from './db/profiles';
 import { SettingsRepo } from './db/settings';
 import { SweepsRepo } from './db/sweeps';
+import { PlacementTracker } from './monitor/placement';
 import { dbPath } from './paths';
+import { buildWebRoutes, unavailableWebRoutes } from './routes/web';
 import { activeProfileId, getRuntime, serverView, startMonitor } from './runtime';
 import { profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
@@ -46,6 +48,14 @@ const chatRuns = new ChatRuns({
 });
 const { supervisor, logs } = runtime;
 const development = process.env.NODE_ENV !== 'production';
+// Production : front construit (et découpé par page) une fois, au démarrage ; développement : import HTML avec HMR.
+// Un front qui ne se construit pas n'empêche pas l'API ni le pilotage de llama-server.
+const web = development
+  ? { '/*': index }
+  : await buildWebRoutes(`${import.meta.dir}/../web/index.html`).catch((err: unknown) => {
+      console.error('[llama-webui] interface web indisponible :', err);
+      return unavailableWebRoutes(err);
+    });
 const monitor = await startMonitor(runtime, settings.get());
 const benchRuns = new BenchRunsRepo(db);
 const sweeps = new SweepsRepo(db);
@@ -83,6 +93,8 @@ monitor.setModelPathResolver((id) => {
   const p = profiles.get(id);
   return p ? profilePaths(p).model : null;
 });
+// Répartition du modèle (logs de démarrage) : recréé à chaque rechargement, il rejoue le ring qui survit.
+const placement = new PlacementTracker({ logs, supervisor });
 
 const server = createApp({
   db,
@@ -96,8 +108,9 @@ const server = createApp({
   sweeps,
   runtime,
   monitor,
+  placement,
   activeProfileId: () => activeProfileId(supervisor),
-  index,
+  web,
   hostname: HOSTNAME,
   port: PORT,
   development,
@@ -106,6 +119,7 @@ const server = createApp({
 const unsubState = supervisor.subscribe(() => hub.broadcast({ type: 'server-state', payload: serverView(supervisor) }));
 const unsubLogs = logs.onLines((lines) => hub.broadcast({ type: 'log', payload: lines }));
 const unsubSnapshot = monitor.onSnapshot((s) => hub.broadcast({ type: 'snapshot', payload: s }));
+const unsubPlacement = placement.onChange((p) => hub.broadcast({ type: 'placement', payload: p }));
 
 // Arrêt de Bun : les réponses en cours sont enregistrées « interrompues » avant que le runtime n'arrête llama-server
 // (sinon elles verraient la coupure et finiraient « erreur »). En tête de file, devant le gestionnaire du runtime.
@@ -130,6 +144,8 @@ g.__llamaWebuiDispose = () => {
   unsubState();
   unsubLogs();
   unsubSnapshot();
+  unsubPlacement();
+  placement.dispose();
   monitor.setModelPathResolver(() => null);
   hub.dispose();
   process.off('SIGINT', stopChats);

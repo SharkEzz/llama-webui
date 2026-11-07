@@ -59,6 +59,15 @@ type Spawned = {
   kill(signal?: NodeJS.Signals | number): void;
 };
 
+/** `reached` se résout à null après `ms` ; le minuteur est annulé à la sortie de la portée (`using`). */
+function timeoutAfter(ms: number): { reached: Promise<null> } & Disposable {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const reached = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return { reached, [Symbol.dispose]: () => clearTimeout(timer) };
+}
+
 /** One long-lived `nvidia-smi -lms` stream + occasional compute-apps query. */
 export class NvidiaMonitor {
   private bin: string;
@@ -175,15 +184,12 @@ export class NvidiaMonitor {
       this.disabled = true;
       return;
     }
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const timedOut = new Promise<null>((resolve) => {
-      timer = setTimeout(() => resolve(null), this.appsTimeoutMs);
-    });
+    using deadline = timeoutAfter(this.appsTimeoutMs);
     // Abandoned on timeout: a pipe torn down by the kill may reject it later, which must not reach the process.
     const read = new Response(p.stdout).text();
     read.catch(() => {});
     try {
-      const text = await Promise.race([read, timedOut]);
+      const text = await Promise.race([read, deadline.reached]);
       if (text === null) {
         try {
           p.kill('SIGKILL');
@@ -194,8 +200,6 @@ export class NvidiaMonitor {
       this.apps = parseComputeApps(text);
     } catch {
       // transient read failure: keep the previous mapping
-    } finally {
-      clearTimeout(timer);
     }
   }
 

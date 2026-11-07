@@ -1,4 +1,11 @@
-import { type ModelKind, type Profile, profileModelPath, reservedFlag, type Settings } from '@llama-webui/shared';
+import {
+  defer,
+  type ModelKind,
+  type Profile,
+  profileModelPath,
+  reservedFlag,
+  type Settings,
+} from '@llama-webui/shared';
 import { Copy, Download, Play, Save, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -81,6 +88,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
       env,
     };
     setSaving(true);
+    using _saving = defer(() => setSaving(false));
     try {
       const saved = profile ? await updateProfile(profile.id, input) : await createProfile(input);
       setErrors({});
@@ -93,8 +101,6 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
         setErrors(byField);
       } else if (e instanceof ApiError && e.status === 409) setErrors({ name: e.message });
       toast.error(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSaving(false);
     }
   };
 

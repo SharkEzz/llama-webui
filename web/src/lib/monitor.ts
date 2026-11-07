@@ -1,4 +1,4 @@
-import type { HistoryDump, Snapshot } from '@llama-webui/shared';
+import { defer, type HistoryDump, type Snapshot } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { api } from './api';
 import { onWs, useWs } from './ws';
@@ -65,6 +65,10 @@ export async function reloadHistory() {
   if (loading) return;
   loading = true;
   pending = [];
+  using _loading = defer(() => {
+    loading = false;
+    pending = [];
+  });
   try {
     const d = await api<HistoryDump & { bootId: string }>('/monitor/history');
     const h = fromDump(d);
@@ -72,9 +76,6 @@ export async function reloadHistory() {
     useMonitor.setState((st) => ({ history: h, version: st.version + 1 }));
   } catch {
     // WS fermé ou serveur absent : la prochaine connexion relira.
-  } finally {
-    loading = false;
-    pending = [];
   }
 }
 

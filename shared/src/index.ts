@@ -1,5 +1,6 @@
 export * from './bench';
 export * from './chat';
+export * from './dispose';
 export * from './flags';
 export * from './logs';
 export * from './models';
@@ -10,5 +11,6 @@ export * from './settings';
 export * from './shell';
 export * from './sse';
 export * from './sweep';
+export * from './topology';
 export * from './tuning';
 export * from './ws';

@@ -1,0 +1,206 @@
+import {
+  type ModelPlacement,
+  PHASE_LABEL,
+  type Phase,
+  type Snapshot,
+  type TopologyGraph,
+  type TopologyNode,
+} from '@llama-webui/shared';
+import type { ReactNode } from 'react';
+import { GLASS } from '@/components/glass/glass';
+import { TONE_VAR, type Tone } from '@/components/glass/tones';
+import { formatBps, formatBytes, formatPct, formatRate } from '@/lib/format';
+import { cn } from '@/lib/utils';
+import { type LinkFlow, placementSeries } from './flows';
+
+/*
+ * Cartes en verre posées sur la scène : phase du serveur, répartition du modèle, légende, débits agrégés.
+ * Chaque état est porté par un texte, jamais par la couleur seule.
+ */
+
+export interface HudProps {
+  phase: Phase;
+  snapshot: Snapshot | null;
+  graph: TopologyGraph | null;
+  placement: ModelPlacement | null;
+  flows: Map<string, LinkFlow> | null;
+  tones: Map<string, Tone>;
+  reducedMotion: boolean;
+  error: boolean;
+}
+
+const PHASE_UI: Record<Phase, { dot: string; text: string }> = {
+  stopped: { dot: 'bg-muted-foreground/60', text: 'text-muted-foreground' },
+  loading: { dot: 'bg-tone-amber animate-pulse', text: 'text-tone-amber' },
+  idle: { dot: 'bg-success', text: 'text-success' },
+  prompt: { dot: 'bg-tone-blue shadow-[0_0_10px] shadow-tone-blue/60', text: 'text-tone-blue' },
+  generating: { dot: 'bg-tone-teal shadow-[0_0_10px] shadow-tone-teal/60', text: 'text-tone-teal' },
+};
+
+function Panel({ className, children, label }: { className?: string; children: ReactNode; label: string }) {
+  return (
+    <section
+      aria-label={label}
+      className={cn(GLASS, 'pointer-events-auto absolute z-20 rounded-md px-3.5 py-3 text-sm', className)}
+    >
+      {children}
+    </section>
+  );
+}
+
+const nf1 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
+
+export function Hud({ phase, snapshot, graph, placement, flows, tones, reducedMotion, error }: HudProps) {
+  const ui = PHASE_UI[phase];
+  const series = graph ? placementSeries(graph, placement) : [];
+  const total = series.reduce((s, x) => s + x.bytes, 0);
+  const colorOf = (nodeId: string | null) => {
+    const tone = nodeId ? tones.get(nodeId) : undefined;
+    return tone ? TONE_VAR[tone] : 'var(--muted-foreground)';
+  };
+  const gpuNodes: TopologyNode[] = graph?.nodes.filter((n) => n.kind === 'gpu') ?? [];
+
+  let toGpu: number | null = null;
+  let fromGpu: number | null = null;
+  let nvme: number | null = null;
+  if (graph && flows) {
+    const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+    for (const l of graph.links) {
+      const f = flows.get(l.id);
+      const kind = byId.get(l.to)?.kind;
+      if (!f) continue;
+      if (kind === 'gpu') {
+        if (f.fwdBps !== null) toGpu = (toGpu ?? 0) + f.fwdBps;
+        if (f.backBps !== null) fromGpu = (fromGpu ?? 0) + f.backBps;
+      } else if (kind === 'nvme' && f.backBps !== null) nvme = (nvme ?? 0) + f.backBps; // lectures : NVMe → CPU
+    }
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      <Panel label="Phase" className="top-3 left-3 min-w-56">
+        <h1 className="text-base font-semibold tracking-tight">Topologie</h1>
+        <p className={cn('mt-1 flex items-center gap-2 font-medium', ui.text)}>
+          <span className={cn('size-2 shrink-0 rounded-full', ui.dot)} aria-hidden="true" />
+          {PHASE_LABEL[phase]}
+        </p>
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+          <dt className="text-muted-foreground">Génération</dt>
+          <dd className="num text-right">{formatRate(snapshot?.rates.genTps)}</dd>
+          <dt className="text-muted-foreground">Prompt</dt>
+          <dd className="num text-right">{formatRate(snapshot?.rates.ppTps)}</dd>
+        </dl>
+      </Panel>
+
+      <Panel label="Répartition du modèle" className="top-3 right-3 w-72">
+        <h2 className="text-[0.9375rem] font-semibold tracking-tight">Modèle</h2>
+        {series.length === 0 ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {phase === 'stopped'
+              ? 'Aucun serveur géré : répartition inconnue.'
+              : phase === 'loading'
+                ? 'Chargement : la répartition arrive avec les logs.'
+                : 'Répartition inconnue (serveur externe ou logs évincés).'}
+          </p>
+        ) : (
+          <>
+            <div
+              className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-well"
+              role="img"
+              aria-label="Part du modèle par device"
+            >
+              {series.map((s) => (
+                <span
+                  key={s.label}
+                  style={{ width: `${(100 * s.bytes) / total}%`, background: colorOf(s.nodeId) }}
+                  title={`${s.label} : ${formatBytes(s.bytes)}`}
+                />
+              ))}
+            </div>
+            <dl className="mt-2 grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-0.5 text-xs">
+              {series.map((s) => (
+                <SliceRow
+                  key={s.label}
+                  label={s.label}
+                  bytes={s.bytes}
+                  pct={(100 * s.bytes) / total}
+                  color={colorOf(s.nodeId)}
+                />
+              ))}
+            </dl>
+            <p className="mt-2 text-xs text-muted-foreground">
+              <span className="num">{formatBytes(total)}</span>
+              {placement?.layers && (
+                <>
+                  {' · couches déchargées '}
+                  <span className="num">
+                    {placement.layers.offloaded}/{placement.layers.total}
+                  </span>
+                </>
+              )}
+            </p>
+          </>
+        )}
+      </Panel>
+
+      <Panel label="Légende" className="bottom-3 left-3 max-w-64">
+        <h2 className="text-[0.9375rem] font-semibold tracking-tight">Légende</h2>
+        <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+          <li>Épaisseur d'un lien : capacité PCIe.</li>
+          <li>Particules : débit mesuré (échelle log), un sens de chaque côté.</li>
+          <li>
+            {snapshot?.system?.memBw
+              ? 'CPU ↔ mémoire : trafic DRAM mesuré (perf), écritures d’un côté, lectures de l’autre.'
+              : 'Pulsation CPU ↔ mémoire : activité CPU, faute de mesure DRAM (perf).'}
+          </li>
+          <li>Lueur : charge ou remplissage. Survoler pour le détail.</li>
+        </ul>
+        {gpuNodes.length > 0 && (
+          <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {gpuNodes.map((n) => (
+              <li key={n.id} className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ background: colorOf(n.id) }} aria-hidden="true" />
+                {n.label}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel label="Débits" className="right-3 bottom-3 min-w-56">
+        <h2 className="text-[0.9375rem] font-semibold tracking-tight">Débits</h2>
+        <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+          <dt className="text-muted-foreground">Hôte → GPU</dt>
+          <dd className="num text-right">{formatBps(toGpu)}</dd>
+          <dt className="text-muted-foreground">GPU → hôte</dt>
+          <dd className="num text-right">{formatBps(fromGpu)}</dd>
+          <dt className="text-muted-foreground">Lecture NVMe</dt>
+          <dd className="num text-right">{formatBps(nvme)}</dd>
+          <dt className="text-muted-foreground">DRAM lecture</dt>
+          <dd className="num text-right">{formatBps(snapshot?.system?.memBw?.readBps)}</dd>
+          <dt className="text-muted-foreground">DRAM écriture</dt>
+          <dd className="num text-right">{formatBps(snapshot?.system?.memBw?.writeBps)}</dd>
+          <dt className="text-muted-foreground">CPU llama-server</dt>
+          <dd className="num text-right">{formatPct(snapshot?.proc?.cpuPct)}</dd>
+        </dl>
+        {reducedMotion && (
+          <p className="mt-2 text-xs text-muted-foreground">Mouvement réduit : lueur fixe, sans particules.</p>
+        )}
+        {error && <p className="mt-2 text-xs text-destructive">Topologie illisible (API indisponible).</p>}
+      </Panel>
+    </div>
+  );
+}
+
+function SliceRow({ label, bytes, pct, color }: { label: string; bytes: number; pct: number; color: string }) {
+  return (
+    <>
+      <dt className="flex items-center gap-1.5 text-muted-foreground">
+        <span className="size-2 rounded-full" style={{ background: color }} aria-hidden="true" />
+        {label}
+      </dt>
+      <dd className="num text-right">{formatBytes(bytes)}</dd>
+      <dd className="num text-right text-muted-foreground">{nf1.format(pct)} %</dd>
+    </>
+  );
+}

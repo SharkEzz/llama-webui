@@ -1,4 +1,4 @@
-import type { ModelEntry, ModelList, ModelSummary } from '@llama-webui/shared';
+import { defer, type ModelEntry, type ModelList, type ModelSummary } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { api } from './api';
 
@@ -17,12 +17,11 @@ export const useModels = create<ModelsState>((set, get) => ({
   refresh: async () => {
     if (get().loading) return;
     set({ loading: true });
+    using _loading = defer(() => set({ loading: false }));
     try {
       set({ list: await api<ModelList>('/models'), error: null });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) });
-    } finally {
-      set({ loading: false });
     }
   },
 }));

@@ -1,0 +1,28 @@
+[llama-webui] lancement: llama-server -m Q2_0/Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.gguf -c 8000 -lv 4 -np 1 -fa on --lazy-mode on --load-mode mmap --host 0.0.0.0 --port 8080 --metrics --slots --props
+0.00.000.493 I ggml_cuda_init: found 2 CUDA devices:
+0.00.000.500 I   Device 0: NVIDIA GeForce RTX 5070 Ti, compute capability 12.0, VMM: yes
+0.00.744.826 I llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 5070 Ti) (0000:01:00.0) - 15683 MiB free
+0.00.744.836 I llama_prepare_model_devices: using device CUDA1 (NVIDIA GeForce RTX 5060 Ti) (0000:03:00.0) - 15802 MiB free
+0.00.744.837 I llama_prepare_model_devices: using device ROCm0 (AMD Radeon RX 9070 XT) (0000:08:00.0) - 16092 MiB free
+0.00.822.181 I load_tensors: loading model tensors, this can take a while... (load_mode = mmap)
+0.00.825.205 I load_tensors: enabling prefetch for 'per_layer_token_embd.weight'
+0.11.852.004 I load_tensors: offloading output layer to GPU
+0.11.852.010 I load_tensors: offloading 47 repeating layers to GPU
+0.11.852.010 I load_tensors: offloaded 49/49 layers to GPU
+0.11.852.017 I load_tensors:   CPU_Mapped model buffer size =   260.50 MiB
+0.11.852.017 I load_tensors:        CUDA0 model buffer size = 12441.95 MiB
+0.11.852.018 I load_tensors:        CUDA1 model buffer size = 11715.43 MiB
+0.11.852.019 I load_tensors:        ROCm0 model buffer size = 11452.43 MiB
+0.11.852.019 I load_tensors:   CPU_Mapped model buffer size = 27465.95 MiB
+0.39.037.160 I llama_kv_cache:      CUDA0 KV buffer size =    64.00 MiB
+0.39.066.768 I llama_kv_cache:      CUDA1 KV buffer size =    64.00 MiB
+0.39.067.104 I llama_kv_cache:      ROCm0 KV buffer size =    64.00 MiB
+0.39.067.630 I llama_kv_cache:      CUDA0 KV buffer size =    16.00 MiB
+0.39.067.757 I llama_kv_cache:      CUDA1 KV buffer size =    16.00 MiB
+0.39.067.863 I llama_kv_cache:      ROCm0 KV buffer size =    16.00 MiB
+0.39.098.213 I sched_reserve:      CUDA0 compute buffer size =   285.56 MiB
+0.39.098.215 I sched_reserve:      CUDA1 compute buffer size =   360.54 MiB
+0.39.098.216 I sched_reserve:      ROCm0 compute buffer size =   360.54 MiB
+0.39.098.216 I sched_reserve:  CUDA_Host compute buffer size =    63.98 MiB
+0.39.303.204 I srv  server_run_i: model loaded
+0.39.303.300 I main: server is listening on http://0.0.0.0:8080

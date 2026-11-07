@@ -4,6 +4,7 @@ import {
   type ConversationDetail,
   type ConversationPatch,
   type ConversationSummary,
+  defer,
   SseParser,
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
@@ -72,6 +73,9 @@ export const useChat = create<ChatState>((set, get) => {
     follow?.abort();
     const ctl = new AbortController();
     follow = ctl;
+    using _follow = defer(() => {
+      if (follow === ctl) follow = null;
+    });
     let pending = { content: '', reasoning: '' };
     let frame = 0;
     const flush = () => {
@@ -136,8 +140,6 @@ export const useChat = create<ChatState>((set, get) => {
         if (e instanceof ApiError) toast.error(e.message);
         else void get().open(conversationId); // connexion perdue : on relit l'état enregistré
       }
-    } finally {
-      if (follow === ctl) follow = null;
     }
   };
 

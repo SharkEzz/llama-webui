@@ -1,5 +1,6 @@
 import { readdir, readlink, realpath } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { basename, join } from 'node:path';
+import { minKnown, parseLinkSpeed, pciName, readNum, readText, slotLink } from '../hardware/pci';
 import { type GpuReading, identityReading } from './gpu';
 
 export interface AmdCard {
@@ -79,50 +80,9 @@ export async function readProcAmdVram(
   return out;
 }
 
-const readText = async (p: string): Promise<string | null> => {
-  try {
-    return (await Bun.file(p).text()).trim();
-  } catch {
-    return null;
-  }
-};
-const readNum = async (p: string | null): Promise<number | null> => {
-  if (!p) return null;
-  const t = await readText(p);
-  const n = t === null ? NaN : Number(t);
-  return Number.isFinite(n) ? n : null;
-};
-
-const PCI_IDS = ['/usr/share/hwdata/pci.ids', '/usr/share/misc/pci.ids', '/usr/share/pci.ids'];
-
-/**
- * Nom d'une carte d'après ses identifiants sysfs (`vendor`, `device` : attributs en cache, lus sans réveiller la carte)
- * et la base pci.ids. Remplace `lspci`, qui lit l'espace de configuration et réveille une carte en veille (runtime-suspended).
- */
-export async function pciIdsName(pdev: string, pciRoot = '/sys/bus/pci/devices', idsPaths = PCI_IDS): Promise<string> {
-  const fallback = `AMD GPU ${pdev}`;
-  const id = async (f: string) =>
-    (await readText(join(pciRoot, pdev, f)))?.trim().toLowerCase().replace(/^0x/, '') ?? null;
-  const [vendor, device] = await Promise.all([id('vendor'), id('device')]);
-  if (!vendor || !device) return fallback;
-  for (const path of idsPaths) {
-    const text = await readText(path);
-    if (text === null) continue;
-    let inVendor = false;
-    for (const line of text.split('\n')) {
-      if (line.startsWith('#') || line === '') continue;
-      if (!line.startsWith('\t')) {
-        if (inVendor) break;
-        inVendor = line.slice(0, 4).toLowerCase() === vendor;
-      } else if (inVendor && !line.startsWith('\t\t') && line.slice(1, 5).toLowerCase() === device) {
-        const name = line.slice(5).trim();
-        return /\[([^\]]+)\]/.exec(name)?.[1] ?? name;
-      }
-    }
-    return fallback;
-  }
-  return fallback;
-}
+/** Nom d'une carte AMD d'après pci.ids ; repli « AMD GPU <pdev> ». */
+export const pciIdsName = (pdev: string, pciRoot?: string, idsPaths?: readonly string[]): Promise<string> =>
+  pciName(pdev, pciRoot, idsPaths, `AMD GPU ${pdev}`);
 
 export async function discoverAmdCards(
   drmRoot = '/sys/class/drm',
@@ -160,30 +120,6 @@ export async function discoverAmdCards(
   return cards;
 }
 
-/** A sysfs host bridge directory (pciDDDD:BB): what sits right under it is a root port or a root-bus device. */
-const isHostBridge = (dir: string) => /^pci[0-9a-f]{4,}:[0-9a-f]{2}$/i.test(basename(dir));
-
-/**
- * Recent Radeon cards sit behind a PCIe switch on the card itself: the GPU's own link goes to that switch
- * and always reads its full width (e.g. Gen5 x16). The slot link is the switch's upstream port: the walk
- * climbs AMD bridges (vendor 0x1002, class 0x0604: any PCI bridge) above the GPU, and stops at the first
- * other bridge (a chipset port) or at a root port, which is never on the card even when it is AMD's own
- * (old ATI chipsets: RD890, 990FX). The link's other end is the port it plugs into, whose capability
- * bounds the link's maximum (a Gen4 x4 chipset slot); a host bridge has no link, so it gives no port.
- */
-export async function slotLink(devicePath: string): Promise<{ linkPath: string; portPath?: string }> {
-  let link = devicePath;
-  for (let i = 0; i < 8; i++) {
-    const parent = dirname(link);
-    if (parent === link || isHostBridge(dirname(parent))) break;
-    const [vendor, cls] = await Promise.all([readText(join(parent, 'vendor')), readText(join(parent, 'class'))]);
-    if (vendor !== '0x1002' || !cls?.startsWith('0x0604')) break;
-    link = parent;
-  }
-  const port = dirname(link);
-  return isHostBridge(port) || port === link ? { linkPath: link } : { linkPath: link, portPath: port };
-}
-
 /**
  * The link's maximum: at most what both of its ends support. Capabilities never change, so it is kept on
  * the card once every one is known; until then (a port powered down or failing its read at startup) it is
@@ -202,21 +138,6 @@ async function linkMax(card: AmdCard, link: string): Promise<{ gen: number | nul
   const ends = port ? [gen, width, portGen, portWidth] : [gen, width];
   if (ends.every((v) => v !== null && v > 0)) card.linkMax = max as { gen: number; width: number };
   return max;
-}
-
-/** The smaller of two link capabilities; either may be unknown (a width of 0 is unknown too). */
-const minKnown = (a: number | null, b: number | null): number | null => {
-  const ka = a !== null && a > 0 ? a : null;
-  const kb = b !== null && b > 0 ? b : null;
-  return ka === null ? kb : kb === null ? ka : Math.min(ka, kb);
-};
-
-const GEN_BY_RATE: Record<string, number> = { '2.5': 1, '5': 2, '8': 3, '16': 4, '32': 5, '64': 6 };
-
-/** sysfs `current_link_speed` ("32.0 GT/s PCIe") → PCIe generation. */
-export function parseLinkSpeed(text: string): number | null {
-  const m = /^([\d.]+)\s*GT\/s/.exec(text.trim());
-  return m ? (GEN_BY_RATE[String(Number(m[1]))] ?? null) : null;
 }
 
 /** `pp_dpm_sclk` / `pp_dpm_mclk`: the current level is marked with "*". */

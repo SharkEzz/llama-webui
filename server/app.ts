@@ -8,6 +8,7 @@ import type { SettingsRepo } from './db/settings';
 import type { SweepsRepo } from './db/sweeps';
 import { guarded, jsonObject } from './http';
 import type { Monitor } from './monitor/monitor';
+import type { PlacementTracker } from './monitor/placement';
 import pkg from './package.json';
 import { benchRoutes } from './routes/bench';
 import { chatRoutes } from './routes/chat';
@@ -16,7 +17,9 @@ import { monitorRoutes } from './routes/monitor';
 import { profileRoutes } from './routes/profiles';
 import { serverRoutes } from './routes/server';
 import { sweepRoutes } from './routes/sweeps';
+import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
+import type { WebRoutes } from './routes/web';
 import type { Runtime } from './runtime';
 import type { WsHub } from './ws/hub';
 
@@ -33,8 +36,10 @@ export interface AppDeps {
   activeProfileId: () => number | null;
   runtime: Runtime;
   monitor: Monitor;
-  /** Page web (import HTML : Bun bundle React + Tailwind à la volée). */
-  index: Bun.HTMLBundle;
+  /** Répartition du modèle chargé (logs de llama-server), pour la page Topologie. */
+  placement: PlacementTracker;
+  /** Interface web : import HTML (développement, HMR) ou fichiers construits au démarrage (production). */
+  web: WebRoutes;
   hostname: string;
   port: number;
   development: boolean;
@@ -43,7 +48,7 @@ export interface AppDeps {
 const startedAt = Date.now();
 
 export function createApp(deps: AppDeps) {
-  const { hub, settings, monitor, index, port, development } = deps;
+  const { hub, settings, monitor, port, development } = deps;
   return Bun.serve({
     port,
     hostname: deps.hostname,
@@ -68,13 +73,14 @@ export function createApp(deps: AppDeps) {
       ...benchRoutes(deps),
       ...sweepRoutes(deps),
       ...tuningRoutes(deps),
+      ...topologyRoutes(deps),
       '/api/*': guarded(() => Response.json({ error: 'Route inconnue' }, { status: 404 })),
       '/ws': guarded((req, server) => {
         if (server.upgrade(req)) return undefined;
         return new Response('Upgrade WebSocket attendu', { status: 426 });
       }),
-      // Toute autre adresse sert l'application (fallback SPA : /chat rechargé fonctionne).
-      '/*': index,
+      // Toute autre adresse sert l'application (fallback SPA `/*` : /chat rechargé fonctionne).
+      ...deps.web,
     },
     websocket: {
       open: (ws) => hub.attach(ws),

@@ -1,4 +1,4 @@
-import type { ServerView } from '@llama-webui/shared';
+import { defer, type ServerView } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { ApiError, api } from './api';
@@ -34,6 +34,7 @@ export function startServerSync() {
 
 async function action(path: string, body?: unknown): Promise<boolean> {
   useServer.setState({ busy: true });
+  using _busy = defer(() => useServer.setState({ busy: false }));
   try {
     const view = await api<ServerView>(`/server/${path}`, {
       method: 'POST',
@@ -44,8 +45,6 @@ async function action(path: string, body?: unknown): Promise<boolean> {
   } catch (e) {
     toast.error(e instanceof ApiError ? e.message : String(e));
     return false;
-  } finally {
-    useServer.setState({ busy: false });
   }
 }
 

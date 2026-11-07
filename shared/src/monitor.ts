@@ -41,6 +41,12 @@ export interface MemInfo {
   swapUsedBytes: number;
 }
 
+/** Bande passante DRAM de la machine (contrôleur mémoire, via perf) : tout ce qui touche la RAM, CPU, GPU et NVMe compris. */
+export interface MemBandwidth {
+  readBps: number;
+  writeBps: number;
+}
+
 export interface SystemSample {
   cpuPct: number;
   corePct: number[];
@@ -48,11 +54,18 @@ export interface SystemSample {
   tempC: number | null;
   load: [number, number, number] | null;
   mem: MemInfo | null;
+  /** Absent ou null : non mesurable (perf absent, PMU inconnu, droits). */
+  memBw?: MemBandwidth | null;
 }
 
-export interface DiskSample {
+export interface DiskRates {
   readBps: number;
   writeBps: number;
+}
+
+/** Disques physiques de la machine : leur total, chacun (par nom de bloc, `nvme0n1`) et celui du modèle. */
+export interface DiskSample extends DiskRates {
+  perDisk: Record<string, DiskRates>;
   model: { disk: string; readBps: number } | null;
 }
 
@@ -66,6 +79,12 @@ export interface SlotView {
   nDecoded: number;
   nRemain: number | null;
 }
+
+/**
+ * Tokens occupés dans le contexte d'un slot. `n_prompt_tokens` est déjà tout le contexte : le prompt plus les tokens
+ * générés jusqu'ici (gardés en cache une fois la requête finie). Y ajouter `n_decoded` compterait la sortie deux fois.
+ */
+export const slotContextTokens = (s: SlotView): number => s.nPromptTokens;
 
 export type Health = 'ok' | 'loading' | 'error' | 'down';
 
@@ -119,6 +138,9 @@ export const SERIES = {
   sysCpu: 'sys.cpu',
   sysMemPct: 'sys.memPct',
   sysTemp: 'sys.tempC',
+  memRead: 'mem.read',
+  memWrite: 'mem.write',
+  procDram: 'proc.dram',
   diskRead: 'disk.read',
   diskWrite: 'disk.write',
   modelDiskRead: 'disk.modelRead',
@@ -146,7 +168,8 @@ export interface Snapshot {
   gpus: GpuSample[];
   /** Toutes les GPU, triées par busId, masquées et en veille comprises (non lues). */
   allGpus: GpuSample[];
-  proc: { cpuPct: number; rssBytes: number } | null;
+  /** `dramBps` : octets/s ramenés de la DRAM par llama-server (perf, événement cœur) ; null = inconnu. */
+  proc: { cpuPct: number; rssBytes: number; dramBps?: number | null } | null;
   system: SystemSample | null;
   disk: DiskSample | null;
   /** Valeurs ajoutées à l'historique à ce tick (NaN → null). */

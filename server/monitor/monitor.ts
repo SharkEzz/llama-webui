@@ -7,7 +7,7 @@ import type {
   Snapshot,
   SpecStats,
 } from '@llama-webui/shared';
-import { SERIES } from '@llama-webui/shared';
+import { defer, SERIES } from '@llama-webui/shared';
 import { type AmdCard, hiddenAmdReading, suspendedAmdReading } from '../collectors/amdgpu';
 import type { DiskSample } from '../collectors/disk';
 import { type GpuReading, identityReading, selectUsedGpus } from '../collectors/gpu';
@@ -134,6 +134,7 @@ export class Monitor {
   async tick(): Promise<void> {
     if (this.inFlight) return;
     this.inFlight = true;
+    using _tick = defer(() => (this.inFlight = false));
     try {
       const snap = await this.doTick();
       this.current = snap;
@@ -146,8 +147,6 @@ export class Monitor {
       }
     } catch (err) {
       console.error('[llama-webui] tick de monitoring :', err);
-    } finally {
-      this.inFlight = false;
     }
   }
 
@@ -201,6 +200,7 @@ export class Monitor {
       disk: null,
     };
 
+    this.collectors.memBw?.setPid(pid);
     if (!isActive(state)) {
       const allGpus = await this.collectGpus(null).catch(() => [] as GpuSample[]);
       this.pushGpuSeries(allGpus);
@@ -220,11 +220,14 @@ export class Monitor {
     this.ticksForPid++;
     const port = state.port;
     const url = `http://127.0.0.1:${port}`;
-    const [raw, allGpus, proc] = await Promise.all([
+    const [raw, allGpus, procRaw] = await Promise.all([
       fetchLlama(url).catch(() => null),
       this.collectGpus(pid).catch(() => [] as GpuSample[]),
       pid === null ? Promise.resolve(null) : this.collectors.proc.sample(pid).catch(() => null),
     ]);
+    const dramBps = this.collectors.memBw?.procSample() ?? null;
+    const proc = procRaw ? { ...procRaw, dramBps } : null;
+    this.known(SERIES.procDram, dramBps);
 
     const rates = raw ? liveRates(this.prevRaw, raw) : { genTps: 0, ppTps: 0 };
     if (raw) this.prevRaw = raw;
@@ -308,6 +311,10 @@ export class Monitor {
       dsk ? dsk.sample(this.modelDiskFor(state)).catch(() => null) : Promise.resolve(null),
     ]);
     if (sys) {
+      const memBw = this.collectors.memBw?.sample() ?? null;
+      if (system) system.memBw = memBw;
+      this.known(SERIES.memRead, memBw?.readBps);
+      this.known(SERIES.memWrite, memBw?.writeBps);
       this.push(SERIES.sysCpu, system?.cpuPct ?? 0);
       const mem = system?.mem;
       this.push(

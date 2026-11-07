@@ -2,6 +2,7 @@ import type { Settings } from '@llama-webui/shared';
 import { type AmdCard, discoverAmdCards, isRuntimeSuspended, readAmdCard, readProcAmdVram } from './amdgpu';
 import { type DiskSample, DiskSampler, physicalDisks, resolveModelDisk } from './disk';
 import type { GpuReading } from './gpu';
+import { MemBandwidthSampler } from './membw';
 import { gpuNeeds } from './needs';
 import { NvidiaMonitor } from './nvidia';
 import { NvmlMonitor } from './nvml/monitor';
@@ -40,6 +41,7 @@ const nvidiaSmiBin = () => process.env.LLAMA_WEBUI_NVIDIA_SMI || 'nvidia-smi';
 export class Collectors {
   private _system: SystemSource | undefined;
   private _disk: DiskSource | undefined;
+  private _memBw: MemBandwidthSampler | undefined;
   private configuring: Promise<void> = Promise.resolve();
 
   private constructor(
@@ -92,12 +94,26 @@ export class Collectors {
     return this._disk;
   }
 
+  /** Bande passante DRAM (perf) ; suit l'interrupteur du collecteur système. */
+  get memBw(): MemBandwidthSampler | undefined {
+    return this._memBw;
+  }
+
   /** Suit les réglages (cadence et cartes masquées côté NVIDIA, interrupteurs système et disque). Appels en série. */
   configure(settings: CollectorSettings): Promise<void> {
     const run = this.configuring.then(async () => {
       this.nvidia.configure({ intervalMs: settings.pollIntervalMs, needs: gpuNeeds(settings.hiddenGpus) });
-      if (!settings.collectors.system) this._system = undefined;
-      else this._system ??= new SystemSampler();
+      if (!settings.collectors.system) {
+        this._system = undefined;
+        this._memBw?.stop();
+        this._memBw = undefined;
+      } else {
+        this._system ??= new SystemSampler();
+        if (!this._memBw) {
+          this._memBw = new MemBandwidthSampler({ intervalMs: settings.pollIntervalMs });
+          this._memBw.start();
+        } else this._memBw.configure(settings.pollIntervalMs);
+      }
       if (!settings.collectors.disk) this._disk = undefined;
       else if (!this._disk) {
         const sampler = new DiskSampler({ disks: await physicalDisks() });
@@ -110,5 +126,6 @@ export class Collectors {
 
   stop(): void {
     this.nvidia.stop();
+    this._memBw?.stop();
   }
 }

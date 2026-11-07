@@ -1,9 +1,8 @@
 import { Database } from 'bun:sqlite';
 import { expect, test } from 'bun:test';
-import { copyFileSync, existsSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type BenchSpec, BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
+import { tempDir } from '../testing/tempDir';
 import { BenchRunsRepo } from './benchRuns';
 import { MIGRATIONS } from './migrations';
 import { openDb } from './open';
@@ -33,13 +32,15 @@ test("a deleted run's id is never handed out again", () => {
 });
 
 const J5_DB = '/tmp/lw-j5/llama-webui.sqlite';
-test.skipIf(!existsSync(J5_DB))('the migration keeps every J5 run', () => {
-  const copy = join(mkdtempSync(join(tmpdir(), 'lw-mig-')), 'db.sqlite');
-  copyFileSync(J5_DB, copy);
-  const before = new Database(copy, { readonly: true })
-    .query<{ n: number; max: number }, []>('SELECT count(*) n, max(id) max FROM bench_runs')
-    .get()!;
-  const db = openDb(copy);
+test.skipIf(!(await Bun.file(J5_DB).exists()))('the migration keeps every J5 run', async () => {
+  using dir = tempDir('lw-mig-');
+  const copy = join(dir.path, 'db.sqlite');
+  await Bun.write(copy, Bun.file(J5_DB));
+  const before = (() => {
+    using ro = new Database(copy, { readonly: true });
+    return ro.query<{ n: number; max: number }, []>('SELECT count(*) n, max(id) max FROM bench_runs').get()!;
+  })();
+  using db = openDb(copy);
   const after = db.query<{ n: number; max: number }, []>('SELECT count(*) n, max(id) max FROM bench_runs').get()!;
   expect(after).toEqual(before);
   expect(db.query<{ version: number }, []>('SELECT version FROM schema_version').get()!.version).toBe(

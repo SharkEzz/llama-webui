@@ -1,6 +1,4 @@
-import { afterEach, expect, test } from 'bun:test';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { afterAll, afterEach, expect, test } from 'bun:test';
 import { join, resolve } from 'node:path';
 import {
   type BenchLive,
@@ -8,6 +6,7 @@ import {
   type BenchSpec,
   BenchSpecSchema,
   DEFAULT_SETTINGS,
+  type GpuSample,
   type ServerState,
   type Sweep,
   type SweepLive,
@@ -21,13 +20,16 @@ import { LogBuffer } from '../logs/buffer';
 import { sweepRoutes } from '../routes/sweeps';
 import type { BuiltCommand } from '../supervisor/args';
 import { probeHealth } from '../supervisor/health';
+import { tempDir } from '../testing/tempDir';
 import { type ExecutorDeps, RunExecutor } from './execute';
 import { BenchGate, type ServerControl } from './gate';
 import { BenchRunner } from './runner';
 
 const FAKE = resolve(import.meta.dir, '../../testdata/fake/fake-llama-server');
-const MODEL = join(mkdtempSync(join(tmpdir(), 'lw-bench-')), 'a.gguf');
-writeFileSync(MODEL, '');
+const modelDir = tempDir('lw-bench-');
+afterAll(() => modelDir[Symbol.dispose]());
+const MODEL = join(modelDir.path, 'a.gguf');
+await Bun.write(MODEL, '');
 const cmdA = { display: 'cmdA', profileName: 'A', profileId: 1, port: 8080 } as BuiltCommand;
 
 afterEach(() => {
@@ -216,7 +218,8 @@ test("a bench run gets its profile's environment", async () => {
 
 test("a server run runs in its profile's directory", async () => {
   Object.assign(process.env, { FAKE_LOAD_MS: '50' });
-  const cwd = mkdtempSync(join(tmpdir(), 'lw-cwd-'));
+  using dir = tempDir('lw-cwd-');
+  const cwd = dir.path;
   const { runner, runs, end } = setup(18090, undefined, { profile: () => ({ cwd, env: {} }) });
   await runner.start(BenchSpecSchema.parse({ kind: 'server', modelPath: MODEL, profileId: 1, r: 1, p: 16, n: 4 }), {
     stopServer: true,
@@ -380,4 +383,33 @@ test('validating an interrupted sweep also finishes its interrupted items', asyn
   while (sweeps.get(sweep.id)!.status === 'running') await Bun.sleep(10);
   expect(repo.list({ sweepId: sweep.id }).filter((r) => r.status === 'interrupted')).toEqual([]);
   expect(sweeps.get(sweep.id)!.status).toBe('done');
+}, 20_000);
+
+test('the VRAM sampler takes its last reading when the run ends, then stops', async () => {
+  // A card holding 1 GiB when the run starts, 3 GiB afterwards.
+  let calls = 0;
+  const gpus = () => [
+    {
+      key: 'g0',
+      name: 'Fake GPU',
+      vendor: 'other',
+      vramUsedBytes: (calls++ === 0 ? 1 : 3) * 1024 ** 3,
+    } as unknown as GpuSample,
+  ];
+  for (const [port, s] of [
+    [8080, spec],
+    [18091, BenchSpecSchema.parse({ kind: 'server', modelPath: MODEL, r: 1, p: 16, n: 4 })],
+  ] as const) {
+    Object.assign(process.env, { FAKE_LOAD_MS: '50' });
+    calls = 0;
+    const { runner, runs, end } = setup(port, undefined, { gpus });
+    await runner.start(s, { stopServer: true });
+    await end;
+    expect(runs.at(-1)!.status).toBe('ok');
+    expect(runs.at(-1)!.vramPeak).toEqual([{ key: 'g0', name: 'Fake GPU', mib: 2048 }]);
+    // Released with the run: no reading afterwards (a leaked sampler would keep polling every SAMPLE_MS).
+    const after = calls;
+    await Bun.sleep(1200);
+    expect(calls).toBe(after);
+  }
 }, 20_000);

@@ -6,6 +6,7 @@ import {
   type BenchRun,
   type BenchSpec,
   type BenchStatus,
+  defer,
   type Profile,
   shellQuote,
   shellSplit,
@@ -287,6 +288,7 @@ export const useBench = create<BenchState>()((set, get) => ({
       return 'error';
     }
     set({ launching: true });
+    using _launching = defer(() => set({ launching: false }));
     try {
       await api<BenchRun>('/bench/run', { method: 'POST', body: JSON.stringify({ spec: built.spec, stopServer }) });
       set({ errors: {} });
@@ -299,8 +301,6 @@ export const useBench = create<BenchState>()((set, get) => ({
         set({ errors });
       } else fail(e);
       return 'error';
-    } finally {
-      set({ launching: false });
     }
   },
 

@@ -1,4 +1,11 @@
-import type { Health, RequestRecord, RequestStats, SlotView, SpecStats } from '@llama-webui/shared';
+import {
+  type Health,
+  type RequestRecord,
+  type RequestStats,
+  type SlotView,
+  type SpecStats,
+  slotContextTokens,
+} from '@llama-webui/shared';
 import { parsePrometheus } from './prometheus';
 
 export type { Health, RequestRecord, RequestStats, SlotView, SpecStats };
@@ -104,7 +111,7 @@ export function kvUsage(slots: SlotView[] | null): { usedTokens: number; totalTo
   let usedTokens = 0;
   let totalTokens = 0;
   for (const s of slots) {
-    usedTokens += s.nPromptTokens + s.nDecoded;
+    usedTokens += slotContextTokens(s);
     totalTokens += s.nCtx;
   }
   return totalTokens > 0 ? { usedTokens, totalTokens } : null;
