@@ -1,22 +1,53 @@
+import { type KeyboardEvent, useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatPct } from '@/lib/format';
 
-/** Une case par cœur logique ; l'intensité de --chart-1 suit la charge. Chaque case est un bouton : le tooltip s'ouvre aussi au clavier. */
+const STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
+/**
+ * Une case par cœur logique, remplie de bas en haut (--chart-1) selon la charge. Chaque case est un bouton (le tooltip s'ouvre
+ * aussi au clavier), en roving tabindex : un seul arrêt Tab pour toute la grille, les flèches et Début/Fin la parcourent.
+ */
 export function CoreHeatmap({ cores }: { cores: number[] }) {
+  const [active, setActive] = useState(0);
+  const list = useRef<HTMLUListElement>(null);
+  const current = Math.min(active, Math.max(0, cores.length - 1));
+
+  const onKeyDown = (e: KeyboardEvent<HTMLUListElement>) => {
+    const last = cores.length - 1;
+    let next: number;
+    if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = last;
+    else if (e.key in STEP) next = Math.min(last, Math.max(0, current + (STEP[e.key] ?? 0)));
+    else return;
+    e.preventDefault();
+    setActive(next);
+    list.current?.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
+  };
+
   return (
-    <ul className="grid grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1" aria-label="Charge par cœur">
+    <ul
+      ref={list}
+      className="grid grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))] gap-1"
+      aria-label="Charge par cœur"
+      onKeyDown={onKeyDown}
+    >
       {cores.map((pct, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: une case par cœur, l'index est l'identité du cœur
         <li key={i}>
           <Tooltip>
             <TooltipTrigger
-              className="flex h-9 w-full items-center justify-center rounded-md border border-border text-[0.65rem] text-muted-foreground outline-none num focus-visible:ring-3 focus-visible:ring-ring/50"
-              style={{
-                backgroundColor: `color-mix(in oklch, var(--chart-1) ${Math.round(Math.min(100, Math.max(0, pct)))}%, transparent)`,
-              }}
+              tabIndex={i === current ? 0 : -1}
+              onFocus={() => setActive(i)}
+              className="relative flex h-9 w-full items-center justify-center overflow-hidden rounded-md border border-border text-[0.65rem] text-muted-foreground outline-none num focus-visible:ring-3 focus-visible:ring-ring/50"
               aria-label={`Cœur ${i} : ${formatPct(pct)}`}
             >
-              {i}
+              <span
+                aria-hidden="true"
+                className="absolute inset-x-0 bottom-0 bg-chart-1/60 transition-[height] duration-300 ease-out motion-reduce:transition-none"
+                style={{ height: `${Math.min(100, Math.max(0, pct))}%` }}
+              />
+              <span className="relative">{i}</span>
             </TooltipTrigger>
             <TooltipContent>
               Cœur {i} : {formatPct(pct)}
