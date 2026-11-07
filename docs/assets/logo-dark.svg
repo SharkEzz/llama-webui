@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 580 128" width="580" height="128" role="img" aria-label="llama-webui">
+  <title>llama-webui</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16213a"/>
+      <stop offset="1" stop-color="#0a0f1c"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.2" r="0.9">
+      <stop offset="0" stop-color="#3698ff" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#3698ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="0.9"/>
+    </filter>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#tile)"/>
+  <rect width="128" height="128" rx="30" fill="url(#glow)"/>
+  <rect x="0.75" y="0.75" width="126.5" height="126.5" rx="29.25" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.5"/>
+  <g transform="translate(14 14) scale(5)">
+    <g filter="url(#blur)" opacity="0.55">
+      <rect x="2" y="11" width="4" height="7" rx="1.5" fill="#3698ff"/>
+      <rect x="8" y="7" width="4" height="11" rx="1.5" fill="#44d0c1"/>
+      <rect x="14" y="2" width="4" height="16" rx="1.5" fill="#fcb442"/>
+    </g>
+    <rect x="2" y="11" width="4" height="7" rx="1.5" fill="#3698ff"/>
+    <rect x="8" y="7" width="4" height="11" rx="1.5" fill="#44d0c1"/>
+    <rect x="14" y="2" width="4" height="16" rx="1.5" fill="#fcb442"/>
+  </g>
+  <text x="160" y="86" font-family="Inter, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="68" font-weight="700" letter-spacing="-2"><tspan fill="#f2f5fa">llama</tspan><tspan fill="#7d8aa0">-</tspan><tspan fill="#3698ff">webui</tspan></text>
+</svg>
