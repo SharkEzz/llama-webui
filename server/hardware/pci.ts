@@ -68,37 +68,31 @@ export async function slotLink(
 
 export const PCI_IDS = ['/usr/share/hwdata/pci.ids', '/usr/share/misc/pci.ids', '/usr/share/pci.ids'];
 
-/** Noms « vendor:device » → nom complet, par fichier pci.ids (environ 1,5 Mo : lu et découpé une seule fois par process). */
-const pciIdsCache = new Map<string, Promise<Map<string, string> | null>>();
+/** Début du bloc suivant : un autre fabricant, ou la section des classes (« C 00  Unclassified device »). */
+const VENDOR_LINE = /\n(?:[0-9a-f]{4} {2}|C )/g;
 
-function parsePciIds(text: string): Map<string, string> {
-  const names = new Map<string, string>();
-  let vendor = '';
-  for (const line of text.split('\n')) {
-    if (line.startsWith('#') || line === '') continue;
-    if (!line.startsWith('\t')) {
-      // Les classes (« C 00  Unclassified device ») terminent la liste des fabricants.
-      if (line.startsWith('C ')) break;
-      vendor = line.slice(0, 4).toLowerCase();
-    } else if (!line.startsWith('\t\t')) {
-      names.set(`${vendor}:${line.slice(1, 5).toLowerCase()}`, line.slice(5).trim());
-    }
-  }
-  return names;
+/**
+ * Entrée « vendor device » dans le texte de pci.ids, sans le découper en lignes (environ 1,5 Mo) : la ligne du
+ * fabricant, puis celle du périphérique avant le fabricant suivant. Les lignes de sous-système (deux tabulations) et
+ * la section des classes (« C 00 ») ne peuvent pas correspondre.
+ */
+export function findPciIdsEntry(text: string, vendor: string, device: string): string | null {
+  const v = text.startsWith(`${vendor}  `) ? 0 : text.indexOf(`\n${vendor}  `);
+  if (v < 0) return null;
+  VENDOR_LINE.lastIndex = v + 1;
+  const end = VENDOR_LINE.exec(text)?.index ?? text.length;
+  const d = text.indexOf(`\n\t${device}  `, v);
+  if (d < 0 || d > end) return null;
+  const nl = text.indexOf('\n', d + 1);
+  // Copie : une sous-chaîne JSC garde en vie tout le texte dont elle est extraite (1,5 Mo par nom retenu).
+  return Buffer.from(text.slice(d + 2 + device.length, nl < 0 ? undefined : nl).trim()).toString();
 }
 
-function loadPciIds(path: string): Promise<Map<string, string> | null> {
-  let p = pciIdsCache.get(path);
-  if (!p) {
-    p = readText(path).then((text) => {
-      // Fichier absent : pas mis en cache (il peut être installé plus tard).
-      if (text === null) pciIdsCache.delete(path);
-      return text === null ? null : parsePciIds(text);
-    });
-    pciIdsCache.set(path, p);
-  }
-  return p;
-}
+/**
+ * Noms déjà trouvés (ou absents), par fichier et « vendor:device ». Le matériel ne change pas : après la première
+ * lecture de la topologie, plus aucune relecture de pci.ids, et seuls quelques noms restent en mémoire.
+ */
+const pciIdsMemo = new Map<string, string | null>();
 
 /** Nom complet d'un périphérique dans pci.ids (« JHL7540 Thunderbolt 3 Bridge [Titan Ridge DD 2018] ») ; null si inconnu. */
 export async function pciIdsEntry(
@@ -110,8 +104,15 @@ export async function pciIdsEntry(
   const [vendor, device] = await Promise.all([id('vendor'), id('device')]);
   if (!vendor || !device) return null;
   for (const path of idsPaths) {
-    const names = await loadPciIds(path);
-    if (names) return names.get(`${vendor}:${device}`) ?? null;
+    const key = `${path}\0${vendor}:${device}`;
+    const known = pciIdsMemo.get(key);
+    if (known !== undefined) return known;
+    // Fichier absent : pas retenu (il peut être installé plus tard), le suivant de la liste est essayé.
+    const text = await readText(path);
+    if (text === null) continue;
+    const entry = findPciIdsEntry(text, vendor, device);
+    pciIdsMemo.set(key, entry);
+    return entry;
   }
   return null;
 }

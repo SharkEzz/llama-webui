@@ -2,7 +2,7 @@ import { afterAll, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chipsetLabel, cpuLabel, minKnown, parseLinkSpeed, readPciTopology } from './pci';
+import { chipsetLabel, cpuLabel, findPciIdsEntry, minKnown, parseLinkSpeed, readPciTopology } from './pci';
 
 const tmpDirs: string[] = [];
 afterAll(() => {
@@ -363,4 +363,28 @@ test('parseLinkSpeed / minKnown / chipsetLabel', () => {
   expect(chipsetLabel('600 Series Chipset PCIe Switch Upstream Port')).toBe('600 Series Chipset');
   expect(chipsetLabel('Z790 Chipset PCI Express Root Port')).toBe('Z790 Chipset');
   expect(chipsetLabel(null)).toBe('Chipset');
+});
+
+test('findPciIdsEntry: the device line of its own vendor only, not a subsystem or a class line', () => {
+  const ids = [
+    '# comment',
+    '1000  Broadcom',
+    '\t0001  Other',
+    '1002  Advanced Micro Devices, Inc. [AMD/ATI]',
+    '\t7550  Navi 48 [Radeon RX 9070/9070 XT/9070 GRE]',
+    '\t\t1458 2424  Subsys',
+    '1003  ULSI',
+    '\t2424  ULSI device',
+    'ffff  Illegal Vendor ID',
+    '',
+    'C 00  Unclassified device',
+    '\t0000  Non-VGA unclassified device',
+  ].join('\n');
+  expect(findPciIdsEntry(ids, '1002', '7550')).toBe('Navi 48 [Radeon RX 9070/9070 XT/9070 GRE]');
+  expect(findPciIdsEntry(ids, '1000', '0001')).toBe('Other'); // vendor on the first line
+  expect(findPciIdsEntry(ids, '1003', '2424')).toBe('ULSI device');
+  expect(findPciIdsEntry(ids, '1002', '2424')).toBeNull(); // another vendor's device, or a subsystem
+  expect(findPciIdsEntry(ids, '1000', '7550')).toBeNull();
+  expect(findPciIdsEntry(ids, 'ffff', '0000')).toBeNull(); // the class section is not a device list
+  expect(findPciIdsEntry(ids, 'abcd', '0001')).toBeNull();
 });
