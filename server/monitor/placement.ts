@@ -60,17 +60,27 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
   return { launchSeq: lines[start]!.seq, layers, buffers: [...buffers.values()] };
 }
 
-const NO_PLACEMENT = new Set<ServerState['kind']>(['idle', 'crashed', 'external']);
+/** Dernier placement lu, avec le PID du serveur qui l'a écrit. */
+export interface PlacementMemory {
+  last: { pid: number; placement: ModelPlacement } | null;
+}
+
+const g = globalThis as { __llamaWebuiPlacement?: PlacementMemory };
+/** Survit à `bun --hot`, comme le ring : un rechargement après l'éviction du lancement garde le placement connu. */
+g.__llamaWebuiPlacement ??= { last: null };
+const sharedMemory = g.__llamaWebuiPlacement;
 
 export interface PlacementTrackerDeps {
   logs: LogBuffer;
   supervisor: { readonly state: ServerState; subscribe(fn: (s: ServerState) => void): () => void };
+  memory?: PlacementMemory;
 }
 
 /**
- * Suit le placement du serveur géré. Recréé à chaque rechargement de Bun : il rejoue le ring (qui, lui, survit) et n'a
- * donc aucun état à garder sur globalThis. Un serveur externe n'écrit rien dans le ring : son placement est inconnu
- * même si le ring garde un ancien lancement.
+ * Suit le placement du serveur géré. Recréé à chaque rechargement de Bun : il rejoue le ring (qui, lui, survit). Le
+ * ring ne garde que les dernières lignes : une fois le lancement évincé (logs de requêtes, -lv 4), le dernier placement
+ * lu reste valable tant que le serveur suivi a le même PID. Un serveur externe n'écrit rien dans le ring : son
+ * placement est inconnu même si le ring garde un ancien lancement.
  */
 export class PlacementTracker {
   private _current: ModelPlacement | null = null;
@@ -103,8 +113,24 @@ export class PlacementTracker {
     this.listeners.clear();
   }
 
+  private placement(): ModelPlacement | null {
+    const state = this.deps.supervisor.state;
+    const memory = this.deps.memory ?? sharedMemory;
+    // Seuls starting, ready et stopping suivent un serveur géré (idle, crashed : aucun ; external : pas de logs).
+    if (state.kind !== 'starting' && state.kind !== 'ready' && state.kind !== 'stopping') {
+      memory.last = null;
+      return null;
+    }
+    const parsed = parsePlacement(this.deps.logs.since(0));
+    if (parsed) {
+      memory.last = { pid: state.pid, placement: parsed };
+      return parsed;
+    }
+    return memory.last?.pid === state.pid ? memory.last.placement : null;
+  }
+
   private recompute(): void {
-    const next = NO_PLACEMENT.has(this.deps.supervisor.state.kind) ? null : parsePlacement(this.deps.logs.since(0));
+    const next = this.placement();
     const s = JSON.stringify(next);
     if (s === this.serialized) return;
     this.serialized = s;

@@ -79,7 +79,7 @@ test('PlacementTracker: replays the ring at construction, follows new lines and 
   for (const l of text.split('\n')) logs.push(l);
   sup.state = { ...ready, kind: 'starting' };
 
-  const tracker = new PlacementTracker({ logs, supervisor: sup });
+  const tracker = new PlacementTracker({ logs, supervisor: sup, memory: { last: null } });
   expect(tracker.current?.layers).toEqual({ offloaded: 49, total: 49 });
 
   const seen: (number | null)[] = [];
@@ -106,9 +106,40 @@ test('PlacementTracker: an external server has no placement even if the ring hol
   for (const l of (await fixture()).split('\n')) logs.push(l);
   const sup = new FakeSupervisor();
   sup.state = { kind: 'external', pid: null, port: 8080 };
-  const tracker = new PlacementTracker({ logs, supervisor: sup });
+  const tracker = new PlacementTracker({ logs, supervisor: sup, memory: { last: null } });
   expect(tracker.current).toBeNull();
   sup.set({ kind: 'crashed', profile: 'p', profileId: 1, exitCode: 1, signal: null, at: 0 });
   expect(tracker.current).toBeNull();
   tracker.dispose();
+});
+
+test('PlacementTracker: the launch evicted from the ring keeps the placement of the same server, across reloads', async () => {
+  const text = (await fixture()).split('\n');
+  const logs = new LogBuffer(text.length);
+  for (const l of text) logs.push(l);
+  const sup = new FakeSupervisor();
+  sup.state = { ...ready, kind: 'starting' };
+  const memory = { last: null };
+  const tracker = new PlacementTracker({ logs, supervisor: sup, memory });
+  expect(tracker.current?.buffers).toHaveLength(5);
+
+  // -lv 4 or a sweep: request logs push the launch line out of the ring.
+  for (let i = 0; i < text.length; i++) logs.push(`srv  log_server_r: request ${i}`);
+  sup.set(ready);
+  expect(tracker.current?.layers).toEqual({ offloaded: 49, total: 49 });
+  tracker.dispose();
+
+  // bun --hot: a new tracker, the ring without the launch, the same server.
+  const reloaded = new PlacementTracker({ logs, supervisor: sup, memory });
+  expect(reloaded.current?.buffers).toHaveLength(5);
+  // Another server (new PID) whose launch is not in the ring: unknown, not the old placement.
+  sup.set({ ...ready, pid: 2 });
+  expect(reloaded.current).toBeNull();
+  sup.set(ready);
+  expect(reloaded.current).not.toBeNull();
+  // Stopped: forgotten, even if the same PID comes back.
+  sup.set({ kind: 'idle' });
+  sup.set(ready);
+  expect(reloaded.current).toBeNull();
+  reloaded.dispose();
 });
