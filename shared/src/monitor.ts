@@ -41,6 +41,12 @@ export interface MemInfo {
   swapUsedBytes: number;
 }
 
+/** Bande passante DRAM de la machine (contrôleur mémoire, via perf) : tout ce qui touche la RAM, CPU, GPU et NVMe compris. */
+export interface MemBandwidth {
+  readBps: number;
+  writeBps: number;
+}
+
 export interface SystemSample {
   cpuPct: number;
   corePct: number[];
@@ -48,6 +54,8 @@ export interface SystemSample {
   tempC: number | null;
   load: [number, number, number] | null;
   mem: MemInfo | null;
+  /** Absent ou null : non mesurable (perf absent, PMU inconnu, droits). */
+  memBw?: MemBandwidth | null;
 }
 
 export interface DiskSample {
@@ -119,6 +127,9 @@ export const SERIES = {
   sysCpu: 'sys.cpu',
   sysMemPct: 'sys.memPct',
   sysTemp: 'sys.tempC',
+  memRead: 'mem.read',
+  memWrite: 'mem.write',
+  procDram: 'proc.dram',
   diskRead: 'disk.read',
   diskWrite: 'disk.write',
   modelDiskRead: 'disk.modelRead',
@@ -146,7 +157,8 @@ export interface Snapshot {
   gpus: GpuSample[];
   /** Toutes les GPU, triées par busId, masquées et en veille comprises (non lues). */
   allGpus: GpuSample[];
-  proc: { cpuPct: number; rssBytes: number } | null;
+  /** `dramBps` : octets/s ramenés de la DRAM par llama-server (perf, événement cœur) ; null = inconnu. */
+  proc: { cpuPct: number; rssBytes: number; dramBps?: number | null } | null;
   system: SystemSample | null;
   disk: DiskSample | null;
   /** Valeurs ajoutées à l'historique à ce tick (NaN → null). */

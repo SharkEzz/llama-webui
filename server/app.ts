@@ -8,6 +8,7 @@ import type { SettingsRepo } from './db/settings';
 import type { SweepsRepo } from './db/sweeps';
 import { guarded, jsonObject } from './http';
 import type { Monitor } from './monitor/monitor';
+import type { PlacementTracker } from './monitor/placement';
 import pkg from './package.json';
 import { benchRoutes } from './routes/bench';
 import { chatRoutes } from './routes/chat';
@@ -16,6 +17,7 @@ import { monitorRoutes } from './routes/monitor';
 import { profileRoutes } from './routes/profiles';
 import { serverRoutes } from './routes/server';
 import { sweepRoutes } from './routes/sweeps';
+import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
 import type { Runtime } from './runtime';
 import type { WsHub } from './ws/hub';
@@ -33,6 +35,8 @@ export interface AppDeps {
   activeProfileId: () => number | null;
   runtime: Runtime;
   monitor: Monitor;
+  /** Répartition du modèle chargé (logs de llama-server), pour la page Topologie. */
+  placement: PlacementTracker;
   /** Page web (import HTML : Bun bundle React + Tailwind à la volée). */
   index: Bun.HTMLBundle;
   hostname: string;
@@ -68,6 +72,7 @@ export function createApp(deps: AppDeps) {
       ...benchRoutes(deps),
       ...sweepRoutes(deps),
       ...tuningRoutes(deps),
+      ...topologyRoutes(deps),
       '/api/*': guarded(() => Response.json({ error: 'Route inconnue' }, { status: 404 })),
       '/ws': guarded((req, server) => {
         if (server.upgrade(req)) return undefined;

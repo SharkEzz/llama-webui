@@ -3,11 +3,12 @@ import { MemoryStick } from 'lucide-react';
 import { TimeSeriesChart } from '@/components/charts/TimeSeriesChart';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { Progress } from '@/components/ui/progress';
-import { formatBytes, formatPct } from '@/lib/format';
+import { formatBps, formatBytes, formatPct } from '@/lib/format';
 import { Facts } from './Facts';
 
 export function MemoryCard({ sample }: { sample: SystemSample | null }) {
   const mem = sample?.mem;
+  const bw = sample?.memBw ?? null;
   const used = mem ? mem.totalBytes - mem.availableBytes : 0;
   const pct = mem && mem.totalBytes > 0 ? (100 * used) / mem.totalBytes : 0;
   return (
@@ -36,8 +37,23 @@ export function MemoryCard({ sample }: { sample: SystemSample | null }) {
                   ? `${formatBytes(mem.swapUsedBytes)} / ${formatBytes(mem.swapTotalBytes)}`
                   : 'aucun',
               ],
+              [
+                'Bande passante DRAM',
+                bw ? `↓ ${formatBps(bw.readBps)} · ↑ ${formatBps(bw.writeBps)}` : 'non mesurée (perf)',
+              ],
             ]}
           />
+          {bw && (
+            <TimeSeriesChart
+              aria-label="Bande passante DRAM"
+              height={120}
+              format={formatBps}
+              series={[
+                { key: SERIES.memRead, label: 'Lecture', tone: 'blue' },
+                { key: SERIES.memWrite, label: 'Écriture', tone: 'teal' },
+              ]}
+            />
+          )}
           <TimeSeriesChart
             aria-label="RAM utilisée"
             height={120}

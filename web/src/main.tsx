@@ -7,12 +7,14 @@ import { startLogsSync } from './lib/logs';
 import { startMonitorSync } from './lib/monitor';
 import { startServerSync } from './lib/server';
 import { startThemeSync } from './lib/theme';
+import { startTopologySync } from './lib/topology';
 import { useWs } from './lib/ws';
 
 startThemeSync();
 startServerSync();
 startMonitorSync();
 startLogsSync();
+startTopologySync();
 useWs.getState().connect();
 
 createRoot(document.getElementById('root')!).render(

@@ -10,6 +10,7 @@ import { openDb } from './db/open';
 import { ProfilesRepo } from './db/profiles';
 import { SettingsRepo } from './db/settings';
 import { SweepsRepo } from './db/sweeps';
+import { PlacementTracker } from './monitor/placement';
 import { dbPath } from './paths';
 import { activeProfileId, getRuntime, serverView, startMonitor } from './runtime';
 import { profilePaths } from './supervisor/args';
@@ -83,6 +84,8 @@ monitor.setModelPathResolver((id) => {
   const p = profiles.get(id);
   return p ? profilePaths(p).model : null;
 });
+// Répartition du modèle (logs de démarrage) : recréé à chaque rechargement, il rejoue le ring qui survit.
+const placement = new PlacementTracker({ logs, supervisor });
 
 const server = createApp({
   db,
@@ -96,6 +99,7 @@ const server = createApp({
   sweeps,
   runtime,
   monitor,
+  placement,
   activeProfileId: () => activeProfileId(supervisor),
   index,
   hostname: HOSTNAME,
@@ -106,6 +110,7 @@ const server = createApp({
 const unsubState = supervisor.subscribe(() => hub.broadcast({ type: 'server-state', payload: serverView(supervisor) }));
 const unsubLogs = logs.onLines((lines) => hub.broadcast({ type: 'log', payload: lines }));
 const unsubSnapshot = monitor.onSnapshot((s) => hub.broadcast({ type: 'snapshot', payload: s }));
+const unsubPlacement = placement.onChange((p) => hub.broadcast({ type: 'placement', payload: p }));
 
 // Arrêt de Bun : les réponses en cours sont enregistrées « interrompues » avant que le runtime n'arrête llama-server
 // (sinon elles verraient la coupure et finiraient « erreur »). En tête de file, devant le gestionnaire du runtime.
@@ -130,6 +135,8 @@ g.__llamaWebuiDispose = () => {
   unsubState();
   unsubLogs();
   unsubSnapshot();
+  unsubPlacement();
+  placement.dispose();
   monitor.setModelPathResolver(() => null);
   hub.dispose();
   process.off('SIGINT', stopChats);

@@ -2,12 +2,12 @@ import { afterAll, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { parseLinkSpeed } from '../hardware/pci';
 import {
   discoverAmdCards,
   isRuntimeSuspended,
   parseDpm,
   parseFdinfo,
-  parseLinkSpeed,
   pciIdsName,
   readAmdCard,
   readProcAmdVram,
