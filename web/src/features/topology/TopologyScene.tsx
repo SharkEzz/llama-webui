@@ -1,6 +1,6 @@
 import type { TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/shared';
 import { OrbitControls, RoundedBox, Tube } from '@react-three/drei';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { advance, Canvas, useFrame, useThree } from '@react-three/fiber';
 import { type ComponentRef, type RefObject, useEffect, useMemo, useRef } from 'react';
 import {
   type Color,
@@ -13,6 +13,7 @@ import {
 import type { Tone } from '@/components/glass/tones';
 import type { LinkFlow, NodeLive } from './flows';
 import { type Bounds, FOV_DEG, fitCamera, type Layout, type Placed } from './layout';
+import { FramePacer } from './pacing';
 import { flowVisual, MAX_PARTICLES, Smoother } from './smooth';
 import type { SceneColors } from './themeColors';
 
@@ -46,6 +47,12 @@ const REF_BPS = 16 * 3.938e9;
 
 export function TopologyScene(p: TopologySceneProps) {
   const smoother = useMemo(() => new Smoother(0.4), []);
+  const pacer = useMemo(() => new FramePacer(), []);
+  // Une entrée a changé : une image au plus tôt, puis les lissages en cours gardent la cadence (voir FramePacer).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: déclencheurs, la scène lit ces valeurs à l'image suivante
+  useEffect(() => {
+    pacer.requested = true;
+  }, [pacer, p.flows, p.live, p.tones, p.colors, p.hovered, p.layout, p.reducedMotion]);
   const byId = useMemo(() => new Map(p.graph.nodes.map((n) => [n.id, n])), [p.graph]);
   const nodeColor = (n: TopologyNode): Color => {
     const tone = p.tones.get(n.id);
@@ -54,6 +61,7 @@ export function TopologyScene(p: TopologySceneProps) {
   };
   return (
     <Canvas
+      frameloop="never"
       gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
       dpr={[1, 1.5]}
       camera={{ fov: FOV_DEG, near: 0.1, far: 200, position: [0, 12, 14] }}
@@ -61,7 +69,14 @@ export function TopologyScene(p: TopologySceneProps) {
       className="cursor-grab active:cursor-grabbing"
       onPointerMissed={() => p.onHover(null)}
     >
-      <Rig bounds={p.layout.bounds} drift={!p.reducedMotion} view={p.view} onMovedChange={p.onViewMoved} />
+      <FrameDriver pacer={pacer} smoother={smoother} />
+      <Rig
+        bounds={p.layout.bounds}
+        drift={!p.reducedMotion}
+        view={p.view}
+        onMovedChange={p.onViewMoved}
+        pacer={pacer}
+      />
       <Projector layout={p.layout} layer={p.labelLayer} />
       <ambientLight intensity={p.colors.dark ? 0.55 : 0.85} />
       <directionalLight position={[6, 12, 8]} intensity={p.colors.dark ? 1.2 : 1.5} />
@@ -101,11 +116,40 @@ export function TopologyScene(p: TopologySceneProps) {
             colors={p.colors}
             reducedMotion={p.reducedMotion}
             smoother={smoother}
+            pacer={pacer}
           />
         );
       })}
     </Canvas>
   );
+}
+
+/** Amortissement de la caméra après un geste : il s'éteint en moins d'une seconde (facteur 0,12 par image). */
+const DAMPING_MS = 1000;
+
+/**
+ * Boucle de rendu (frameloop « never ») : à chaque rAF, une image seulement si le pacer la demande. Un onglet caché ne
+ * reçoit plus de rAF : rien n'est dessiné.
+ */
+function FrameDriver({ pacer, smoother }: { pacer: FramePacer; smoother: Smoother }) {
+  const get = useThree((s) => s.get);
+  const size = useThree((s) => s.size);
+  // Redimensionner efface le canvas : une image tout de suite.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `size` est le déclencheur
+  useEffect(() => {
+    pacer.requested = true;
+  }, [pacer, size]);
+  useEffect(() => {
+    let raf = requestAnimationFrame(function tick(now) {
+      raf = requestAnimationFrame(tick);
+      if (!pacer.shouldRender(now)) return;
+      // En frameloop « never », l'horloge de la scène suit le temps passé ici, en secondes.
+      advance(now / 1000, true, get());
+      pacer.rendered(now, smoother.takeMoving());
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pacer, smoother, get]);
+  return null;
 }
 
 /** Pilotage de la caméra depuis le DOM (bouton « Recentrer »). */
@@ -122,6 +166,7 @@ interface RigProps {
   drift: boolean;
   view: RefObject<SceneView | null>;
   onMovedChange: (moved: boolean) => void;
+  pacer: FramePacer;
 }
 
 /**
@@ -129,7 +174,7 @@ interface RigProps {
  * clic droit (ou deux doigts) déplace, la molette zoome : dès que l'utilisateur la prend en main, la caméra reste où il
  * l'a laissée (ni dérive ni recadrage au redimensionnement) jusqu'au « Recentrer », qui la ramène en douceur.
  */
-function Rig({ bounds, drift, view, onMovedChange }: RigProps) {
+function Rig({ bounds, drift, view, onMovedChange, pacer }: RigProps) {
   const { camera, size } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const cam = useMemo(() => fitCamera(bounds, size.width / Math.max(1, size.height)), [bounds, size]);
@@ -145,18 +190,20 @@ function Rig({ bounds, drift, view, onMovedChange }: RigProps) {
         if (!c) return;
         moved.current = false;
         back.current = drift ? { pos: camera.position.clone(), target: c.target.clone(), t: 0 } : null;
+        pacer.requested = true;
         onMovedChange(false);
       },
     };
     return () => {
       view.current = null;
     };
-  }, [view, camera, drift, onMovedChange]);
+  }, [view, camera, drift, onMovedChange, pacer]);
 
   // Après les contrôles (priorité -1, qui appliquent l'amortissement) : la pose de repos l'emporte tant que
   // l'utilisateur n'a pas pris la main.
   useFrame(({ clock }, dt) => {
     const c = controls.current;
+    pacer.drift = drift && !moved.current;
     if (!c || moved.current) return;
     const t = drift ? clock.elapsedTime : 0;
     goalPos.set(
@@ -172,6 +219,7 @@ function Rig({ bounds, drift, view, onMovedChange }: RigProps) {
       goalPos.lerpVectors(b.pos, goalPos, k);
       goalTarget.lerpVectors(b.target, goalTarget, k);
       if (b.t >= 1) back.current = null;
+      else pacer.active = true;
     }
     camera.position.copy(goalPos);
     c.target.copy(goalTarget);
@@ -189,10 +237,16 @@ function Rig({ bounds, drift, view, onMovedChange }: RigProps) {
       // Reste au-dessus du sol : on ne passe pas sous les dalles.
       maxPolarAngle={Math.PI / 2 - 0.05}
       onStart={() => {
+        pacer.interacting = true;
         back.current = null;
         if (moved.current) return;
         moved.current = true;
         onMovedChange(true);
+      }}
+      onEnd={() => {
+        pacer.interacting = false;
+        if (drift) pacer.hold(performance.now(), DAMPING_MS);
+        else pacer.requested = true;
       }}
     />
   );
@@ -204,7 +258,7 @@ const sub3 = (a: readonly number[], b: readonly number[]) => a.map((v, i) => v -
 
 const projected = new Vector3();
 
-/** Projette le sommet de chaque bloc sur l'écran et y ancre son étiquette DOM (sans passer par React : 60 fois/s). */
+/** Projette le sommet de chaque bloc sur l'écran et y ancre son étiquette DOM (sans passer par React, à chaque image). */
 function Projector({ layout, layer }: { layout: Layout; layer: RefObject<HTMLDivElement | null> }) {
   const { camera, size } = useThree();
   const els = useRef(new Map<string, HTMLElement>());
@@ -296,9 +350,10 @@ interface LinkProps {
   colors: SceneColors;
   reducedMotion: boolean;
   smoother: Smoother;
+  pacer: FramePacer;
 }
 
-function Link({ link, from, to, flow, color, colors, reducedMotion, smoother }: LinkProps) {
+function Link({ link, from, to, flow, color, colors, reducedMotion, smoother, pacer }: LinkProps) {
   const neutral = color === colors.neutral;
   const curve = useMemo(() => {
     // Les tubes partent des flancs qui se font face (pas du dessus : les faces supérieures et les étiquettes restent
@@ -339,6 +394,7 @@ function Link({ link, from, to, flow, color, colors, reducedMotion, smoother }: 
     if (link.kind === 'memory' && f.fwdBps === null && f.backBps === null) {
       // Sans mesure DRAM : pulsation dont la cadence suit l'activité CPU (0–100) ; sans animation, une intensité fixe.
       const a = Math.min(1, (f.activity ?? 0) / 100);
+      if (!reducedMotion && a > 0) pacer.active = true;
       target = reducedMotion
         ? 0.08 + 0.6 * a
         : 0.08 + a * (0.35 + 0.35 * Math.abs(Math.sin(clock.elapsedTime * (1 + 4 * a))));
@@ -373,6 +429,7 @@ function Link({ link, from, to, flow, color, colors, reducedMotion, smoother }: 
             reverse={false}
             side={0.1}
             smoother={smoother}
+            pacer={pacer}
           />
           <Particles
             id={`${link.id}:back`}
@@ -382,6 +439,7 @@ function Link({ link, from, to, flow, color, colors, reducedMotion, smoother }: 
             reverse
             side={-0.1}
             smoother={smoother}
+            pacer={pacer}
           />
         </>
       )}
@@ -399,13 +457,14 @@ interface ParticlesProps {
   /** Décalage latéral (unités) pour que les deux sens ne se superposent pas. */
   side: number;
   smoother: Smoother;
+  pacer: FramePacer;
 }
 
 const tmpPoint = new Vector3();
 const tmpTangent = new Vector3();
 
 /** Particules le long d'un lien : nombre et vitesse en échelle log du débit (voir flowVisual), lissés. */
-function Particles({ id, curve, bps, color, reverse, side, smoother }: ParticlesProps) {
+function Particles({ id, curve, bps, color, reverse, side, smoother, pacer }: ParticlesProps) {
   const mesh = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
   // Décalage initial de chaque particule, déterministe (suite de Weyl).
@@ -422,6 +481,7 @@ function Particles({ id, curve, bps, color, reverse, side, smoother }: Particles
     const n = Math.round(smoother.step(`${id}:n`, vis.particles, dt));
     const speed = smoother.step(`${id}:speed`, vis.speed, dt);
     phase.current = (phase.current + speed * dt) % 1;
+    if (n > 0) pacer.active = true;
     m.count = n;
     for (let i = 0; i < n; i++) {
       let u = (offsets[i]! + phase.current) % 1;

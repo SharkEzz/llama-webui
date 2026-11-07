@@ -1,6 +1,10 @@
 /** Lissage exponentiel par clé, pour que les valeurs du tick (1 s) n'avancent pas par sauts dans la boucle de rendu. */
+/** Écart à la cible sous lequel une valeur lissée est arrivée (invisible : moins d'un niveau de couleur sur 8 bits). */
+const SETTLED = 2e-3;
+
 export class Smoother {
   private v = new Map<string, number>();
+  private moving = false;
 
   /** `tau` : constante de temps (s) ; après `tau`, 63 % du chemin vers la cible est fait. */
   constructor(private readonly tau = 0.35) {}
@@ -14,7 +18,15 @@ export class Smoother {
     }
     const next = prev + (t - prev) * (1 - Math.exp(-dt / this.tau));
     this.v.set(key, next);
+    if (Math.abs(t - next) > SETTLED) this.moving = true;
     return next;
+  }
+
+  /** Une valeur n'avait pas encore rejoint sa cible depuis le dernier appel : l'animation doit continuer. */
+  takeMoving(): boolean {
+    const m = this.moving;
+    this.moving = false;
+    return m;
   }
 }
 
