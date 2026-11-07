@@ -147,12 +147,9 @@ context length and experts (MoE). Split (sharded) models and multimodal projecto
 Light and dark themes (or follow the system), a refined glass look, and real-time updates over a single WebSocket that
 reconnects on its own.
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/assets/screenshots/dashboard.jpg" alt="Dashboard in dark theme"><p align="center"><sub><b>Dark</b></sub></p></td>
-    <td width="50%"><img src="docs/assets/screenshots/dashboard-light.jpg" alt="Dashboard in light theme"><p align="center"><sub><b>Light</b></sub></p></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/assets/screenshots/dashboard-light.jpg" alt="Dashboard in light theme" width="100%">
+</p>
 
 ## Requirements
 
