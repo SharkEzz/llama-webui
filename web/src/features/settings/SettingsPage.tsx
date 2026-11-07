@@ -20,12 +20,12 @@ type Errors = Partial<Record<keyof Settings, string>>;
 
 const INTERVALS = [250, 500, 1000, 2000].map((ms) => ({ value: String(ms), label: `${ms} ms` }));
 const THEMES: { value: ThemeMode; label: string }[] = [
-  { value: 'system', label: 'Système' },
-  { value: 'light', label: 'Clair' },
-  { value: 'dark', label: 'Sombre' },
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
 ];
 
-/** Réglages enregistrés champ par champ (PATCH /api/settings) ; erreur de validation affichée sous le champ. */
+/** Settings saved field by field (PATCH /api/settings); validation error shown under the field. */
 export function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [errors, setErrors] = useState<Errors>({});
@@ -44,7 +44,7 @@ export function SettingsPage() {
         for (const k of keys) delete copy[k];
         return copy;
       });
-      toast.success('Réglage enregistré', { id: 'settings-saved' });
+      toast.success('Setting saved', { id: 'settings-saved' });
     } catch (e) {
       if (e instanceof ApiError && e.issues.length > 0) {
         const next: Errors = {};
@@ -56,15 +56,15 @@ export function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-3xl font-semibold tracking-tight">Réglages</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
       {!settings ? (
         <Skeleton className="h-72" />
       ) : (
         <Tabs defaultValue="general">
           <TabsList className={cn(GLASS, 'h-9 p-1 *:px-3')}>
-            <TabsTrigger value="general">Général</TabsTrigger>
+            <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
-            <TabsTrigger value="appearance">Apparence</TabsTrigger>
+            <TabsTrigger value="appearance">Appearance</TabsTrigger>
           </TabsList>
           <TabsContent value="general">
             <General settings={settings} errors={errors} save={save} />
@@ -92,30 +92,30 @@ function General({ settings, errors, save }: SectionProps & { errors: Errors }) 
       <div className="grid gap-5 md:grid-cols-2">
         <TextField
           id="binary"
-          label="Binaire"
-          hint="Chemin ou nom dans le PATH."
+          label="Binary"
+          hint="Path, or name in the PATH."
           value={settings.binary}
           error={errors.binary}
           onCommit={(v) => save({ binary: v })}
         />
         <TextField
           id="modelsDir"
-          label="Dossier des modèles"
-          hint="Dossier de travail par défaut des profils."
+          label="Models folder"
+          hint="Default working directory of profiles."
           value={settings.modelsDir}
           error={errors.modelsDir}
           onCommit={(v) => save({ modelsDir: v })}
         />
         <TextField
           id="host"
-          label="Hôte par défaut"
+          label="Default host"
           value={settings.host}
           error={errors.host}
           onCommit={(v) => save({ host: v })}
         />
         <TextField
           id="port"
-          label="Port par défaut"
+          label="Default port"
           value={String(settings.port)}
           error={errors.port}
           inputMode="numeric"
@@ -173,35 +173,35 @@ function Monitoring({ settings, save }: SectionProps) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <GlassCard title="Collecte">
+      <GlassCard title="Collection">
         <div className="flex flex-col gap-5">
           <SwitchRow
             id="nvml"
-            label="NVML pour les GPU NVIDIA"
-            hint="Sinon nvidia-smi (sans débit PCIe). Pris en compte au prochain démarrage de llama-webui."
+            label="NVML for NVIDIA GPUs"
+            hint="Otherwise nvidia-smi (no PCIe bandwidth). Applied on the next llama-webui start."
             checked={c.nvml}
             onChange={(on) => save({ collectors: { ...c, nvml: on } })}
           />
           <SwitchRow
             id="sys"
-            label="CPU et mémoire"
+            label="CPU and memory"
             checked={c.system}
             onChange={(on) => save({ collectors: { ...c, system: on } })}
           />
           <SwitchRow
             id="disk"
-            label="Disques"
+            label="Disks"
             checked={c.disk}
             onChange={(on) => save({ collectors: { ...c, disk: on } })}
           />
           <div className="flex flex-col gap-1.5">
-            <Label>Intervalle de mesure</Label>
+            <Label>Polling interval</Label>
             <Select
               items={INTERVALS}
               value={String(settings.pollIntervalMs)}
               onValueChange={(v) => v && save({ pollIntervalMs: Number(v) })}
             >
-              <SelectTrigger className="w-40" aria-label="Intervalle de mesure">
+              <SelectTrigger className="w-40" aria-label="Polling interval">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -215,7 +215,7 @@ function Monitoring({ settings, save }: SectionProps) {
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
-              <Label>Historique gardé</Label>
+              <Label>History kept</Label>
               <span className="num text-sm text-muted-foreground">{formatDuration(history * 1000)}</span>
             </div>
             <Slider
@@ -225,15 +225,15 @@ function Monitoring({ settings, save }: SectionProps) {
               value={history}
               onValueChange={(v) => setHistory(Array.isArray(v) ? v[0]! : v)}
               onValueCommitted={(v) => save({ historySeconds: Array.isArray(v) ? v[0]! : v })}
-              aria-label="Historique gardé, en secondes"
+              aria-label="History kept, in seconds"
             />
           </div>
         </div>
       </GlassCard>
-      <GlassCard title="GPU affichées">
+      <GlassCard title="Displayed GPUs">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted-foreground">
-            Une carte masquée n'est plus lue (elle n'est pas réveillée si elle dort).
+            A hidden GPU is no longer read (it is not woken up if asleep).
           </p>
           {!info ? (
             <Skeleton className="h-24" />
@@ -280,11 +280,11 @@ function Appearance() {
   const mode = useTheme((s) => s.mode);
   const setMode = useTheme((s) => s.setMode);
   return (
-    <GlassCard title="Thème">
+    <GlassCard title="Theme">
       <div className="flex flex-col gap-1.5">
-        <Label>Thème de l'interface</Label>
+        <Label>Interface theme</Label>
         <Select items={THEMES} value={mode} onValueChange={(v) => v && setMode(v as ThemeMode)}>
-          <SelectTrigger className="w-40" aria-label="Thème">
+          <SelectTrigger className="w-40" aria-label="Theme">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -295,7 +295,7 @@ function Appearance() {
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">« Système » suit le réglage clair ou sombre du système.</p>
+        <p className="text-xs text-muted-foreground">“System” follows the OS light or dark setting.</p>
       </div>
     </GlassCard>
   );

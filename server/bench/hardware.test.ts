@@ -12,7 +12,7 @@ test('buildOf reads the version again after the binary is rebuilt', async () => 
       bin,
       `#!/bin/sh\necho "version: ${n} (c${n})" >&2\necho "built with cc (build ${n}, commit c${n})" >&2\n`,
     );
-    // Droits et date de modification : node:fs (l'option `mode` de Bun.write est ignorée, Bun 1.4.4).
+    // Permissions and modification time: node:fs (Bun.write's `mode` option is ignored, Bun 1.4.4).
     chmodSync(bin, 0o755);
     utimesSync(bin, n * 1000, n * 1000);
   };

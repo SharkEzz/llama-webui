@@ -60,13 +60,13 @@ export function ProfilesPage() {
     try {
       raw = JSON.parse(await file.text());
     } catch {
-      toast.error(`${file.name} n'est pas un JSON valide`);
+      toast.error(`${file.name} is not valid JSON`);
       return;
     }
     try {
       const r = await importProfiles(raw);
       await reload();
-      const detail = r.skipped.map((s) => `${s.name} : ${s.reason}`).join('\n');
+      const detail = r.skipped.map((s) => `${s.name}: ${s.reason}`).join('\n');
       const notify = r.imported.length > 0 ? toast.success : toast.warning;
       notify(importSummary(r), detail ? { description: detail } : undefined);
       if (r.imported[0]) select(r.imported[0].id);
@@ -78,12 +78,12 @@ export function ProfilesPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-3xl font-semibold tracking-tight">Profils</h1>
+        <h1 className="mr-auto text-3xl font-semibold tracking-tight">Profiles</h1>
         <Button onClick={() => select('new')}>
-          <Plus /> Nouveau profil
+          <Plus /> New profile
         </Button>
         <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-          <Upload /> Importer
+          <Upload /> Import
         </Button>
         <Button
           variant="ghost"
@@ -91,7 +91,7 @@ export function ProfilesPage() {
           render={<a href="/api/profiles/export" download />}
           disabled={profiles.length === 0}
         >
-          <Download /> Tout exporter
+          <Download /> Export all
         </Button>
         <input
           ref={fileRef}
@@ -111,17 +111,17 @@ export function ProfilesPage() {
       {loaded && profiles.length === 0 && !creating ? (
         <Alert className={GLASS}>
           <SlidersHorizontal />
-          <AlertTitle>Aucun profil</AlertTitle>
+          <AlertTitle>No profiles</AlertTitle>
           <AlertDescription>
-            Un profil réunit le modèle à charger et les arguments de llama-server : créez-en un, ou importez un JSON
-            exporté depuis llama-webui ou llama-tui.
+            A profile combines the model to load and the llama-server arguments: create one, or import a JSON file
+            exported from llama-webui or llama-tui.
           </AlertDescription>
         </Alert>
       ) : (
         <div className="grid items-start gap-4 lg:grid-cols-[17rem_minmax(0,1fr)]">
-          <nav aria-label="Profils" className={cn(GLASS, 'flex flex-col gap-0.5 p-2')}>
+          <nav aria-label="Profiles" className={cn(GLASS, 'flex flex-col gap-0.5 p-2')}>
             {!loaded && [0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
-            {creating && <div className="rounded-md bg-accent px-3 py-2 text-sm font-medium">Nouveau profil</div>}
+            {creating && <div className="rounded-md bg-accent px-3 py-2 text-sm font-medium">New profile</div>}
             {profiles.map((p) => {
               const active = view?.profileId === p.id && isRunning(view);
               return (
@@ -138,7 +138,7 @@ export function ProfilesPage() {
                   <span className="flex w-full items-center gap-2 text-sm font-medium">
                     <span className="truncate">{p.name}</span>
                     {active && (
-                      <span className="ml-auto size-2 shrink-0 rounded-full bg-success" title="Serveur en cours" />
+                      <span className="ml-auto size-2 shrink-0 rounded-full bg-success" title="Server running" />
                     )}
                   </span>
                   <span className="w-full truncate font-mono text-[0.7rem] font-normal text-muted-foreground">
@@ -149,7 +149,7 @@ export function ProfilesPage() {
             })}
           </nav>
 
-          <GlassCard title={selected ? selected.name : 'Nouveau profil'}>
+          <GlassCard title={selected ? selected.name : 'New profile'}>
             <ProfileForm
               key={selected?.id ?? `new:${initial ? fromModel : ''}`}
               initial={initial}

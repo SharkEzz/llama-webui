@@ -2,7 +2,7 @@ import { shellQuote, shellSplit } from '@llama-webui/shared';
 
 const isFlag = (a: string) => a.length > 1 && a.startsWith('-') && !/^-\d/.test(a);
 
-/** Une ligne par flag et ses valeurs, citées façon shell. */
+/** One line per flag and its values, shell-quoted. */
 export function formatArgs(args: string[]): string {
   const lines: string[][] = [];
   for (const a of args) {
@@ -12,12 +12,12 @@ export function formatArgs(args: string[]): string {
   return lines.map((l) => shellQuote(l)).join('\n');
 }
 
-/** Arguments du texte saisi (les retours à la ligne séparent comme des espaces). */
+/** Arguments of the typed text (line breaks separate like spaces). */
 export function parseArgs(text: string): string[] | { error: string } {
   return shellSplit(text.replace(/\r?\n/g, ' '));
 }
 
-/** Le mot sous le curseur et ses bornes ; le mot précédent sert à retrouver le flag d'une valeur. */
+/** The word under the cursor and its bounds; the previous word is used to find a value's flag. */
 export function wordAt(text: string, cursor: number): { word: string; start: number; end: number; previous: string } {
   let start = cursor;
   while (start > 0 && !/\s/.test(text[start - 1]!)) start--;
@@ -36,16 +36,16 @@ export function formatEnv(env: Record<string, string>): string {
     .join('\n');
 }
 
-/** `CLÉ=valeur` par ligne ; lignes vides ignorées. */
+/** `KEY=value` per line; empty lines ignored. */
 export function parseEnv(text: string): Record<string, string> | { error: string } {
   const env: Record<string, string> = {};
   for (const [i, raw] of text.split('\n').entries()) {
     const line = raw.trim();
     if (!line) continue;
     const eq = line.indexOf('=');
-    if (eq <= 0) return { error: `ligne ${i + 1} : CLÉ=valeur attendu` };
+    if (eq <= 0) return { error: `line ${i + 1}: expected KEY=value` };
     const key = line.slice(0, eq).trim();
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return { error: `ligne ${i + 1} : nom de variable invalide « ${key} »` };
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) return { error: `line ${i + 1}: invalid variable name “${key}”` };
     env[key] = line.slice(eq + 1);
   }
   return env;

@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { ApiError, api } from './api';
+import { formatShortDate } from './format';
 import { onWs, useWs } from './ws';
 
 type Draft = Pick<BenchSpec, 'modelPath' | 'mmprojPath' | 'profileId' | 'params' | 'serverArgs'>;
@@ -29,7 +30,7 @@ interface TuningState {
   modelPath: string | null;
   mmprojPath: string | null;
   profileId: number | null;
-  /** Flags serveur du profil hors champs mesurables (-c, --spec-type…) : repris par le sweep et le profil créé. */
+  /** Profile server flags outside the measurable fields (-c, --spec-type…): carried over to the sweep and the created profile. */
   serverArgs: string[];
   preset: PresetId;
   pinned: Partial<BenchParams>;
@@ -90,12 +91,8 @@ const modelName = (p: string) =>
     .split('/')
     .pop()!
     .replace(/\.gguf$/, '');
-const shortDate = () =>
-  new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(
-    new Date(),
-  );
 
-/** Une action qui prend la garde : 409 « server-running » → le client demande confirmation. */
+/** An action that takes the gate: 409 “server-running” → the client asks for confirmation. */
 async function guarded(fn: () => Promise<unknown>): Promise<'ok' | 'confirm' | 'error'> {
   try {
     await fn();
@@ -107,7 +104,7 @@ async function guarded(fn: () => Promise<unknown>): Promise<'ok' | 'confirm' | '
   }
 }
 
-/** Espace proposé autour de la recommandation : -ncmoe voisins (MoE), jeux de cartes, -ub pour l'agent. */
+/** Space suggested around the recommendation: neighboring -ncmoe (MoE), GPU sets, -ub for the agent preset. */
 export function suggestedSpace(e: Estimate, hw: TuningHardware, preset: PresetId): SweepSpace {
   const space: SweepSpace = {};
   const n = e.params.ncmoe;
@@ -155,7 +152,9 @@ export const useTuning = create<TuningState>()((set, get) => {
   const specBody = () => {
     const s = get();
     return {
-      name: s.run.name.trim() || `${modelName(s.modelPath ?? 'modèle')} · ${presetOf(s.preset).label} · ${shortDate()}`,
+      name:
+        s.run.name.trim() ||
+        `${modelName(s.modelPath ?? 'model')} · ${presetOf(s.preset).label} · ${formatShortDate(new Date())}`,
       modelPath: s.modelPath,
       mmprojPath: s.mmprojPath,
       profileId: s.profileId,
@@ -364,7 +363,7 @@ export const useTuning = create<TuningState>()((set, get) => {
     async toProfile(runId) {
       try {
         const p = await api<Profile>(`/bench/${runId}/to-profile`, { method: 'POST', body: '{}' });
-        toast.success(`Profil « ${p.name} » créé`);
+        toast.success(`Profile “${p.name}” created`);
         return p;
       } catch (e) {
         fail(e);
@@ -410,7 +409,7 @@ function dropSweep(id: number) {
 }
 
 let started = false;
-/** Abonnement WS (une fois) : sweeps, progression, runs du sweep ouvert ; relecture à chaque (re)connexion. */
+/** WS subscription (once): sweeps, progress, runs of the open sweep; reload on every (re)connect. */
 export function startTuningSync(): void {
   if (started) return;
   started = true;

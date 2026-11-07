@@ -14,11 +14,11 @@ import {
 } from './bench';
 import { NOISE, PRESET_IDS, type PresetId, presetOf } from './tuning';
 
-const values = <T extends z.ZodType>(t: T) => z.array(t).min(1, 'au moins une valeur').optional();
+const values = <T extends z.ZodType>(t: T) => z.array(t).min(1, 'at least one value').optional();
 const p = BenchParamsSchema.shape;
 const inner = <T extends z.ZodType>(s: z.ZodOptional<T>): T => s.unwrap();
 
-/** Pour chaque flag, les valeurs à essayer ; clé absente = la valeur de la base. */
+/** For each flag, the values to try; missing key = the base value. */
 export const SweepSpaceSchema = z.strictObject({
   ngl: values(inner(p.ngl)),
   ot: values(inner(p.ot)),
@@ -36,9 +36,9 @@ export const SweepSpaceSchema = z.strictObject({
 export type SweepSpace = z.infer<typeof SweepSpaceSchema>;
 
 export const SweepSpecSchema = z.strictObject({
-  name: z.string({ error: 'obligatoire' }).trim().min(1, 'obligatoire').max(80, '80 caractères au plus'),
+  name: z.string({ error: 'required' }).trim().min(1, 'required').max(80, '80 characters at most'),
   ...benchSpecBase,
-  preset: z.enum(PRESET_IDS, { error: 'préréglage inconnu' }),
+  preset: z.enum(PRESET_IDS, { error: 'unknown preset' }),
   base: BenchParamsSchema.default({}),
   space: SweepSpaceSchema.default({}),
   serverArgs: serverArgsField,
@@ -55,7 +55,7 @@ export interface Sweep {
   status: SweepStatus;
   spec: SweepSpec;
   bestRunId: number | null;
-  /** Résumé du meilleur run (historique des sweeps sans charger leurs runs). */
+  /** Summary of the best run (sweep history without loading their runs). */
   best: { label: string | null; kind: BenchKind; ppTps: number | null; tgTps: number | null } | null;
   counts: {
     total: number;
@@ -80,8 +80,8 @@ export interface SweepLive {
 }
 
 /**
- * Produit cartésien de l'espace sur la base, dans l'ordre des champs. `-ts` ne s'applique qu'aux combinaisons dont `-dev` a
- * autant de devices (les autres n'en ont pas) ; un seul device → pas de `-ts`. Doublons retirés ; espace vide → [base].
+ * Cartesian product of the space over the base, in field order. `-ts` only applies to combinations whose `-dev` has as
+ * many devices (the others get none); a single device → no `-ts`. Duplicates removed; empty space → [base].
  */
 export function expandSpace(base: BenchParams, space: SweepSpace): { items: BenchParams[]; droppedTs: number } {
   let combos: BenchParams[] = [{ ...base }];
@@ -110,19 +110,18 @@ export function expandSpace(base: BenchParams, space: SweepSpace): { items: Benc
   return { items, droppedTs };
 }
 
-/** Les seules dimensions de l'espace, en flags llama-server : « -ngl all · -ncmoe 8 · -dev CUDA0,Vulkan3 ». */
+/** Only the space's dimensions, as llama-server flags: “-ngl all · -ncmoe 8 · -dev CUDA0,Vulkan3”. */
 export function itemLabel(params: BenchParams, space: SweepSpace): string {
   const parts: string[] = [];
   for (const key of FIELD_ORDER) {
     if (!space[key]) continue;
     const args = serverArgs({ [key]: params[key] } as BenchParams);
-    parts.push(args.length ? args.join(' ') : `-${key} défaut`);
+    parts.push(args.length ? args.join(' ') : `-${key} default`);
   }
   return parts.length ? parts.join(' · ') : 'base';
 }
 
-/** Score du préréglage pour un run réussi ; null sinon. */
-/** Contexte d'un sweep : le -c des autres flags serveur, sinon le minimum du préréglage. */
+/** Context of a sweep: the -c from the other server flags, otherwise the preset's minimum. */
 export function sweepCtx(spec: Pick<SweepSpec, 'serverArgs' | 'preset'>): number {
   const args = spec.serverArgs;
   for (let i = 0; i < args.length; i++) {
@@ -133,6 +132,7 @@ export function sweepCtx(spec: Pick<SweepSpec, 'serverArgs' | 'preset'>): number
   return presetOf(spec.preset).ctxMin;
 }
 
+/** The preset's score for a successful run; null otherwise. */
 export function scoreOf(preset: PresetId, run: Pick<BenchRun, 'status' | 'pp' | 'tg'>, ctx: number): number | null {
   if (run.status !== 'ok' || !run.pp || !run.tg) return null;
   return presetOf(preset).score({ ppTps: run.pp.tps, tgTps: run.tg.tps, ctx });
@@ -142,11 +142,11 @@ export interface Ranked {
   run: BenchRun;
   score: number | null;
   rank: number | null;
-  /** L'écart avec le meilleur est sous le bruit de mesure (le meilleur aussi, s'il a un ex æquo). */
+  /** The gap to the best is within measurement noise (also set on the best when it has a tie). */
   tie: boolean;
 }
 
-/** Runs réussis par score décroissant, puis les autres dans l'ordre d'origine. */
+/** Successful runs by decreasing score, then the others in their original order. */
 export function rankRuns(runs: BenchRun[], preset: PresetId, ctx: number): Ranked[] {
   const scored = runs.map((run) => ({ run, score: scoreOf(preset, run, ctx) }));
   const ok = scored
@@ -170,7 +170,7 @@ export function rankRuns(runs: BenchRun[], preset: PresetId, ctx: number): Ranke
 
 const LOAD_BYTES_PER_SEC = 1.5 * 1024 ** 3;
 
-/** Durée grossière : un chargement par élément plus ~10 s par répétition. */
+/** Rough duration: one load per item plus ~10 s per repetition. */
 export function estimatedSweepSeconds(items: number, fileBytes: number, r: number): number {
   return Math.round(items * (fileBytes / LOAD_BYTES_PER_SEC + 10 * r));
 }

@@ -1,17 +1,16 @@
 import type { Measure, Ranked } from '@llama-webui/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatMeasure } from '@/features/bench/format';
-
-const nf = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
+import { fmt } from '@/lib/format';
 
 /**
- * Les meilleures configurations : une seule mesure par barre, donc une seule teinte ; pp et tg sur deux graphes, chacun sur
- * sa propre échelle (pas de double axe). Le trait fin autour de l'extrémité montre ± σ.
+ * The best configurations: one measurement per bar, so a single hue; pp and tg on two charts, each on its own scale
+ * (no dual axis). The thin line around the bar's end shows ± σ.
  */
 export function RankBars({ ranked }: { ranked: Ranked[] }) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <Panel title="Génération (tok/s)" ranked={ranked} pick={(r) => r.run.tg} />
+      <Panel title="Generation (tok/s)" ranked={ranked} pick={(r) => r.run.tg} />
       <Panel title="Prompt (tok/s)" ranked={ranked} pick={(r) => r.run.pp} />
     </div>
   );
@@ -32,7 +31,7 @@ function Panel({ title, ranked, pick }: { title: string; ranked: Ranked[]; pick(
                 render={<div />}
                 tabIndex={0}
                 className="grid grid-cols-[2rem_minmax(0,13rem)_minmax(0,1fr)_3.5rem] items-center gap-2 rounded-sm py-1 outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring/50"
-                aria-label={`${r.run.sweepLabel ?? `#${r.run.id}`} : ${formatMeasure(m)}`}
+                aria-label={`${r.run.sweepLabel ?? `#${r.run.id}`}: ${formatMeasure(m)}`}
               >
                 <span className="num text-xs text-muted-foreground">{r.tie ? '1=' : r.rank}</span>
                 <span className="truncate font-mono text-xs">{r.run.sweepLabel ?? `#${r.run.id}`}</span>
@@ -53,10 +52,10 @@ function Panel({ title, ranked, pick }: { title: string; ranked: Ranked[]; pick(
                     </>
                   )}
                 </span>
-                <span className="num text-right text-xs">{m ? nf.format(m.tps) : '—'}</span>
+                <span className="num text-right text-xs">{m ? fmt(m.tps, 1) : '—'}</span>
               </TooltipTrigger>
               <TooltipContent className="num">
-                {r.run.sweepLabel} : {formatMeasure(m)}
+                {r.run.sweepLabel}: {formatMeasure(m)}
               </TooltipContent>
             </Tooltip>
           );

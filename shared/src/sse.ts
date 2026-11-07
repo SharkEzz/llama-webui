@@ -1,10 +1,10 @@
 export interface SseEvent {
-  /** « message » quand le flux ne nomme pas l'événement. */
+  /** `message` when the stream does not name the event. */
   event: string;
   data: string;
 }
 
-/** Lecteur incrémental de text/event-stream : accepte des morceaux coupés n'importe où, LF ou CRLF. */
+/** Incremental text/event-stream reader: accepts chunks split anywhere, LF or CRLF. */
 export class SseParser {
   private buffer = '';
   private event = '';
@@ -35,5 +35,5 @@ export class SseParser {
   }
 }
 
-/** Un événement SSE nommé, donnée en JSON sur une ligne. */
+/** A named SSE event, data as single-line JSON. */
 export const formatSse = (event: string, data: unknown): string => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;

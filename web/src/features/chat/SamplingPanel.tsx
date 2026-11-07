@@ -11,29 +11,29 @@ import type { ServerProps } from './useServerProps';
 type Key = keyof Sampling;
 
 const FIELDS: { key: Key; label: string; server: string; step?: string }[] = [
-  { key: 'temperature', label: 'Température', server: 'temperature', step: '0.05' },
+  { key: 'temperature', label: 'Temperature', server: 'temperature', step: '0.05' },
   { key: 'top_p', label: 'Top-p', server: 'top_p', step: '0.01' },
   { key: 'top_k', label: 'Top-k', server: 'top_k' },
   { key: 'min_p', label: 'Min-p', server: 'min_p', step: '0.01' },
-  { key: 'presence_penalty', label: 'Pénalité de présence', server: 'presence_penalty', step: '0.1' },
-  { key: 'repeat_penalty', label: 'Pénalité de répétition', server: 'repeat_penalty', step: '0.05' },
-  { key: 'max_tokens', label: 'Jetons max', server: 'n_predict' },
-  { key: 'seed', label: 'Graine', server: 'seed' },
+  { key: 'presence_penalty', label: 'Presence penalty', server: 'presence_penalty', step: '0.1' },
+  { key: 'repeat_penalty', label: 'Repeat penalty', server: 'repeat_penalty', step: '0.05' },
+  { key: 'max_tokens', label: 'Max tokens', server: 'n_predict' },
+  { key: 'seed', label: 'Seed', server: 'seed' },
 ];
 
-/** Valeur par défaut du serveur affichée en placeholder (champ vide = cette valeur). */
+/** Server default shown as a placeholder (empty field = this value). */
 function serverDefault(key: Key, v: unknown): string {
-  if (typeof v !== 'number') return 'défaut du serveur';
-  if (key === 'max_tokens' && v < 0) return 'illimité';
-  if (key === 'seed' && (v < 0 || v === 4294967295)) return 'aléatoire';
+  if (typeof v !== 'number') return 'server default';
+  if (key === 'max_tokens' && v < 0) return 'unlimited';
+  if (key === 'seed' && (v < 0 || v === 4294967295)) return 'random';
   return String(Math.round(v * 1000) / 1000);
 }
 
-/** Prompt système, réflexion et sampling de la conversation ouverte, enregistrés au fil de la saisie (contenu du panneau Réglages). */
+/** System prompt, reasoning and sampling of the open conversation, saved as you type (content of the Settings panel). */
 export function SamplingPanel({ props }: { props: ServerProps | null }) {
   const current = useChat((s) => s.current);
   if (!current) return null;
-  // key : changer de conversation remonte le formulaire (champ et erreurs repartent de zéro).
+  // key: switching conversations remounts the form (fields and errors start from scratch).
   return <SamplingForm key={current.id} current={current} props={props} />;
 }
 
@@ -41,8 +41,8 @@ function SamplingForm({ current, props }: { current: ConversationDetail; props: 
   const patch = useChat((s) => s.patch);
   const [errors, setErrors] = useState<Partial<Record<Key | 'systemPrompt', string>>>({});
   const [system, setSystem] = useState(current.systemPrompt);
-  // Le prompt change côté store (enregistrement, autre onglet) : le champ le suit, pendant le rendu plutôt que dans un effet,
-  // sauf s'il contient une saisie pas encore enregistrée (elle l'emporte et sera enregistrée au blur).
+  // The prompt changes in the store (save, another tab): the field follows it during render rather than in an effect,
+  // unless it holds unsaved input (which wins and will be saved on blur).
   const [savedPrompt, setSavedPrompt] = useState(current.systemPrompt);
   if (savedPrompt !== current.systemPrompt) {
     setSavedPrompt(current.systemPrompt);
@@ -63,21 +63,21 @@ function SamplingForm({ current, props }: { current: ConversationDetail; props: 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="sys-prompt">Prompt système</Label>
+        <Label htmlFor="sys-prompt">System prompt</Label>
         <Textarea
           id="sys-prompt"
           value={system}
           onChange={(e) => setSystem(e.target.value)}
           onBlur={() => system !== current.systemPrompt && void save({ systemPrompt: system }, 'systemPrompt')}
-          placeholder="Aucun"
+          placeholder="None"
           className="max-h-48 text-sm"
         />
         {errors.systemPrompt && <p className="text-xs text-destructive">{errors.systemPrompt}</p>}
       </div>
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-0.5">
-          <Label htmlFor="thinking">Réflexion</Label>
-          <p className="text-xs text-muted-foreground">Le modèle réfléchit avant de répondre (s'il sait le faire).</p>
+          <Label htmlFor="thinking">Reasoning</Label>
+          <p className="text-xs text-muted-foreground">The model thinks before answering (if it can).</p>
         </div>
         <Switch
           id="thinking"
@@ -103,7 +103,7 @@ function SamplingForm({ current, props }: { current: ConversationDetail; props: 
           />
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">Un champ vide garde la valeur du profil (affichée en gris).</p>
+      <p className="text-xs text-muted-foreground">An empty field keeps the profile value (shown in gray).</p>
     </div>
   );
 }
@@ -127,7 +127,7 @@ function NumberField(props: {
       return;
     }
     const n = Number(t);
-    if (!Number.isFinite(n)) return props.onInvalid('Nombre attendu');
+    if (!Number.isFinite(n)) return props.onInvalid('Number expected');
     if (n !== props.value) props.onCommit(n);
   };
   return (

@@ -1,6 +1,7 @@
 import type { Profile } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { api } from './api';
+import { plural } from './format';
 
 interface ProfilesStore {
   profiles: Profile[];
@@ -42,9 +43,9 @@ export const importProfiles = (raw: unknown) => api<ImportResult>('/profiles/imp
 export const llamaTuiStatus = () => api<LlamaTuiStatus>('/profiles/import/llama-tui');
 export const importLlamaTui = () => api<ImportResult>('/profiles/import/llama-tui', { method: 'POST' });
 
-/** Résumé d'import pour un toast : « 2 importés, 1 ignoré ». */
+/** Import summary for a toast: “2 profiles imported, 1 skipped”. */
 export function importSummary(r: ImportResult): string {
   const n = r.imported.length;
   const m = r.skipped.length;
-  return `${n} profil${n > 1 ? 's' : ''} importé${n > 1 ? 's' : ''}${m ? `, ${m} ignoré${m > 1 ? 's' : ''}` : ''}`;
+  return `${n} ${plural(n, 'profile')} imported${m ? `, ${m} skipped` : ''}`;
 }

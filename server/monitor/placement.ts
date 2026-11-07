@@ -1,43 +1,49 @@
-import type { LogLine, ModelPlacement, PlacementBuffer, ServerState } from '@llama-webui/shared';
+import {
+  LAUNCH_LOG_PREFIX,
+  type LogLine,
+  type ModelPlacement,
+  type PlacementBuffer,
+  type ServerState,
+} from '@llama-webui/shared';
 import type { LogBuffer } from '../logs/buffer';
 
 /*
- * Répartition du modèle chargé entre les devices, lue dans les logs de démarrage de llama-server : « using device CUDA0
- * (…) (0000:01:00.0) », « CUDA0 model buffer size = 12441.95 MiB », « offloaded 49/49 layers to GPU »… llama-server
- * n'expose pas ces chiffres par API. Les lignes sont au niveau INFO : présentes quelle que soit la verbosité (-lv).
+ * How the loaded model is split across devices, read from llama-server's startup logs: “using device CUDA0
+ * (…) (0000:01:00.0)”, “CUDA0 model buffer size = 12441.95 MiB”, “offloaded 49/49 layers to GPU”… llama-server
+ * doesn't expose these figures through its API. The lines are at INFO level: present whatever the verbosity (-lv).
  */
 
 const MiB = 1024 ** 2;
-const LAUNCH = '[llama-webui] lancement:';
-/** Préfixe llama.cpp optionnel (« 0.11.852.017 I »), gardé dans `LogLine.text`. */
+const LAUNCH = LAUNCH_LOG_PREFIX;
+/** Optional llama.cpp prefix (“0.11.852.017 I”), kept in `LogLine.text`. */
 const PREFIX = /^(?:\d+\.\d+(?:\.\d+)*\s+[IWEDT]\s+)?/;
 const USING = /using device (\S+) \(.*\) \(([0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f])\)/i;
 const LAYERS = /offloaded (\d+)\/(\d+) layers to GPU/;
-/** `RS` : état des couches récurrentes d'un modèle hybride (Mamba, DeltaNet…), l'équivalent de leur cache KV. */
+/** `RS`: state of a hybrid model's recurrent layers (Mamba, DeltaNet…), the equivalent of their KV cache. */
 const BUFFER = /(\S+) (model|KV|RS|compute) buffer size =\s*([\d.]+) MiB/;
-/** Un nouveau contexte (le principal, puis celui du draft ou du MTP) : il a ses propres buffers compute. */
+/** A new context (the main one, then the draft's or the MTP's): it has its own compute buffers. */
 const CONTEXT = /llama_context: constructing llama_context/;
-/** Nouvelle réservation du contexte en cours : ses buffers compute remplacent ceux de la précédente. */
+/** New reservation of the current context: its compute buffers replace those of the previous one. */
 const RESERVE = /sched_reserve: reserving/;
-/** Buffers du projecteur multimodal (mmproj, clip.cpp) : pas le modèle, et estimés avant même son chargement. */
+/** Multimodal projector buffers (mmproj, clip.cpp): not the model, and estimated before it is even loaded. */
 const MMPROJ = /^(?:clip\w*|(?:reserve|alloc)_compute_meta):/;
 /**
- * Début et fin de l'ajustement à la mémoire (-fit, actif par défaut), la fin écrite quelle qu'en soit l'issue. Ses sondes
- * chargent le modèle sans allouer (couches, buffers à 0 MiB, contextes, puis le draft ou le MTP) : à -lv 5, leurs lignes
- * sortent entre les deux et ne sont pas le vrai chargement.
+ * Start and end of fitting to memory (-fit, on by default), the end being written whatever the outcome. Its probes
+ * load the model without allocating (layers, 0 MiB buffers, contexts, then the draft or the MTP): at -lv 5, their lines
+ * come out in between and are not the real load.
  */
 const FIT_START = /fitting params to device memory \.\.\./;
 const FIT_DONE = /common_fit_params: fitting params to free memory took/;
 
-/** Une ligne qui peut changer le placement : évite de relire tout le ring à chaque lot de logs de requêtes. */
-export const RELEVANT = /lancement:|using device|buffer size =|offloaded \d+\/\d+ layers/;
+/** A line that can change the placement: avoids rereading the whole ring on every batch of request logs. */
+export const RELEVANT = /\[llama-webui\] launch:|using device|buffer size =|offloaded \d+\/\d+ layers/;
 
 /**
- * Placement du modèle principal issu du dernier lancement présent dans `lines` ; null sans ligne de lancement (ring
- * vidé ou évincé). llama-server charge le modèle principal (poids, cache KV, compute), puis le draft éventuel (-md),
- * puis le mmproj : le second « offloaded N/M layers » ouvre le draft et clôt la lecture. Le compute se compte par
- * contexte (celui d'un MTP s'ajoute à celui du modèle) et un contexte réservé à nouveau ne garde que sa dernière taille.
- * Les sondes de l'ajustement (-fit, visibles à -lv 5) précèdent le chargement : elles sont sautées.
+ * Placement of the main model from the last launch found in `lines`; null without a launch line (ring cleared or
+ * evicted). llama-server loads the main model (weights, KV cache, compute), then the optional draft (-md), then the
+ * mmproj: the second “offloaded N/M layers” opens the draft and ends the parsing. Compute is counted per context
+ * (an MTP's adds to the model's) and a context reserved again keeps only its last size.
+ * The fitting probes (-fit, visible at -lv 5) come before the load: they are skipped.
  */
 export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null {
   let start = -1;
@@ -51,7 +57,7 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
   const busIds = new Map<string, string>();
   const buffers = new Map<string, PlacementBuffer>();
   let layers: ModelPlacement['layers'] = null;
-  // Compute par contexte puis par device ; un premier contexte implicite pour les logs sans « constructing ».
+  // Compute per context then per device; an implicit first context for logs without “constructing”.
   const contexts: Map<string, number>[] = [new Map()];
   let constructed = false;
   let fitting = false;
@@ -101,13 +107,13 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
   return { launchSeq: lines[start]!.seq, layers, buffers: [...buffers.values()] };
 }
 
-/** Dernier placement lu, avec le PID du serveur qui l'a écrit. */
+/** Last placement read, with the PID of the server that wrote it. */
 export interface PlacementMemory {
   last: { pid: number; placement: ModelPlacement } | null;
 }
 
 const g = globalThis as { __llamaWebuiPlacement?: PlacementMemory };
-/** Survit à `bun --hot`, comme le ring : un rechargement après l'éviction du lancement garde le placement connu. */
+/** Survives `bun --hot`, like the ring: a reload after the launch was evicted keeps the known placement. */
 g.__llamaWebuiPlacement ??= { last: null };
 const sharedMemory = g.__llamaWebuiPlacement;
 
@@ -118,10 +124,10 @@ export interface PlacementTrackerDeps {
 }
 
 /**
- * Suit le placement du serveur géré. Recréé à chaque rechargement de Bun : il rejoue le ring (qui, lui, survit). Le
- * ring ne garde que les dernières lignes : une fois le lancement évincé (logs de requêtes, -lv 4), le dernier placement
- * lu reste valable tant que le serveur suivi a le même PID. Un serveur externe n'écrit rien dans le ring : son
- * placement est inconnu même si le ring garde un ancien lancement.
+ * Tracks the managed server's placement. Recreated on every Bun reload: it replays the ring (which does survive). The
+ * ring only keeps the latest lines: once the launch is evicted (request logs, -lv 4), the last placement read stays
+ * valid as long as the tracked server has the same PID. An external server writes nothing to the ring: its
+ * placement is unknown even if the ring still holds an old launch.
  */
 export class PlacementTracker {
   private _current: ModelPlacement | null = null;
@@ -157,7 +163,7 @@ export class PlacementTracker {
   private placement(): ModelPlacement | null {
     const state = this.deps.supervisor.state;
     const memory = this.deps.memory ?? sharedMemory;
-    // Seuls starting, ready et stopping suivent un serveur géré (idle, crashed : aucun ; external : pas de logs).
+    // Only starting, ready and stopping track a managed server (idle, crashed: none; external: no logs).
     if (state.kind !== 'starting' && state.kind !== 'ready' && state.kind !== 'stopping') {
       memory.last = null;
       return null;

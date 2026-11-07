@@ -10,7 +10,7 @@ import { SpaceEditor } from './SpaceEditor';
 import { SweepCard } from './SweepCard';
 import { SweepHistory } from './SweepHistory';
 
-/** Tuning : matériel, modèle et préréglage en haut, recommandation expliquée, puis l'espace de sweep et ses résultats. */
+/** Tuning: hardware, model and preset at the top, the explained recommendation, then the sweep space and its results. */
 export function TuningPage() {
   const [params, setParams] = useSearchParams();
   const wanted = Number(params.get('sweep')) || null;
@@ -25,8 +25,8 @@ export function TuningPage() {
     if (!useModels.getState().list) void useModels.getState().refresh();
   }, []);
 
-  // ?sweep=<id> ouvre ce sweep ; sinon le sweep qui tourne s'affiche de lui-même.
-  // Seul un changement de ?sweep ouvre ; openId est lu à jour sans relancer l'effet.
+  // ?sweep=<id> opens that sweep; otherwise the running sweep shows up on its own.
+  // Only a change of ?sweep opens one; openId is read fresh without re-running the effect.
   const openWanted = useEffectEvent((id: number) => {
     if (id !== openId) void useTuning.getState().open(id);
   });
@@ -36,7 +36,7 @@ export function TuningPage() {
   useEffect(() => {
     if (wanted === null && liveId !== null && openId === null) void useTuning.getState().open(liveId);
   }, [wanted, liveId, openId]);
-  // L'URL suit le sweep ouvert quand il change (lancement, fermeture, suppression) ; pas au montage, où ?sweep= attend encore.
+  // The URL follows the open sweep when it changes (launch, close, delete); not on mount, where ?sweep= is still pending.
   const prevOpen = useRef(openId);
   const syncUrl = useEffectEvent(() => {
     if (openId !== wanted) setParams(openId === null ? {} : { sweep: String(openId) }, { replace: true });

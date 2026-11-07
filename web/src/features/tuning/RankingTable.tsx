@@ -1,6 +1,7 @@
 import {
   type BenchRun,
   type BenchStatus,
+  isOomError,
   NOISE,
   type Ranked,
   rankRuns,
@@ -33,15 +34,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { formatAccept, vramTotal } from '@/features/bench/format';
 import { STATUS_LABEL } from '@/lib/bench';
 import { copyText } from '@/lib/clipboard';
-import { formatDuration } from '@/lib/format';
+import { fmt, formatDuration, formatInt, formatStddev } from '@/lib/format';
 import { useTuning } from '@/lib/tuning';
 import { cn } from '@/lib/utils';
 import { VerdictBadge } from './PlanTable';
 import { RankBars } from './RankBars';
 
 const BARS = 8;
-const NOISE_TEXT = `ex æquo avec le premier : écart inférieur au bruit de mesure (pp ±${NOISE.pp * 100} %, tg ±${NOISE.tg * 100} %)`;
-const nf = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
+const NOISE_TEXT = `tied with the first: gap below the measurement noise (pp ±${NOISE.pp * 100}%, tg ±${NOISE.tg * 100}%)`;
 const STATUS_VARIANT: Record<BenchStatus, 'secondary' | 'outline' | 'destructive'> = {
   queued: 'outline',
   running: 'secondary',
@@ -51,7 +51,7 @@ const STATUS_VARIANT: Record<BenchStatus, 'secondary' | 'outline' | 'destructive
   interrupted: 'secondary',
 };
 
-/** Le classement d'un sweep : exploration (llama-bench) et validation (serveur) à part, jamais mélangées. */
+/** A sweep's ranking: exploration (llama-bench) and validation (server) kept apart, never mixed. */
 export function RankingTable({ sweep, runs }: { sweep: Sweep; runs: BenchRun[] }) {
   const ctx = sweepCtx(sweep.spec);
   const explore = rankRuns(
@@ -64,7 +64,7 @@ export function RankingTable({ sweep, runs }: { sweep: Sweep; runs: BenchRun[] }
     sweep.spec.preset,
     ctx,
   );
-  // Le meilleur enregistré, sinon (supprimé depuis Benchmark) celui du classement affiché.
+  // The saved best, otherwise (deleted from Benchmark) the one from the displayed ranking.
   const bestId =
     sweep.bestRunId ?? (validate.find((r) => r.rank === 1) ?? explore.find((r) => r.rank === 1))?.run.id ?? null;
   const top = explore.filter((r) => r.rank !== null).slice(0, BARS);
@@ -72,16 +72,16 @@ export function RankingTable({ sweep, runs }: { sweep: Sweep; runs: BenchRun[] }
   return (
     <div className="flex flex-col gap-6">
       {validate.length > 0 && (
-        <Ranking title="Validation (serveur)" ranked={validate} bestId={bestId} ctx={ctx} server />
+        <Ranking title="Validation (server)" ranked={validate} bestId={bestId} ctx={ctx} server />
       )}
       <Ranking title="Exploration (llama-bench)" ranked={explore} bestId={bestId} ctx={ctx} />
       {top.length > 1 && (
         <div className="flex flex-col gap-2">
           <RankBars ranked={top} />
           <p className="text-xs text-muted-foreground">
-            Meilleures configurations de l'exploration. Trait fin : ± un écart-type. Les configurations dont l'écart
-            avec la première est sous le bruit (pp ±{NOISE.pp * 100} %, tg ±{NOISE.tg * 100} %) sont ex æquo (« 1= ») ;
-            llama-bench ne mesure ni MTP ni -c : la validation serveur tranche.
+            Best configurations of the exploration. Thin line: ± one standard deviation. Configurations whose gap to the
+            first is below the noise (pp ±{NOISE.pp * 100}%, tg ±{NOISE.tg * 100}%) are tied (“1=”); llama-bench
+            measures neither MTP nor -c: the server validation settles it.
           </p>
         </div>
       )}
@@ -103,7 +103,7 @@ function Ranking({
   server?: boolean;
 }) {
   const navigate = useNavigate();
-  // Un run d'exploration « ne tient pas » : llama-bench l'a mesuré sans réserver le contexte du profil, le profil risque l'OOM.
+  // An exploration run that “does not fit”: llama-bench measured it without reserving the profile's context, so the profile may OOM.
   const [unfit, setUnfit] = useState<BenchRun | null>(null);
   const toProfile = async (run: BenchRun) => {
     const p = await useTuning.getState().toProfile(run.id);
@@ -113,20 +113,20 @@ function Ranking({
     <section className="flex flex-col gap-2">
       <h3 className="text-sm font-medium">{title}</h3>
       {ranked.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucun run.</p>
+        <p className="text-sm text-muted-foreground">No runs.</p>
       ) : (
         <Table className="[&_td]:px-1.5 [&_th]:px-1.5">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-10">Rang</TableHead>
+              <TableHead className="w-10">Rank</TableHead>
               <TableHead>Configuration</TableHead>
-              <TableHead>Estimé</TableHead>
-              <TableHead>Statut</TableHead>
+              <TableHead>Estimated</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">Prompt</TableHead>
-              <TableHead className="text-right">Génération</TableHead>
+              <TableHead className="text-right">Generation</TableHead>
               {server && <TableHead className="text-right">MTP</TableHead>}
-              <TableHead className="text-right">VRAM pic</TableHead>
-              <TableHead className="text-right">Durée</TableHead>
+              <TableHead className="text-right">Peak VRAM</TableHead>
+              <TableHead className="text-right">Duration</TableHead>
               <TableHead className="w-8">
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -153,9 +153,7 @@ function Ranking({
                   </TableCell>
                   <TableCell className="font-mono text-xs whitespace-normal">
                     <span className="flex items-center gap-1.5">
-                      {best && (
-                        <Star className="size-3.5 shrink-0 fill-current text-primary-ink" aria-label="meilleur" />
-                      )}
+                      {best && <Star className="size-3.5 shrink-0 fill-current text-primary-ink" aria-label="best" />}
                       {r.run.sweepLabel?.replace(/^validation · /, '') ?? `#${r.run.id}`}
                     </span>
                   </TableCell>
@@ -184,7 +182,7 @@ function Ranking({
                     <DropdownMenu>
                       <DropdownMenuTrigger
                         render={<Button variant="ghost" size="icon-xs" />}
-                        aria-label={`Actions pour ${r.run.sweepLabel ?? r.run.id}`}
+                        aria-label={`Actions for ${r.run.sweepLabel ?? r.run.id}`}
                       >
                         <MoreHorizontal />
                       </DropdownMenuTrigger>
@@ -193,13 +191,13 @@ function Ranking({
                           disabled={r.run.status !== 'ok'}
                           onClick={() => (!server && r.run.fit === 'no' ? setUnfit(r.run) : void toProfile(r.run))}
                         >
-                          <UserPlus /> Créer un profil
+                          <UserPlus /> Create profile
                         </DropdownMenuItem>
                         <DropdownMenuItem disabled={!r.run.command} onClick={() => void copyText(r.run.command)}>
-                          <Copy /> Copier la commande
+                          <Copy /> Copy command
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => navigate(`/bench?run=${r.run.id}`)}>
-                          <ExternalLink /> Voir dans Benchmark
+                          <ExternalLink /> View in Benchmark
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -213,16 +211,16 @@ function Ranking({
       <AlertDialog open={unfit !== null} onOpenChange={(o) => !o && setUnfit(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cette configuration ne tient pas avec le contexte visé</AlertDialogTitle>
+            <AlertDialogTitle>This configuration does not fit with the target context</AlertDialogTitle>
             <AlertDialogDescription>
-              llama-bench a mesuré <span className="font-mono">{unfit?.sweepLabel}</span> avec seulement son test
-              (prompt et génération), sans réserver le contexte de{' '}
-              <span className="num">{ctx.toLocaleString('fr-FR')}</span> jetons. D'après l'estimation, le profil risque
-              de manquer de mémoire au démarrage. Validez-la d'abord sur le serveur, ou baissez -c dans le profil créé.
+              llama-bench measured <span className="font-mono">{unfit?.sweepLabel}</span> with its test alone (prompt
+              and generation), without reserving the <span className="num">{formatInt(ctx)}</span>-token context. Per
+              the estimate, the profile may run out of memory at startup. Validate it on the server first, or lower -c
+              in the created profile.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 const run = unfit;
@@ -230,7 +228,7 @@ function Ranking({
                 if (run) void toProfile(run);
               }}
             >
-              Créer quand même
+              Create anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -240,10 +238,8 @@ function Ranking({
 }
 
 function StatusBadge({ run }: { run: BenchRun }) {
-  const oom = run.status === 'failed' && run.error?.startsWith('Mémoire insuffisante');
-  const badge = (
-    <Badge variant={STATUS_VARIANT[run.status]}>{oom ? 'mémoire insuffisante' : STATUS_LABEL[run.status]}</Badge>
-  );
+  const oom = run.status === 'failed' && isOomError(run.error);
+  const badge = <Badge variant={STATUS_VARIANT[run.status]}>{oom ? 'out of memory' : STATUS_LABEL[run.status]}</Badge>;
   if (!run.error) return badge;
   return (
     <Tooltip>
@@ -256,8 +252,8 @@ function StatusBadge({ run }: { run: BenchRun }) {
 function Measure({ m }: { m: BenchRun['pp'] }) {
   return (
     <TableCell className="num text-right text-xs whitespace-nowrap">
-      {m ? nf.format(m.tps) : '—'}
-      {m && m.stddev > 0 && <div className="text-[0.7rem] text-muted-foreground">± {nf.format(m.stddev)}</div>}
+      {m ? fmt(m.tps, 1) : '—'}
+      {m && m.stddev > 0 && <div className="text-[0.7rem] text-muted-foreground">{formatStddev(m.stddev).trim()}</div>}
     </TableCell>
   );
 }

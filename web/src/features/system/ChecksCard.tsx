@@ -19,7 +19,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Skeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
-import { formatBps } from '@/lib/format';
+import { formatBps, plural } from '@/lib/format';
 import { readable, useModels } from '@/lib/models';
 import { useServer } from '@/lib/server';
 import { useTuning } from '@/lib/tuning';
@@ -32,18 +32,18 @@ const FAMILY: Record<CheckFamily, string> = {
   nvidia: 'NVIDIA',
   amd: 'AMD',
   cpu: 'CPU',
-  build: 'Build llama.cpp',
-  kernel: 'Noyau et disque',
+  build: 'llama.cpp build',
+  kernel: 'Kernel and disk',
 };
 
 const STATE: Record<CheckState, { icon: typeof CircleCheck; className: string; label: string }> = {
-  warn: { icon: TriangleAlert, className: 'text-warning', label: 'à améliorer' },
+  warn: { icon: TriangleAlert, className: 'text-warning', label: 'to improve' },
   ok: { icon: CircleCheck, className: 'text-success', label: 'ok' },
-  unknown: { icon: CircleHelp, className: 'text-muted-foreground', label: 'inconnu' },
-  na: { icon: CircleMinus, className: 'text-muted-foreground/60', label: 'non applicable' },
+  unknown: { icon: CircleHelp, className: 'text-muted-foreground', label: 'unknown' },
+  na: { icon: CircleMinus, className: 'text-muted-foreground/60', label: 'not applicable' },
 };
 
-/** Vérifications système (governor, PCIe, pilotes, swap, débit du disque…), repliées par défaut. */
+/** System checks (governor, PCIe, drivers, swap, disk bandwidth…), collapsed by default. */
 export function ChecksCard() {
   const checks = useTuning((s) => s.checks);
   const loading = useTuning((s) => s.checksLoading);
@@ -58,7 +58,7 @@ export function ChecksCard() {
     if (!models) void useModels.getState().refresh();
   }, [models]);
 
-  // Modèle par défaut : celui du profil actif, sinon le premier du dossier.
+  // Default model: the active profile's, otherwise the first one in the folder.
   useEffect(() => {
     if (model !== null) return;
     let gone = false;
@@ -76,7 +76,7 @@ export function ChecksCard() {
     };
   }, [model, models, profileId]);
 
-  // Lu à l'ouverture, au changement de modèle, puis toutes les 10 s tant que la carte est dépliée.
+  // Loaded when opened, when the model changes, then every 10 s while the card is expanded.
   useEffect(() => {
     if (!open) return;
     const load = () => void useTuning.getState().loadChecks(model);
@@ -87,7 +87,7 @@ export function ChecksCard() {
 
   const items = useMemo(
     () => [
-      { value: NO_MODEL, label: 'Aucun modèle' },
+      { value: NO_MODEL, label: 'No model' },
       ...(models?.models ?? [])
         .filter(readable)
         .filter((m) => m.kind === 'model')
@@ -99,7 +99,7 @@ export function ChecksCard() {
 
   return (
     <GlassCard
-      title="Vérifications"
+      title="Checks"
       icon={ListChecks}
       actions={
         <>
@@ -107,20 +107,16 @@ export function ChecksCard() {
             <span className="hidden items-center gap-1.5 sm:flex">
               {summary.warn > 0 && (
                 <Badge variant="outline" className="text-warning">
-                  {summary.warn} à améliorer
+                  {summary.warn} to improve
                 </Badge>
               )}
               <Badge variant="outline">{summary.ok} ok</Badge>
-              {summary.unknown > 0 && (
-                <Badge variant="secondary">
-                  {summary.unknown} inconnu{summary.unknown > 1 ? 's' : ''}
-                </Badge>
-              )}
+              {summary.unknown > 0 && <Badge variant="secondary">{summary.unknown} unknown</Badge>}
             </span>
           )}
           <Button variant="ghost" size="sm" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
             <ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
-            {open ? 'Masquer' : 'Afficher'}
+            {open ? 'Hide' : 'Show'}
           </Button>
         </>
       }
@@ -128,7 +124,7 @@ export function ChecksCard() {
       <Collapsible open={open} onOpenChange={setOpen}>
         {!open && (
           <p className="text-sm text-muted-foreground">
-            Réglages du système qui pèsent sur llama.cpp : governor CPU, PCIe, pilotes, swap, débit du disque du modèle.
+            System settings that affect llama.cpp: CPU governor, PCIe, drivers, swap, bandwidth of the model’s disk.
           </p>
         )}
         <CollapsibleContent className="flex flex-col gap-5">
@@ -138,7 +134,7 @@ export function ChecksCard() {
               value={model ?? NO_MODEL}
               onValueChange={(v) => v && setModel(v === NO_MODEL ? null : v)}
             >
-              <SelectTrigger className="w-80 max-w-full" aria-label="Modèle à vérifier">
+              <SelectTrigger className="w-80 max-w-full" aria-label="Model to check">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -156,12 +152,12 @@ export function ChecksCard() {
               onClick={() => model && void useTuning.getState().measureDisk(model)}
             >
               <HardDrive className={cn(measuring && 'animate-pulse')} />
-              {measuring ? 'Mesure…' : 'Mesurer le disque'}
+              {measuring ? 'Measuring…' : 'Measure disk'}
             </Button>
             {diskSpeed && diskSpeed.path === model && (
               <span className="text-sm text-muted-foreground">
-                <span className="num text-foreground">{formatBps(diskSpeed.bytesPerSec)}</span> · le cache du système
-                peut gonfler la mesure
+                <span className="num text-foreground">{formatBps(diskSpeed.bytesPerSec)}</span> · the system cache may
+                inflate the measurement
               </span>
             )}
             <Button
@@ -170,7 +166,7 @@ export function ChecksCard() {
               className="ml-auto"
               disabled={loading}
               onClick={() => void useTuning.getState().loadChecks(model)}
-              aria-label="Relire les vérifications"
+              aria-label="Reload checks"
             >
               <RefreshCw className={cn(loading && 'animate-spin')} />
             </Button>
@@ -203,7 +199,7 @@ function CheckList({ checks }: { checks: Check[] }) {
               <Collapsible>
                 <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
                   <ChevronDown className="size-3.5 transition-transform group-data-[panel-open]:rotate-180" />
-                  {ok.length} vérification{ok.length > 1 ? 's' : ''} ok
+                  {ok.length} {plural(ok.length, 'check')} ok
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <ul className="mt-2 flex flex-col gap-2">
@@ -233,20 +229,15 @@ function CheckRow({ check: c }: { check: Check }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{c.label}</span>
           {c.persistence && (
-            <Badge variant="secondary">{c.persistence === 'session' ? "jusqu'au redémarrage" : 'permanent'}</Badge>
+            <Badge variant="secondary">{c.persistence === 'session' ? 'until reboot' : 'permanent'}</Badge>
           )}
         </div>
         <p className="text-muted-foreground">{c.detail}</p>
-        {c.state === 'warn' && <p className="text-xs text-muted-foreground">Impact : {c.impact}</p>}
+        {c.state === 'warn' && <p className="text-xs text-muted-foreground">Impact: {c.impact}</p>}
         {c.command && (
           <div className="flex items-start gap-1.5 rounded-md bg-well inset-shadow-well py-1 pr-1 pl-2.5">
             <code className="min-w-0 flex-1 py-0.5 font-mono text-xs break-all">{c.command}</code>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={() => void copyText(c.command!)}
-              aria-label="Copier la commande"
-            >
+            <Button variant="ghost" size="icon-xs" onClick={() => void copyText(c.command!)} aria-label="Copy command">
               <Copy />
             </Button>
           </div>

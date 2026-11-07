@@ -9,11 +9,11 @@ export function PlaceholderPage({ title }: { title: string }) {
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-      <GlassCard icon={route?.icon} title={milestone ? 'Page en construction' : undefined}>
+      <GlassCard icon={route?.icon} title={milestone ? 'Page under construction' : undefined}>
         <p className="text-sm text-muted-foreground">
           {milestone
-            ? `Disponible au jalon ${milestone}.`
-            : 'Cette adresse ne correspond à aucune page. Choisissez une section dans le menu.'}
+            ? `Available in milestone ${milestone}.`
+            : 'This address does not match any page. Pick a section from the menu.'}
         </p>
       </GlassCard>
     </div>

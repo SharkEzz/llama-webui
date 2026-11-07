@@ -22,11 +22,11 @@ import { VramProbe } from './vram';
 export interface ExecutorDeps {
   settings(): Settings;
   logs: LogBuffer;
-  /** GPU vues par le Monitor (toutes, masquées comprises). */
+  /** GPUs seen by the Monitor (all of them, hidden ones included). */
   gpus(): GpuSample[];
-  /** Débit de lecture actuel du disque du modèle (Monitor), null si inconnu. */
+  /** Current read bandwidth of the model's disk (Monitor), null if unknown. */
   disk(): number | null;
-  /** Dossier et variables d'environnement du profil d'origine (null si le profil n'existe plus). */
+  /** Directory and environment variables of the source profile (null if the profile no longer exists). */
   profile?(id: number): Pick<Profile, 'cwd' | 'env'> | null;
   fetch?: typeof fetch;
   now?: () => number;
@@ -59,8 +59,8 @@ const MIB = 1024 * 1024;
 const LIVE_THROTTLE_MS = 250;
 
 /**
- * Exécute un run (llama-bench ou llama-server) déjà enregistré « running » et renvoie son résultat sans l'écrire.
- * Un seul à la fois. Ne touche pas au serveur géré : c'est le rôle de la garde (gate.ts).
+ * Executes a run (llama-bench or llama-server) already saved as “running” and returns its result without writing it.
+ * One at a time. Does not touch the managed server: that is the gate's job (gate.ts).
  */
 export class RunExecutor {
   private cur: Exec | null = null;
@@ -77,8 +77,8 @@ export class RunExecutor {
   }
 
   /**
-   * La commande d'un run. Serveur : modèle, projecteur, flags des champs puis autres flags, sur 127.0.0.1 et le port des
-   * réglages, dans le dossier et avec l'environnement du profil d'origine (ses flags peuvent viser des chemins relatifs).
+   * A run's command. Server: model, projector, flags from the fields then other flags, on 127.0.0.1 and the settings'
+   * port, in the directory and with the environment of the source profile (its flags may point to relative paths).
    */
   commandOf(spec: BenchSpec): { argv: string[]; display: string; cmd: BuiltCommand | null } {
     if (spec.kind === 'server') {
@@ -122,13 +122,13 @@ export class RunExecutor {
     return { argv, display: shellQuote(argv.slice(4)), cmd: null };
   }
 
-  /** Exécute le run ; `onLive` reçoit les phases loading…measure et les dernières lignes (au plus toutes les 250 ms). */
-  /** `spec` : celui demandé (le run enregistré perd un profileId dont le profil n'existe plus). */
+  /** Executes the run; `onLive` receives the loading…measure phases and the last lines (at most every 250 ms). */
+  /** `spec`: the requested one (the saved run loses a profileId whose profile no longer exists). */
   async run(
     run: BenchRun,
     o: { onLive(l: BenchLive): void; startedAt?: number; spec?: BenchSpec },
   ): Promise<ExecResult> {
-    if (this.cur) throw new Error("un run est déjà en cours d'exécution");
+    if (this.cur) throw new Error('a run is already in progress');
     const t0 = this.now();
     const spec = o.spec ?? run.spec;
     const ex: Exec = {
@@ -149,7 +149,7 @@ export class RunExecutor {
     let result: BenchFinish;
     try {
       this.setLive(ex, {});
-      if (!(await Bun.file(spec.modelPath).exists())) throw new Error(`Modèle introuvable : ${spec.modelPath}`);
+      if (!(await Bun.file(spec.modelPath).exists())) throw new Error(`Model not found: ${spec.modelPath}`);
       const { argv, cmd } = this.commandOf(spec);
       result = ex.cancelled
         ? { status: 'cancelled' }
@@ -173,19 +173,19 @@ export class RunExecutor {
     };
   }
 
-  /** Annule le run en cours : SIGTERM puis SIGKILL ; son résultat devient « cancelled ». */
+  /** Cancels the running run: SIGTERM then SIGKILL; its result becomes “cancelled”. */
   cancel(): boolean {
     const ex = this.cur;
     if (!ex || ex.cancelled) return false;
     ex.cancelled = true;
     ex.abort.abort();
     if (ex.proc) this.kill(ex.proc);
-    this.line(ex, 'annulation demandée');
+    this.line(ex, 'cancellation requested');
     this.setLive(ex, {});
     return true;
   }
 
-  /** Rechargement ou arrêt de Bun : SIGKILL immédiat, résolu à la sortie de l'enfant. */
+  /** Reload or Bun shutdown: immediate SIGKILL, resolved when the child exits. */
   async killNow(): Promise<void> {
     const ex = this.cur;
     if (!ex) return;
@@ -205,7 +205,7 @@ export class RunExecutor {
     ex.onLive(ex.live);
   }
 
-  /** Nouvelles lignes : diffusées au plus toutes les 250 ms (llama-server en écrit des centaines au chargement). */
+  /** New lines: broadcast at most every 250 ms (llama-server writes hundreds of them while loading). */
   private touchLive(ex: Exec): void {
     if (this.now() - ex.liveAt >= LIVE_THROTTLE_MS) this.setLive(ex, {});
   }
@@ -218,8 +218,8 @@ export class RunExecutor {
   }
 
   /**
-   * Pic de VRAM au-dessus de ce que chaque carte tenait au lancement : relevé rapide (VramProbe, 100 ms) et, en secours,
-   * les snapshots du Monitor (1 s par défaut : un pic court peut leur échapper). Pic de lecture du disque du modèle.
+   * VRAM peak above what each card held at launch: fast sampling (VramProbe, 100 ms) and, as a fallback, the
+   * Monitor's snapshots (1 s by default: a short peak can slip past them). Read peak of the model's disk.
    */
   private sampler(ex: Exec): AsyncDisposable {
     const gpus = this.deps.gpus();
@@ -235,7 +235,7 @@ export class RunExecutor {
       if (d !== null && (ex.diskPeak === null || d > ex.diskPeak)) ex.diskPeak = d;
     };
     const timer = setInterval(sample, SAMPLE_MS);
-    // `await using` : dernier relevé, arrêt de la sonde et pics de la sonde rapide, à la sortie du run.
+    // `await using`: last sample, probe stop and the fast probe's peaks, when the run exits.
     return {
       [Symbol.asyncDispose]: async () => {
         sample();
@@ -254,7 +254,7 @@ export class RunExecutor {
     await using _sampling = this.sampler(ex);
     let proc: Child;
     try {
-      // Environnement du profil d'origine (CUDA_VISIBLE_DEVICES… : mêmes cartes que le serveur).
+      // Environment of the source profile (CUDA_VISIBLE_DEVICES…: same cards as the server).
       proc = Bun.spawn(argv, {
         env: { ...process.env, ...this.source(ex.spec)?.env },
         stdin: 'ignore',

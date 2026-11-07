@@ -32,7 +32,7 @@ const STATUSES = new Set(['queued', 'running', 'ok', 'failed', 'cancelled', 'int
 
 export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }: BenchRouteDeps) {
   const home = homedir();
-  /** Nom libre : « <base> », puis « <base> (2) », « (3) »… */
+  /** Free name: “<base>”, then “<base> (2)”, “(3)”… */
   const freeName = (base: string) => {
     const taken = new Set(profiles.list().map((p) => p.name));
     let name = base;
@@ -52,7 +52,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }:
           kind: kind && KINDS.has(kind) ? (kind as BenchKind) : undefined,
           status: status && STATUSES.has(status) ? (status as BenchStatus) : undefined,
           modelPath: q.get('model') || undefined,
-          // Par défaut : les runs ponctuels seulement ; « all » ou l'id d'un sweep pour les autres.
+          // By default: one-off runs only; “all” or a sweep id for the others.
           sweepId: sweep === 'all' ? 'all' : sweep && /^\d+$/.test(sweep) ? Number(sweep) : 'none',
           limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 5000) : undefined,
         });
@@ -81,7 +81,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }:
         const id = idParam(req, 'Run');
         const run = benchRuns.get(id);
         if (!run) throw notFound('Run');
-        if (run.status === 'running') throw new HttpError(409, "Ce run tourne : annulez-le d'abord");
+        if (run.status === 'running') throw new HttpError(409, 'This run is still running: cancel it first');
         benchRuns.delete(id);
         hub.broadcast({ type: 'bench-deleted', payload: { ids: [id] } });
         return new Response(null, { status: 204 });
@@ -89,8 +89,8 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }:
     },
     '/api/bench/from-profile/:id': {
       GET: guarded((req) => {
-        const profile = profiles.get(idParam(req, 'Profil'));
-        if (!profile) throw notFound('Profil');
+        const profile = profiles.get(idParam(req, 'Profile'));
+        if (!profile) throw notFound('Profile');
         const paths = profilePaths(profile, home);
         const { params, rest } = paramsFromServerArgs(profile.args);
         const draft: Pick<BenchSpec, 'modelPath' | 'mmprojPath' | 'profileId' | 'params' | 'serverArgs'> = {
@@ -107,7 +107,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }:
       POST: guarded((req) => {
         const run = benchRuns.get(idParam(req, 'Run'));
         if (!run) throw notFound('Run');
-        if (run.status === 'running') throw new HttpError(409, 'Ce run tourne encore');
+        if (run.status === 'running') throw new HttpError(409, 'This run is still running');
         const { spec } = run;
         const modelsDir = settings.get().modelsDir;
         const placed = profileModelPath(spec.modelPath, { modelsDir, home });
@@ -129,7 +129,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }:
     '/api/bench/:id/cancel': {
       POST: guarded((req) => {
         const id = idParam(req, 'Run');
-        if (!benchRunner.cancel(id)) throw new HttpError(409, 'Ce run ne tourne pas');
+        if (!benchRunner.cancel(id)) throw new HttpError(409, 'This run is not running');
         return new Response(null, { status: 204 });
       }),
     },

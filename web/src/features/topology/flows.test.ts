@@ -6,7 +6,7 @@ const graph: TopologyGraph = {
   at: 0,
   nodes: [
     { id: 'cpu', kind: 'cpu', label: 'Ryzen', detail: { physicalCores: 6, logicalThreads: 12, numaNodes: 1 } },
-    { id: 'ram', kind: 'ram', label: 'Mémoire', detail: { totalBytes: 32 * 1024 ** 3, dimms: 2, tempC: 29.5 } },
+    { id: 'ram', kind: 'ram', label: 'Memory', detail: { totalBytes: 32 * 1024 ** 3, dimms: 2, tempC: 29.5 } },
     { id: 'pci:0000:01:00.0', kind: 'gpu', label: 'RTX 5070 Ti', busId: '0000:01:00.0', vendor: 'nvidia', detail: {} },
     { id: 'pci:0000:02:00.0', kind: 'nvme', label: 'Kingston', busId: '0000:02:00.0', block: 'nvme0n1', detail: {} },
     { id: 'chipset:0000:04:00.0', kind: 'chipset', label: '600 Series Chipset', busId: '0000:04:00.0', detail: {} },
@@ -141,7 +141,7 @@ test('linkFlows: an NVMe link carries its own disk (writes forward, reads back);
 });
 
 test('linkFlows: memory activity is a share of the whole machine (0–100), for llama-server as for the system', () => {
-  // llama-server at 140 % (1.4 cores) on the 12 threads of the CPU node.
+  // llama-server at 140% (1.4 cores) on the 12 threads of the CPU node.
   expect(linkFlows(graph, snapshot).get('cpu-ram')!.activity).toBeCloseTo(140 / 12, 5);
   // Thread count from the live per-core sample when there is one.
   const sampled = { ...snapshot, system: { ...snapshot.system, corePct: Array(16).fill(0) } } as Snapshot;
@@ -161,15 +161,15 @@ test('linkFlows / nodeLive: with perf, the memory link carries measured DRAM tra
   } as Snapshot;
   expect(linkFlows(graph, s).get('cpu-ram')).toMatchObject({ fwdBps: 1e9, backBps: 3e9, activity: null });
   const ram = nodeLive(graph, s, placement).get('ram')!;
-  expect(ram.headline).toBe('3,7 Go/s');
+  expect(ram.headline).toBe('3.7 GiB/s');
   expect(ram.facts.map((f) => f.label)).toEqual([
-    'Utilisée',
-    'Lecture',
-    'Écriture',
+    'Used',
+    'Read',
+    'Write',
     'llama-server (DRAM)',
     'llama-server (RSS)',
-    'Modèle en RAM',
-    'Barrettes',
+    'Model in RAM',
+    'DIMMs',
   ]);
 });
 
@@ -196,41 +196,41 @@ test('nodeLive: GPU facts, load and dimming', () => {
   expect(rtx.loadPct).toBe(80);
   expect(rtx.fillPct).toBe(75);
   expect(rtx.dim).toBe(false);
-  expect(rtx.headline).toBe('80 %');
+  expect(rtx.headline).toBe('80%');
   expect(rtx.facts.map((f) => f.label)).toEqual([
-    'Utilisation',
+    'Utilization',
     'VRAM',
-    'Modèle',
-    'Cache KV',
-    'Température',
-    'Puissance',
-    'Lien PCIe',
+    'Model',
+    'KV cache',
+    'Temperature',
+    'Power',
+    'PCIe link',
   ]);
-  expect(rtx.facts.find((f) => f.label === 'Modèle')!.value).toBe('11,2 Go');
-  expect(rtx.facts.find((f) => f.label === 'Lien PCIe')!.value).toBe('Gen5 x8');
+  expect(rtx.facts.find((f) => f.label === 'Model')!.value).toBe('11.2 GiB');
+  expect(rtx.facts.find((f) => f.label === 'PCIe link')!.value).toBe('Gen5 x8');
 
   const igpu = live.get('pci:0000:0d:00.0')!;
   expect(igpu.dim).toBe(true);
-  expect(igpu.headline).toBe('masquée');
+  expect(igpu.headline).toBe('hidden');
   expect(igpu.loadPct).toBeNull();
 });
 
 test('nodeLive: CPU, RAM, NVMe and chipset', () => {
   const live = nodeLive(graph, snapshot, placement);
-  expect(live.get('cpu')).toMatchObject({ loadPct: 18, headline: '18 %' });
-  expect(live.get('cpu')!.facts.find((f) => f.label === 'llama-server')!.value).toBe('140 %');
+  expect(live.get('cpu')).toMatchObject({ loadPct: 18, headline: '18%' });
+  expect(live.get('cpu')!.facts.find((f) => f.label === 'llama-server')!.value).toBe('140%');
   const ram = live.get('ram')!;
   expect(ram.fillPct).toBe(37.5);
-  expect(ram.facts.find((f) => f.label === 'Modèle en RAM')!.value).toBe('25,1 Go');
-  expect(ram.facts.find((f) => f.label === 'Barrettes')!.value).toBe('2 · 29,5 °C');
+  expect(ram.facts.find((f) => f.label === 'Model in RAM')!.value).toBe('25.1 GiB');
+  expect(ram.facts.find((f) => f.label === 'DIMMs')!.value).toBe('2 · 29.5 °C');
   // NVMe headline: reads + writes of its own disk; facts keep them apart.
   const nvme = live.get('pci:0000:02:00.0')!;
-  expect(nvme.headline).toBe('815,4 Mo/s');
-  expect(nvme.facts.filter((f) => f.label === 'Lecture' || f.label === 'Écriture').map((f) => f.value)).toEqual([
-    '810,6 Mo/s',
-    '4,8 Mo/s',
+  expect(nvme.headline).toBe('815.4 MiB/s');
+  expect(nvme.facts.filter((f) => f.label === 'Read' || f.label === 'Write').map((f) => f.value)).toEqual([
+    '810.6 MiB/s',
+    '4.8 MiB/s',
   ]);
-  expect(nvme.facts.find((f) => f.label === 'Rôle')!.value).toBe('Disque du modèle');
+  expect(nvme.facts.find((f) => f.label === 'Role')!.value).toBe('Model disk');
   expect(live.get('chipset:0000:04:00.0')).toMatchObject({ loadPct: null, headline: 'Gen4 x4' });
 });
 
@@ -239,7 +239,7 @@ test('placementSeries: GPUs in graph order with their tone, host last, none when
   expect(s.map((x) => [x.label, x.bytes, x.nodeId])).toEqual([
     ['CUDA0', 12e9, 'pci:0000:01:00.0'],
     ['ROCm0', 11e9, 'pci:0000:08:00.0'],
-    ['Hôte (RAM)', 27e9, 'ram'],
+    ['Host (RAM)', 27e9, 'ram'],
   ]);
   expect(placementSeries(graph, null)).toEqual([]);
 });

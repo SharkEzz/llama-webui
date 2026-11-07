@@ -12,8 +12,8 @@ const levelOf = (bytes: number, budget: number): Level =>
 const FILL: Record<Level, string> = { fits: 'bg-chart-1', tight: 'bg-warning', over: 'bg-destructive' };
 
 /**
- * Une jauge par device puis la RAM : remplissage = mémoire estimée sur la mémoire totale, trait = budget utilisable.
- * Une seule teinte ; « limite » et « dépasse » prennent les couleurs d'état, toujours accompagnées d'un libellé.
+ * One gauge per device, then RAM: fill = estimated memory over total memory, tick = usable budget.
+ * A single hue; “tight” and “over” take the status colors, always with a text label.
  */
 export function MemoryBars({
   fit,
@@ -35,7 +35,7 @@ export function MemoryBars({
       {fit.vram.map((d) => (
         <Bar key={d.device} d={d} name={names[d.device] ?? ''} />
       ))}
-      <Bar d={ram} name="Mémoire système" ram />
+      <Bar d={ram} name="System memory" ram />
     </div>
   );
 }
@@ -56,7 +56,7 @@ function Bar({ d, name, ram = false }: { d: DeviceBudget; name: string; ram?: bo
           <span className="num ml-auto text-xs whitespace-nowrap">
             {formatBytes(d.bytes)}{' '}
             <span className="text-muted-foreground">
-              / {formatBytes(d.budget)} {ram ? 'disponibles' : 'utilisables'}
+              / {formatBytes(d.budget)} {ram ? 'available' : 'usable'}
             </span>
           </span>
         </div>
@@ -74,20 +74,20 @@ function Bar({ d, name, ram = false }: { d: DeviceBudget; name: string; ram?: bo
           >
             {level === 'tight' ? <TriangleAlert className="size-3.5" /> : <CircleAlert className="size-3.5" />}
             {level === 'tight'
-              ? 'limite : moins de 5 % de marge'
+              ? 'tight: less than 5% headroom'
               : ram
-                ? `déborde de ${formatBytes(d.bytes - d.budget)} : relu sur le disque (mmap)`
-                : `dépasse de ${formatBytes(d.bytes - d.budget)}`}
+                ? `${formatBytes(d.bytes - d.budget)} over: read back from disk (mmap)`
+                : `${formatBytes(d.bytes - d.budget)} over`}
           </span>
         )}
       </TooltipTrigger>
       <TooltipContent className="num">
         <div className="font-sans font-medium">{name}</div>
-        <div>Estimé : {formatBytes(d.bytes)}</div>
+        <div>Estimated: {formatBytes(d.bytes)}</div>
         <div>
-          {ram ? 'Disponible' : 'Utilisable (marge déduite)'} : {formatBytes(d.budget)}
+          {ram ? 'Available' : 'Usable (headroom deducted)'}: {formatBytes(d.budget)}
         </div>
-        <div>Total : {formatBytes(d.totalBytes)}</div>
+        <div>Total: {formatBytes(d.totalBytes)}</div>
       </TooltipContent>
     </Tooltip>
   );

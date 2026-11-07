@@ -9,24 +9,22 @@ export const FLASH_ATTN = ['on', 'off', 'auto'] as const;
 
 const int = (min: number, max = 1_000_000) =>
   z
-    .number({ error: 'nombre attendu' })
-    .int({ error: 'nombre entier attendu' })
-    .min(min, `au moins ${min}`)
-    .max(max, `au plus ${max}`);
+    .number({ error: 'expected a number' })
+    .int({ error: 'expected an integer' })
+    .min(min, `at least ${min}`)
+    .max(max, `at most ${max}`);
 
-/** Flags de la spec, sous une forme commune aux deux outils. Clé absente = défaut de l'outil. */
+/** The spec's flags, in a form shared by both tools. Missing key = the tool's default. */
 export const BenchParamsSchema = z.strictObject({
-  ngl: z
-    .union([int(0, 9999), z.literal('all'), z.literal('auto')], { error: 'nombre, « all » ou « auto »' })
-    .optional(),
-  ot: z.array(z.string().regex(/^[^=,;]+=[^=,;]+$/, 'motif=buffer attendu (ex. exps=CPU)')).optional(),
+  ngl: z.union([int(0, 9999), z.literal('all'), z.literal('auto')], { error: 'a number, “all” or “auto”' }).optional(),
+  ot: z.array(z.string().regex(/^[^=,;]+=[^=,;]+$/, 'expected pattern=buffer (e.g. exps=CPU)')).optional(),
   ncmoe: int(0, 9999).optional(),
-  dev: z.array(z.string().regex(/^[A-Za-z]+\d*$/, 'nom de device attendu (ex. CUDA0)')).optional(),
-  ts: z.array(z.number({ error: 'nombre attendu' }).min(0, 'proportion positive attendue')).optional(),
-  sm: z.enum(SPLIT_MODES, { error: 'none, layer, row ou tensor' }).optional(),
-  fa: z.enum(FLASH_ATTN, { error: 'on, off ou auto' }).optional(),
-  ctk: z.enum(CACHE_TYPES, { error: 'type de cache inconnu' }).optional(),
-  ctv: z.enum(CACHE_TYPES, { error: 'type de cache inconnu' }).optional(),
+  dev: z.array(z.string().regex(/^[A-Za-z]+\d*$/, 'expected a device name (e.g. CUDA0)')).optional(),
+  ts: z.array(z.number({ error: 'expected a number' }).min(0, 'expected a positive proportion')).optional(),
+  sm: z.enum(SPLIT_MODES, { error: 'none, layer, row or tensor' }).optional(),
+  fa: z.enum(FLASH_ATTN, { error: 'on, off or auto' }).optional(),
+  ctk: z.enum(CACHE_TYPES, { error: 'unknown cache type' }).optional(),
+  ctv: z.enum(CACHE_TYPES, { error: 'unknown cache type' }).optional(),
   t: int(1, 1024).optional(),
   b: int(1).optional(),
   ub: int(1).optional(),
@@ -34,7 +32,7 @@ export const BenchParamsSchema = z.strictObject({
 export type BenchParams = z.infer<typeof BenchParamsSchema>;
 type Key = keyof BenchParams;
 
-/** Ordre fixe des champs, avec leur flag court et leurs formes longues côté llama-server. */
+/** Fixed field order, with each field's short flag and its llama-server long forms. */
 const FIELDS: { key: Key; short: string; long: string[] }[] = [
   { key: 'ngl', short: '-ngl', long: ['--gpu-layers', '--n-gpu-layers'] },
   { key: 'ot', short: '-ot', long: ['--override-tensor'] },
@@ -49,15 +47,23 @@ const FIELDS: { key: Key; short: string; long: string[] }[] = [
   { key: 'b', short: '-b', long: ['--batch-size'] },
   { key: 'ub', short: '-ub', long: ['--ubatch-size'] },
 ];
-/** Ordre fixe des champs (traduction, produit cartésien d'un sweep, étiquettes). */
+/** Fixed field order (translation, cartesian product of a sweep, labels). */
 export const FIELD_ORDER: readonly Key[] = FIELDS.map((f) => f.key);
 const BY_FLAG = new Map(FIELDS.flatMap((f) => [f.short, ...f.long].map((flag) => [flag, f] as const)));
 
 export type BenchKind = 'bench' | 'server';
-/** « queued » : élément d'un sweep en attente. */
+/** Prefix of the error recorded for a run that ran out of memory. */
+export const OOM_ERROR = 'Out of memory';
+/** Prefixes written by earlier versions, still present in existing databases. */
+const LEGACY_OOM_ERRORS: readonly string[] = ['Mémoire insuffisante'];
+/** True when a run's error is an out-of-memory failure (current or legacy wording). */
+export const isOomError = (error: string | null | undefined): boolean =>
+  !!error && (error.startsWith(OOM_ERROR) || LEGACY_OOM_ERRORS.some((p) => error.startsWith(p)));
+
+/** `queued`: a sweep item waiting its turn. */
 export type BenchStatus = 'queued' | 'running' | 'ok' | 'failed' | 'cancelled' | 'interrupted';
 
-/** « Autres flags serveur » : refuse les flags réservés et ceux couverts par un champ, à l'index fautif. */
+/** “Other server flags”: rejects reserved flags and those covered by a field, at the offending index. */
 export const serverArgsField = z
   .array(z.string())
   .default([])
@@ -68,17 +74,17 @@ export const serverArgsField = z
       if (reserved) ctx.addIssue({ code: 'custom', path: [i], message: reservedFlagMessage(reserved) });
       else {
         const field = BY_FLAG.get(flag);
-        if (field) ctx.addIssue({ code: 'custom', path: [i], message: `${flag} : utilisez le champ ${field.short}` });
+        if (field) ctx.addIssue({ code: 'custom', path: [i], message: `${flag}: use the ${field.short} field` });
       }
     });
   });
 
-/** Champs communs à un run et à un sweep. */
+/** Fields shared by a run and a sweep. */
 export const benchSpecBase = {
   modelPath: z
-    .string({ error: 'obligatoire' })
-    .refine((p) => p.startsWith('/'), 'chemin absolu attendu')
-    .refine((p) => p.endsWith('.gguf'), 'fichier .gguf attendu'),
+    .string({ error: 'required' })
+    .refine((p) => p.startsWith('/'), 'expected an absolute path')
+    .refine((p) => p.endsWith('.gguf'), 'expected a .gguf file'),
   mmprojPath: z.string().nullable().default(null),
   profileId: z.number().int().nullable().default(null),
   p: int(1, 32_768).default(512),
@@ -87,7 +93,7 @@ export const benchSpecBase = {
 };
 
 export const BenchSpecSchema = z.strictObject({
-  kind: z.enum(['bench', 'server'], { error: '« bench » ou « server »' }),
+  kind: z.enum(['bench', 'server'], { error: '“bench” or “server”' }),
   ...benchSpecBase,
   params: BenchParamsSchema.default({}),
   serverArgs: serverArgsField,
@@ -121,12 +127,12 @@ export interface BenchRun {
   error: string | null;
   logExcerpt: string;
   durationMs: number | null;
-  /** Débit de lecture du disque du modèle au plus haut pendant le run (octets/s), si mesuré. */
+  /** Peak read bandwidth of the model's disk during the run (bytes/s), if measured. */
   diskReadPeakBps: number | null;
   sweepId: number | null;
-  /** Étiquette de l'élément dans son sweep (« -ncmoe 8 · -dev CUDA0,CUDA1 »). */
+  /** Label of the item within its sweep (“-ncmoe 8 · -dev CUDA0,CUDA1”). */
   sweepLabel: string | null;
-  /** Verdict de l'estimateur au moment du plan. */
+  /** The estimator's verdict at planning time. */
   fit: FitVerdict | null;
   createdAt: number;
 }
@@ -146,7 +152,7 @@ export interface BenchLive {
   phase: BenchPhase;
   step: { index: number; total: number } | null;
   startedAt: number;
-  /** Les 20 dernières lignes de l'outil. */
+  /** The tool's last 20 lines. */
   lines: string[];
 }
 
@@ -155,11 +161,11 @@ export interface BenchDevice {
   name: string;
   totalMib: number;
   freeMib: number;
-  /** Lettres de l'id : "CUDA", "Vulkan", "BLAS"… */
+  /** Letters of the id: "CUDA", "Vulkan", "BLAS"… */
   backend: string;
 }
 
-/** Valeur lue pour un champ, ou undefined si elle n'est pas lisible (le flag reste alors dans `rest`). */
+/** Parsed value for a field, or undefined if unreadable (the flag then stays in `rest`). */
 function readValue(key: Key, raw: string): BenchParams[Key] | undefined {
   const num = (s: string) => (/^-?\d+(\.\d+)?$/.test(s) ? Number(s) : undefined);
   const intOf = (s: string) => (/^\d+$/.test(s) ? Number(s) : undefined);
@@ -187,7 +193,7 @@ function readValue(key: Key, raw: string): BenchParams[Key] | undefined {
   }
 }
 
-/** Décompose les args d'un profil llama-server : les flags couverts par un champ, et le reste dans l'ordre d'origine. */
+/** Splits a llama-server profile's args: flags covered by a field, and the rest in their original order. */
 export function paramsFromServerArgs(args: string[]): { params: BenchParams; rest: string[] } {
   const params: BenchParams = {};
   const rest: string[] = [];
@@ -204,7 +210,7 @@ export function paramsFromServerArgs(args: string[]): { params: BenchParams; res
     const taken: string[] = [arg];
     if (eq > 0 && flag !== arg) raw = arg.slice(eq + 1);
     else if (field.key === 'fa') {
-      // -fa sans valeur (ancienne forme) = on.
+      // -fa without a value (old form) = on.
       const next = args[i + 1];
       if (next !== undefined && (FLASH_ATTN as readonly string[]).includes(next)) {
         raw = next;
@@ -244,13 +250,13 @@ function toArgs(p: BenchParams, tool: BenchKind): string[] {
   return out;
 }
 
-/** Les champs en flags llama-server (`,` entre les valeurs). */
+/** The fields as llama-server flags (`,` between values). */
 export const serverArgs = (p: BenchParams): string[] => toArgs(p, 'server');
-/** Les champs en flags llama-bench (`/` pour -dev et -ts, `;` pour -ot). */
+/** The fields as llama-bench flags (`/` for -dev and -ts, `;` for -ot). */
 export const benchArgs = (p: BenchParams): string[] => toArgs(p, 'bench');
 
 const IGNORED: { test: (flag: string) => boolean; why: string }[] = [
-  { test: (f) => f === '-c' || f === '--ctx-size', why: 'contexte non réservé' },
+  { test: (f) => f === '-c' || f === '--ctx-size', why: 'context not allocated' },
   {
     test: (f) =>
       f === '--spec-type' ||
@@ -259,13 +265,13 @@ const IGNORED: { test: (flag: string) => boolean; why: string }[] = [
       f.startsWith('--draft') ||
       f === '-ngld' ||
       f === '-devd',
-    why: 'décodage spéculatif non mesuré',
+    why: 'speculative decoding not measured',
   },
-  { test: (f) => f === '-cmoe' || f === '--cpu-moe', why: 'utilisez -ncmoe' },
-  { test: (f) => f === '-np' || f === '--parallel', why: 'slots parallèles' },
+  { test: (f) => f === '-cmoe' || f === '--cpu-moe', why: 'use -ncmoe' },
+  { test: (f) => f === '-np' || f === '--parallel', why: 'parallel slots' },
 ];
 
-/** Flags d'un profil qui changent vitesse ou mémoire et que llama-bench ne reproduit pas. */
+/** Profile flags that change speed or memory and that llama-bench does not reproduce. */
 export function ignoredByBench(rest: string[]): { flag: string; why: string }[] {
   const out: { flag: string; why: string }[] = [];
   for (const arg of rest) {

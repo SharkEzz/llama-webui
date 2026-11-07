@@ -6,7 +6,7 @@ export interface TopologyRouteDeps {
   placement: PlacementTracker;
 }
 
-/** Graphe matériel (relu à chaque appel : l'état courant des liens change avec les états d'énergie) et placement du modèle. */
+/** Hardware graph (re-read on every call: the current link state changes with power states) and model placement. */
 export function topologyRoutes({ placement }: TopologyRouteDeps) {
   return {
     '/api/topology': {

@@ -5,8 +5,8 @@ const GiB = 1024 ** 3;
 const MIN_BYTES = 64 * 1024 ** 2;
 
 /**
- * Débit de lecture séquentielle du disque du modèle : lit `bytes` octets à partir d'un point du fichier (aléatoire par
- * défaut, pour éviter le début déjà en cache) et chronomètre. Le cache du système peut gonfler la mesure.
+ * Sequential-read bandwidth of the model's disk: reads `bytes` bytes from some point in the file (random by default, to
+ * avoid the already-cached start) and times it. The OS page cache can inflate the measurement.
  */
 export async function measureDiskSpeed(
   path: string,
@@ -14,12 +14,11 @@ export async function measureDiskSpeed(
 ): Promise<DiskSpeed> {
   const now = o.now ?? performance.now.bind(performance);
   const file = Bun.file(path);
-  if (!(await file.exists())) throw new HttpError(404, `Fichier introuvable : ${path}`);
+  if (!(await file.exists())) throw new HttpError(404, `File not found: ${path}`);
   const size = file.size;
-  // Au plus 1 Gio, au plus le fichier entier ; en dessous de 64 Mio la mesure ne veut plus rien dire.
+  // At most 1 GiB, at most the whole file; below 64 MiB the measurement is meaningless.
   const bytes = Math.min(o.bytes ?? GiB, size);
-  if (bytes < MIN_BYTES)
-    throw new HttpError(400, `Fichier trop petit pour mesurer (${Math.round(size / 1024 ** 2)} Mio)`);
+  if (bytes < MIN_BYTES) throw new HttpError(400, `File too small to measure (${Math.round(size / 1024 ** 2)} MiB)`);
   const start = Math.floor((size - bytes) * (o.offsetFraction ?? Math.random()));
   const t0 = now();
   let read = 0;

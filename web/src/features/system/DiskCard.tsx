@@ -7,29 +7,29 @@ import { Facts } from './Facts';
 
 export function DiskCard({ sample }: { sample: DiskSample | null }) {
   return (
-    <GlassCard title="Disques" icon={HardDrive}>
+    <GlassCard title="Disks" icon={HardDrive}>
       {!sample ? (
-        <p className="text-sm text-muted-foreground">Collecteur disque désactivé dans les réglages.</p>
+        <p className="text-sm text-muted-foreground">Disk collector disabled in Settings.</p>
       ) : (
         <div className="flex flex-col gap-4">
           <Facts
             rows={[
-              ['Lecture (machine)', formatBps(sample.readBps)],
-              ['Écriture (machine)', formatBps(sample.writeBps)],
+              ['Read (machine)', formatBps(sample.readBps)],
+              ['Write (machine)', formatBps(sample.writeBps)],
               [
-                sample.model ? `Lecture du disque du modèle (${sample.model.disk})` : 'Disque du modèle',
+                sample.model ? `Model disk read (${sample.model.disk})` : 'Model disk',
                 sample.model ? formatBps(sample.model.readBps) : '—',
               ],
             ]}
           />
           <TimeSeriesChart
-            aria-label="Débit des disques"
+            aria-label="Disk throughput"
             height={120}
             format={(v) => formatBps(v)}
             series={[
-              { key: SERIES.diskRead, label: 'Lecture', tone: 'blue' },
-              { key: SERIES.diskWrite, label: 'Écriture', tone: 'teal' },
-              { key: SERIES.modelDiskRead, label: 'Disque du modèle', tone: 'amber' },
+              { key: SERIES.diskRead, label: 'Read', tone: 'blue' },
+              { key: SERIES.diskWrite, label: 'Write', tone: 'teal' },
+              { key: SERIES.modelDiskRead, label: 'Model disk', tone: 'amber' },
             ]}
           />
         </div>

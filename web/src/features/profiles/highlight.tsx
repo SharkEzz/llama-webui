@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 const isFlag = (t: string) => t.length > 1 && t.startsWith('-') && !/^-\d/.test(t);
 
-/** Arguments : flags connus en bleu, réservés en rose, inconnus en ambre souligné ; valeurs entre guillemets en vert. */
+/** Arguments: known flags in blue, reserved in rose, unknown in underlined amber; quoted values in green. */
 export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactNode {
   return text.split(/(\s+)/).map((tok, i) => {
     if (!tok || /^\s+$/.test(tok)) return tok;
@@ -16,7 +16,7 @@ export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactN
           ? 'text-tone-amber underline decoration-dotted decoration-tone-amber/70'
           : 'text-tone-blue';
       return (
-        // biome-ignore lint/suspicious/noArrayIndexKey: jetons positionnels recalculés à chaque rendu
+        // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
         <span key={i}>
           <span className={cls}>{name}</span>
           {rest && <span className="text-foreground/85">{rest}</span>}
@@ -25,13 +25,13 @@ export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactN
     }
     if (/^["']/.test(tok))
       return (
-        // biome-ignore lint/suspicious/noArrayIndexKey: jetons positionnels recalculés à chaque rendu
+        // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
         <span key={i} className="text-success">
           {tok}
         </span>
       );
     return (
-      // biome-ignore lint/suspicious/noArrayIndexKey: jetons positionnels recalculés à chaque rendu
+      // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
       <span key={i} className="text-foreground/85">
         {tok}
       </span>
@@ -39,7 +39,7 @@ export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactN
   });
 }
 
-/** Variables : CLÉ en teal, « = » discret, valeur normale ; ligne mal formée soulignée en rose. */
+/** Variables: KEY in teal, subdued “=”, plain value; malformed line underlined in rose. */
 export function highlightEnv(text: string): ReactNode {
   return text.split('\n').map((line, i, all) => {
     const nl = i < all.length - 1 ? '\n' : '';
@@ -48,7 +48,7 @@ export function highlightEnv(text: string): ReactNode {
     if (!line.trim()) return line + nl;
     if (eq <= 0 || !/^\s*[A-Za-z_][A-Za-z0-9_]*\s*$/.test(key)) {
       return (
-        // biome-ignore lint/suspicious/noArrayIndexKey: jetons positionnels recalculés à chaque rendu
+        // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
         <span key={i}>
           <span className="text-tone-rose underline decoration-wavy decoration-tone-rose/70">{line}</span>
           {nl}
@@ -56,7 +56,7 @@ export function highlightEnv(text: string): ReactNode {
       );
     }
     return (
-      // biome-ignore lint/suspicious/noArrayIndexKey: jetons positionnels recalculés à chaque rendu
+      // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
       <span key={i}>
         <span className="text-tone-teal">{key}</span>
         <span className="text-muted-foreground">=</span>

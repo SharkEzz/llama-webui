@@ -32,7 +32,7 @@ self.onmessage = (e: MessageEvent) => {
   try {
     lib = openNvml();
     const rc = lib.nvmlInit_v2();
-    if (rc !== 0) throw new Error(`nvmlInit_v2 a renvoyé ${rc}`);
+    if (rc !== 0) throw new Error(`nvmlInit_v2 returned ${rc}`);
     handles = deviceHandles(lib);
   } catch (err) {
     postMessage({ type: 'error', message: err instanceof Error ? err.message : String(err) });

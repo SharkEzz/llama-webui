@@ -4,7 +4,7 @@ import type { ServerWebSocket } from 'bun';
 const PING_INTERVAL_MS = 15_000;
 const MAX_MISSED_PINGS = 2;
 
-/** Registre des clients WS : diffusion et heartbeat (ping 15 s, fermeture après 2 pings sans pong). */
+/** WS client registry: broadcast and heartbeat (ping every 15 s, close after 2 pings without a pong). */
 export class WsHub {
   private readonly clients = new Map<ServerWebSocket<unknown>, { missed: number }>();
   private readonly timer: Timer;
@@ -25,7 +25,7 @@ export class WsHub {
     this.clients.delete(ws);
   }
 
-  /** À appeler pour chaque message texte reçu d'un client. */
+  /** Call for every text message received from a client. */
   receive(ws: ServerWebSocket<unknown>, raw: string | Buffer): void {
     let msg: WsMessage;
     try {
@@ -50,7 +50,7 @@ export class WsHub {
 
   dispose(): void {
     clearInterval(this.timer);
-    for (const ws of this.clients.keys()) ws.close(1001, 'arrêt');
+    for (const ws of this.clients.keys()) ws.close(1001, 'shutdown');
     this.clients.clear();
   }
 

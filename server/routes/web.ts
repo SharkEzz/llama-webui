@@ -2,13 +2,13 @@ import { basename } from 'node:path';
 import tailwind from 'bun-plugin-tailwind';
 
 /*
- * Interface web. En développement, l'import HTML de Bun.serve (HMR). En production, Bun.serve bundlerait aussi la page
- * à la volée, mais en un seul fichier : il ignore le découpage et inline les import() du routeur, si bien que chaque
- * page chargeait tout (three.js de la Topologie compris, ~1 Mo). Bun.build, lui, découpe : le front est construit au
- * démarrage, en mémoire (pas d'étape de build), et chaque page ne charge que ses chunks.
+ * Web UI. In development, Bun.serve's HTML import (HMR). In production, Bun.serve would also bundle the page on the
+ * fly, but into a single file: it ignores code splitting and inlines the router's import()s, so every page loaded
+ * everything (including the Topology page's three.js, ~1 MB). Bun.build does split: the front end is built at
+ * startup, in memory (no build step), and each page only loads its own chunks.
  */
 
-/** Routes de l'UI pour Bun.serve : fichiers construits et fallback SPA (`/*`). */
+/** UI routes for Bun.serve: built files and SPA fallback (`/*`). */
 export type WebRoutes = Record<string, Bun.HTMLBundle | Response>;
 
 export async function buildWebRoutes(entry: string): Promise<WebRoutes> {
@@ -17,13 +17,13 @@ export async function buildWebRoutes(entry: string): Promise<WebRoutes> {
     target: 'browser',
     splitting: true,
     minify: true,
-    // Chemins absolus : une adresse profonde (/chat/12) ne doit pas chercher ses chunks sous /chat/.
+    // Absolute paths: a deep URL (/chat/12) must not look for its chunks under /chat/.
     publicPath: '/',
     plugins: [tailwind],
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   if (!result.success) {
-    throw new AggregateError(result.logs, `construction de l'interface web impossible (${entry})`);
+    throw new AggregateError(result.logs, `failed to build the web UI (${entry})`);
   }
   const routes: WebRoutes = {};
   let html: string | null = null;
@@ -33,13 +33,13 @@ export async function buildWebRoutes(entry: string): Promise<WebRoutes> {
       html = await out.text();
       continue;
     }
-    // Noms à empreinte de contenu : immuables.
+    // Content-hashed names: immutable.
     routes[`/${name}`] = new Response(await out.arrayBuffer(), {
       headers: { 'Content-Type': out.type, 'Cache-Control': 'public, max-age=31536000, immutable' },
     });
   }
-  if (html === null) throw new Error(`construction de l'interface web : pas de HTML produit (${entry})`);
-  // Toute autre adresse sert l'application (fallback SPA) ; jamais en cache, elle désigne les chunks du moment.
+  if (html === null) throw new Error(`web UI build: no HTML produced (${entry})`);
+  // Any other path serves the app (SPA fallback); never cached, since it points to the current chunks.
   routes['/*'] = new Response(html, {
     headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'no-cache' },
   });
@@ -47,13 +47,13 @@ export async function buildWebRoutes(entry: string): Promise<WebRoutes> {
 }
 
 /**
- * Construction impossible (import cassé, plugin en échec) : l'API, le WebSocket et le superviseur restent servis ;
- * toute page répond 503 avec l'erreur, jusqu'au prochain démarrage.
+ * Build failed (broken import, failing plugin): the API, the WebSocket and the supervisor are still served;
+ * every page answers 503 with the error, until the next startup.
  */
 export function unavailableWebRoutes(err: unknown): WebRoutes {
   const detail = err instanceof AggregateError ? [err.message, ...err.errors.map(String)] : [String(err)];
   return {
-    '/*': new Response(`llama-webui : interface web indisponible.\n\n${detail.join('\n')}\n`, {
+    '/*': new Response(`llama-webui: web UI unavailable.\n\n${detail.join('\n')}\n`, {
       status: 503,
       headers: { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-store' },
     }),

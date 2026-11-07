@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useServer } from '@/lib/server';
 
-/** Confirmation d'arrêt du serveur géré avant un sweep (lancement, reprise, validation) : arrêté une fois, relancé une fois. */
+/** Confirms stopping the managed server before a sweep (launch, resume, validation): stopped once, restarted once. */
 export function StopServerDialog({
   open,
   onOpenChange,
@@ -26,22 +26,22 @@ export function StopServerDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Arrêter llama-server ?</AlertDialogTitle>
+          <AlertDialogTitle>Stop llama-server?</AlertDialogTitle>
           <AlertDialogDescription>
-            {profile ? <>Le profil « {profile} »</> : 'Le serveur'} sera arrêté une fois pour tout le sweep, puis
-            relancé avec la même commande à la fin, même en cas d'échec ou d'annulation. Le chat est indisponible
-            pendant ce temps.
+            {profile ? <>Profile “{profile}”</> : 'The server'} will be stopped once for the whole sweep, then restarted
+            with the same command at the end, even if the sweep fails or is cancelled. Chat is unavailable in the
+            meantime.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Annuler</AlertDialogCancel>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={() => {
               onOpenChange(false);
               onConfirm();
             }}
           >
-            Arrêter et lancer
+            Stop and run
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

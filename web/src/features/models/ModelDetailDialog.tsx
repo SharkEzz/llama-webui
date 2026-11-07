@@ -19,9 +19,9 @@ import { api } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatBytes, formatInt, formatParams } from '@/lib/format';
 
-const yesNo = (b: boolean) => (b ? 'oui' : 'non');
+const yesNo = (b: boolean) => (b ? 'yes' : 'no');
 
-/** Détail d'un GGUF : en-tête, répartition des poids, fichiers ; crée un profil prérempli. */
+/** GGUF details: header, weight breakdown, files; creates a prefilled profile. */
 export function ModelDetailDialog({ path, onClose }: { path: string | null; onClose(): void }) {
   const [detail, setDetail] = useState<ModelDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="break-all font-mono text-sm">{detail?.relPath ?? path}</DialogTitle>
-          <DialogDescription>{detail?.name || 'En-tête GGUF'}</DialogDescription>
+          <DialogDescription>{detail?.name || 'GGUF header'}</DialogDescription>
         </DialogHeader>
         {error ? (
           <Alert variant="destructive">
@@ -60,37 +60,37 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
             <Facts
               rows={[
                 ['Architecture', detail.arch],
-                ['Quantification', detail.quant],
-                ['Paramètres', formatParams(detail.params)],
-                ['Couches', formatInt(detail.blockCount)],
-                ['Contexte', detail.contextLength > 0 ? formatInt(detail.contextLength) : '—'],
-                ['Dimension', formatInt(detail.embeddingLength)],
-                ['Têtes / têtes KV', `${detail.headCount} / ${detail.headCountKv}`],
+                ['Quantization', detail.quant],
+                ['Parameters', formatParams(detail.params)],
+                ['Layers', formatInt(detail.blockCount)],
+                ['Context', detail.contextLength > 0 ? formatInt(detail.contextLength) : '—'],
+                ['Embedding size', formatInt(detail.embeddingLength)],
+                ['Heads / KV heads', `${detail.headCount} / ${detail.headCountKv}`],
                 [
-                  'Experts (actifs)',
+                  'Experts (active)',
                   detail.expertCount > 0 ? `${detail.expertCount} (${detail.expertUsedCount})` : '—',
                 ],
-                ['Couches MTP', detail.nextnLayers > 0 ? formatInt(detail.nextnLayers) : '—'],
-                ['Récurrent', yesNo(detail.recurrent)],
-                ['Fenêtre glissante', detail.slidingWindow ? formatInt(detail.slidingWindow) : '—'],
-                ['Modèle de chat', yesNo(detail.hasChatTemplate)],
+                ['MTP layers', detail.nextnLayers > 0 ? formatInt(detail.nextnLayers) : '—'],
+                ['Recurrent', yesNo(detail.recurrent)],
+                ['Sliding window', detail.slidingWindow ? formatInt(detail.slidingWindow) : '—'],
+                ['Chat template', yesNo(detail.hasChatTemplate)],
               ]}
             />
             <div className="flex flex-col gap-4">
               <Facts
                 rows={[
                   ['Embeddings', formatBytes(w.embedBytes)],
-                  ['Couches (hors experts)', formatBytes(w.layersBytes)],
+                  ['Layers (excluding experts)', formatBytes(w.layersBytes)],
                   ['Experts', w.expertsBytes > 0 ? formatBytes(w.expertsBytes) : '—'],
-                  ['Sortie', formatBytes(w.outputBytes)],
-                  ['Autres', formatBytes(w.otherBytes)],
-                  ['Total des poids', formatBytes(w.totalBytes)],
-                  ['Tenseurs', formatInt(detail.tensorCount)],
+                  ['Output', formatBytes(w.outputBytes)],
+                  ['Other', formatBytes(w.otherBytes)],
+                  ['Total weights', formatBytes(w.totalBytes)],
+                  ['Tensors', formatInt(detail.tensorCount)],
                 ]}
               />
               <div className="flex flex-col gap-1">
                 <p className="text-sm text-muted-foreground">
-                  {detail.files.length > 1 ? `${detail.files.length} fichiers` : 'Fichier'}
+                  {detail.files.length > 1 ? `${detail.files.length} files` : 'File'}
                 </p>
                 {detail.files.map((f) => (
                   <p key={f} className="break-all font-mono text-xs">
@@ -105,13 +105,13 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
           <Button
             variant="ghost"
             disabled={!path}
-            onClick={() => path && copyText(path).then(() => toast.success('Chemin copié'))}
+            onClick={() => path && copyText(path).then(() => toast.success('Path copied'))}
           >
-            <Copy /> Copier le chemin
+            <Copy /> Copy path
           </Button>
           {detail?.kind === 'model' && (
             <Button onClick={() => navigate(`/profiles?new=1&model=${encodeURIComponent(detail.path)}`)}>
-              <Plus /> Créer un profil
+              <Plus /> Create profile
             </Button>
           )}
         </DialogFooter>

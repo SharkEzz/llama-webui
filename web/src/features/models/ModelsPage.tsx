@@ -21,7 +21,7 @@ type KindFilter = 'model' | 'mmproj' | 'all';
 const matches = (m: ModelEntry, q: string) =>
   !q || [m.relPath, ...(m.ok ? [m.name, m.arch, m.quant] : [])].some((s) => s.toLowerCase().includes(q));
 
-/** Les GGUF du dossier des modèles, avec les métadonnées de leur en-tête. */
+/** The GGUFs of the models folder, with their header metadata. */
 export function ModelsPage() {
   const { list, error, loading, refresh } = useModels();
   const [query, setQuery] = useState('');
@@ -39,17 +39,17 @@ export function ModelsPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Modèles</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Models</h1>
           {list && <p className="font-mono text-sm text-muted-foreground">{list.dir}</p>}
         </div>
         <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw className={cn(loading && 'animate-spin')} /> Rescanner
+          <RefreshCw className={cn(loading && 'animate-spin')} /> Rescan
         </Button>
       </div>
 
       {error && (
         <Alert variant="destructive" className={GLASS}>
-          <AlertTitle>Scan impossible</AlertTitle>
+          <AlertTitle>Scan failed</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -59,12 +59,12 @@ export function ModelsPage() {
       ) : list.models.length === 0 ? (
         <Alert className={GLASS}>
           <Boxes />
-          <AlertTitle>Aucun fichier GGUF dans {list.setting}</AlertTitle>
+          <AlertTitle>No GGUF files in {list.setting}</AlertTitle>
           <AlertDescription>
             <p>
-              Déposez des modèles dans ce dossier ou changez-le dans les{' '}
+              Put models in this folder or change it in{' '}
               <Link to="/settings" className="underline underline-offset-4">
-                Réglages
+                Settings
               </Link>
               .
             </p>
@@ -81,30 +81,30 @@ export function ModelsPage() {
                 <InputGroupInput
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Fichier, nom, architecture, quantification"
+                  placeholder="File, name, architecture, quantization"
                 />
               </InputGroup>
               <Tabs value={kind} onValueChange={(v) => setKind(v as KindFilter)}>
                 <TabsList className="h-9 p-1 *:px-3">
-                  <TabsTrigger value="model">Modèles</TabsTrigger>
-                  <TabsTrigger value="mmproj">Projecteurs</TabsTrigger>
-                  <TabsTrigger value="all">Tous</TabsTrigger>
+                  <TabsTrigger value="model">Models</TabsTrigger>
+                  <TabsTrigger value="mmproj">Projectors</TabsTrigger>
+                  <TabsTrigger value="all">All</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
             {rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun fichier ne correspond.</p>
+              <p className="text-sm text-muted-foreground">No matching files.</p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Fichier</TableHead>
-                    <TableHead>Archi</TableHead>
+                    <TableHead>File</TableHead>
+                    <TableHead>Arch</TableHead>
                     <TableHead>Quant</TableHead>
-                    <TableHead className="text-right">Taille</TableHead>
-                    <TableHead className="text-right">Paramètres</TableHead>
-                    <TableHead className="text-right">Couches</TableHead>
-                    <TableHead className="text-right">Contexte</TableHead>
+                    <TableHead className="text-right">Size</TableHead>
+                    <TableHead className="text-right">Parameters</TableHead>
+                    <TableHead className="text-right">Layers</TableHead>
+                    <TableHead className="text-right">Context</TableHead>
                     <TableHead className="text-right">Experts</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -137,7 +137,7 @@ export function ModelsPage() {
                         </>
                       ) : (
                         <TableCell colSpan={7}>
-                          <Badge variant="destructive">illisible</Badge>
+                          <Badge variant="destructive">unreadable</Badge>
                           <span className="ml-2 text-xs text-muted-foreground">{m.error}</span>
                         </TableCell>
                       )}

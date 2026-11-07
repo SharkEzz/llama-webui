@@ -16,7 +16,7 @@ import { SamplingPanel } from './SamplingPanel';
 import { Thread } from './Thread';
 import { type ServerProps, useServerProps } from './useServerProps';
 
-/** Contexte occupé par la dernière réponse (prompt + jetons générés) sur le contexte du serveur. */
+/** Context used by the last reply (prompt + generated tokens) out of the server context. */
 function ContextGauge({ props }: { props: ServerProps | null }) {
   const current = useChat((s) => s.current);
   const nCtx = props?.default_generation_settings?.n_ctx;
@@ -28,21 +28,21 @@ function ContextGauge({ props }: { props: ServerProps | null }) {
   return (
     <div
       className="flex min-w-48 flex-col gap-1"
-      title="Prompt et réponse du dernier échange, sur le contexte du serveur"
+      title="Prompt and reply of the last exchange, out of the server context"
     >
       <div className={cn('num flex justify-between gap-3 text-xs', high ? 'text-warning' : 'text-muted-foreground')}>
-        <span>Contexte</span>
+        <span>Context</span>
         <span>
-          {formatInt(used)} / {formatInt(nCtx)} jetons
+          {formatInt(used)} / {formatInt(nCtx)} tokens
         </span>
       </div>
-      <Progress value={pct} aria-label="Contexte utilisé" />
-      {high && <p className="text-xs text-warning">Bientôt plein : commencez une nouvelle conversation.</p>}
+      <Progress value={pct} aria-label="Context used" />
+      {high && <p className="text-xs text-warning">Almost full: start a new conversation.</p>}
     </div>
   );
 }
 
-/** Chat avec le llama-server actif : conversations, fil en streaming, réglages par conversation. */
+/** Chat with the active llama-server: conversations, streaming thread, per-conversation settings. */
 export function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -80,9 +80,9 @@ export function ChatPage() {
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold tracking-tight">{current?.title ?? 'Chat'}</h1>
             <p className="truncate font-mono text-xs text-muted-foreground">
-              {started ?? serving ?? 'Aucun modèle chargé'}
+              {started ?? serving ?? 'No model loaded'}
               {started && serving && started !== serving && (
-                <span className="ml-2 font-sans">— le serveur sert maintenant {serving}</span>
+                <span className="ml-2 font-sans">— the server now serves {serving}</span>
               )}
             </p>
           </div>
@@ -91,12 +91,12 @@ export function ChatPage() {
             {current && (
               <Sheet>
                 <SheetTrigger render={<Button variant="secondary" size="sm" />}>
-                  <SlidersHorizontal /> Réglages
+                  <SlidersHorizontal /> Settings
                 </SheetTrigger>
                 <SheetContent className="overflow-y-auto">
                   <SheetHeader>
-                    <SheetTitle>Réglages de la conversation</SheetTitle>
-                    <SheetDescription>Pris en compte à la prochaine réponse.</SheetDescription>
+                    <SheetTitle>Conversation settings</SheetTitle>
+                    <SheetDescription>Applied from the next reply.</SheetDescription>
                   </SheetHeader>
                   <div className="px-4 pb-4">
                     <SamplingPanel props={props} />

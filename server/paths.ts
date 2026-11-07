@@ -3,8 +3,8 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 /**
- * Répertoire des données locales : `dir` (flag --data-dir), sinon $LLAMA_WEBUI_DATA_DIR, sinon
- * $XDG_DATA_HOME/llama-webui, sinon ~/.local/share/llama-webui. Créé si absent.
+ * Local data directory: `dir` (--data-dir flag), else $LLAMA_WEBUI_DATA_DIR, else
+ * $XDG_DATA_HOME/llama-webui, else ~/.local/share/llama-webui. Created if missing.
  */
 export function dataDir(dir?: string): string {
   const resolved =

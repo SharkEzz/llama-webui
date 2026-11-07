@@ -3,7 +3,7 @@ import { HttpError } from '../http';
 import type { LogBuffer } from '../logs/buffer';
 import type { BuiltCommand } from '../supervisor/args';
 
-/** Ce que la garde attend du superviseur : arrêter le serveur géré avant un benchmark, le relancer après. */
+/** What the gate expects from the supervisor: stop the managed server before a benchmark, restart it afterwards. */
 export interface ServerControl {
   readonly state: ServerState;
   readonly lastCommand: BuiltCommand | null;
@@ -14,23 +14,23 @@ export interface ServerControl {
 export interface GateDeps {
   server: ServerControl;
   logs: LogBuffer;
-  /** Délai laissé au nouveau module pour reprendre la garde après un rechargement (3 s). */
+  /** Time left to the new module to take over the gate after a reload (3 s). */
   adoptGraceMs?: number;
-  /** Attente maximale d'un arrêt déjà en cours avant de prendre la garde (60 s). */
+  /** Maximum wait for a stop already in progress before taking the gate (60 s). */
   stoppingTimeoutMs?: number;
 }
 
 const POLL_MS = 100;
 
 /**
- * La garde du serveur pendant les benchmarks : un seul détenteur (run ponctuel ou sweep), le serveur géré arrêté une fois
- * à la prise et relancé une fois à la libération, le détecteur de serveur externe en pause tant qu'elle est tenue.
- * Vit dans le runtime (survit à `bun --hot`) : le runner est recréé à chaque rechargement, la garde non, si bien qu'un
- * sweep reprend dans le nouveau module sans relancer le serveur entre-temps. Modifier ce fichier demande de relancer Bun.
+ * The server gate during benchmarks: a single holder (one-off run or sweep), the managed server stopped once on
+ * acquire and restarted once on release, the external server detector paused while it is held.
+ * Lives in the runtime (survives `bun --hot`): the runner is recreated on every reload, the gate is not, so a
+ * sweep resumes in the new module without restarting the server in between. Changing this file requires restarting Bun.
  */
 export class BenchGate {
   private holding = false;
-  /** Commande du serveur effectivement arrêté par la garde, à relancer. */
+  /** Command of the server actually stopped by the gate, to restart. */
   private stopped: BuiltCommand | null = null;
   private stopping: Promise<void> | null = null;
   private releasing: Promise<void> | null = null;
@@ -46,45 +46,45 @@ export class BenchGate {
     return this.stopped;
   }
 
-  /** Vrai tant que l'arrêt du serveur lancé par acquire() n'est pas fini. */
+  /** True while the server stop started by acquire() is not finished. */
   get isStopping(): boolean {
     return this.stopping !== null;
   }
 
   /**
-   * Prend la garde. Refus (409) si elle est déjà tenue, si un serveur externe tourne, ou si le serveur géré tourne sans
-   * `stopServer` (code « server-running », le client demande confirmation). Un arrêt déjà en cours est attendu (rien à
-   * relancer ensuite). Sinon l'arrêt du serveur est lancé sans être attendu : `ready()` le fait.
+   * Takes the gate. Refused (409) if it is already held, if an external server is running, or if the managed server is
+   * running without `stopServer` (code “server-running”, the client asks for confirmation). A stop already in progress is
+   * awaited (nothing to restart afterwards). Otherwise the server stop is started without being awaited: `ready()` does that.
    */
   async acquire(o: { stopServer: boolean }): Promise<void> {
-    if (this.holding) throw new HttpError(409, 'Un benchmark est en cours');
+    if (this.holding) throw new HttpError(409, 'A benchmark is running');
     this.holding = true;
     try {
       const { server } = this.deps;
       const deadline = Date.now() + (this.deps.stoppingTimeoutMs ?? 60_000);
       while (server.state.kind === 'stopping') {
-        if (Date.now() > deadline) throw new HttpError(409, "llama-server met trop de temps à s'arrêter : réessayez");
+        if (Date.now() > deadline) throw new HttpError(409, 'llama-server is taking too long to stop: try again');
         await Bun.sleep(POLL_MS);
       }
       const s = server.state;
       if (s.kind === 'external')
-        throw new HttpError(409, `Un llama-server externe tourne sur le port ${s.port} : arrêtez-le d'abord`);
+        throw new HttpError(409, `An external llama-server is running on port ${s.port}: stop it first`);
       if (s.kind === 'starting' || s.kind === 'ready') {
         if (!o.stopServer)
           throw new HttpError(
             409,
-            `llama-server tourne (profil ${s.profile}) : il sera arrêté pendant le benchmark puis relancé`,
+            `llama-server is running (profile ${s.profile}): it will be stopped during the benchmark, then restarted`,
             'server-running',
           );
         const cmd = server.lastCommand;
-        this.deps.logs.push('[bench] arrêt de llama-server pendant le benchmark');
+        this.deps.logs.push('[bench] stopping llama-server for the benchmark');
         this.stopped = cmd;
         this.stopping = server.stop().then(
           () => {
             this.stopping = null;
           },
           (e) => {
-            // Pas arrêté : rien à relancer, l'échec remonte au premier run.
+            // Not stopped: nothing to restart, the failure surfaces in the first run.
             this.stopping = null;
             this.stopped = null;
             throw e;
@@ -98,14 +98,14 @@ export class BenchGate {
     }
   }
 
-  /** Attend la fin de l'arrêt du serveur (rejette s'il a échoué). */
+  /** Waits for the server stop to finish (rejects if it failed). */
   async ready(): Promise<void> {
     await this.stopping;
   }
 
   /**
-   * Relance le serveur arrêté et libère la garde. Idempotent. Rejette avec « relance de llama-server impossible : … »
-   * si la relance échoue (la garde est libérée quand même).
+   * Restarts the stopped server and releases the gate. Idempotent. Rejects with “could not restart llama-server: …”
+   * if the restart fails (the gate is released anyway).
    */
   release(): Promise<void> {
     if (!this.holding) return Promise.resolve();
@@ -120,11 +120,11 @@ export class BenchGate {
         this.releasing = null;
       });
       if (!cmd) return;
-      this.deps.logs.push(`[bench] relance de llama-server (${cmd.profileName})`);
+      this.deps.logs.push(`[bench] restarting llama-server (${cmd.profileName})`);
       try {
         await this.deps.server.start(cmd);
       } catch (e) {
-        const msg = `relance de llama-server impossible : ${(e as Error).message}`;
+        const msg = `could not restart llama-server: ${(e as Error).message}`;
         this.deps.logs.push(`[bench] ${msg}`);
         throw new Error(msg);
       }
@@ -132,7 +132,7 @@ export class BenchGate {
     return this.releasing;
   }
 
-  /** Rechargement de l'ancien module : libère quand `after` est réglé et le délai écoulé, sauf si adopt() vient avant. */
+  /** Reload of the old module: releases once `after` settles and the delay has elapsed, unless adopt() comes first. */
   releaseLater(after: Promise<unknown>): void {
     if (!this.holding || this.releasing) return;
     const settled = Promise.allSettled([after]).then(() => {});
@@ -148,8 +148,8 @@ export class BenchGate {
   }
 
   /**
-   * Nouveau module : reprend une garde laissée par l'ancien (annule la libération différée). Renvoie la promesse de fin de
-   * l'ancien process (à attendre avant de relancer quoi que ce soit sur les cartes), null si rien à reprendre.
+   * New module: takes over a gate left by the old one (cancels the deferred release). Returns the promise of the old
+   * process finishing (to await before restarting anything on the cards), null if there is nothing to take over.
    */
   adopt(): Promise<void> | null {
     if (!this.holding || !this.pending || this.releasing) return null;

@@ -40,7 +40,7 @@ function namesAndValue(prefix: string): { names: string[]; value?: string } {
   return value ? { names, value } : { names };
 }
 
-/** Catalogue reconstruit à partir de la liste de flags (telle que l'API l'envoie en JSON). */
+/** Catalogue rebuilt from the flag list (as the API sends it in JSON). */
 export function catalogFrom(flags: Flag[]): FlagCatalog {
   const byName = new Map<string, Flag>();
   for (const f of flags) for (const n of f.names) byName.set(n, f);

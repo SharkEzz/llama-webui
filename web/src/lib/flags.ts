@@ -11,7 +11,7 @@ interface FlagsStore {
 
 const useFlagsStore = create<FlagsStore>()(() => ({ catalog: null, loading: false }));
 
-/** Catalogue des flags du llama-server configuré (lu une fois, via `llama-server --help` côté serveur). */
+/** Flag catalog of the configured llama-server (read once, via `llama-server --help` on the server). */
 export function useFlags(): FlagsStore {
   const s = useFlagsStore();
   useEffect(() => {

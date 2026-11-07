@@ -14,7 +14,7 @@ import { useTuning } from '@/lib/tuning';
 
 const NO_PROFILE = '__none';
 
-/** Modèle à régler : depuis un profil (modèle, projecteur, autres flags) ou choisi directement. */
+/** Model to tune: from a profile (model, projector, other flags) or picked directly. */
 export function ModelCard() {
   const modelPath = useTuning((s) => s.modelPath);
   const mmprojPath = useTuning((s) => s.mmprojPath);
@@ -43,22 +43,22 @@ export function ModelCard() {
   }, [modelPath]);
 
   const items = [
-    { value: NO_PROFILE, label: 'Aucun : modèle seul' },
+    { value: NO_PROFILE, label: 'None: model only' },
     ...profiles.map((p) => ({ value: String(p.id), label: p.name })),
   ];
   const ignored = ignoredByBench(serverArgs);
 
   return (
-    <GlassCard title="Modèle" icon={Box}>
+    <GlassCard title="Model" icon={Box}>
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <Label>Partir d'un profil</Label>
+          <Label>Start from a profile</Label>
           <Select
             items={items}
             value={profileId === null ? NO_PROFILE : String(profileId)}
             onValueChange={(v) => void useTuning.getState().fromProfile(v && v !== NO_PROFILE ? Number(v) : null)}
           >
-            <SelectTrigger className="w-full" aria-label="Profil de départ">
+            <SelectTrigger className="w-full" aria-label="Starting profile">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -71,13 +71,13 @@ export function ModelCard() {
           </Select>
         </div>
         <PathInput
-          label="Modèle"
+          label="Model"
           kind="model"
           value={modelPath ?? ''}
           onCommit={(p) => useTuning.getState().setModel(p || null, mmprojPath)}
         />
         <PathInput
-          label="Projecteur (facultatif)"
+          label="Projector (optional)"
           kind="mmproj"
           value={mmprojPath ?? ''}
           onCommit={(p) => useTuning.getState().setModel(modelPath, p || null)}
@@ -91,15 +91,15 @@ export function ModelCard() {
             <dd className="text-right font-mono text-xs">
               {info.arch} · {info.quant} · {formatParams(info.params)}
             </dd>
-            <dt className="text-muted-foreground">Taille</dt>
+            <dt className="text-muted-foreground">Size</dt>
             <dd className="num text-right">{formatBytes(info.fileBytes)}</dd>
-            <dt className="text-muted-foreground">Couches</dt>
+            <dt className="text-muted-foreground">Layers</dt>
             <dd className="num text-right">{info.blockCount}</dd>
             <dt className="text-muted-foreground">Experts</dt>
             <dd className="num text-right">
-              {info.expertCount > 0 ? `${info.expertUsedCount} actifs sur ${info.expertCount}` : 'dense'}
+              {info.expertCount > 0 ? `${info.expertUsedCount} active of ${info.expertCount}` : 'dense'}
             </dd>
-            <dt className="text-muted-foreground">Contexte max</dt>
+            <dt className="text-muted-foreground">Max context</dt>
             <dd className="num text-right">{formatInt(info.contextLength)}</dd>
           </dl>
         )}
@@ -107,14 +107,14 @@ export function ModelCard() {
         {serverArgs.length > 0 && (
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">
-              Autres flags du profil (repris par le profil créé et la validation serveur)
+              Other profile flags (carried over to the created profile and the server validation)
             </span>
             <code className="rounded-md bg-well inset-shadow-well px-2.5 py-1.5 font-mono text-xs break-all">
               {shellQuote(serverArgs)}
             </code>
             {ignored.length > 0 && (
               <span className="text-xs text-muted-foreground">
-                Ignorés par llama-bench : {ignored.map((i) => i.flag).join(', ')}
+                Ignored by llama-bench: {ignored.map((i) => i.flag).join(', ')}
               </span>
             )}
           </div>
@@ -148,7 +148,7 @@ function PathInput({
           onChange={(e) => setText(e.target.value)}
           onBlur={() => text.trim() !== value && onCommit(text.trim())}
           onKeyDown={(e) => e.key === 'Enter' && onCommit(text.trim())}
-          placeholder={kind === 'model' ? '/chemin/absolu/vers/modele.gguf' : '/chemin/absolu/vers/mmproj.gguf'}
+          placeholder={kind === 'model' ? '/absolute/path/to/model.gguf' : '/absolute/path/to/mmproj.gguf'}
           className="font-mono text-xs"
         />
         <InputGroupAddon align="inline-end">

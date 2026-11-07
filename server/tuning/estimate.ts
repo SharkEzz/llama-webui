@@ -21,9 +21,9 @@ export interface EstimateInput {
   hw: TuningHardware;
   preset: PresetId;
   mmprojBytes: number;
-  /** Valeurs imposées par l'utilisateur : la recherche trouve le meilleur placement sous ces contraintes. */
+  /** Values pinned by the user: the search finds the best placement under these constraints. */
   pinned?: Partial<BenchParams>;
-  /** Contexte imposé. */
+  /** Pinned context. */
   ctx?: number;
 }
 
@@ -41,16 +41,16 @@ interface Tried {
   m: PlacementMeasure;
 }
 
-/** Une famille de placement sur un jeu de cartes : produit des flags pour (ctx, kv, ub), ou null si rien ne tient. */
+/** A placement family over a set of cards: yields flags for (ctx, kv, ub), or null if nothing fits. */
 type Kind = { name: 'gpu' | 'moe-cpu' | 'partial' | 'cpu'; cards: BenchDevice[] };
 
 /**
- * Recommandation par règles (adaptée de l'estimateur de llama-tui) : cartes CUDA puis Vulkan (doublons et iGPU exclus),
- * `-ncmoe` pour les MoE qui débordent, `-ngl` partiel pour les denses, puis CPU seul. Le préréglage « 100 Go » place
- * d'emblée les experts en RAM sur toutes les cartes et accepte que la RAM déborde (mmap : relecture NVMe).
+ * Rule-based recommendation (adapted from llama-tui's estimator): CUDA cards then Vulkan (duplicates and iGPU excluded),
+ * `-ncmoe` for MoEs that overflow, partial `-ngl` for dense models, then CPU only. The “100 GB model” preset puts the
+ * experts in RAM right away across all cards and accepts a RAM overflow (mmap: re-reads from NVMe).
  */
-/** « experts de la première couche », « experts des 8 premières couches ». */
-const firstLayers = (n: number) => (n === 1 ? 'experts de la première couche' : `experts des ${n} premières couches`);
+/** “experts of the first layer”, “experts of the first 8 layers”. */
+const firstLayers = (n: number) => (n === 1 ? 'experts of the first layer' : `experts of the first ${n} layers`);
 
 export function estimate(input: EstimateInput): Estimate {
   const { model, hw, mmprojBytes } = input;
@@ -66,7 +66,7 @@ export function estimate(input: EstimateInput): Estimate {
 
   const budget = (d: BenchDevice) => Math.max(0, d.totalMib * MiB - marginBytes(d.totalMib * MiB));
   const gpus = gpuDevices(hw.devices).filter((d) => budget(d) >= TS_UNIT);
-  // CUDA d'abord (dans l'ordre de --list-devices : CUDA0 est la carte la plus rapide ici), puis les autres.
+  // CUDA first (in --list-devices order: CUDA0 is the fastest card here), then the others.
   const ordered = [...gpus.filter((d) => d.backend === 'CUDA'), ...gpus.filter((d) => d.backend !== 'CUDA')];
   const cuda = ordered.filter((d) => d.backend === 'CUDA');
   const pinnedCards = pinned.dev?.map((id) => byId.get(id)).filter((d): d is BenchDevice => !!d);
@@ -77,7 +77,7 @@ export function estimate(input: EstimateInput): Estimate {
   };
   if (pinnedCards) addSet(pinnedCards);
   else {
-    // Chaque CUDA seule, la paire CUDA, puis les autres cartes seules (plus lentes ici), puis toutes.
+    // Each CUDA card alone, the CUDA pair, then the other cards alone (slower here), then all of them.
     for (const d of cuda) addSet([d]);
     if (cuda.length >= 2) addSet(cuda);
     for (const d of ordered) addSet([d]);
@@ -105,7 +105,7 @@ export function estimate(input: EstimateInput): Estimate {
   const ubs = pinned.ub ? [pinned.ub] : preset.ub === 512 ? [512] : [preset.ub, 512];
   const ctxMax = Math.max(preset.ctxMin, Math.floor((model.contextLength || preset.ctxMin) / 1024) * 1024);
 
-  /** -ts proportionnel au budget de chaque carte, moins les tampons sur la première ; null sur une seule carte. */
+  /** -ts proportional to each card's budget, minus the buffers on the first one; undefined on a single card. */
   const tsOf = (cards: BenchDevice[], ub: number): number[] | undefined => {
     if (cards.length < 2) return undefined;
     const extras = computeBytes(model, ub) + mmprojBytes;
@@ -179,7 +179,7 @@ export function estimate(input: EstimateInput): Estimate {
     return out;
   };
 
-  /** Le plus grand contexte (multiple de 1024) qui tient avec cette famille. */
+  /** The largest context (multiple of 1024) that fits with this family. */
   const largest = (k: Kind, kv: Kv): Tried | null => {
     for (const ub of ubs) {
       let lo = fitKind(k, preset.ctxMin, kv, ub);
@@ -212,8 +212,8 @@ export function estimate(input: EstimateInput): Estimate {
       }
       return null;
     }
-    // Une carte quand tout y tient, au contexte visé et dans le cache préféré ; ensuite seulement on réduit.
-    // Une configuration avec de la marge passe avant une configuration « limite » plus simple.
+    // One card when everything fits on it, at the target context and with the preferred cache; only then scale down.
+    // A configuration with headroom wins over a simpler “tight” one.
     const target = ctxList()[0]!;
     let tight: Tried | null = null;
     for (const k of kinds.filter((x) => x.name === 'gpu'))
@@ -235,10 +235,10 @@ export function estimate(input: EstimateInput): Estimate {
 
   const found = search();
   const warnings: string[] = [];
-  if (pinned.ncmoe && !isMoe) warnings.push('modèle dense : -ncmoe sans effet');
+  if (pinned.ncmoe && !isMoe) warnings.push('dense model: -ncmoe has no effect');
 
   if (!found) {
-    // Rien ne tient : on montre quand même la configuration la plus simple, sans la valider.
+    // Nothing fits: still show the simplest configuration, without validating it.
     const ctx = input.ctx ?? preset.ctxMin;
     const kv: Kv = noFa ? 'f16' : 'q8_0';
     const params: BenchParams = {
@@ -259,8 +259,7 @@ export function estimate(input: EstimateInput): Estimate {
     const m = measurePlacement(pi);
     const fit = fitOf(pi, m);
     const reason =
-      fit.reason ??
-      `modèle trop gros : ${fmtBytes(m.ram)} de RAM nécessaires, ${fmtBytes(hw.ramAvailableBytes)} disponibles`;
+      fit.reason ?? `model too large: ${fmtBytes(m.ram)} of RAM needed, ${fmtBytes(hw.ramAvailableBytes)} available`;
     return {
       ok: false,
       reason,
@@ -301,55 +300,55 @@ export function estimate(input: EstimateInput): Estimate {
       '-ncmoe',
       String(params.ncmoe),
       input.preset === 'big'
-        ? `${firstLayers(params.ncmoe)} en RAM ; attention, normes et experts restants sur ${cards}`
-        : `${firstLayers(params.ncmoe)} en RAM (${fmtBytes(m.cpuExpertsBytes)})`,
+        ? `${firstLayers(params.ncmoe)} in RAM; attention, norms and remaining experts on ${cards}`
+        : `${firstLayers(params.ncmoe)} in RAM (${fmtBytes(m.cpuExpertsBytes)})`,
     );
   if (params.ngl === 'all')
     row(
       '-ngl',
       'all',
       params.ncmoe
-        ? 'toutes les couches sur GPU, sauf les experts ci-dessus'
-        : `${fmtBytes(m.gpuWeights)} de poids tiennent dans ${fmtBytes(totalBudget)} utilisables`,
+        ? 'all layers on GPU, except the experts above'
+        : `${fmtBytes(m.gpuWeights)} of weights fit in ${fmtBytes(totalBudget)} usable`,
     );
   else if (typeof params.ngl === 'number' && params.ngl > 0)
-    row('-ngl', String(params.ngl), `${params.ngl} couches sur ${L} tiennent, le reste en RAM`);
-  else row('-ngl', '0', 'pas une couche ne tient : tout en RAM');
+    row('-ngl', String(params.ngl), `${params.ngl} of ${L} layers fit, the rest in RAM`);
+  else row('-ngl', '0', 'not a single layer fits: everything in RAM');
   if (params.dev && params.dev[0] !== 'none')
     row(
       '-dev',
       params.dev.join(','),
       params.dev.length === 1
-        ? 'une seule carte : pas de saut PCIe'
-        : `${params.dev.length} cartes, ${params.dev[0]} reçoit les tampons de calcul`,
+        ? 'single card: no PCIe hop'
+        : `${params.dev.length} cards, ${params.dev[0]} gets the compute buffers`,
     );
-  if (params.ts) row('-ts', params.ts.join(','), 'réparti selon la VRAM utilisable de chaque carte');
+  if (params.ts) row('-ts', params.ts.join(','), 'split by the usable VRAM of each card');
   const kvTotal = [...m.vram.values()].reduce((a, b) => a + b, 0) + m.ram;
-  row('-c', String(ctx), `${fmtBytes(kvTotal)} estimés au total, cache KV ${kv} compris, marge conservée`);
+  row('-c', String(ctx), `${fmtBytes(kvTotal)} estimated in total, ${kv} KV cache included, margin kept`);
   if (params.fa)
     row(
       '-fa',
       'on',
-      kv === 'f16' ? 'attention plus rapide, tampons de calcul plus petits' : 'requis pour le cache KV quantifié',
+      kv === 'f16' ? 'faster attention, smaller compute buffers' : 'required for the quantized KV cache',
     );
-  row('-ctk / -ctv', kv, kv === 'f16' ? 'le budget le permet, pas de perte' : 'cache divisé par 2, perte négligeable');
-  row('-t', String(threads), `${threads} cœurs physiques`);
+  row('-ctk / -ctv', kv, kv === 'f16' ? 'the budget allows it, no loss' : 'cache halved, negligible loss');
+  row('-t', String(threads), `${threads} physical ${threads === 1 ? 'core' : 'cores'}`);
   row(
     '-b / -ub',
     `${batch} / ${params.ub}`,
-    params.ub === 512 && batch === DEFAULT_BATCH ? 'défaut' : 'prompt processing plus rapide, marge VRAM suffisante',
+    params.ub === 512 && batch === DEFAULT_BATCH ? 'default' : 'faster prompt processing, enough VRAM headroom',
   );
-  row('--fit', 'off', 'ce qui est mesuré est exactement ce qui est écrit');
-  if (mlock) row('--mlock', '', 'tout le modèle en mémoire, RAM suffisante');
-  if (numa) row('--numa', 'distribute', 'plusieurs nœuds NUMA');
+  row('--fit', 'off', 'what gets measured is exactly what gets written');
+  if (mlock) row('--mlock', '', 'whole model locked in memory, enough RAM');
+  if (numa) row('--numa', 'distribute', 'several NUMA nodes');
 
   if (typeof params.ngl === 'number' && params.ngl > 0)
-    warnings.push(`génération lente : ${L - params.ngl} couches sur ${L} en RAM`);
-  if (params.ncmoe) warnings.push(`${firstLayers(params.ncmoe)} en RAM : génération ralentie`);
-  if (params.ngl === 0) warnings.push('VRAM insuffisante : tout en RAM');
+    warnings.push(`slow generation: ${L - params.ngl} of ${L} layers in RAM`);
+  if (params.ncmoe) warnings.push(`${firstLayers(params.ncmoe)} in RAM: slower generation`);
+  if (params.ngl === 0) warnings.push('not enough VRAM: everything in RAM');
   if (ramOverflowBytes > 0)
     warnings.push(
-      `déborde la RAM de ${fmtBytes(ramOverflowBytes)} : lecture NVMe ≈ ${fmtBytes(diskReadBytesPerToken)} par jeton généré`,
+      `overflows RAM by ${fmtBytes(ramOverflowBytes)}: NVMe read ≈ ${fmtBytes(diskReadBytesPerToken)} per generated token`,
     );
   if (fit.verdict === 'tight' && fit.reason && ramOverflowBytes === 0) warnings.push(fit.reason);
   warnings.push(...m.issues);

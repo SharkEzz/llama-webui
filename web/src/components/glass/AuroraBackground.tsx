@@ -1,4 +1,4 @@
-/** Fond fixe : deux lueurs très diffuses (accent en haut à gauche, teal en bas à droite) qui dérivent lentement. */
+/** Fixed background: two very diffuse glows (accent top left, teal bottom right) drifting slowly. */
 export function AuroraBackground() {
   return (
     <div className="aurora" aria-hidden="true">

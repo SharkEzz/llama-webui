@@ -12,7 +12,7 @@ interface GlassCardProps {
   children?: ReactNode;
 }
 
-/** Card shadcn en verre : fond --card translucide + flou ; visible au-delà de ses bords (menus de suggestions). */
+/** Glass shadcn Card: translucent --card background + blur; visible beyond its edges (suggestion menus). */
 export function GlassCard({ title, icon: Icon, actions, className, children }: GlassCardProps) {
   const hasHeader = Boolean(title || actions);
   return (

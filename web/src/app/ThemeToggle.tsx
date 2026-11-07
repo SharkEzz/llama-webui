@@ -13,9 +13,9 @@ import {
 import { useTheme } from '@/lib/theme';
 
 const MODES: { value: ThemeMode; label: string; Icon: typeof Sun }[] = [
-  { value: 'system', label: 'Système', Icon: Monitor },
-  { value: 'light', label: 'Clair', Icon: Sun },
-  { value: 'dark', label: 'Sombre', Icon: Moon },
+  { value: 'system', label: 'System', Icon: Monitor },
+  { value: 'light', label: 'Light', Icon: Sun },
+  { value: 'dark', label: 'Dark', Icon: Moon },
 ];
 
 export function ThemeToggle() {
@@ -25,12 +25,12 @@ export function ThemeToggle() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Thème : ${current.label}`} />}>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Theme: ${current.label}`} />}>
         <current.Icon />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-36">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Thème</DropdownMenuLabel>
+          <DropdownMenuLabel>Theme</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={mode} onValueChange={(v) => setMode(v as ThemeMode)}>
             {MODES.map(({ value, label, Icon }) => (
               <DropdownMenuRadioItem key={value} value={value} closeOnClick>

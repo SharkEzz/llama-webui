@@ -12,7 +12,7 @@ interface ComposerProps {
   onStop(): void;
 }
 
-/** Zone de saisie : Entrée envoie, Maj+Entrée va à la ligne ; Arrêter pendant une réponse. */
+/** Input box: Enter sends, Shift+Enter adds a new line; Stop during a reply. */
 export function Composer({ canSend, streaming, onSend, onStop }: ComposerProps) {
   const [text, setText] = useState('');
   const submit = () => {
@@ -26,11 +26,11 @@ export function Composer({ canSend, streaming, onSend, onStop }: ComposerProps) 
         <Alert>
           <AlertDescription>
             <p>
-              llama-server n'est pas prêt : démarrez un profil depuis la page{' '}
+              llama-server is not ready: start a profile from the{' '}
               <Link to="/server" className="underline underline-offset-4">
-                Serveur
+                Server
               </Link>{' '}
-              pour discuter.
+              page to chat.
             </p>
           </AlertDescription>
         </Alert>
@@ -45,18 +45,18 @@ export function Composer({ canSend, streaming, onSend, onStop }: ComposerProps) 
               submit();
             }
           }}
-          placeholder="Votre message (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)"
+          placeholder="Your message (Enter to send, Shift+Enter for a new line)"
           disabled={!canSend}
           aria-label="Message"
           className="max-h-60 min-h-12 resize-none bg-card pr-14 backdrop-blur-(--surface-blur)"
         />
         <div className="absolute right-2 bottom-2">
           {streaming ? (
-            <Button size="icon-sm" variant="secondary" aria-label="Arrêter la réponse" onClick={onStop}>
+            <Button size="icon-sm" variant="secondary" aria-label="Stop the reply" onClick={onStop}>
               <Square />
             </Button>
           ) : (
-            <Button size="icon-sm" aria-label="Envoyer" disabled={!canSend || !text.trim()} onClick={submit}>
+            <Button size="icon-sm" aria-label="Send" disabled={!canSend || !text.trim()} onClick={submit}>
               <ArrowUp />
             </Button>
           )}

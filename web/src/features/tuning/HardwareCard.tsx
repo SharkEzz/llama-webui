@@ -10,18 +10,18 @@ import { useTuning } from '@/lib/tuning';
 import { cn } from '@/lib/utils';
 
 const MiB = 1024 ** 2;
-const ROLE = { gpu: null, duplicate: 'doublon', integrated: 'iGPU', host: 'hôte' } as const;
+const ROLE = { gpu: null, duplicate: 'duplicate', integrated: 'iGPU', host: 'host' } as const;
 
-/** Devices de llama.cpp (--list-devices), RAM et CPU : ce que l'estimateur répartit. */
+/** llama.cpp devices (--list-devices), RAM and CPU: what the estimator splits the model across. */
 export function HardwareCard() {
   const hw = useTuning((s) => s.hardware);
   return (
     <GlassCard
-      title="Matériel"
+      title="Hardware"
       icon={Cpu}
       actions={
         <Button variant="ghost" size="sm" render={<Link to="/system" />} nativeButton={false}>
-          <ListChecks /> Vérifications
+          <ListChecks /> Checks
         </Button>
       }
     >
@@ -51,22 +51,22 @@ export function HardwareCard() {
                 );
               })}
             {hw.devices.length === 0 && (
-              <li className="text-muted-foreground">Aucun device : vérifiez le binaire dans les réglages.</li>
+              <li className="text-muted-foreground">No devices: check the binary in Settings.</li>
             )}
           </ul>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 border-t pt-3">
             <dt className="text-muted-foreground">RAM</dt>
             <dd className="num text-right">
               {formatBytes(hw.ramAvailableBytes)}{' '}
-              <span className="text-muted-foreground">disponibles / {formatBytes(hw.ramTotalBytes)}</span>
+              <span className="text-muted-foreground">available / {formatBytes(hw.ramTotalBytes)}</span>
             </dd>
             <dt className="text-muted-foreground">CPU</dt>
             <dd className="min-w-0 truncate text-right" title={hw.cpu.model}>
-              {hw.cpu.physicalCores} cœurs · {hw.cpu.model}
+              {hw.cpu.physicalCores} cores · {hw.cpu.model}
             </dd>
           </dl>
           <p className="text-xs text-muted-foreground">
-            Les doublons (une carte vue par deux backends) et l'iGPU ne sont pas proposés par l'estimateur.
+            Duplicates (one card seen by two backends) and the iGPU are not offered by the estimator.
           </p>
         </div>
       )}

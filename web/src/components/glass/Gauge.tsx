@@ -9,9 +9,9 @@ interface GaugeProps {
   tone?: Tone;
 }
 
-const SWEEP = 0.75; // arc de 270°
+const SWEEP = 0.75; // 270° arc
 
-/** Jauge circulaire 270°, ouverture en bas, valeur au centre. */
+/** 270° circular gauge, open at the bottom, value in the center. */
 export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = 'blue' }: GaugeProps) {
   const stroke = Math.max(6, Math.round(size / 14));
   const r = (size - stroke) / 2;
@@ -23,7 +23,7 @@ export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = '
   return (
     <figure className="inline-flex flex-col items-center gap-1.5" style={{ width: size }}>
       <div className="relative" style={{ width: size, height: size }}>
-        {/* biome-ignore lint/a11y/useSemanticElements: jauge SVG : <meter> n'est pas applicable à un <svg> */}
+        {/* biome-ignore lint/a11y/useSemanticElements: SVG gauge: <meter> cannot apply to an <svg> */}
         <svg
           width={size}
           height={size}

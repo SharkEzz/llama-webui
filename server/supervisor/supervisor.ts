@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import type { ServerState } from '@llama-webui/shared';
+import { LAUNCH_LOG_PREFIX, type ServerState } from '@llama-webui/shared';
 import type { LogBuffer } from '../logs/buffer';
 import { LineSplitter } from '../logs/lines';
 import type { BuiltCommand } from './args';
@@ -90,14 +90,14 @@ export class Supervisor {
 
   private async externalError(port: number): Promise<SupervisorError> {
     const pid = this._state.kind === 'external' ? this._state.pid : await findLlamaServerPid(port);
-    return new SupervisorError(`port occupé par un serveur externe (PID ${pid ?? 'inconnu'})`);
+    return new SupervisorError(`port in use by an external server (PID ${pid ?? 'unknown'})`);
   }
 
   // One lifecycle operation at a time: start/restart/switch overlap would spawn two servers.
   private op: Promise<void> | null = null;
 
   private exclusive(fn: () => Promise<void>): Promise<void> {
-    if (this.op) return Promise.reject(new SupervisorError('opération en cours, réessayez'));
+    if (this.op) return Promise.reject(new SupervisorError('operation in progress, try again'));
     const p = fn().finally(() => {
       if (this.op === p) this.op = null;
     });
@@ -115,14 +115,14 @@ export class Supervisor {
       if (await this.portAnswers(this._state.port)) throw await this.externalError(this._state.port);
       this.set({ kind: 'idle' });
     }
-    if (this.proc) throw new SupervisorError('un serveur est déjà lancé');
+    if (this.proc) throw new SupervisorError('a server is already running');
     if (await this.portAnswers(cmd.port)) {
       this.set({ kind: 'external', pid: await findLlamaServerPid(cmd.port), port: cmd.port });
       throw await this.externalError(cmd.port);
     }
     this.lastCmd = cmd;
     const fail = (message: string) => {
-      this.logs.push(`[llama-webui] échec du lancement: ${message}`);
+      this.logs.push(`[llama-webui] launch failed: ${message}`);
       this.set({
         kind: 'crashed',
         profile: cmd.profileName,
@@ -133,7 +133,7 @@ export class Supervisor {
         message,
       });
     };
-    if (!existsSync(cmd.cwd)) return fail(`répertoire introuvable: ${cmd.cwd}`);
+    if (!existsSync(cmd.cwd)) return fail(`directory not found: ${cmd.cwd}`);
     let proc: Child;
     try {
       proc = Bun.spawn(cmd.argv, { cwd: cmd.cwd, env: cmd.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
@@ -141,7 +141,7 @@ export class Supervisor {
       return fail((e as Error).message);
     }
     this.proc = proc;
-    this.logs.push(`[llama-webui] lancement: ${cmd.display}`);
+    this.logs.push(`${LAUNCH_LOG_PREFIX} ${cmd.display}`);
     this.pipe(proc.stdout as ReadableStream<Uint8Array>);
     this.pipe(proc.stderr as ReadableStream<Uint8Array>);
     this.set({
@@ -193,7 +193,7 @@ export class Supervisor {
     this.proc = null;
     const wasStopping = this._state.kind === 'stopping';
     this.logs.push(
-      `[llama-webui] llama-server terminé (code ${proc.exitCode ?? '-'}${proc.signalCode ? `, ${proc.signalCode}` : ''})`,
+      `[llama-webui] llama-server exited (code ${proc.exitCode ?? '-'}${proc.signalCode ? `, ${proc.signalCode}` : ''})`,
     );
     if (wasStopping) this.set({ kind: 'idle' });
     else
@@ -232,7 +232,7 @@ export class Supervisor {
     } catch {}
     const exited = await Promise.race([proc.exited.then(() => true), Bun.sleep(this.killTimeoutMs).then(() => false)]);
     if (!exited) {
-      this.logs.push(`[llama-webui] pas d'arrêt après ${this.killTimeoutMs} ms, SIGKILL`);
+      this.logs.push(`[llama-webui] not stopped after ${this.killTimeoutMs} ms, SIGKILL`);
       try {
         proc.kill('SIGKILL');
       } catch {}

@@ -10,7 +10,7 @@ const chunk = (delta: Record<string, string>, extra: Record<string, unknown> = {
 const TIMINGS = { prompt_n: 10, prompt_per_second: 200, predicted_n: 3, predicted_per_second: 51.23 };
 const tick = () => Bun.sleep(5);
 
-/** Un llama-server simulé : le test pousse les morceaux du flux un par un. */
+/** A fake llama-server: the test pushes the stream chunks one by one. */
 function setup() {
   const repo = new ConversationsRepo(openDb(':memory:'));
   const conv = repo.create({ profileId: null, modelPath: '/m.gguf' });
@@ -52,78 +52,78 @@ const answer = (repo: ConversationsRepo, id: number) => repo.messages(id).find((
 
 test('a run keeps going and is saved when its listener leaves', async () => {
   const t = setup();
-  const run = t.runs.send(t.conv.id, 'Salut toi');
+  const run = t.runs.send(t.conv.id, 'Hi there');
   const events: ChatEvent[] = [];
   const leave = run.subscribe((e) => events.push(e));
   await tick();
   await t.push(chunk({ reasoning_content: 'Hmm.' }));
   leave();
-  await t.push(chunk({ content: 'Bonjour' }));
-  await t.push(chunk({ content: ' !' }));
+  await t.push(chunk({ content: 'Hello' }));
+  await t.push(chunk({ content: '!' }));
   await t.push(chunk({}, { timings: TIMINGS }));
   await t.push('data: [DONE]\n\n');
   t.end();
   await run.done;
   expect(events.map((e) => e.type)).toEqual(['start', 'delta']);
   const a = answer(t.repo, t.conv.id);
-  expect([a.status, a.content, a.reasoning]).toEqual(['done', 'Bonjour !', 'Hmm.']);
+  expect([a.status, a.content, a.reasoning]).toEqual(['done', 'Hello!', 'Hmm.']);
   expect(a.stats?.tgTps).toBe(51.23);
   expect(a.stats?.ttftMs).not.toBeNull();
-  expect(t.repo.conversation(t.conv.id)!.title).toBe('Salut toi');
+  expect(t.repo.conversation(t.conv.id)!.title).toBe('Hi there');
   expect(t.runs.live(t.conv.id)).toBeUndefined();
 });
 
 test('stop saves the partial answer as stopped', async () => {
   const t = setup();
-  const run = t.runs.send(t.conv.id, 'Salut');
+  const run = t.runs.send(t.conv.id, 'Hi');
   await tick();
-  await t.push(chunk({ content: 'Bon' }));
+  await t.push(chunk({ content: 'Hel' }));
   expect(t.runs.stop(t.conv.id)).toBe(true);
   await run.done;
   const a = answer(t.repo, t.conv.id);
-  expect([a.status, a.content]).toEqual(['stopped', 'Bon']);
+  expect([a.status, a.content]).toEqual(['stopped', 'Hel']);
   expect(t.signal().aborted).toBe(true);
 });
 
 test('a late subscriber gets what was already written', async () => {
   const t = setup();
-  const run = t.runs.send(t.conv.id, 'Salut');
+  const run = t.runs.send(t.conv.id, 'Hi');
   await tick();
-  await t.push(chunk({ content: 'Bon' }));
-  await t.push(chunk({ content: 'jour' }));
+  await t.push(chunk({ content: 'Hel' }));
+  await t.push(chunk({ content: 'lo' }));
   const events: ChatEvent[] = [];
   run.subscribe((e) => events.push(e));
-  await t.push(chunk({ content: ' !' }));
+  await t.push(chunk({ content: '!' }));
   t.end();
   await run.done;
   expect(events[0]!.type).toBe('start');
-  expect(events[1]).toEqual({ type: 'delta', content: 'Bonjour' });
-  expect(events[2]).toEqual({ type: 'delta', content: ' !' });
+  expect(events[1]).toEqual({ type: 'delta', content: 'Hello' });
+  expect(events[2]).toEqual({ type: 'delta', content: '!' });
   expect(events.at(-1)!.type).toBe('done');
 });
 
 test('a stream that ends without [DONE] or breaks is an error that keeps the partial answer', async () => {
   const t = setup();
-  const run = t.runs.send(t.conv.id, 'Salut');
+  const run = t.runs.send(t.conv.id, 'Hi');
   await tick();
-  await t.push(chunk({ content: 'Bon' }));
+  await t.push(chunk({ content: 'Hel' }));
   t.end();
   await run.done;
   const a = answer(t.repo, t.conv.id);
-  expect([a.status, a.content]).toEqual(['error', 'Bon']);
-  expect(a.error).toBe('llama-server a coupé la réponse (arrêté ou planté)');
+  expect([a.status, a.content]).toEqual(['error', 'Hel']);
+  expect(a.error).toBe('llama-server cut the reply short (stopped or crashed)');
 });
 
 test('dispose emits done(stopped) to listeners, so their streams close', async () => {
   const t = setup();
-  const run = t.runs.send(t.conv.id, 'Salut');
+  const run = t.runs.send(t.conv.id, 'Hi');
   const events: ChatEvent[] = [];
   run.subscribe((e) => events.push(e));
   await tick();
-  await t.push(chunk({ content: 'Bon' }));
+  await t.push(chunk({ content: 'Hel' }));
   t.runs.dispose();
   const last = events.at(-1)!;
   expect(last.type).toBe('done');
-  expect(last.type === 'done' && [last.message.status, last.message.content]).toEqual(['stopped', 'Bon']);
+  expect(last.type === 'done' && [last.message.status, last.message.content]).toEqual(['stopped', 'Hel']);
   expect(answer(t.repo, t.conv.id).status).toBe('stopped');
 });

@@ -5,8 +5,8 @@ import { physicalDisks } from '../collectors/disk';
 import { readCpuInfo } from './cpu';
 
 /*
- * Topologie PCIe de la machine, lue dans sysfs (jamais lspci : il réveille les cartes en veille). Partagé avec le
- * collecteur AMD, qui a besoin des mêmes lectures de liens.
+ * The machine's PCIe topology, read from sysfs (never lspci: it wakes up suspended cards). Shared with the
+ * AMD collector, which needs the same link readings.
  */
 
 export const readText = async (p: string): Promise<string | null> => {
@@ -69,13 +69,13 @@ export async function slotLink(
 
 export const PCI_IDS = ['/usr/share/hwdata/pci.ids', '/usr/share/misc/pci.ids', '/usr/share/pci.ids'];
 
-/** Début du bloc suivant : un autre fabricant, ou la section des classes (« C 00  Unclassified device »). */
+/** Start of the next block: another vendor, or the class section (“C 00  Unclassified device”). */
 const VENDOR_LINE = /\n(?:[0-9a-f]{4} {2}|C )/g;
 
 /**
- * Entrée « vendor device » dans le texte de pci.ids, sans le découper en lignes (environ 1,5 Mo) : la ligne du
- * fabricant, puis celle du périphérique avant le fabricant suivant. Les lignes de sous-système (deux tabulations) et
- * la section des classes (« C 00 ») ne peuvent pas correspondre.
+ * “vendor device” entry in the pci.ids text, without splitting it into lines (about 1.5 MiB): the vendor line, then
+ * the device line before the next vendor. Subsystem lines (two tabs) and the class section (“C 00”) cannot
+ * match.
  */
 export function findPciIdsEntry(text: string, vendor: string, device: string): string | null {
   const v = text.startsWith(`${vendor}  `) ? 0 : text.indexOf(`\n${vendor}  `);
@@ -85,17 +85,17 @@ export function findPciIdsEntry(text: string, vendor: string, device: string): s
   const d = text.indexOf(`\n\t${device}  `, v);
   if (d < 0 || d > end) return null;
   const nl = text.indexOf('\n', d + 1);
-  // Copie : une sous-chaîne JSC garde en vie tout le texte dont elle est extraite (1,5 Mo par nom retenu).
+  // Copy: a JSC substring keeps the whole text it was sliced from alive (1.5 MiB per kept name).
   return Buffer.from(text.slice(d + 2 + device.length, nl < 0 ? undefined : nl).trim()).toString();
 }
 
 /**
- * Noms déjà trouvés (ou absents), par fichier et « vendor:device ». Le matériel ne change pas : après la première
- * lecture de la topologie, plus aucune relecture de pci.ids, et seuls quelques noms restent en mémoire.
+ * Names already found (or missing), per file and “vendor:device”. Hardware doesn't change: after the first topology
+ * read, pci.ids is never read again, and only a few names stay in memory.
  */
 const pciIdsMemo = new Map<string, string | null>();
 
-/** Nom complet d'un périphérique dans pci.ids (« JHL7540 Thunderbolt 3 Bridge [Titan Ridge DD 2018] ») ; null si inconnu. */
+/** Full name of a device in pci.ids (“JHL7540 Thunderbolt 3 Bridge [Titan Ridge DD 2018]”); null if unknown. */
 export async function pciIdsEntry(
   pdev: string,
   pciRoot = '/sys/bus/pci/devices',
@@ -108,7 +108,7 @@ export async function pciIdsEntry(
     const key = `${path}\0${vendor}:${device}`;
     const known = pciIdsMemo.get(key);
     if (known !== undefined) return known;
-    // Fichier absent : pas retenu (il peut être installé plus tard), le suivant de la liste est essayé.
+    // Missing file: not remembered (it may be installed later), the next one in the list is tried.
     const text = await readText(path);
     if (text === null) continue;
     const entry = findPciIdsEntry(text, vendor, device);
@@ -118,12 +118,12 @@ export async function pciIdsEntry(
   return null;
 }
 
-/** Le nom entre crochets (« GB203 [GeForce RTX 5070 Ti] ») est préféré au nom de la puce. */
+/** The name in brackets (“GB203 [GeForce RTX 5070 Ti]”) is preferred over the chip name. */
 const displayName = (entry: string) => /\[([^\]]+)\]/.exec(entry)?.[1] ?? entry;
 
 /**
- * Nom d'un périphérique d'après ses identifiants sysfs (`vendor`, `device` : attributs en cache, lus sans réveiller la
- * carte) et la base pci.ids.
+ * Name of a device from its sysfs IDs (`vendor`, `device`: cached attributes, read without waking the card up) and
+ * the pci.ids database.
  */
 export async function pciName(
   pdev: string,
@@ -136,11 +136,11 @@ export async function pciName(
 }
 
 /**
- * Le premier bridge sous un root port est le chipset s'il vient du fabricant de la plateforme (celui du root port :
- * AMD pour Promontory, X570 et 600 Series). Un switch d'un autre fabricant (PLX/Broadcom, ASMedia, Microchip : carte
- * NVMe, riser) n'est pas un chipset : ses périphériques restent reliés au CPU. Thunderbolt et USB4, du même fabricant
- * que le root port sur Intel, n'en sont pas non plus : le noyau marque « removable » ce qui est sous un port externe,
- * et le nom pci.ids complet le dit.
+ * The first bridge below a root port is the chipset if it comes from the platform vendor (the root port's:
+ * AMD for Promontory, X570 and 600 Series). A switch from another vendor (PLX/Broadcom, ASMedia, Microchip: NVMe
+ * card, riser) is not a chipset: its devices stay attached to the CPU. Thunderbolt and USB4, from the same vendor
+ * as the root port on Intel, aren't either: the kernel marks what sits below an external port “removable”,
+ * and the full pci.ids name says so.
  */
 async function isChipset(up: string, root: string, entry: string | null): Promise<boolean> {
   const [upVendor, rootVendor, removable] = await Promise.all([
@@ -152,7 +152,7 @@ async function isChipset(up: string, root: string, entry: string | null): Promis
   return removable !== 'removable' && !/thunderbolt|usb4/i.test(entry ?? '');
 }
 
-/** « 600 Series Chipset PCIe Switch Upstream Port » → « 600 Series Chipset ». */
+/** “600 Series Chipset PCIe Switch Upstream Port” → “600 Series Chipset”. */
 export function chipsetLabel(name: string | null): string {
   if (!name) return 'Chipset';
   const cut = name
@@ -162,7 +162,7 @@ export function chipsetLabel(name: string | null): string {
   return cut || 'Chipset';
 }
 
-/** « AMD Ryzen 5 9600X 6-Core Processor » → « AMD Ryzen 5 9600X » ; « Intel(R) Core(TM) i7-12700K CPU @ 3.60GHz » → « Intel Core i7-12700K ». */
+/** “AMD Ryzen 5 9600X 6-Core Processor” → “AMD Ryzen 5 9600X”; “Intel(R) Core(TM) i7-12700K CPU @ 3.60GHz” → “Intel Core i7-12700K”. */
 export function cpuLabel(model: string): string {
   return (
     model
@@ -184,7 +184,7 @@ export interface PciTopologyOptions {
   pciIds?: readonly string[];
 }
 
-/** Lien PCIe `from → to` dont le côté aval est `linkPath` et le port amont `portPath` ; sans attributs de lien : interne. */
+/** PCIe link `from → to` whose downstream side is `linkPath` and upstream port `portPath`; no link attributes: internal. */
 async function pcieLink(
   id: string,
   from: string,
@@ -204,7 +204,7 @@ async function pcieLink(
     speed(linkPath, 'current_link_speed'),
     readNum(join(linkPath, 'current_link_width')),
   ]);
-  // Une carte en veille (D3cold) peut répondre 0xFFFF à la lecture de config : largeur « 63 », à ignorer.
+  // A suspended card (D3cold) may answer 0xFFFF to a config read: width “63”, to be ignored.
   const sane = (w: number | null) => (w !== null && w > 0 && w <= 32 ? w : null);
   const genMax = minKnown(genL, genP);
   const widthMax = minKnown(sane(widthL), sane(widthP));
@@ -222,7 +222,7 @@ async function pcieLink(
 
 interface BlockDev {
   block: string;
-  /** Répertoire réel du contrôleur (`…/0000:02:00.0/nvme/nvme0`). */
+  /** Real directory of the controller (`…/0000:02:00.0/nvme/nvme0`). */
   ctrlPath: string;
   model: string | null;
   sizeBytes: number | null;
@@ -258,7 +258,7 @@ async function ramNode(sysRoot: string, procRoot: string): Promise<TopologyNode>
   return {
     id: 'ram',
     kind: 'ram',
-    label: 'Mémoire',
+    label: 'Memory',
     detail: {
       totalBytes: Number.isFinite(kb) ? kb * 1024 : null,
       dimms: temps.length > 0 ? temps.length : null,
@@ -268,9 +268,9 @@ async function ramNode(sysRoot: string, procRoot: string): Promise<TopologyNode>
 }
 
 /**
- * Graphe matériel : CPU, mémoire, puis chaque GPU (classe 0x03) et contrôleur NVMe (0x0108) avec son lien vers le CPU,
- * directement (port racine) ou via un nœud chipset (bridges entre le port racine et la carte qui ne sont pas les
- * siens). Toute lecture qui échoue dégrade en inconnu : au pire le graphe ne contient que CPU et mémoire.
+ * Hardware graph: CPU, memory, then each GPU (class 0x03) and NVMe controller (0x0108) with its link to the CPU,
+ * directly (root port) or through a chipset node (bridges between the root port and the card that aren't the card's
+ * own). Any failed read degrades to unknown: at worst the graph holds only the CPU and memory.
  */
 export async function readPciTopology(o: PciTopologyOptions = {}): Promise<TopologyGraph> {
   const sysRoot = o.sysRoot ?? '/sys';

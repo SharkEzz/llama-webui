@@ -273,7 +273,7 @@ describe('context usage and recent requests', () => {
     expect(foldRecent(l2, { ...p, at: 3 }).map((r) => r.at)).toEqual([3, 1]);
     expect(foldRecent([], g)).toEqual([g]);
     expect(foldRecent(l2, null)).toBe(l2);
-    // Kept for wide dashboards, where Requêtes récentes grows to fill its column.
+    // Kept for wide dashboards, where Recent requests grows to fill its column.
     const many = Array.from({ length: 45 }, (_, i) => ({ ...p, at: i })).reduce<RequestRecord[]>(
       (l, r) => foldRecent(l, r),
       [],

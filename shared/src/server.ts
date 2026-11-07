@@ -1,4 +1,4 @@
-/** État du llama-server supervisé (copié de llama-tui, avec l'id du profil). */
+/** State of the supervised llama-server (copied from llama-tui, with the profile id). */
 export type ServerState =
   | { kind: 'idle' }
   | { kind: 'starting'; profile: string; profileId: number; pid: number; port: number; since: number }
@@ -17,7 +17,7 @@ export type ServerState =
 
 export interface ServerView {
   state: ServerState;
-  /** Dernière commande lancée, citée façon shell (sans le préfixe setpriv). */
+  /** Last launched command, shell-quoted (without the setpriv prefix). */
   command: string | null;
   profileId: number | null;
 }

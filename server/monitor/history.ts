@@ -1,14 +1,14 @@
 import type { HistoryDump } from '@llama-webui/shared';
 import { Ring } from './ring';
 
-/** Points d'un historique de `historySeconds` échantillonné toutes les `intervalMs`. */
+/** Points of a `historySeconds` history sampled every `intervalMs`. */
 export const historyPoints = (historySeconds: number, intervalMs: number) =>
   Math.ceil((historySeconds * 1000) / intervalMs);
 
 /**
- * Anneaux nommés de même capacité (copié de llama-tui) + l'anneau des instants de chaque tick.
- * Toutes les séries avancent d'un point par tick une fois créées (NaN = trou), donc une série plus courte
- * que les instants commence plus tard : elle est complétée à gauche par des trous dans dump().
+ * Named rings of the same capacity (copied from llama-tui) + the ring of each tick's timestamp.
+ * Every series moves one point per tick once created (NaN = gap), so a series shorter than the
+ * timestamps started later: dump() pads it on the left with gaps.
  */
 export class History {
   private rings = new Map<string, Ring>();
@@ -21,7 +21,7 @@ export class History {
     this.times = new Ring(capacity);
   }
 
-  /** Mêmes séries sur `capacity` points (les plus récents gardés), à la cadence `intervalMs`. */
+  /** Same series over `capacity` points (the most recent kept), at the `intervalMs` interval. */
   resized(capacity: number, intervalMs = this.intervalMs): History {
     const h = new History(capacity, intervalMs);
     h.times = Ring.of(this.times.values(), capacity);
@@ -29,7 +29,7 @@ export class History {
     return h;
   }
 
-  /** Nouveau tick à l'instant `at`. */
+  /** New tick at time `at`. */
   tick(at: number): void {
     this.times.push(at);
   }

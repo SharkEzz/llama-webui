@@ -22,7 +22,7 @@ const list = (t: string) => {
   return xs.length >= 2 && xs.every((x) => Number.isFinite(x) && x >= 0) ? xs : null;
 };
 
-/** Motifs -ot proposés : ils visent les experts MoE (llama.cpp applique la première règle qui correspond). */
+/** Suggested -ot patterns: they target MoE experts (llama.cpp applies the first matching rule). */
 const OT_SUGGESTIONS = [
   'exps=CPU',
   'blk\\.(\\d|1\\d)\\.ffn_.*_exps=CPU',
@@ -30,7 +30,7 @@ const OT_SUGGESTIONS = [
   'ffn_.*_exps=Vulkan3',
 ];
 
-/** L'espace de recherche : une ligne par flag, chaque valeur ajoutée multiplie les configurations. */
+/** The search space: one row per flag, each added value multiplies the configurations. */
 export function SpaceEditor() {
   const space = useTuning((s) => s.space);
   const base = useTuning((s) => s.base);
@@ -47,7 +47,7 @@ export function SpaceEditor() {
 
   return (
     <GlassCard
-      title="Espace de recherche"
+      title="Search space"
       icon={Waypoints}
       actions={
         <Button
@@ -56,30 +56,30 @@ export function SpaceEditor() {
           disabled={!estimate?.ok}
           onClick={() => useTuning.getState().suggestSpace()}
         >
-          <Sparkles /> Partir de la recommandation
+          <Sparkles /> Start from the recommendation
         </Button>
       }
     >
       {!modelPath ? (
-        <p className="py-6 text-center text-sm text-muted-foreground">Choisissez un modèle pour composer un sweep.</p>
+        <p className="py-6 text-center text-sm text-muted-foreground">Pick a model to build a sweep.</p>
       ) : (
         <div className="flex flex-col gap-5">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Base :</span>
+            <span className="text-muted-foreground">Base:</span>
             {baseArgs.length === 0 ? (
-              <span className="text-muted-foreground">aucun flag (défauts de llama-bench)</span>
+              <span className="text-muted-foreground">no flags (llama-bench defaults)</span>
             ) : (
               <>
                 <code className="rounded-md bg-well inset-shadow-well px-2 py-1 font-mono text-xs">
                   {baseArgs.join(' ')}
                 </code>
                 <Button variant="ghost" size="xs" onClick={() => setBase({})}>
-                  Vider
+                  Clear
                 </Button>
               </>
             )}
             <span className="w-full text-xs text-muted-foreground">
-              Chaque valeur d'une ligne remplace celle de la base ; une ligne vide n'intervient pas.
+              Each value in a row overrides the base’s; an empty row has no effect.
             </span>
           </div>
 
@@ -88,30 +88,30 @@ export function SpaceEditor() {
               flag="-ngl"
               values={space.ngl ?? []}
               onChange={(ngl) => setSpace({ ngl })}
-              parse={(t) => (t.trim() === 'all' ? 'all' : int(t)) ?? 'un nombre de couches ou « all »'}
+              parse={(t) => (t.trim() === 'all' ? 'all' : int(t)) ?? 'a number of layers or “all”'}
               suggestions={['all']}
             />
             <ValuesRow
               flag="-ncmoe"
               values={space.ncmoe ?? []}
               onChange={(v) => setSpace({ ncmoe: v })}
-              parse={(t) => int(t) ?? 'un entier'}
+              parse={(t) => int(t) ?? 'an integer'}
               suggestions={around}
-              hint={ncmoe > 0 ? `autour de l'estimation (${ncmoe})` : undefined}
+              hint={ncmoe > 0 ? `around the estimate (${ncmoe})` : undefined}
             />
             <DevRow gpus={gpus} values={space.dev ?? []} onChange={(dev) => setSpace({ dev })} />
             <ValuesRow
               flag="-ts"
               values={space.ts ?? []}
               onChange={(ts) => setSpace({ ts })}
-              parse={(t) => list(t) ?? 'des proportions (3,1)'}
-              hint="appliqué aux jeux de -dev de même longueur"
+              parse={(t) => list(t) ?? 'proportions (3,1)'}
+              hint="applied to -dev sets of the same length"
             />
             <ValuesRow
               flag="-ot"
               values={space.ot ?? []}
               onChange={(ot) => setSpace({ ot })}
-              parse={(t) => (/^[^=,;]+=[^=,;]+$/.test(t.trim()) ? [t.trim()] : 'motif=buffer (ex. exps=CPU)')}
+              parse={(t) => (/^[^=,;]+=[^=,;]+$/.test(t.trim()) ? [t.trim()] : 'pattern=buffer (e.g. exps=CPU)')}
               suggestions={OT_SUGGESTIONS.map((o) => [o])}
               mono
               wide
@@ -134,47 +134,47 @@ export function SpaceEditor() {
               flag="-ub"
               values={space.ub ?? []}
               onChange={(ub) => setSpace({ ub })}
-              parse={(t) => int(t) || 'un entier'}
+              parse={(t) => int(t) || 'an integer'}
               suggestions={[256, 512, 1024, 2048]}
             />
             <ValuesRow
               flag="-b"
               values={space.b ?? []}
               onChange={(b) => setSpace({ b })}
-              parse={(t) => int(t) || 'un entier'}
+              parse={(t) => int(t) || 'an integer'}
               suggestions={[512, 2048, 4096]}
             />
             <ValuesRow
               flag="-t"
               values={space.t ?? []}
               onChange={(t) => setSpace({ t })}
-              parse={(t) => int(t) || 'un entier'}
+              parse={(t) => int(t) || 'an integer'}
               suggestions={hw ? [...new Set([hw.cpu.physicalCores, hw.cpu.logicalThreads])] : []}
             />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
-            <Field label="Nom du sweep" id="sweep-name">
+            <Field label="Sweep name" id="sweep-name">
               <Input
                 id="sweep-name"
                 value={run.name}
-                placeholder="automatique : modèle · préréglage · date"
+                placeholder="automatic: model · preset · date"
                 maxLength={80}
                 onChange={(e) => setRun({ name: e.target.value })}
               />
             </Field>
             <NumField label="p (prompt)" value={run.p} onChange={(p) => setRun({ p })} />
-            <NumField label="n (génération)" value={run.n} onChange={(n) => setRun({ n })} />
+            <NumField label="n (generation)" value={run.n} onChange={(n) => setRun({ n })} />
             <NumField
-              label="r (répétitions)"
+              label="r (repetitions)"
               value={run.r}
               onChange={(r) => setRun({ r })}
-              hint="r ≥ 3 pour que l'écart-type ait un sens"
+              hint="r ≥ 3 for the standard deviation to be meaningful"
             />
           </div>
           <Label className="flex items-center gap-2 font-normal">
             <Checkbox checked={includeUnfit} onCheckedChange={(v) => setIncludeUnfit(v === true)} />
-            Inclure les configurations qui ne tiennent pas (elles finiront probablement en « Mémoire insuffisante »)
+            Include configurations that do not fit (they will most likely end in “Out of memory”)
           </Label>
 
           <PlanTable />
@@ -200,7 +200,7 @@ function Chip({ label, onRemove, mono }: { label: string; onRemove(): void; mono
   return (
     <Badge variant="secondary" className={cn('max-w-full gap-1 pr-0.5', mono && 'font-mono')}>
       <span className="truncate">{label}</span>
-      <Button variant="ghost" size="icon-xs" className="size-4" onClick={onRemove} aria-label={`Retirer ${label}`}>
+      <Button variant="ghost" size="icon-xs" className="size-4" onClick={onRemove} aria-label={`Remove ${label}`}>
         <X />
       </Button>
     </Badge>
@@ -260,8 +260,8 @@ function ValuesRow<T>(props: {
           }
         }}
         onBlur={submit}
-        placeholder="ajouter…"
-        aria-label={`Ajouter une valeur à ${props.flag}`}
+        placeholder="add…"
+        aria-label={`Add a value to ${props.flag}`}
         aria-invalid={error ? true : undefined}
         className={cn('h-7 font-mono text-xs', props.wide ? 'w-56' : 'w-24')}
       />
@@ -324,7 +324,7 @@ function DevRow({
   };
   const cuda = gpus.filter((d) => d.backend === 'CUDA').map((d) => d.id);
   return (
-    <Row flag="-dev" hint="un jeu de devices par configuration">
+    <Row flag="-dev" hint="one device set per configuration">
       {values.map((v) => (
         <Chip key={v.join()} label={v.join(',')} mono onRemove={() => onChange(values.filter((x) => !same(x, v)))} />
       ))}
@@ -353,11 +353,11 @@ function DevRow({
             setDraft([]);
           }}
         >
-          <Plus /> Ajouter ce jeu
+          <Plus /> Add this set
         </Button>
-        <Suggestion label="chaque carte seule" onClick={() => add(...gpus.map((d) => [d.id]))} />
-        {cuda.length >= 2 && <Suggestion label="les CUDA" onClick={() => add(cuda)} />}
-        {gpus.length >= 2 && <Suggestion label="toutes" onClick={() => add(gpus.map((d) => d.id))} />}
+        <Suggestion label="each card alone" onClick={() => add(...gpus.map((d) => [d.id]))} />
+        {cuda.length >= 2 && <Suggestion label="all CUDA" onClick={() => add(cuda)} />}
+        {gpus.length >= 2 && <Suggestion label="all" onClick={() => add(gpus.map((d) => d.id))} />}
       </div>
     </Row>
   );

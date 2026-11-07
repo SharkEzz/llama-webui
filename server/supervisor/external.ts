@@ -7,11 +7,11 @@ export interface ExternalWatcherDeps {
     recheckExternal(): Promise<void>;
   };
   port(): number;
-  /** Vrai pendant un benchmark : le llama-server qu'il lance sur le port des réglages n'est pas un serveur externe. */
+  /** True during a benchmark: the llama-server it starts on the settings port is not an external server. */
   paused(): boolean;
 }
 
-/** Détection du serveur externe (au démarrage puis périodiquement), et sortie de l'état « external » quand il s'arrête. */
+/** External server detection (at startup then periodically), and leaving the “external” state when it stops. */
 export function externalWatcher(d: ExternalWatcherDeps): () => Promise<void> {
   let checking = false;
   return async () => {

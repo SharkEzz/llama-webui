@@ -21,17 +21,17 @@ interface ArgsEditorProps {
 
 const MAX_SUGGESTIONS = 8;
 
-/** Arguments en syntaxe shell, avec autocomplétion des flags, aide du flag sous le curseur et avertissements. */
+/** Arguments in shell syntax, with flag autocompletion, help for the flag under the cursor, and warnings. */
 export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   const { catalog, error: catalogError } = useFlags();
   const ref = useRef<HTMLTextAreaElement>(null);
   const [cursor, setCursor] = useState(0);
   const [active, setActive] = useState(0);
-  // Entrée ne complète qu'après un choix aux flèches ; sinon elle garde son rôle (nouvelle ligne).
+  // Enter only completes after picking with the arrows; otherwise it keeps its role (new line).
   const [navigated, setNavigated] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  // cmdk attribue lui-même les id de la liste et des options : on les relit pour aria-controls / aria-activedescendant.
+  // cmdk assigns the list and option ids itself: read them back for aria-controls / aria-activedescendant.
   const [aria, setAria] = useState<{ list?: string; active?: string }>({});
 
   const parsed = useMemo(() => parseArgs(value), [value]);
@@ -125,11 +125,11 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
               const i = suggestions.indexOf(v);
               if (i >= 0) setActive(i);
             }}
-            // garde le focus dans le textarea pendant le clic sur une suggestion
+            // keep focus in the textarea while clicking a suggestion
             onMouseDown={(e) => e.preventDefault()}
             className="absolute inset-x-0 top-full z-20 mt-1 h-auto rounded-lg! border border-border shadow-surface inset-shadow-highlight backdrop-blur-(--surface-blur)"
           >
-            <CommandList ref={listRef} aria-label="Flags suggérés">
+            <CommandList ref={listRef} aria-label="Suggested flags">
               {suggestions.map((name) => {
                 const flag = catalog ? flagOf(catalog, name) : undefined;
                 return (
@@ -154,25 +154,23 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
         )}
       </div>
 
-      {!Array.isArray(parsed) && <p className="text-sm text-destructive">Lecture impossible : {parsed.error}</p>}
+      {!Array.isArray(parsed) && <p className="text-sm text-destructive">Could not parse: {parsed.error}</p>}
       {problems.reserved.map((f) => (
         <p key={f} className="text-sm text-destructive">
           {reservedFlagMessage(f)}
         </p>
       ))}
       {problems.unknown.length > 0 && (
-        <p className="text-sm text-warning">Inconnu de ce llama-server : {problems.unknown.join(', ')}</p>
+        <p className="text-sm text-warning">Unknown to this llama-server: {problems.unknown.join(', ')}</p>
       )}
       {helpFlag ? (
         <p className="rounded-md bg-well inset-shadow-well px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">
           {describeFlag(helpFlag)}
         </p>
       ) : catalogError ? (
-        <p className="text-xs text-muted-foreground">Aide des flags indisponible : {catalogError}</p>
+        <p className="text-xs text-muted-foreground">Flag help unavailable: {catalogError}</p>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          Tapez « - » pour voir les flags ; Tab complète, ↑ ↓ puis Entrée choisit.
-        </p>
+        <p className="text-xs text-muted-foreground">Type “-” to see flags; Tab completes, ↑ ↓ then Enter picks.</p>
       )}
     </div>
   );

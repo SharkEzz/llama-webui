@@ -46,7 +46,7 @@ afterEach(() => {
     delete process.env[k];
 });
 
-/** Un serveur géré factice (prêt, profil A) qui note les arrêts et relances. */
+/** A fake managed server (ready, profile A) that records stops and restarts. */
 function setup(
   port = 8080,
   patch?: (s: ServerControl) => void,
@@ -117,7 +117,7 @@ test('restarts the server it stopped even when llama-bench fails', async () => {
   const last = runs.at(-1)!;
   expect(last.id).toBe(run.id);
   expect(last.status).toBe('failed');
-  expect(last.error!.startsWith('Mémoire insuffisante')).toBe(true);
+  expect(last.error!.startsWith('Out of memory')).toBe(true);
   expect(calls).toEqual(['stop', 'start:cmdA']);
   expect(lives.at(-1)).toBeNull();
   expect(runner.busy).toBe(false);
@@ -173,18 +173,18 @@ test('a missing model is refused before anything stops', async () => {
 test('a failed restart is recorded on the run', async () => {
   const { runner, runs, end } = setup(8080, (s) => {
     s.start = async () => {
-      throw new Error('port occupé');
+      throw new Error('port in use');
     };
   });
   await runner.start(spec, { stopServer: true });
   await end;
   const last = runs.at(-1)!;
   expect(last.status).toBe('ok');
-  expect(last.error).toContain('relance de llama-server impossible : port occupé');
+  expect(last.error).toContain('could not restart llama-server: port in use');
 });
 
 test('a reload while the server is stopping restarts it once the stop is over', async () => {
-  // Comme le superviseur : start est refusé tant qu'une autre opération (l'arrêt) est en cours.
+  // Like the supervisor: start is refused while another operation (the stop) is in progress.
   let stopping = false;
   let release!: () => void;
   const { runner, calls, repo } = setup(8080, (s) => {
@@ -195,7 +195,7 @@ test('a reload while the server is stopping restarts it once the stop is over', 
       stopping = false;
     };
     s.start = async (cmd) => {
-      if (stopping) throw new Error('opération en cours, réessayez');
+      if (stopping) throw new Error('operation in progress, try again');
       calls.push(`start:${cmd.display}`);
     };
   });
@@ -228,7 +228,7 @@ test("a server run runs in its profile's directory", async () => {
   expect(runs.at(-1)!.logExcerpt).toContain(`cwd ${cwd}`);
 }, 20_000);
 
-/** Un sweep de llama-bench : un élément par valeur de -ncmoe. */
+/** A llama-bench sweep: one item per -ncmoe value. */
 function sweepOf(repo: BenchRunsRepo, sweeps: SweepsRepo, values: number[]) {
   const sw = sweeps.create(
     SweepSpecSchema.parse({ name: 's', modelPath: MODEL, preset: 'chat', r: 1, space: { ncmoe: values } }),
@@ -263,7 +263,7 @@ test('a sweep stops the server once, continues after an OOM item and restarts it
   expect(calls).toEqual(['stop', 'start:cmdA']);
   const done = repo.list({ sweepId: sweep.id });
   expect(done.map((r) => r.status)).toEqual(['failed', 'ok', 'ok']);
-  expect(done[0]!.error!.startsWith('Mémoire insuffisante')).toBe(true);
+  expect(done[0]!.error!.startsWith('Out of memory')).toBe(true);
   const final = sweeps.get(sweep.id)!;
   expect(final.status).toBe('done');
   expect(final.bestRunId).toBe(done[1]!.id);
@@ -292,7 +292,7 @@ test('after a reload the interrupted item is replayed only once the killed proce
   await first.runner.startSweep(sweep.id, { stopServer: true });
   while (!first.runs.some((r) => r.status === 'running')) await Bun.sleep(10);
   await Bun.sleep(80);
-  // Un process tué qui tarde à sortir (le pilote libère sa VRAM) : rejouer avant, c'est deux llama-bench sur les mêmes cartes.
+  // A killed process that is slow to exit (the driver frees its VRAM): replaying before that means two llama-bench on the same cards.
   const kill = first.executor.killNow.bind(first.executor);
   let exitedAt = 0;
   first.executor.killNow = async () => {
@@ -320,7 +320,7 @@ test('a reload hands the held gate to the next runner, which replays the interru
   const first = setup();
   const { sweep } = sweepOf(first.repo, first.sweeps, [1, 2, 3]);
   await first.runner.startSweep(sweep.id, { stopServer: true });
-  // Pendant l'élément 2.
+  // During item 2.
   while (first.repo.list({ sweepId: sweep.id }).filter((r) => r.status === 'ok').length < 1) await Bun.sleep(10);
   await Bun.sleep(80);
   first.runner.dispose({ restart: true });
@@ -339,14 +339,14 @@ test('a reload hands the held gate to the next runner, which replays the interru
 }, 20_000);
 
 test('a reload that finds the gate already being released marks the orphan sweep interrupted instead of leaving it running', async () => {
-  // Le rechargement a pris plus que le délai de grâce : l'ancienne garde relance le serveur (lent) quand le nouveau module démarre.
+  // The reload took longer than the grace period: the old gate restarts the server (slowly) when the new module starts.
   const { runner, gate, repo, sweeps, sweepEvents } = setup(8080, (s) => {
     s.start = () => new Promise(() => {});
   });
   await gate.acquire({ stopServer: true });
   void gate.release();
   const { sweep } = sweepOf(repo, sweeps, [1, 2]);
-  expect(gate.held).toBe(true); // index.ts ne lance donc pas stopOrphans()
+  expect(gate.held).toBe(true); // so index.ts does not run stopOrphans()
   await runner.resume();
   expect(sweeps.get(sweep.id)!.status).toBe('interrupted');
   expect(sweepEvents.at(-1)?.status).toBe('interrupted');
@@ -357,9 +357,9 @@ test('validating an interrupted sweep also finishes its interrupted items', asyn
   const { sweep } = sweepOf(repo, sweeps, [1, 2]);
   await runner.startSweep(sweep.id, { stopServer: true });
   await sweepEnd(sweepLives);
-  // Comme après un Ctrl-C au milieu de l'élément 2.
+  // As after a Ctrl-C in the middle of item 2.
   const second = repo.list({ sweepId: sweep.id }).find((r) => r.sweepLabel === '-ncmoe 2')!;
-  repo.finish(second.id, { status: 'interrupted', error: 'interrompu' });
+  repo.finish(second.id, { status: 'interrupted', error: 'interrupted' });
   sweeps.setStatus(sweep.id, 'interrupted');
   const routes = sweepRoutes({
     sweeps,

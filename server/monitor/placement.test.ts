@@ -9,7 +9,7 @@ const fixture = async () =>
 const lines = (text: string, from = 0): LogLine[] =>
   text.split('\n').map((t, i) => ({ seq: from + i, text: t, level: 'info', kind: 'other' }));
 
-test('parsePlacement: real llama-server start, buffers summed per device, bus ids from « using device »', async () => {
+test('parsePlacement: real llama-server start, buffers summed per device, bus ids from “using device”', async () => {
   const p = parsePlacement(lines(await fixture()));
   expect(p).not.toBeNull();
   expect(p!.launchSeq).toBe(0);
@@ -54,7 +54,7 @@ test('parsePlacement: real MTP + mmproj start, compute per context (last reserva
 
 test('parsePlacement: at -lv 5 the -fit probes (no-alloc loads, 0 MiB buffers, own contexts) are left out', async () => {
   const text = (await Bun.file(`${import.meta.dir}/../../testdata/llama-server-load-mtp-lv5.txt`).text()).trimEnd();
-  // The probes print their « offloaded » lines and 0 MiB model buffers before the real load.
+  // The probes print their “offloaded” lines and 0 MiB model buffers before the real load.
   expect(text.split('\n').filter((l) => /offloaded \d+\/\d+ layers/.test(l))).toHaveLength(3);
   const p = parsePlacement(lines(text))!;
   expect(p.layers).toEqual({ offloaded: 66, total: 66 });
@@ -105,7 +105,7 @@ test('parsePlacement: only the last launch counts; no launch → null; bare line
   const first = lines(await fixture());
   const second = lines(
     [
-      '[llama-webui] lancement: llama-server -m other.gguf',
+      '[llama-webui] launch: llama-server -m other.gguf',
       'llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 5070 Ti) (0000:01:00.0) - 15683 MiB free',
       'load_tensors: offloaded 10/33 layers to GPU',
       'load_tensors:        CUDA0 model buffer size =  1000.00 MiB',

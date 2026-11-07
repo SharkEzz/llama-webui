@@ -16,7 +16,7 @@ import { type SceneView, TopologyScene } from './TopologyScene';
 import { useSceneColors } from './themeColors';
 import { useReducedMotion } from './useReducedMotion';
 
-/** Scène 3D plein cadre (hauteur du chat et des logs : p-4 + barre d'état + gap) et cartes HUD par-dessus. */
+/** Full-frame 3D scene (same height as chat and logs: p-4 + status bar + gap) with HUD cards on top. */
 export function TopologyPage() {
   const graph = useTopology((s) => s.graph);
   const placement = useTopology((s) => s.placement);
@@ -30,7 +30,7 @@ export function TopologyPage() {
   const view = useRef<SceneView | null>(null);
   const [viewMoved, setViewMoved] = useState(false);
 
-  // Le graphe est relu à l'ouverture : l'état courant des liens (Gen/largeur) bouge avec les états d'énergie.
+  // The graph is reloaded on open: the links' current state (Gen/width) changes with power states.
   useEffect(() => {
     void refreshTopology();
   }, []);
@@ -87,18 +87,16 @@ export function TopologyPage() {
             onClick={() => view.current?.reset()}
           >
             <LocateFixed aria-hidden="true" />
-            Recentrer la vue
+            Recenter view
           </Button>
-          <p className="text-[11px] text-muted-foreground">
-            Glisser : pivoter · Clic droit : déplacer · Molette : zoom
-          </p>
+          <p className="text-[11px] text-muted-foreground">Drag: rotate · Right-click: pan · Wheel: zoom</p>
         </div>
       )}
     </div>
   );
 }
 
-/** WebGL indisponible (pilote, navigateur distant sans accélération) : la page reste lisible, les cartes HUD aussi. */
+/** WebGL unavailable (driver, remote browser without acceleration): the page stays readable, the HUD cards too. */
 class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
 
@@ -110,7 +108,7 @@ class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean
     if (!this.state.failed) return this.props.children;
     return (
       <p className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-        Scène 3D indisponible : WebGL n'a pas pu démarrer dans ce navigateur.
+        3D scene unavailable: WebGL could not start in this browser.
       </p>
     );
   }

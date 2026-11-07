@@ -217,7 +217,7 @@ describe('readModel', () => {
     await writeGguf(path, DENSE_KV, DENSE_TENSORS);
     chmodSync(locked, 0o000);
     using _unlock = defer(() => chmodSync(locked, 0o755));
-    expect(readModel(path)).rejects.toThrow(/accès refusé/);
+    expect(readModel(path)).rejects.toThrow(/permission denied/);
   });
 });
 

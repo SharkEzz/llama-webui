@@ -9,15 +9,15 @@ import { NvmlMonitor } from './nvml/monitor';
 import { ProcSampler } from './proc';
 import { type SystemSample, SystemSampler } from './system';
 
-/** Ce dont les collecteurs dépendent dans les réglages. */
+/** The settings the collectors depend on. */
 export type CollectorSettings = Pick<Settings, 'collectors' | 'pollIntervalMs' | 'hiddenGpus'>;
 
 export interface AmdSource {
   cards: () => AmdCard[];
   read: (c: AmdCard) => Promise<GpuReading>;
-  /** VRAM du process par carte ; les descripteurs ouverts sur `skipNodes` (cartes à ne pas lire) sont ignorés. */
+  /** Process VRAM per card; descriptors open on `skipNodes` (cards not to read) are ignored. */
   procVram: (pid: number, skipNodes: ReadonlySet<string>) => Promise<Map<string, number>>;
-  /** Cartes en veille : listées mais jamais lues, pour ne pas les réveiller. */
+  /** Suspended cards: listed but never read, so as not to wake them up. */
   suspended: (c: AmdCard) => Promise<boolean>;
 }
 
@@ -30,13 +30,13 @@ export interface DiskSource {
   resolveModelDisk(path: string): Promise<string | null>;
 }
 
-/** Binaire nvidia-smi du repli (LLAMA_WEBUI_NVIDIA_SMI pour le tester absent). */
+/** nvidia-smi binary for the fallback (LLAMA_WEBUI_NVIDIA_SMI to test it missing). */
 const nvidiaSmiBin = () => process.env.LLAMA_WEBUI_NVIDIA_SMI || 'nvidia-smi';
 
 /**
- * Collecteurs matériels (copiés de llama-tui) : NVIDIA par NVML dans un Worker (repli nvidia-smi), AMD par sysfs,
- * le process du serveur, et CPU/mémoire et disques selon leur interrupteur. configure() suit les réglages,
- * sauf le choix NVML / nvidia-smi, fait une fois au démarrage.
+ * Hardware collectors (copied from llama-tui): NVIDIA through NVML in a Worker (nvidia-smi fallback), AMD through sysfs,
+ * the server process, and CPU/memory and disks depending on their switch. configure() follows the settings,
+ * except the NVML / nvidia-smi choice, made once at startup.
  */
 export class Collectors {
   private _system: SystemSource | undefined;
@@ -46,7 +46,7 @@ export class Collectors {
 
   private constructor(
     readonly nvidia: NvmlMonitor | NvidiaMonitor,
-    /** Défini quand nvidia-smi est la source NVIDIA : il tourne dans son propre process. */
+    /** Set when nvidia-smi is the NVIDIA source: it runs in its own process. */
     private readonly smi: NvidiaMonitor | null,
     readonly amd: AmdSource,
     readonly proc: ProcSampler,
@@ -74,32 +74,32 @@ export class Collectors {
     return c;
   }
 
-  /** Pilote NVIDIA lu par NVML (null avec nvidia-smi ou avant la première lecture). */
+  /** NVIDIA driver read by NVML (null with nvidia-smi or before the first reading). */
   get nvmlSystem(): { driver: string | null; cudaDriver: number | null } | null {
     return this.smi ? null : (this.nvidia as NvmlMonitor).system;
   }
 
-  /** Source NVIDIA effective (affichée dans Système). */
+  /** Effective NVIDIA source (shown on the System page). */
   get nvidiaSource(): 'nvml' | 'nvidia-smi' {
     return this.smi ? 'nvidia-smi' : 'nvml';
   }
 
-  /** CPU et mémoire ; undefined quand le collecteur est coupé. */
+  /** CPU and memory; undefined when the collector is off. */
   get system(): SystemSource | undefined {
     return this._system;
   }
 
-  /** Disques ; undefined quand le collecteur est coupé. */
+  /** Disks; undefined when the collector is off. */
   get disk(): DiskSource | undefined {
     return this._disk;
   }
 
-  /** Bande passante DRAM (perf) ; suit l'interrupteur du collecteur système. */
+  /** DRAM bandwidth (perf); follows the system collector's switch. */
   get memBw(): MemBandwidthSampler | undefined {
     return this._memBw;
   }
 
-  /** Suit les réglages (cadence et cartes masquées côté NVIDIA, interrupteurs système et disque). Appels en série. */
+  /** Follows the settings (interval and hidden cards for NVIDIA, system and disk switches). Calls are serialized. */
   configure(settings: CollectorSettings): Promise<void> {
     const run = this.configuring.then(async () => {
       this.nvidia.configure({ intervalMs: settings.pollIntervalMs, needs: gpuNeeds(settings.hiddenGpus) });

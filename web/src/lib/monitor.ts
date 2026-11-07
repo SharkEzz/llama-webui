@@ -4,8 +4,8 @@ import { api } from './api';
 import { onWs, useWs } from './ws';
 
 /**
- * Historique côté client : instants (s, pour uPlot) et une série par clé, alignées point à point (null = trou).
- * Tableaux mutables, partagés avec les graphes ; `version` change à chaque modification.
+ * Client-side history: timestamps (s, for uPlot) and one series per key, aligned point by point (null = gap).
+ * Mutable arrays shared with the charts; `version` changes on every update.
  */
 export interface ClientHistory {
   intervalMs: number;
@@ -24,7 +24,7 @@ const emptyHistory = (): ClientHistory => ({ intervalMs: 1000, capacity: 300, ti
 
 export const useMonitor = create<MonitorState>(() => ({ snapshot: null, history: emptyHistory(), version: 0 }));
 
-/** Série d'historique (alignée sur `history.times`) ; se met à jour avec `version`. */
+/** History series (aligned with `history.times`); updates with `version`. */
 export function useSeries(key: string): (number | null)[] | undefined {
   useMonitor((s) => s.version);
   return useMonitor.getState().history.series.get(key);
@@ -60,7 +60,7 @@ function append(h: ClientHistory, s: Snapshot) {
 let loading = false;
 let pending: Snapshot[] = [];
 
-/** Relit tout l'historique du serveur (connexion, autre démarrage, forme changée par les réglages). */
+/** Rereads the whole server history (connect, different boot, shape changed by settings). */
 export async function reloadHistory() {
   if (loading) return;
   loading = true;
@@ -75,7 +75,7 @@ export async function reloadHistory() {
     for (const s of pending) append(h, s);
     useMonitor.setState((st) => ({ history: h, version: st.version + 1 }));
   } catch {
-    // WS fermé ou serveur absent : la prochaine connexion relira.
+    // WS closed or server gone: the next connection will reread.
   }
 }
 
@@ -94,7 +94,7 @@ export function startMonitorSync() {
     append(h, s);
     useMonitor.setState((st) => ({ version: st.version + 1 }));
   });
-  // Le hello d'un autre démarrage de llama-webui précède toujours ses snapshots : l'historique local ne vaut plus rien.
+  // The hello of a different llama-webui boot always precedes its snapshots: the local history is worthless.
   let bootId: string | null = null;
   onWs('hello', ({ payload }) => {
     if (bootId !== null && bootId !== payload.bootId) useMonitor.setState({ history: emptyHistory(), snapshot: null });

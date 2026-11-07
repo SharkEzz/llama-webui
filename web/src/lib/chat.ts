@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { create } from 'zustand';
 import { ApiError, api } from './api';
 
-/** Réponse en cours d'écriture dans la conversation ouverte. */
+/** Reply being written in the open conversation. */
 export interface Streaming {
   conversationId: number;
   assistantId: number;
@@ -24,7 +24,7 @@ interface ChatState {
   current: ConversationDetail | null;
   streaming: Streaming | null;
   loadList(): Promise<void>;
-  /** Ouvre une conversation et se rebranche sur sa réponse en cours s'il y en a une. */
+  /** Opens a conversation and reattaches to its in-progress reply, if any. */
   open(id: number | null): Promise<void>;
   create(): Promise<number>;
   patch(p: ConversationPatch): Promise<void>;
@@ -35,7 +35,7 @@ interface ChatState {
   stop(): Promise<void>;
 }
 
-/** Lit un flux SSE de ChatEvent jusqu'au bout (ou jusqu'à l'abandon). */
+/** Reads an SSE stream of ChatEvent to the end (or until aborted). */
 export async function readSse(res: Response, onEvent: (e: ChatEvent) => void): Promise<void> {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
@@ -47,7 +47,7 @@ export async function readSse(res: Response, onEvent: (e: ChatEvent) => void): P
   }
 }
 
-/** Flux suivi pour la conversation ouverte ; l'abandonner ne coupe pas la génération côté serveur. */
+/** Stream followed for the open conversation; aborting it does not stop generation on the server. */
 let follow: AbortController | null = null;
 
 async function postStream(path: string, body?: unknown, signal?: AbortSignal): Promise<Response | null> {
@@ -68,7 +68,7 @@ async function postStream(path: string, body?: unknown, signal?: AbortSignal): P
 const replace = (messages: ChatMessage[], m: ChatMessage) => messages.map((x) => (x.id === m.id ? m : x));
 
 export const useChat = create<ChatState>((set, get) => {
-  /** Suit un flux : le texte s'accumule et n'est poussé dans le store qu'une fois par image. */
+  /** Follows a stream: text accumulates and is pushed to the store only once per frame. */
   const consume = async (conversationId: number, request: (signal: AbortSignal) => Promise<Response | null>) => {
     follow?.abort();
     const ctl = new AbortController();
@@ -91,7 +91,7 @@ export const useChat = create<ChatState>((set, get) => {
       const cur = get().current;
       if (e.type === 'start') {
         if (cur?.id === conversationId) {
-          // Régénération : la dernière réponse disparaît (le serveur l'a supprimée).
+          // Regeneration: the last reply goes away (the server deleted it).
           let messages = e.user
             ? cur.messages
             : cur.messages.slice(0, cur.messages.findLastIndex((m) => m.role === 'user') + 1);
@@ -112,7 +112,7 @@ export const useChat = create<ChatState>((set, get) => {
         if (cur?.id === conversationId)
           set({ current: { ...cur, messages: replace(cur.messages, e.message), live: false } });
         set({ streaming: null });
-        // Le premier message donne son titre à la conversation (côté serveur).
+        // The first message gives the conversation its title (server side).
         void get()
           .loadList()
           .then(() => {
@@ -125,7 +125,7 @@ export const useChat = create<ChatState>((set, get) => {
     try {
       const res = await request(ctl.signal);
       if (res) await readSse(res, onEvent);
-      // Flux fini sans « done » (serveur rechargé ou coupé), ou rien en cours (204) : on relit l'état enregistré.
+      // Stream ended without “done” (server reloaded or cut off), or nothing running (204): reread the saved state.
       if (!ended && !ctl.signal.aborted) {
         if (get().streaming?.conversationId === conversationId) set({ streaming: null });
         if (get().current?.id === conversationId) {
@@ -138,7 +138,7 @@ export const useChat = create<ChatState>((set, get) => {
       if (!ctl.signal.aborted) {
         if (get().streaming?.conversationId === conversationId) set({ streaming: null });
         if (e instanceof ApiError) toast.error(e.message);
-        else void get().open(conversationId); // connexion perdue : on relit l'état enregistré
+        else void get().open(conversationId); // connection lost: reread the saved state
       }
     }
   };

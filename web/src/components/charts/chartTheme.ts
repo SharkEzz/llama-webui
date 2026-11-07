@@ -1,6 +1,6 @@
 import type { Tone } from '@/components/glass/tones';
 
-/** Série de graphe par ton : --chart-N (validés pour chaque thème), dans l'ordre fixe bleu, teal, ambre, rose. */
+/** Chart series per tone: --chart-N (validated for each theme), in the fixed order blue, teal, amber, rose. */
 const CHART_VAR: Record<Tone, string> = {
   blue: '--chart-1',
   teal: '--chart-2',
@@ -15,7 +15,7 @@ export interface ChartTheme {
   series: Record<Tone, string>;
 }
 
-/** Couleurs lues des variables CSS du thème courant (à relire quand le thème change). */
+/** Colors read from the current theme's CSS variables (reread when the theme changes). */
 export function readChartTheme(): ChartTheme {
   const cs = getComputedStyle(document.documentElement);
   const v = (name: string) => cs.getPropertyValue(name).trim();
@@ -32,7 +32,7 @@ export function readChartTheme(): ChartTheme {
   };
 }
 
-/** Même couleur à l'opacité `a` (tokens en oklch()). */
+/** Same color at opacity `a` (tokens in oklch()). */
 export function withAlpha(color: string, a: number): string {
   const m = /^oklch\(([^/)]*)\)$/.exec(color);
   return m ? `oklch(${m[1]!.trim()} / ${a})` : color;

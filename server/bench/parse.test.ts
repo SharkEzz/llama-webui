@@ -20,9 +20,9 @@ test('parseBenchJson gives null on the truncated output of a failed load', async
 test('benchFailure reports an out-of-memory load', async () => {
   const f = benchFailure((await fixture('oom-stderr.txt')).split('\n'), 1);
   expect(f.oom).toBe(true);
-  expect(f.message.startsWith('Mémoire insuffisante : ')).toBe(true);
+  expect(f.message.startsWith('Out of memory: ')).toBe(true);
   expect(f.message).toContain('unable to allocate CUDA1 buffer');
-  expect(benchFailure(['rien'], 2)).toEqual({ oom: false, message: 'llama-bench terminé (code 2)' });
+  expect(benchFailure(['nothing'], 2)).toEqual({ oom: false, message: 'llama-bench exited (code 2)' });
 });
 
 test('parseBenchProgress reads the --progress lines', () => {

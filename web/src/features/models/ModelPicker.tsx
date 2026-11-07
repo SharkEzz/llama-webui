@@ -8,8 +8,8 @@ import { formatBytes } from '@/lib/format';
 import { readable, useModels } from '@/lib/models';
 
 /**
- * Espacements du Command shadcn (components/ui reste d'origine) : recherche plus haute et séparée des résultats par un
- * filet, 8 px autour de chaque zone et entre les résultats.
+ * Spacing for the shadcn Command (components/ui stays stock): a taller search box separated from the results by a
+ * rule, 8 px around each area and between results.
  */
 const COMMAND_SPACING = [
   'p-0',
@@ -18,7 +18,7 @@ const COMMAND_SPACING = [
   '[&_[cmdk-list-sizer]]:flex [&_[cmdk-list-sizer]]:flex-col [&_[cmdk-list-sizer]]:gap-1',
 ].join(' ');
 
-/** Choix d'un GGUF du dossier des modèles (bouton à placer dans un InputGroup). */
+/** Picks a GGUF from the models folder (button to place inside an InputGroup). */
 export function ModelPicker({ kind, onSelect }: { kind: ModelKind; onSelect(path: string): void }) {
   const [open, setOpen] = useState(false);
   const list = useModels((s) => s.list);
@@ -35,20 +35,17 @@ export function ModelPicker({ kind, onSelect }: { kind: ModelKind; onSelect(path
     >
       <PopoverTrigger
         render={
-          <InputGroupButton
-            size="icon-xs"
-            aria-label={kind === 'mmproj' ? 'Choisir un projecteur' : 'Choisir un modèle'}
-          />
+          <InputGroupButton size="icon-xs" aria-label={kind === 'mmproj' ? 'Choose a projector' : 'Choose a model'} />
         }
       >
         <FolderOpen />
       </PopoverTrigger>
-      {/* Large : les chemins de GGUF sont longs ; borné par la fenêtre. */}
+      {/* Wide: GGUF paths are long; bounded by the window. */}
       <PopoverContent align="end" className="w-[36rem] max-w-[calc(100vw-2rem)] p-0">
         <Command className={COMMAND_SPACING}>
-          <CommandInput placeholder={kind === 'mmproj' ? 'Chercher un projecteur…' : 'Chercher un modèle…'} />
+          <CommandInput placeholder={kind === 'mmproj' ? 'Search projectors…' : 'Search models…'} />
           <CommandList className="max-h-80 p-2">
-            <CommandEmpty>{list ? `Aucun fichier dans ${list.setting}` : 'Chargement…'}</CommandEmpty>
+            <CommandEmpty>{list ? `No files in ${list.setting}` : 'Loading…'}</CommandEmpty>
             {items.map((m) => (
               <CommandItem
                 key={m.path}

@@ -33,7 +33,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
     return sw;
   };
   const notRunning = (status: string) => {
-    if (status === 'running') throw new HttpError(409, "Ce sweep tourne : annulez-le d'abord");
+    if (status === 'running') throw new HttpError(409, 'This sweep is still running: cancel it first');
   };
 
   return {
@@ -52,10 +52,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
         ]);
         const plan = planSweep({ model, hw, spec, mmprojBytes: mmproj });
         if (plan.items.length === 0)
-          throw new HttpError(
-            409,
-            `Aucune configuration à exécuter : ${plan.excluded} exclue${plan.excluded > 1 ? 's' : ''} par l'estimateur`,
-          );
+          throw new HttpError(409, `No configuration to run: ${plan.excluded} excluded by the estimator`);
         const { modelPath, mmprojPath, profileId, serverArgs, p, n, r } = spec;
         const sweep = await benchRunner.startSweep(
           () => {
@@ -101,7 +98,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
     },
     '/api/sweeps/:id/cancel': {
       POST: guarded((req) => {
-        if (!benchRunner.cancelSweep(getSweep(req).id)) throw new HttpError(409, 'Ce sweep ne tourne pas');
+        if (!benchRunner.cancelSweep(getSweep(req).id)) throw new HttpError(409, 'This sweep is not running');
         return new Response(null, { status: 204 });
       }),
     },
@@ -114,7 +111,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
           () => {
             benchRuns.requeueInterrupted(sweep.id);
             if (!benchRuns.nextQueued(sweep.id))
-              throw new HttpError(409, 'Rien à reprendre : aucun élément interrompu ou en attente');
+              throw new HttpError(409, 'Nothing to resume: no interrupted or queued item');
             return sweep.id;
           },
           { stopServer: body.stopServer === true },
@@ -131,11 +128,11 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
         const best = rankRuns(explored, sweep.spec.preset, sweepCtx(sweep.spec))
           .filter((x) => x.rank !== null)
           .slice(0, n);
-        if (best.length === 0) throw new HttpError(409, 'Aucun run réussi à valider');
+        if (best.length === 0) throw new HttpError(409, 'No successful run to validate');
         const { modelPath, mmprojPath, profileId, serverArgs, p, r } = sweep.spec;
         const started = await benchRunner.startSweep(
           () => {
-            // Un sweep interrompu : ses éléments interrompus repartent avec la validation (sinon plus rien ne permet de les finir).
+            // An interrupted sweep: its interrupted items are requeued with the validation (otherwise nothing could finish them).
             benchRuns.requeueInterrupted(sweep.id);
             benchRuns.enqueue(
               sweep.id,

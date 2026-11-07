@@ -24,15 +24,15 @@ export interface CheckContext {
   model: ModelInfo | null;
   estimate: Estimate | null;
   mem: MemInfo | null;
-  /** Dernière mesure de lecture séquentielle du disque du modèle. */
+  /** Latest sequential-read measurement of the model's disk. */
   diskSpeed: DiskSpeed | null;
   now: number;
 }
 
-/** En dessous, un modèle qui déborde la RAM est limité par le disque. */
+/** Below this, a model that spills out of RAM is bound by the disk. */
 const DISK_OK_BPS = 2 * GiB;
 
-const NA = 'non applicable (carte ignorée)';
+const NA = 'not applicable (card ignored)';
 const OLD_BUILD_MS = 60 * 86400_000;
 const NETWORK_FS = /^(nfs|nfs4|cifs|smb3?|fuse|sshfs|9p|afs|ceph|glusterfs)/;
 
@@ -50,10 +50,10 @@ export function runChecks(ctx: CheckContext): Check[] {
 
   const pcie = (family: CheckFamily, g: GpuSample) => {
     const id = `${family}.pcie.${g.busId}`;
-    const label = `Lien PCIe ${g.name}`;
-    const impact = 'chargement et offload CPU↔GPU plus lents';
+    const label = `PCIe link ${g.name}`;
+    const impact = 'slower loading and CPU↔GPU offload';
     if (g.pcieGenMax == null || g.pcieWidthMax == null)
-      return push({ id, family, label, state: 'unknown', detail: 'lien PCIe inconnu', impact });
+      return push({ id, family, label, state: 'unknown', detail: 'unknown PCIe link', impact });
     // Idle links train down (ASPM): only a link seen under load says anything (null until then, see withObservedLinks).
     if (g.pcieGen == null || g.pcieWidth == null)
       return push({
@@ -61,7 +61,7 @@ export function runChecks(ctx: CheckContext): Check[] {
         family,
         label,
         state: 'unknown',
-        detail: "mesuré sous charge : lancer le serveur d'abord",
+        detail: 'measured under load: start the server first',
         impact,
       });
     const below =
@@ -71,7 +71,7 @@ export function runChecks(ctx: CheckContext): Check[] {
       family,
       label,
       state: below ? 'warn' : 'ok',
-      detail: `${pcieLabel(g.pcieGen, g.pcieWidth)} (max ${pcieLabel(g.pcieGenMax, g.pcieWidthMax)})${below ? ' : vérifier le slot, le riser ou le BIOS' : ''}`,
+      detail: `${pcieLabel(g.pcieGen, g.pcieWidth)} (max ${pcieLabel(g.pcieGenMax, g.pcieWidthMax)})${below ? ': check the slot, riser or BIOS' : ''}`,
       persistence: below ? 'permanent' : undefined,
       impact,
     });
@@ -86,19 +86,19 @@ export function runChecks(ctx: CheckContext): Check[] {
       // persistence
       {
         const id = `nvidia.persistence.${bus}`;
-        const label = `Persistance ${g.name}`;
-        const impact = 'premier chargement et réveil de la carte plus lents';
+        const label = `Persistence ${g.name}`;
+        const impact = 'slower first load and card wake-up';
         if (!on) push({ id, family: 'nvidia', label, state: 'na', detail: NA, impact });
         else if (g.persistence == null)
-          push({ id, family: 'nvidia', label, state: 'unknown', detail: 'NVML ne le dit pas', impact });
-        else if (g.persistence) push({ id, family: 'nvidia', label, state: 'ok', detail: 'activée', impact });
+          push({ id, family: 'nvidia', label, state: 'unknown', detail: 'not reported by NVML', impact });
+        else if (g.persistence) push({ id, family: 'nvidia', label, state: 'ok', detail: 'enabled', impact });
         else
           push({
             id,
             family: 'nvidia',
             label,
             state: 'warn',
-            detail: 'désactivée',
+            detail: 'disabled',
             command: `sudo nvidia-smi -i ${smiId} -pm 1`,
             persistence: 'session',
             impact,
@@ -107,41 +107,48 @@ export function runChecks(ctx: CheckContext): Check[] {
       // power limit
       {
         const id = `nvidia.powerlimit.${bus}`;
-        const label = `Limite de puissance ${g.name}`;
-        const impact = 'fréquences bridées sous charge';
+        const label = `Power limit ${g.name}`;
+        const impact = 'clocks capped under load';
         if (!on) push({ id, family: 'nvidia', label, state: 'na', detail: NA, impact });
         else if (g.powerLimitW == null || g.powerDefaultLimitW == null)
-          push({ id, family: 'nvidia', label, state: 'unknown', detail: 'limite inconnue', impact });
+          push({ id, family: 'nvidia', label, state: 'unknown', detail: 'unknown limit', impact });
         else if (g.powerLimitW < g.powerDefaultLimitW - 1)
           push({
             id,
             family: 'nvidia',
             label,
             state: 'warn',
-            detail: `${Math.round(g.powerLimitW)} W, défaut ${Math.round(g.powerDefaultLimitW)} W`,
+            detail: `${Math.round(g.powerLimitW)} W, default ${Math.round(g.powerDefaultLimitW)} W`,
             command: `sudo nvidia-smi -i ${smiId} -pl ${Math.round(g.powerDefaultLimitW)}`,
             persistence: 'session',
             impact,
           });
         else
-          push({ id, family: 'nvidia', label, state: 'ok', detail: `${Math.round(g.powerLimitW)} W (défaut)`, impact });
+          push({
+            id,
+            family: 'nvidia',
+            label,
+            state: 'ok',
+            detail: `${Math.round(g.powerLimitW)} W (default)`,
+            impact,
+          });
       }
       pcie('nvidia', g);
       // resizable BAR
       {
         const id = `nvidia.rebar.${bus}`;
         const label = `Resizable BAR ${g.name}`;
-        const impact = 'transferts hôte→VRAM par fenêtre de 256 MiB';
+        const impact = 'host→VRAM transfers through a 256 MiB window';
         const bar = r.bar1Bytes[bus];
         if (bar === undefined || g.vramTotalBytes <= 0)
-          push({ id, family: 'nvidia', label, state: 'unknown', detail: 'taille du BAR1 inconnue', impact });
+          push({ id, family: 'nvidia', label, state: 'unknown', detail: 'unknown BAR1 size', impact });
         else if (bar < g.vramTotalBytes)
           push({
             id,
             family: 'nvidia',
             label,
             state: 'warn',
-            detail: `BAR1 ${fmtBytes(bar)} < VRAM ${fmtBytes(g.vramTotalBytes)} : activer Resizable BAR / Above 4G dans le BIOS`,
+            detail: `BAR1 ${fmtBytes(bar)} < VRAM ${fmtBytes(g.vramTotalBytes)}: enable Resizable BAR / Above 4G decoding in the BIOS`,
             persistence: 'permanent',
             impact,
           });
@@ -150,8 +157,8 @@ export function runChecks(ctx: CheckContext): Check[] {
     }
     {
       const id = 'nvidia.driver';
-      const label = 'Pilote NVIDIA';
-      const impact = 'le backend CUDA du build refuse de démarrer';
+      const label = 'NVIDIA driver';
+      const impact = 'the build’s CUDA backend fails to start';
       const cuda =
         r.cudaDriver == null
           ? ''
@@ -162,29 +169,29 @@ export function runChecks(ctx: CheckContext): Check[] {
           family: 'nvidia',
           label,
           state: 'warn',
-          detail: `trop ancien pour le CUDA du build (pilote ${r.driver ?? '?'}${cuda}) : mettre à jour le pilote`,
+          detail: `too old for the build’s CUDA (driver ${r.driver ?? '?'}${cuda}): update the driver`,
           persistence: 'permanent',
           impact,
         });
       else if (r.driver === null)
-        push({ id, family: 'nvidia', label, state: 'unknown', detail: 'version inconnue', impact });
-      else push({ id, family: 'nvidia', label, state: 'ok', detail: `pilote ${r.driver}${cuda}`, impact });
+        push({ id, family: 'nvidia', label, state: 'unknown', detail: 'unknown version', impact });
+      else push({ id, family: 'nvidia', label, state: 'ok', detail: `driver ${r.driver}${cuda}`, impact });
     }
     {
       const id = 'nvidia.uvm';
       const label = 'Module nvidia_uvm';
-      const impact = "CUDA ne s'initialise pas";
+      const impact = 'CUDA fails to initialize';
       if (r.modules.length === 0)
-        push({ id, family: 'nvidia', label, state: 'unknown', detail: '/proc/modules illisible', impact });
+        push({ id, family: 'nvidia', label, state: 'unknown', detail: '/proc/modules unreadable', impact });
       else if (r.modules.includes('nvidia_uvm'))
-        push({ id, family: 'nvidia', label, state: 'ok', detail: 'chargé', impact });
+        push({ id, family: 'nvidia', label, state: 'ok', detail: 'loaded', impact });
       else
         push({
           id,
           family: 'nvidia',
           label,
           state: 'warn',
-          detail: 'absent',
+          detail: 'missing',
           command: 'sudo modprobe nvidia_uvm',
           persistence: 'session',
           impact,
@@ -196,8 +203,8 @@ export function runChecks(ctx: CheckContext): Check[] {
     const anyRetained = amd.some((g) => retained(g.busId));
     for (const g of amd) {
       const id = `amd.dpm.${g.busId}`;
-      const label = `Niveau DPM ${g.name}`;
-      const impact = 'fréquences qui hésitent sous charge';
+      const label = `DPM level ${g.name}`;
+      const impact = 'clocks fluctuate under load';
       const dpm = r.amdDpm[g.busId];
       if (!retained(g.busId)) push({ id, family: 'amd', label, state: 'na', detail: NA, impact });
       else if (!dpm)
@@ -206,7 +213,7 @@ export function runChecks(ctx: CheckContext): Check[] {
           family: 'amd',
           label,
           state: 'unknown',
-          detail: 'power_dpm_force_performance_level illisible',
+          detail: 'power_dpm_force_performance_level unreadable',
           impact,
         });
       else if (dpm.level === 'auto')
@@ -226,27 +233,27 @@ export function runChecks(ctx: CheckContext): Check[] {
     {
       const id = 'amd.hip';
       const label = 'Backend ROCm/HIP';
-      const impact = 'la carte AMD tourne en Vulkan, plus lent';
+      const impact = 'the AMD card runs on Vulkan, slower';
       if (!anyRetained) push({ id, family: 'amd', label, state: 'na', detail: NA, impact });
       else if (r.backendLibs.length === 0)
-        push({ id, family: 'amd', label, state: 'unknown', detail: 'bibliothèques du build introuvables', impact });
+        push({ id, family: 'amd', label, state: 'unknown', detail: 'build libraries not found', impact });
       else if (r.backendLibs.some((l) => l.startsWith('libggml-hip')))
-        push({ id, family: 'amd', label, state: 'ok', detail: 'présent', impact });
+        push({ id, family: 'amd', label, state: 'ok', detail: 'present', impact });
       else
         push({
           id,
           family: 'amd',
           label,
           state: 'warn',
-          detail: 'absent : reconstruire llama.cpp avec -DGGML_HIP=ON, sinon Vulkan',
+          detail: 'missing: rebuild llama.cpp with -DGGML_HIP=ON, otherwise Vulkan',
           persistence: 'permanent',
           impact,
         });
     }
     {
       const id = 'amd.rocm-gfx';
-      const label = 'Carte reconnue par ROCm';
-      const impact = 'HIP refuse la carte sans HSA_OVERRIDE_GFX_VERSION';
+      const label = 'Card recognized by ROCm';
+      const impact = 'HIP rejects the card without HSA_OVERRIDE_GFX_VERSION';
       if (!anyRetained) push({ id, family: 'amd', label, state: 'na', detail: NA, impact });
       else
         push({
@@ -254,21 +261,20 @@ export function runChecks(ctx: CheckContext): Check[] {
           family: 'amd',
           label,
           state: 'unknown',
-          detail:
-            'rocminfo non consulté : si HIP refuse la carte, ajouter HSA_OVERRIDE_GFX_VERSION=… dans env du profil',
+          detail: 'rocminfo not queried: if HIP rejects the card, add HSA_OVERRIDE_GFX_VERSION=… to the profile env',
           impact,
         });
     }
   }
 
-  // CPU / mémoire
+  // CPU / memory
   {
     const id = 'cpu.governor';
-    const label = 'Gouverneur CPU';
-    const impact = 'prompt processing et offload CPU plus lents';
+    const label = 'CPU governor';
+    const impact = 'slower prompt processing and CPU offload';
     const bad = r.governors.filter((g) => g !== 'performance');
     if (r.governors.length === 0)
-      push({ id, family: 'cpu', label, state: 'unknown', detail: 'cpufreq illisible', impact });
+      push({ id, family: 'cpu', label, state: 'unknown', detail: 'cpufreq unreadable', impact });
     else if (bad.length === 0) push({ id, family: 'cpu', label, state: 'ok', detail: 'performance', impact });
     else
       push({
@@ -285,15 +291,15 @@ export function runChecks(ctx: CheckContext): Check[] {
   {
     const id = 'cpu.thp';
     const label = 'Transparent hugepages';
-    const impact = 'accès aux poids en RAM plus lents';
-    if (r.thp === null) push({ id, family: 'cpu', label, state: 'unknown', detail: 'illisible', impact });
+    const impact = 'slower access to weights in RAM';
+    if (r.thp === null) push({ id, family: 'cpu', label, state: 'unknown', detail: 'unreadable', impact });
     else if (r.thp === 'never')
       push({
         id,
         family: 'cpu',
         label,
         state: 'warn',
-        detail: 'never ; permanent : transparent_hugepage=madvise sur la cmdline du noyau',
+        detail: 'never; permanent: transparent_hugepage=madvise on the kernel cmdline',
         command: 'echo madvise | sudo tee /sys/kernel/mm/transparent_hugepage/enabled',
         persistence: 'session',
         impact,
@@ -302,20 +308,20 @@ export function runChecks(ctx: CheckContext): Check[] {
   }
   {
     const id = 'cpu.memlock';
-    const label = 'Limite memlock';
-    const impact = '--mlock échoue, les poids peuvent être évincés';
+    const label = 'memlock limit';
+    const impact = '--mlock fails, weights can be evicted';
     const wantsMlock = estimate?.serverArgs.includes('--mlock') ?? false;
     const need = ctx.model?.fileBytes ?? 0;
-    if (!wantsMlock) push({ id, family: 'cpu', label, state: 'ok', detail: '--mlock non recommandé ici', impact });
+    if (!wantsMlock) push({ id, family: 'cpu', label, state: 'ok', detail: '--mlock not recommended here', impact });
     else if (r.memlockLimitBytes === null)
-      push({ id, family: 'cpu', label, state: 'unknown', detail: 'illisible', impact });
+      push({ id, family: 'cpu', label, state: 'unknown', detail: 'unreadable', impact });
     else if (r.memlockLimitBytes < need)
       push({
         id,
         family: 'cpu',
         label,
         state: 'warn',
-        detail: `${fmtBytes(r.memlockLimitBytes)} < modèle ${fmtBytes(need)} ; permanent : /etc/security/limits.conf`,
+        detail: `${fmtBytes(r.memlockLimitBytes)} < model ${fmtBytes(need)}; permanent: /etc/security/limits.conf`,
         command: 'ulimit -l unlimited',
         persistence: 'session',
         impact,
@@ -326,22 +332,22 @@ export function runChecks(ctx: CheckContext): Check[] {
         family: 'cpu',
         label,
         state: 'ok',
-        detail: r.memlockLimitBytes === Number.POSITIVE_INFINITY ? 'illimitée' : fmtBytes(r.memlockLimitBytes),
+        detail: r.memlockLimitBytes === Number.POSITIVE_INFINITY ? 'unlimited' : fmtBytes(r.memlockLimitBytes),
         impact,
       });
   }
   {
     const id = 'cpu.swappiness';
     const label = 'vm.swappiness';
-    const impact = 'les poids en RAM partent en swap';
-    if (r.swappiness === null) push({ id, family: 'cpu', label, state: 'unknown', detail: 'illisible', impact });
+    const impact = 'weights in RAM get swapped out';
+    if (r.swappiness === null) push({ id, family: 'cpu', label, state: 'unknown', detail: 'unreadable', impact });
     else if (overflow && r.swappiness > 10)
       push({
         id,
         family: 'cpu',
         label,
         state: 'warn',
-        detail: `${r.swappiness} alors que le modèle déborde en RAM ; permanent : /etc/sysctl.d/`,
+        detail: `${r.swappiness} while the model spills into RAM; permanent: /etc/sysctl.d/`,
         command: 'sudo sysctl vm.swappiness=10',
         persistence: 'session',
         impact,
@@ -350,16 +356,16 @@ export function runChecks(ctx: CheckContext): Check[] {
   }
   {
     const id = 'cpu.numa';
-    const label = 'Nœuds NUMA';
-    const impact = 'accès mémoire distants';
-    if (ctx.cpu.numaNodes <= 1) push({ id, family: 'cpu', label, state: 'ok', detail: 'un seul nœud', impact });
+    const label = 'NUMA nodes';
+    const impact = 'remote memory accesses';
+    if (ctx.cpu.numaNodes <= 1) push({ id, family: 'cpu', label, state: 'ok', detail: 'single node', impact });
     else if (estimate?.serverArgs.includes('--numa'))
       push({
         id,
         family: 'cpu',
         label,
         state: 'ok',
-        detail: `${ctx.cpu.numaNodes} nœuds, --numa distribute recommandé`,
+        detail: `${ctx.cpu.numaNodes} nodes, --numa distribute recommended`,
         impact,
       });
     else
@@ -368,7 +374,7 @@ export function runChecks(ctx: CheckContext): Check[] {
         family: 'cpu',
         label,
         state: 'warn',
-        detail: `${ctx.cpu.numaNodes} nœuds sans --numa : ajouter --numa distribute au profil`,
+        detail: `${ctx.cpu.numaNodes} nodes without --numa: add --numa distribute to the profile`,
         persistence: 'permanent',
         impact,
       });
@@ -378,30 +384,29 @@ export function runChecks(ctx: CheckContext): Check[] {
   {
     const id = 'build.cuda';
     const label = 'Backend CUDA';
-    const impact = 'les cartes NVIDIA ne servent pas';
+    const impact = 'NVIDIA cards go unused';
     const cudaListed = ctx.devices.some((d) => d.backend === 'CUDA');
-    if (cudaListed) push({ id, family: 'build', label, state: 'ok', detail: 'présent', impact });
-    else if (nvidia.length === 0)
-      push({ id, family: 'build', label, state: 'ok', detail: 'pas de carte NVIDIA', impact });
+    if (cudaListed) push({ id, family: 'build', label, state: 'ok', detail: 'present', impact });
+    else if (nvidia.length === 0) push({ id, family: 'build', label, state: 'ok', detail: 'no NVIDIA card', impact });
     else if (r.backendLibs.length === 0)
-      push({ id, family: 'build', label, state: 'unknown', detail: 'bibliothèques du build introuvables', impact });
+      push({ id, family: 'build', label, state: 'unknown', detail: 'build libraries not found', impact });
     else if (r.backendLibs.some((l) => l.startsWith('libggml-cuda')))
-      push({ id, family: 'build', label, state: 'ok', detail: 'présent', impact });
+      push({ id, family: 'build', label, state: 'ok', detail: 'present', impact });
     else
       push({
         id,
         family: 'build',
         label,
         state: 'warn',
-        detail: 'absent : reconstruire llama.cpp avec -DGGML_CUDA=ON',
+        detail: 'missing: rebuild llama.cpp with -DGGML_CUDA=ON',
         persistence: 'permanent',
         impact,
       });
   }
   {
     const id = 'build.simd';
-    const label = 'Instructions SIMD du build';
-    const impact = 'calcul CPU plus lent';
+    const label = 'Build SIMD instructions';
+    const impact = 'slower CPU compute';
     const want = ['AVX2', 'AVX512'].filter((f) => ctx.cpu.flags.includes(f === 'AVX2' ? 'avx2' : 'avx512f'));
     if (r.systemInfo === null)
       push({
@@ -409,20 +414,20 @@ export function runChecks(ctx: CheckContext): Check[] {
         family: 'build',
         label,
         state: 'unknown',
-        detail: "pas de system_info dans les logs : lancer le serveur d'abord",
+        detail: 'no system_info in the logs: start the server first',
         impact,
       });
     else {
       const missing = want.filter((f) => !new RegExp(`\\b${f} = 1\\b`).test(r.systemInfo as string));
       if (missing.length === 0)
-        push({ id, family: 'build', label, state: 'ok', detail: want.join(', ') || 'aucune', impact });
+        push({ id, family: 'build', label, state: 'ok', detail: want.join(', ') || 'none', impact });
       else
         push({
           id,
           family: 'build',
           label,
           state: 'warn',
-          detail: `${missing.join(', ')} disponible mais inutilisé : reconstruire avec -DGGML_NATIVE=ON`,
+          detail: `${missing.join(', ')} available but unused: rebuild with -DGGML_NATIVE=ON`,
           persistence: 'permanent',
           impact,
         });
@@ -430,10 +435,10 @@ export function runChecks(ctx: CheckContext): Check[] {
   }
   {
     const id = 'build.age';
-    const label = 'Âge du build';
-    const impact = 'optimisations et correctifs récents absents';
+    const label = 'Build age';
+    const impact = 'missing recent optimizations and fixes';
     if (r.buildDate === null)
-      push({ id, family: 'build', label, state: 'unknown', detail: 'date inconnue (pas de dépôt git)', impact });
+      push({ id, family: 'build', label, state: 'unknown', detail: 'unknown date (no git repository)', impact });
     else {
       const days = Math.floor((ctx.now - r.buildDate) / 86400_000);
       if (ctx.now - r.buildDate > OLD_BUILD_MS)
@@ -442,52 +447,52 @@ export function runChecks(ctx: CheckContext): Check[] {
           family: 'build',
           label,
           state: 'warn',
-          detail: `${days} jours`,
+          detail: `${days} ${days === 1 ? 'day' : 'days'}`,
           command: 'git pull && cmake --build build',
           persistence: 'permanent',
           impact,
         });
-      else push({ id, family: 'build', label, state: 'ok', detail: `${days} jours`, impact });
+      else push({ id, family: 'build', label, state: 'ok', detail: `${days} ${days === 1 ? 'day' : 'days'}`, impact });
     }
   }
 
-  // Noyau / disque
+  // Kernel / disk
   {
     const id = 'kernel.iommu';
     const label = 'IOMMU';
-    const impact = 'copies entre cartes plus lentes';
+    const impact = 'slower copies between cards';
     const pt =
       /\biommu=pt\b/.test(r.cmdline) || /\bamd_iommu=off\b/.test(r.cmdline) || /\bintel_iommu=off\b/.test(r.cmdline);
     if (r.iommuActive === null)
-      push({ id, family: 'kernel', label, state: 'unknown', detail: '/sys/class/iommu illisible', impact });
+      push({ id, family: 'kernel', label, state: 'unknown', detail: '/sys/class/iommu unreadable', impact });
     else if (!r.iommuActive || pt)
-      push({ id, family: 'kernel', label, state: 'ok', detail: r.iommuActive ? 'passthrough' : 'inactif', impact });
+      push({ id, family: 'kernel', label, state: 'ok', detail: r.iommuActive ? 'passthrough' : 'inactive', impact });
     else if (ctx.retainedBusIds.length < 2)
-      push({ id, family: 'kernel', label, state: 'ok', detail: 'actif, une seule carte', impact });
+      push({ id, family: 'kernel', label, state: 'ok', detail: 'active, single card', impact });
     else
       push({
         id,
         family: 'kernel',
         label,
         state: 'warn',
-        detail: 'actif sans passthrough : ajouter iommu=pt à la cmdline du noyau (redémarrage)',
+        detail: 'active without passthrough: add iommu=pt to the kernel cmdline (reboot)',
         persistence: 'permanent',
         impact,
       });
   }
   {
     const id = 'kernel.disk';
-    const label = 'Disque du modèle';
-    const impact = 'chargement lent';
+    const label = 'Model disk';
+    const impact = 'slow loading';
     const d = r.modelDisk;
-    if (d === null) push({ id, family: 'kernel', label, state: 'unknown', detail: 'inconnu', impact });
+    if (d === null) push({ id, family: 'kernel', label, state: 'unknown', detail: 'unknown', impact });
     else if (d.rotational === true)
       push({
         id,
         family: 'kernel',
         label,
         state: 'warn',
-        detail: 'disque rotatif : déplacer le modèle sur un SSD local',
+        detail: 'spinning disk: move the model to a local SSD',
         persistence: 'permanent',
         impact,
       });
@@ -497,7 +502,7 @@ export function runChecks(ctx: CheckContext): Check[] {
         family: 'kernel',
         label,
         state: 'warn',
-        detail: `${d.fsType} : déplacer le modèle sur un SSD local`,
+        detail: `${d.fsType}: move the model to a local SSD`,
         persistence: 'permanent',
         impact,
       });
@@ -513,8 +518,8 @@ export function runChecks(ctx: CheckContext): Check[] {
   }
   {
     const id = 'kernel.disk-speed';
-    const label = 'Débit du disque du modèle';
-    const impact = 'un modèle qui déborde la RAM lit le disque à chaque jeton';
+    const label = 'Model disk bandwidth';
+    const impact = 'a model that spills out of RAM reads the disk on every token';
     const d = ctx.diskSpeed;
     if (!d)
       push({
@@ -522,7 +527,7 @@ export function runChecks(ctx: CheckContext): Check[] {
         family: 'kernel',
         label,
         state: 'unknown',
-        detail: 'non mesuré : bouton « Mesurer le disque »',
+        detail: 'not measured: “Measure disk” button',
         impact,
       });
     else if (d.bytesPerSec < DISK_OK_BPS)
@@ -531,7 +536,7 @@ export function runChecks(ctx: CheckContext): Check[] {
         family: 'kernel',
         label,
         state: 'warn',
-        detail: `lecture séquentielle ${fmtBytes(d.bytesPerSec)}/s${overflow ? ' alors que le modèle déborde' : ''}`,
+        detail: `sequential read ${fmtBytes(d.bytesPerSec)}/s${overflow ? ' while the model spills over' : ''}`,
         impact,
       });
     else
@@ -540,22 +545,22 @@ export function runChecks(ctx: CheckContext): Check[] {
         family: 'kernel',
         label,
         state: 'ok',
-        detail: `lecture séquentielle ${fmtBytes(d.bytesPerSec)}/s`,
+        detail: `sequential read ${fmtBytes(d.bytesPerSec)}/s`,
         impact,
       });
   }
   {
     const id = 'kernel.swap';
     const label = 'Swap';
-    const impact = 'génération par à-coups';
-    if (ctx.mem === null) push({ id, family: 'kernel', label, state: 'unknown', detail: 'mémoire inconnue', impact });
+    const impact = 'stuttering generation';
+    if (ctx.mem === null) push({ id, family: 'kernel', label, state: 'unknown', detail: 'unknown memory', impact });
     else if (overflow && ctx.mem.swapUsedBytes > 0)
       push({
         id,
         family: 'kernel',
         label,
         state: 'warn',
-        detail: `${fmtBytes(ctx.mem.swapUsedBytes)} utilisés alors que le modèle déborde : réduire -c ou monter --n-cpu-moe`,
+        detail: `${fmtBytes(ctx.mem.swapUsedBytes)} used while the model spills over: lower -c or raise --n-cpu-moe`,
         impact,
       });
     else
@@ -564,7 +569,7 @@ export function runChecks(ctx: CheckContext): Check[] {
         family: 'kernel',
         label,
         state: 'ok',
-        detail: ctx.mem.swapUsedBytes > 0 ? `${fmtBytes(ctx.mem.swapUsedBytes)} utilisés` : 'inutilisé',
+        detail: ctx.mem.swapUsedBytes > 0 ? `${fmtBytes(ctx.mem.swapUsedBytes)} used` : 'unused',
         impact,
       });
   }

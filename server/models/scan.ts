@@ -7,7 +7,7 @@ import { type ModelInfo, readModel } from './gguf';
 
 const SHARD = /^(.*)-(\d{5})-of-(\d{5})\.gguf$/;
 
-/** Regroupe les parties `-0000k-of-0000N.gguf` sous la première ; signale les parties absentes. Trié par fichier principal. */
+/** Groups the `-0000k-of-0000N.gguf` parts under the first one; reports missing parts. Sorted by main file. */
 export function groupGgufFiles(relPaths: string[]): { main: string; files: string[]; missing: string[] }[] {
   const shards = new Map<string, { total: number; parts: Set<number> }>();
   const out: { main: string; files: string[]; missing: string[] }[] = [];
@@ -36,7 +36,7 @@ export function groupGgufFiles(relPaths: string[]): { main: string; files: strin
   return out.sort((a, b) => (a.main < b.main ? -1 : a.main > b.main ? 1 : 0));
 }
 
-/** Les `*.gguf` sous `dir` (chemins relatifs) ; les noms commençant par « . » sont ignorés, les liens de dossiers pas suivis. */
+/** The `*.gguf` files under `dir` (relative paths); names starting with “.” are ignored, directory links not followed. */
 async function walk(dir: string, rel = ''): Promise<string[]> {
   let entries: Dirent[];
   try {
@@ -90,8 +90,8 @@ export function toSummary(info: ModelInfo, relPath: string): ModelSummary {
 }
 
 /**
- * Les GGUF de `dir`, un par modèle (shards regroupés). Un résumé en cache sert tant que mtime et taille de chaque partie
- * n'ont pas changé ; un fichier illisible devient une entrée `ok: false` (jamais mise en cache) et le scan continue.
+ * The GGUFs in `dir`, one per model (shards grouped). A cached summary is used as long as the mtime and size of every
+ * part are unchanged; an unreadable file becomes an `ok: false` entry (never cached) and the scan goes on.
  */
 export async function scanModels(
   dir: string,
@@ -108,7 +108,7 @@ export async function scanModels(
       const fileBytes = stats.reduce((a, s) => a + (s?.size ?? 0), 0);
       const files = g.files.map((f) => join(dir, f));
       const fail = (error: string): ModelEntry => ({ ok: false, path, relPath: g.main, files, fileBytes, error });
-      if (g.missing.length > 0) return fail(`shard manquant : ${g.missing.map((m) => basename(m)).join(', ')}`);
+      if (g.missing.length > 0) return fail(`missing shard: ${g.missing.map((m) => basename(m)).join(', ')}`);
       const stamp = stats.map((s) => (s ? `${s.mtimeMs}:${s.size}` : '?')).join('|');
       const hit = o.cache.get(path);
       if (hit && hit.stamp === stamp) return { ok: true, ...hit.summary, relPath: g.main };

@@ -4,27 +4,27 @@ import { api } from './api';
 import { onWs, useWs } from './ws';
 
 interface TopologyState {
-  /** Graphe matériel (sysfs) ; null tant qu'il n'a pas été lu. */
+  /** Hardware graph (sysfs); null until it has been read. */
   graph: TopologyGraph | null;
-  /** Répartition du modèle chargé ; null sans serveur géré ou tant que les logs ne l'ont pas donnée. */
+  /** Placement of the loaded model; null without a managed server or until the logs have provided it. */
   placement: ModelPlacement | null;
-  /** La dernière lecture de /api/topology a échoué. */
+  /** The last read of /api/topology failed. */
   error: boolean;
 }
 
 export const useTopology = create<TopologyState>()(() => ({ graph: null, placement: null, error: false }));
 
-/** Numéro du dernier placement reçu par le WS : une réponse REST partie avant lui ne doit pas l'écraser. */
+/** Sequence number of the last placement received over WS: a REST response sent before it must not overwrite it. */
 let placementSeq = 0;
 let requestSeq = 0;
 
-/** Relit le graphe (l'état courant des liens change avec les états d'énergie) et le placement. */
+/** Rereads the graph (current link state changes with power states) and the placement. */
 export async function refreshTopology(): Promise<void> {
   const req = ++requestSeq;
   const seenPlacement = placementSeq;
   try {
     const r = await api<{ graph: TopologyGraph; placement: ModelPlacement | null }>('/topology');
-    if (req !== requestSeq) return; // une relecture plus récente est partie : elle fera foi
+    if (req !== requestSeq) return; // a newer reread is in flight: it wins
     useTopology.setState(
       placementSeq === seenPlacement
         ? { graph: r.graph, placement: r.placement, error: false }
@@ -36,7 +36,7 @@ export async function refreshTopology(): Promise<void> {
 }
 
 let started = false;
-/** Alimente le store : messages « placement » + relecture à chaque (re)connexion. */
+/** Feeds the store: “placement” messages + a reread on every (re)connect. */
 export function startTopologySync(): void {
   if (started) return;
   started = true;

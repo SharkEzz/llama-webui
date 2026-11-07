@@ -19,15 +19,15 @@ import { profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
 import { WsHub } from './ws/hub';
 
-// Flags, sinon env, sinon défauts (`--help`). Écoute locale par défaut ; --host 0.0.0.0 (ou LLAMA_WEBUI_HOST) pour
-// ouvrir au réseau local (aucune authentification). Relu à chaque rechargement `bun --hot` : mêmes arguments.
+// Flags, else env, else defaults (`--help`). Listens locally by default; --host 0.0.0.0 (or LLAMA_WEBUI_HOST) opens
+// it to the local network (no authentication). Re-read on every `bun --hot` reload: same arguments.
 const cli = cliOptionsOrExit();
 const HOSTNAME = cli.host;
 const PORT = cli.port;
 const EXTERNAL_CHECK_MS = 2000;
 
-// Sous `bun --hot`, ce module est réévalué : on libère l'instance précédente (timers, db, abonnements).
-// Le superviseur et les logs (runtime) survivent au rechargement.
+// Under `bun --hot`, this module is re-evaluated: release the previous instance (timers, db, subscriptions).
+// The supervisor and the logs (runtime) survive the reload.
 const g = globalThis as { __llamaWebuiDispose?: () => void };
 g.__llamaWebuiDispose?.();
 
@@ -37,7 +37,7 @@ const hub = new WsHub(runtime.bootId);
 const settings = new SettingsRepo(db);
 const profiles = new ProfilesRepo(db);
 const conversations = new ConversationsRepo(db);
-// Une réponse restée « streaming » après un arrêt brutal de Bun est interrompue.
+// A reply left “streaming” after Bun was killed is marked interrupted.
 conversations.stopOrphans();
 const chatRuns = new ChatRuns({
   repo: conversations,
@@ -51,20 +51,20 @@ const chatRuns = new ChatRuns({
 });
 const { supervisor, logs } = runtime;
 const development = process.env.NODE_ENV !== 'production';
-// Production : front construit (et découpé par page) une fois, au démarrage ; développement : import HTML avec HMR.
-// Un front qui ne se construit pas n'empêche pas l'API ni le pilotage de llama-server.
+// Production: front end built (and split per page) once, at startup; development: HTML import with HMR.
+// A front end that fails to build does not block the API or llama-server control.
 const web = development
   ? { '/*': index }
   : await buildWebRoutes(`${import.meta.dir}/../web/index.html`).catch((err: unknown) => {
-      console.error('[llama-webui] interface web indisponible :', err);
+      console.error('[llama-webui] web UI unavailable:', err);
       return unavailableWebRoutes(err);
     });
 const monitor = await startMonitor(runtime, settings.get());
 const benchRuns = new BenchRunsRepo(db);
 const sweeps = new SweepsRepo(db);
 const benchGate = runtime.benchGate;
-// Démarrage à froid : un run resté « running » (arrêt brutal de Bun) est interrompu, son sweep aussi (bouton Reprendre).
-// Au rechargement la garde est encore tenue : l'ancien module a déjà rangé son run et le nouveau reprend le sweep.
+// Cold start: a run left “running” (Bun killed) is marked interrupted, and so is its sweep (Resume button).
+// On reload the gate is still held: the old module has already settled its run and the new one resumes the sweep.
 if (!benchGate.held) {
   benchRuns.stopOrphans();
   sweeps.stopOrphans();
@@ -96,7 +96,7 @@ monitor.setModelPathResolver((id) => {
   const p = profiles.get(id);
   return p ? profilePaths(p).model : null;
 });
-// Répartition du modèle (logs de démarrage) : recréé à chaque rechargement, il rejoue le ring qui survit.
+// Model placement (startup logs): recreated on every reload, it replays the surviving ring.
 const placement = new PlacementTracker({ logs, supervisor });
 
 const server = createApp({
@@ -124,8 +124,8 @@ const unsubLogs = logs.onLines((lines) => hub.broadcast({ type: 'log', payload: 
 const unsubSnapshot = monitor.onSnapshot((s) => hub.broadcast({ type: 'snapshot', payload: s }));
 const unsubPlacement = placement.onChange((p) => hub.broadcast({ type: 'placement', payload: p }));
 
-// Arrêt de Bun : les réponses en cours sont enregistrées « interrompues » avant que le runtime n'arrête llama-server
-// (sinon elles verraient la coupure et finiraient « erreur »). En tête de file, devant le gestionnaire du runtime.
+// Bun shutdown: running replies are saved as “interrupted” before the runtime stops llama-server
+// (otherwise they would see the disconnect and end as “error”). First in line, ahead of the runtime's handler.
 const stopChats = () => {
   chatRuns.dispose();
   benchRunner.dispose({ restart: false });
@@ -133,7 +133,7 @@ const stopChats = () => {
 process.prependListener('SIGINT', stopChats);
 process.prependListener('SIGTERM', stopChats);
 
-// Serveur externe : détecté au démarrage puis surveillé (sortie de l'état « external » quand il s'arrête).
+// External server: detected at startup then watched (leaves the “external” state when it stops).
 const checkExternal = externalWatcher({
   supervisor,
   port: () => settings.get().port,
@@ -154,10 +154,10 @@ g.__llamaWebuiDispose = () => {
   process.off('SIGINT', stopChats);
   process.off('SIGTERM', stopChats);
   chatRuns.dispose();
-  // Rechargement : le run ponctuel est interrompu, l'élément de sweep remis en attente ; la garde (runtime) passe au
-  // nouveau module, ou relance le serveur si personne ne la reprend.
+  // Reload: a one-off run is interrupted, the sweep item is queued again; the gate (runtime) is handed to the
+  // new module, or restarts the server if nobody takes it over.
   benchRunner.dispose({ restart: true });
   db.close();
 };
 
-console.log(`llama-webui sur http://${HOSTNAME}:${server.port}${development ? ' (dev, HMR)' : ''}`);
+console.log(`llama-webui on http://${HOSTNAME}:${server.port}${development ? ' (dev, HMR)' : ''}`);

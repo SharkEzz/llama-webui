@@ -35,14 +35,14 @@ export function modelRoutes({ db, settings }: { db: Database; settings: Settings
       GET: guarded(async (req) => {
         const path = new URL(req.url).searchParams.get('path') ?? '';
         if (!path.startsWith('/') || !path.endsWith('.gguf'))
-          throw new HttpError(400, 'Chemin absolu de fichier .gguf attendu');
+          throw new HttpError(400, 'Absolute path to a .gguf file expected');
         if (
           !(await stat(path).then(
             (s) => s.isFile(),
             () => false,
           ))
         )
-          throw notFound('Fichier');
+          throw notFound('File');
         let info: Awaited<ReturnType<typeof readModel>>;
         try {
           info = await readModel(path);

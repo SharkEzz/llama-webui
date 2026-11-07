@@ -1,9 +1,9 @@
 import { Skeleton } from '@/components/ui/skeleton';
 
-/** Le temps de charger le code d'une page (routes chargées à la demande). */
+/** While a page's code loads (routes are loaded on demand). */
 export function PageSkeleton() {
   return (
-    <div className="flex flex-col gap-4" role="status" aria-busy="true" aria-label="Chargement de la page">
+    <div className="flex flex-col gap-4" role="status" aria-busy="true" aria-label="Loading page">
       <Skeleton className="h-10 w-48" />
       <Skeleton className="h-64" />
       <Skeleton className="h-64" />

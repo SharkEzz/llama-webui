@@ -10,14 +10,14 @@ import { useWs, WS_STATUS_UI } from '@/lib/ws';
 const MILESTONES = [
   {
     id: 'J2',
-    title: 'Serveur, profils, logs',
-    detail: 'Démarrer et arrêter llama-server, gérer les profils, suivre les logs.',
+    title: 'Server, profiles, logs',
+    detail: 'Start and stop llama-server, manage profiles, follow the logs.',
   },
-  { id: 'J3', title: 'Monitoring', detail: 'Débit, slots, GPU NVIDIA et AMD, CPU, mémoire, disque en temps réel.' },
-  { id: 'J4', title: 'Modèles et chat', detail: 'Parcourir les GGUF, discuter avec le modèle chargé.' },
-  { id: 'J5', title: 'Benchmark', detail: "Mesurer avec llama-bench ou le serveur, comparer l'historique." },
-  { id: 'J6', title: 'Tuning et sweep', detail: "Recommandations d'offload et exploration automatique des réglages." },
-  { id: 'J7', title: 'Finitions', detail: "Raccourcis, états vides, gestion d'erreurs, documentation." },
+  { id: 'J3', title: 'Monitoring', detail: 'Throughput, slots, NVIDIA and AMD GPUs, CPU, memory, disk in real time.' },
+  { id: 'J4', title: 'Models and chat', detail: 'Browse GGUF files, chat with the loaded model.' },
+  { id: 'J5', title: 'Benchmark', detail: 'Measure with llama-bench or the server, compare the history.' },
+  { id: 'J6', title: 'Tuning and sweep', detail: 'Offload recommendations and automatic exploration of settings.' },
+  { id: 'J7', title: 'Polish', detail: 'Shortcuts, empty states, error handling, documentation.' },
 ] as const;
 
 export function HomePage() {
@@ -33,28 +33,28 @@ export function HomePage() {
       <header className="flex flex-col gap-2">
         <h1 className="text-3xl font-semibold tracking-tight">llama-webui</h1>
         <p className="max-w-prose text-muted-foreground">
-          Superviseur local pour llama-server : profils, monitoring, chat, benchmark et tuning sur cette machine.
+          Local supervisor for llama-server: profiles, monitoring, chat, benchmark and tuning on this machine.
         </p>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile
-          label="Connexion temps réel"
+          label="Real-time connection"
           value={WS_STATUS_UI[status].label}
           tone={online ? 'teal' : 'rose'}
           mono={false}
-          hint={online ? 'WebSocket ouvert' : 'Nouvelle tentative automatique'}
+          hint={online ? 'WebSocket open' : 'Retrying automatically'}
         />
         <StatTile
-          label="Version de l'API"
+          label="API version"
           value={health?.version ?? '—'}
           tone="blue"
           hint={error && !online ? error : undefined}
         />
-        <StatTile label="Serveur lancé depuis" value={uptime} tone="amber" />
+        <StatTile label="Server uptime" value={uptime} tone="amber" />
       </div>
 
-      <GlassCard title="Jalons" icon={Flag}>
+      <GlassCard title="Milestones" icon={Flag}>
         <ol className="flex flex-col divide-y divide-border">
           {MILESTONES.map((m) => (
             <li key={m.id} className="flex items-start gap-4 py-3 first:pt-0 last:pb-0">
@@ -64,7 +64,7 @@ export function HomePage() {
                 <p className="text-sm text-muted-foreground">{m.detail}</p>
               </div>
               <Badge variant="outline" className="shrink-0 text-muted-foreground">
-                à venir
+                upcoming
               </Badge>
             </li>
           ))}

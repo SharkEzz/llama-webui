@@ -5,7 +5,7 @@ import { StatTile } from '@/components/glass/StatTile';
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ServerStateBadge } from '@/features/server/ServerStateBadge';
-import { formatInt, formatPct } from '@/lib/format';
+import { formatInt, formatPct, num } from '@/lib/format';
 import { useMonitor } from '@/lib/monitor';
 import { useServer } from '@/lib/server';
 import { ContextCard } from './ContextCard';
@@ -13,8 +13,7 @@ import { RequestsTable } from './RequestsTable';
 import { SystemStrip } from './SystemStrip';
 import { ThroughputCard } from './ThroughputCard';
 
-const rate = (v: number) =>
-  new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(v);
+const rate = (v: number) => num(1).format(v);
 
 export function DashboardPage() {
   const snapshot = useMonitor((s) => s.snapshot);
@@ -33,34 +32,34 @@ export function DashboardPage() {
       {!active ? (
         <Alert className={GLASS}>
           <CircleStop />
-          <AlertTitle>llama-server est arrêté</AlertTitle>
+          <AlertTitle>llama-server is stopped</AlertTitle>
           <AlertDescription>
-            Débit, slots et requêtes s'affichent dès qu'un serveur tourne. Le bandeau système reste mesuré.
+            Throughput, slots and requests show up as soon as a server is running. The system strip is still measured.
           </AlertDescription>
           <AlertAction>
             <Button size="sm" nativeButton={false} render={<Link to="/server" />}>
-              Démarrer
+              Start
             </Button>
           </AlertAction>
         </Alert>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile label="Génération" value={rate(snapshot.rates.genTps)} unit="tok/s" tone="blue" />
+          <StatTile label="Generation" value={rate(snapshot.rates.genTps)} unit="tok/s" tone="blue" />
           <StatTile label="Prompt" value={rate(snapshot.rates.ppTps)} unit="tok/s" tone="teal" />
           {spec && spec.drafts > 0 && (
             <StatTile
-              label="Acceptation spéculative"
+              label="Speculative acceptance"
               value={spec.acceptCum === null ? '—' : formatPct(100 * spec.acceptCum)}
               hint={
                 spec.meanAcceptedPerDraft === null
                   ? undefined
-                  : `${rate(spec.meanAcceptedPerDraft)} tokens acceptés par brouillon`
+                  : `${rate(spec.meanAcceptedPerDraft)} tokens accepted per draft`
               }
               tone="amber"
             />
           )}
           <StatTile
-            label="Contexte utilisé"
+            label="Context used"
             value={kv ? formatPct((100 * kv.usedTokens) / kv.totalTokens) : '—'}
             hint={kv ? `${formatInt(kv.usedTokens)} / ${formatInt(kv.totalTokens)} tokens` : undefined}
             tone="rose"

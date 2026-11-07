@@ -11,8 +11,8 @@ interface LabelsProps {
 }
 
 /**
- * Étiquettes des blocs et infobulle du bloc survolé : DOM ordinaire (typographie et tokens du thème), ancré par la
- * scène sur le sommet de chaque bloc (voir <Projector>). Invisibles tant que la scène ne les a pas placées.
+ * Block labels and the hovered block's tooltip: plain DOM (theme typography and tokens), anchored by the scene to the
+ * top of each block (see <Projector>). Invisible until the scene has placed them.
  */
 export function Labels({ graph, live, hovered, layerRef }: LabelsProps) {
   return (

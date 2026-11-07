@@ -1,7 +1,7 @@
 import { createHighlighterCore, type HighlighterCore } from 'shiki/core';
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 
-/** Langue d'un bloc Markdown → grammaire shiki ; une langue absente reste en texte brut. */
+/** Markdown block language → shiki grammar; a missing language stays plain text. */
 const ALIASES: Record<string, string> = {
   ts: 'typescript',
   typescript: 'typescript',
@@ -66,8 +66,8 @@ function highlighter(): Promise<HighlighterCore> {
 }
 
 /**
- * HTML coloré (thèmes clair et sombre en variables CSS, choisis par index.css selon la classe .dark), ou null pour une
- * langue inconnue.
+ * Highlighted HTML (light and dark themes as CSS variables, picked by index.css from the .dark class), or null for an
+ * unknown language.
  */
 export async function highlight(code: string, lang: string | undefined): Promise<string | null> {
   const id = lang ? ALIASES[lang.toLowerCase()] : undefined;

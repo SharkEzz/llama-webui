@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { autoTitle, statsFromTimings } from './chat';
+import { autoTitle, DEFAULT_TITLE, isDefaultTitle, statsFromTimings } from './chat';
 
 test('statsFromTimings maps llama-server timings', () => {
   const t = {
@@ -27,11 +27,17 @@ test('statsFromTimings maps llama-server timings', () => {
 });
 
 test('autoTitle keeps the first six words within 48 characters', () => {
-  expect(autoTitle('  Explique-moi   les shards GGUF de llama.cpp en détail stp ')).toBe(
-    'Explique-moi les shards GGUF de llama.cpp…',
+  expect(autoTitle('  Explain   the GGUF shards of llama.cpp in detail please ')).toBe(
+    'Explain the GGUF shards of llama.cpp…',
   );
-  expect(autoTitle('Bonjour')).toBe('Bonjour');
-  expect(autoTitle('Un deux trois quatre cinq six sept')).toBe('Un deux trois quatre cinq six…');
-  expect(autoTitle('   ')).toBe('Nouvelle conversation');
+  expect(autoTitle('Hello')).toBe('Hello');
+  expect(autoTitle('One two three four five six seven')).toBe('One two three four five six…');
+  expect(autoTitle('   ')).toBe('New conversation');
   expect(autoTitle('a'.repeat(60))).toBe(`${'a'.repeat(47)}…`);
+});
+
+test('isDefaultTitle accepts the current and the legacy default title', () => {
+  expect(isDefaultTitle(DEFAULT_TITLE)).toBe(true);
+  expect(isDefaultTitle('Nouvelle conversation')).toBe(true);
+  expect(isDefaultTitle('Explain speculative decoding')).toBe(false);
 });

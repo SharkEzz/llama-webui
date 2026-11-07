@@ -7,7 +7,7 @@ const conv: Conversation = {
   title: 't',
   profileId: null,
   modelPath: null,
-  systemPrompt: 'Réponds en français.',
+  systemPrompt: 'Answer in English.',
   sampling: { temperature: 0.2 },
   thinking: false,
   createdAt: 0,
@@ -34,16 +34,16 @@ const m = (
 
 test('empty sampling sends no sampling key, reasoning and failed messages stay out', () => {
   const body = buildChatRequest(conv, [
-    m('user', 'Salut'),
-    m('assistant', 'Bonjour', 'done', 'Il dit bonjour.'),
-    m('user', 'Et alors ?'),
+    m('user', 'Hi'),
+    m('assistant', 'Hello', 'done', 'They say hi.'),
+    m('user', 'So what?'),
     m('assistant', '', 'error'),
   ]);
   expect(body.messages).toEqual([
-    { role: 'system', content: 'Réponds en français.' },
-    { role: 'user', content: 'Salut' },
-    { role: 'assistant', content: 'Bonjour' },
-    { role: 'user', content: 'Et alors ?' },
+    { role: 'system', content: 'Answer in English.' },
+    { role: 'user', content: 'Hi' },
+    { role: 'assistant', content: 'Hello' },
+    { role: 'user', content: 'So what?' },
   ]);
   expect(body.stream).toBe(true);
   expect(body.temperature).toBe(0.2);
@@ -56,7 +56,7 @@ test('empty sampling sends no sampling key, reasoning and failed messages stay o
 });
 
 test("a context overflow becomes a clear message, other errors keep llama-server's text", () => {
-  const n = (v: number) => v.toLocaleString('fr-FR');
+  const n = (v: number) => v.toLocaleString('en-US');
   expect(
     llamaErrorMessage({
       code: 400,
@@ -64,12 +64,12 @@ test("a context overflow becomes a clear message, other errors keep llama-server
       message: 'request (41234 tokens) exceeds the available context size (40000 tokens), try increasing it',
     }),
   ).toBe(
-    `Conversation trop longue pour le contexte du modèle (${n(41234)} / ${n(40000)} jetons) : commencez une nouvelle conversation ou utilisez un profil à plus grand contexte.`,
+    `Conversation too long for the model's context (${n(41234)} / ${n(40000)} tokens): start a new conversation or use a profile with a larger context.`,
   );
   expect(
     llamaErrorMessage({ type: 'exceed_context_size_error', message: '?', n_prompt_tokens: 50, n_ctx: 40 }),
-  ).toContain(`(${n(50)} / ${n(40)} jetons)`);
-  expect(llamaErrorMessage({ type: 'server_error', message: 'boom' })).toBe('llama-server : boom');
+  ).toContain(`(${n(50)} / ${n(40)} tokens)`);
+  expect(llamaErrorMessage({ type: 'server_error', message: 'boom' })).toBe('llama-server: boom');
 });
 
 test('consecutive messages of the same role are merged (strict templates require alternating roles)', () => {

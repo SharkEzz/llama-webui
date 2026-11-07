@@ -5,18 +5,18 @@ import { GlassCard } from '@/components/glass/GlassCard';
 import { useTuning } from '@/lib/tuning';
 import { cn } from '@/lib/utils';
 
-/** L'objectif de la recommandation et du classement des sweeps. */
+/** The goal behind the recommendation and the sweep ranking. */
 export function PresetPicker() {
   const preset = useTuning((s) => s.preset);
-  // Nom de groupe propre à l'instance : deux PresetPicker montés ne partagent pas leurs radios.
+  // Per-instance group name: two mounted PresetPickers do not share their radios.
   const group = useId();
   return (
-    <GlassCard title="Préréglage" icon={Target}>
-      <div role="radiogroup" aria-label="Préréglage" className="flex flex-col gap-1">
+    <GlassCard title="Preset" icon={Target}>
+      <div role="radiogroup" aria-label="Preset" className="flex flex-col gap-1">
         {PRESETS.map((p) => {
           const active = p.id === preset;
           return (
-            // Radios natifs (masqués) : Tab entre dans le groupe, les flèches changent de préréglage.
+            // Native (hidden) radios: Tab enters the group, arrows switch presets.
             <label
               key={p.id}
               className={cn(

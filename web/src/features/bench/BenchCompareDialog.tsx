@@ -5,9 +5,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { KIND_LABEL } from '@/lib/bench';
+import { formatShortDate } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { BenchBars } from './BenchBars';
-import { dateFmt, formatAccept, formatMeasure, formatMib, modelName } from './format';
+import { formatAccept, formatMeasure, formatMib, modelName } from './format';
 
 const PARAM_ROWS: { key: keyof BenchParams; label: string }[] = [
   { key: 'ngl', label: '-ngl' },
@@ -24,14 +25,14 @@ const PARAM_ROWS: { key: keyof BenchParams; label: string }[] = [
   { key: 'ub', label: '-ub' },
 ];
 
-/** Valeur d'un flag dans la syntaxe de l'outil du run (« défaut » si absent). */
+/** A flag's value in the run's tool syntax (“default” when absent). */
 function paramText(run: BenchRun, key: keyof BenchParams): string {
   const one = { [key]: run.spec.params[key] } as BenchParams;
   const args = run.kind === 'bench' ? benchArgs(one) : serverArgs(one);
-  return args[1] ?? 'défaut';
+  return args[1] ?? 'default';
 }
 
-/** Comparaison côte à côte de 2 à 4 runs : flags (différences surlignées), débits, VRAM, matériel, puis barres pp/tg. */
+/** Side-by-side comparison of 2 to 4 runs: flags (differences highlighted), throughput, VRAM, hardware, then pp/tg bars. */
 export function BenchCompareDialog({
   runs,
   open,
@@ -71,22 +72,22 @@ export function BenchCompareDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
-          <DialogTitle>Comparaison de {runs.length} runs</DialogTitle>
-          <DialogDescription>Les valeurs qui diffèrent d'un run à l'autre sont surlignées.</DialogDescription>
+          <DialogTitle>Comparing {runs.length} runs</DialogTitle>
+          <DialogDescription>Values that differ between runs are highlighted.</DialogDescription>
         </DialogHeader>
         {mixed && (
           <Alert>
             <TriangleAlert />
             <AlertDescription>
-              llama-bench et serveur ne se comparent pas directement : le décodage spéculatif (MTP, draft) et le
-              contexte du profil ne sont pas mesurés par llama-bench.
+              llama-bench and server runs are not directly comparable: llama-bench does not measure speculative decoding
+              (MTP, draft) or the profile’s context.
             </AlertDescription>
           </Alert>
         )}
         {otherHardware && (
           <Alert>
             <TriangleAlert />
-            <AlertDescription>Matériel différent entre ces runs (CPU ou GPU).</AlertDescription>
+            <AlertDescription>These runs used different hardware (CPU or GPU).</AlertDescription>
           </Alert>
         )}
         <Table>
@@ -95,18 +96,18 @@ export function BenchCompareDialog({
               <TableHead />
               {runs.map((r) => (
                 <TableHead key={r.id} className="num">
-                  #{r.id} · {dateFmt.format(r.createdAt)}
+                  #{r.id} · {formatShortDate(r.createdAt)}
                 </TableHead>
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {row(
-              'Outil',
+              'Tool',
               runs.map((r) => KIND_LABEL[r.kind]),
             )}
             {row(
-              'Modèle',
+              'Model',
               runs.map((r) => modelName(r.spec.modelPath)),
             )}
             {PARAM_ROWS.map((p) =>
@@ -116,8 +117,8 @@ export function BenchCompareDialog({
               ),
             )}
             {row(
-              'Autres flags',
-              runs.map((r) => (r.kind === 'server' ? r.spec.serverArgs.join(' ') || '—' : 'ignorés')),
+              'Other flags',
+              runs.map((r) => (r.kind === 'server' ? r.spec.serverArgs.join(' ') || '—' : 'ignored')),
             )}
             {row(
               '-p / -n / -r',
@@ -129,12 +130,12 @@ export function BenchCompareDialog({
               false,
             )}
             {row(
-              'Génération',
+              'Generation',
               runs.map((r) => formatMeasure(r.tg)),
               false,
             )}
             {row(
-              'MTP accepté',
+              'MTP accepted',
               runs.map((r) => formatAccept(r.draftAcceptPct)),
               false,
             )}

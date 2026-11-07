@@ -116,7 +116,7 @@ test('shellSplit reads what a user types: spaces separate, quotes group', () => 
 });
 
 test('shellSplit says why it cannot read a line', () => {
-  expect(shellSplit(`a "b`)).toEqual({ error: 'guillemet non fermé' });
-  expect(shellSplit("a 'b")).toEqual({ error: 'guillemet non fermé' });
-  expect(shellSplit('a \\')).toEqual({ error: 'barre oblique inverse en fin de ligne' });
+  expect(shellSplit(`a "b`)).toEqual({ error: 'unclosed quote' });
+  expect(shellSplit("a 'b")).toEqual({ error: 'unclosed quote' });
+  expect(shellSplit('a \\')).toEqual({ error: 'trailing backslash' });
 });

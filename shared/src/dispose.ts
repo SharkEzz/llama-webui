@@ -1,12 +1,12 @@
 /**
- * Clé de libération : `Symbol.dispose`, sinon le même repli que le code produit par `Bun.build` pour `using`
- * (`Symbol.for('Symbol.dispose')`), pour les navigateurs qui n'ont pas encore `Symbol.dispose`.
+ * Disposal key: `Symbol.dispose`, otherwise the same fallback as the code `Bun.build` emits for `using`
+ * (`Symbol.for('Symbol.dispose')`), for browsers that do not have `Symbol.dispose` yet.
  */
 const DISPOSE: typeof Symbol.dispose = Symbol.dispose ?? (Symbol.for('Symbol.dispose') as typeof Symbol.dispose);
 
 /**
- * `fn` appelée à la sortie du bloc qui la tient par `using`, même sur une exception ou un `return` :
- * `busy = true; using _busy = defer(() => (busy = false));` remplace un `try { … } finally { busy = false; }`.
+ * `fn` called on exiting the block that holds it with `using`, even on an exception or a `return`:
+ * `busy = true; using _busy = defer(() => (busy = false));` replaces a `try { … } finally { busy = false; }`.
  */
 export function defer(fn: () => void): Disposable {
   return { [DISPOSE]: fn };

@@ -76,7 +76,7 @@ export interface MessageUpdate {
   stats?: MessageStats | null;
 }
 
-/** Conversations et messages du chat. */
+/** Chat conversations and messages. */
 export class ConversationsRepo {
   constructor(
     private readonly db: Database,
@@ -143,7 +143,7 @@ export class ConversationsRepo {
     return this.conversation(id)!;
   }
 
-  /** Change le modèle courant de la conversation (le serveur en sert un autre). */
+  /** Changes the conversation's current model (the server is serving another one). */
   setModel(id: number, profileId: number | null, modelPath: string | null): void {
     this.db.run('UPDATE conversations SET profile_id = ?, model_path = ? WHERE id = ?', [profileId, modelPath, id]);
   }
@@ -182,13 +182,13 @@ export class ConversationsRepo {
     this.db.run('UPDATE conversations SET title = ? WHERE id = ?', [title, id]);
   }
 
-  /** Supprime ce message et tous les suivants de la conversation. */
+  /** Deletes this message and all the following ones in the conversation. */
   deleteFrom(conversationId: number, messageId: number): void {
     this.db.run('DELETE FROM messages WHERE conversation_id = ? AND id >= ?', [conversationId, messageId]);
     this.touch(conversationId);
   }
 
-  /** Après un arrêt brutal : une réponse restée « streaming » est « interrompue ». */
+  /** After a hard stop: a reply left “streaming” becomes “interrupted”. */
   stopOrphans(): number {
     return this.db.run("UPDATE messages SET status = 'stopped' WHERE status = 'streaming'").changes;
   }

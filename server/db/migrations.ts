@@ -1,10 +1,10 @@
 import type { Database } from 'bun:sqlite';
 
-/** Une entrée par version de schéma ; ne jamais modifier une migration déjà livrée, en ajouter une nouvelle. */
+/** One entry per schema version; never change a migration that has shipped, add a new one. */
 export const MIGRATIONS: string[] = [
-  // 1 — réglages clé/valeur
+  // 1 — key/value settings
   `CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL);`,
-  // 2 — profils llama-server
+  // 2 — llama-server profiles
   `CREATE TABLE profiles(
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
@@ -19,9 +19,9 @@ export const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );`,
-  // 3 — résumés GGUF en cache (clé : chemin ; stamp : mtime et taille de chaque partie)
+  // 3 — cached GGUF summaries (key: path; stamp: mtime and size of each part)
   `CREATE TABLE model_cache(path TEXT PRIMARY KEY, stamp TEXT NOT NULL, summary_json TEXT NOT NULL, read_at INTEGER NOT NULL);`,
-  // 4 — conversations du chat
+  // 4 — chat conversations
   `CREATE TABLE conversations(
     id INTEGER PRIMARY KEY,
     title TEXT NOT NULL,
@@ -33,7 +33,7 @@ export const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );`,
-  // 5 — messages (réflexion à part, statut de génération, stats tirées des timings)
+  // 5 — messages (reasoning kept separate, generation status, stats taken from the timings)
   `CREATE TABLE messages(
     id INTEGER PRIMARY KEY,
     conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -48,7 +48,7 @@ export const MIGRATIONS: string[] = [
   );`,
   // 6
   `CREATE INDEX messages_by_conversation ON messages(conversation_id, id);`,
-  // 7 — runs de benchmark (args_json = BenchSpec, matériel figé, stats_json = { pp, tg, draftAcceptPct })
+  // 7 — benchmark runs (args_json = BenchSpec, frozen hardware, stats_json = { pp, tg, draftAcceptPct })
   `CREATE TABLE bench_runs(
     id INTEGER PRIMARY KEY,
     kind TEXT NOT NULL,
@@ -70,7 +70,7 @@ export const MIGRATIONS: string[] = [
   );`,
   // 8
   `CREATE INDEX bench_runs_by_date ON bench_runs(created_at DESC);`,
-  // 9 — sweeps (spec_json = SweepSpec) ; best_run_id vise bench_runs par son nom, reconstruite juste après
+  // 9 — sweeps (spec_json = SweepSpec); best_run_id targets bench_runs by name, rebuilt right after
   `CREATE TABLE sweeps(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -82,8 +82,8 @@ export const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL,
     finished_at INTEGER
   );`,
-  // 10–14 — bench_runs reconstruite en AUTOINCREMENT (un id supprimé n'est jamais redonné : sweeps.best_run_id s'y fie),
-  // avec l'appartenance à un sweep (sweep_id, étiquette, verdict de l'estimateur). Les lignes de J5 sont recopiées.
+  // 10–14 — bench_runs rebuilt with AUTOINCREMENT (a deleted id is never reused: sweeps.best_run_id relies on it),
+  // with sweep membership (sweep_id, label, estimator verdict). The milestone 5 rows are copied over.
   `CREATE TABLE bench_runs_v2(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,

@@ -39,6 +39,6 @@ test('buildWebRoutes: a broken front rejects; unavailableWebRoutes then answers 
   const page = unavailableWebRoutes(err)['/*'] as Response;
   expect(page.status).toBe(503);
   const text = await page.clone().text();
-  expect(text).toContain('interface web indisponible');
+  expect(text).toContain('web UI unavailable');
   expect(text).toContain('missing');
 }, 30_000);

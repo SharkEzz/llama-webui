@@ -1,2 +1,2 @@
-// Imports de CSS traités par le bundler de Bun.
+// CSS imports handled by Bun's bundler.
 declare module '*.css';

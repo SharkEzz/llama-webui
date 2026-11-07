@@ -5,7 +5,7 @@ import { readCpuInfo } from '../hardware/cpu';
 
 let cpu: Promise<CpuInfo> | null = null;
 
-/** Devices de `llama-bench --list-devices`, CPU, RAM (du dernier snapshot, sinon /proc/meminfo). */
+/** Devices from `llama-bench --list-devices`, CPU, RAM (from the latest snapshot, otherwise /proc/meminfo). */
 export async function readTuningHardware(o: { benchBinary: string; mem: MemInfo | null }): Promise<TuningHardware> {
   cpu ??= readCpuInfo();
   const mem =

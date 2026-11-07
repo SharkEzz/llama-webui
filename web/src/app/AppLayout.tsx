@@ -10,12 +10,12 @@ import { PageSkeleton } from './PageSkeleton';
 import { Sidebar } from './Sidebar';
 import { StatusBar } from './StatusBar';
 
-/** `loading` : premier chargement d'une page (son code n'est pas encore là), la coquille avec un squelette. */
+/** `loading`: first load of a page (its code is not there yet), the shell with a skeleton. */
 export function AppLayout({ loading = false }: { loading?: boolean }) {
   const status = useWs((s) => s.status);
   const refreshHealth = useHealth((s) => s.refresh);
 
-  // À chaque (re)connexion, on relit l'état du serveur.
+  // On every (re)connect, reread the server state.
   useEffect(() => {
     if (status === 'open') void refreshHealth();
   }, [status, refreshHealth]);
@@ -26,8 +26,8 @@ export function AppLayout({ loading = false }: { loading?: boolean }) {
       <div className="grid h-dvh grid-cols-[4.5rem_minmax(0,1fr)] md:grid-cols-[240px_minmax(0,1fr)]">
         <Sidebar />
         <ScrollArea className="h-dvh">
-          {/* Pleine largeur ; p-4 = la marge de la Sidebar (m-4), même gouttière partout. Le chat et les logs
-              calculent leur hauteur sur p-4 + barre d'état (h-10) + gap-4 : 5.5rem. */}
+          {/* Full width; p-4 = the Sidebar margin (m-4), same gutter everywhere. Chat and logs compute their
+              height from p-4 + status bar (h-10) + gap-4: 5.5rem. */}
           <div className="flex flex-col gap-4 p-4">
             <StatusBar />
             <main>{loading ? <PageSkeleton /> : <Outlet />}</main>

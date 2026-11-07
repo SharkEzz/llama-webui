@@ -1,4 +1,4 @@
-/** Copie du texte ; repli sur execCommand hors contexte sécurisé (accès par IP du réseau local). */
+/** Copies text; falls back to execCommand outside a secure context (access via a LAN IP). */
 export async function copyText(text: string): Promise<void> {
   if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
   const ta = document.createElement('textarea');
@@ -9,5 +9,5 @@ export async function copyText(text: string): Promise<void> {
   ta.select();
   const ok = document.execCommand('copy');
   ta.remove();
-  if (!ok) throw new Error('copie refusée par le navigateur');
+  if (!ok) throw new Error('copy refused by the browser');
 }

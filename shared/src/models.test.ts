@@ -11,8 +11,8 @@ test('profileModelPath fills an empty cwd with models_dir and keeps paths relati
     cwd: '~/Modèles/q',
     model: 'a.gguf',
   });
-  expect(profileModelPath(abs, { cwd: '/autre', modelsDir: '~/Modèles', home: '/h' })).toEqual({
-    cwd: '/autre',
+  expect(profileModelPath(abs, { cwd: '/other', modelsDir: '~/Modèles', home: '/h' })).toEqual({
+    cwd: '/other',
     model: abs,
   });
 });

@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { LogRow } from '@/features/logs/LogRow';
 import { api } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
-import { formatDuration } from '@/lib/format';
+import { formatDuration, formatInt } from '@/lib/format';
 import { useLogs } from '@/lib/logs';
 import { useProfiles } from '@/lib/profiles';
 import { isRunning, restartServer, startProfile, stopServer, switchProfile, useServer } from '@/lib/server';
@@ -37,7 +37,7 @@ export function ServerPage() {
     );
   }, [reload]);
 
-  // Profil proposé : celui du serveur, sinon le dernier utilisé, sinon le premier.
+  // Suggested profile: the server's, otherwise the last used, otherwise the first.
   const fallbackId = view?.profileId ?? defaultId ?? profiles[0]?.id ?? null;
   const selectedId = selected !== null ? Number(selected) : fallbackId;
   const selectedProfile = profiles.find((p) => p.id === selectedId);
@@ -47,7 +47,7 @@ export function ServerPage() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-semibold tracking-tight">Serveur</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Server</h1>
         <ServerStateBadge state={state} className="text-base" />
       </header>
 
@@ -57,16 +57,16 @@ export function ServerPage() {
           <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5">
             {state.kind === 'external' ? (
               <p className="text-sm text-muted-foreground">
-                Un llama-server lancé hors de llama-webui occupe le port {state.port}
-                {state.pid !== null ? ` (PID ${state.pid})` : ''}. Arrêtez-le pour reprendre la main.
+                A llama-server started outside llama-webui is using port {state.port}
+                {state.pid !== null ? ` (PID ${state.pid})` : ''}. Stop it to take back control.
               </p>
             ) : loaded && profiles.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Aucun profil.{' '}
+                No profiles.{' '}
                 <Link to="/profiles" className="text-primary-ink underline-offset-4 hover:underline">
-                  Créez ou importez un profil
+                  Create or import a profile
                 </Link>{' '}
-                pour lancer llama-server.
+                to start llama-server.
               </p>
             ) : (
               <>
@@ -75,8 +75,8 @@ export function ServerPage() {
                   value={selectedId !== null ? String(selectedId) : null}
                   onValueChange={(v) => setSelected(v as string | null)}
                 >
-                  <SelectTrigger className="w-full" aria-label="Profil">
-                    <SelectValue placeholder="Choisir un profil" />
+                  <SelectTrigger className="w-full" aria-label="Profile">
+                    <SelectValue placeholder="Choose a profile" />
                   </SelectTrigger>
                   <SelectContent>
                     {items.map((it) => (
@@ -92,45 +92,45 @@ export function ServerPage() {
                       disabled={busy || !selectedProfile || state.kind === 'stopping'}
                       onClick={() => selectedId !== null && void startProfile(selectedId)}
                     >
-                      <Play /> Démarrer
+                      <Play /> Start
                     </Button>
                   )}
                   {running && selectedProfile && selectedId !== view?.profileId && (
                     <ConfirmDialog
-                      title={`Basculer vers « ${selectedProfile.name} » ?`}
-                      description={`llama-server sera arrêté${currentProfile ? ` (profil « ${currentProfile.name} »)` : ''} puis relancé avec ce profil. Les requêtes en cours seront interrompues.`}
-                      confirmLabel="Basculer"
+                      title={`Switch to “${selectedProfile.name}”?`}
+                      description={`llama-server will be stopped${currentProfile ? ` (profile “${currentProfile.name}”)` : ''} and restarted with this profile. Running requests will be interrupted.`}
+                      confirmLabel="Switch"
                       onConfirm={() => switchProfile(selectedProfile.id)}
                       trigger={
                         <Button disabled={busy}>
-                          <Repeat /> Basculer
+                          <Repeat /> Switch
                         </Button>
                       }
                     />
                   )}
                   {running && (
                     <ConfirmDialog
-                      title="Redémarrer llama-server ?"
-                      description="Le profil courant est relu (modifications comprises) puis le serveur est relancé. Les requêtes en cours seront interrompues."
-                      confirmLabel="Redémarrer"
+                      title="Restart llama-server?"
+                      description="The current profile is reread (including changes), then the server is restarted. Running requests will be interrupted."
+                      confirmLabel="Restart"
                       onConfirm={restartServer}
                       trigger={
                         <Button variant="secondary" disabled={busy}>
-                          <RotateCw /> Redémarrer
+                          <RotateCw /> Restart
                         </Button>
                       }
                     />
                   )}
                   {running && (
                     <ConfirmDialog
-                      title="Arrêter llama-server ?"
-                      description="Le modèle sera déchargé de la mémoire. Les requêtes en cours seront interrompues."
-                      confirmLabel="Arrêter"
+                      title="Stop llama-server?"
+                      description="The model will be unloaded from memory. Running requests will be interrupted."
+                      confirmLabel="Stop"
                       destructive
                       onConfirm={stopServer}
                       trigger={
                         <Button variant="destructive" disabled={busy}>
-                          <Square /> Arrêter
+                          <Square /> Stop
                         </Button>
                       }
                     />
@@ -163,10 +163,10 @@ function StateDetails() {
   const view = useServer((s) => s.view);
   const now = useNow(1000);
   const s = view?.state;
-  if (!s || s.kind === 'idle') return <p className="text-sm text-muted-foreground">Aucun serveur en cours.</p>;
+  if (!s || s.kind === 'idle') return <p className="text-sm text-muted-foreground">No server running.</p>;
   return (
     <dl className="divide-y divide-border">
-      {'profile' in s && <Row label="Profil">{s.profile}</Row>}
+      {'profile' in s && <Row label="Profile">{s.profile}</Row>}
       {'pid' in s && s.pid !== null && (
         <Row label="PID">
           <span className="num">{s.pid}</span>
@@ -178,14 +178,14 @@ function StateDetails() {
         </Row>
       )}
       {(s.kind === 'starting' || s.kind === 'ready') && (
-        <Row label={s.kind === 'ready' ? 'Prêt depuis' : 'Démarrage depuis'}>
+        <Row label={s.kind === 'ready' ? 'Ready for' : 'Starting for'}>
           <span className="num">{formatDuration(now - s.since)}</span>
         </Row>
       )}
       {s.kind === 'crashed' && (
-        <Row label="Arrêt">
+        <Row label="Exit">
           {[s.message, s.exitCode !== null ? `code ${s.exitCode}` : null, s.signal].filter(Boolean).join(', ') ||
-            'inattendu'}
+            'unexpected'}
         </Row>
       )}
     </dl>
@@ -209,40 +209,39 @@ function PropsCard() {
   const gen = (props?.default_generation_settings ?? {}) as Props;
   const modalities = Object.entries((props?.modalities ?? {}) as Record<string, boolean>)
     .filter(([, on]) => on)
-    .map(([m]) => ({ vision: 'image', video: 'vidéo', audio: 'audio' })[m] ?? m);
+    .map(([m]) => ({ vision: 'image', video: 'video', audio: 'audio' })[m] ?? m);
 
   return (
-    <GlassCard title="Infos du serveur" icon={Info}>
+    <GlassCard title="Server info" icon={Info}>
       {!live ? (
-        <p className="text-sm text-muted-foreground">Disponibles quand le serveur est prêt.</p>
+        <p className="text-sm text-muted-foreground">Available once the server is ready.</p>
       ) : error ? (
         <Alert variant="destructive">
           <CircleAlert />
-          <AlertTitle>Lecture de /props impossible</AlertTitle>
+          <AlertTitle>Could not read /props</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : !props ? (
-        <div className="flex flex-col gap-3" role="status" aria-label="Lecture de /props…">
+        <div className="flex flex-col gap-3" role="status" aria-label="Reading /props…">
           {[0, 1, 2, 3, 4].map((i) => (
             <Skeleton key={i} className="h-5 w-full" />
           ))}
         </div>
       ) : (
         <dl className="divide-y divide-border">
-          <Row label="Modèle">
+          <Row label="Model">
             <span className="font-mono text-xs" title={String(props.model_path ?? '')}>
               {String(props.model_alias ?? props.model_path ?? '—')}
             </span>
           </Row>
-          {props.model_ftype !== undefined && <Row label="Quantification">{String(props.model_ftype)}</Row>}
-          <Row label="Contexte">
-            <span className="num">{typeof gen.n_ctx === 'number' ? gen.n_ctx.toLocaleString('fr-FR') : '—'}</span>{' '}
-            tokens
+          {props.model_ftype !== undefined && <Row label="Quantization">{String(props.model_ftype)}</Row>}
+          <Row label="Context">
+            <span className="num">{typeof gen.n_ctx === 'number' ? formatInt(gen.n_ctx) : '—'}</span> tokens
           </Row>
           <Row label="Slots">
             <span className="num">{String(props.total_slots ?? '—')}</span>
           </Row>
-          <Row label="Entrées en plus du texte">{modalities.length > 0 ? modalities.join(', ') : 'aucune'}</Row>
+          <Row label="Inputs besides text">{modalities.length > 0 ? modalities.join(', ') : 'none'}</Row>
           <Row label="Build llama.cpp">
             <span className="num">{String(props.build_info ?? '—')}</span>
           </Row>
@@ -255,7 +254,7 @@ function PropsCard() {
 function CommandCard({ command }: { command: string | null }) {
   return (
     <GlassCard
-      title="Commande effective"
+      title="Effective command"
       icon={Terminal}
       actions={
         command && (
@@ -264,12 +263,12 @@ function CommandCard({ command }: { command: string | null }) {
             size="sm"
             onClick={() =>
               copyText(command).then(
-                () => toast.success('Commande copiée'),
+                () => toast.success('Command copied'),
                 (e: Error) => toast.error(e.message),
               )
             }
           >
-            <Copy /> Copier
+            <Copy /> Copy
           </Button>
         )
       }
@@ -279,7 +278,7 @@ function CommandCard({ command }: { command: string | null }) {
           {command}
         </pre>
       ) : (
-        <p className="text-sm text-muted-foreground">Aucun lancement depuis le démarrage de llama-webui.</p>
+        <p className="text-sm text-muted-foreground">No launch since llama-webui started.</p>
       )}
     </GlassCard>
   );
@@ -290,16 +289,16 @@ function RecentLogs() {
   const last = lines.slice(-20);
   return (
     <GlassCard
-      title="Derniers logs"
+      title="Latest logs"
       icon={ScrollText}
       actions={
         <Button variant="ghost" size="sm" nativeButton={false} render={<Link to="/logs" />}>
-          Tous les logs
+          All logs
         </Button>
       }
     >
       {last.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Rien pour l'instant.</p>
+        <p className="text-sm text-muted-foreground">Nothing yet.</p>
       ) : (
         <div className="flex flex-col rounded-md bg-well inset-shadow-well p-3">
           {last.map((l) => (

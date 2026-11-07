@@ -1,5 +1,5 @@
-// Page Topologie : graphe matériel (sysfs), placement du modèle (logs de llama-server) et phase d'inférence.
-// Module sans DOM : partagé par le serveur et l'UI.
+// Topology page: hardware graph (sysfs), model placement (llama-server logs) and inference phase.
+// DOM-free module: shared by the server and the UI.
 
 import type { Snapshot } from './monitor';
 import type { ServerState } from './server';
@@ -7,26 +7,26 @@ import type { ServerState } from './server';
 export type TopologyNodeKind = 'cpu' | 'ram' | 'nvme' | 'gpu' | 'chipset';
 
 export interface TopologyNode {
-  /** `cpu`, `ram`, `pci:<busId>` (GPU, NVMe), `chipset:<busId du switch>`. */
+  /** `cpu`, `ram`, `pci:<busId>` (GPU, NVMe), `chipset:<busId of the switch>`. */
   id: string;
   kind: TopologyNodeKind;
   label: string;
-  /** Adresse PCI sysfs (`0000:01:00.0`), même format que `GpuSample.busId` et le réglage `hiddenGpus`. */
+  /** sysfs PCI address (`0000:01:00.0`), same format as `GpuSample.busId` and the `hiddenGpus` setting. */
   busId?: string;
   vendor?: 'nvidia' | 'amd' | 'intel' | 'other';
-  /** Périphérique bloc d'un NVMe (`nvme0n1`) : relie le nœud à `DiskSample.perDisk` et `model.disk`. */
+  /** Block device of an NVMe (`nvme0n1`): ties the node to `DiskSample.perDisk` and `model.disk`. */
   block?: string;
-  /** Faits statiques affichés dans l'infobulle (modèle, cœurs, taille…) ; null = inconnu. */
+  /** Static facts shown in the tooltip (model, cores, size…); null = unknown. */
   detail: Record<string, string | number | null>;
 }
 
 export interface TopologyLink {
   id: string;
-  /** Côté CPU (amont). */
+  /** CPU side (upstream). */
   from: string;
   to: string;
   kind: 'pcie' | 'memory' | 'internal';
-  /** Capacité du lien (min des deux bouts) et état courant ; null = inconnu. */
+  /** Link capability (min of both ends) and current state; null = unknown. */
   genMax: number | null;
   widthMax: number | null;
   genCur: number | null;
@@ -39,27 +39,27 @@ export interface TopologyGraph {
   at: number;
 }
 
-/** Octets de modèle, de cache KV et de calcul d'un device, d'après les logs de chargement. */
+/** Model, KV cache and compute bytes of a device, from the loading logs. */
 export interface PlacementBuffer {
-  /** Nom ggml : `CUDA0`, `ROCm0`, `Vulkan1`, `CPU`, `CPU_Mapped`, `CUDA_Host`… */
+  /** ggml name: `CUDA0`, `ROCm0`, `Vulkan1`, `CPU`, `CPU_Mapped`, `CUDA_Host`… */
   device: string;
-  /** Adresse PCI du device (ligne « using device »), null pour l'hôte ou si non loggée. */
+  /** PCI address of the device (“using device” line), null for the host or when not logged. */
   busId: string | null;
   modelBytes: number;
-  /** Cache KV, plus l'état récurrent (« RS ») des modèles hybrides. */
+  /** KV cache, plus the recurrent state (“RS”) of hybrid models. */
   kvBytes: number;
   computeBytes: number;
 }
 
 export interface ModelPlacement {
-  /** Numéro de la ligne « [llama-webui] lancement: » dont il est issu. */
+  /** Number of the “[llama-webui] launch:” line it comes from. */
   launchSeq: number;
-  /** « offloaded N/M layers to GPU » ; null tant que la ligne n'est pas passée. */
+  /** “offloaded N/M layers to GPU”; null until that line has gone by. */
   layers: { offloaded: number; total: number } | null;
   buffers: PlacementBuffer[];
 }
 
-/** Buffers côté hôte (RAM) : `CPU`, `CPU_Mapped` (mmap depuis le disque), `CPU_REPACK`, `CUDA_Host` (pinned)… */
+/** Host-side (RAM) buffers: `CPU`, `CPU_Mapped` (mmap from disk), `CPU_REPACK`, `CUDA_Host` (pinned)… */
 export function hostDevice(device: string): boolean {
   return /^CPU(?:_|$)|_Host$/.test(device);
 }
@@ -81,25 +81,25 @@ export function placementTotals(p: ModelPlacement): {
 export type Phase = 'stopped' | 'loading' | 'idle' | 'prompt' | 'generating';
 
 export const PHASE_LABEL: Record<Phase, string> = {
-  stopped: 'Arrêté',
-  loading: 'Chargement',
-  idle: 'Inactif',
+  stopped: 'Stopped',
+  loading: 'Loading',
+  idle: 'Idle',
   prompt: 'Prompt',
-  generating: 'Génération',
+  generating: 'Generating',
 };
 
-/** Ce que fait llama-server en ce moment, d'après l'état du superviseur et les slots du dernier tick. */
+/** What llama-server is doing right now, from the supervisor state and the slots of the last tick. */
 export function phaseOf(state: ServerState | undefined, snapshot: Snapshot | null): Phase {
   if (!state || state.kind === 'idle' || state.kind === 'stopping' || state.kind === 'crashed') return 'stopped';
   if (state.kind === 'starting' || snapshot?.health === 'loading') return 'loading';
   const busy = (snapshot?.slots ?? []).filter((s) => s.processing);
   if (busy.length === 0) return 'idle';
-  // Pas encore de token généré : le prompt est en cours. `n_prompt_tokens` ne s'y prête pas : c'est le contexte du
-  // slot, qui grossit des tokens générés, et `n_prompt_tokens_processed` exclut ce qui vient du cache.
+  // No token generated yet: the prompt is being processed. `n_prompt_tokens` won't do: it is the slot's context, which
+  // grows with the generated tokens, and `n_prompt_tokens_processed` leaves out what came from the cache.
   return busy.some((s) => s.nDecoded === 0) ? 'prompt' : 'generating';
 }
 
-/** Débit utile par voie et par sens (octets/s), après encodage : Gen1 8b/10b, Gen3+ 128b/130b. */
+/** Payload bandwidth per lane and direction (bytes/s), after encoding: Gen1 8b/10b, Gen3+ 128b/130b. */
 const LANE_BPS: Record<number, number> = {
   1: 0.25e9,
   2: 0.5e9,
@@ -109,7 +109,7 @@ const LANE_BPS: Record<number, number> = {
   6: 7.563e9,
 };
 
-/** Capacité d'un lien PCIe par sens (octets/s) ; null si la génération ou la largeur est inconnue. */
+/** Capacity of a PCIe link per direction (bytes/s); null if the generation or width is unknown. */
 export function pcieBps(gen: number | null, width: number | null): number | null {
   if (gen === null || width === null || width <= 0) return null;
   const lane = LANE_BPS[gen];

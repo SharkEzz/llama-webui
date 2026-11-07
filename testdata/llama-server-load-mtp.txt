@@ -1,4 +1,4 @@
-[llama-webui] lancement: llama-server -m Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf -mm mmproj-Qwen3.8-27B-BF16.gguf -c 64500 --spec-type draft-mtp -lv 4 -np 1 -fa on --host 0.0.0.0 --port 8080 --metrics --slots --props
+[llama-webui] launch: llama-server -m Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf -mm mmproj-Qwen3.8-27B-BF16.gguf -c 64500 --spec-type draft-mtp -lv 4 -np 1 -fa on --host 0.0.0.0 --port 8080 --metrics --slots --props
 0.00.000.498 I srv  llama_server: initializing ...
 0.00.314.132 I ggml_cuda_init: found 2 CUDA devices (Total VRAM: 31865 MiB):
 0.00.314.136 I   Device 0: NVIDIA GeForce RTX 5070 Ti, compute capability 12.0, VMM: yes, VRAM: 15924 MiB

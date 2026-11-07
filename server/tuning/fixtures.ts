@@ -16,7 +16,7 @@ export interface FakeModel {
   contextLength?: number;
 }
 
-/** Un ModelInfo complet (tenseurs compris) aux tailles données, pour l'estimateur. */
+/** A complete ModelInfo (tensors included) with the given sizes, for the estimator. */
 export function fakeModel(o: FakeModel = {}): ModelInfo {
   const layers = o.layers ?? 48;
   const experts = o.experts ?? 0;
@@ -77,7 +77,7 @@ const dev = (id: string, name: string, totalMib: number, freeMib = totalMib - 30
   backend: id.replace(/\d+$/, ''),
 });
 
-/** La machine de l'utilisateur : 2 × 16 Go CUDA, la RX 9070 XT en Vulkan, l'iGPU et les doublons Vulkan des cartes NVIDIA. */
+/** The user's machine: 2 × 16 GiB CUDA, the RX 9070 XT on Vulkan, the iGPU and the Vulkan duplicates of the NVIDIA cards. */
 export function hw3(o: { ramAvailableGiB?: number } = {}): TuningHardware {
   return {
     devices: [

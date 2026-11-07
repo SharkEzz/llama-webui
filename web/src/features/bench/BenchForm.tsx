@@ -23,13 +23,14 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { ModelPicker } from '@/features/models/ModelPicker';
 import { type BenchForm as Form, type FormField, splitArgs, useBench } from '@/lib/bench';
+import { fmt } from '@/lib/format';
 import { useProfiles } from '@/lib/profiles';
 import { useServer } from '@/lib/server';
 
 const DEFAULT = '__default';
 const NO_PROFILE = '__none';
 
-/** Formulaire d'un run : modèle, outil, un champ par flag, autres flags serveur ; lancement avec confirmation si le serveur tourne. */
+/** Run form: model, tool, one field per flag, other server flags; asks for confirmation if the server is running. */
 export function BenchForm() {
   const form = useBench((s) => s.form);
   const errors = useBench((s) => s.errors);
@@ -53,18 +54,18 @@ export function BenchForm() {
     return Array.isArray(split) ? ignoredByBench(split) : [];
   }, [form.serverArgs]);
   const gpuDevices = (devices ?? []).filter((d) => d.totalMib > 0);
-  // Un -dev du formulaire (profil, run relancé) absent de --list-devices reste affiché, coché, pour qu'on puisse le retirer.
+  // A form -dev (from a profile or a rerun) missing from --list-devices stays listed, checked, so it can be removed.
   const missing = form.dev.filter((id) => !gpuDevices.some((d) => d.id === id));
   const shownDevices = [
-    ...gpuDevices.map((d) => ({ id: d.id, label: `${d.name} · ${Math.round(d.totalMib / 102.4) / 10} Gio` })),
-    ...missing.map((id) => ({ id, label: 'absent de --list-devices' })),
+    ...gpuDevices.map((d) => ({ id: d.id, label: `${d.name} · ${fmt(d.totalMib / 1024, 1)} GiB` })),
+    ...missing.map((id) => ({ id, label: 'missing from --list-devices' })),
   ];
 
   const launch = async (stopServer = false) => {
     const r = await useBench.getState().launch(stopServer);
     if (r === 'confirm') {
       const s = server?.state;
-      setConfirm(s && 'profile' in s ? s.profile : 'le profil actif');
+      setConfirm(s && 'profile' in s ? s.profile : 'the active profile');
     }
   };
 
@@ -76,12 +77,12 @@ export function BenchForm() {
   });
 
   const profileItems = [
-    { value: NO_PROFILE, label: 'Aucun : modèle et flags' },
+    { value: NO_PROFILE, label: 'None: model and flags' },
     ...profiles.map((p) => ({ value: String(p.id), label: p.name })),
   ];
 
   return (
-    <GlassCard title="Nouveau benchmark" icon={Play}>
+    <GlassCard title="New benchmark" icon={Play}>
       <form
         className="flex flex-col gap-5"
         onSubmit={(e) => {
@@ -91,13 +92,13 @@ export function BenchForm() {
       >
         <div className="grid gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <Label>Partir d'un profil</Label>
+            <Label>Start from a profile</Label>
             <Select
               items={profileItems}
               value={form.profileId === null ? NO_PROFILE : String(form.profileId)}
               onValueChange={(v) => void useBench.getState().fromProfile(v && v !== NO_PROFILE ? Number(v) : null)}
             >
-              <SelectTrigger className="w-full" aria-label="Profil de départ">
+              <SelectTrigger className="w-full" aria-label="Starting profile">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -108,48 +109,42 @@ export function BenchForm() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Préremplit le modèle et les flags ; le profil n'est pas modifié.
-            </p>
+            <p className="text-xs text-muted-foreground">Prefills the model and flags; the profile is not modified.</p>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Outil</Label>
+            <Label>Tool</Label>
             <Tabs value={form.kind} onValueChange={(v) => setForm({ kind: v as Form['kind'] })}>
               <TabsList className="h-9 w-full p-1 *:px-3">
                 <TabsTrigger value="bench">llama-bench</TabsTrigger>
-                <TabsTrigger value="server">Serveur</TabsTrigger>
+                <TabsTrigger value="server">Server</TabsTrigger>
               </TabsList>
             </Tabs>
             <p className="text-xs text-muted-foreground">
               {form.kind === 'bench'
-                ? 'Mesure brute de llama.cpp : ni décodage spéculatif, ni contexte du profil.'
-                : 'Un vrai llama-server : échauffement puis r requêtes de chat (≈ p jetons de texte + consigne, n jetons générés).'}
+                ? 'Raw llama.cpp measurement: no speculative decoding, no profile context.'
+                : 'A real llama-server: a warm-up, then r chat requests (≈ p text tokens + instruction, n generated tokens).'}
             </p>
           </div>
         </div>
 
         <PathField
-          label="Modèle"
+          label="Model"
           kind="model"
           error={errors.modelPath}
           {...field('modelPath')}
           onPick={(p) => setForm({ modelPath: p })}
         />
         <PathField
-          label="Projecteur (facultatif)"
+          label="Projector (optional)"
           kind="mmproj"
           error={errors.mmprojPath}
-          hint={
-            form.kind === 'bench'
-              ? 'Ignoré par llama-bench, gardé pour « Créer un profil » et « Relancer ».'
-              : undefined
-          }
+          hint={form.kind === 'bench' ? 'Ignored by llama-bench, kept for “Create profile” and “Rerun”.' : undefined}
           {...field('mmprojPath')}
           onPick={(p) => setForm({ mmprojPath: p })}
         />
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <TextField label="-ngl" hint="nombre, all ou auto" error={errors.ngl} {...field('ngl')} />
+          <TextField label="-ngl" hint="number, all or auto" error={errors.ngl} {...field('ngl')} />
           <TextField label="-ncmoe" error={errors.ncmoe} {...field('ncmoe')} />
           <TextField label="-t" hint="threads" error={errors.t} {...field('t')} />
           <TextField label="-b" error={errors.b} {...field('b')} />
@@ -185,12 +180,12 @@ export function BenchForm() {
         </div>
 
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1.5 text-sm font-medium">-dev et -ts</legend>
+          <legend className="mb-1.5 text-sm font-medium">-dev and -ts</legend>
           {devices === null ? (
-            <p className="text-xs text-muted-foreground">Lecture des devices…</p>
+            <p className="text-xs text-muted-foreground">Reading devices…</p>
           ) : shownDevices.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              Aucun device lu (llama-bench introuvable ?) : le choix reste automatique.
+              No devices read (llama-bench not found?): the choice stays automatic.
             </p>
           ) : (
             <div className="grid gap-x-6 gap-y-2 md:grid-cols-2">
@@ -214,7 +209,7 @@ export function BenchForm() {
                     {on && (
                       <Input
                         className="h-7 w-16 font-mono text-xs"
-                        aria-label={`Proportion -ts pour ${d.id}`}
+                        aria-label={`-ts proportion for ${d.id}`}
                         placeholder="ts"
                         value={form.ts[d.id] ?? ''}
                         onChange={(e) => setForm({ ts: { ...form.ts, [d.id]: e.target.value } })}
@@ -233,7 +228,7 @@ export function BenchForm() {
               <Input
                 id="bench-tsAll"
                 className="h-7 w-40 font-mono text-xs"
-                placeholder="ex. 3,1"
+                placeholder="e.g. 3,1"
                 aria-invalid={errors.ts ? true : undefined}
                 value={form.tsAll}
                 onChange={(e) => setForm({ tsAll: e.target.value })}
@@ -242,7 +237,7 @@ export function BenchForm() {
           )}
           <FieldMessage
             error={errors.dev ?? errors.ts}
-            hint="Rien de coché : devices choisis par l'outil, -ts dans leur ordre. Devices cochés : -ts par device, dans l'ordre coché."
+            hint="Nothing checked: the tool picks the devices, -ts in their order. Devices checked: -ts per device, in the order checked."
           />
         </fieldset>
 
@@ -252,19 +247,19 @@ export function BenchForm() {
             {...field('ot')}
             rows={2}
             className="font-mono text-xs"
-            placeholder="une règle par ligne, ex. exps=CPU"
+            placeholder="one rule per line, e.g. exps=CPU"
           />
           <FieldMessage error={errors.ot} />
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          <TextField label="-p" hint="jetons de prompt" error={errors.p} {...field('p')} />
-          <TextField label="-n" hint="jetons générés" error={errors.n} {...field('n')} />
-          <TextField label="-r" hint="mesures" error={errors.r} {...field('r')} />
+          <TextField label="-p" hint="prompt tokens" error={errors.p} {...field('p')} />
+          <TextField label="-n" hint="generated tokens" error={errors.n} {...field('n')} />
+          <TextField label="-r" hint="repetitions" error={errors.r} {...field('r')} />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="bench-serverArgs">Autres flags serveur</Label>
+          <Label htmlFor="bench-serverArgs">Other server flags</Label>
           <Textarea
             {...field('serverArgs')}
             rows={2}
@@ -275,8 +270,8 @@ export function BenchForm() {
             error={errors.serverArgs}
             hint={
               form.kind === 'bench'
-                ? 'Ignorés par llama-bench (gardés pour un run serveur ou un profil).'
-                : 'Passés tels quels à llama-server.'
+                ? 'Ignored by llama-bench (kept for a server run or a profile).'
+                : 'Passed as-is to llama-server.'
             }
           />
         </div>
@@ -284,26 +279,26 @@ export function BenchForm() {
         {form.kind === 'bench' && ignored.length > 0 && (
           <Alert>
             <TriangleAlert />
-            <AlertTitle>llama-bench ne reproduira pas tout le profil</AlertTitle>
+            <AlertTitle>llama-bench will not reproduce the whole profile</AlertTitle>
             <AlertDescription>
               <ul className="list-disc pl-4">
                 {ignored.map((i) => (
                   <li key={i.flag}>
-                    <span className="font-mono">{i.flag}</span> : {i.why}
+                    <span className="font-mono">{i.flag}</span>: {i.why}
                   </li>
                 ))}
               </ul>
-              Son débit de génération ne se compare pas directement à celui d'un run serveur.
+              Its generation throughput is not directly comparable to a server run’s.
             </AlertDescription>
           </Alert>
         )}
 
         <div className="flex items-center justify-end gap-3">
           {external && (
-            <p className="text-xs text-muted-foreground">Un llama-server externe tourne : arrêtez-le d'abord.</p>
+            <p className="text-xs text-muted-foreground">An external llama-server is running: stop it first.</p>
           )}
           <Button type="submit" disabled={live !== null || launching || external || form.modelPath.trim() === ''}>
-            <Play /> Lancer
+            <Play /> Run
           </Button>
         </div>
       </form>
@@ -311,21 +306,21 @@ export function BenchForm() {
       <AlertDialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Arrêter llama-server ?</AlertDialogTitle>
+            <AlertDialogTitle>Stop llama-server?</AlertDialogTitle>
             <AlertDialogDescription>
-              Le profil « {confirm} » sera arrêté pendant le benchmark, puis relancé avec la même commande à la fin,
-              même en cas d'échec ou d'annulation. Le chat est indisponible pendant ce temps.
+              Profile “{confirm}” will be stopped during the benchmark, then restarted with the same command at the end,
+              even if the run fails or is cancelled. Chat is unavailable in the meantime.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setConfirm(null);
                 void launch(true);
               }}
             >
-              Arrêter et lancer
+              Stop and run
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -359,7 +354,7 @@ function TextField({ id, label, hint, error, value, onChange }: TextFieldProps) 
         value={value}
         onChange={onChange}
         aria-invalid={error ? true : undefined}
-        placeholder="défaut"
+        placeholder="default"
         className="font-mono"
       />
       <FieldMessage error={error} hint={hint} />
@@ -386,7 +381,7 @@ function PathField({
           value={value}
           onChange={onChange}
           aria-invalid={error ? true : undefined}
-          placeholder="/chemin/absolu/vers/modele.gguf"
+          placeholder="/absolute/path/to/model.gguf"
           className="font-mono text-xs"
         />
         <InputGroupAddon align="inline-end">
@@ -405,7 +400,7 @@ function OptionField(props: {
   error?: string;
   onChange(v: string): void;
 }) {
-  const items = [{ value: DEFAULT, label: 'défaut' }, ...props.options.map((o) => ({ value: o, label: o }))];
+  const items = [{ value: DEFAULT, label: 'default' }, ...props.options.map((o) => ({ value: o, label: o }))];
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <Label className="font-mono">{props.label}</Label>

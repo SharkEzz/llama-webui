@@ -2,27 +2,27 @@ import { z } from 'zod';
 
 const num = (min: number, max: number, label: string) =>
   z
-    .number({ error: 'Nombre attendu' })
-    .min(min, `${label} : entre ${min} et ${max}`)
-    .max(max, `${label} : entre ${min} et ${max}`);
-const int = (min: number, max: number, label: string) => num(min, max, label).int({ error: 'Nombre entier attendu' });
+    .number({ error: 'Expected a number' })
+    .min(min, `${label}: between ${min} and ${max}`)
+    .max(max, `${label}: between ${min} and ${max}`);
+const int = (min: number, max: number, label: string) => num(min, max, label).int({ error: 'Expected an integer' });
 
-/** Sampling d'une conversation ; une clé absente = valeur du serveur (celle du profil). */
+/** A conversation's sampling; a missing key = the server's value (the profile's). */
 export const SamplingSchema = z.strictObject({
-  temperature: num(0, 5, 'Température').optional(),
+  temperature: num(0, 5, 'Temperature').optional(),
   top_p: num(0, 1, 'Top-p').optional(),
   top_k: int(0, 1000, 'Top-k').optional(),
   min_p: num(0, 1, 'Min-p').optional(),
-  presence_penalty: num(-2, 2, 'Pénalité de présence').optional(),
-  repeat_penalty: num(0, 5, 'Pénalité de répétition').optional(),
-  max_tokens: int(1, 1_000_000, 'Jetons max').optional(),
-  seed: z.number({ error: 'Nombre attendu' }).int({ error: 'Nombre entier attendu' }).optional(),
+  presence_penalty: num(-2, 2, 'Presence penalty').optional(),
+  repeat_penalty: num(0, 5, 'Repeat penalty').optional(),
+  max_tokens: int(1, 1_000_000, 'Max tokens').optional(),
+  seed: z.number({ error: 'Expected a number' }).int({ error: 'Expected an integer' }).optional(),
 });
 export type Sampling = z.infer<typeof SamplingSchema>;
 
 export const ConversationPatchSchema = z.strictObject({
-  title: z.string().trim().min(1, 'Obligatoire').max(200, '200 caractères au plus').optional(),
-  systemPrompt: z.string().max(100_000, 'Prompt système trop long').optional(),
+  title: z.string().trim().min(1, 'Required').max(200, '200 characters at most').optional(),
+  systemPrompt: z.string().max(100_000, 'System prompt too long').optional(),
   sampling: SamplingSchema.optional(),
   thinking: z.boolean().optional(),
 });
@@ -31,7 +31,7 @@ export type ConversationPatch = z.infer<typeof ConversationPatchSchema>;
 export type MessageStatus = 'streaming' | 'done' | 'stopped' | 'error';
 
 export interface MessageStats {
-  /** Délai entre l'envoi et le premier jeton (réflexion comprise). */
+  /** Time from sending to the first token (reasoning included). */
   ttftMs: number | null;
   promptTokens: number;
   cachedTokens: number;
@@ -52,7 +52,7 @@ export interface ChatMessage {
   status: MessageStatus;
   error: string | null;
   stats: MessageStats | null;
-  /** Modèle qui a écrit la réponse. */
+  /** Model that wrote the reply. */
   model: string | null;
   createdAt: number;
 }
@@ -85,7 +85,7 @@ export type ChatEvent =
   | { type: 'delta'; content?: string; reasoning?: string }
   | { type: 'done'; message: ChatMessage };
 
-/** `timings` du dernier morceau d'un stream llama-server. */
+/** `timings` of the last chunk of a llama-server stream. */
 export interface LlamaTimings {
   prompt_n: number;
   prompt_per_second: number;
@@ -110,11 +110,16 @@ export function statsFromTimings(t: LlamaTimings, ttftMs: number | null, duratio
   };
 }
 
-export const DEFAULT_TITLE = 'Nouvelle conversation';
+export const DEFAULT_TITLE = 'New conversation';
+/** Default titles from earlier versions, still present in existing databases. */
+const LEGACY_DEFAULT_TITLES: readonly string[] = ['Nouvelle conversation'];
+/** True when the conversation still has its default title (current or legacy) and can be auto-titled. */
+export const isDefaultTitle = (title: string): boolean =>
+  title === DEFAULT_TITLE || LEGACY_DEFAULT_TITLES.includes(title);
 const TITLE_WORDS = 6;
 const TITLE_MAX = 48;
 
-/** Titre tiré du premier message : 6 mots au plus, 48 caractères au plus, « … » si coupé. */
+/** Title taken from the first message: at most 6 words, at most 48 characters, “…” if truncated. */
 export function autoTitle(text: string): string {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return DEFAULT_TITLE;

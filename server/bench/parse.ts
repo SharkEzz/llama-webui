@@ -1,5 +1,5 @@
 import { basename, dirname, join } from 'node:path';
-import type { BenchDevice, Measure } from '@llama-webui/shared';
+import { type BenchDevice, type Measure, OOM_ERROR } from '@llama-webui/shared';
 
 interface BenchJsonEntry {
   n_prompt?: number;
@@ -10,7 +10,7 @@ interface BenchJsonEntry {
   build_commit?: string;
 }
 
-/** pp et tg d'une sortie `llama-bench -o json` ; null si le JSON est absent ou tronqué (échec de chargement). */
+/** pp and tg from a `llama-bench -o json` output; null if the JSON is missing or truncated (loading failed). */
 export function parseBenchJson(
   stdout: string,
 ): { pp: Measure | null; tg: Measure | null; build: string | null } | null {
@@ -24,7 +24,7 @@ export function parseBenchJson(
   let pp: Measure | null = null;
   let tg: Measure | null = null;
   let build: string | null = null;
-  // model_filename est mal encodé par llama-bench (UTF-8 du chemin cassé) : jamais lu.
+  // model_filename is badly encoded by llama-bench (the path's UTF-8 is broken): never read.
   for (const e of entries as BenchJsonEntry[]) {
     const np = e.n_prompt ?? 0;
     const ng = e.n_gen ?? 0;
@@ -39,7 +39,7 @@ export function parseBenchJson(
 
 const PROGRESS = /^llama-bench: benchmark (\d+)\/(\d+): (warmup|prompt|generation)(?: \w+)? run(?: (\d+)\/(\d+))?/;
 
-/** Une ligne de `--progress` (stderr) : `llama-bench: benchmark 1/2: prompt run 2/2`. */
+/** A `--progress` line (stderr): `llama-bench: benchmark 1/2: prompt run 2/2`. */
 export function parseBenchProgress(line: string): {
   phase: 'warmup' | 'prompt' | 'generation';
   test: number;
@@ -60,7 +60,7 @@ export function parseBenchProgress(line: string): {
 
 const DEVICE = /^\s+(\S+): (.+) \((\d+) MiB, (\d+) MiB free\)\s*$/;
 
-/** La sortie de `llama-bench --list-devices`. */
+/** The output of `llama-bench --list-devices`. */
 export function parseDeviceList(text: string): BenchDevice[] {
   const out: BenchDevice[] = [];
   for (const line of text.split('\n')) {
@@ -77,28 +77,28 @@ export function parseDeviceList(text: string): BenchDevice[] {
   return out;
 }
 
-/** Une ligne qui dit pourquoi l'outil s'est arrêté (copié de llama-tui, + « unable to allocate »). */
+/** A line that says why the tool stopped (copied from llama-tui, + “unable to allocate”). */
 export const ERROR_LINE =
   /out of memory|failed to allocate|unable to allocate|CUDA error|\berror( loading [^:]*)?:|what\(\):/i;
 const OOM = /out of memory|failed to allocate|unable to allocate/i;
 
-/** Pourquoi un run a échoué, d'après les dernières lignes de l'outil. */
+/** Why a run failed, based on the tool's last lines. */
 export function benchFailure(
   lines: string[],
   exit: number | string,
   tool = 'llama-bench',
 ): { message: string; oom: boolean } {
   const oom = lines.some((l) => OOM.test(l));
-  // OOM : la ligne d'allocation (« unable to allocate CUDA1 buffer ») plutôt que le « failed to load model » qui suit.
+  // OOM: the allocation line (“unable to allocate CUDA1 buffer”) rather than the “failed to load model” that follows.
   const line = [...lines]
     .reverse()
     .find((l) => (oom ? OOM : ERROR_LINE).test(l))
     ?.trim();
-  if (!line) return { oom, message: oom ? 'Mémoire insuffisante' : `${tool} terminé (code ${exit})` };
-  return { oom, message: oom ? `Mémoire insuffisante : ${line}` : line };
+  if (!line) return { oom, message: oom ? OOM_ERROR : `${tool} exited (code ${exit})` };
+  return { oom, message: oom ? `${OOM_ERROR}: ${line}` : line };
 }
 
-/** llama-bench à côté du binaire serveur des réglages (nom nu → nom nu, cherché dans le PATH). */
+/** llama-bench next to the server binary from the settings (bare name → bare name, looked up in the PATH). */
 export function benchBinary(serverBinary: string): string {
   const name = basename(serverBinary).replace('llama-server', 'llama-bench');
   return serverBinary.includes('/') ? join(dirname(serverBinary), name) : name;

@@ -12,9 +12,9 @@ export interface TensorInfo {
 
 export interface ModelInfo {
   path: string;
-  /** "mmproj" pour un projecteur multimodal (general.type = mmproj ou architecture clip). */
+  /** "mmproj" for a multimodal projector (general.type = mmproj or clip architecture). */
   kind: 'model' | 'mmproj';
-  /** L'en-tête porte un modèle de chat (tokenizer.chat_template). */
+  /** The header carries a chat template (tokenizer.chat_template). */
   hasChatTemplate: boolean;
   /** Every part of the model (one, or the shards in order). */
   files: string[];
@@ -175,8 +175,8 @@ async function sizeOf(path: string): Promise<{ mtimeMs: number; size: number }> 
     return { mtimeMs: s.mtimeMs, size: s.size };
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
-    if (code === 'ENOENT' || code === 'ENOTDIR') throw new ModelReadError(`fichier introuvable: ${path}`);
-    if (code === 'EACCES' || code === 'EPERM') throw new ModelReadError(`accès refusé: ${path}`);
+    if (code === 'ENOENT' || code === 'ENOTDIR') throw new ModelReadError(`file not found: ${path}`);
+    if (code === 'EACCES' || code === 'EPERM') throw new ModelReadError(`permission denied: ${path}`);
     throw new ModelReadError(`${code ?? (e as Error).message}: ${path}`);
   }
 }
@@ -208,7 +208,7 @@ export async function readModel(path: string): Promise<ModelInfo> {
       parameterCount = one.parameterCount;
     }
   } catch (e) {
-    throw new ModelReadError(`GGUF illisible: ${(e as Error).message}`);
+    throw new ModelReadError(`unreadable GGUF: ${(e as Error).message}`);
   }
   const info = { ...parseModel(path, shards, sizes, parameterCount), files };
   cache.delete(path);
