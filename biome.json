@@ -7,7 +7,18 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/node_modules", "!**/testdata", "!**/data", "!**/dist", "!**/out", "!**/.claude"]
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/testdata",
+      "!**/data",
+      "!**/dist",
+      "!**/out",
+      "!**/.claude",
+      "!site/build",
+      "!site/dist",
+      "!site/.react-router"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -46,7 +57,7 @@
   },
   "overrides": [
     {
-      "includes": ["web/src/components/ui/**"],
+      "includes": ["web/src/components/ui/**", "site/src/components/ui/**"],
       "linter": {
         "enabled": false
       },
