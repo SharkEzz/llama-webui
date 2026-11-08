@@ -1,0 +1,213 @@
+---
+title: Benchmark
+description: Measure prompt and generation speed with llama-bench or a real llama-server, compare runs side by side and turn the best one into a profile.
+---
+
+The Benchmark page measures how fast a model runs with a given set of flags: prompt processing and generation speed in
+tokens per second, and the VRAM the run used. Use it to compare two settings before you change a profile, or to check
+what a [Tuning](/docs/tuning/) recommendation is worth on your hardware.
+
+The page has three parts: the **New benchmark** form, a card that follows the current run (or sums up the last one),
+and the **History** of past runs.
+
+## Choose a tool
+
+A run uses one of two tools, picked with the **Tool** tabs of the form.
+
+|                     | **llama-bench**                                                        | **Server**                                                                         |
+| ------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| What runs           | llama.cpp's own benchmark, `llama-bench`                               | A temporary `llama-server`, started for the measurement and stopped afterwards     |
+| What it measures    | Raw prompt and generation speed for the flags in the fields            | Real chat requests, with every flag of the run                                      |
+| Context (`-c`)      | Not allocated                                                          | Allocated, as in daily use                                                         |
+| Speculative decoding | Not measured                                                          | Measured, with the draft acceptance rate in the **MTP** column                     |
+| Projector           | Ignored                                                                | Loaded                                                                             |
+| Needs               | `llama-bench` next to `llama-server`                                   | `llama-server` only                                                                |
+
+Use **llama-bench** to compare placement and memory flags quickly and repeatably (`-ngl`, `-ncmoe`, `-dev`, `-ts`,
+cache types): it is what [sweeps](/docs/sweeps/) use to explore. Use **Server** for the numbers you will actually see in
+[Chat](/docs/chat/): your context size, speculative decoding (see
+[Speculative decoding and MTP](/docs/guides/speculative-decoding/)) and the rest of your profile's flags. The two tools
+do not give comparable generation speeds, and the comparison dialog says so when you mix them.
+
+### What a server run does
+
+A server run starts `llama-server` on `127.0.0.1`, on the port set in [Settings](/docs/settings/), and then:
+
+1. Waits for the server to report healthy, for up to 10 minutes.
+2. Sends a short warm-up request.
+3. Sends `-r` chat requests. Each one is the same fixed text of about `-p` tokens, followed by an instruction to write
+   a new story, and asks for exactly `-n` generated tokens. Temperature is 0, the seed is fixed, the prompt cache is
+   off and thinking is turned off, so every repetition does the same work.
+4. Stops the server.
+
+**Prompt** and **Generation** are the mean of the speeds `llama-server` reports for these requests, with their standard
+deviation. The **MTP** value is the share of drafted tokens that were accepted, over all the requests; it stays empty
+without speculative decoding.
+
+## Run a benchmark
+
+Fill in the **New benchmark** form, then click **Run**.
+
+| Field                     | What it does                                                                                                           | Default                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| **Start from a profile**  | Prefills the model, the projector and the flags from a profile. The profile is not modified.                          | **None: model and flags** |
+| **Tool**                  | **llama-bench** or **Server**.                                                                                         | **llama-bench**        |
+| **Model**                 | Absolute path to the `.gguf` file. The folder button at the end of the field lists your models.                        | Empty                  |
+| **Projector (optional)**  | A multimodal projector. llama-bench ignores it, but it is kept for **Create profile** and **Rerun**.                  | Empty                  |
+| `-ngl`                    | Layers on the GPUs: a number, `all` or `auto`.                                                                         | Tool default           |
+| `-ncmoe`                  | Keeps the MoE experts of the first N layers in RAM.                                                                    | Tool default           |
+| `-t`, `-b`, `-ub`         | Threads, batch size, micro-batch size.                                                                                 | Tool default           |
+| `-sm`                     | Split mode: `none`, `layer`, `row` or `tensor`.                                                                        | Tool default           |
+| `-fa`                     | Flash attention: `on`, `off` or `auto`.                                                                                | Tool default           |
+| `-ctk`, `-ctv`            | KV cache types: `f32`, `f16`, `bf16`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`.                               | Tool default           |
+| **-dev and -ts**          | One checkbox per device, then a proportion box next to each checked device. With nothing checked, one `-ts` field (for example `3,1`) applies in the tool's device order. | Automatic |
+| `-ot`                     | Tensor overrides, one `pattern=buffer` rule per line, for example `exps=CPU`.                                          | None                   |
+| `-p`                      | Prompt tokens, 1 to 32,768.                                                                                            | 512                    |
+| `-n`                      | Generated tokens, 1 to 4,096.                                                                                          | 128                    |
+| `-r`                      | Repetitions, 1 to 20.                                                                                                  | 3                      |
+| **Other server flags**    | Any other `llama-server` flag, passed as is to a server run. llama-bench ignores them, but they are kept for a server run or a profile. | Empty |
+
+An empty field leaves the flag out, so the tool uses its own default. The device list comes from
+`llama-bench --list-devices`; when it cannot be read, the form says so and the choice stays automatic.
+
+**Other server flags** cannot contain the flags llama-webui manages itself (`--host`, `--port`, `-m`, `--mmproj`,
+`--metrics`, `--slots`, `--props`), nor a flag that has its own field: the form asks you to use the field instead.
+
+When you start from a profile, a server run uses the profile's working directory, and both tools get its environment
+variables (for example `CUDA_VISIBLE_DEVICES`), so the run sees the same cards as the profile.
+
+### What llama-bench leaves out
+
+With **llama-bench** selected, the form warns **llama-bench will not reproduce the whole profile** when **Other server
+flags** contains a flag that changes speed or memory but that llama-bench does not apply:
+
+| Flag                                                         | Why it is listed                    |
+| ------------------------------------------------------------ | ----------------------------------- |
+| `-c`, `--ctx-size`                                           | context not allocated               |
+| `--spec-type`, `-md`, `--model-draft`, `--draft…`, `-ngld`, `-devd` | speculative decoding not measured |
+| `-cmoe`, `--cpu-moe`                                         | use `-ncmoe`                        |
+| `-np`, `--parallel`                                          | parallel slots                      |
+
+Switch the tool to **Server** to measure them.
+
+### Follow a run
+
+While a run is in progress, the **Running** card shows its phase (**Stopping server**, **Loading**, **Warming up**,
+**Prompt**, **Generating**, **Measuring**, **Restarting server**), the step it is at, the elapsed time, a progress bar
+and the last 20 lines of the tool's output. The whole output also goes to the [Logs](/docs/logs/) page, each line
+prefixed with `[bench]`.
+
+**Cancel** stops the tool (it is asked to exit, then killed after 5 seconds) and records the run as **Cancelled**.
+Once the server restarts, the run is over and there is nothing left to cancel.
+
+When nothing runs, the card becomes **Last run**: **Prompt** and **Generation** with their deviation and token count,
+**MTP accepted**, **Peak VRAM**, and the error if the run failed.
+
+## What happens to a running model
+
+A benchmark needs the GPUs and the server port to itself, so only one runs at a time: a one-off run or a sweep. While
+it runs, starting, stopping or switching the server is refused with **A benchmark is running**.
+
+If a profile is running in llama-webui when you click **Run**, a dialog asks first:
+
+> **Stop llama-server?** Profile “…” will be stopped during the benchmark, then restarted with the same command at the
+> end, even if the run fails or is cancelled. Chat is unavailable in the meantime.
+
+Click **Stop and run** to go ahead. If the restart fails, its error is added to the run's error
+(`could not restart llama-server: …`), and you can start the profile again by hand.
+
+A `llama-server` that llama-webui did not launch (shown as external) cannot be stopped this way: the form says **An
+external llama-server is running: stop it first.** and **Run** stays disabled.
+
+## History
+
+<Screenshot name="benchmark" alt="Benchmark page: the bottom of the run form, then the History table with five runs of the same model, their tool, flags, prompt and generation speeds, MTP acceptance, peak VRAM, duration and status" />
+
+The **History** card lists the latest 500 runs, newest first. Four filters narrow it down: the tool (**All tools**,
+**llama-bench**, **Server**), the model (**All models** or one file), the status (**All statuses**, **Queued**,
+**Running**, **Done**, **Failed**, **Cancelled**, **Interrupted**), and sweeps. **Without sweeps**, the default, hides the
+runs that belong to a [sweep](/docs/sweeps/); **With sweeps** shows them and adds a **Sweep** column.
+
+| Column         | Shows                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| **Run**        | The run number and its date.                                                               |
+| **Tool**       | `llama-bench` or `server`.                                                                 |
+| **Model**      | The file name; hover for the full path.                                                    |
+| **Flags**      | The run's flags in the tool's syntax; hover for the full command.                          |
+| **Sweep**      | With sweeps only: the sweep number and the configuration, linked to the sweep on Tuning.   |
+| **Prompt**     | Prompt processing speed in tok/s, with the standard deviation below.                       |
+| **Generation** | Generation speed in tok/s, with the standard deviation below.                              |
+| **MTP**        | Draft acceptance rate of a server run with speculative decoding.                           |
+| **Peak VRAM**  | VRAM the run added, summed over the cards; hover for each card.                            |
+| **Duration**   | The whole run, model loading included.                                                     |
+| **Status**     | **Done**, **Failed**, **Cancelled**, **Interrupted**…; hover a failed run for its error.   |
+
+The **…** menu of each row has **Rerun**, **Create profile**, **Copy command** and **Delete**. **Delete failed**, at
+the top of the card, removes every failed, cancelled and interrupted run in one go; runs that belong to a sweep stay
+with their sweep.
+
+llama-bench writes some flags differently from `llama-server`, and the history shows each run in its own tool's syntax:
+`-ngl all` becomes `-ngl 999`, `-dev` and `-ts` values are separated by `/` (`-dev CUDA0/CUDA1`), and `-ot` rules by
+`;`.
+
+## Compare runs
+
+Check the box of two to four runs, then click **Compare** (the button shows how many runs are selected). Once four are
+checked, the other boxes are disabled.
+
+<Screenshot name="benchmark-compare" alt="Comparing 2 runs dialog: one column per run, rows for tool, model and each flag; the -sm row is highlighted because one run used layer and the other tensor" />
+
+The **Comparing N runs** dialog has one column per run and one row per setting: **Tool**, **Model**, every flag from
+`-ngl` to `-ub`, **Other flags** (`ignored` for a llama-bench run), **-p / -n / -r**, then the results: **Prompt**,
+**Generation**, **MTP accepted**, the VRAM peak of each card, and the **Build** and **CPU** the run used. Settings that
+differ between runs are highlighted; measurements are not.
+
+Two notes appear when they apply: llama-bench and server runs are not directly comparable, and the runs used different
+hardware. Below the table, two bar charts show prompt and generation speed, each on its own scale; a run keeps the same
+color in both.
+
+## Rerun a benchmark
+
+**Rerun** copies the run's tool, model, projector, flags and `-p`, `-n`, `-r` back into the form and scrolls up to it.
+Nothing starts: change what you want to test, then click **Run**. To measure a llama-bench result in real conditions,
+rerun it and switch the tool to **Server**.
+
+## Turn a run into a profile
+
+**Create profile** saves the run as a new [profile](/docs/profiles/) and opens it on the Profiles page. The profile is
+named after the model and the run (`<model> — bench #12`, with a number added if the name is taken), and gets:
+
+- the model and the projector;
+- the run's flags in `llama-server` syntax, followed by its other server flags;
+- the environment variables of the profile the run started from, if any.
+
+The menu item is disabled while the run is in progress.
+
+## Peak VRAM
+
+For each card, the peak is the highest VRAM use seen during the run minus what the card held when the run started: it
+is what the run itself added. llama-webui samples it every 100 ms, with `nvidia-smi` for NVIDIA cards and the `amdgpu`
+sysfs files for AMD cards, and also uses its regular GPU monitoring as a fallback. Without GPU telemetry the column
+shows `—`.
+
+**Peak VRAM** in the history is the sum over the cards; the comparison dialog shows each card on its own row.
+
+## Failed runs and out of memory
+
+A run is **Failed** when the tool exits without results. Its error is the line of the tool's output that says why (a
+CUDA error, an error loading the model…), or `llama-bench exited (code N)` when there is none. Hover the status to read
+it; the **Last run** card shows it too, and the full output is in [Logs](/docs/logs/).
+
+When the output reports an allocation failure, the error starts with **Out of memory**, followed by the line that names
+the device, for example `Out of memory: llama_model_load: error loading model: unable to allocate CUDA1 buffer`. To make
+the configuration fit, put fewer layers on the cards (`-ngl`), move more experts to RAM (`-ncmoe`), spread the model
+over more cards (`-dev`, `-ts`), or lower the context or quantize the KV cache in a server run. The
+[Tuning](/docs/tuning/) page estimates all of this before you run anything.
+
+A server run can also fail for its own reasons:
+
+- `port N is used by another server`: another process listens on the port from Settings.
+- `loading > 10 min`: the server did not become healthy within 10 minutes.
+- `no response after 10 min`: a request did not complete within 10 minutes.
+
+A run is **Interrupted** when llama-webui stops or restarts while it is in progress.

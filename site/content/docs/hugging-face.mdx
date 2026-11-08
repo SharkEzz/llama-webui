@@ -1,0 +1,143 @@
+---
+title: Hugging Face downloads
+description: Search Hugging Face for GGUF models, pick a quantization that fits your GPUs, and download it into your models folder with resume and checksums.
+---
+
+llama-webui downloads GGUF models from Hugging Face straight into your models folder. You search the Hub (or paste a
+repository), pick a quantization, and the file lands where the [Models](/docs/models/) page and your profiles can use
+it.
+
+Open it from the [Models](/docs/models/) page with **Download** (or **Download one from Hugging Face** when the folder
+is empty). A side panel opens: **Download from Hugging Face**.
+
+<Screenshot name="models-hf" alt="The Download from Hugging Face panel over the Models page: a search box holding unsloth/Qwen3.8-27B-GGUF, the destination folder, a checked box to also download the F16 projector, and a list of quantizations from 1.3 GiB to 16.3 GiB, each with a Fits in VRAM badge and a Download button." />
+
+## Find a repository
+
+Type in the search box. What you type decides what the panel shows:
+
+| You type                                                       | The panel shows                                                                    |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Words, such as `qwen 27b`                                      | GGUF repositories that match, most downloaded first (30 at most).                  |
+| A repository id, `org/name`                                    | That repository's files. If no repository has that id, an error and the search results for that text. |
+| `org/name:Q4_K_M` (the syntax of `llama-server -hf`)           | The repository, with that quantization highlighted.                               |
+| A Hugging Face URL (`huggingface.co/…` or `hf.co/…`)           | The repository. A link to a file (`…/blob/main/…`) highlights that file.           |
+
+Each search result shows its download and like counts, and a lock when the repository is gated. Click a result to open
+it; **Results** takes you back to the list.
+
+## Pick a quantization
+
+A repository shows a link to its page on Hugging Face (license, model card) and, below it, the folder the files will
+go to. Then it lists its GGUF files, smallest first:
+
+- One row per file, or per set of parts for a split model (the row says how many parts, for example `3 parts`).
+- The quantization badge (`Q4_K_M`, `UD-IQ3_XXS`, `BF16`…), read from the file name.
+- The total size.
+- A fit badge (see below).
+- **Download**, or **Resume** when part of it is already on disk, **Queued** while it is in the download queue, and
+  **Downloaded** when every file is already in place.
+
+Multimodal projectors are listed apart, under **Projectors (mmproj)**. When the repository has projectors and none of
+them is downloaded or queued yet, a box **Also download the projector (…) for image input** appears, checked by
+default: downloading a model then queues the projector too. llama-webui picks the `F16` projector, else `BF16`, else the smallest. Uncheck the box
+to download the model alone, or download any projector from its own row.
+
+### The fit badge
+
+The badge compares the size of the weights with the total VRAM of your GPUs (those not hidden in
+[Settings](/docs/settings/)):
+
+| Badge               | Meaning                                                                                  |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| **Fits in VRAM**    | The weights take at most 85% of the VRAM.                                                |
+| **Tight**           | The weights take 85 to 100% of the VRAM: little room is left for the context.            |
+| **Partial offload** | The weights are larger than the VRAM: part of the model will have to stay in system RAM. |
+
+It is a first sort only. The context (KV cache) and compute buffers come on top of the weights, and a mixture-of-experts
+model can run well with its experts in RAM. Without a GPU there is no badge. Once the model is downloaded,
+[Tuning](/docs/tuning/) gives a per-device estimate with real flags.
+
+## The download queue
+
+Downloads run one at a time, in the order you queued them. The **Downloads** section at the bottom of the panel lists
+the running and queued items first, then the last 20 finished ones. You can close the panel: downloads continue on the
+server, even with no browser open, and the **Download** button on the Models page shows the progress of the whole
+queue.
+
+The running item shows a progress bar, the bytes received out of the total, the speed and the time left, and
+`part 2/3` for a split model. Two other messages can appear:
+
+- **Checking the partial file…**: llama-webui reads back what was already downloaded before it resumes (see below).
+- **Connection lost, retrying in …**: a network error, with the time before the next attempt.
+
+When a download ends, a notification says so. **Details** (in the notification or on the finished row) opens the model
+on the [Models](/docs/models/) page, which is rescanned by itself, so you can go on with **Create profile**.
+
+### Cancel, retry and clear
+
+| Action                         | Where                           | Effect                                                                                     |
+| ------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------ |
+| Cancel (the cross)             | A queued or running item        | Stops it and deletes what it wrote: partial files, and files it had already completed.     |
+| Retry (the circular arrow)     | A failed or canceled item       | Puts it back in the queue. Files that are still complete on disk are kept.                 |
+| Remove from the list (the bin) | A finished, failed or canceled item | Removes the row only. Downloaded files stay.                                            |
+| **Clear finished**             | Above the list                  | Removes every finished, failed and canceled row. Downloaded files stay.                    |
+
+There is no pause button. A download interrupted by a restart of llama-webui resumes on its own at the next start
+(see below).
+
+## Where files land
+
+Files go to `<models folder>/<org>/<repo>/`, keeping the repository's subfolders: `unsloth/Qwen3.8-27B-GGUF` lands in
+`~/models/unsloth/Qwen3.8-27B-GGUF/` with the default models folder. The Models page lists them as soon as they are
+complete.
+
+While it downloads, a file is written as `<file>.part`, which the Models page ignores. It gets its real name only once
+it is complete and verified.
+
+## Resume, checksums and disk space
+
+- **Resume.** A network error does not throw away what was already downloaded. llama-webui retries after 2, 4, 8, 16
+  and 30 seconds, and restarts an attempt that receives no data for 60 seconds. Each attempt continues where the file
+  stopped. When the retries run out, the item fails and **Retry** continues from the same point.
+- **Restarts.** If llama-webui stops or crashes during a download, the item stays in the queue and resumes at the
+  next start, from its `.part` file.
+- **Checksums.** Hugging Face publishes the sha256 of each model file. llama-webui computes it while downloading and
+  compares it at the end. On a mismatch, the file is deleted and the item fails with `Checksum mismatch`. When it
+  resumes a `.part` file, it first reads it back to continue the computation (the **Checking the partial file…**
+  message).
+- **Pinned version.** Files are downloaded at the exact commit you saw when you opened the repository, so all the
+  parts of a split model come from the same version even if the repository changes meanwhile.
+- **Disk space.** Before queuing, llama-webui checks the free space on the disk of the models folder. It refuses a
+  download that does not fit next to what the queue still has to write, plus 1 GiB of margin, with a
+  `Not enough disk space` message.
+- **Already there.** Files already in the folder with the right size are skipped. Queuing a model whose files are all
+  present only shows **Already downloaded**.
+
+## Gated and private repositories
+
+Without a token you can download public repositories. The panel's header says which token it uses:
+
+- **No token: public models only.**
+- **Signed in as** your account name, with the source of the token (`HF_TOKEN` or `hf auth login`).
+- A warning when Hugging Face rejected the token.
+
+llama-webui finds the token the way the `hf` command does: the `HF_TOKEN` environment variable (or the older
+`HUGGING_FACE_HUB_TOKEN`), else the file `hf auth login` writes (`~/.cache/huggingface/token` by default, `$HF_HOME/token` if you set
+`HF_HOME`). The file is
+read again on every request, so running `hf auth login` while llama-webui runs is enough; a change to `HF_TOKEN` needs
+a restart. See [Launch options](/docs/configuration/) for how to set environment variables.
+
+A gated repository needs two things: a token, and the license accepted on the repository's page with the account of
+that token. The panel shows a note on gated repositories, and a download refused for that
+reason links to the page where you accept the license. A private repository you cannot access is reported as not
+found.
+
+The token is sent to Hugging Face only, never to the download servers Hugging Face redirects to.
+
+<Callout type="tip" title="Mirrors">
+
+Set `HF_ENDPOINT` to the address of a Hugging Face mirror before starting llama-webui. Search, repository listings,
+downloads and the links to repository pages then use the mirror instead of `https://huggingface.co`.
+
+</Callout>

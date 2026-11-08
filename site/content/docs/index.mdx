@@ -1,6 +1,76 @@
 ---
-title: Documentation
-description: How to install llama-webui, and how to use each of its pages to run, watch and tune llama-server.
+title: Introduction
+description: What llama-webui is, the problem it solves, who it is for, what it does not do, and how this documentation is organized.
 ---
 
-The user documentation is being written. Start with [Installation](/docs/getting-started/installation/).
+llama-webui is a local web app that drives llama.cpp's `llama-server` on a Linux machine you own. One Bun process
+serves the interface, its API and the live updates on port 7860: from a single browser tab you start models, watch
+every GPU, chat, run benchmarks, and get flags tuned for your hardware.
+
+<Screenshot
+  name="dashboard"
+  alt="The Dashboard during a generation: generation and prompt speed in tok/s, speculative acceptance, context used, gauges for CPU, RAM and the VRAM of two GPUs, a throughput chart, the slot list and a table of recent requests."
+/>
+
+## The problem it solves
+
+`llama-server` is fast and flexible, but running it every day tends to look like this:
+
+- one long command line per model, kept in your shell history or in scripts;
+- `nvidia-smi` in a second terminal to see whether the model fits and what each card is doing;
+- rounds of trial and error with `-ngl`, `--n-cpu-moe`, `--tensor-split` or `--override-tensor` to fit a large model
+  across several GPUs and system RAM.
+
+llama-webui puts all of this in one place:
+
+- **Profiles.** A model, its `llama-server` arguments and environment variables, saved once and started in one click
+  from the launch pad. The argument editor completes flags and shows their help, read from your own
+  `llama-server --help`.
+- **Live monitoring.** Generation and prompt speed, context use and speculative-decoding acceptance come from
+  `llama-server` itself. Next to them: utilization, VRAM, PCIe traffic, power and temperature of every GPU, plus CPU,
+  RAM, disk reads and DRAM bandwidth.
+- **Measured tuning.** Tuning estimates the memory a model needs on each device and recommends flags for a goal.
+  Benchmarks and sweeps then measure the candidates with real `llama-bench` and `llama-server` runs before you turn the
+  best one into a profile.
+
+## Who it is for
+
+llama-webui is for people who run llama.cpp locally on their own Linux machine, a workstation or a home server, and
+want to get the most out of its hardware. It is built for machines with several GPUs, including mixed ones (NVIDIA
+next to AMD, CUDA next to Vulkan or ROCm), and for models larger than the VRAM, whose experts spill into system RAM.
+
+It also works with a single GPU, or none: on a CPU-only machine you still get profiles, chat, monitoring and
+benchmarks.
+
+## What it is not
+
+- **Not a model runtime.** llama-webui does not run models itself. It starts and watches your own llama.cpp build:
+  `llama-server`, and `llama-bench` for benchmarks. You pick the backend (CUDA, ROCm, Vulkan, CPU) when you build
+  llama.cpp, and you update it yourself.
+- **Not a hosted or multi-user service.** It runs on your machine, with no account and no authentication. It listens
+  on `127.0.0.1` by default, and whoever can reach it can start processes on the machine: read
+  [Security](/docs/security/) before opening it to your network. The only outside service it contacts is Hugging
+  Face, when you search for or download models.
+- **Not a model router.** It runs one `llama-server` at a time. Starting another profile switches the server to it,
+  and a benchmark stops the running server for its duration, then starts it again.
+- **Not a proxy.** Other tools (editor plugins, agents, scripts) keep talking to `llama-server` directly on its own
+  port; llama-webui does not relay its API.
+- **Not cross-platform.** It runs on Linux only: hardware discovery and telemetry read `/proc` and `/sys`.
+
+## How this documentation is organized
+
+New here? Read [Requirements](/docs/getting-started/requirements/), then follow
+[Installation](/docs/getting-started/installation/) and the [Quick start](/docs/getting-started/quick-start/).
+
+| Section            | Pages                                                                                                                                                                                                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Getting started    | [Requirements](/docs/getting-started/requirements/), [Installation](/docs/getting-started/installation/), [First run](/docs/getting-started/first-run/) (the setup checklist), [Quick start](/docs/getting-started/quick-start/) (from a fresh install to a first chat)        |
+| Configuration      | [Launch options](/docs/configuration/) (flags, environment variables, data directory), [Settings](/docs/settings/), [Security](/docs/security/)                                                                                                                              |
+| Run models         | [Home and launch pad](/docs/home/), [Models](/docs/models/), [Hugging Face downloads](/docs/hugging-face/), [Profiles](/docs/profiles/), [Server](/docs/server/), [Chat](/docs/chat/)                                                                                          |
+| Monitor            | [Dashboard](/docs/dashboard/), [System](/docs/system/), [Topology](/docs/topology/), [Logs](/docs/logs/)                                                                                                                                                                      |
+| Measure and tune   | [Benchmark](/docs/benchmark/), [Tuning](/docs/tuning/), [Sweeps](/docs/sweeps/)                                                                                                                                                                                               |
+| Guides             | [Run a 100 GB MoE model on consumer GPUs](/docs/guides/big-moe-models/), [Split a model across mixed GPUs](/docs/guides/mixed-gpus/), [Find the best flags with a sweep](/docs/guides/find-best-flags/), [Speculative decoding and MTP](/docs/guides/speculative-decoding/), [Monitor DRAM bandwidth](/docs/guides/dram-bandwidth/) |
+| Help               | [Troubleshooting](/docs/troubleshooting/), [FAQ](/docs/faq/)                                                                                                                                                                                                                  |
+
+The pages under **Run models**, **Monitor** and **Measure and tune** follow the app's sidebar: each one explains a
+screen area by area, then the common tasks. The guides are procedures that combine several pages to reach one result.

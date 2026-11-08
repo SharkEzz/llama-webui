@@ -9,10 +9,10 @@ export function ProfilesSection() {
       id="profiles"
       tone="rose"
       pages={[
-        { label: 'Models', icon: Boxes },
-        { label: 'Profiles', icon: SlidersHorizontal },
-        { label: 'Home', icon: Home },
-        { label: 'Chat', icon: MessageSquare },
+        { label: 'Models', icon: Boxes, doc: '/docs/models/' },
+        { label: 'Profiles', icon: SlidersHorizontal, doc: '/docs/profiles/' },
+        { label: 'Home', icon: Home, doc: '/docs/home/' },
+        { label: 'Chat', icon: MessageSquare, doc: '/docs/chat/' },
       ]}
       title="From a GGUF file to a conversation."
       lede="Download a model from Hugging Face, save how to run it in a profile, start it from Home and chat with it, without leaving the tab."

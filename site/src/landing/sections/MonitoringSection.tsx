@@ -24,10 +24,10 @@ export function MonitoringSection() {
       id="monitoring"
       tone="blue"
       pages={[
-        { label: 'Dashboard', icon: Activity },
-        { label: 'System', icon: Cpu },
-        { label: 'Topology', icon: Network },
-        { label: 'Logs', icon: ScrollText },
+        { label: 'Dashboard', icon: Activity, doc: '/docs/dashboard/' },
+        { label: 'System', icon: Cpu, doc: '/docs/system/' },
+        { label: 'Topology', icon: Network, doc: '/docs/topology/' },
+        { label: 'Logs', icon: ScrollText, doc: '/docs/logs/' },
       ]}
       title="See what every GPU is doing."
       lede="Throughput, VRAM, PCIe traffic, power and temperatures, read from the real hardware every second while llama-server works."

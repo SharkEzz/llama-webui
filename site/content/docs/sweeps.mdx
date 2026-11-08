@@ -1,0 +1,188 @@
+---
+title: Sweeps
+description: Benchmark many flag combinations in one go with llama-bench, rank them for your goal, validate the best on a real llama-server and keep the winner.
+---
+
+A sweep runs the same benchmark over many configurations: every combination of the values you list for each flag. It
+explores them with `llama-bench`, ranks the results for the goal you picked, validates the best few on a real
+`llama-server`, and lets you save the winner as a profile. Use it when the [Tuning](/docs/tuning/) recommendation gives
+you a starting point and you want measured numbers rather than an estimate.
+
+Sweeps live on the Tuning page, below the recommendation, and need `llama-bench` next to `llama-server`. For a
+step-by-step walkthrough, see [Find the best flags with a sweep](/docs/guides/find-best-flags/).
+
+## Build the search space
+
+Pick a model and a preset at the top of the Tuning page first: the **Search space** card stays empty until a model is
+set, and the preset decides how results are ranked.
+
+### The base
+
+Every configuration starts from the **Base** flags. **Start from the recommendation** copies the recommended flags into
+the base and suggests values around them. **Clear** empties the base; configurations then use llama-bench's defaults for
+every flag you do not vary.
+
+### The rows
+
+Each row is a flag. Every value you add to a row overrides the base for that flag and multiplies the number of
+configurations; an empty row has no effect. Type a value and press <Kbd>Enter</Kbd> (or leave the field) to add it, click
+a suggestion to add it, and click × on a value to remove it.
+
+| Row      | Values                                              | Suggestions                                                                   |
+| -------- | --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `-ngl`   | A number of layers or `all`                         | `all`                                                                         |
+| `-ncmoe` | Whole numbers                                       | Around the estimate (N−8, N−4, N, N+4, N+8) when it uses `-ncmoe`, otherwise 0, 4, 8, 16 |
+| `-dev`   | Device sets: check cards, then **Add this set**     | **each card alone**, **all CUDA** (two CUDA cards or more), **all** (two cards or more) |
+| `-ts`    | Proportions such as `3,1`                           | None. A value only applies to `-dev` sets with as many cards.                 |
+| `-ot`    | One `pattern=buffer` rule per value                 | `exps=CPU`, `blk\.(\d\|1\d)\.ffn_.*_exps=CPU`, `blk\.[0-9]\.ffn_.*_exps=CPU`, `ffn_.*_exps=Vulkan3` |
+| `-fa`    | Toggle `on`, `off`, `auto`                          |                                                                               |
+| `-ctk`, `-ctv` | Toggle any KV cache type                      |                                                                               |
+| `-sm`    | Toggle `none`, `layer`, `row`, `tensor`             |                                                                               |
+| `-ub`    | Whole numbers                                       | 256, 512, 1024, 2048                                                          |
+| `-b`     | Whole numbers                                       | 512, 2048, 4096                                                               |
+| `-t`     | Whole numbers                                       | Your physical core count and thread count                                    |
+
+**Start from the recommendation** fills in a few rows for you: `-ncmoe` around the recommended value when the model keeps
+experts in RAM; a few `-dev` sets (the recommended one, all cards, all CUDA cards, the largest card alone) when there is
+more than one; and `-ub` 512 and 2048 for **Agent & RAG**.
+
+The suggested `-ot` patterns move MoE expert tensors to the CPU: all of them, or those of the first 20 or the first 10
+layers. The last suggestion sends every expert to `Vulkan3`; if you have no such device, type your own rule with a device
+id from the **Hardware** card.
+
+### Run settings
+
+| Field              | Default                               | Notes                                                                 |
+| ------------------ | ------------------------------------- | --------------------------------------------------------------------- |
+| **Sweep name**     | Automatic: model · preset · date      | Up to 80 characters.                                                  |
+| **p (prompt)**     | 512                                   | Prompt tokens per measurement.                                        |
+| **n (generation)** | 128                                   | Generated tokens per measurement.                                     |
+| **r (repetitions)**| 3                                     | Keep 3 or more for the standard deviation to mean something.          |
+
+**Include configurations that do not fit (they will most likely end in “Out of memory”)** keeps the configurations the
+estimator rejects. Leave it unchecked unless you want to see where the limit really is.
+
+### Check the plan
+
+Under the fields, the plan shows what the sweep will run before anything starts: the number of configurations, how many
+were excluded because they do not fit, and an estimated duration. Its table lists each configuration (only the flags that
+vary), the estimator's verdict (**fits**, **tight** or **does not fit**), the estimated VRAM per card and the RAM. The
+first 100 configurations are listed.
+
+Duplicates are removed. A `-ts` value is dropped from combinations whose `-dev` set has a different number of cards, and
+the plan says how many were affected.
+
+The verdict uses the sweep's context: the `-c` among your profile's other flags, otherwise the preset's minimum context
+(16,384 for **Agent & RAG**, 8,192 for the others). Since llama-bench does not allocate that context, the estimator is
+what keeps configurations that would not fit in daily use out of the sweep.
+
+## Run the sweep
+
+Click **Run sweep**. It is disabled when there is nothing to run, when a sweep is already running, or when an external
+`llama-server` is using the GPUs.
+
+If a profile is running, a **Stop llama-server?** dialog asks first: the server is stopped once for the whole sweep and
+restarted with the same command at the end, even if the sweep fails or is cancelled. [Chat](/docs/chat/) is unavailable
+in the meantime, and no other benchmark can start.
+
+### Exploration with llama-bench
+
+Each configuration becomes one llama-bench run, executed one after another with a one-second pause in between. A
+configuration that fails, out of memory included, does not stop the sweep: the next one starts.
+
+<Screenshot name="tuning-sweep" alt="A finished sweep of 10 configurations: the Validation (server) table with two runs tied for first place, the best one starred, then the Exploration (llama-bench) table ranking eight configurations by generation speed" />
+
+The sweep card shows the progress: the item number, its configuration and phase, how many items succeeded or failed,
+the elapsed time and an estimate of the time left. The current item's output scrolls underneath. Each item is also
+listed in the [Benchmark](/docs/benchmark/) history, under the **With sweeps** filter.
+
+### How long it takes
+
+The plan's estimate counts, for each configuration, one model load (the file read at about 1.5 GiB/s) plus about 10
+seconds per repetition. With a 20 GiB model and `r` = 3, that is about 43 seconds per configuration, so 12
+configurations take close to 9 minutes. While the sweep runs, the time left is the average duration of the items that
+succeeded, times the items still to run.
+
+When the estimate exceeds an hour, the plan warns: **Long sweep: the server will stay stopped the whole time.**
+Validation adds one server run per configuration you validate.
+
+## Read the results
+
+The sweep card keeps two rankings apart, never mixed: **Validation (server)**, once you have validated, and
+**Exploration (llama-bench)**.
+
+| Column            | Shows                                                                     |
+| ----------------- | ------------------------------------------------------------------------- |
+| **Rank**          | The position by the preset's score; `1=` for a tie with the first.        |
+| **Configuration** | The flags that vary; a star marks the best run.                           |
+| **Estimated**     | The estimator's verdict when the sweep was planned.                       |
+| **Status**        | **Done**, **Failed**, **out of memory**…; hover for the error.            |
+| **Prompt**, **Generation** | Speeds in tok/s, with the standard deviation below.              |
+| **MTP**           | Validation only: draft acceptance with speculative decoding.              |
+| **Peak VRAM**     | VRAM the run added, summed over the cards.                                |
+| **Duration**      | The whole run, model loading included.                                    |
+
+The score depends on the preset (see [Presets](/docs/tuning/#presets)): generation speed for most of them,
+0.6 × prompt speed + 0.4 × generation speed for **Agent & RAG**. Successful runs are ranked by score; the others follow
+without a rank.
+
+Two runs whose gap is smaller than llama-bench's measurement noise (±10% for prompt speed, ±2% for generation speed)
+are a tie: both show `1=`. The star marks the best run among the validation runs if any succeeded, otherwise among the
+exploration runs.
+
+Below the tables, two bar charts compare the best eight exploration configurations, generation and prompt speed each on
+its own scale, with a thin line for ± one standard deviation.
+
+## Validate on the server
+
+llama-bench measures neither the context nor speculative decoding, so the exploration ranking can change once the real
+server runs. Pick how many configurations to check (**Top 1** to **Top 5**, **Top 3** by default), then click **Validate
+on the server**.
+
+Each of the best exploration configurations runs again as a server [benchmark](/docs/benchmark/#what-a-server-run-does),
+with the sweep's `p`, `n` and `r` and your profile's other flags (`-c`, speculative decoding…). These runs appear in
+**Validation (server)**, and in the Benchmark history with a label that starts with `validation ·`. Validation needs at
+least one successful exploration run, and asks to stop the running model again if there is one.
+
+<Callout type="tip" title="Start from a profile">
+
+The server validation uses the other flags of the profile you started from. Without a `-c` among them, `llama-server`
+uses the context stored in the model, which can be much larger than the one the estimator checked.
+
+</Callout>
+
+## Keep the best as a profile
+
+The **…** menu of a result row has:
+
+- **Create profile**: saves the configuration as a new [profile](/docs/profiles/) and opens it. The profile gets the
+  configuration's flags in `llama-server` syntax, your profile's other flags and its environment variables. Only
+  successful runs can be saved.
+- **Copy command**: copies the exact command of the run.
+- **View in Benchmark**: opens the Benchmark page with this run selected in the history.
+
+If an exploration run was estimated **does not fit** (because you included such configurations), **Create profile**
+first opens **This configuration does not fit with the target context**: the profile may run out of memory at startup
+with the sweep's context. Click **Create anyway** to save it regardless. Validating it on the server first is the safer path.
+
+## Stop, resume and delete
+
+- **Cancel sweep** stops the current item, cancels the queued ones and restarts the server if the sweep stopped it. A
+  cancelled sweep cannot be resumed, but its results stay and you can still validate them.
+- **Cancel** in the Benchmark page's **Running** card stops only the current item; the sweep moves on to the next one.
+- **Delete sweep** removes the sweep and all its runs, from the Benchmark history too. A running sweep must be cancelled
+  first.
+
+### Resume an interrupted sweep
+
+If llama-webui stops while a sweep runs (you stop it, it crashes, the machine reboots), the item in progress and the
+sweep are marked **interrupted**; the items still queued are kept. Open the sweep from the **Sweeps** list and click
+**Resume**: interrupted items go back in the queue and the sweep carries on from where it stopped. Resuming takes over
+the GPUs again, so it asks to stop a running model first.
+
+## Sweeps list
+
+The **Sweeps** card at the bottom of the Tuning page lists every sweep: **Name**, **Model**, **Preset**,
+**ok / failed / total**, **Best** (the best configuration, its generation speed, and a `server` badge when it comes from a
+validation), **Status** (**running**, **done**, **cancelled** or **interrupted**) and **Date**. Click a row to open the sweep; a
+running sweep opens on its own when you visit the page.

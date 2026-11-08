@@ -1,0 +1,91 @@
+---
+title: Home and launch pad
+description: The Home page lists every profile as a card with its model, last benchmark and memory fit, and starts, switches or stops it in one click.
+---
+
+Home is where you start a model. Until the first-run setup is finished it shows the setup checklist; after that it
+becomes the launch pad: one card per profile, each with a button to start it.
+
+<Screenshot name="launchpad" alt="The launch pad with three profile cards. The first is Ready, with Chat, Dashboard and Stop buttons, a benchmark line in tok/s and a green Fits badge; the other two show No benchmark yet, an amber Tight badge and a Switch button." />
+
+## Before the setup is finished
+
+On a fresh install, Home opens the setup checklist (**Welcome to llama-webui**) instead of the launch pad. Two steps
+are required: llama-webui must find `llama-server`, and the models folder must exist. **Finish** stays disabled until
+both are done; once you click it, Home shows the launch pad from then on. See [First run](/docs/getting-started/first-run/)
+for each step of the checklist.
+
+You can reopen the checklist at any time with **Setup checklist** at the top right of the launch pad, or with
+**Run setup again** in [Settings](/docs/settings/).
+
+If something the setup checked breaks later, for example the `llama-server` binary was moved or the models folder was
+deleted, the launch pad shows a **Setup incomplete** banner that says what is missing. Click **Fix** to open the
+checklist and correct it.
+
+## What a card shows
+
+Cards appear in alphabetical order of profile name. Each one reads the profile's model file and shows:
+
+| Line              | What it means                                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Title             | The profile name. While this profile is the one `llama-server` runs, its state appears on the right: **Starting…**, **Ready**, **Stopping…** or **Crashed**.                                            |
+| Model             | The model name from the GGUF header, its quantization and its size on disk. Hover it to see the file path. If the file cannot be read (moved, deleted, incomplete), the error appears in red instead. |
+| Last benchmark    | Prompt (`pp`) and generation (`tg`) speed in tok/s of the latest successful [benchmark](/docs/benchmark/) run with this profile, and its date. Runs that belong to a sweep are not counted. Otherwise **No benchmark yet**. |
+| Memory fit        | A badge that estimates whether the profile fits in your memory (see below).                                                                                                                              |
+| Crash details     | After a crash, the error message, exit code or signal.                                                                                                                                                  |
+
+The card of the profile that is ready gets a green outline.
+
+### The memory fit badge
+
+The badge is an estimate of the memory this profile needs **with its own arguments** (context size, layers on the GPU,
+experts kept in RAM, tensor split…), compared with the memory of your GPUs and the RAM available. It uses the same
+estimator as [Tuning](/docs/tuning/).
+
+| Badge                      | Meaning                                                                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Fits in VRAM**           | Everything fits on the GPUs with room to spare.                                                                                     |
+| **Fits · 12 GiB in RAM**   | Part of the model stays in system RAM (for example MoE experts kept on the CPU), and everything fits.                              |
+| **Tight in VRAM**          | It fits, but at least one GPU is above 95% of its usable memory.                                                                    |
+| **Tight · 32 GiB in RAM**  | Either a GPU has a thin margin, or the part kept in RAM is larger than the RAM available: the rest is read again from disk, which is slow but works. |
+| **Does not fit**           | At least one GPU needs more than its usable memory: the launch will most likely fail.                                              |
+
+Usable memory is the GPU's total minus a safety margin. Hover the badge to see the total planned on the GPUs and the
+reason for a tight or failed verdict.
+
+The badge is missing when the estimate cannot be made: when the model file cannot be read, or when your machine has
+GPUs but `llama-bench` cannot list them (the estimator needs `llama-bench`, next to `llama-server`, to know your
+devices).
+
+## Start, switch and stop
+
+The buttons at the bottom of a card depend on what `llama-server` is doing:
+
+- **Start**: nothing is running. The profile is launched right away and the card shows **Starting…** until the model
+  is loaded. Disabled when the model cannot be read, or when a `llama-server` started outside llama-webui is using the
+  port (hover the button to see why).
+- **Switch**: another profile is running. After you confirm, llama-webui stops the running server and starts this
+  profile. Requests in progress are interrupted.
+- **Starting…** or **Stopping…**: a disabled button while the server changes state.
+- **Chat**, **Dashboard** and **Stop**: this profile is ready. **Chat** opens the [Chat](/docs/chat/) page,
+  **Dashboard** the live [Dashboard](/docs/dashboard/). **Stop** asks for confirmation, then unloads the model.
+
+Only one `llama-server` runs at a time. Starting a profile also makes it the default choice on the
+[Server](/docs/server/) page, where you can restart it and read the command that was launched.
+
+<Callout type="note">
+
+While a [benchmark](/docs/benchmark/) or a [sweep](/docs/sweeps/) is running, it controls `llama-server`: starting,
+switching or stopping from a card is refused until it ends.
+
+</Callout>
+
+## No profile yet
+
+Without any profile, the launch pad shows a **No profile yet** card with two ways to create one:
+
+- **Create a profile** opens the [Profiles](/docs/profiles/) page, where you pick a model and write its arguments.
+- **Get a recommendation** opens [Tuning](/docs/tuning/), which proposes flags for your hardware and creates the
+  profile for you.
+
+You can also create a profile straight from a model on the [Models](/docs/models/) page.

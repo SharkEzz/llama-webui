@@ -1,0 +1,105 @@
+---
+title: Models
+description: The Models page lists the GGUF files of your models folder with their header metadata, and creates a profile from any of them.
+---
+
+The Models page shows every GGUF file in your models folder, read from the file headers: architecture, quantization,
+size, parameters, layers, context length and experts. Open it to check what you have, to inspect a model before
+writing a profile, or to download a new one from Hugging Face.
+
+<Screenshot name="models" alt="The Models page: the models folder path under the title, Download and Rescan buttons, a search box, Models, Projectors and All tabs, and a table of five GGUF files with their architecture, quantization badge, size, parameters, layers, context and experts." />
+
+## The models folder
+
+llama-webui scans one folder, set during the [first run](/docs/getting-started/first-run/) and changed later in
+[Settings](/docs/settings/) (default `~/models`). Its full path appears under the page title.
+
+The scan goes through every subfolder and keeps the files ending in `.gguf`:
+
+- Files and folders whose name starts with a dot are skipped.
+- A symbolic link to a `.gguf` file is listed; a symbolic link to a folder is not followed.
+- Partial downloads (`.gguf.part`) are not listed.
+
+The first scan reads each file's header; the result is kept in the database and reused as long as the file's size and
+modification time do not change. Click **Rescan** after you add, replace or remove files: only the changed ones are
+read again. A finished [Hugging Face download](/docs/hugging-face/) triggers a rescan by itself.
+
+If the folder has no GGUF file, the page says so and offers to download one from Hugging Face or to change the folder
+in Settings.
+
+## The list
+
+Each row is one model. The **File** column shows the path relative to the models folder, with the model name from the
+header below it.
+
+| Column         | What it shows                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------- |
+| **Arch**       | The architecture recorded in the file (`llama`, `qwen3moe`, `clip` for a projector…).                 |
+| **Quant**      | The quantization type of the file (`Q4_K_M`, `IQ3_S`, `BF16`…), `?` when the header does not say.    |
+| **Size**       | Size on disk, all parts included for a split model.                                                    |
+| **Parameters** | Parameter count, in millions (`M`) or billions (`B`).                                                 |
+| **Layers**     | Number of transformer blocks.                                                                         |
+| **Context**    | The context length the model was trained for, `—` when unknown.                                       |
+| **Experts**    | For a mixture-of-experts model, total experts / experts used per token (`512 / 10`); `—` otherwise.   |
+
+Type in the search box to filter on the file path, model name, architecture or quantization. The tabs choose what is
+listed: **Models** (the default), **Projectors** or **All**.
+
+A file llama-webui cannot read stays in the list with an **unreadable** badge and the reason, for example a truncated
+download or a file that is not a GGUF. The rest of the scan is not affected.
+
+## Split models
+
+Large models are often published in several parts named `<name>-00001-of-00003.gguf`, `<name>-00002-of-00003.gguf`
+and so on. llama-webui groups the parts of a set into a single row, named after the first part, and adds their sizes.
+`llama-server` only needs the first part: it finds the others next to it.
+
+If a part is missing, the row is marked **unreadable** with `missing shard:` and the names of the missing files.
+
+## Multimodal projectors
+
+A multimodal projector (`mmproj` file) lets a model read images, and for some models audio or video. llama-webui
+recognizes a projector from its header (its type, or the `clip` architecture) and lists it under **Projectors** rather
+than **Models**.
+
+A projector is not a model on its own: you attach it to a model in a [profile](/docs/profiles/), in the
+**Multimodal projector** field.
+
+## Model details
+
+Click a row to open the details of a model. The dialog shows the header and a breakdown of the weights:
+
+- **Architecture**, **Quantization**, **Parameters**, **Layers**, **Context**, **Embedding size**, **Heads / KV heads**.
+- **Experts (active)**: total experts and, in parentheses, experts used per token; `—` for a dense model.
+- **MTP layers**: multi-token prediction layers shipped in the file, usable for speculative decoding (see
+  [Speculative decoding and MTP](/docs/guides/speculative-decoding/)); `—` when there are none.
+- **Recurrent** (`yes` for models with recurrent layers), **Sliding window** (its size when attention uses one) and
+  **Chat template** (`yes` when the file includes one).
+- The weight sizes: **Embeddings**, **Layers (excluding experts)**, **Experts**, **Output**, **Other**, **Total weights**,
+  and the number of **Tensors**. The experts' share tells you how much memory moves to RAM when you keep experts on the
+  CPU, as in [Run a 100 GB MoE model on consumer GPUs](/docs/guides/big-moe-models/).
+- The file, or every file of a split model.
+
+## Create a profile from a model
+
+In the details of a model, click **Create profile**. The [Profiles](/docs/profiles/) page opens with a new profile
+already filled in:
+
+- **Name**: the file name, without the extension and the part number.
+- **Working directory**: the models folder, as written in Settings.
+- **Model (GGUF)**: the path relative to the models folder.
+- **Multimodal projector**: filled when exactly one projector in the same folder matches the model's name, for example
+  `mmproj-Qwen3.8-27B-BF16.gguf` next to `Qwen3.8-27B-IQ3_S.gguf`.
+
+Add the `llama-server` arguments, then click **Create profile** to save it. Projectors have no **Create profile**
+button. **Copy path** copies the absolute path of the file.
+
+To have flags chosen for your hardware instead of writing them yourself, pick the model in [Tuning](/docs/tuning/).
+
+## Add and remove models
+
+- To add a model, click **Download** to get one from Hugging Face (see [Hugging Face downloads](/docs/hugging-face/)),
+  or copy GGUF files into the models folder and click **Rescan**. While downloads are running, the **Download** button
+  shows the progress of the whole queue.
+- The Models page never deletes files. To remove a model, delete its files from the folder, then click **Rescan**.
+  Profiles that used it show the error on their [launch pad](/docs/home/) card.

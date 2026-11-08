@@ -167,7 +167,7 @@ export function TuningSection() {
     <FeatureSection
       id="tuning"
       tone="amber"
-      pages={[{ label: 'Tuning', icon: Wand2 }]}
+      pages={[{ label: 'Tuning', icon: Wand2, doc: '/docs/tuning/' }]}
       title="Get flags that fit your hardware."
       lede="Choose a goal. llama-webui reads your GPUs, RAM and CPU, recommends every flag with the reason behind it, then backs it up with benchmarks."
     >

@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
 import type { Tone } from './dashboard/tones';
 
@@ -14,11 +15,13 @@ const TONE_TEXT: Record<Tone, string> = {
 export interface AppPage {
   label: string;
   icon: LucideIcon;
+  /** Its page in the user documentation ("/docs/dashboard/"). */
+  doc: string;
 }
 
 /**
- * A feature section: the app pages it covers (named and drawn as in the app's sidebar, in the section's tone), a
- * headline, a lede, then a 6-column grid of cards.
+ * A feature section: the app pages it covers (named and drawn as in the app's sidebar, in the section's tone, each
+ * linking to its documentation page), a headline, a lede, then a 6-column grid of cards.
  */
 export function FeatureSection({
   id,
@@ -38,10 +41,16 @@ export function FeatureSection({
   return (
     <section id={id} aria-labelledby={`${id}-title`} className="mx-auto max-w-6xl scroll-mt-20 px-6 py-24 sm:py-32">
       <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-muted-foreground">
-        {pages.map(({ label, icon: Icon }) => (
-          <li key={label} className="flex items-center gap-2">
-            <Icon className={cn('size-4', TONE_TEXT[tone])} aria-hidden="true" />
-            {label}
+        {pages.map(({ label, icon: Icon, doc }) => (
+          <li key={label}>
+            <Link
+              to={doc}
+              className="flex items-center gap-2 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+            >
+              <Icon className={cn('size-4', TONE_TEXT[tone])} aria-hidden="true" />
+              {label}
+              <span className="sr-only"> documentation</span>
+            </Link>
           </li>
         ))}
       </ul>

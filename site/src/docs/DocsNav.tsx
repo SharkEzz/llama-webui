@@ -1,18 +1,28 @@
+import { ChevronRight } from 'lucide-react';
 import { NavLink } from 'react-router';
 import { href } from '@/lib/content';
 import { cn } from '@/lib/utils';
 import { NAV } from '../../content/nav';
 import { type NavSection, sectionOf } from './nav';
 
-/** Sidebar of the current section (Documentation or Developers), group by group. */
+/**
+ * Sidebar of the current section (Documentation or Developers). Each group is a native <details>, open by default:
+ * collapsing works without JavaScript and survives client-side navigation (React does not reset `open` on re-render).
+ */
 export function DocsNav({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
   const section: NavSection = sectionOf(NAV, pathname) ?? NAV[0]!;
   return (
-    <nav aria-label={section.title} className="flex flex-col gap-7 text-sm">
+    <nav aria-label={section.title} className="flex flex-col gap-4 text-sm">
       {section.groups.map((group) => (
-        <div key={group.title}>
-          <p className="mb-2 px-3 text-xs font-medium text-muted-foreground">{group.title}</p>
-          <ul className="flex flex-col gap-0.5">
+        <details key={group.title} open className="group/group">
+          <summary className="flex cursor-pointer list-none items-center justify-between rounded-md px-3 py-1 text-xs font-medium text-muted-foreground transition-colors select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
+            {group.title}
+            <ChevronRight
+              className="size-3.5 transition-transform group-open/group:rotate-90 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </summary>
+          <ul className="mt-1 flex flex-col gap-0.5">
             {group.pages.map((page) => (
               <li key={page.path}>
                 <NavLink
@@ -33,7 +43,7 @@ export function DocsNav({ pathname, onNavigate }: { pathname: string; onNavigate
               </li>
             ))}
           </ul>
-        </div>
+        </details>
       ))}
     </nav>
   );

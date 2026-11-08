@@ -1,0 +1,132 @@
+---
+title: Server
+description: Start, stop, restart or switch llama-server, follow its state, read what it reports through /props, and see the exact command llama-webui launched.
+---
+
+The Server page controls the `llama-server` process llama-webui runs for you. It shows its state, starts, stops,
+restarts or switches profiles, and shows what the running server reports, the exact command that was launched and its
+latest logs.
+
+<Screenshot name="server" alt="The Server page with the Ready state: the llama-server card with profile, PID, port and uptime, a profile picker with Restart and Stop buttons, the Server info card with model, quantization, context, slots, inputs and build, the Effective command card, and the latest logs." />
+
+## Server states
+
+llama-webui runs one `llama-server` at a time. Its state appears next to the page title, on the profile's card on the
+[launch pad](/docs/home/), and in the status bar at the top of every page (click it to open the Server page).
+
+| State          | Meaning                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Stopped**    | No server is running.                                                                                                           |
+| **Starting…**  | The process is running and loading the model. llama-webui checks its `/health` endpoint every half second.                     |
+| **Ready**      | `/health` answered: the model is loaded and the server accepts requests.                                                        |
+| **Stopping…**  | llama-webui asked the server to exit and waits for it.                                                                          |
+| **Crashed**    | The process exited without being asked to, or could not be launched. The exit code, the signal or the error appears with it.  |
+| **External**   | A `llama-server` that llama-webui did not start is using the port (see [An external server](#an-external-server)).             |
+
+A normal run goes **Stopped** → **Starting…** → **Ready** → **Stopping…** → **Stopped**. There is no time limit on
+**Starting…**: a large model can take minutes to load, and the [Logs](/docs/logs/) page shows its progress. If
+`llama-server` fails while loading (model too large for memory, invalid flag…), it exits and the state becomes
+**Crashed**; its last log lines usually say why.
+
+## Control the server
+
+The **llama-server** card shows the details of the current state: **Profile**, **PID**, **Port**, and how long the
+server has been starting or ready (**Starting for**, **Ready for**). After a crash, **Exit** gives the message, exit
+code or signal.
+
+Below the details, pick a profile in the list. It preselects the profile of the running server, otherwise the last
+profile you started. The buttons depend on the state:
+
+- **Start**: launches the selected profile. Available when no server is running, including after a crash.
+- **Switch**: shown when a server is running and you select another profile. After you confirm, llama-webui stops the
+  running server and starts the selected profile.
+- **Restart**: reads the profile again, so changes you saved since the launch are applied, then stops and starts the
+  server.
+- **Stop**: unloads the model and ends the process.
+
+**Switch**, **Restart** and **Stop** ask for confirmation: requests in progress, including a [chat](/docs/chat/) reply
+being written, are interrupted.
+
+To stop the server, llama-webui sends it `SIGTERM` and waits up to 5 seconds before forcing it with `SIGKILL`. Only one
+operation runs at a time: a second click while a start or a switch is in progress is refused with
+`operation in progress, try again`.
+
+<Callout type="note">
+
+While a [benchmark](/docs/benchmark/) or a [sweep](/docs/sweeps/) is running, it owns the GPUs and controls
+`llama-server` itself: **Start**, **Switch**, **Restart** and **Stop** are refused with `A benchmark is running`.
+
+</Callout>
+
+If you have no profile yet, the card links to the [Profiles](/docs/profiles/) page instead.
+
+## What llama-webui reads from llama-server
+
+The profile's arguments are completed with `--metrics`, `--slots` and `--props` (see
+[Flags llama-webui sets itself](/docs/profiles/#flags-llama-webui-sets-itself)) so that llama-webui can read:
+
+| Endpoint   | When                                                     | Used for                                                                                  |
+| ---------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `/health`  | Every half second while starting, then at every sample   | The **Starting…** → **Ready** transition, and detecting an external server.               |
+| `/slots`   | At every sample, once ready                              | Live speed and context use per slot on the [Dashboard](/docs/dashboard/).                 |
+| `/metrics` | At every sample, once ready                              | Per-request stats, the request queue and speculative decoding acceptance on the Dashboard. |
+| `/props`   | When the server becomes ready                            | The **Server info** card, and the context size and default sampling shown in [Chat](/docs/chat/). |
+
+A sample is taken every polling interval, 1 second by default ([Settings](/docs/settings/)).
+
+### Server info
+
+Once the server is ready, the **Server info** card shows what `/props` reports:
+
+- **Model**: the model alias, or the path of the loaded file.
+- **Quantization**: as `llama-server` reports it, for example `IQ3_S - 3.4375 bpw`.
+- **Context**: the context size, in tokens.
+- **Slots**: how many requests the server can process in parallel.
+- **Inputs besides text**: `image`, `video`, `audio`, or `none`, depending on the model and its projector.
+- **Build llama.cpp**: the build number and commit of your `llama-server`.
+
+Before the server is ready the card says **Available once the server is ready.**; if `/props` does not answer, it
+shows **Could not read /props** with the error.
+
+### Effective command
+
+The **Effective command** card shows the full command line of the last launch: the binary from Settings, the model
+and projector, the profile's arguments and the flags llama-webui adds, quoted the way a shell would need them.
+**Copy** puts it on the clipboard, which is handy to run the same server by hand or to report a problem. Before the
+first launch, it says **No launch since llama-webui started.**
+
+### Latest logs
+
+The last 20 log lines, updated live: `llama-server`'s output and llama-webui's own messages about it (launch, exit).
+**All logs** opens the [Logs](/docs/logs/) page, with search and filters.
+
+## An external server
+
+llama-webui notices a `llama-server` it did not start, for example one you launched in a terminal:
+
+- When llama-webui starts, then every 2 seconds while the state is **Stopped**, it checks the port set in
+  [Settings](/docs/settings/) (`8080` by default).
+- When you start a profile, it first checks that profile's port.
+
+If something answers HTTP on that port, the state becomes **External**. llama-webui looks for the process in `/proc`
+and shows its PID when it finds a `llama-server` started with that port; the PID can be unknown.
+
+An external server can be used but not controlled:
+
+- [Chat](/docs/chat/), the [Dashboard](/docs/dashboard/) and the **Server info** card work with it.
+- **Start** is refused while it holds the port, with `port in use by an external server`. llama-webui never stops a
+  process it did not start: stop it yourself to take back control.
+
+Once that process has exited and the port is silent, the state returns to **Stopped** within a few seconds.
+
+## llama-server stops with llama-webui
+
+The `llama-server` llama-webui starts is tied to it, so no model is left in memory when llama-webui goes away:
+
+- When you stop llama-webui (<Kbd>Ctrl</Kbd> + <Kbd>C</Kbd>, `systemctl stop`, `SIGTERM`), it first stops
+  `llama-server` the normal way. A chat reply being written is saved as it is, marked **stopped**.
+- If llama-webui crashes or is killed, the kernel kills `llama-server` too. llama-webui launches it through
+  `setpriv --pdeathsig KILL` (from util-linux) for that purpose; the effective command does not show this prefix.
+
+A server is not restarted on its own when llama-webui starts again: start a profile from the launch pad or this page.
+An external server, on the other hand, is not affected by llama-webui stopping.

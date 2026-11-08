@@ -1,0 +1,302 @@
+---
+title: Troubleshooting
+description: What to do when llama-server will not start, a GPU is missing, a benchmark runs out of memory, a download fails or the interface disconnects.
+---
+
+Each entry starts with what you see, then explains the cause and the fix. Most problems leave a trace on the
+[Logs](/docs/logs/) page, which keeps the output of the `llama-server` that llama-webui started: search it first.
+
+## Setup
+
+### `llama-server` cannot be found
+
+**What you see:** the **llama-server** step of the setup checklist says the path `cannot be found or is not executable`.
+Or a profile goes to **Crashed** with code 127 right after **Start**, and the Logs show a `failed to execute` line from
+`setpriv`.
+
+**Cause:** the **Binary** setting does not lead to an executable file. Common reasons:
+
+- The path starts with `~`: it is not expanded for the binary.
+- The setting is a bare name (`llama-server`, the default) and the binary is not in the `PATH` of the llama-webui
+  process. A systemd service gets a shorter `PATH` than your shell.
+- The file lost its executable bit, or the build did not finish.
+
+**Fix:** type the absolute path in the setup checklist's **Binary** field, or on the **General** tab of
+[Settings](/docs/settings/): `/home/you/llama.cpp/build/bin/llama-server`. Check it in a terminal with
+`ls -l /home/you/llama.cpp/build/bin/llama-server`, and `chmod +x` it if needed.
+
+If the crash message is instead `Executable not found in $PATH: "setpriv"`, install `util-linux`, which provides
+`setpriv`: llama-webui uses it to start `llama-server` as a child process.
+
+### Benchmark and Tuning see no GPU
+
+**What you see:** the **llama-bench** step of the setup checklist says the binary `is missing or lists no device`. The
+**Hardware** card on the Tuning page says `No devices: check the binary in Settings.`, and the Benchmark form says
+`No devices read (llama-bench not found?): the choice stays automatic.` Launch pad cards have no memory fit badge.
+
+**Cause:** llama-webui looks for `llama-bench` in the same folder as `llama-server` and reads the device list from
+`llama-bench --list-devices`. Without it, benchmarks and sweeps cannot run and Tuning does not know your GPUs.
+
+**Fix:** keep `llama-bench` next to `llama-server`. A llama.cpp build puts both in `build/bin/`. If the binary is there
+but lists no GPU, the build lacks the backend for your cards: rebuild it (see
+[Installation](/docs/getting-started/installation/#install)). After a rebuild that changes the devices, restart
+llama-webui: the device list is read once.
+
+### The models folder looks empty
+
+**What you see:** the **Models folder** step says `Folder not found` or `No GGUF model in … yet`, or the Models page
+says **No GGUF files in** your folder.
+
+**Cause:** llama-webui scans the folder and its subfolders for `.gguf` files. It finds nothing when:
+
+- the path is wrong (`~` is expanded here, so `~/models` works);
+- the folder or a subfolder cannot be read by the user that runs llama-webui: unreadable folders are skipped silently;
+- the models sit behind a symbolic link to a folder: links to folders are not followed (links to `.gguf` files are);
+- the names start with `.`: hidden files and folders are ignored.
+
+**Fix:** set the folder in the setup checklist or on the **General** tab of Settings, fix the permissions or replace the
+folder link with the real path, then click **Rescan** on the [Models](/docs/models/) page.
+
+A file listed with an **unreadable** badge was found but its GGUF header could not be read: the message next to it
+says why. `missing shard: …` means a part of a split model is absent: download the missing part.
+
+## GPUs and telemetry
+
+### An NVIDIA GPU is missing
+
+**What you see:** the [System](/docs/system/) page has no card for an NVIDIA GPU, or the setup checklist says
+`No GPU detected: llama-server will run on the CPU.`
+
+**Cause:** llama-webui reads NVIDIA cards through NVML, the driver's `libnvidia-ml.so.1`. When that library cannot be
+loaded at startup, it falls back to `nvidia-smi`. If neither works, no NVIDIA card is listed. **NVIDIA source**, next
+to the System page title, shows which one is in use; with `nvidia-smi`, PCIe traffic is not measured.
+
+**Fix:**
+
+1. Check that `nvidia-smi` works in a terminal. If it does not, install or repair the NVIDIA driver.
+2. Restart llama-webui: the choice between NVML and `nvidia-smi` is made once, at startup.
+3. On the **Monitoring** tab of Settings, check that **NVML for NVIDIA GPUs** is on (it takes effect on the next
+   start), and that the card is not switched off under **Displayed GPUs**. A hidden card stays listed with a **hidden**
+   badge and no readings.
+
+If the card is listed but `llama-server` does not use it, open the **Checks** card on the System page: **Backend CUDA**
+warns when the build has no CUDA backend, **Module nvidia_uvm** when the module is not loaded (`sudo modprobe
+nvidia_uvm`), and **NVIDIA driver** when the driver is too old for the build's CUDA.
+
+### An AMD GPU is missing
+
+**What you see:** the System page has no card for an AMD GPU, or shows it with a **suspended** badge and no readings.
+
+**Cause:** llama-webui finds AMD cards in `/sys/class/drm` when it starts, and reads them through the `amdgpu`
+driver's files. A card without the `amdgpu` driver, or one that appeared after llama-webui started, is not listed. A
+card the kernel has put to sleep is shown as **suspended**: llama-webui does not read it, so as not to wake it up, and
+reads it again once it is awake (for example when `llama-server` uses it).
+
+**Fix:** check that `lspci -k` shows `Kernel driver in use: amdgpu` for the card, then restart llama-webui. Also check
+**Displayed GPUs** on the **Monitoring** tab of Settings.
+
+A card can appear on the System page and still be missing from Tuning and Benchmark: those read the devices of your
+llama.cpp build. The **Backend ROCm/HIP** check warns when the build has neither ROCm nor HIP (the card then needs
+Vulkan), and **Card recognized by ROCm** reminds you that ROCm may need `HSA_OVERRIDE_GFX_VERSION=…` in the profile's
+environment variables.
+
+### DRAM bandwidth is not measured
+
+**What you see:** the Topology legend says `CPU ↔ memory pulse: CPU activity, for lack of a DRAM measurement (perf).`,
+and the setup checklist says either `Not measured: it needs perf and an AMD Zen 4/5 CPU.` or that `perf is not allowed
+to read the memory controller`.
+
+**Cause:** DRAM bandwidth comes from `perf`, on AMD Zen 4 and Zen 5 processors only, and the kernel must allow it
+(`kernel.perf_event_paranoid` at 0 or below, or `perf` with the `cap_perfmon` capability). The **CPU and memory**
+switch on the **Monitoring** tab of Settings must also be on.
+
+**Fix:** install `perf`, then allow it until the next reboot:
+
+```bash title="Terminal"
+sudo sysctl kernel.perf_event_paranoid=0
+```
+
+or permanently:
+
+```bash title="Terminal"
+echo 'kernel.perf_event_paranoid = 0' | sudo tee /etc/sysctl.d/99-perf.conf
+```
+
+No restart is needed: after a failure, llama-webui tries `perf` again every minute. The full procedure is in
+[Monitor DRAM bandwidth](/docs/guides/dram-bandwidth/).
+
+## Starting a model
+
+### Another server is on the port
+
+**What you see:** the server status reads **External**, with a PID when llama-webui could find one. The Server page says
+`A llama-server started outside llama-webui is using port 8080`, **Start** is disabled on the launch pad, and starting
+a profile fails with `port in use by an external server (PID …)`. A benchmark refuses to start with
+`An external llama-server is running on port 8080: stop it first`.
+
+**Cause:** every 2 seconds, llama-webui checks whether something answers `/health` on `127.0.0.1` at the **Default
+port** of Settings (8080 by default). Any HTTP server there counts, not only `llama-server`; the PID reads `unknown`
+when llama-webui finds no `llama-server` process on that port. llama-webui can chat with such a server and monitor it,
+but cannot stop it.
+
+**Fix:** stop that process (`kill <PID>`). The status goes back to **Stopped** by itself once that process has exited
+and the port is silent. To
+keep both, give llama-webui's servers another port: **Default port** on the **General** tab of Settings, or **Port** in
+the profile.
+
+### The server crashes right after Start
+
+**What you see:** the status goes from **Starting…** to **Crashed**. The **Exit** row of the [Server](/docs/server/)
+page, and the profile's card on the launch pad, give the reason, the exit code or the signal.
+
+**Cause and fix**, by message:
+
+| Message                                     | Cause                                                       | Fix                                                                         |
+| ------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `directory not found: …`                    | The profile's **Working directory** does not exist.         | Fix or empty the field on the [Profiles](/docs/profiles/) page.             |
+| `Executable not found in $PATH: "setpriv"`  | `setpriv` is missing.                                       | Install `util-linux`.                                                       |
+| `code 127`                                  | The binary cannot be run.                                   | See [`llama-server` cannot be found](#llama-server-cannot-be-found).        |
+| Another exit code                           | `llama-server` stopped on its own: bad argument, unreadable model, out of memory. | Read the last lines on the Logs page, or under **Latest logs** on the Server page. |
+
+A flag that your build does not know is a common cause after a llama.cpp update: flag names change between versions.
+The argument editor of a profile only suggests the flags your binary lists in its `--help`.
+
+A profile whose model file cannot be read shows the error in red on its launch pad card, in place of the model name,
+and its **Start** button is disabled.
+
+### Out of memory while loading
+
+**What you see:** the server crashes during **Starting…**, and the Logs show lines with `out of memory`,
+`failed to allocate` or `unable to allocate`.
+
+**Cause:** the model, its KV cache and its buffers need more memory than the GPUs have free. Other programs count: a
+game, a desktop session, a `llama-server` started by hand. Profiles created by Tuning contain `--fit off`, so
+`llama-server` does not shrink the values you left unset to make them fit, and the Tuning estimate counts each card's
+total memory, not what other programs use.
+
+**Fix:**
+
+1. Look at the VRAM gauges on the System page before starting, and close what holds the memory.
+2. Lower the context (`-c`), use a `q8_0` KV cache (`-ctk q8_0 -ctv q8_0`), keep more MoE experts in RAM (raise
+   `-ncmoe`) or fewer layers on the GPUs (lower `-ngl`).
+3. Or run [Tuning](/docs/tuning/) again with the **Make the model fit** goal, and create a new profile from it.
+
+Removing `--fit off` from the arguments also lets `llama-server` adjust what you did not set (its `--fit` is on by
+default).
+
+### The server stays on Starting…
+
+**What you see:** the status stays on **Starting…**, and the timer on the Server page keeps counting.
+
+**Cause:** the status turns **Ready** once `llama-server` answers `/health` on `127.0.0.1` with success. Until the
+model is loaded, it answers that it is still loading: a large model read from a slow disk takes minutes. If the
+profile's **Host** is an address that does not include `127.0.0.1` (a single LAN address, for example), llama-webui
+cannot reach `/health` at all.
+
+**Fix:** follow the loading on the Logs page. If it has finished, set the profile's **Host** to `0.0.0.0` or
+`127.0.0.1`, or leave it empty to use the **Default host** of Settings (`0.0.0.0`).
+
+## Benchmarks and memory
+
+### A benchmark fails with out of memory
+
+**What you see:** in the Benchmark history, the run's status is **Failed** and its tooltip starts with
+`Out of memory:` followed by the line that says why. In a sweep's ranking on the Tuning page, the badge reads
+**out of memory**.
+
+**Cause:** the configuration needs more memory than the GPUs have free. llama-webui stops its own `llama-server` before
+a benchmark, so the loaded model is not the cause; other programs on the GPUs are. A **Server** run also allocates a
+KV cache for its context (`-c` in its other flags, otherwise the model's own context length), which a llama-bench run
+of the same configuration does not.
+
+**Fix:** lower `-ngl`, `-ub` or `-c`, raise `-ncmoe`, or free the VRAM, then run it again. In a sweep, configurations
+the estimator expects not to fit are left out unless you check **Include configurations that do not fit**; they
+usually end this way. **Delete failed** clears the failed runs from the history. See [Benchmark](/docs/benchmark/).
+
+### A model does not fit
+
+**What you see:** the Tuning recommendation shows a **Does not fit** alert with a reason, or a launch pad card shows a
+**Does not fit** badge. Hover the badge for the estimate.
+
+**Cause:** the estimate places the model, its KV cache and its buffers on the devices, and finds a device over its
+usable memory: its total minus a margin of 512 MiB plus 4 %. The reason names the problem:
+
+| Reason                                           | Meaning                                                                                      |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `CUDA0: 18.2 GiB for 14.4 GiB usable`            | That device would hold more than it can.                                                     |
+| `unknown device: CUDA2`                          | The profile's `-dev` names a device that `llama-bench --list-devices` does not list.         |
+| `model too large: … of RAM needed, … available` | Nothing fits on the GPUs and the RAM is too small as well.                                   |
+
+The launch pad estimates each profile with its own flags and context. **Tight in VRAM** means less than 5 % headroom
+on a card: it should start, but the margin is thin. A placement that runs over the RAM is also only tight, not a
+failure: what does not fit is read back from the disk, slowly. In the Hugging Face sheet, **Partial offload** only
+means the file is larger than your VRAM: part of the model will stay in RAM.
+
+**Fix:** on the [Tuning](/docs/tuning/) page, pick **Make the model fit**, or **100 GB model** for a large MoE model,
+and create a profile from the result. Otherwise use a smaller quantization. For `unknown device`, check the device
+names in the **Hardware** card: they change when the build changes backends (see
+[Split a model across mixed GPUs](/docs/guides/mixed-gpus/#how-devices-are-named)).
+
+## Downloads
+
+### A Hugging Face download fails
+
+**What you see:** a row of the download queue on the Models page turns red with a message. Each message has its fix:
+
+| Message                                                    | Fix                                                                                                                                       |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `… is gated: accept its license on Hugging Face`           | Click **Accept the license on Hugging Face** in the row, accept it with the account of your token, then click **Retry**.                 |
+| `… not found on Hugging Face (or private …)`               | Check the repository id. A private repository needs a token from an account that can read it.                                            |
+| `Hugging Face rejected the token`                          | Create a new token, then set it again (below). The sheet's header says `The token from … was rejected.`                                  |
+| `Hugging Face rate limit reached, try again later`         | Wait, then click **Retry**.                                                                                                              |
+| `Hugging Face unreachable: …`                              | Check the network, or `HF_ENDPOINT` if you use a mirror.                                                                                 |
+| `Checksum mismatch for …: the file was deleted`            | The downloaded file did not match its sha256. Click **Retry** to download it again.                                                      |
+| `Not enough disk space: …` or `Disk full`                  | Free space on the disk of the models folder. llama-webui keeps 1.0 GiB free on top of the download.                                      |
+
+The token is the one of the `hf` command-line tool: `HF_TOKEN` if set when llama-webui starts, otherwise the file saved
+by `hf auth login`, which is read again on every request. After changing `HF_TOKEN`, restart llama-webui.
+
+A dropped connection is not an error at first: the row says `Connection lost, retrying in …`, and llama-webui tries
+again after 2, 4, 8, 16 and 30 seconds, from where the file stopped. No data for 60 seconds counts as a dropped
+connection. After five failed attempts in a row with no data received, the download stops with the error. A download
+still unfinished when llama-webui stops resumes when it starts again. See
+[Hugging Face downloads](/docs/hugging-face/).
+
+## Connection
+
+### The status shows Disconnected
+
+**What you see:** the status at the top right reads **Disconnected** in red, and the live figures stop moving.
+
+**Cause:** the page receives its live data over one WebSocket. It drops when llama-webui stops or restarts, when the
+network between your browser and the machine drops, or when the request is refused (see the next section). The page
+reconnects by itself: it waits half a second, then twice as long after each failure, up to 10 seconds between
+attempts.
+
+**Fix:** check that llama-webui still runs: its terminal, or `journalctl --user -u llama-webui -f` for a
+[service](/docs/getting-started/installation/#run-it-as-a-service). When llama-webui stops, the `llama-server` it
+started stops too.
+
+### The page is unreachable from another machine
+
+**What you see:** another computer cannot open `http://<machine>:7860`, or it opens the page but nothing loads, the
+status stays **Disconnected**, and the API answers `Host not allowed`.
+
+**Cause and fix:**
+
+- **llama-webui listens on `127.0.0.1` by default**, so only the machine itself can reach it. Start it with
+  `--host 0.0.0.0` (or `LLAMA_WEBUI_HOST=0.0.0.0`). See
+  [Open it from another machine](/docs/getting-started/installation/#open-it-from-another-machine).
+- **A firewall blocks the port.** Allow TCP port 7860 (or the port given with `--port`).
+- **You used a host name.** To block DNS rebinding, the API only accepts `localhost` or an IP address in the address
+  bar: open `http://192.168.1.20:7860`, not `http://workstation.lan:7860`. A reverse proxy runs into the same check.
+  See [Security](/docs/security/).
+
+### llama-webui does not start
+
+**What you see:** `bun run start` stops with `Failed to start server. Is port 7860 in use?`
+
+**Cause:** another program, often a second llama-webui, already listens on that port.
+
+**Fix:** stop it, or start llama-webui on another port with `--port 7861`. See
+[Launch options](/docs/configuration/).

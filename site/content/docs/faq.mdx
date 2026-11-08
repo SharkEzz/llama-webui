@@ -1,0 +1,124 @@
+---
+title: FAQ
+description: Short answers about platforms, Docker, GPUs, several models, remote servers, authentication, your data, network access, llama.cpp versions and updates.
+---
+
+Short answers to the questions that come up most, with a link to the page that covers each one in full. For an error
+message or something that does not work, see [Troubleshooting](/docs/troubleshooting/).
+
+## Platform and requirements
+
+### Does it run on Windows or macOS?
+
+No. llama-webui runs on Linux only: it discovers the hardware and reads the telemetry from `/proc` and `/sys`, and
+starts `llama-server` through `setpriv`, from util-linux. Your browser can be on any system: open the interface from
+another machine as described in
+[Open it from another machine](/docs/getting-started/installation/#open-it-from-another-machine).
+
+### Is there a Docker image?
+
+No. The repository has no image and no Dockerfile. llama-webui is meant to run directly on the machine with the GPUs:
+it reads that machine's `/proc` and `/sys` and starts `llama-server` as its own child process. Installing it is a
+`git clone` and a `bun install`, see [Installation](/docs/getting-started/installation/).
+
+### Do I need Node.js?
+
+No. Bun 1.4.4 or later is the only runtime. It serves the API, the WebSocket and the interface, stores the data in
+SQLite and builds the interface in memory when llama-webui starts: there is no separate build step.
+
+### Do I need a GPU?
+
+No. Without a GPU, the setup checklist says `No GPU detected: llama-server will run on the CPU.`, and every page works
+with CPU and memory figures. GPU telemetry covers NVIDIA cards (through NVML or `nvidia-smi`) and AMD cards (through
+the `amdgpu` driver). Other GPUs, Intel ones for example, can still run models through a llama.cpp backend such as
+Vulkan, but the System page does not read them. See [Requirements](/docs/getting-started/requirements/).
+
+### Which llama.cpp version do I need?
+
+llama-webui adapts to your build rather than to a fixed version: the argument editor reads the flags from your
+`llama-server --help`, and Tuning and Benchmark read the devices from your `llama-bench --list-devices`. A recent
+build is the safe choice, since flag names change between llama.cpp versions. The **Build age** check, in the
+**Checks** card of the [System](/docs/system/) page, warns when your build is more than 60 days old.
+
+### Can I use the llama-server I already built?
+
+Yes. Give its path in the **Binary** field of the setup checklist, or later on the **General** tab of
+[Settings](/docs/settings/#general), for example `/home/you/llama.cpp/build/bin/llama-server`. Keep `llama-bench` in
+the same folder: benchmarks, sweeps and the GPU list of Tuning need it. llama-webui does not build or update llama.cpp.
+
+## Running models
+
+### Can I run several models at once?
+
+Not from one llama-webui: it runs one `llama-server` at a time. **Switch** on the launch pad or the Server page stops
+the running profile and starts the other one. A benchmark also stops the running server, then starts it again when it
+is done. See [Home and launch pad](/docs/home/#start-switch-and-stop).
+
+To keep two models loaded, run a second llama-webui with its own port, data folder and **Default port** for
+`llama-server`, as described in [Run a separate instance](/docs/configuration/#run-a-separate-instance).
+
+### Can it drive a llama-server on another machine?
+
+No. llama-webui starts `llama-server` on its own machine and talks to it on `127.0.0.1`. A `llama-server` you started
+yourself on the same machine, on the port of the Settings, is detected as an external server: Chat and the Dashboard
+work with it, but llama-webui does not stop or restart it. See [An external server](/docs/server/#an-external-server).
+
+### What happens when I close the browser?
+
+Nothing stops: the server and the models run in the llama-webui process, not in the page. Open the page again to find
+everything where it was. `llama-server` stops when llama-webui stops. See
+[Leave, reload or close the tab](/docs/chat/#leave-reload-or-close-the-tab) for chat replies being written.
+
+## Security and privacy
+
+### Is there a login or a password?
+
+No. llama-webui has no authentication: anyone who can reach its port can start models, read your conversations and
+download files. That is why it listens on `127.0.0.1` by default. Before you open it to your network, read
+[Security](/docs/security/); an [SSH tunnel](/docs/security/#use-an-ssh-tunnel-instead) gives you remote access
+without opening the port.
+
+### Does it send anything over the internet?
+
+There is no telemetry and no analytics, and the fonts ship with the app. llama-webui only connects to Hugging Face
+(`https://huggingface.co`, or the mirror set with `HF_ENDPOINT`):
+
+- when you open the **Download from Hugging Face** sheet on the Models page, to check your token, search and list a
+  repository's files;
+- while it downloads a file you picked;
+- when it starts, to resume a download that was not finished.
+
+`llama-server` is another program: some of its own flags, such as `-hf`, download models when you put them in a
+profile.
+
+## Data and updates
+
+### Where is my data stored?
+
+In one folder, `~/.local/share/llama-webui` by default (or the one given with `--data-dir`), in a SQLite database
+named `llama-webui.sqlite`. It holds the settings, profiles, conversations, benchmark runs and sweeps, and the download
+queue. Monitoring history and logs stay in memory and are lost when llama-webui restarts. Models stay in your models
+folder. See [Data directory](/docs/configuration/#data-directory).
+
+### How do I back up my data?
+
+Stop llama-webui, then copy the data folder: the database, with its `-wal` and `-shm` files if they are there. To keep
+only your profiles, click **Export all** on the Profiles page: it downloads them as a JSON file that **Import**, on
+the same page, reads back. An import never overwrites a profile with the same name. See
+[Import and export](/docs/profiles/#import-and-export).
+
+### How do I update llama-webui?
+
+Pull the repository, install the dependencies, then restart llama-webui:
+
+```bash title="Terminal"
+git pull
+bun install
+```
+
+The database is migrated when llama-webui starts, and your data is kept. See
+[Update](/docs/getting-started/installation/#update).
+
+### What is the license?
+
+llama-webui is released under the MIT license. llama.cpp, which you install separately, has its own license.

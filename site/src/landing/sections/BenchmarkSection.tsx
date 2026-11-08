@@ -18,7 +18,7 @@ export function BenchmarkSection() {
     <FeatureSection
       id="benchmark"
       tone="teal"
-      pages={[{ label: 'Benchmark', icon: Gauge }]}
+      pages={[{ label: 'Benchmark', icon: Gauge, doc: '/docs/benchmark/' }]}
       title="Measure the server you will actually run."
       lede="Benchmark raw llama.cpp speed, or a real llama-server with your profile's context and speculative decoding. Every run is kept, so you can compare them side by side."
     >
