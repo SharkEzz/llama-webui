@@ -329,7 +329,7 @@
 }
 
 /* ======================================================================================================
- * Site-only utilities (not in the app): glass panel, fine grid, halos, brand gradient text.
+ * Site-only utilities (not in the app): glass panel, fine grid, halos, headline ink.
  * ==================================================================================================== */
 
 /* Same glass as the app's GLASS class (web/src/components/glass/glass.ts). */
@@ -347,9 +347,13 @@
   mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, black 30%, transparent 75%);
 }
 
-/* Logo colors as a gradient on text (tagline highlights). */
-@utility text-gradient-brand {
-  background-image: linear-gradient(100deg, #3698ff 10%, #44d0c1 55%, #fcb442 95%);
+/* Headline ink: full foreground at the top, fading toward the baseline of the last line. */
+@utility text-gradient-fade {
+  background-image: linear-gradient(
+    180deg,
+    var(--foreground) 35%,
+    color-mix(in oklch, var(--foreground) 62%, transparent)
+  );
   background-clip: text;
   color: transparent;
 }
@@ -363,4 +367,34 @@
   );
   filter: blur(60px);
   pointer-events: none;
+}
+
+/*
+ * Hero window: tilted back, it stands up as it scrolls into view (CSS scroll-driven animation, no JS). The timeline
+ * is the parent's (.scroll-tilt-scope), because a transform on the subject itself would skew its own view timeline.
+ * Browsers without view timelines, and reduced motion, get the flat window.
+ */
+@utility scroll-tilt-scope {
+  view-timeline-name: --tilt;
+  perspective: 1800px;
+}
+
+@utility scroll-tilt {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      transform-origin: 50% 0%;
+      animation: scroll-tilt linear both;
+      animation-timeline: --tilt;
+      animation-range: entry 0% entry 80%;
+    }
+  }
+}
+
+@keyframes scroll-tilt {
+  from {
+    transform: rotateX(18deg) scale(0.92);
+  }
+  to {
+    transform: none;
+  }
 }
