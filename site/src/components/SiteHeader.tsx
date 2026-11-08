@@ -1,4 +1,5 @@
-import { Menu } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -6,6 +7,7 @@ import { NAV_LINKS, SITE } from '@/lib/site';
 import { cn } from '@/lib/utils';
 import { GitHubIcon } from './GitHubIcon';
 import { Logo } from './Logo';
+import { SearchDialog } from './SearchDialog';
 import { ThemeToggle } from './ThemeToggle';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -29,6 +31,7 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-1">
+          <SearchButton />
           <Button
             variant="ghost"
             size="icon-sm"
@@ -42,6 +45,44 @@ export function SiteHeader() {
         </div>
       </div>
     </header>
+  );
+}
+
+/** Opens the documentation search; ⌘K / Ctrl+K and "/" open it from anywhere. */
+function SearchButton() {
+  const [open, setOpen] = useState(false);
+  const [mac, setMac] = useState(false);
+
+  useEffect(() => {
+    setMac(/Mac|iPhone|iPad/.test(navigator.userAgent));
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing = target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? '');
+      if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) {
+        e.preventDefault();
+        setOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Search the documentation"
+        className="mr-1 flex h-8 items-center gap-2 rounded-lg border border-border bg-muted/40 px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none max-sm:w-8 max-sm:justify-center max-sm:px-0"
+      >
+        <Search className="size-4" aria-hidden="true" />
+        <span className="max-sm:hidden">Search</span>
+        <kbd className="ml-4 rounded border border-border bg-background px-1.5 font-mono text-[11px] max-sm:hidden">
+          {mac ? '⌘' : 'Ctrl'} K
+        </kbd>
+      </button>
+      <SearchDialog open={open} onOpenChange={setOpen} />
+    </>
   );
 }
 

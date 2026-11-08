@@ -398,3 +398,67 @@
     transform: none;
   }
 }
+
+/*
+ * Documentation pages (MDX content): element styles scoped to .docs-prose, at :where() specificity so components and
+ * utilities win; .not-prose opts a block out.
+ */
+@layer components {
+  .docs-prose {
+    @apply leading-7 text-foreground/90;
+  }
+  .docs-prose > :first-child {
+    margin-top: 0;
+  }
+  .docs-prose :where(h2):not(:where(.not-prose *)) {
+    @apply mt-14 mb-4 scroll-mt-24 text-2xl font-semibold tracking-tight text-foreground;
+  }
+  .docs-prose :where(h3):not(:where(.not-prose *)) {
+    @apply mt-10 mb-3 scroll-mt-24 text-lg font-semibold tracking-tight text-foreground;
+  }
+  .docs-prose :where(p):not(:where(.not-prose *)) {
+    @apply my-5;
+  }
+  .docs-prose :where(a:not(.heading-link)):not(:where(.not-prose *)) {
+    @apply font-medium text-primary-ink underline decoration-primary-ink/35 underline-offset-4 transition-colors hover:decoration-primary-ink;
+  }
+  .docs-prose :where(strong):not(:where(.not-prose *)) {
+    @apply font-semibold text-foreground;
+  }
+  .docs-prose :where(ul, ol):not(:where(.not-prose *)) {
+    @apply my-5 pl-6;
+  }
+  .docs-prose :where(ul):not(:where(.not-prose *)) {
+    @apply list-disc;
+  }
+  .docs-prose :where(ol):not(:where(.not-prose *)) {
+    @apply list-decimal;
+  }
+  .docs-prose :where(li):not(:where(.not-prose *)) {
+    @apply my-1.5 pl-1 marker:text-muted-foreground;
+  }
+  .docs-prose :where(li > ul, li > ol):not(:where(.not-prose *)) {
+    @apply my-1.5;
+  }
+  .docs-prose :where(:not(pre) > code):not(:where(.not-prose *)) {
+    @apply rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground;
+  }
+  .docs-prose :where(blockquote):not(:where(.not-prose *)) {
+    @apply my-6 border-l-2 border-border pl-4 text-muted-foreground;
+  }
+  .docs-prose :where(hr):not(:where(.not-prose *)) {
+    @apply my-12 border-border;
+  }
+  /* Headings are wrapped in a link to themselves (rehype-autolink-headings): "#" on hover. */
+  .docs-prose .heading-link {
+    @apply text-inherit no-underline;
+  }
+  .docs-prose .heading-link::after {
+    content: "#";
+    @apply ml-2 text-muted-foreground/60 opacity-0 transition-opacity;
+  }
+  .docs-prose :where(h2, h3):hover .heading-link::after,
+  .docs-prose .heading-link:focus-visible::after {
+    @apply opacity-100;
+  }
+}
