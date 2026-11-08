@@ -4,5 +4,5 @@ export default {
   appDirectory: 'src',
   basename: '/llama-webui/',
   ssr: false,
-  prerender: true,
+  prerender: ({ getStaticPaths }) => getStaticPaths().filter((p) => p !== '*'),
 } satisfies Config;
