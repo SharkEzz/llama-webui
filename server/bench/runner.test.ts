@@ -56,7 +56,15 @@ function setup(
   shared?: { gate: BenchGate; repo: BenchRunsRepo; sweeps: SweepsRepo; calls: string[] },
 ) {
   const calls: string[] = shared?.calls ?? [];
-  let state: ServerState = { kind: 'ready', profile: 'A', profileId: 1, pid: 1, port: 8080, since: 0 };
+  let state: ServerState = {
+    kind: 'ready',
+    profile: 'A',
+    profileId: 1,
+    pid: 1,
+    host: '127.0.0.1',
+    port: 8080,
+    since: 0,
+  };
   const server: ServerControl = {
     get state() {
       return state;
@@ -68,7 +76,7 @@ function setup(
     },
     start: async (cmd) => {
       calls.push(`start:${cmd.display}`);
-      state = { kind: 'starting', profile: 'A', profileId: 1, pid: 2, port: 8080, since: 0 };
+      state = { kind: 'starting', profile: 'A', profileId: 1, pid: 2, host: '127.0.0.1', port: 8080, since: 0 };
     },
   };
   patch?.(server);

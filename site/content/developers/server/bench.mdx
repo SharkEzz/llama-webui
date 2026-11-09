@@ -106,8 +106,11 @@ and the run fails with `could not stop llama-server: …`.
 
 ### Release
 
-`release()` waits for the stop to finish, restarts the stopped server with the recorded command (logged as
-`[bench] restarting llama-server (<profile>)`), and frees the gate even when the restart fails. It is idempotent: a
+`release(rebuild)` waits for the stop to finish, restarts the stopped server (logged as
+`[bench] restarting llama-server (<profile>)`), and frees the gate even when the restart fails. The command comes from
+`rebuild(stopped)`, the runner's `rebuild` dependency: `buildCommand()` on the profile as it is now, so edits saved
+during the benchmark apply. The recorded command is the fallback, when the profile was deleted or the release comes
+from a reload (`releaseLater()`). It is idempotent: a
 second call returns the same promise. A failed restart rejects with `could not restart llama-server: …`; the runner
 appends that message to the error of the run (the last item for a sweep), so it shows on the **Last run** card and in
 the history.

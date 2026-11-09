@@ -1,5 +1,17 @@
-import type { Settings } from '@llama-webui/shared';
-import { CircleAlert, Copy, Info, Play, Repeat, RotateCw, ScrollText, Server, Square, Terminal } from 'lucide-react';
+import { isLoopback, type Settings, stateHost } from '@llama-webui/shared';
+import {
+  CircleAlert,
+  Copy,
+  Info,
+  Play,
+  Repeat,
+  RotateCw,
+  ScrollText,
+  Server,
+  ShieldAlert,
+  Square,
+  Terminal,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { toast } from 'sonner';
@@ -144,7 +156,7 @@ export function ServerPage() {
         <PropsCard />
       </div>
 
-      <CommandCard command={view?.command ?? null} />
+      <CommandCard command={view?.command ?? null} host={view ? stateHost(view.state) : null} />
       <RecentLogs />
     </div>
   );
@@ -251,7 +263,7 @@ function PropsCard() {
   );
 }
 
-function CommandCard({ command }: { command: string | null }) {
+function CommandCard({ command, host }: { command: string | null; host: string | null }) {
   return (
     <GlassCard
       title="Effective command"
@@ -274,9 +286,17 @@ function CommandCard({ command }: { command: string | null }) {
       }
     >
       {command ? (
-        <pre className="overflow-x-auto rounded-md bg-well inset-shadow-well p-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-foreground/90">
-          {command}
-        </pre>
+        <div className="flex flex-col gap-2">
+          <pre className="overflow-x-auto rounded-md bg-well inset-shadow-well p-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-foreground/90">
+            {command}
+          </pre>
+          {host !== null && !isLoopback(host) && (
+            <p className="flex items-start gap-1.5 text-xs text-warning">
+              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+              llama-server is reachable from your network (--host {host}), with no authentication.
+            </p>
+          )}
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">No launch since llama-webui started.</p>
       )}

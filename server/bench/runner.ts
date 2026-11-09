@@ -12,6 +12,7 @@ import {
 import type { BenchFinish, BenchRunsRepo } from '../db/benchRuns';
 import type { SweepsRepo } from '../db/sweeps';
 import { HttpError, notFound } from '../http';
+import type { BuiltCommand } from '../supervisor/args';
 import type { RunExecutor } from './execute';
 import type { BenchGate } from './gate';
 
@@ -31,6 +32,8 @@ export interface BenchRunnerDeps {
   now?: () => number;
   /** Pause between two sweep items, while the VRAM is freed (1 s). */
   pauseMs?: number;
+  /** The command of the stopped server's profile as it is now, to restart it with the edits saved meanwhile (#39). */
+  rebuild?: (stopped: BuiltCommand) => BuiltCommand | null;
 }
 
 interface Current {
@@ -107,7 +110,7 @@ export class BenchRunner {
       void this.oneOff(run, spec);
       return run;
     } catch (e) {
-      await this.deps.gate.release().catch(() => {});
+      await this.deps.gate.release(this.deps.rebuild).catch(() => {});
       throw e;
     }
   }
@@ -155,7 +158,7 @@ export class BenchRunner {
   private async release(cur: Current | null, runId: number | null): Promise<void> {
     if (cur && this.deps.gate.stoppedCommand) this.setLive(cur, { phase: 'restarting-server', step: null });
     try {
-      await this.deps.gate.release();
+      await this.deps.gate.release(this.deps.rebuild);
     } catch (e) {
       if (this.disposed || runId === null) return;
       const prev = this.deps.repo.get(runId);
@@ -195,7 +198,7 @@ export class BenchRunner {
     try {
       id = typeof target === 'number' ? target : target();
     } catch (e) {
-      await this.deps.gate.release().catch(() => {});
+      await this.deps.gate.release(this.deps.rebuild).catch(() => {});
       throw e;
     }
     return this.begin(id);

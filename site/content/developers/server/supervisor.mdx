@@ -30,9 +30,9 @@ type:
 ```ts title="shared/src/server.ts"
 export type ServerState =
   | { kind: 'idle' }
-  | { kind: 'starting'; profile: string; profileId: number; pid: number; port: number; since: number }
-  | { kind: 'ready'; profile: string; profileId: number; pid: number; port: number; since: number }
-  | { kind: 'stopping'; profile: string; profileId: number; pid: number; port: number }
+  | { kind: 'starting'; profile: string; profileId: number; pid: number; host: string; port: number; since: number }
+  | { kind: 'ready'; profile: string; profileId: number; pid: number; host: string; port: number; since: number }
+  | { kind: 'stopping'; profile: string; profileId: number; pid: number; host: string; port: number }
   | {
       kind: 'crashed';
       profile: string;
@@ -141,7 +141,9 @@ profile's `env` over it: a profile variable overrides an inherited one with the 
 1. If the state is `external`, it probes that port again. If it still answers, it rejects with
    `port in use by an external server (PID …)`; otherwise it goes back to `idle`.
 2. If it already has a process, it rejects with `a server is already running`.
-3. If something answers on `cmd.port`, it switches to `external` and rejects with the same "port in use" error.
+3. If something answers on `cmd.host`:`cmd.port`: when it is a `llama-server` (`probeLlamaServer()`), it switches to
+   `external` and rejects with the same "port in use" error; any other service rejects with
+   `port <port> is in use by another service`, the state unchanged.
 4. It records `cmd` as the last command, checks that `cmd.cwd` exists, and calls `Bun.spawn(cmd.argv, …)` with that
    `cwd` and `env`, `stdin` ignored, `stdout` and `stderr` piped. A missing directory or a spawn error logs
    `[llama-webui] launch failed: …` and sets `crashed` with that message.
@@ -154,8 +156,12 @@ profile's `env` over it: a profile variable overrides an inherited one with the 
 `start()` resolves once the process is spawned, not once it is ready: the routes answer `202` and the client follows
 the state over the WebSocket.
 
-`probeHealth(port)` sends `GET http://127.0.0.1:<port>/health` with a timeout of `PROBE_TIMEOUT_MS = 800` and returns
-the status code, or `null` when nothing answers in time. `llama-server` answers `503` while it loads and `200` once the
+`probeHealth(port, fetch, host)` sends `GET <probeUrl(host, port)>/health` with a timeout of `PROBE_TIMEOUT_MS = 800`
+and returns the status code, or `null` when nothing answers in time. `probeUrl()` reaches the address the server
+listens on: loopback for a wildcard (`0.0.0.0` → `127.0.0.1`, `::` → `[::1]`) or no host, the address itself otherwise
+(a LAN address refuses loopback connections), with brackets for IPv6. The `starting`, `ready` and `stopping` states
+carry the `host`, so the monitor, `/api/server/props` and chat reach the server the same way (`stateHost()`); an
+external server is reached on loopback. `llama-server` answers `503` while it loads and `200` once the
 model is loaded. The first `200` while the state is still `starting` for the same process sets `ready` and stops the
 timer. There is no load timeout: a large model can stay in `starting` for minutes. The same function is the
 benchmark's rule for "a server is on the port" (any status) and "it is ready" (`200`).
@@ -195,14 +201,16 @@ turns them into `409` responses by checking `e.name`, not `instanceof`, for the 
 
 ## External servers
 
-An external server is anything that answers HTTP on the port llama-webui would use, while llama-webui has no process
-of its own.
+An external server is a `llama-server` that answers on a port llama-webui would use, while llama-webui has no process
+of its own. `probeLlamaServer(port)` (`health.ts`) tells it apart from any other HTTP service: its `/health` answers
+JSON, `{"status":"ok"}` once loaded or `{"error":{"type":"unavailable_error",…}}` while loading.
 
 `externalWatcher()` (`external.ts`) returns a check function. `server/index.ts` runs it once at startup, then every
 `EXTERNAL_CHECK_MS` (2,000 ms):
 
-- In `idle`, it calls `detectExternal(settings.port)`: if the port answers `/health` with any status, the state
-  becomes `external`.
+- In `idle` or `crashed`, it calls `detectExternal(port)` for the settings port, then the last started command's
+  port (`ports()` in `server/index.ts`), and stops at the first hit: the state becomes `external`. After a crash, a
+  `llama-server` started by hand on the port is thus seen without waiting for another state change.
 - In `external`, it calls `recheckExternal()`: when the recorded PID is still alive (`process.kill(pid, 0)`) the state
   stays, even if the port is silent (a hung server is still a server); when the PID is dead or unknown and the port no
   longer answers, the state goes back to `idle`.
@@ -270,7 +278,7 @@ it as is. Consequences:
   `server/runtime.ts`, `server/monitor/**` (except `placement.ts`) or `server/collectors/**` only apply after stopping
   Bun and running `bun run dev` again.
 - A `SupervisorError` thrown by the surviving instance is the old module's class, which fails `instanceof` against the
-  new import. Compare `name` instead.
+  new import. Compare `name` instead, as `errorResponse()` does for `HttpError` (`isHttpError()`).
 - Each evaluation of `server/index.ts` subscribes again, so it first calls `globalThis.__llamaWebuiDispose()`, left by
   the previous evaluation, which unsubscribes the old listeners, clears its timers and closes its database handle.
 
@@ -290,8 +298,10 @@ spawns its own `llama-server` (on `127.0.0.1` and the settings port), and `serve
   `external`, or when the managed server is `starting` or `ready` and `stopServer` is false (code `server-running`,
   so the client can ask for confirmation). It waits up to 60 seconds for a `stopping` state to finish. With
   `stopServer`, it records `supervisor.lastCommand` and calls `supervisor.stop()`.
-- `release()` restarts the recorded command with `supervisor.start()` (the same `BuiltCommand`, not re-read from the
-  profile) and frees the gate. A failed restart is logged as `[bench] could not restart llama-server: …`.
+- `release(rebuild)` restarts the stopped server with `supervisor.start()` and frees the gate. `rebuild` (given by
+  the `BenchRunner`, `rebuild` in `server/index.ts`) builds the command again from the profile as it is now, so edits
+  saved during the benchmark apply; the recorded command is used when the profile is gone or no `rebuild` is given (the
+  deferred release of a reload). A failed restart is logged as `[bench] could not restart llama-server: …`.
 - While a benchmark runs, the server routes refuse every lifecycle call with `409 A benchmark is running`, and the
   external watcher is paused: the benchmark's own `llama-server` on the settings port is not an external server.
 

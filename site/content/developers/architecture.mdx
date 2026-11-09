@@ -276,16 +276,9 @@ if (e instanceof Error && e.name === 'SupervisorError') throw new HttpError(409,
 `SupervisorError` sets `override name = 'SupervisorError'` for this. Apply the same rule to any error thrown by an
 object that lives in the runtime.
 
-<Callout type="warning" title="Known limitation: bench gate errors after a reload">
-
-The bench gate does not follow this rule yet. It lives in the runtime and throws the `HttpError` of the first
-evaluation of `server/http.ts`, while `errorResponse()` in the reloaded `server/http.ts` checks
-`err instanceof HttpError` against the new class. After a `bun --hot` reload, the refusals of `BenchGate.acquire()` (an
-external server running, the managed server running with `code: "server-running"`, a stop that takes too long)
-therefore answer `500` with `Internal error` instead of `409`, and the UI cannot ask whether to stop the server. This only happens in development,
-after a reload; restarting `bun run dev` restores the `409`.
-
-</Callout>
+`HttpError` does the same (`override name = 'HttpError'`): the bench gate lives in the runtime and throws the class
+of the first evaluation of `server/http.ts`, so `errorResponse()` recognizes it with `isHttpError()` (its `name` and a
+numeric `status`) rather than `instanceof`. Its refusals keep their `409` and `code: "server-running"` after a reload.
 
 ### New files in web/src
 

@@ -12,7 +12,7 @@ from a few checks that keep other websites in your browser away from it.
 | Process                          | Listens on by default         | Change it with                                                                                  |
 | -------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
 | llama-webui                      | `127.0.0.1:7860`              | `--host` and `--port` ([Launch options](/docs/configuration/))                                   |
-| `llama-server`, from a profile   | `0.0.0.0:8080`                | **Default host** and **Default port** in [Settings](/docs/settings/#general), or the profile's **Host** and **Port** |
+| `llama-server`, from a profile   | `127.0.0.1:8080`              | **Default host** and **Default port** in [Settings](/docs/settings/#general), or the profile's **Host** and **Port** |
 | `llama-server`, for a benchmark  | `127.0.0.1`, on the default port | **Default port** in Settings                                                                |
 
 On the default address, only programs running on the same machine can reach llama-webui. `llama-server` is a
@@ -51,6 +51,15 @@ like. They apply to every API request and to the WebSocket.
 | Request body     | A `POST`, `PUT`, `PATCH` or `DELETE` with a body must be sent as `application/json`                    | `415`                          | Cross-site form submissions, which browsers send without asking                                      |
 
 llama-webui also sends no CORS headers, so your browser does not let other sites read its responses.
+
+<Callout type="note" title="No reverse proxy with HTTPS">
+
+The `Origin` check compares the page's origin with the scheme llama-webui itself serves, plain `http`. Behind a reverse
+proxy that terminates TLS, the browser sends an `https://` origin, and every write and the WebSocket get
+`403 Origin not allowed`. llama-webui does not trust `X-Forwarded-Proto` (any client could send it), so this setup is not
+supported: reach it over SSH forwarding or a VPN instead (see [Use an SSH tunnel instead](#use-an-ssh-tunnel-instead)).
+
+</Callout>
 
 A few other rules limit what a request can do:
 
@@ -105,16 +114,16 @@ machine can use the tunnel. `-N` keeps the session open for forwarding only; sto
 
 llama-webui's `--host` only concerns llama-webui. Each `llama-server` it starts gets its own `--host` and `--port`:
 the profile's **Host** and **Port** when they are set, otherwise the **Default host** and **Default port** from
-[Settings](/docs/settings/#general), which are `0.0.0.0` and `8080`.
+[Settings](/docs/settings/#general), which are `127.0.0.1` and `8080`.
 
-So by default, **`llama-server` listens on every interface**, even when llama-webui itself only listens on
-`127.0.0.1`. Any device on your network can then send prompts to the loaded model through `llama-server`'s HTTP API,
-which is useful for other machines and tools, but open to everyone who can reach the port. llama-webui always adds
-`--metrics`, `--slots` and `--props`, which enable those endpoints as well.
+So by default, **`llama-server` only accepts connections from this machine**, like llama-webui. To use the model's
+HTTP API from other machines and tools, set **Default host** (or a profile's **Host**) to `0.0.0.0` or to one of this
+machine's addresses. Any device that can reach the port can then send prompts to the loaded model; llama-webui always
+adds `--metrics`, `--slots` and `--props`, which enable those endpoints as well. A warning says so under the
+**Default host** field, in the first-run checklist and on the [Server](/docs/server/) page.
 
-To keep `llama-server` on this machine, set **Default host** to `127.0.0.1` in Settings, or the **Host** of a profile.
-Keep a host that accepts local connections (`127.0.0.1` or `0.0.0.0`): llama-webui talks to `llama-server` through
-`127.0.0.1`, and with a host that refuses local connections it would not see the server become ready.
+llama-webui reaches `llama-server` on the address it listens on: `127.0.0.1` for `0.0.0.0`, the address itself for a
+specific one (a LAN address refuses local connections).
 
 llama-webui does not send an API key to `llama-server`, so `--api-key` is not a way to protect it here: limit the
 address instead.

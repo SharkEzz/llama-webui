@@ -46,7 +46,7 @@ and are not part of this schema.
 | Field                     | Type                                          | Default        | Limits                 | Description                                                                                                                                                                 |
 | ------------------------- | --------------------------------------------- | -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `binary`                  | string                                        | `llama-server` | not empty              | The `llama-server` to run: an absolute path or a name looked up in the `PATH`. `llama-bench` is derived from it (same folder, or the `PATH` for a bare name).                 |
-| `host`                    | string                                        | `0.0.0.0`      | not empty              | `--host` given to `llama-server` for a profile without `host`.                                                                                                              |
+| `host`                    | string                                        | `127.0.0.1`    | not empty              | `--host` given to `llama-server` for a profile without `host`.                                                                                                              |
 | `port`                    | integer                                       | `8080`         | 1 to 65535             | `--port` given to `llama-server` for a profile without `port`; also the port watched for an external server.                                                               |
 | `modelsDir`               | string                                        | `~/models`     | not empty              | The folder scanned for GGUF files; `~` is expanded by the server.                                                                                                           |
 | `pollIntervalMs`          | integer                                       | `1000`         | at least 250           | Interval of the monitor ticks, so of the `snapshot` messages, in milliseconds.                                                                                              |
@@ -79,7 +79,7 @@ curl http://127.0.0.1:7860/api/settings
 ```json
 {
   "binary": "llama-server",
-  "host": "0.0.0.0",
+  "host": "127.0.0.1",
   "port": 8080,
   "modelsDir": "~/models",
   "pollIntervalMs": 1000,

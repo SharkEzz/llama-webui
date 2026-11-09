@@ -9,9 +9,12 @@ import {
 } from '@llama-webui/shared';
 import type { ConversationsRepo } from '../db/conversations';
 import { HttpError, notFound } from '../http';
+import { probeUrl } from '../supervisor/health';
 import { buildChatRequest, type LlamaError, llamaErrorMessage } from './request';
 
 export interface ChatTarget {
+  /** `--host` of the server, null for loopback (external server). */
+  host: string | null;
   port: number;
   profileId: number | null;
   modelPath: string | null;
@@ -285,7 +288,7 @@ export class ChatRuns {
       this.deps,
       user,
       assistant,
-      `http://127.0.0.1:${target.port}/v1/chat/completions`,
+      `${probeUrl(target.host, target.port)}/v1/chat/completions`,
       buildChatRequest(conv, history),
       () => {
         if (this.runs.get(conversationId) === run) this.runs.delete(conversationId);

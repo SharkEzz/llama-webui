@@ -105,21 +105,26 @@ export class BenchGate {
 
   /**
    * Restarts the stopped server and releases the gate. Idempotent. Rejects with “could not restart llama-server: …”
-   * if the restart fails (the gate is released anyway).
+   * if the restart fails (the gate is released anyway). `rebuild` gives the command from the profile as it is now, so
+   * edits saved during the benchmark apply (#39); the recorded command is the fallback (profile deleted, no rebuild).
    */
-  release(): Promise<void> {
+  release(rebuild?: (stopped: BuiltCommand) => BuiltCommand | null): Promise<void> {
     if (!this.holding) return Promise.resolve();
     if (this.releasing) return this.releasing;
     this.pending = null;
     this.releasing = (async () => {
       await this.stopping?.catch(() => {});
-      const cmd = this.stopped;
+      const stopped = this.stopped;
       this.stopped = null;
       using _free = defer(() => {
         this.holding = false;
         this.releasing = null;
       });
-      if (!cmd) return;
+      if (!stopped) return;
+      let cmd = stopped;
+      try {
+        cmd = rebuild?.(stopped) ?? stopped;
+      } catch {}
       this.deps.logs.push(`[bench] restarting llama-server (${cmd.profileName})`);
       try {
         await this.deps.server.start(cmd);

@@ -24,3 +24,8 @@ test('settings: a stored value that became invalid falls back to the default and
   expect(repo.get().pollIntervalMs).toBe(DEFAULT_SETTINGS.pollIntervalMs);
   expect(repo.patch({ port: 9001 }).port).toBe(9001);
 });
+
+test('settings: llama-server listens on loopback by default, like llama-webui (#27)', () => {
+  using db = openDb(':memory:');
+  expect(new SettingsRepo(db).get().host).toBe('127.0.0.1');
+});

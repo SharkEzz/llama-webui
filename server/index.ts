@@ -18,7 +18,7 @@ import { PlacementTracker } from './monitor/placement';
 import { dbPath } from './paths';
 import { buildWebRoutes, unavailableWebRoutes } from './routes/web';
 import { activeProfileId, getRuntime, serverView, startMonitor } from './runtime';
-import { profilePaths } from './supervisor/args';
+import { buildCommand, profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
 import { WsHub } from './ws/hub';
 
@@ -46,10 +46,10 @@ const chatRuns = new ChatRuns({
   repo: conversations,
   target: () => {
     const s = runtime.supervisor.state;
-    if (s.kind === 'external') return { port: s.port, profileId: null, modelPath: null };
+    if (s.kind === 'external') return { host: null, port: s.port, profileId: null, modelPath: null };
     if (s.kind !== 'ready') return null;
     const p = profiles.get(s.profileId);
-    return { port: s.port, profileId: s.profileId, modelPath: p ? profilePaths(p).model : null };
+    return { host: s.host, port: s.port, profileId: s.profileId, modelPath: p ? profilePaths(p).model : null };
   },
 });
 const { supervisor, logs } = runtime;
@@ -93,6 +93,10 @@ const benchRunner = new BenchRunner({
   onRun: (r) => hub.broadcast({ type: 'bench-run', payload: r }),
   onSweep: (s) => hub.broadcast({ type: 'sweep', payload: s }),
   onSweepLive: (l) => hub.broadcast({ type: 'sweep-progress', payload: l }),
+  rebuild: (stopped) => {
+    const p = profiles.get(stopped.profileId);
+    return p ? buildCommand(p, settings.get()) : null;
+  },
 });
 void benchRunner.resume();
 monitor.setModelPathResolver((id) => {
@@ -154,7 +158,7 @@ process.prependListener('SIGTERM', stopChats);
 // External server: detected at startup then watched (leaves the “external” state when it stops).
 const checkExternal = externalWatcher({
   supervisor,
-  port: () => settings.get().port,
+  ports: () => [settings.get().port, supervisor.lastCommand?.port],
   paused: () => benchGate.held || benchRunner.busy,
 });
 void checkExternal();

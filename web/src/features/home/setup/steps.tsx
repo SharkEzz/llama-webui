@@ -311,14 +311,22 @@ export function ProfileStep() {
 }
 
 export function NetworkStep({ report }: Pick<StepProps, 'report'>) {
-  if (!report?.listen.exposed) return null;
+  if (!report?.listen.exposed && !report?.llamaListen.exposed) return null;
   return (
     <Step title="Network access" icon={ShieldAlert} state="info">
-      <p className="text-muted-foreground">
-        llama-webui listens on <Path>{report.listen.host}</Path> and has no authentication: anyone who can reach it can
-        start processes on this machine. Only use it on a network you trust; start it without <Path>--host</Path> to
-        keep it local.
-      </p>
+      {report.listen.exposed && (
+        <p className="text-muted-foreground">
+          llama-webui listens on <Path>{report.listen.host}</Path> and has no authentication: anyone who can reach it
+          can start processes on this machine. Only use it on a network you trust; start it without <Path>--host</Path>{' '}
+          to keep it local.
+        </p>
+      )}
+      {report.llamaListen.exposed && (
+        <p className="text-muted-foreground">
+          llama-server listens on <Path>{report.llamaListen.host}</Path> (Settings, <b>Default host</b>): any device on
+          your network can send prompts to the loaded model. Set it to <Path>127.0.0.1</Path> to keep it local.
+        </p>
+      )}
     </Step>
   );
 }

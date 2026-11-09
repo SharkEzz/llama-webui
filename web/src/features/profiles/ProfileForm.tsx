@@ -1,4 +1,5 @@
 import {
+  DEFAULT_SETTINGS,
   defer,
   type ModelKind,
   type Profile,
@@ -170,7 +171,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
         {fileField('model', 'model', 'Model (GGUF)', 'Qwen3.8-27B-IQ3_S.gguf')}
         {fileField('mmproj', 'mmproj', 'Multimodal projector', 'optional')}
         {field('host', 'Host', {
-          placeholder: settings?.host ?? '0.0.0.0',
+          placeholder: settings?.host ?? DEFAULT_SETTINGS.host,
           hint: 'Empty: value from settings.',
           mono: true,
         })}

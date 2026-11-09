@@ -19,15 +19,17 @@ The supervisor's state, a union on `kind` (`shared/src/server.ts`):
 | `kind`     | Other fields                                                        | Meaning                                                                                                             |
 | ---------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `idle`     |                                                                     | No server is running.                                                                                               |
-| `starting` | `profile`, `profileId`, `pid`, `port`, `since`                      | The process runs; the supervisor polls its `/health` every 500 ms until it answers `200`.                           |
-| `ready`    | `profile`, `profileId`, `pid`, `port`, `since`                      | `/health` answered `200`: the model is loaded.                                                                      |
-| `stopping` | `profile`, `profileId`, `pid`, `port`                               | `SIGTERM` was sent; `SIGKILL` follows after 5 seconds.                                                              |
+| `starting` | `profile`, `profileId`, `pid`, `host`, `port`, `since`              | The process runs; the supervisor polls its `/health` every 500 ms until it answers `200`.                           |
+| `ready`    | `profile`, `profileId`, `pid`, `host`, `port`, `since`              | `/health` answered `200`: the model is loaded.                                                                      |
+| `stopping` | `profile`, `profileId`, `pid`, `host`, `port`                       | `SIGTERM` was sent; `SIGKILL` follows after 5 seconds.                                                              |
 | `crashed`  | `profile`, `profileId`, `exitCode`, `signal`, `at`, `message?`      | The process exited without being asked to, or could not be launched (`message`: why, for example `directory not found: <cwd>`). |
-| `external` | `pid` (number \| null), `port`                                      | A server llama-webui did not start answers on the port; `pid` is `null` when it cannot be found.                    |
+| `external` | `pid` (number \| null), `port`                                      | A `llama-server` llama-webui did not start answers on the port (reached on loopback); `pid` is `null` when it cannot be found. |
 
-`profile` is the profile's name at launch, `since` and `at` are epoch milliseconds, `exitCode` and `signal` are `null`
-when unknown. llama-webui looks for an external server on the `port` setting at startup, then every 2 seconds while
-the state is `idle` or `external`, except during a benchmark (`externalWatcher()`, `server/supervisor/external.ts`).
+`profile` is the profile's name at launch, `host` its `--host` (the probes reach it there, loopback for `0.0.0.0`),
+`since` and `at` are epoch milliseconds, `exitCode` and `signal` are `null` when unknown. llama-webui looks for an
+external server on the `port` setting and the last started profile's port at startup, then every 2 seconds while the
+state is `idle`, `crashed` or `external`, except during a benchmark (`externalWatcher()`,
+`server/supervisor/external.ts`). Only a service whose `/health` answers like `llama-server` counts.
 
 ### ServerView
 
@@ -86,7 +88,8 @@ The four routes share these `409` refusals, without a `code`:
 | `A benchmark is running`                                   | A benchmark or a sweep owns the GPUs (`BenchRunner.busy`); it stops and restarts `llama-server` itself.        |
 | `operation in progress, try again`                         | Another start, switch, restart or stop is in progress: the supervisor runs one lifecycle operation at a time.  |
 | `a server is already running`                              | Start while a managed server runs: use switch.                                                                 |
-| `port in use by an external server (PID <pid>)`            | An external server still answers (state `external`), or the profile's port already answers HTTP on `/health`, which makes the state `external`. The PID is `unknown` when it cannot be found. |
+| `port in use by an external server (PID <pid>)`            | An external server still answers (state `external`), or a `llama-server` already answers on the profile's port, which makes the state `external`. The PID is `unknown` when it cannot be found. |
+| `port <port> is in use by another service`                  | Something that is not a `llama-server` answers HTTP on the profile's port. The state does not change.           |
 
 Stop only gets the first one: it waits for an operation in progress instead of refusing. The supervisor errors are
 recognized by `name === 'SupervisorError'`, not with `instanceof`: the supervisor survives `bun --hot` and throws the
@@ -176,7 +179,8 @@ curl -X POST http://127.0.0.1:7860/api/server/stop
 
 <Endpoint method="GET" path="/api/server/props" />
 
-Proxies `GET http://127.0.0.1:<port>/props` of the ready server (managed or external), with a 2-second timeout. The
+Proxies `GET <host>:<port>/props` of the ready server (managed: on its `--host`, loopback for `0.0.0.0`; external:
+on loopback), with a 2-second timeout. The
 response is `llama-server`'s own JSON, unchanged: its fields depend on the llama.cpp build.
 
 **Response**: `200` with the `/props` body.

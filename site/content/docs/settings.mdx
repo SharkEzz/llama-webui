@@ -36,17 +36,17 @@ listens by default.
 | ----------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Binary**        | `llama-server` | The `llama-server` to run: an absolute path, or a name found in the `PATH` (`~` is not expanded). Also used to read its build number and its `--help`, and to find `llama-bench` in the same folder.            |
 | **Models folder** | `~/models`     | The folder scanned for GGUF files, with its subfolders. [Hugging Face downloads](/docs/hugging-face/) are saved there, and it becomes the working directory of a new profile when you pick its model.          |
-| **Default host**  | `0.0.0.0`      | The `--host` given to `llama-server` for profiles that leave **Host** empty.                                                                                                                                     |
+| **Default host**  | `127.0.0.1`    | The `--host` given to `llama-server` for profiles that leave **Host** empty. Below the field, a warning says when it opens `llama-server` to your network.                                                     |
 | **Default port**  | `8080`         | The `--port` given to `llama-server` for profiles that leave **Port** empty. Also the port of the temporary servers of benchmark runs, and the port where llama-webui looks for a `llama-server` it did not start. |
 
 Changes apply to the next start: a running `llama-server` keeps its binary, host and port until you restart it.
 
-<Callout type="important" title="llama-server listens on every interface by default">
+<Callout type="important" title="Reach llama-server from other machines">
 
-With the default host `0.0.0.0`, the model's API on port 8080 is reachable from your whole network. Set
-**Default host** to `127.0.0.1` if only this machine should use it. llama-webui talks to `llama-server` on
-`127.0.0.1`, so keep a host that accepts local connections (`127.0.0.1` or `0.0.0.0`). See
-[Security](/docs/security/#how-llama-server-is-exposed).
+With the default host `127.0.0.1`, only this machine can use the model's API. Set **Default host** to `0.0.0.0` (every
+interface) or to one of this machine's addresses to reach it from your network: anyone who can reach the port can then
+send prompts to the model. Earlier versions defaulted to `0.0.0.0`: if you relied on it, set it again here.
+See [Security](/docs/security/#how-llama-server-is-exposed).
 
 </Callout>
 

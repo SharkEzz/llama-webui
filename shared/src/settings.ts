@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 export const SettingsSchema = z.object({
   binary: z.string().min(1, 'Required').default('llama-server'),
-  host: z.string().min(1, 'Required').default('0.0.0.0'),
+  /** llama-server's `--host`: loopback by default, like llama-webui; `0.0.0.0` opens it to the network (#27). */
+  host: z.string().min(1, 'Required').default('127.0.0.1'),
   port: z
     .number({ error: 'Expected a number' })
     .int('Expected an integer')
