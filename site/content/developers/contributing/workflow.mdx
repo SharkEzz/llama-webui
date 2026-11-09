@@ -1,0 +1,246 @@
+---
+title: Docs, commits and PRs
+description: Keep the docs in sync with the code, write a docs page, refresh the screenshots, write commits and pull requests, and pass the checks CI runs.
+---
+
+A change to llama-webui ships with its documentation, passes the same checks as CI, and lands as one pull request. This
+page covers that workflow; [Conventions](/developers/contributing/conventions/) covers the code itself.
+
+## Keep the docs in sync
+
+Any change to a feature, the UI, an API route, a WebSocket message, a CLI flag, a setting or the architecture updates
+the matching pages of `site/content/` **in the same pull request**. The API reference is written by hand: it drifts as
+soon as a change forgets it.
+
+| Code you change                                                              | Pages to update                                                                                                                  |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `server/routes/<domain>.ts`, `server/app.ts`, zod schemas in `shared/src/`   | `/developers/api/<domain>/` (`server/app.ts` is [Health and settings](/developers/api/app/)) and the user page of the feature    |
+| `shared/src/ws.ts`, `server/ws/`                                             | [WebSocket](/developers/api/websocket/)                                                                                          |
+| `server/cli.ts`, `server/paths.ts`, environment variables                    | [Launch options](/docs/configuration/), [Architecture](/developers/architecture/)                                                |
+| `server/security.ts`, `server/http.ts`                                       | [Security](/docs/security/) (user), [Security](/developers/server/security/) (server), [API overview](/developers/api/overview/) |
+| `server/supervisor/**`                                                       | [Supervisor](/developers/server/supervisor/), [Server](/docs/server/)                                                            |
+| `server/monitor/**`, `server/collectors/**`                                  | [Monitor and collectors](/developers/server/monitor/), [Dashboard](/docs/dashboard/), [System](/docs/system/), [Topology](/docs/topology/) |
+| `server/chat/**`                                                             | [Chat runs](/developers/server/chat/), [Chat](/docs/chat/)                                                                       |
+| `server/bench/**`                                                            | [Benchmarks and sweeps](/developers/server/bench/), [Benchmark](/docs/benchmark/), [Sweeps](/docs/sweeps/)                       |
+| `shared/src/tuning.ts`, `server/tuning/**`                                   | [Tuning](/developers/server/tuning/) (server), [Tuning](/docs/tuning/) (user), [Sweeps](/docs/sweeps/), the guides it affects    |
+| `server/hf/**`                                                               | [Hugging Face downloads](/developers/server/hugging-face/) (server), [Hugging Face downloads](/docs/hugging-face/) (user)         |
+| `server/db/**` (migrations, tables)                                          | [Database](/developers/server/database/)                                                                                         |
+| `web/src/features/home/setup/**`                                             | [First run](/docs/getting-started/first-run/)                                                                                    |
+| `web/src/features/<page>/**`                                                 | `/docs/<page>/` and its screenshots (`bench` is [Benchmark](/docs/benchmark/), the Hugging Face part of `models` is [Hugging Face downloads](/docs/hugging-face/)) |
+| `web/src/app/**`, `web/src/lib/**`, `web/src/components/**`                  | [Web app](/developers/frontend/)                                                                                                 |
+| `shared/src/**` (a new module, the role of a module)                         | [Shared package](/developers/shared/)                                                                                            |
+| `shared/src/settings.ts`, the Settings page                                  | [Settings](/docs/settings/), [Health and settings](/developers/api/app/)                                                         |
+| `server/index.ts`, `server/runtime.ts`, `server/routes/web.ts`, hot reload   | [Architecture](/developers/architecture/)                                                                                        |
+| `package.json` scripts, repository layout                                    | [Development setup](/developers/getting-started/)                                                                                |
+| Requirements, installation (README)                                          | [Requirements](/docs/getting-started/requirements/), [Installation](/docs/getting-started/installation/)                         |
+| Project conventions (Biome, language, tests, docs)                           | These Contributing pages                                                                                                         |
+
+The rules on these pages come from `CLAUDE.md` at the root of the repository: when a convention changes, update both.
+
+## Write a docs page
+
+The website lives in `site/`, a package of its own (Vite, React Router with prerendering, Tailwind, MDX) outside the
+Bun workspaces, with its own `package.json` and `bun.lock`. Every `.mdx` file under `site/content/docs/` or
+`site/content/developers/` becomes a prerendered page: `docs/getting-started/installation.mdx` is
+`/docs/getting-started/installation/`, and an `index.mdx` is the page of its folder.
+
+<Steps>
+  <Step title="Create the file">
+
+Start with a YAML front matter. Both fields are required, and the build fails without them:
+
+```mdx title="site/content/docs/server.mdx"
+---
+title: Server
+description: Start, stop, restart or switch llama-server, follow its state, read what it reports through /props, and see the exact command llama-webui launched.
+---
+```
+
+The layout renders the title as the page heading and the description under it (it is also the meta description), so the
+body has no `#` heading. Its `##` and `###` headings build the "On this page" table of contents.
+
+  </Step>
+  <Step title="Add it to the sidebar">
+
+Add `{ path, title }` to its section and group in `site/content/nav.ts`, in reading order. The path is the route
+without slashes (`docs/server`, `developers` for `developers/index.mdx`). `site/src/docs/nav.test.ts` fails when a page
+is missing from the sidebar or an entry has no file.
+
+  </Step>
+  <Step title="Write the content">
+
+The components of `site/src/docs/mdx-components.tsx` need no import:
+
+| Component                   | Use                                                                                     |
+| --------------------------- | --------------------------------------------------------------------------------------- |
+| `Callout`                   | A note with `type` `note`, `tip`, `warning` or `important`, and an optional `title`     |
+| `Steps`, `Step`             | A numbered procedure, one `title` per step                                              |
+| `Tabs`, `Tab`               | Alternatives (one tab per backend, per shell…)                                          |
+| `Screenshot`                | A capture by `name`, with `alt` and an optional `caption`; click to enlarge             |
+| `Kbd`                       | A key: `<Kbd>Ctrl</Kbd>`                                                                |
+| `Endpoint`                  | The method and path of an API route, under the heading that names it                    |
+| `FileTree`                  | A folder tree written as a Markdown list, names in backticks, a trailing `/` for folders |
+| `ArchitectureDiagram`       | The overview diagram of the [Architecture](/developers/architecture/) page              |
+
+Leave a blank line after an opening tag and before the closing tag when the content is Markdown. A code fence always
+takes a language, and a title after it for a snippet from a file or a terminal: `bash title="Terminal"`,
+`ts title="server/http.ts"`.
+
+Internal links use the route with its trailing slash and without the `/llama-webui` base, which React Router adds:
+`[Server](/docs/server/)`, `[States](/docs/server/#server-states)`. An anchor is the heading text in lowercase, spaces
+turned into hyphens, punctuation dropped.
+
+  </Step>
+  <Step title="Preview it">
+
+Install the site's dependencies once, then run the site from the root of the repository:
+
+```bash title="Terminal"
+cd site && bun install && cd ..
+bun run site:dev
+```
+
+`site:dev` serves the site with hot reload on port 5173 on every interface: open `http://<host>:5173/llama-webui/`.
+
+  </Step>
+  <Step title="Build and check the links">
+
+```bash title="Terminal"
+bun run site:build
+bun run --cwd site check-links
+bun run site:preview
+```
+
+`site:build` prerenders every page, then `scripts/postbuild.ts` writes `site/dist/`: the pages, a `404.html`, the
+`sitemap.xml` and the search index. `check-links` fails on any broken internal link or anchor
+([Test the website](/developers/contributing/testing/#test-the-website)). `site:preview` serves `site/dist/` on port 4173
+the way GitHub Pages does (under `/llama-webui/`, with the trailing-slash redirect and the 404 page); search only works
+there, since its index only exists after a build.
+
+  </Step>
+</Steps>
+
+Pages are in English and describe the code as it is: check names, defaults and limits in the source rather than in
+another page.
+
+## Screenshots
+
+Captures live in `site/public/screenshots/` as `<name>-dark.webp` and `<name>-light.webp` (1600 px wide), plus an
+800 px version of each; `<Screenshot name="server" … />` picks the right one. When a UI change alters a captured
+screen, capture it again in the same pull request.
+
+<Steps>
+  <Step title="Start a demo instance">
+
+Captures come from a demo instance, never from the one you use every day. It runs on port 7861 with a neutral home so
+that no personal path or account appears:
+
+```bash title="Terminal"
+env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" bun run start --host 0.0.0.0 --port 7861
+```
+
+`/home/demo/models` points to the models folder, and `/home/demo/llama.cpp/build/bin` holds hard links to the llama.cpp
+binaries: the app resolves the binary's real path, so a symbolic link would show the original location.
+
+  </Step>
+  <Step title="Fill it">
+
+```bash title="Terminal"
+bun run --cwd site demo-seed setup bench sweep start chat
+```
+
+`site/scripts/demo-seed.ts` drives the real API: settings and profiles (`setup`), `llama-bench` and server runs
+(`bench`), a validated sweep (`sweep`), a running server (`start`) and a conversation (`chat`). It loads real models on
+the GPUs, so free them first.
+
+  </Step>
+  <Step title="Capture">
+
+```bash title="Terminal"
+bun run --cwd site screenshots            # every screen but the live and manual ones, or: screenshots server logs
+bun run --cwd site demo-seed generate
+bun run --cwd site screenshots --live     # Dashboard, System and Topology, during a generation
+```
+
+`site/scripts/screenshots.ts` opens each screen in headless Chromium (`/usr/bin/chromium`), switches the theme through
+`PATCH /api/settings` to capture it in dark and light, and restores the theme at the end. `--base` points it at another address.
+`site/scripts/shots.ts` lists the screens and how each is staged; a `manual` shot (the setup checklist) is only taken
+when you name it.
+
+  </Step>
+  <Step title="Update what depends on them">
+
+After a new Dashboard capture, run `bun run --cwd site og` to render the Open Graph image (`site/public/og.png`). The
+landing page also redraws some app screens in React with their real values (the hero's live Dashboard, the argument
+editor, the Tuning recommendation, in `site/src/landing/`): update them when those screens change.
+
+  </Step>
+</Steps>
+
+## Commit messages
+
+The history uses a type prefix and a capitalized subject that names the change, in English, without a final period:
+
+```text
+build: Prerender every static path except the 404 splat route
+docs: User documentation for the website (site M6)
+feat: Download GGUF models from Hugging Face on the Models page (#11)
+feat: First-run setup checklist and profile launch pad on Home (#10)
+```
+
+- **Types** seen in the history: `feat` (a feature), `docs` (documentation only), `build` (build and tooling), `ref` (a
+  rework of existing code or UI).
+- **Body**: after a blank line, wrapped at about 72 columns, say what changed and why, in prose or as `-` bullets (one
+  per area for a large change).
+- **Pull request number**: pull requests are squash-merged, and the resulting commit's subject ends with `(#N)`.
+
+## Pull requests
+
+- **Branch** from `master`, named after the type and the topic: `feat/hf-downloads`, `docs/readme`, `chore/biome`.
+- **Title**: the subject of the future squashed commit, `feat: Download GGUF models from Hugging Face on the Models page`.
+- **Body**:
+  - `## Summary`: what the change does and why, as the user sees it, then the notable choices.
+  - `## Layout` for a large change: the new or changed files, by area.
+  - `## Test plan`: a checklist of what you ran (the quality gate below, the site build) and checked by hand.
+  - When a pull request builds on another one, say so ("Stacked on #20"). Problems found along the way but not fixed
+    get their own list or an issue.
+- **Docs**: the pages from [Keep the docs in sync](#keep-the-docs-in-sync) and the screenshots are part of the same pull
+  request.
+
+## The quality gate
+
+Before a commit, a pull request or the end of a milestone, these must pass from the root of the repository:
+
+```bash title="Terminal"
+bun run lint
+bun run check
+bun test
+```
+
+- `bun run lint`: Biome with zero errors and zero warnings (format, lint, sorted imports).
+- `bun run check`: the type checks of `server/` and `shared/`, `web/` and `site/`.
+- `bun test`: every test file, `web/src/` included ([Run the tests](/developers/contributing/testing/#run-the-tests)).
+
+When the change touches `site/`, including its pages, also run `bun run site:build`, then
+`bun run --cwd site check-links`.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and every push to `master`, on Ubuntu with Bun 1.4.4 and
+Node.js 24 (the React Router CLI that builds the site runs on Node, and Vite 8 needs a recent version):
+
+| Step                                         | Command                                              |
+| -------------------------------------------- | ---------------------------------------------------- |
+| Install the app's dependencies               | `bun install --frozen-lockfile`                      |
+| Install the site's dependencies              | `bun install --frozen-lockfile` in `site/`           |
+| Lint                                         | `bun run lint`                                       |
+| Type check                                   | `bun run check`                                      |
+| Tests                                        | `bun test`                                           |
+| Build the site                               | `bun run site:build`                                 |
+| Check the site's links                       | `bun run --cwd site check-links`                     |
+
+`--frozen-lockfile` fails when a lockfile is out of date: commit `bun.lock` (and `site/bun.lock`) with any dependency
+change.
+
+`.github/workflows/site-deploy.yml` publishes `site/dist/` to GitHub Pages. It only runs when started by hand
+(`workflow_dispatch`) while the website is not public.

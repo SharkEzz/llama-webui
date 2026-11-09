@@ -1,0 +1,277 @@
+---
+title: Profiles
+description: Create, read, update, delete and duplicate llama-server profiles, export and import them as JSON, and import the profiles of llama-tui.
+---
+
+A profile is a saved `llama-server` launch: a model, optional projector, working directory, host, port, arguments and
+environment. The routes are in `server/routes/profiles.ts`, the storage in `ProfilesRepo` (`server/db/profiles.ts`),
+the llama-tui reader in `server/llamatui.ts`, and the schema and import parser in `shared/src/profile.ts`. The common
+rules are on the [API overview](/developers/api/overview/); the Profiles page is described on
+[Profiles](/docs/profiles/).
+
+## The profile schema
+
+### ProfileInput
+
+`ProfileInputSchema` (`shared/src/profile.ts`) is the body of a create or an update, and the import and export format.
+It is the profile format of llama-tui. The object is strict: an unknown key is refused (`Unrecognized key`).
+
+| Field    | Type                     | Required | Description                                                                                                              |
+| -------- | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `name`   | string                   | yes      | Not empty. Unique among profiles (exact, case-sensitive match).                                                          |
+| `model`  | string                   | yes      | Not empty. The GGUF to load (`-m`): absolute, `~/…`, or relative to `cwd`.                                               |
+| `mmproj` | string                   | no       | A multimodal projector (`-mm`), with the same path rules.                                                                |
+| `cwd`    | string                   | no       | The working directory of `llama-server` (`~` expanded). Without it, llama-webui's own working directory.                 |
+| `host`   | string                   | no       | `--host`. Without it, the `host` setting.                                                                                |
+| `port`   | integer                  | no       | `--port`, 1 to 65535. Without it, the `port` setting.                                                                    |
+| `args`   | string[]                 | no       | The other `llama-server` arguments, one item per word (`["-c", "16384"]`). Default `[]`.                                 |
+| `env`    | `Record<string, string>` | no       | Environment variables added to llama-webui's own when `llama-server` starts. Default `{}`.                               |
+
+`args` cannot contain a flag llama-webui passes itself (`RESERVED_FLAGS`): `--host`, `--port`, `--metrics`, `--slots`,
+`--props`, `-m`, `--model`, `-mm`, `--mmproj`, also written as `--flag=value`. Each one is a zod issue at its index,
+`<flag> is managed by llama-webui (use the profile fields)` with the path `args.<index>`. The launch command itself is
+built by `buildCommand()` (`server/supervisor/args.ts`, see [Supervisor](/developers/server/supervisor/)).
+
+### Profile
+
+What the routes return: a `ProfileInput` plus four fields.
+
+| Field       | Type                              | Description                                                                                   |
+| ----------- | --------------------------------- | --------------------------------------------------------------------------------------------- |
+| `id`        | number                            | The profile's id.                                                                             |
+| `source`    | `'ui' \| 'import' \| 'llama-tui'` | How it was created: `ui` by `POST /api/profiles` (the editor) or from a benchmark run, `import` by a file import, `llama-tui` by the llama-tui import. |
+| `createdAt` | number                            | Creation time (epoch ms).                                                                     |
+| `updatedAt` | number                            | Last update time (epoch ms).                                                                  |
+
+The optional fields (`mmproj`, `cwd`, `host`, `port`) are left out when they are not set, never `null`.
+
+```json
+{
+  "id": 3,
+  "name": "Qwen3 32B",
+  "model": "/models/qwen3-32b-q4_k_m.gguf",
+  "args": ["-ngl", "99", "-c", "16384", "-fa", "on"],
+  "env": {},
+  "source": "ui",
+  "createdAt": 1794210000000,
+  "updatedAt": 1794210000000
+}
+```
+
+<Callout type="note">
+
+The `profiles` table uses `id INTEGER PRIMARY KEY` without `AUTOINCREMENT`: once the profile with the highest id is
+deleted, SQLite can give that id to the next profile created. Do not keep a profile id across a deletion.
+
+</Callout>
+
+## Profiles
+
+### List profiles
+
+<Endpoint method="GET" path="/api/profiles" />
+
+**Response**: `200` with a `Profile[]`, sorted by name (case-insensitive).
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/profiles
+```
+
+### Create a profile
+
+<Endpoint method="POST" path="/api/profiles" />
+
+Validates the body and saves it with the source `ui`. Nothing is checked on disk: a model path that does not exist is
+accepted, and fails at launch.
+
+**Body**: `ProfileInput` (see [ProfileInput](#profileinput)).
+
+**Response**: `201` with the created `Profile`.
+
+**Errors**: `400` invalid body (zod issues), `409` `A profile named “<name>” already exists` (`code: "name-taken"`).
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/profiles \
+  -H 'content-type: application/json' \
+  -d '{"name":"Qwen3 32B","model":"/models/qwen3-32b-q4_k_m.gguf","args":["-ngl","99","-c","16384"]}'
+```
+
+### Read a profile
+
+<Endpoint method="GET" path="/api/profiles/:id" />
+
+**Response**: `200` with the `Profile`.
+
+**Errors**: `404` `Profile not found`.
+
+### Update a profile
+
+<Endpoint method="PUT" path="/api/profiles/:id" />
+
+Replaces the whole profile: the body is a full `ProfileInput`, and an optional field it leaves out is cleared. The id,
+the source and `createdAt` stay, `updatedAt` changes. A running server keeps the arguments it was started with until
+it restarts ([`POST /api/server/restart`](/developers/api/server/) reads the profile again).
+
+**Body**: `ProfileInput`.
+
+**Response**: `200` with the updated `Profile`.
+
+**Errors**: `404` `Profile not found` (before the body is validated), `400` invalid body, `409` `name-taken` when
+another profile has the name.
+
+```bash title="Terminal"
+curl -X PUT http://127.0.0.1:7860/api/profiles/3 \
+  -H 'content-type: application/json' \
+  -d '{"name":"Qwen3 32B","model":"/models/qwen3-32b-q4_k_m.gguf","args":["-ngl","99","-c","32768"]}'
+```
+
+### Delete a profile
+
+<Endpoint method="DELETE" path="/api/profiles/:id" />
+
+Deletes the profile. If it was the `defaultProfileId` setting, that setting goes back to `null`. Conversations,
+benchmark runs and sweeps that referred to it stay, with no profile (`ON DELETE SET NULL`).
+
+**Response**: `204`.
+
+**Errors**: `404` `Profile not found`, `409` `This profile belongs to the running server: stop it first` while the
+managed server runs it (state `starting`, `ready` or `stopping`).
+
+```bash title="Terminal"
+curl -X DELETE http://127.0.0.1:7860/api/profiles/3
+```
+
+### Duplicate a profile
+
+<Endpoint method="POST" path="/api/profiles/:id/duplicate" />
+
+Creates a copy named `<name> (copy)`, or `<name> (copy 2)`, `(copy 3)`… when that name is taken. The copy keeps the
+source of the original, except that a copy of a `llama-tui` profile gets `import`.
+
+**Response**: `201` with the new `Profile`.
+
+**Errors**: `404` `Profile not found`.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/profiles/3/duplicate
+```
+
+## Export and import
+
+The export routes answer with a JSON file to download: `content-type: application/json; charset=utf-8`, a
+`content-disposition: attachment; filename*=UTF-8''<name>` header, the JSON indented by two spaces and a final newline.
+The profiles are exported as `ProfileInput`, without `id`, `source` or dates.
+
+### Export every profile
+
+<Endpoint method="GET" path="/api/profiles/export" />
+
+**Response**: `200` with `{ "profiles": ProfileInput[] }`, in the list order, as the file `llama-webui-profils.json`.
+
+```bash title="Terminal"
+curl -o profiles.json http://127.0.0.1:7860/api/profiles/export
+```
+
+### Export a profile
+
+<Endpoint method="GET" path="/api/profiles/:id/export" />
+
+**Response**: `200` with the `ProfileInput` as the file `<profile name>.json`.
+
+**Errors**: `404` `Profile not found`.
+
+### Import profiles
+
+<Endpoint method="POST" path="/api/profiles/import" />
+
+Adds the profiles of a JSON document. `parseProfileImport()` (`shared/src/profile.ts`) accepts:
+
+- a whole llama-tui configuration, `{ "profiles": [...] }` (its other keys are ignored), which is also the export
+  format;
+- an array of profiles;
+- a single profile (an object with a `name` or a `model`).
+
+Each profile is validated on its own, then `ProfilesRepo.importMany()` adds the valid ones in one transaction, with
+the source `import`. An import never overwrites: a name that already exists is skipped.
+
+**Body**: one of the forms above.
+
+**Response**: `200`
+
+| Field      | Type                         | Description                                                    |
+| ---------- | ---------------------------- | -------------------------------------------------------------- |
+| `imported` | `Profile[]`                  | The profiles created.                                          |
+| `skipped`  | `{ name, reason }[]`         | The profiles left out: those refused by the parser first, then those whose name exists. |
+
+The reasons are the first zod issue (`<message> (<path>)`), `duplicate name in the file`, `already exists`, or
+`no profile found in this JSON` with the name `(file)` when the document has none of the three forms. A profile without
+a usable name is reported as `(unnamed)`.
+
+**Errors**: `400` `Invalid JSON` when the body is not JSON. A document with nothing to import is still a `200`.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/profiles/import \
+  -H 'content-type: application/json' \
+  --data-binary @profiles.json
+```
+
+```json
+{
+  "imported": [{ "id": 7, "name": "Gemma 3 27B", "model": "gemma-3-27b-it-Q4_K_M.gguf", "args": [], "env": {}, "source": "import", "createdAt": 1794210000000, "updatedAt": 1794210000000, "cwd": "~/models" }],
+  "skipped": [{ "name": "Qwen3 32B", "reason": "already exists" }]
+}
+```
+
+## llama-tui import
+
+llama-webui reads the profiles of llama-tui from its configuration file,
+`$XDG_CONFIG_HOME/llama-tui/config.json`, or `~/.config/llama-tui/config.json` when `XDG_CONFIG_HOME` is not set
+(`llamaTuiConfigPath()`, `server/llamatui.ts`). The file is read on every call, and parsed with the same
+`parseProfileImport()` as a file import.
+
+### Check for llama-tui profiles
+
+<Endpoint method="GET" path="/api/profiles/import/llama-tui" />
+
+Tells the Profiles page whether to offer the import.
+
+**Response**: `200`
+
+| Field          | Type     | Description                                                                                  |
+| -------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `path`         | string   | The configuration file looked for.                                                           |
+| `exists`       | boolean  | The file exists.                                                                             |
+| `names`        | string[] | Names of the valid profiles it holds.                                                        |
+| `error`        | string   | Present only when the file is not valid JSON (`Invalid JSON: …`).                            |
+| `dismissed`    | boolean  | The `llamaTuiImportDismissed` setting.                                                       |
+| `profileCount` | number   | How many profiles llama-webui has.                                                           |
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/profiles/import/llama-tui
+```
+
+```json
+{
+  "path": "/home/me/.config/llama-tui/config.json",
+  "exists": true,
+  "names": ["Qwen3 32B", "Gemma 3 27B"],
+  "dismissed": false,
+  "profileCount": 0
+}
+```
+
+### Import the llama-tui profiles
+
+<Endpoint method="POST" path="/api/profiles/import/llama-tui" />
+
+Imports every valid profile of the llama-tui configuration, with the source `llama-tui` and the rules of a file import
+(existing names skipped). If the `defaultProfileId` setting is still `null` and the configuration names a
+`defaultProfile` that was imported or already exists, its id becomes the default profile. No body.
+
+**Response**: `200` with `{ imported, skipped }`, as for [Import profiles](#import-profiles).
+
+**Errors**: `404` `llama-tui config not found (<path>)`, `400` `Unreadable llama-tui config: Invalid JSON: …`.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/profiles/import/llama-tui
+```

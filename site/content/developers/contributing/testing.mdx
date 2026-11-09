@@ -1,0 +1,261 @@
+---
+title: Testing
+description: Run the tests and the type check, write a test, and use the captured outputs, fake llama-server and llama-bench, fixtures and site checks.
+---
+
+Tests run on Bun's built-in runner (`bun:test`) and sit next to the code they test. They cover logic rather than
+screens: parsers fed with real captured outputs from `testdata/`, the estimator, the repositories against SQLite, and the
+benchmark runner driving fake `llama-server` and `llama-bench` binaries.
+
+## Run the tests
+
+From the root of the repository:
+
+```bash title="Terminal"
+bun test
+```
+
+Bun's runner looks for `*.test.ts` files (and the other test suffixes) in every folder except `node_modules` and hidden
+ones, so this runs the tests of `server/`, `shared/`, `web/` and `site/`. It is the command CI runs.
+
+<Callout type="note" title="bun test and bun run test">
+
+The root `test` script is `bun test server shared site`. Positional arguments are path filters (substring matches), so
+`bun run test` only runs the files whose path contains `server`, `shared` or `site`, and leaves out the tests under
+`web/src/`. Use `bun test` to run everything.
+
+</Callout>
+
+| Command                                     | Runs                                                 |
+| ------------------------------------------- | ---------------------------------------------------- |
+| `bun test server/bench`                     | Test files whose path contains `server/bench`        |
+| `bun test ./server/bench/parse.test.ts`     | One file (the path starts with `./` or `/`)          |
+| `bun test -t 'sweep'`                       | Tests whose name matches the regular expression      |
+| `bun test --check`                          | Type checks the test files and their imports first   |
+
+A test has 5 seconds by default. Tests that spawn processes or build the front end pass a longer timeout as the third
+argument of `test()` (`}, 20_000);` in `server/bench/runner.test.ts`, `30_000` in `server/routes/web.test.ts`).
+
+## Where tests live
+
+A test file sits next to its module: `server/bench/parse.test.ts` tests `server/bench/parse.ts`.
+
+| Folder     | What the tests cover                                                                                                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `server/`  | Parsers (`llama-bench` output, `/metrics`, `/slots`, `nvidia-smi`, AMD sysfs and fdinfo, `perf`, startup logs, PCI topology), GGUF reading and the model scan, `llama-server` command lines, external-server detection, tuning, repositories, the bench runner and gate, chat runs, Hugging Face downloads, the security guard, CLI flags, the setup report, the production front-end build |
+| `shared/`  | Pure logic used on both sides: flags from `--help`, benchmark parameters, profile import, sweeps, the SSE parser, chat stats and titles, logs, topology, models, setup checks, Hugging Face inputs, `defer` |
+| `web/src/` | Pure UI logic: the Topology page's flows, layout, pacing and smoothing (`web/src/features/topology/`), the benchmark form mapping (`web/src/lib/bench.ts`)                                 |
+| `site/`    | The link checker helpers, the sidebar and content routes, the landing page's telemetry simulation                                                                                         |
+
+There are no component or browser tests (no DOM library is installed). When a page has logic worth testing, it lives in
+a plain module next to the page, as `flows.ts` does for the Topology page.
+
+## Write a test
+
+```ts title="server/db/settings.test.ts"
+test('settings: defaults, then a persisted patch', () => {
+  using dir = tempDir('lw-');
+  using db = openDb(join(dir.path, 'sub', 't.sqlite')); // missing subdirectory
+  const repo = new SettingsRepo(db);
+  expect(repo.get()).toEqual(DEFAULT_SETTINGS);
+  expect(repo.patch({ port: 9000 }).port).toBe(9000);
+  expect(new SettingsRepo(db).get().port).toBe(9000);
+  expect(() => repo.patch({ pollIntervalMs: 10 })).toThrow();
+});
+```
+
+- **Names** are English sentences that state the behavior: `a deleted run's id is never handed out again`,
+  `isOomError recognizes the current and the legacy out-of-memory errors`. A prefix (`setup: …`) or a `describe` block
+  groups the tests of one function.
+- **Temporary directories** come from `tempDir(prefix)` (`server/testing/tempDir.ts`). With `using`, the directory is
+  deleted when the test ends, even when it fails. At module level, where `using` would release it before the tests run,
+  call `afterAll(() => dir[Symbol.dispose]())`.
+- **Databases**: `openDb(':memory:')` gives a fresh database with every migration applied; `openDb()` on a path in a
+  temporary directory tests a real file.
+- **Dependencies are injected.** Server classes and builders take their collaborators as arguments, so a test passes
+  fakes instead of mocking modules (`mock()` from `bun:test` only records callbacks, in `server/hf/downloader.test.ts`):
+
+  | Code                              | Injected in tests                                                  |
+  | --------------------------------- | ------------------------------------------------------------------ |
+  | `ChatRuns` (`server/chat/runs.ts`) | `fetch`: a fake `llama-server` stream the test feeds chunk by chunk |
+  | `HfClient`, `DownloadQueue` (`server/hf/`) | `fetch`: a fake Hub and CDN with `Range` support and scripted failures |
+  | `NvidiaMonitor` (`server/collectors/nvidia.ts`) | `spawn`: canned `nvidia-smi` output                        |
+  | `BenchGate` (`server/bench/gate.ts`) | A `ServerControl` that records stops and restarts               |
+  | `buildSetupReport`, `buildLaunchpad` (`server/setup.ts`) | A `SetupDeps` object                                |
+
+- **`/proc` and `/sys` readers** take the root to read from, so a test writes a small tree in a temporary directory:
+  `readProcAmdVram(pid, root)` reads `<root>/<pid>/fdinfo/*`.
+- **Route handlers** can be called directly with a `Request` that carries `params`, as `server/bench/runner.test.ts`
+  does for `POST /api/sweeps/:id/validate`.
+- **Environment variables** a test sets (the `FAKE_*` switches below) are deleted in an `afterEach`.
+
+## Captured outputs
+
+`testdata/` holds real outputs captured from `llama-server`, `llama-bench`, `nvidia-smi` and the kernel. Parsers are
+tested against them rather than against hand-written strings. Biome does not check this folder.
+
+| File                                                   | What it is                                               | Read by                                 |
+| ------------------------------------------------------ | -------------------------------------------------------- | --------------------------------------- |
+| `llama-server-help.txt`                                | `llama-server --help`                                    | `shared/src/flags.test.ts`              |
+| `llama-server-load.txt`, `llama-server-load-mtp.txt`, `llama-server-load-mtp-lv5.txt` | Startup logs (with MTP, and at `-lv 5`) | `server/monitor/placement.test.ts` |
+| `metrics-idle.txt`, `metrics-after.txt`                | Prometheus `/metrics`, idle and after generating tokens  | `server/collectors/llama.test.ts`       |
+| `slots-idle.json`, `slots-busy.json`                   | `/slots`, idle and busy                                  | `server/collectors/llama.test.ts`       |
+| `nvidia-gpu.csv`, `nvidia-apps.csv`                    | `nvidia-smi` CSV queries (GPUs, compute apps)            | `server/collectors/nvidia.test.ts`      |
+| `fdinfo-amd-vram.txt`, `fdinfo-amd-igpu.txt`, `fdinfo-other.txt` | `/proc/<pid>/fdinfo` entries (AMD card, AMD iGPU, another driver) | `server/collectors/amdgpu.test.ts` |
+| `llama-tui-config.json`                                | A llama-tui configuration to import                      | `shared/src/profile.test.ts`            |
+| `llama-bench/ok.json`, `oom-stdout.json`, `oom-stderr.txt` | `llama-bench -o json` output, and an out-of-memory failure | `server/bench/parse.test.ts`, the fake `llama-bench` |
+| `llama-bench/list-devices.txt`                         | `llama-bench --list-devices`                             | `server/bench/parse.test.ts`, the fake `llama-bench` |
+| `fake/`                                                | The fake binaries and the files they serve               | See below                               |
+
+Tests read these files relative to their own location:
+
+```ts title="server/collectors/llama.test.ts"
+const fx = (n: string) => Bun.file(`${import.meta.dir}/../../testdata/${n}`);
+```
+
+## Fake binaries
+
+`testdata/fake/` holds two stand-ins for the llama.cpp binaries. Each is a shell script that runs its TypeScript
+counterpart with `bun` from the `PATH` (or `$BUN_PATH`), so a test can use it wherever the app expects a binary path.
+
+### Fake llama-server
+
+`fake-llama-server` takes `llama-server`'s flags, prints log lines on stderr, and serves on `127.0.0.1` at the `--port`
+it was given:
+
+- `/health` answers `503` while it "loads" the model, then `{"status":"ok"}`.
+- `/completion` and `/v1/chat/completions` answer with timings. A streamed chat reply sends reasoning (unless thinking
+  is off), then Markdown, one chunk at a time; a prompt larger than the simulated context gets `llama-server`'s
+  context-size error.
+- `/slots`, `/metrics` and `/props` serve `slots-busy.json`, `metrics-after.txt` and `props.json` from `testdata/fake/`.
+- `--version` prints a fake build line and exits.
+
+Environment variables shape its behavior:
+
+| Variable                                  | Effect                                                                |
+| ----------------------------------------- | --------------------------------------------------------------------- |
+| `FAKE_LOAD_MS`                            | Loading time before `/health` is ready (default 300 ms)               |
+| `FAKE_SLOW_ARG`, `FAKE_SLOW_MS`           | A longer load (default 5000 ms) when that argument is present          |
+| `FAKE_FAIL_ARG`                           | Logs a CUDA out-of-memory and exits with 1 when that argument is present |
+| `FAKE_EXIT_LINES`                         | Logs these `\|`-separated lines, then exits with 1                     |
+| `FAKE_CRASH_ON_PREDICT`                   | Dies mid-request on a `/completion` with that `n_predict`             |
+| `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`        | Reported prompt and generation speeds, draft statistics when `1`      |
+| `FAKE_N_CTX`                              | Simulated context size (default 40192 tokens)                         |
+| `FAKE_CHAT_DELAY_MS`, `FAKE_CHAT_LINES`   | Delay between streamed chunks (default 60 ms), extra reply lines      |
+| `FAKE_IGNORE_TERM`                        | Ignores `SIGTERM` when `1`                                            |
+| `FAKE_EXIT_AFTER_MS`, `FAKE_EXIT_CODE`    | Exits on its own after a delay, with that code (default 1)            |
+
+### Fake llama-bench
+
+`fake-llama-bench` sits next to the fake server, as `llama-bench` sits next to `llama-server`: `benchBinary()`
+(`server/bench/parse.ts`) turns `testdata/fake/fake-llama-server` into `testdata/fake/fake-llama-bench`. It prints
+`llama-bench`'s progress lines on stderr and the JSON of `testdata/llama-bench/ok.json` on stdout, and answers
+`--list-devices` with `list-devices.txt`.
+
+| Variable                          | Effect                                                                            |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| `FAKE_BENCH_STEP_MS`              | Pause between progress steps (default 100 ms)                                     |
+| `FAKE_BENCH_OOM`                  | `1`: fails like an out-of-memory load (`oom-stderr.txt`, exit code 1)             |
+| `FAKE_BENCH_OOM_ARG`              | Same failure when the arguments contain that fragment                             |
+| `FAKE_PP`, `FAKE_TG`              | Overrides the prompt and generation speeds                                         |
+| `FAKE_TG_BY_ARG`                  | `-ncmoe 8=30;-dev CUDA0/CUDA1=55`: the generation speed of the first fragment found |
+
+### Use them in a test
+
+The bench runner tests point the `binary` setting at the fake server. Variables set in `process.env` reach the
+spawned fakes; a run can also get them from the profile's environment
+(`profile: () => ({ env: { FAKE_BENCH_OOM: '1' } })`).
+
+```ts title="server/bench/runner.test.ts"
+const FAKE = resolve(import.meta.dir, '../../testdata/fake/fake-llama-server');
+// …
+const executor = new RunExecutor({
+  settings: () => ({ ...DEFAULT_SETTINGS, binary: FAKE, port }),
+  logs,
+  gpus: () => [],
+  disk: () => null,
+  ...deps,
+});
+```
+
+The tests that start server runs (`kind: 'server'`) give each one its own port (`18089` to `18091`).
+
+## Fixtures
+
+Two modules build inputs in code, for tests that need a model or a machine:
+
+- **`server/tuning/fixtures.ts`**
+  - `fakeModel(o)` returns a complete `ModelInfo`, tensors included, with the sizes you pass: 48 layers by default, an
+    embedding and an output of 300 MiB, 100 MiB of attention per layer, and expert tensors (`ffn_gate_exps`,
+    `ffn_up_exps`, `ffn_down_exps`, 300 MiB per layer) when `experts` is above 0.
+  - `hw3(o)` returns a `TuningHardware`: two 16 GiB CUDA cards, an RX 9070 XT on Vulkan, an iGPU, the Vulkan duplicates of
+    the NVIDIA cards and BLAS, with 61 GiB of RAM (55 GiB available unless `ramAvailableGiB` says otherwise).
+  - The estimator, placement, system checks and setup tests use them.
+- **`server/models/gguf.fixture.ts`**: `writeGguf(path, kv, tensors)` writes a real GGUF v3 file: header, typed key/value
+  pairs (`u32`, `u64`, `f32`, `string`, `u32[]`), tensor infos aligned on 32 bytes, then zero bytes for each tensor. The
+  GGUF reader and model scan tests parse these files instead of shipping models.
+
+## Skipped tests
+
+One test is skipped unless a local file exists:
+
+```ts title="server/db/sweeps.test.ts"
+const J5_DB = '/tmp/lw-j5/llama-webui.sqlite';
+test.skipIf(!(await Bun.file(J5_DB).exists()))('the migration keeps every J5 run', async () => {
+```
+
+It needs a database from an early version of the app, before migrations 10 to 14 rebuilt the `bench_runs` table. The
+test migrates a copy and checks that the run count, the highest id and the schema version are right, and that the next
+run gets the next id. It never runs in CI or on a fresh clone. Follow the same pattern when a migration rewrites
+existing data.
+
+## Type checking
+
+```bash title="Terminal"
+bun run check
+```
+
+The `check` script runs three type checks with Bun's built-in checker (`bun check`):
+
+| Step                                    | Project                                          | Covers                                                    |
+| --------------------------------------- | ------------------------------------------------ | --------------------------------------------------------- |
+| `bun check --no-script`                 | `tsconfig.json`                                  | `server/` and `shared/`                                   |
+| `bun check -p web`                      | `web/tsconfig.json`                              | `web/src/`, with `shared/` through the workspace          |
+| `bun run --cwd site typecheck`          | `site/tsconfig.json`                             | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types |
+
+At the root, a plain `bun check` runs the `check` script itself; `--no-script` makes it run the type checker. The three
+projects do not enable the same options:
+
+| Option                                                          | Root (`server/`, `shared/`) | `web/` | `site/` |
+| --------------------------------------------------------------- | --------------------------- | ------ | ------- |
+| `strict`, `verbatimModuleSyntax`, `noFallthroughCasesInSwitch`  | yes                         | yes    | yes     |
+| `noUncheckedIndexedAccess`                                      | yes                         | no     | yes     |
+| `noImplicitOverride`                                            | yes                         | no     | no      |
+| `noUnusedLocals`, `noUnusedParameters`                          | no                          | yes    | yes     |
+
+With `verbatimModuleSyntax`, type-only imports must use `import type`.
+
+The `.mdx` pages are not type checked; the site build compiles them.
+
+## Test the website
+
+The site's unit tests run with the others under `bun test`:
+
+- `site/src/docs/nav.test.ts` fails when a page under `site/content/` is missing from `site/content/nav.ts`, when an
+  entry has no file or appears twice, or when a page sits in the wrong section.
+- `site/src/lib/content.test.ts` checks how a file maps to its route.
+- `site/scripts/links.test.ts` tests the link checker's helpers.
+- `site/src/landing/telemetry.test.ts` checks that the landing page's simulated dashboard is deterministic, so the
+  prerendered HTML and the hydrated page start from the same frame.
+
+After a build, the link checker reads every page of `site/dist/`:
+
+```bash title="Terminal"
+bun run site:build
+bun run --cwd site check-links
+```
+
+It extracts each `href`, `src` and `srcset` URL and fails on a page or file that does not exist, a missing `#anchor` (on
+the same page or the target), a page link without its trailing slash, a relative URL or a URL outside `/llama-webui/`.
+External links are not fetched. CI runs both commands; [Docs, commits and PRs](/developers/contributing/workflow/) covers
+writing pages.

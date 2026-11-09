@@ -1,0 +1,267 @@
+---
+title: WebSocket
+description: The /ws channel, from connection and guard to the hello message, bootId and heartbeat, every message type with its payload, and how a client resyncs.
+---
+
+llama-webui pushes its live events over one WebSocket, `/ws`. The server side is `WsHub` (`server/ws/hub.ts`), the
+message types are the `WsMessage` union (`shared/src/ws.ts`), and the web app's client is `useWs` and `onWs()`
+(`web/src/lib/ws.ts`). The events themselves are wired in `server/index.ts`.
+
+## Connect
+
+<Endpoint method="WS" path="/ws" />
+
+The upgrade request goes through the same [request guard](/developers/api/overview/#the-request-guard) as the REST
+routes: its `Host` must be `localhost` or an IP address, and an `Origin`, when present, must be llama-webui's own. A
+browser always sends `Origin` on a WebSocket handshake, so only pages served by llama-webui can connect; most
+non-browser clients send none. A plain `GET /ws` without an upgrade gets `426` `WebSocket upgrade expected`.
+
+Every frame is a JSON text message `{ "type": "…", "payload": … }` (`ping` and `pong` have no payload). There is no
+subscription: every connected client receives every broadcast message. The server reads only `ping` and `pong` from
+clients and ignores anything else, unparseable frames included.
+
+```ts title="watch.ts"
+const ws = new WebSocket('ws://127.0.0.1:7860/ws');
+
+ws.onmessage = (event) => {
+  const msg = JSON.parse(String(event.data));
+  // Answer the heartbeat, or the server closes the connection.
+  if (msg.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }));
+  else if (msg.type === 'server-state') console.log(msg.payload.state.kind);
+};
+```
+
+Run it with `bun watch.ts`. Import `WsMessage` from `@llama-webui/shared` to type `msg`.
+
+## hello and bootId
+
+On every new connection, `WsHub.attach()` sends `hello` to that client before anything else:
+
+```json
+{ "type": "hello", "payload": { "serverTime": 1794210000000, "bootId": "1b0f6c52-8a7e-4f4e-9d0b-3f2a5c7e9a14" } }
+```
+
+`bootId` identifies the llama-webui process (`crypto.randomUUID()` in `getRuntime()`, `server/runtime.ts`). It lives
+on `globalThis` with the supervisor and the log ring, so it is the same after a `bun --hot` reload, and changes only
+when llama-webui restarts. Log line numbers (`seq`) and the monitor history belong to one boot: they start over when
+the `bootId` changes. `GET /api/state`, `GET /api/logs` and `GET /api/monitor/history` return the `bootId` too, so a
+client can tell which boot a REST answer comes from.
+
+## Heartbeat
+
+The heartbeat is made of application messages, not WebSocket protocol pings:
+
+- Every `PING_INTERVAL_MS = 15_000` (15 seconds), the hub sends `{ "type": "ping" }` to each client and counts it as
+  missed.
+- A `{ "type": "pong" }` from the client resets its count.
+- At a tick where a client has `MAX_MISSED_PINGS = 2` pings unanswered, the hub closes it with code `4000` and reason
+  `heartbeat`, and forgets it. A client that stops answering is dropped between 30 and 45 seconds after its last
+  `pong`.
+- A client can send `ping` too: the hub answers `pong` right away.
+
+On a `bun --hot` reload, `server/index.ts` disposes of the old hub: it closes every client with code `1001`
+and reason `shutdown`, and the clients reconnect to the new one (same `bootId`).
+
+## Messages
+
+| `type`                                      | Direction        | Payload (`shared/src/`)                        | Sent                                                                                       |
+| ------------------------------------------- | ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [`hello`](#hello)                           | server to client | `{ serverTime, bootId }`                       | Once, when the client connects.                                                            |
+| [`ping`](#ping-and-pong)                    | both             | none                                           | Every 15 seconds by the server; by a client when it wants.                                 |
+| [`pong`](#ping-and-pong)                    | both             | none                                           | In answer to a `ping`.                                                                     |
+| [`snapshot`](#snapshot)                     | server to all    | `Snapshot` (`monitor.ts`)                      | At every monitor tick (`pollIntervalMs`, 1000 ms by default).                              |
+| [`log`](#log)                               | server to all    | `LogLine[]` (`logs.ts`)                        | When lines reach the log ring, batched.                                                    |
+| [`server-state`](#server-state)             | server to all    | `ServerView` (`server.ts`)                     | On every change of the supervisor's state.                                                 |
+| [`bench-progress`](#bench-progress)         | server to all    | `BenchLive \| null` (`bench.ts`)               | On every change of the running benchmark's progress; `null` when the run is over.         |
+| [`bench-run`](#bench-run)                   | server to all    | `BenchRun` (`bench.ts`)                        | When a run starts and when it ends.                                                        |
+| [`bench-deleted`](#bench-deleted)           | server to all    | `{ ids: number[] }`                            | When runs are deleted.                                                                     |
+| [`sweep-progress`](#sweep-progress)         | server to all    | `SweepLive \| null` (`sweep.ts`)               | When a sweep starts its next item; `null` when the sweep is over.                          |
+| [`sweep`](#sweep)                           | server to all    | `Sweep` (`sweep.ts`)                           | On every change of a sweep (status, counters, best run).                                   |
+| [`sweep-deleted`](#sweep-deleted)           | server to all    | `{ id: number }`                               | When a sweep is deleted.                                                                   |
+| [`placement`](#placement)                   | server to all    | `ModelPlacement \| null` (`topology.ts`)       | When the loaded model's placement changes.                                                 |
+| [`download-progress`](#download-progress)   | server to all    | `DownloadLive \| null` (`hf.ts`)               | While a download runs, at most every 250 ms; `null` when it ends.                          |
+| [`download`](#download)                     | server to all    | `DownloadItem` (`hf.ts`)                       | On every status change of a download.                                                      |
+| [`download-deleted`](#download-deleted)     | server to all    | `{ ids: number[] }`                            | When downloads are removed from the list.                                                  |
+
+### `hello`
+
+| Field        | Type   | Description                                                      |
+| ------------ | ------ | ---------------------------------------------------------------- |
+| `serverTime` | number | The server's clock when the client connected (epoch ms).         |
+| `bootId`     | string | A UUID for this llama-webui process (see [hello and bootId](#hello-and-bootid)). |
+
+### `ping` and `pong`
+
+No payload: `{ "type": "ping" }` and `{ "type": "pong" }`. See [Heartbeat](#heartbeat).
+
+### `snapshot`
+
+The monitor's state at a tick (`Monitor.tick()`, `server/monitor/monitor.ts`); `GET /api/monitor/snapshot` returns the
+latest one. Its main fields:
+
+| Field            | Type                                         | Description                                                                     |
+| ---------------- | -------------------------------------------- | ------------------------------------------------------------------------------- |
+| `at`             | number                                       | Time of the tick (epoch ms).                                                    |
+| `tick`           | number                                       | Tick number, from 1 at startup.                                                 |
+| `health`         | `'ok' \| 'loading' \| 'error' \| 'down' \| null` | `llama-server` health; `null` when no server is active.                     |
+| `rates`          | `{ genTps, ppTps }`                          | Generation and prompt processing speed, tokens per second.                     |
+| `slots`          | `SlotView[] \| null`                         | The server's slots, from `/slots`.                                              |
+| `kv`             | `{ usedTokens, totalTokens } \| null`        | Context (KV cache) use.                                                         |
+| `queue`          | `{ processing, deferred, busySlots } \| null` | Requests being processed and waiting.                                          |
+| `lastRequest`    | `RequestStats \| null`                       | Speeds of the last request.                                                     |
+| `spec`           | `SpecStats \| null`                          | Speculative decoding acceptance.                                                |
+| `recentRequests` | `RequestRecord[]`                            | Recent requests, most recent first.                                             |
+| `gpus`           | `GpuSample[]`                                | GPUs the server uses (more than 64 MiB of VRAM).                                |
+| `allGpus`        | `GpuSample[]`                                | Every GPU, sorted by `busId`, hidden and sleeping ones included (not read).     |
+| `proc`           | `{ cpuPct, rssBytes, dramBps? } \| null`     | The `llama-server` process.                                                     |
+| `system`         | `SystemSample \| null`                       | CPU, memory and DRAM bandwidth of the machine.                                  |
+| `disk`           | `DiskSample \| null`                         | Disk rates, per disk and for the model's disk.                                  |
+| `points`         | `Record<string, number \| null>`             | The values appended to each history series at this tick.                        |
+| `history`        | `{ intervalMs, capacity }`                   | Shape of the history. A change (settings) means the client's copy is stale.     |
+
+The nested types are described on [Monitor and system](/developers/api/monitor/) and
+[Monitor and collectors](/developers/server/monitor/).
+
+### `log`
+
+A batch of `LogLine` (`shared/src/logs.ts`): every line pushed to the ring in the same microtask
+(`LogBuffer.push()`, `server/logs/buffer.ts`).
+
+| Field   | Type                                       | Description                                                                            |
+| ------- | ------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `seq`   | number                                     | Line number, from 0 at each boot, never reused within a boot.                          |
+| `text`  | string                                     | The line as written by `llama-server` (stdout and stderr) or by llama-webui.           |
+| `level` | `'error' \| 'warn' \| 'info' \| 'debug'`   | From llama.cpp's level letter, otherwise guessed from the words (`classifyLine()`).    |
+| `kind`  | `'srv' \| 'slot' \| 'other'`               | The llama.cpp tag the line starts with.                                                |
+
+### `server-state`
+
+The `ServerView` (`shared/src/server.ts`), the same body as `GET /api/server/state`: `state` (a `ServerState`, by
+`kind`: `idle`, `starting`, `ready`, `stopping`, `crashed`, `external`), `command` (the last launched command) and
+`profileId`. The fields are described on [Server, state and logs](/developers/api/server/#serverview).
+
+### `bench-progress`
+
+The `BenchLive` of the running benchmark run (`shared/src/bench.ts`), `null` when a run ends (between the items of a
+sweep too).
+
+| Field       | Type                              | Description                                                                                                  |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `runId`     | number                            | The run in progress.                                                                                         |
+| `kind`      | `'bench' \| 'server'`             | A `llama-bench` run, or a run through `llama-server`.                                                        |
+| `phase`     | `BenchPhase`                      | `stopping-server`, `loading`, `warmup`, `prompt`, `generation`, `measure` or `restarting-server`.            |
+| `step`      | `{ index, total } \| null`        | Position within the run's steps, when it has some.                                                           |
+| `startedAt` | number                            | When the run started (epoch ms).                                                                             |
+| `lines`     | string[]                          | The tool's last 20 lines.                                                                                    |
+
+### `bench-run`
+
+A whole `BenchRun` (`shared/src/bench.ts`): sent when the run starts (a one-off run when it is created, a sweep item
+when its turn comes), when it ends, and again if the server restart that follows it fails (the error is appended to
+the run's). Its fields: `id`, `kind`, `status`, `spec`, `command`, `hardware`, `pp`, `tg`, `draftAcceptPct`,
+`vramPeak`, `error`, `logExcerpt`, `durationMs`, `diskReadPeakBps`, `sweepId`, `sweepLabel`, `fit` and `createdAt`.
+See [Benchmarks](/developers/api/bench/).
+
+### `bench-deleted`
+
+`{ ids: number[] }`: the runs deleted by `DELETE /api/bench/:id`, `DELETE /api/bench/runs?failed=1` (only when it
+deleted some) or `DELETE /api/sweeps/:id` (the sweep's runs, sent before `sweep-deleted`).
+
+### `sweep-progress`
+
+The `SweepLive` of the running sweep (`shared/src/sweep.ts`), `null` when none is running.
+
+| Field     | Type                       | Description                                         |
+| --------- | -------------------------- | --------------------------------------------------- |
+| `sweepId` | number                     | The sweep in progress.                              |
+| `runId`   | number \| null             | The run of the current item.                        |
+| `index`   | number                     | The current item, 1-based.                          |
+| `total`   | number                     | Number of items.                                    |
+| `stage`   | `'explore' \| 'validate'`  | `explore` for a `llama-bench` item, `validate` for an item run through `llama-server`. |
+
+### `sweep`
+
+A whole `Sweep` (`shared/src/sweep.ts`), on every change: `id`, `name`, `status` (`running`, `done`, `cancelled`,
+`interrupted`), `spec`, `bestRunId`, `best` (a summary of the best run), `counts` (runs per status), `createdAt` and
+`finishedAt`. See [Sweeps](/developers/api/sweeps/).
+
+### `sweep-deleted`
+
+`{ id: number }`: the sweep deleted by `DELETE /api/sweeps/:id`.
+
+### `placement`
+
+Where the loaded model sits, read from the `llama-server` startup logs (`PlacementTracker`,
+`server/monitor/placement.ts`). It is sent only when the value changes, and is `null` when no managed server is
+running or its placement is not known (an external server writes nothing to the ring, so its placement is unknown).
+
+| Field       | Type                              | Description                                                                 |
+| ----------- | --------------------------------- | --------------------------------------------------------------------------- |
+| `launchSeq` | number                            | `seq` of the `[llama-webui] launch:` log line it was read after.            |
+| `layers`    | `{ offloaded, total } \| null`    | From "offloaded N/M layers to GPU"; `null` until that line has gone by.     |
+| `buffers`   | `PlacementBuffer[]`               | One entry per device: `device`, `busId`, `modelBytes`, `kvBytes`, `computeBytes`. |
+
+See [Topology](/developers/api/topology/).
+
+### `download-progress`
+
+The `DownloadLive` of the running download (`shared/src/hf.ts`). While bytes arrive it is emitted at most once every
+`liveEveryMs` (250 ms by default, `DownloadQueue` in `server/hf/downloader.ts`); it is `null` when a download ends
+(the next one in the queue then sends its own).
+
+| Field        | Type                                          | Description                                                  |
+| ------------ | --------------------------------------------- | ------------------------------------------------------------ |
+| `id`         | number                                        | The download.                                                |
+| `phase`      | `'downloading' \| 'verifying' \| 'retrying'`  | What it is doing.                                            |
+| `file`       | string                                        | The file being downloaded (its path in the repository).      |
+| `bytesDone`  | number                                        | Bytes written so far, for the whole download.                |
+| `totalBytes` | number                                        | Bytes of the whole download.                                 |
+| `bps`        | number                                        | Smoothed throughput, bytes per second.                       |
+| `retryAt`    | number \| null                                | For `retrying`: when the next attempt starts (epoch ms).     |
+
+### `download`
+
+A whole `DownloadItem` (`shared/src/hf.ts`) on every status change (`queued`, `downloading`, `done`, `error`,
+`canceled`): `id`, `repo`, `revision`, `key`, `name`, `quant`, `kind`, `dir`, `files`, `status`, `bytesDone`,
+`totalBytes`, `error`, `code`, `createdAt` and `finishedAt`. See [Hugging Face](/developers/api/hf/).
+
+### `download-deleted`
+
+`{ ids: number[] }`: the downloads removed from the list by `DELETE /api/downloads/:id` (a finished one) or
+`POST /api/downloads/clear`.
+
+## Resync after a reconnect
+
+The socket only carries changes, so a client that connects, or reconnects after a drop, first reads the current state
+over REST. The web app does it in each store: when `useWs` goes to `open`, it reloads.
+
+| Store (`web/src/lib/`) | Reloads                                  | Then applies                                                |
+| ---------------------- | ---------------------------------------- | ----------------------------------------------------------- |
+| `server.ts`            | `GET /api/state`                         | `server-state`                                              |
+| `logs.ts`              | `GET /api/logs?since=<next seq>`         | `log`                                                       |
+| `monitor.ts`           | `GET /api/monitor/history`               | `snapshot`                                                  |
+| `topology.ts`          | `GET /api/topology`                      | `placement`                                                 |
+| `bench.ts`             | `GET /api/bench/runs`                    | `bench-progress`, `bench-run`, `bench-deleted`              |
+| `tuning.ts`            | `GET /api/sweeps`                        | `sweep-progress`, `sweep`, `bench-progress`, `bench-run`, `bench-deleted`, `sweep-deleted` |
+| `downloads.ts`         | `GET /api/downloads`                     | `download-progress`, `download`, `download-deleted`         |
+
+The list routes return the current progress with the list (`{ runs, live }`, `{ sweeps, live }`, `{ items, live }`), so
+a progress bar comes back without waiting for the next `*-progress` message.
+
+Then the `bootId` decides what the client keeps:
+
+- **Same `bootId`** (a network drop, a `bun --hot` reload): the numbering goes on. The logs store asks for the lines
+  from its next expected `seq` and merges them by number (`mergeLogs()`, `shared/src/logs.ts`).
+- **Different `bootId`** (llama-webui restarted): the log numbering restarted at 0 and the history is empty. The
+  clients drop what they hold: the logs store starts over (`onBoot()`) and reads `GET /api/logs?since=0`, the monitor
+  store empties its history and snapshot, and reloads the history.
+
+`hello` is the first message on a new connection, so a client sees the boot change before any `log` or `snapshot` of
+the new boot. The monitor store also reloads the history when a `snapshot` reports a `history` shape that differs from
+its copy (the polling interval or the history length changed in the settings).
+
+### Reconnect policy
+
+`useWs` keeps a single socket and reconnects when it closes, after `BACKOFF_START_MS = 500` ms, doubled on each
+failure up to `BACKOFF_MAX_MS = 10_000` ms, and reset once a connection opens. After the first drop it stays in the
+`closed` status while it retries, so the status dot does not flicker.

@@ -1,0 +1,276 @@
+---
+title: Server, state and logs
+description: Read the state of llama-server, start, switch, restart and stop it, read its /props and its flags, and read the log ring.
+---
+
+These routes drive the supervised `llama-server` and read what it reports (`server/routes/server.ts`). The process
+itself is managed by the `Supervisor` (`server/supervisor/supervisor.ts`, see
+[Supervisor](/developers/server/supervisor/)), its output by the `LogBuffer` ring (`server/logs/buffer.ts`). Types:
+`ServerState` and `ServerView` (`shared/src/server.ts`), `LogLine` (`shared/src/logs.ts`), `Flag`
+(`shared/src/flags.ts`). The common rules are on the [API overview](/developers/api/overview/); the Server page is
+described on [Server](/docs/server/).
+
+## Server state
+
+### ServerState
+
+The supervisor's state, a union on `kind` (`shared/src/server.ts`):
+
+| `kind`     | Other fields                                                        | Meaning                                                                                                             |
+| ---------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `idle`     |                                                                     | No server is running.                                                                                               |
+| `starting` | `profile`, `profileId`, `pid`, `port`, `since`                      | The process runs; the supervisor polls its `/health` every 500 ms until it answers `200`.                           |
+| `ready`    | `profile`, `profileId`, `pid`, `port`, `since`                      | `/health` answered `200`: the model is loaded.                                                                      |
+| `stopping` | `profile`, `profileId`, `pid`, `port`                               | `SIGTERM` was sent; `SIGKILL` follows after 5 seconds.                                                              |
+| `crashed`  | `profile`, `profileId`, `exitCode`, `signal`, `at`, `message?`      | The process exited without being asked to, or could not be launched (`message`: why, for example `directory not found: <cwd>`). |
+| `external` | `pid` (number \| null), `port`                                      | A server llama-webui did not start answers on the port; `pid` is `null` when it cannot be found.                    |
+
+`profile` is the profile's name at launch, `since` and `at` are epoch milliseconds, `exitCode` and `signal` are `null`
+when unknown. llama-webui looks for an external server on the `port` setting at startup, then every 2 seconds while
+the state is `idle` or `external`, except during a benchmark (`externalWatcher()`, `server/supervisor/external.ts`).
+
+### ServerView
+
+What the routes and the [`server-state`](/developers/api/websocket/#server-state) message send:
+
+| Field       | Type             | Description                                                                                                   |
+| ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------- |
+| `state`     | `ServerState`    | The current state.                                                                                            |
+| `command`   | string \| null   | The last launched command, shell-quoted, without the `setpriv` prefix; `null` before the first launch.       |
+| `profileId` | number \| null   | The state's profile, otherwise the last launched one; `null` when there is none.                              |
+
+```json
+{
+  "state": { "kind": "ready", "profile": "Qwen3 32B", "profileId": 3, "pid": 48211, "port": 8080, "since": 1794210123456 },
+  "command": "llama-server -m /models/qwen3-32b-q4_k_m.gguf -ngl 99 -c 16384 --host 0.0.0.0 --port 8080 --metrics --slots --props",
+  "profileId": 3
+}
+```
+
+### Read the app state
+
+<Endpoint method="GET" path="/api/state" />
+
+What a client needs to resync after it connects: the server view, the log position and the boot.
+
+**Response**: `200`
+
+| Field    | Type         | Description                                                                 |
+| -------- | ------------ | --------------------------------------------------------------------------- |
+| `server` | `ServerView` | As above.                                                                   |
+| `logSeq` | number       | The number the next log line will get.                                      |
+| `bootId` | string       | This llama-webui process (see [WebSocket](/developers/api/websocket/#hello-and-bootid)). |
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/state
+```
+
+### Read the server state
+
+<Endpoint method="GET" path="/api/server/state" />
+
+**Response**: `200` with the `ServerView`.
+
+## Lifecycle
+
+Start, switch and restart answer `202` as soon as the new process is spawned (switch and restart first wait for the
+old one to exit): the state is then `starting`, or `crashed` if the launch failed, and the `server-state` messages
+report `ready` or `crashed` later. Stop answers once the process has exited.
+
+### Refusals
+
+The four routes share these `409` refusals, without a `code`:
+
+| Message                                                    | When                                                                                                           |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `A benchmark is running`                                   | A benchmark or a sweep owns the GPUs (`BenchRunner.busy`); it stops and restarts `llama-server` itself.        |
+| `operation in progress, try again`                         | Another start, switch, restart or stop is in progress: the supervisor runs one lifecycle operation at a time.  |
+| `a server is already running`                              | Start while a managed server runs: use switch.                                                                 |
+| `port in use by an external server (PID <pid>)`            | An external server still answers (state `external`), or the profile's port already answers HTTP on `/health`, which makes the state `external`. The PID is `unknown` when it cannot be found. |
+
+Stop only gets the first one: it waits for an operation in progress instead of refusing. The supervisor errors are
+recognized by `name === 'SupervisorError'`, not with `instanceof`: the supervisor survives `bun --hot` and throws the
+class of the old module. The user-side view of an external server is on [Server](/docs/server/#an-external-server).
+
+### Start the server
+
+<Endpoint method="POST" path="/api/server/start" />
+
+Builds the command of the profile (`buildCommand()`: the binary of the settings, `-m`, `-mm`, the profile's `args`,
+then `--host`, `--port`, `--metrics`, `--slots`, `--props`) and spawns it. An accepted start stores the profile as the
+`defaultProfileId` setting.
+
+A profile whose `cwd` does not exist, or a binary that cannot be spawned, does not fail the request: the state becomes
+`crashed` with a `message`, and a `[llama-webui] launch failed: …` line goes to the logs.
+
+**Body**
+
+| Field       | Type    | Required | Description           |
+| ----------- | ------- | -------- | --------------------- |
+| `profileId` | integer | yes      | The profile to start. |
+
+**Response**: `202` with the `ServerView`.
+
+**Errors**: `400` `JSON object expected`, `404` `Profile not found` (also for a missing or non-integer `profileId`),
+and the [refusals](#refusals).
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/server/start \
+  -H 'content-type: application/json' \
+  -d '{"profileId":3}'
+```
+
+### Switch profiles
+
+<Endpoint method="POST" path="/api/server/switch" />
+
+Stops the managed server, if any, then starts the given profile, as one supervisor operation. With no server running
+it is a start. Stores the profile as the `defaultProfileId` setting.
+
+**Body**: `{ "profileId": integer }`, as for [start](#start-the-server).
+
+**Response**: `202` with the `ServerView`.
+
+**Errors**: as for [start](#start-the-server), except `a server is already running`.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/server/switch \
+  -H 'content-type: application/json' \
+  -d '{"profileId":5}'
+```
+
+### Restart the server
+
+<Endpoint method="POST" path="/api/server/restart" />
+
+Restarts the profile of the `ServerView` (the running one, or the last one launched, after a crash for example). The
+profile is read again from the database, so the changes saved since the launch apply. No body.
+
+**Response**: `202` with the `ServerView`.
+
+**Errors**: `409` `No profile to restart` when nothing was launched since llama-webui started, `404`
+`Profile not found` when that profile was deleted, and the [refusals](#refusals).
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/server/restart
+```
+
+### Stop the server
+
+<Endpoint method="POST" path="/api/server/stop" />
+
+Stops the managed server: `SIGTERM`, then `SIGKILL` if it has not exited after 5 seconds. It never touches an external
+server, and from `crashed` it goes back to `idle`. No body.
+
+**Response**: `200` with the `ServerView`, once the process has exited.
+
+**Errors**: `409` `A benchmark is running`.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/server/stop
+```
+
+## What llama-server reports
+
+### Read the server's props
+
+<Endpoint method="GET" path="/api/server/props" />
+
+Proxies `GET http://127.0.0.1:<port>/props` of the ready server (managed or external), with a 2-second timeout. The
+response is `llama-server`'s own JSON, unchanged: its fields depend on the llama.cpp build.
+
+**Response**: `200` with the `/props` body.
+
+**Errors**: `409` `Server not ready` (any state but `ready` and `external`), `502`
+`llama-server is not responding on /props`, `502` `llama-server /props: HTTP <status>`.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/server/props
+```
+
+### List the server's flags
+
+<Endpoint method="GET" path="/api/flags" />
+
+The flags the installed `llama-server` accepts, parsed from `<binary> --help` (`parseHelp()`, `shared/src/flags.ts`,
+5-second timeout). The list is cached in memory per binary; a failure is not cached. The argument
+editor uses it for completion, help and warnings: nothing is refused on its word.
+
+**Response**: `200` with `{ "flags": Flag[] }`.
+
+| Field     | Type     | Description                                                                         |
+| --------- | -------- | ----------------------------------------------------------------------------------- |
+| `names`   | string[] | Every name as listed, the short form first, `--no-…` forms included.               |
+| `value`   | string   | The value's placeholder (`N`, `FNAME`, `[on\|off\|auto]`…); absent for a switch.    |
+| `help`    | string   | The help text on one line.                                                          |
+| `section` | string   | The help section that lists it (`common params`, `sampling params`…).               |
+
+**Errors**: `503` `llama-server --help failed (<binary>)` when the binary cannot run, exits with an error, or lists no
+flag.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/flags
+```
+
+```json
+{
+  "flags": [
+    {
+      "names": ["-c", "--ctx-size"],
+      "value": "N",
+      "help": "size of the prompt context (default: 0, 0 = loaded from model) (env: LLAMA_ARG_CTX_SIZE)",
+      "section": "common params"
+    }
+  ]
+}
+```
+
+## Logs
+
+### Read the logs
+
+<Endpoint method="GET" path="/api/logs" />
+
+The lines of the log ring: the stdout and stderr of `llama-server`, and llama-webui's own lines about it
+(`[llama-webui] launch: <command>`, `[llama-webui] llama-server exited (code …)`,
+`[bench] stopping llama-server for the benchmark`…). The ring is in memory only and keeps the last 10,000 lines (`LogBuffer(10_000)` in
+`server/runtime.ts`); it survives `bun --hot`, not a restart. New lines are pushed as
+[`log`](/developers/api/websocket/#log) messages.
+
+**Query**
+
+| Parameter | Type    | Default | Description                                                                                                   |
+| --------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| `since`   | integer | `0`     | First line number wanted. Lines no longer in the ring are skipped; a value that is not a number counts as `0`. |
+
+**Response**: `200`
+
+| Field    | Type        | Description                                                    |
+| -------- | ----------- | -------------------------------------------------------------- |
+| `lines`  | `LogLine[]` | The lines still in the ring whose `seq` is at least `since`.   |
+| `seq`    | number      | The number the next line will get.                             |
+| `bootId` | string      | The boot the numbering belongs to.                             |
+
+A `LogLine` is `{ seq, text, level, kind }`: see [`log`](/developers/api/websocket/#log). The numbering starts at 0 on
+every boot: compare `bootId` with the one you hold before you trust `since` (see
+[Resync after a reconnect](/developers/api/websocket/#resync-after-a-reconnect)).
+
+```bash title="Terminal"
+curl 'http://127.0.0.1:7860/api/logs?since=120'
+```
+
+```json
+{
+  "lines": [
+    {
+      "seq": 120,
+      "text": "[llama-webui] launch: llama-server -m /models/qwen3-32b-q4_k_m.gguf -ngl 99 --host 0.0.0.0 --port 8080 --metrics --slots --props",
+      "level": "info",
+      "kind": "other"
+    },
+    { "seq": 121, "text": "0.00.012.345 I srv  load_model: loading model '/models/qwen3-32b-q4_k_m.gguf'", "level": "info", "kind": "srv" }
+  ],
+  "seq": 122,
+  "bootId": "1b0f6c52-8a7e-4f4e-9d0b-3f2a5c7e9a14"
+}
+```

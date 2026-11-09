@@ -1,0 +1,128 @@
+---
+title: Setup and launch pad
+description: The first-run setup report and the launch pad cards of the Home page, with every field of SetupReport and LaunchpadEntry.
+---
+
+Two read-only routes feed the Home page (`server/routes/setup.ts`): the setup report behind the
+[first-run checklist](/docs/getting-started/first-run/), and the cards of the [launch pad](/docs/home/). The work is
+done by `buildSetupReport()` and `buildLaunchpad()` (`server/setup.ts`), the types are `SetupReport` and
+`LaunchpadEntry` (`shared/src/setup.ts`). The common rules are on the [API overview](/developers/api/overview/).
+
+## Setup report
+
+### Read the setup report
+
+<Endpoint method="GET" path="/api/setup" />
+
+Checks what llama-webui needs (the `llama-server` binary, the models folder) and what makes it work better
+(`llama-bench`, GPU and DRAM telemetry), from the current [settings](/developers/api/app/#settings-fields). The checklist
+loads it, and its **Check again** button loads it again.
+
+It runs commands and reads the disk, so it is not free:
+
+- `llama-server --version`, cached per binary path and modification time (a rebuild is read again);
+- `llama-bench --list-devices` (15-second timeout), cached per binary, an empty list excepted;
+- a scan of the models folder, which reads the header of each new or changed GGUF (the summaries are cached in the
+  database, as for [`GET /api/models`](/developers/api/models/)).
+
+**Response**: `200` with a `SetupReport`.
+
+| Field                     | Type                       | Description                                                                                                                         |
+| ------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `binary.setting`          | string                     | The `binary` setting as typed.                                                                                                      |
+| `binary.path`             | string \| null             | The resolved absolute path (looked up in the `PATH` for a bare name, links resolved), `null` when it is not an executable regular file. |
+| `binary.version`          | string \| null             | The build, `b12119 (6f1e65437)` from `--version`; `null` when the binary is not found or its output has no build number.            |
+| `bench.path`              | string                     | The `llama-bench` derived from the server binary: same folder, or a bare name for a bare `binary`.                                 |
+| `bench.devices`           | `BenchDevice[]`            | The devices `llama-bench --list-devices` reports; empty when `llama-bench` is missing or fails.                                    |
+| `models.setting`          | string                     | The `modelsDir` setting as typed.                                                                                                   |
+| `models.dir`              | string                     | The folder with `~` expanded.                                                                                                       |
+| `models.exists`           | boolean                    | The folder exists and is a directory.                                                                                               |
+| `models.count`            | number                     | Readable models in it, projectors and unreadable files left out.                                                                    |
+| `models.bytes`            | number                     | Total size of those models, in bytes.                                                                                               |
+| `telemetry.nvidiaSource`  | `'nvml' \| 'nvidia-smi'`   | How the monitor reads NVIDIA cards.                                                                                                 |
+| `telemetry.perfParanoid`  | number \| null             | `kernel.perf_event_paranoid` (`/proc/sys/kernel/perf_event_paranoid`), `null` when unreadable.                                      |
+| `listen.host`             | string                     | The address llama-webui itself listens on (`--host`).                                                                               |
+| `listen.exposed`          | boolean                    | That address is not a loopback one (`isLoopback()`: `127.*`, `::1`, `localhost`, `[::1]`), so the network can reach the API.       |
+| `ready`                   | boolean                    | The required steps pass: `binary.path` is not `null` and `models.exists` is `true`.                                                 |
+
+A `BenchDevice` (`shared/src/bench.ts`) is `{ id, name, totalMib, freeMib, backend }`: the device id (`CUDA0`,
+`Vulkan1`), its name, its total and free memory in MiB as `llama-bench` reports them, and the backend (the letters of
+the id).
+
+The GPUs and the DRAM bandwidth of the checklist are not in this report: they come from the live monitor snapshot
+(NVML lists its cards after its first tick).
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/setup
+```
+
+```json
+{
+  "binary": { "setting": "llama-server", "path": "/opt/llama.cpp/build/bin/llama-server", "version": "b12119 (6f1e65437)" },
+  "bench": {
+    "path": "llama-bench",
+    "devices": [{ "id": "CUDA0", "name": "NVIDIA GeForce RTX 4090", "totalMib": 24080, "freeMib": 23501, "backend": "CUDA" }]
+  },
+  "models": { "setting": "~/models", "dir": "/home/me/models", "exists": true, "count": 3, "bytes": 52143285248 },
+  "telemetry": { "nvidiaSource": "nvml", "perfParanoid": 2 },
+  "listen": { "host": "127.0.0.1", "exposed": false },
+  "ready": true
+}
+```
+
+## Launch pad
+
+### List the launch pad cards
+
+<Endpoint method="GET" path="/api/launchpad" />
+
+One card per profile, in the order of [`GET /api/profiles`](/developers/api/profiles/) (by name, case-insensitive),
+with what the Home page shows on it: the model, the last benchmark and the memory fit badge. A profile whose model
+cannot be read still gets a card, with `modelError`.
+
+For each profile, `buildLaunchpad()`:
+
+1. resolves its model and projector paths (`profilePaths()`: `~` expanded, relative paths taken from its `cwd`);
+2. reads the GGUF header (`loadModel()`) and the projector's size;
+3. runs the memory estimator of [Tuning](/developers/server/tuning/) (`estimate()`, `fit` preset) with the flags the
+   profile pins and its context size (`-c` or `--ctx-size`), on the hardware read once for the whole request
+   (`readTuningHardware()`: `llama-bench` devices, CPU, RAM).
+
+An estimate that fails only drops the badge (`fit: null`). It is refused on purpose when `llama-bench` lists no device
+while the monitor sees GPUs: an estimate without the GPUs would be wrong.
+
+**Response**: `200` with a `LaunchpadEntry[]`.
+
+| Field          | Type                                                          | Description                                                                                                    |
+| -------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `profileId`    | number                                                        | The profile.                                                                                                   |
+| `name`         | string                                                        | The profile's name.                                                                                            |
+| `modelPath`    | string \| null                                                | The absolute model path, `null` when the profile's paths cannot be resolved.                                  |
+| `model`        | `{ name, quant, fileBytes } \| null`                          | From the GGUF header: `general.name`, the quantization label and the size of every part; `null` when unreadable. |
+| `modelError`   | string \| null                                                | Why the model cannot be read (`Model not found`, `Projector not found`, a GGUF error), `null` when it can.     |
+| `lastBench`    | `{ ppTps, tgTps, at } \| null`                                | The profile's latest successful one-off benchmark run (sweep runs left out): prompt and generation tokens per second, and its `createdAt`. |
+| `fit`          | object \| null                                                | The memory estimate with the profile's own arguments, `null` when it could not be made.                       |
+| `fit.verdict`  | `'fits' \| 'tight' \| 'no'`                                   | The badge.                                                                                                     |
+| `fit.reason`   | string \| null                                                | The estimator's explanation of the verdict, or `null`.                                                         |
+| `fit.vramBytes`| number                                                        | Bytes planned on the GPUs, all cards together.                                                                 |
+| `fit.ramBytes` | number                                                        | Bytes left in system RAM (CPU layers, offloaded experts).                                                      |
+
+What the badge means for users is on [Home](/docs/home/#the-memory-fit-badge).
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/launchpad
+```
+
+```json
+[
+  {
+    "profileId": 3,
+    "name": "Qwen3 32B",
+    "lastBench": { "ppTps": 2310.4, "tgTps": 38.2, "at": 1794210000000 },
+    "model": { "name": "Qwen3 32B", "quant": "Q4_K_M", "fileBytes": 19762149376 },
+    "fit": { "verdict": "fits", "reason": null, "vramBytes": 22548578304, "ramBytes": 0 },
+    "modelPath": "/models/qwen3-32b-q4_k_m.gguf",
+    "modelError": null
+  }
+]
+```

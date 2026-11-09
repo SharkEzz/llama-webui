@@ -1,0 +1,232 @@
+---
+title: API overview
+description: Base URL, the REST, WebSocket and SSE channels, the request guard, the error shape, status codes and the conventions every route follows.
+---
+
+<Callout type="note">
+
+Checked against commit `bbc6a5b`.
+
+</Callout>
+
+llama-webui has one HTTP API. Its own web app uses it, and so can your scripts and integrations. The route table is
+in `server/app.ts`, the routes themselves in `server/routes/` (one file per domain), the handler wrapper and errors in
+`server/http.ts`, and the request guard in `server/security.ts`. Types and zod schemas come from `shared/src/`
+(`@llama-webui/shared`).
+
+## Base URL
+
+One Bun process serves the API, the WebSocket and the web app on one address, `http://127.0.0.1:7860` by default
+(`DEFAULT_HOST` and `DEFAULT_PORT` in `server/cli.ts`). `--host` and `--port`, or `LLAMA_WEBUI_HOST` and
+`LLAMA_WEBUI_PORT`, change it: see [Launch options](/docs/configuration/).
+
+- REST routes are under `/api/`.
+- The WebSocket is `/ws`.
+- Any other path serves the web app (the SPA fallback `/*`, so reloading `/chat` works).
+
+There is no authentication and no API key: anyone who can reach the port can call every route. The examples on these
+pages use `http://127.0.0.1:7860`.
+
+## Channels
+
+| Channel            | Where                                                                                        | Carries                                                                                                                        |
+| ------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| REST               | `/api/*`                                                                                     | Reads and commands, JSON in and out.                                                                                           |
+| WebSocket          | `/ws`                                                                                        | Events pushed by the server: monitor snapshots, log lines, server state, benchmark, sweep and download progress.              |
+| Server-sent events | `POST /api/chat/:id/messages`, `POST /api/chat/:id/regenerate`, `GET /api/chat/:id/stream` | The events of a chat reply while it is generated (`event: <type>` then `data: <json>`, a `: ping` comment every 15 seconds). |
+
+The WebSocket only sends `hello` when a client connects, then events as they happen. A client reads the current state
+over REST and applies the messages on top of it: see [WebSocket](/developers/api/websocket/). The chat streams are
+described on [Chat](/developers/api/chat/).
+
+## The request guard
+
+Every `/api/*` route and the `/ws` upgrade go through `guard()` (`server/security.ts`) before their handler runs. The
+API is unauthenticated and local, so the guard protects it from other websites open in your browser. It does not
+protect it from people on your network. It applies three checks, in this order:
+
+| Check          | Rule                                                                                                                                      | Refusal                                                          |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `Host`         | The header (or the URL's host) parses, and its hostname is `localhost`, ends in `.localhost`, or is an IPv4 or IPv6 literal.             | `403` `Invalid host` or `403` `Host not allowed`                 |
+| `Origin`       | When the header is present, it equals `<scheme>//<Host header>` exactly.                                                                  | `403` `Origin not allowed`                                       |
+| `content-type` | For `POST`, `PUT`, `PATCH` and `DELETE`: a `content-type`, when sent, is `application/json` (parameters such as `; charset=utf-8` allowed), and a request with a body sends it. | `415` `JSON body expected (content-type: application/json)` |
+
+- The `Host` rule stops DNS rebinding: a domain name can be made to resolve to `127.0.0.1`, an IP address cannot. The
+  API therefore refuses requests addressed by host name, such as `http://myserver.lan:7860`.
+- The `Origin` rule stops cross-site requests, a WebSocket opened by another site included. `curl` and most
+  non-browser clients send no `Origin`, so they pass.
+- The `content-type` rule stops "simple request" CSRF: another site can make the browser post a form or a plain-text
+  body without asking, but `application/json` needs a CORS preflight, which llama-webui never grants. A write without
+  a body and without a `content-type` passes (`curl -X POST http://127.0.0.1:7860/api/server/stop`).
+
+A refusal has the usual error shape, without a `code`:
+
+```bash title="Terminal"
+curl -i http://127.0.0.1:7860/api/health -H 'Origin: http://example.com'
+```
+
+```text
+HTTP/1.1 403 Forbidden
+content-type: application/json;charset=utf-8
+
+{"error":"Origin not allowed"}
+```
+
+The API sends no CORS headers either, so a browser does not let another site read its responses. The reasons behind
+each rule are on [Security](/developers/server/security/), and the user-facing summary on
+[Security](/docs/security/).
+
+## Errors
+
+Every `/api/*` error is a JSON object with an `error` message, and a `code` when the route sets one:
+
+```json
+{ "error": "A profile named “Qwen3 32B” already exists", "code": "name-taken" }
+```
+
+`guarded()` catches whatever a handler throws and turns it into a response with `errorResponse()`
+(`server/http.ts`):
+
+| Thrown                                           | Status         | Body                                                     |
+| ------------------------------------------------ | -------------- | -------------------------------------------------------- |
+| `HttpError(status, message, code?)`              | `status`       | `{ error: message }`, plus `code` when there is one       |
+| `ZodError` (a schema refused the input)          | `400`          | `{ error: "Invalid data: <first issue> (<path>)", issues }` |
+| `SyntaxError` (the body is not valid JSON)       | `400`          | `{ error: "Invalid JSON" }`                              |
+| Anything else                                    | `500`          | `{ error: "Internal error" }`, and the error is logged on the server console |
+
+Match on the status and the `code`, never on the `error` text: messages are written for people and can change. The
+web app follows the same rule (`ApiError` in `web/src/lib/api.ts` keeps `status`, `issues` and `code`).
+
+### Validation errors
+
+When a zod schema refuses a body, the response is a `400` with the first issue in `error` (its path in parentheses,
+when it has one) and every issue in `issues`, as zod reports them (`code`, `path`, `message`, and the fields specific to
+the issue):
+
+```json
+{
+  "error": "Invalid data: Expected a number (port)",
+  "issues": [{ "expected": "number", "code": "invalid_type", "path": ["port"], "message": "Expected a number" }]
+}
+```
+
+This one comes from `PATCH /api/settings` with `{"port":"abc"}`. The web app shows each issue under the field its
+`path` names.
+
+### Error codes
+
+A few refusals carry a machine-readable `code`:
+
+| `code`                                                                       | Status            | When                                                                                                               |
+| ---------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `name-taken`                                                                 | `409`             | Creating or renaming a profile with a name another profile has ([Profiles](/developers/api/profiles/)).           |
+| `server-running`                                                             | `409`             | Starting a benchmark or a sweep while `llama-server` runs, without `stopServer` ([Benchmarks](/developers/api/bench/)). |
+| `hf-gated`, `hf-not-found`, `hf-unauthorized`, `hf-rate-limited`, `hf-unreachable` | `403`, `404`, `401`, `429`, `502` | Hugging Face refused or failed a request ([Hugging Face](/developers/api/hf/)).                                    |
+| `already-queued`, `not-finished`                                             | `409`             | Queueing a download that is already queued, retrying one that has not failed or been canceled ([Hugging Face](/developers/api/hf/)). |
+| `disk-full`                                                                  | `507`             | Queueing or retrying a download that does not fit on the disk ([Hugging Face](/developers/api/hf/)).              |
+
+Every other error has no `code`.
+
+## Status codes
+
+| Status | Meaning in this API                                                                                                                                     |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200`  | Success, with a JSON body.                                                                                                                              |
+| `201`  | A resource was created (profile, duplicate, conversation, profile from a benchmark run); the body is the new resource.                                 |
+| `202`  | The operation started and goes on in the background (server start, switch and restart, benchmark run, sweep, download); follow it over the WebSocket. |
+| `204`  | Success without a body (deletions, cancellations, a chat stream with no reply in progress).                                                            |
+| `400`  | Invalid body, JSON or query parameter.                                                                                                                  |
+| `403`  | Refused by the guard (`Host`, `Origin`), or a gated Hugging Face repository.                                                                           |
+| `404`  | Unknown route, unknown id, or missing file.                                                                                                             |
+| `409`  | The request conflicts with the current state: a name is taken, an operation is in progress, a benchmark holds the GPUs, a server is running…           |
+| `415`  | Refused by the guard: a write that is not `application/json`.                                                                                           |
+| `422`  | The file exists but cannot be read as a GGUF.                                                                                                           |
+| `426`  | `/ws` requested without a WebSocket upgrade (plain-text body `WebSocket upgrade expected`).                                                            |
+| `500`  | An unexpected exception (`Internal error`).                                                                                                             |
+| `502`  | An upstream service failed: `llama-server` (`/props`) or Hugging Face.                                                                                  |
+| `503`  | `llama-server --help` failed (`/api/flags`).                                                                                                            |
+| `507`  | Not enough disk space for a download.                                                                                                                   |
+
+## How routes are registered
+
+`createApp()` in `server/app.ts` starts a single `Bun.serve()` with a `routes` table. Each domain module in
+`server/routes/` exports a function that takes its dependencies and returns its part of the table,
+`{ path: { METHOD: handler } }`, and every handler is wrapped in `guarded()`:
+
+```ts title="server/routes/models.ts"
+export function modelRoutes({ db, settings }: { db: Database; settings: SettingsRepo }) {
+  // …
+  return {
+    '/api/models': {
+      GET: guarded(async () => {
+        // …
+        return Response.json(list);
+      }),
+    },
+```
+
+`createApp()` defines the health and settings routes itself, spreads the domain tables, then adds the catch-alls:
+
+```ts title="server/app.ts"
+      ...setupRoutes(deps),
+      '/api/*': guarded(() => Response.json({ error: 'Unknown route' }, { status: 404 })),
+      '/ws': guarded((req, server) => {
+        if (server.upgrade(req)) return undefined;
+        return new Response('WebSocket upgrade expected', { status: 426 });
+      }),
+      // Any other path serves the app (SPA fallback `/*`: reloading /chat works).
+      ...deps.web,
+```
+
+- An unknown path under `/api/` gets `404` `{ "error": "Unknown route" }`. A known path called with a method it does
+  not define is a `404` too, never a `405`: Bun falls through to the next route that matches the path, usually
+  `/api/*`, sometimes a parameterized one (`GET /api/profiles/import` reaches `/api/profiles/:id`, which answers
+  `Profile not found`).
+- Path parameters are read with `idParam(req, what)`: anything but a positive integer gives `404` `<what> not found`,
+  the same answer as an id that does not exist.
+- A body that must be an object is read with `jsonObject(req)`: valid JSON that is not an object gives `400`
+  `JSON object expected`.
+- `notFound(what)` is the shared `404` `<what> not found`.
+
+To add a route, see [How-to guides](/developers/contributing/how-to/).
+
+## API pages
+
+68 routes (a method on a path), in 12 files, plus the WebSocket:
+
+| Page                                                   | Source                       | Routes | Paths                                                         |
+| ------------------------------------------------------ | ---------------------------- | ------ | ------------------------------------------------------------- |
+| [Health and settings](/developers/api/app/)            | `server/app.ts`              | 3      | `/api/health`, `/api/settings`                                |
+| [Setup and launch pad](/developers/api/setup/)         | `server/routes/setup.ts`     | 2      | `/api/setup`, `/api/launchpad`                                |
+| [Profiles](/developers/api/profiles/)                  | `server/routes/profiles.ts`  | 11     | `/api/profiles/*`                                             |
+| [Server, state and logs](/developers/api/server/)      | `server/routes/server.ts`    | 9      | `/api/state`, `/api/server/*`, `/api/flags`, `/api/logs`      |
+| [Models](/developers/api/models/)                      | `server/routes/models.ts`    | 2      | `/api/models`, `/api/models/info`                             |
+| [Hugging Face](/developers/api/hf/)                    | `server/routes/hf.ts`        | 8      | `/api/hf/*`, `/api/downloads/*`                               |
+| [Chat](/developers/api/chat/)                          | `server/routes/chat.ts`      | 9      | `/api/chat/*`                                                 |
+| [Monitor and system](/developers/api/monitor/)         | `server/routes/monitor.ts`   | 3      | `/api/monitor/*`, `/api/system/info`                          |
+| [Topology](/developers/api/topology/)                  | `server/routes/topology.ts`  | 1      | `/api/topology`                                               |
+| [Benchmarks](/developers/api/bench/)                   | `server/routes/bench.ts`     | 8      | `/api/bench/*`                                                |
+| [Sweeps](/developers/api/sweeps/)                      | `server/routes/sweeps.ts`    | 7      | `/api/sweeps/*`                                               |
+| [Tuning](/developers/api/tuning/)                      | `server/routes/tuning.ts`    | 5      | `/api/tuning/*`                                               |
+| [WebSocket](/developers/api/websocket/)                | `server/ws/hub.ts`           | 1      | `/ws`, 16 message types                                       |
+
+## Conventions
+
+- **JSON everywhere.** Bodies are JSON, sent with `content-type: application/json`. Responses are JSON, except a `204`
+  (no body), the chat event streams (`text/event-stream`), the profile exports (a JSON file sent as an attachment) and
+  the `426` of `/ws` (plain text).
+- **Ids** are SQLite integer ids (`id INTEGER PRIMARY KEY`), positive integers in paths (`/api/profiles/3`).
+- **Times** are epoch milliseconds, from `Date.now()`: `createdAt`, `updatedAt`, `finishedAt`, `since`, `at`,
+  `scannedAt`, `serverTime`.
+- **Durations** carry their unit in their name: `uptimeMs`, `durationMs` and `pollIntervalMs` are milliseconds,
+  `historySeconds` is seconds, `promptSec` and `genSec` are seconds.
+- **Sizes** are bytes, named `…Bytes` (`fileBytes`, `vramBytes`, `rssBytes`), and rates are bytes per second, named
+  `…Bps` (`readBps`, `diskReadPeakBps`). The exceptions are in MiB and say so: `BenchDevice.totalMib` and
+  `BenchDevice.freeMib` (as `llama-bench --list-devices` reports them) and `BenchRun.vramPeak[].mib`.
+- **`null` and absent fields.** A field typed `T | null` is always present, and `null` means unknown, not applicable
+  or not set (`SetupReport.binary.path`, `ServerView.command`, `LaunchpadEntry.fit`). A field typed `field?: T` is left
+  out when it has no value, never sent as `null`: the optional fields of a profile (`mmproj`, `cwd`, `host`, `port`),
+  `Flag.value` for a switch, `error` in the llama-tui check when the file reads fine. A few monitor fields accept both
+  (`GpuSample.fanPct?: number | null`): missing or `null` both mean unknown.
+- **Paths** are absolute paths on the machine that runs llama-webui. The server expands `~` in the models folder
+  setting and in a profile's `model`, `mmproj` and `cwd`.

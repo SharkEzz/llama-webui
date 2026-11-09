@@ -1,0 +1,258 @@
+---
+title: Development setup
+description: Install the tools, run llama-webui in development or production mode, learn the scripts and the repository layout, and pass the quality gate.
+---
+
+This page gets a working copy of llama-webui running for development: prerequisites, installation, the two ways to run
+the server, every script, the repository layout, how to work without GPUs or without llama.cpp, and the checks every
+change must pass.
+
+## Prerequisites
+
+| Tool | Why |
+| --- | --- |
+| **Linux** | Hardware discovery and telemetry read `/proc` and `/sys`. |
+| **[Bun](https://bun.com) 1.4.4 or later** | Runtime, bundler, test runner and package manager for the whole repository. CI pins 1.4.4. |
+| **`setpriv`** (util-linux) | Every `llama-server` and `llama-bench` process is launched as `setpriv --pdeathsig KILL -- …`, so it dies with Bun. |
+| **Git** | To clone the repository. |
+| A llama.cpp build (optional) | Needed to run real models. Without it, use the [fake binaries](#without-llamacpp). |
+| Node.js (website only) | The website's build runs the React Router CLI on Node.js; CI installs Node 24 for it. |
+
+The [user requirements](/docs/getting-started/requirements/) list the optional pieces (NVIDIA driver, `amdgpu`,
+`perf`) and what each one unlocks.
+
+## Install
+
+<Steps>
+  <Step title="Clone the repository">
+
+```bash title="Terminal"
+git clone https://github.com/SharkEzz/llama-webui.git
+cd llama-webui
+```
+
+  </Step>
+  <Step title="Install the workspaces">
+
+```bash title="Terminal"
+bun install
+```
+
+This installs the three workspaces declared in the root `package.json`: `shared`, `server` and `web`.
+
+  </Step>
+  <Step title="Install the website">
+
+The website (`site/`) is a standalone package with its own `bun.lock`, outside the workspaces. `bun run check` and
+`bun test` cover it too, so install it even if you only work on the app.
+
+```bash title="Terminal"
+cd site
+bun install
+cd ..
+```
+
+  </Step>
+</Steps>
+
+## Run llama-webui
+
+There is no build step in either mode: Bun runs the TypeScript sources directly.
+
+<Tabs>
+  <Tab title="Development">
+
+```bash title="Terminal"
+bun run dev
+```
+
+`bun run dev` is `bun --hot server/index.ts`. The UI is served through the HTML import of `Bun.serve`
+(`web/index.html`) with hot module replacement, and the browser console is streamed to your terminal
+(`development: { hmr: true, console: true }` in `server/app.ts`). Saving a server file re-evaluates the server modules
+in place, without restarting the process or `llama-server`. It prints:
+
+```text
+llama-webui on http://127.0.0.1:7860 (dev, HMR)
+```
+
+  </Tab>
+  <Tab title="Production">
+
+```bash title="Terminal"
+bun run start
+```
+
+`bun run start` is `NODE_ENV=production bun server/index.ts`. At startup, `Bun.build` bundles the UI in memory,
+minified and split per page (`server/routes/web.ts`); there is no HMR and no hot reload. If the build fails, the API
+and the WebSocket still start and every page answers `503` with the build error.
+
+  </Tab>
+</Tabs>
+
+Both scripts accept the launch options (`--host`, `--port`, `--data-dir`, or their `LLAMA_WEBUI_*` variables), listed
+by `bun run start --help` and documented in [Launch options](/docs/configuration/). Two habits keep development away
+from your everyday instance:
+
+- Use a separate data directory. `data/` and `*.sqlite` are ignored by Git, so `bun run dev --data-dir ./data` keeps a
+  development database inside the clone.
+- Use another port if an instance already runs on 7860: `bun run dev --port 7861`.
+
+`bun --hot` keeps some state alive across reloads, and changes to those files need a full restart. Read
+[the `bun --hot` pitfall](/developers/architecture/#the-bun---hot-pitfall) before changing the supervisor, the monitor,
+the collectors, the log ring or the bench gate.
+
+## Scripts
+
+The root `package.json` defines every script. The `shared`, `server` and `web` workspaces have none.
+
+| Script | Runs | What it does |
+| --- | --- | --- |
+| `bun run dev` | `bun --hot server/index.ts` | Development server with HMR and hot reload. |
+| `bun run start` | `NODE_ENV=production bun server/index.ts` | Production server, UI built in memory at startup. |
+| `bun run check` | `bun check --no-script && bun check -p web && bun run --cwd site typecheck` | Type checks `server/` and `shared/` (root `tsconfig.json`), then `web/` (its own `tsconfig.json`, with the DOM types and the `@/` alias), then the website. |
+| `bun run lint` | `biome check` | Format, lint and import order, read-only. |
+| `bun run lint:fix` | `biome check --write` | Applies Biome's safe fixes. |
+| `bun run format` | `biome format --write` | Formats only. |
+| `bun run test` | `bun test server shared site` | Runs the test files whose path contains `server`, `shared` or `site`. |
+| `bun run site:dev` | `bun run --cwd site dev` | Website dev server (Vite, HMR) on `0.0.0.0:5173`. |
+| `bun run site:build` | `bun run --cwd site build` | Prerenders the website into `site/dist/`. |
+| `bun run site:preview` | `bun run --cwd site preview` | Serves `site/dist/` the way GitHub Pages does, on port 4173. |
+
+<Callout type="note" title="bun test or bun run test">
+
+`bun test` without arguments runs every test file in the repository; it is what CI and the quality gate use.
+`bun run test` passes `server shared site` as path filters (substring matches), so it skips the tests under `web/`.
+
+</Callout>
+
+The website has more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typecheck`), run with
+`bun run --cwd site <script>`; [Docs, commits and PRs](/developers/contributing/workflow/) covers them.
+
+## Repository layout
+
+<FileTree>
+- `server/` the Bun process (workspace `@llama-webui/server`)
+  - `index.ts` entry point: opens the database, builds the services, wires their events to the WebSocket
+  - `app.ts` `Bun.serve`: routes, `/ws`, health and settings
+  - `runtime.ts` state that survives `bun --hot` (supervisor, log ring, monitor, bench gate)
+  - `cli.ts` launch options and `--help`
+  - `paths.ts` data directory and database path
+  - `http.ts` `HttpError`, `guarded()`, JSON error responses
+  - `security.ts` the request guard (Host, Origin, JSON-only writes)
+  - `setup.ts` first-run report and launch pad
+  - `llamatui.ts` llama-tui config import
+  - `routes/` one module per API domain, plus `web.ts` for the production UI build
+  - `supervisor/` the managed `llama-server`: command line, health, external server detection, `--help` flags
+  - `monitor/` the sampling tick, history ring, model placement
+  - `collectors/` NVML (in `nvml/`, through `bun:ffi` in a worker), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
+  - `chat/` server-owned chat generations
+  - `bench/` the bench gate, runner, executor and output parsers
+  - `tuning/` memory estimator, sweep space, system checks
+  - `hf/` Hugging Face client and download queue
+  - `models/` models folder scan and GGUF header reading
+  - `hardware/` PCIe topology and CPU info from sysfs and `/proc`
+  - `db/` `bun:sqlite`: connection, migrations, one repository per table
+  - `logs/` the log ring buffer and line splitter
+  - `ws/` the WebSocket hub
+  - `testing/` test helpers (`tempDir`)
+- `web/` the React app (workspace `@llama-webui/web`)
+  - `index.html` HTML entry, applies the theme before the first paint
+  - `src/`
+    - `main.tsx` starts the stores and the WebSocket, renders the router
+    - `app/` router, layout, sidebar, status bar
+    - `features/` one folder per page
+    - `lib/` API client, WebSocket client, zustand stores, formatting
+    - `components/` shared components: `glass/`, `charts/`, and `ui/` (generated shadcn)
+    - `index.css` Tailwind, theme tokens
+- `shared/` types, zod schemas and pure functions (workspace `@llama-webui/shared`)
+  - `src/` one module per domain, re-exported by `index.ts`
+- `site/` this website (standalone package)
+  - `content/` the `.mdx` pages and `nav.ts`
+  - `src/` routes, layout, docs components, landing page
+  - `scripts/` build, preview, link check, demo seeding, screenshots
+  - `public/` static files and screenshots
+- `testdata/` captured outputs used by the tests
+  - `fake/` stand-ins for `llama-server` and `llama-bench`, with their fixtures
+  - `llama-bench/` `llama-bench` JSON, stderr and `--list-devices` captures
+- `docs/` README assets and design plans
+- `package.json` workspaces and scripts
+- `tsconfig.json` type check of `server/` and `shared/`
+- `biome.json` format and lint rules
+- `bunfig.toml` the Tailwind plugin for the HTML import
+</FileTree>
+
+The [Web app](/developers/frontend/) and [Shared package](/developers/shared/) pages describe `web/src/` and
+`shared/src/` module by module; the server pages describe each server folder.
+
+## Without GPUs
+
+llama-webui runs on a machine without a GPU: the GPU collectors find no card, and the CPU, memory and disk readings
+still work. A few things help when you work on telemetry code:
+
+- The **collectors** switches in [Settings](/docs/settings/) turn NVML, the system sampler and the disk sampler on or
+  off.
+- NVIDIA cards are read through NVML, with `nvidia-smi` as the fallback. `LLAMA_WEBUI_NVIDIA_SMI` overrides the
+  `nvidia-smi` binary the fallback runs, which lets you test it missing.
+- Hardware parsers are tested against captured files in `testdata/` (`nvidia-gpu.csv`, `fdinfo-*.txt`,
+  `metrics-*.txt`, `slots-*.json`…), so most collector changes can be covered by a test without the hardware.
+
+## Without llama.cpp
+
+`testdata/fake/` holds two stand-ins that the tests launch instead of the real binaries. Each is a small shell
+wrapper that runs a TypeScript fake with `bun` (or `$BUN_PATH`):
+
+- `fake-llama-server` answers `--version`, listens on `127.0.0.1` at the `--port` it receives (8080 without one),
+  returns `503` on `/health` while it "loads", then serves `/health`, `/slots`, `/metrics` and `/props` from the
+  fixtures next to it, `/completion`, and `/v1/chat/completions` (a streamed, simulated Markdown reply with
+  reasoning, or a whole reply when `stream` is not `true`).
+- `fake-llama-bench` prints `--list-devices` from `testdata/llama-bench/list-devices.txt`, writes `llama-bench`-style
+  progress on stderr, and prints the JSON of `testdata/llama-bench/ok.json`.
+
+llama-webui finds `llama-bench` by replacing `llama-server` with `llama-bench` in the binary's file name
+(`benchBinary()` in `server/bench/parse.ts`), so the two fakes pair up the same way the real binaries do.
+
+The server wrapper's comment notes it can be used as the binary setting. Point **llama-server binary** in
+[Settings](/docs/settings/) at the absolute path of `testdata/fake/fake-llama-server` to drive the UI without
+llama.cpp. Keep in mind that the fake:
+
+- ignores the model: a profile still needs a `model` value, but the file is never opened;
+- has no `--help`, so the argument editor has no flag catalogue;
+- listens on `127.0.0.1` whatever `--host` says.
+
+Environment variables change the fakes' behavior. The supervisor passes llama-webui's environment and the profile's
+environment variables to `llama-server`, so you can set them in either place.
+
+| Variable | Fake | Effect |
+| --- | --- | --- |
+| `FAKE_LOAD_MS` | server | Loading time before `/health` answers `200` (default 300 ms). |
+| `FAKE_SLOW_ARG`, `FAKE_SLOW_MS` | server | Loads for `FAKE_SLOW_MS` (default 5000 ms) when one of its arguments equals `FAKE_SLOW_ARG`. |
+| `FAKE_FAIL_ARG` | server | Logs an out-of-memory error and exits with code 1 when one of its arguments equals this value. |
+| `FAKE_EXIT_LINES` | server | Logs these lines (separated by `\|`) and exits with code 1 at startup. |
+| `FAKE_EXIT_AFTER_MS`, `FAKE_EXIT_CODE` | server | Exits after a delay, with `FAKE_EXIT_CODE` (default 1). |
+| `FAKE_IGNORE_TERM` | server | `1` ignores `SIGTERM` (tests the `SIGKILL` path). |
+| `FAKE_CRASH_ON_PREDICT` | server | Dies in the middle of a `/completion` request with this `n_predict`. |
+| `FAKE_N_CTX` | server | Context size of the simulated chat (default 40192 tokens); a larger prompt gets `llama-server`'s context error. |
+| `FAKE_CHAT_DELAY_MS`, `FAKE_CHAT_LINES` | server | Delay between streamed chunks (default 60 ms), extra lines appended to the reply. |
+| `FAKE_DRAFT` | server | `1` adds draft statistics (speculative decoding) to `/completion` and non-streamed replies; the streamed chat reply always has them. |
+| `FAKE_PP`, `FAKE_TG` | both | Prompt and generation speed reported, in tokens per second (server: `/completion` and non-streamed replies). |
+| `FAKE_TG_BY_ARG` | bench | Generation speed per argument fragment, the first match wins, for example `-ncmoe 8=30;-ncmoe 16=20`. |
+| `FAKE_BENCH_OOM`, `FAKE_BENCH_OOM_ARG` | bench | Reproduces a load failure: always with `FAKE_BENCH_OOM=1`, or when the arguments contain the `FAKE_BENCH_OOM_ARG` fragment. |
+| `FAKE_BENCH_STEP_MS` | bench | Delay between progress steps (default 100 ms). |
+
+[Testing](/developers/contributing/testing/) explains how the tests use the fakes and the other captures.
+
+## Quality gate
+
+Before you close a piece of work, commit, or open a pull request, these three commands must pass from the repository
+root, with zero errors and zero Biome warnings:
+
+```bash title="Terminal"
+bun run lint
+bun run check
+bun test
+```
+
+CI (`.github/workflows/ci.yml`) runs the same commands, then builds the website and checks its links. Do not disable a
+Biome rule or lower it to a warning to get a green run: for a genuine false positive, add a targeted
+`// biome-ignore lint/<group>/<rule>: <reason>` comment. `web/src/components/ui/` (generated shadcn components) is
+ignored by Biome. [Conventions](/developers/contributing/conventions/) has the full rules.

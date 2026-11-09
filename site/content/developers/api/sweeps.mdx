@@ -1,0 +1,267 @@
+---
+title: Sweeps
+description: Routes that create, list, cancel, resume, validate and delete sweeps, the benchmark series that explore a space of llama.cpp flags.
+---
+
+A sweep runs a series of benchmarks over a space of flag values, keeps the items that the estimator says fit, and ranks
+the results with a tuning preset. The routes live in `server/routes/sweeps.ts`; the spec schema, the space expansion
+and the ranking are in `shared/src/sweep.ts`, the planning in `server/tuning/space.ts`, the execution in
+`server/bench/runner.ts` (see [Benchmarks and sweeps](/developers/server/bench/)). The user side is described on the
+[Sweeps](/docs/sweeps/) page.
+
+The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
+
+## How a sweep runs
+
+A sweep's items are benchmark runs (`bench_runs` rows with a `sweepId`), so they have the `BenchRun` shape of the
+[Benchmarks](/developers/api/bench/) API and are listed with `GET /api/bench/runs?sweep=<id>`.
+
+1. **Plan**: the space is expanded over the base and each combination gets the estimator's verdict at the sweep's
+   context. Combinations that do not fit are dropped, unless `includeUnfit` is set. `POST /api/tuning/plan` returns the
+   same plan without starting anything (see [Plan a sweep](/developers/api/tuning/#plan-a-sweep)).
+2. **Explore**: each planned combination is queued as a `bench` (`llama-bench`) item. The sweep takes the
+   [server gate](/developers/api/bench/#runs-and-the-server-gate) once for all its items, runs them one after another
+   with a 1-second pause between two items while the VRAM is freed, and goes on after a failed item (out of memory
+   included).
+3. **Best**: when the queue is empty, the sweep becomes `done` (or `cancelled`) and records its best run: among the
+   successful `server` validations if there are some, otherwise among the exploration. Then the gate restarts the
+   server it stopped.
+4. **Validate** (optional): `POST /api/sweeps/:id/validate` queues the best configurations again as `server` items,
+   measured with a real `llama-server`, and runs the sweep again.
+
+A sweep survives a `bun --hot` reload: the item in progress goes back to the queue and the new module replays it, with
+the gate still held. When Bun stops, the sweep and its running item become `interrupted`, and
+`POST /api/sweeps/:id/resume` picks them up.
+
+Progress goes over the [WebSocket](/developers/api/websocket/), next to the `bench-run` and `bench-progress` messages
+of each item:
+
+| Message          | Payload               | When                                                                |
+| ---------------- | --------------------- | ------------------------------------------------------------------- |
+| `sweep`          | `Sweep`               | On every change: start, after each item, cancel, end.               |
+| `sweep-progress` | `SweepLive` \| null    | When an item starts; null when the sweep ends.                      |
+| `sweep-deleted`  | `{ id: number }`      | A sweep was deleted.                                                |
+
+## The sweep spec
+
+`SweepSpec` (`SweepSpecSchema`, `shared/src/sweep.ts`), strict. `modelPath`, `mmprojPath`, `profileId`, `p`, `n`, `r`
+and `serverArgs` have the same rules as in a [run spec](/developers/api/bench/#the-run-spec).
+
+| Field          | Type            | Required | Description                                                                                  |
+| -------------- | --------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `name`         | string          | yes      | Trimmed, 1 to 80 characters.                                                                 |
+| `modelPath`    | string          | yes      | Absolute path ending in `.gguf`.                                                             |
+| `mmprojPath`   | string \| null   | no       | Projector, default null: counted by the estimator, loaded by the `server` validations.       |
+| `profileId`    | integer \| null  | no       | Source profile (environment, working directory), default null.                               |
+| `p`            | integer         | no       | Prompt tokens, 1 to 32,768, default 512.                                                     |
+| `n`            | integer         | no       | Generated tokens, 1 to 4096, default 128.                                                    |
+| `r`            | integer         | no       | Repetitions per item, 1 to 20, default 3.                                                    |
+| `preset`       | string          | yes      | Tuning preset that sets the context and ranks the results: `chat`, `agent`, `context`, `fit` or `big` (see [Presets](/developers/api/tuning/#presets)). |
+| `base`         | `BenchParams`   | no       | Values shared by every item, default `{}`.                                                   |
+| `space`        | `SweepSpace`    | no       | The values to try, default `{}`.                                                             |
+| `serverArgs`   | string[]        | no       | Other `llama-server` flags, default `[]`: they set the context (`-c`) and are passed to the `server` validations. |
+| `includeUnfit` | boolean         | no       | Keep the combinations the estimator says do not fit. Default `false`.                       |
+
+### The space
+
+`SweepSpace` (`SweepSpaceSchema`) has the keys of `BenchParams` (`ngl`, `ot`, `ncmoe`, `dev`, `ts`, `sm`, `fa`, `ctk`,
+`ctv`, `t`, `b`, `ub`). Each key is optional and holds at least one value of that field's type; a missing key keeps the
+base value. For the list fields (`ot`, `dev`, `ts`), each value is itself a list.
+
+```json
+{
+  "ncmoe": [0, 8, 16],
+  "dev": [["CUDA0"], ["CUDA0", "CUDA1"]],
+  "ts": [[3, 1], [1, 1]],
+  "ub": [512, 2048]
+}
+```
+
+`expandSpace()` builds the cartesian product over `base`, in the fixed field order (`FIELD_ORDER`):
+
+- `-ts` only applies to combinations whose `-dev` lists as many devices, more than one. The others lose their `-ts`;
+  when `ts` is part of the space, each of them counts in the plan's `droppedTs`.
+- Duplicate combinations are removed. An empty space gives one item: the base.
+- Each item is labeled with the space's dimensions only, as `llama-server` flags (`itemLabel()`):
+  `-ncmoe 8 · -dev CUDA0,CUDA1 · -ub 2048`, `-<key> default` for an unset value, `base` for an empty space.
+
+The estimator (`planSweep()` in `server/tuning/space.ts`) checks each item at the sweep's context (`sweepCtx()`: the
+`-c`, `--ctx-size` or `--ctx-size=` of `serverArgs`, otherwise the preset's minimum context), with the item's `ctk` and
+`ctv` (default `f16`; `ctv` defaults to `ctk`) and `ub` (default 512). Its verdict is saved in each item's `fit`.
+
+## The sweep record
+
+`Sweep`:
+
+| Field        | Type            | Description                                                                         |
+| ------------ | --------------- | ----------------------------------------------------------------------------------- |
+| `id`         | number          | Sweep id.                                                                           |
+| `name`       | string          | Name.                                                                               |
+| `status`     | string          | `running`, `done`, `cancelled` or `interrupted`.                                   |
+| `spec`       | `SweepSpec`     | The spec; `profileId` becomes null if the profile was deleted since.                |
+| `bestRunId`  | number \| null   | Best run, set when the sweep ends.                                                  |
+| `best`       | object \| null   | Summary of the best run: `label`, `kind`, `ppTps`, `tgTps`.                         |
+| `counts`     | object          | Items per status: `total`, `queued`, `running`, `ok`, `failed`, `cancelled`, `interrupted`. |
+| `createdAt`  | number          | Epoch ms.                                                                           |
+| `finishedAt` | number \| null   | Epoch ms; reset to null when the sweep runs again.                                  |
+
+`SweepLive`, the payload of `sweep-progress`:
+
+| Field     | Type                        | Description                                       |
+| --------- | --------------------------- | ------------------------------------------------- |
+| `sweepId` | number                      | Running sweep.                                    |
+| `runId`   | number \| null               | Item being run.                                   |
+| `index`   | number                      | Position of the item, 1-based.                    |
+| `total`   | number                      | Items in the sweep.                               |
+| `stage`   | `"explore"` \| `"validate"`  | `bench` item or `server` validation.              |
+
+### Ranking
+
+`rankRuns()` sorts the successful runs by the preset's score at the sweep's context (`scoreOf()`), then the others in
+their order. A run whose gap to the best is within the measurement noise (`NOISE`: 10% on prompt processing, 2% on
+generation) is marked `tie`, and so is the best when it has a tie. The preset scores are listed on the
+[Tuning](/developers/api/tuning/#presets) page.
+
+## Sweeps
+
+### Create and start a sweep
+
+<Endpoint method="POST" path="/api/sweeps" />
+
+Plans the sweep, takes the [server gate](/developers/api/bench/#runs-and-the-server-gate), then saves the sweep and its queued items and starts
+it. The sweep and its items are written only once the gate is taken: a refused request writes nothing.
+
+**Body**:
+
+| Field        | Type        | Required | Description                                                                   |
+| ------------ | ----------- | -------- | ----------------------------------------------------------------------------- |
+| `spec`       | `SweepSpec` | yes      | [The sweep spec](#the-sweep-spec). Its zod issues have paths relative to `spec`. |
+| `stopServer` | boolean     | no       | `true` allows stopping the managed server (restarted at the end).             |
+
+**Response**: `202` with `{ sweep: Sweep, items: number, excluded: number }`: the sweep (status `running`), the number
+of queued items, and the number of combinations dropped by the estimator.
+
+**Errors**: `400` invalid spec; `404` `Model not found` or `Projector not found`; `422` unreadable GGUF; `409`
+`No configuration to run: <n> excluded by the estimator`; the [gate errors](/developers/api/bench/#gate-errors) (`409`, `code:
+"server-running"` when the server must be stopped).
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/sweeps \
+  -H 'content-type: application/json' \
+  -d '{"spec":{"name":"Qwen3 30B offload","modelPath":"/home/demo/models/Qwen3-30B-A3B-Q4_K_M.gguf","preset":"chat","base":{"ngl":"all","fa":"on"},"space":{"ncmoe":[0,8,16],"ub":[512,2048]},"serverArgs":["-c","32768"]},"stopServer":true}'
+```
+
+```json
+{
+  "sweep": {
+    "id": 4,
+    "name": "Qwen3 30B offload",
+    "status": "running",
+    "spec": { "name": "Qwen3 30B offload", "preset": "chat", "space": { "ncmoe": [0, 8, 16], "ub": [512, 2048] } },
+    "bestRunId": null,
+    "best": null,
+    "counts": { "total": 5, "queued": 5, "running": 0, "ok": 0, "failed": 0, "cancelled": 0, "interrupted": 0 },
+    "createdAt": 1762700000000,
+    "finishedAt": null
+  },
+  "items": 5,
+  "excluded": 1
+}
+```
+
+### List sweeps
+
+<Endpoint method="GET" path="/api/sweeps" />
+
+**Response**: `200` with `{ sweeps: Sweep[], live: SweepLive | null }`, newest first.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/sweeps
+```
+
+### Get a sweep
+
+<Endpoint method="GET" path="/api/sweeps/:id" />
+
+**Response**: `200` with `{ sweep: Sweep, runs: BenchRun[] }`, the runs in item order (up to 10,000).
+
+**Errors**: `404` unknown sweep.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/sweeps/4
+```
+
+### Cancel a sweep
+
+<Endpoint method="POST" path="/api/sweeps/:id/cancel" />
+
+Marks its queued items `cancelled`, stops the running item, and ends the sweep with status `cancelled`. The gate then
+restarts the server it stopped.
+
+**Response**: `204`.
+
+**Errors**: `404` unknown sweep; `409` `This sweep is not running`.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/sweeps/4/cancel
+```
+
+### Resume a sweep
+
+<Endpoint method="POST" path="/api/sweeps/:id/resume" />
+
+Puts the `interrupted` items back in the queue, then runs the queued items: those an interruption left behind and the
+requeued ones. Cancelled items are not resumed.
+
+**Body**: a JSON object, `{}` or `{ "stopServer": true }`.
+
+**Response**: `202` with the `Sweep` (status `running`).
+
+**Errors**: `404` unknown sweep; `409` `This sweep is still running: cancel it first`; `409`
+`Nothing to resume: no interrupted or queued item`; the [gate errors](/developers/api/bench/#gate-errors).
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/sweeps/4/resume \
+  -H 'content-type: application/json' \
+  -d '{"stopServer":true}'
+```
+
+### Validate the best configurations
+
+<Endpoint method="POST" path="/api/sweeps/:id/validate" />
+
+Takes the `n` best successful `bench` items of the sweep ([ranking](#ranking)) and queues each of them again as a
+`server` item: same params, the sweep's `serverArgs`, `p`, `n` and `r`, labeled `validation · <item label>`. The
+sweep's interrupted items are requeued with them. The sweep then runs again, in the `validate` stage.
+
+**Body**: strict.
+
+| Field        | Type    | Required | Description                                          |
+| ------------ | ------- | -------- | ---------------------------------------------------- |
+| `n`          | integer | no       | Configurations to validate, 1 to 5, default 3.       |
+| `stopServer` | boolean | no       | `true` allows stopping the managed server.           |
+
+**Response**: `202` with the `Sweep` (status `running`).
+
+**Errors**: `400` invalid body; `404` unknown sweep; `409` `This sweep is still running: cancel it first`; `409`
+`No successful run to validate`; the [gate errors](/developers/api/bench/#gate-errors).
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/sweeps/4/validate \
+  -H 'content-type: application/json' \
+  -d '{"n":2,"stopServer":true}'
+```
+
+### Delete a sweep
+
+<Endpoint method="DELETE" path="/api/sweeps/:id" />
+
+Deletes the sweep and all its runs. Broadcasts `bench-deleted` with the ids of the runs, then `sweep-deleted`.
+
+**Response**: `204`.
+
+**Errors**: `404` unknown sweep; `409` `This sweep is still running: cancel it first`.
+
+```bash title="Terminal"
+curl -X DELETE http://127.0.0.1:7860/api/sweeps/4
+```

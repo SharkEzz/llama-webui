@@ -1,0 +1,142 @@
+---
+title: Health and settings
+description: The routes server/app.ts defines itself, the health check and the settings read and patch, with every field of the settings schema.
+---
+
+`server/app.ts` defines a few routes itself, next to the domain tables it spreads in: the health check, the settings,
+the `/api/*` fallback and the `/ws` upgrade. The settings schema is `SettingsSchema` (`shared/src/settings.ts`), stored
+by `SettingsRepo` (`server/db/settings.ts`). The common rules (guard, error shape, `400` on invalid data) are on the
+[API overview](/developers/api/overview/).
+
+## Health
+
+### Check the server
+
+<Endpoint method="GET" path="/api/health" />
+
+Answers as long as the Bun process serves requests, whatever the state of `llama-server`. It goes through the guard
+like every API route.
+
+**Response**: `200`
+
+| Field      | Type    | Description                                                                 |
+| ---------- | ------- | --------------------------------------------------------------------------- |
+| `ok`       | boolean | Always `true`.                                                              |
+| `version`  | string  | The `version` of `server/package.json`.                                     |
+| `uptimeMs` | number  | Milliseconds since `server/app.ts` was loaded (`startedAt`).                |
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/health
+```
+
+```json
+{ "ok": true, "version": "0.1.0", "uptimeMs": 5234871 }
+```
+
+## Settings
+
+The settings are the options you change while llama-webui runs (the [Settings](/docs/settings/) page). The options
+needed before it starts, its own address, port and data folder, are [launch options](/docs/configuration/) instead
+and are not part of this schema.
+
+### Settings fields
+
+`Settings` (`shared/src/settings.ts`). Every field has a default, so a fresh database returns `DEFAULT_SETTINGS`.
+
+| Field                     | Type                                          | Default        | Limits                 | Description                                                                                                                                                                 |
+| ------------------------- | --------------------------------------------- | -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `binary`                  | string                                        | `llama-server` | not empty              | The `llama-server` to run: an absolute path or a name looked up in the `PATH`. `llama-bench` is derived from it (same folder, or the `PATH` for a bare name).                 |
+| `host`                    | string                                        | `0.0.0.0`      | not empty              | `--host` given to `llama-server` for a profile without `host`.                                                                                                              |
+| `port`                    | integer                                       | `8080`         | 1 to 65535             | `--port` given to `llama-server` for a profile without `port`; also the port watched for an external server.                                                               |
+| `modelsDir`               | string                                        | `~/models`     | not empty              | The folder scanned for GGUF files; `~` is expanded by the server.                                                                                                           |
+| `pollIntervalMs`          | integer                                       | `1000`         | at least 250           | Interval of the monitor ticks, so of the `snapshot` messages, in milliseconds.                                                                                              |
+| `historySeconds`          | integer                                       | `300`          | 30 to 1800             | How much monitor history the server keeps, in seconds.                                                                                                                       |
+| `hiddenGpus`              | string[]                                      | `[]`           |                        | PCI addresses (`0000:01:00.0`, the `busId` of `GpuSample`) of GPUs that are listed but not read.                                                                            |
+| `defaultProfileId`        | integer \| null                               | `null`         |                        | The last profile started, preselected on the Server page.                                                                                                                   |
+| `llamaTuiImportDismissed` | boolean                                       | `false`        |                        | The offer to import llama-tui profiles was dismissed.                                                                                                                       |
+| `onboardingDone`          | boolean                                       | `false`        |                        | The first-run setup checklist was completed: Home shows the launch pad.                                                                                                     |
+| `collectors`              | `{ nvml: boolean, system: boolean, disk: boolean }` | all `true` |                   | Monitor collectors: NVML for NVIDIA GPUs (otherwise `nvidia-smi`), CPU and memory (with the DRAM bandwidth), disks.                                                        |
+| `theme`                   | `'system' \| 'light' \| 'dark'`               | `system`       |                        | The web app's theme.                                                                                                                                                        |
+
+The server writes `defaultProfileId` on its own: [starting or switching](/developers/api/server/) to a profile stores
+its id, deleting that profile resets it to `null`, and the llama-tui import sets it from llama-tui's default profile
+when it is still `null` ([Profiles](/developers/api/profiles/)). The web app writes the other values without a field
+on the Settings page (`onboardingDone`, `llamaTuiImportDismissed`).
+
+### Read the settings
+
+<Endpoint method="GET" path="/api/settings" />
+
+Returns the stored values merged over the defaults. A stored value that no longer passes its field's schema, or whose
+JSON cannot be read, falls back to its default (with a warning on the server console) instead of failing the request.
+
+**Response**: `200` with the whole `Settings`.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/settings
+```
+
+```json
+{
+  "binary": "llama-server",
+  "host": "0.0.0.0",
+  "port": 8080,
+  "modelsDir": "~/models",
+  "pollIntervalMs": 1000,
+  "historySeconds": 300,
+  "hiddenGpus": [],
+  "defaultProfileId": 3,
+  "llamaTuiImportDismissed": false,
+  "onboardingDone": true,
+  "collectors": { "nvml": true, "system": true, "disk": true },
+  "theme": "system"
+}
+```
+
+### Change settings
+
+<Endpoint method="PATCH" path="/api/settings" />
+
+Changes some settings and applies them. `SettingsRepo.patch()` merges the body over the current settings and validates
+the result with `SettingsSchema` as a whole: if one field is invalid, nothing is written. It then writes only the keys
+present in the body, one row per key in the `settings` table (the value as JSON).
+
+**Body**: a JSON object with any subset of the [settings fields](#settings-fields).
+
+- Unknown keys are ignored, not refused.
+- The merge is shallow: an object such as `collectors` replaces the stored one, and its missing keys take their
+  default, not their current value. Send the three switches together.
+
+After the write, the route calls `Monitor.configure()` with the new settings:
+
+- `collectors.system`, `collectors.disk`, `hiddenGpus`, `pollIntervalMs` and `historySeconds` apply at once (the
+  history is resized, the tick timer restarted).
+- `collectors.nvml` is only read when llama-webui starts: the NVIDIA collector is chosen once.
+- `binary`, `host`, `port` and `modelsDir` are read when they are used: the next start, scan or setup report. A
+  running `llama-server` keeps its binary, host and port until it restarts.
+
+No WebSocket message announces the change. Other clients see it on their next `GET /api/settings`, and a change of
+`pollIntervalMs` or `historySeconds` shows in the `history` field of the next
+[`snapshot`](/developers/api/websocket/#snapshot), which makes the web app reload its history.
+
+**Response**: `200` with the whole `Settings` after the change.
+
+**Errors**: `400` `JSON object expected` when the body is not an object, `400` with zod issues when a value is invalid
+(`Port between 1 and 65535`, `At least 250 ms`, `Between 30 and 1800 s`, `Required`…).
+
+```bash title="Terminal"
+curl -X PATCH http://127.0.0.1:7860/api/settings \
+  -H 'content-type: application/json' \
+  -d '{"pollIntervalMs":500,"historySeconds":600}'
+```
+
+## Fallbacks
+
+`server/app.ts` also registers, after the domain routes:
+
+- `/api/*`: any other path under `/api/` gets `404` `{ "error": "Unknown route" }`, and so does, most of the time, a
+  method that a known path does not define (see
+  [How routes are registered](/developers/api/overview/#how-routes-are-registered)).
+- `/ws`: the WebSocket upgrade (`426` without an upgrade). See [WebSocket](/developers/api/websocket/).
+- The web app's routes (`deps.web`) for every other path: the HTML import with HMR in development, the bundle built at
+  startup in production (`server/routes/web.ts`).

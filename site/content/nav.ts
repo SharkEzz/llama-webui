@@ -81,7 +81,59 @@ export const NAV: NavSection[] = [
     groups: [
       {
         title: 'Overview',
-        pages: [{ path: 'developers', title: 'Overview' }],
+        pages: [
+          { path: 'developers', title: 'Overview' },
+          { path: 'developers/getting-started', title: 'Development setup' },
+          { path: 'developers/architecture', title: 'Architecture' },
+        ],
+      },
+      {
+        title: 'Server',
+        pages: [
+          { path: 'developers/server/supervisor', title: 'Supervisor' },
+          { path: 'developers/server/monitor', title: 'Monitor and collectors' },
+          { path: 'developers/server/chat', title: 'Chat runs' },
+          { path: 'developers/server/bench', title: 'Benchmarks and sweeps' },
+          { path: 'developers/server/tuning', title: 'Tuning' },
+          { path: 'developers/server/hugging-face', title: 'Hugging Face downloads' },
+          { path: 'developers/server/database', title: 'Database' },
+          { path: 'developers/server/security', title: 'Security' },
+        ],
+      },
+      {
+        title: 'Web app and shared code',
+        pages: [
+          { path: 'developers/frontend', title: 'Web app' },
+          { path: 'developers/shared', title: 'Shared package' },
+        ],
+      },
+      {
+        title: 'API reference',
+        pages: [
+          { path: 'developers/api/overview', title: 'Overview' },
+          { path: 'developers/api/websocket', title: 'WebSocket' },
+          { path: 'developers/api/app', title: 'Health and settings' },
+          { path: 'developers/api/setup', title: 'Setup and launch pad' },
+          { path: 'developers/api/profiles', title: 'Profiles' },
+          { path: 'developers/api/server', title: 'Server, state and logs' },
+          { path: 'developers/api/models', title: 'Models' },
+          { path: 'developers/api/hf', title: 'Hugging Face' },
+          { path: 'developers/api/chat', title: 'Chat' },
+          { path: 'developers/api/monitor', title: 'Monitor and system' },
+          { path: 'developers/api/topology', title: 'Topology' },
+          { path: 'developers/api/bench', title: 'Benchmarks' },
+          { path: 'developers/api/sweeps', title: 'Sweeps' },
+          { path: 'developers/api/tuning', title: 'Tuning' },
+        ],
+      },
+      {
+        title: 'Contributing',
+        pages: [
+          { path: 'developers/contributing/conventions', title: 'Conventions' },
+          { path: 'developers/contributing/testing', title: 'Testing' },
+          { path: 'developers/contributing/how-to', title: 'How-to guides' },
+          { path: 'developers/contributing/workflow', title: 'Docs, commits and PRs' },
+        ],
       },
     ],
   },

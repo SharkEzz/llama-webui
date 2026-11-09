@@ -1,0 +1,164 @@
+---
+title: Topology
+description: The route that returns the machine's PCIe graph read from sysfs and the placement of the loaded model read from llama-server's logs.
+---
+
+`GET /api/topology` returns what the [Topology](/docs/topology/) page draws: the hardware graph (CPU, memory, GPUs,
+NVMe drives, chipsets and their PCIe links) and how the loaded model is split across devices. The route lives in
+`server/routes/topology.ts`; the types and the pure helpers are in `shared/src/topology.ts`, the graph reader in
+`server/hardware/pci.ts`, the placement tracker in `server/monitor/placement.ts`.
+
+The guard and the error shape follow the common rules of the [API overview](/developers/api/overview/).
+
+## Get the topology
+
+<Endpoint method="GET" path="/api/topology" />
+
+The graph is read again on every call: the current state of a PCIe link changes with power states. The placement is
+the tracker's latest value.
+
+**Response**: `200` with `{ graph: TopologyGraph, placement: ModelPlacement | null }`.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/topology
+```
+
+```json
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "cpu",
+        "kind": "cpu",
+        "label": "AMD Ryzen 5 9600X",
+        "detail": { "model": "AMD Ryzen 5 9600X 6-Core Processor", "physicalCores": 6, "logicalThreads": 12, "numaNodes": 1 }
+      },
+      { "id": "ram", "kind": "ram", "label": "Memory", "detail": { "totalBytes": 66571993088, "dimms": 2, "tempC": 41.5 } },
+      {
+        "id": "pci:0000:01:00.0",
+        "kind": "gpu",
+        "label": "GeForce RTX 5070 Ti",
+        "busId": "0000:01:00.0",
+        "vendor": "nvidia",
+        "detail": {}
+      }
+    ],
+    "links": [
+      { "id": "cpu-ram", "from": "cpu", "to": "ram", "kind": "memory", "genMax": null, "widthMax": null, "genCur": null, "widthCur": null },
+      { "id": "cpu-pci:0000:01:00.0", "from": "cpu", "to": "pci:0000:01:00.0", "kind": "pcie", "genMax": 5, "widthMax": 16, "genCur": 5, "widthCur": 16 }
+    ],
+    "at": 1762700000000
+  },
+  "placement": {
+    "launchSeq": 18342,
+    "layers": { "offloaded": 37, "total": 37 },
+    "buffers": [
+      { "device": "CUDA0", "busId": "0000:01:00.0", "modelBytes": 4685794918, "kvBytes": 2415919104, "computeBytes": 314572800 },
+      { "device": "CPU_Mapped", "busId": null, "modelBytes": 333447168, "kvBytes": 0, "computeBytes": 0 },
+      { "device": "CUDA_Host", "busId": null, "modelBytes": 0, "kvBytes": 0, "computeBytes": 41943040 }
+    ]
+  }
+}
+```
+
+## The hardware graph
+
+`readPciTopology()` reads sysfs only, never `lspci`, which wakes up suspended cards. It always starts with the CPU and
+memory nodes and their `cpu-ram` link, then walks `/sys/bus/pci/devices` for display controllers (class `0x03`, GPUs)
+and NVMe controllers (class `0x0108`). Each device is linked to the CPU directly (root port), or through a chipset node
+when the first bridge below the root port has the root port's vendor, is not marked removable, and is not a
+Thunderbolt or USB4 bridge (a PCIe switch from another vendor, on an NVMe card or a riser, is not a chipset). Any failed
+read degrades to unknown: at worst the graph holds the CPU and memory only.
+
+`TopologyGraph`:
+
+| Field   | Type             | Description                 |
+| ------- | ---------------- | --------------------------- |
+| `nodes` | `TopologyNode[]` | Devices.                    |
+| `links` | `TopologyLink[]` | Connections between them.   |
+| `at`    | number           | When it was read (epoch ms). |
+
+### Nodes
+
+`TopologyNode`:
+
+| Field    | Type                                               | Description                                                                 |
+| -------- | -------------------------------------------------- | --------------------------------------------------------------------------- |
+| `id`     | string                                             | `cpu`, `ram`, `pci:<busId>` (GPU, NVMe) or `chipset:<busId of the switch>`. |
+| `kind`   | `"cpu"` \| `"ram"` \| `"nvme"` \| `"gpu"` \| `"chipset"` |                                                                       |
+| `label`  | string                                             | Display name: the CPU model shortened, `Memory`, the name from `pci.ids` (the bracketed name when there is one), the NVMe model, or the chipset name. |
+| `busId`  | string                                             | PCI address (`0000:01:00.0`), the same format as `GpuSample.busId` and the `hiddenGpus` setting. Missing for `cpu` and `ram`. |
+| `vendor` | `"nvidia"` \| `"amd"` \| `"intel"` \| `"other"`       | GPUs and NVMe drives only.                                                  |
+| `block`  | string                                             | NVMe only: its block device (`nvme0n1`), the key of `DiskSample.perDisk` and `model.disk` in the [Snapshot](/developers/api/monitor/#disk). |
+| `detail` | `Record<string, string \| number \| null>`           | Static facts for the tooltip; null is unknown.                              |
+
+What `detail` holds per kind:
+
+| Kind      | Keys                                                                                           |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| `cpu`     | `model`, `physicalCores`, `logicalThreads`, `numaNodes`                                        |
+| `ram`     | `totalBytes`; `dimms` and `tempC`: the number of `spd5118` sensors (DDR5 modules) and the hottest reading |
+| `nvme`    | `sizeBytes`                                                                                    |
+| `gpu`     | none                                                                                           |
+| `chipset` | none                                                                                           |
+
+### Links
+
+`TopologyLink`:
+
+| Field      | Type                                     | Description                                                                 |
+| ---------- | ---------------------------------------- | --------------------------------------------------------------------------- |
+| `id`       | string                                   | `cpu-ram`, `cpu-chipset:<busId>`, or `<from>-pci:<busId>`.                  |
+| `from`     | string                                   | Node id on the CPU side (upstream).                                         |
+| `to`       | string                                   | Node id downstream.                                                         |
+| `kind`     | `"pcie"` \| `"memory"` \| `"internal"`     | `memory` for `cpu-ram`; `internal` when the link reports no PCIe speed at all. |
+| `genMax`   | number \| null                            | Link capability: the lower of both ends' maximum generation.                |
+| `widthMax` | number \| null                            | Link capability: the lower of both ends' maximum width.                     |
+| `genCur`   | number \| null                            | Current generation.                                                         |
+| `widthCur` | number \| null                            | Current width.                                                              |
+
+For recent Radeon cards, which sit behind a PCIe switch on the card itself, the link is read at the card's upstream
+port (`slotLink()`): the GPU's own link to that switch always reads its full width. A width outside 1 to 32 (a
+suspended card can answer `0xFFFF` to a config read) is treated as unknown.
+
+## The model placement
+
+`ModelPlacement` comes from `llama-server`'s startup logs, since `llama-server` does not expose these figures through
+its API (`parsePlacement()` in `server/monitor/placement.ts`). The tracker reads the log ring from the last
+`[llama-webui] launch:` line: the `using device … (<busId>)` lines, the `… model|KV|RS|compute buffer size = N MiB`
+lines and `offloaded N/M layers to GPU`. A second `offloaded` line opens the draft model and ends the parsing; the
+projector's buffers and the fitting probes of `-fit` are skipped.
+
+`placement` is null when no managed server is `starting`, `ready` or `stopping`, before the launch line appears in the
+logs, and for an external server (it writes nothing to the ring). Once the launch line is evicted from the ring, the
+last placement read stays valid as long as the server has the same PID.
+
+| Field       | Type                                         | Description                                                             |
+| ----------- | -------------------------------------------- | ----------------------------------------------------------------------- |
+| `launchSeq` | number                                       | Sequence number of the `[llama-webui] launch:` log line it comes from.  |
+| `layers`    | `{ offloaded, total }` \| null                | From `offloaded N/M layers to GPU`; null until that line has gone by.  |
+| `buffers`   | `PlacementBuffer[]`                          | One per device that has buffers.                                        |
+
+`PlacementBuffer`:
+
+| Field          | Type           | Description                                                                              |
+| -------------- | -------------- | ---------------------------------------------------------------------------------------- |
+| `device`       | string         | ggml device name: `CUDA0`, `ROCm0`, `Vulkan1`, `CPU`, `CPU_Mapped`, `CUDA_Host`…         |
+| `busId`        | string \| null  | PCI address from the `using device` line; null for the host or when not logged.          |
+| `modelBytes`   | number         | Weights on the device.                                                                   |
+| `kvBytes`      | number         | KV cache, plus the recurrent state (`RS`) of hybrid models.                              |
+| `computeBytes` | number         | Compute buffers, summed over the contexts (an MTP's adds to the model's); a context reserved again keeps only its last size. |
+
+Every change is pushed as the `placement` message of the [WebSocket](/developers/api/websocket/), with the same
+`ModelPlacement | null` payload.
+
+## Helpers in shared
+
+`shared/src/topology.ts` holds the pure logic the UI uses with this payload:
+
+| Export              | What it does                                                                                         |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `hostDevice()`      | True for host-side (RAM) buffers: `CPU`, `CPU_*` (`CPU_Mapped`, `CPU_REPACK`…) and `*_Host`.         |
+| `placementTotals()` | `modelBytes`, `gpuModelBytes` and `hostModelBytes` of a placement.                                   |
+| `phaseOf()`         | `stopped`, `loading`, `idle`, `prompt` or `generating`, from the supervisor state and the latest snapshot's slots. |
+| `pcieBps()`         | Payload capacity of a link per direction (bytes/s) from its generation and width; null if either is unknown. |

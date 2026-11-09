@@ -1,0 +1,311 @@
+---
+title: Tuning
+description: Routes that read the hardware, estimate the best llama-server flags for a model and a preset, plan a sweep, run the system checks and time the model's disk.
+---
+
+The tuning routes give the [Tuning](/docs/tuning/) page its recommendation: the hardware the estimator works with, the
+estimate itself, the dry run of a sweep plan, the system checks and the model disk's read speed. They live in
+`server/routes/tuning.ts`; the types and the presets are in `shared/src/tuning.ts`, the estimator and the checks in
+`server/tuning/` (see [Tuning](/developers/server/tuning/)).
+
+The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
+
+## Model errors
+
+The routes that read a model parse its GGUF with `loadModel()` (`server/tuning/models.ts`), cached while the file's size
+and modification time do not change. It answers:
+
+- `400` `Expected an absolute path to a .gguf file`;
+- `404` `Model not found` (or `Projector not found` for `mmprojPath`);
+- `422` with the parser's message when the file is not a readable GGUF.
+
+## Presets
+
+A preset (`PRESETS` in `shared/src/tuning.ts`) sets what the estimator aims for and how sweep results are ranked.
+
+| `id`      | Label              | Target context    | Minimum context | Preferred KV | `-ub` | Score                       |
+| --------- | ------------------ | ----------------- | --------------- | ------------ | ----- | --------------------------- |
+| `chat`    | Responsive chat    | 32,768            | 8192            | `f16`        | 512   | `tgTps`                     |
+| `agent`   | Agent & RAG        | 65,536            | 16,384          | `q8_0`       | 2048  | `0.6 × ppTps + 0.4 × tgTps` |
+| `context` | Max context        | the largest that fits | 8192        | `q8_0`       | 512   | `ctx × 10⁶ + tgTps`         |
+| `fit`     | Make the model fit | 8192              | 8192            | `q8_0`       | 512   | `tgTps`                     |
+| `big`     | 100 GB model       | 32,768            | 8192            | `q8_0`       | 512   | `tgTps`                     |
+
+## Hardware
+
+### Get the hardware
+
+<Endpoint method="GET" path="/api/tuning/hardware" />
+
+What the estimator plans for (`readTuningHardware()` in `server/tuning/hardware.ts`).
+
+**Response**: `200` with a `TuningHardware`.
+
+| Field               | Type            | Description                                                                                  |
+| ------------------- | --------------- | -------------------------------------------------------------------------------------------- |
+| `devices`           | `BenchDevice[]` | `llama-bench --list-devices`, cached per binary; empty when the tool is missing (see [List devices](/developers/api/bench/#list-devices)). |
+| `cpu`               | `CpuInfo`       | Model, physical cores, threads, flags, NUMA nodes (see [Get the system info](/developers/api/monitor/#get-the-system-info)). |
+| `ramTotalBytes`     | number          | From the latest snapshot's `system.mem`, otherwise `/proc/meminfo`; 0 when unknown.          |
+| `ramAvailableBytes` | number          | Same source: `MemAvailable`.                                                                 |
+
+`deviceRole()` and `gpuDevices()` (`shared/src/tuning.ts`) sort the devices: dedicated cards, Vulkan copies of a card
+already seen through CUDA, integrated GPUs (Vulkan named after the processor) and host devices (BLAS, CPU). The
+estimator only places layers on the dedicated cards.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/tuning/hardware
+```
+
+## Estimate
+
+### Estimate the flags for a model
+
+<Endpoint method="POST" path="/api/tuning/estimate" />
+
+Reads the model's GGUF and the hardware, then searches the placement that fits best for the preset
+(`estimate()` in `server/tuning/estimate.ts`). The latest estimate of each model is kept in memory for the
+[checks](#run-the-system-checks).
+
+**Body**: `EstimateRequest`, a schema local to `server/routes/tuning.ts`, strict.
+
+| Field        | Type           | Required | Description                                                           |
+| ------------ | -------------- | -------- | --------------------------------------------------------------------- |
+| `modelPath`  | string         | yes      | Absolute path to the `.gguf`.                                         |
+| `mmprojPath` | string \| null  | no       | Projector, counted on the first card.                                 |
+| `preset`     | string         | yes      | A [preset](#presets) id.                                              |
+| `pinned`     | `BenchParams`  | no       | Values the search must keep (see [Pins](#pins)).                      |
+| `ctx`        | integer        | no       | Pinned context, 512 to 10,000,000.                                    |
+
+**Response**: `200` with an `Estimate`, also when nothing fits (`ok: false`).
+
+**Errors**: `400` invalid body; the [model errors](#model-errors).
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/tuning/estimate \
+  -H 'content-type: application/json' \
+  -d '{"modelPath":"/home/demo/models/Qwen3-30B-A3B-Q4_K_M.gguf","preset":"chat","pinned":{"dev":["CUDA0"]}}'
+```
+
+### How the search works
+
+The estimator tries placement families in order and returns the first configuration that fits:
+
+1. **Cards**: the dedicated cards with at least 256 MiB of budget, CUDA first. Without a pinned `dev`, it tries each
+   CUDA card alone, the CUDA cards together, each other card alone, then all of them. Several cards get a `-ts`
+   proportional to their budget, minus the compute buffers and the projector on the first one.
+2. **Families**: all layers on a set of cards (`-ngl all`); for a MoE model, the experts of the first N layers in RAM
+   (`-ncmoe N`, smallest N first); a partial `-ngl` (largest first); then CPU only (`-ngl 0 -dev none`). The last
+   families use the widest set of cards. With the `big` preset, only the MoE and partial families are tried before CPU
+   only, and a RAM overflow (re-read from disk through mmap) is accepted.
+3. **Order**: first, the `-ngl all` families at the preset's target context (capped by the model's training context)
+   with the preferred KV cache type: the first that fits with headroom wins, otherwise the first `tight` one. Only then
+   does it go through every family, cache type (`chat` prefers `f16`, then tries `q8_0`) and context, from the target
+   down to the preset's minimum in 4096-token steps. The `context` preset searches the largest context that fits
+   instead.
+
+Every candidate gets `-fa on` (unless `fa: "off"` is pinned), `-ctk`/`-ctv`, `-t` (the physical cores), `-b 2048` and
+the preset's `-ub` (`agent` also tries 512).
+
+### Pins
+
+`pinned` is applied over every candidate, so its values always end up in `params`. Some pins also narrow the search:
+
+| Pin            | Effect on the search                                                       |
+| -------------- | -------------------------------------------------------------------------- |
+| `dev`          | Only this set of cards is tried.                                           |
+| `ncmoe`        | The MoE family uses this value instead of searching it.                    |
+| `ngl`          | The partial family uses this value instead of searching it.                |
+| `fa: "off"`    | `-fa off` instead of `-fa on`; the KV cache stays `f16`.                   |
+| `ctk`          | The KV cache searched is `f16` if `ctk` is `f16`, `q8_0` otherwise.        |
+| `ub`           | Only this micro-batch.                                                     |
+| `t`, `b`       | Replace the defaults (physical cores, 2048).                               |
+
+The top-level `ctx` pins the context: only that size is tried. Pinning a nonzero `ncmoe` on a dense model adds the
+warning `dense model: -ncmoe has no effect`.
+
+### The estimate
+
+`Estimate`:
+
+| Field                   | Type               | Description                                                                         |
+| ----------------------- | ------------------ | ----------------------------------------------------------------------------------- |
+| `ok`                    | boolean            | A configuration fits.                                                               |
+| `reason`                | string \| null      | Why nothing fits, when `ok` is false.                                               |
+| `preset`                | string             | The preset id.                                                                      |
+| `params`                | `BenchParams`      | The recommended flags, pins included. When nothing fits: the simplest configuration (all layers on the widest set of cards, or `-ngl 0`), not validated. |
+| `ctx`                   | number             | Context size.                                                                       |
+| `kv`                    | `"f16"` \| `"q8_0"` | KV cache type the search used.                                                     |
+| `serverArgs`            | string[]           | `serverArgs(params)`, then `-c <ctx>`, `--fit off`, and `--mlock` and `--numa distribute` when they apply: ready for a profile. |
+| `rows`                  | `Recommendation[]` | One row per flag: `flag`, `value` and `why`, the reason shown in the UI. Empty when `ok` is false. |
+| `fit`                   | `Fit`              | Per-device memory and verdict (below).                                              |
+| `ramOverflowBytes`      | number             | What exceeds the available RAM (re-read from disk through mmap).                    |
+| `diskReadBytesPerToken` | number             | Bytes read from disk per generated token when RAM overflows, 0 otherwise.           |
+| `warnings`              | string[]           | Slow placements (layers or experts in RAM, RAM overflow), a `tight` fit's reason, and the placement's issues. |
+
+`--mlock` is added when `-ngl` is not `all`, some weights stay in RAM, `-ncmoe` is not used, nothing overflows, and at
+least 2 GiB of RAM are left. `--numa distribute` is added on a machine with several NUMA nodes. `--fit off` is always there: what gets
+measured is exactly what gets written.
+
+`Fit` (`fitOf()` in `server/tuning/placement.ts`):
+
+| Field               | Type             | Description                                                     |
+| ------------------- | ---------------- | --------------------------------------------------------------- |
+| `verdict`           | string           | `fits`, `tight` or `no`.                                        |
+| `vram`              | `DeviceBudget[]` | One entry per device the placement uses.                        |
+| `ramBytes`          | number           | Estimated RAM use.                                              |
+| `ramAvailableBytes` | number           | Available RAM it was compared to.                               |
+| `reason`            | string \| null    | Why the verdict is not `fits`.                                  |
+
+`DeviceBudget`:
+
+| Field        | Type   | Description                                                                       |
+| ------------ | ------ | --------------------------------------------------------------------------------- |
+| `device`     | string | Device id (`CUDA0`).                                                              |
+| `bytes`      | number | Estimated bytes on the device: weights and KV cache, plus the compute buffers, the projector and the recurrent state on the first card. |
+| `budget`     | number | Usable bytes: the total minus a margin of 512 MiB plus 4% (`marginBytes()`), for the driver context and fragmentation. |
+| `totalBytes` | number | Memory of the device.                                                             |
+
+The verdict is `no` when a device needs more than its budget or a flag names an unknown device; `tight` when the RAM
+needed exceeds the available RAM, or a device uses more than 95% of its budget; `fits` otherwise.
+
+A response, trimmed (3 of the 9 rows):
+
+```json
+{
+  "ok": true,
+  "reason": null,
+  "preset": "chat",
+  "params": { "ngl": "all", "ncmoe": 8, "dev": ["CUDA0"], "fa": "on", "ctk": "f16", "ctv": "f16", "t": 6, "b": 2048, "ub": 512 },
+  "ctx": 32768,
+  "kv": "f16",
+  "serverArgs": ["-ngl", "all", "-ncmoe", "8", "-dev", "CUDA0", "-fa", "on", "-ctk", "f16", "-ctv", "f16", "-t", "6", "-b", "2048", "-ub", "512", "-c", "32768", "--fit", "off"],
+  "rows": [
+    { "flag": "-ncmoe", "value": "8", "why": "experts of the first 8 layers in RAM (5.6 GiB)" },
+    { "flag": "-ngl", "value": "all", "why": "all layers on GPU, except the experts above" },
+    { "flag": "-dev", "value": "CUDA0", "why": "single card: no PCIe hop" }
+  ],
+  "fit": {
+    "verdict": "fits",
+    "vram": [{ "device": "CUDA0", "bytes": 14418914304, "budget": 15874266234.88, "totalBytes": 17094934528 }],
+    "ramBytes": 7180648448,
+    "ramAvailableBytes": 58291478528,
+    "reason": null
+  },
+  "ramOverflowBytes": 0,
+  "diskReadBytesPerToken": 0,
+  "warnings": ["experts of the first 8 layers in RAM: slower generation"]
+}
+```
+
+## Plan
+
+### Plan a sweep
+
+<Endpoint method="POST" path="/api/tuning/plan" />
+
+Expands a sweep spec and runs the estimator on each combination, without saving or starting anything: the same plan
+`POST /api/sweeps` builds (`planSweep()`, see [Sweeps](/developers/api/sweeps/)).
+
+**Body**: `{ spec: SweepSpec }` (see [The sweep spec](/developers/api/sweeps/#the-sweep-spec)).
+
+**Response**: `200` with a `PlanResult`.
+
+| Field              | Type         | Description                                                                         |
+| ------------------ | ------------ | ----------------------------------------------------------------------------------- |
+| `items`            | `PlanItem[]` | The items to run: `params`, `label` and `fit` (a `Fit`).                            |
+| `excluded`         | number       | Combinations dropped because they do not fit (0 with `includeUnfit`).              |
+| `droppedTs`        | number       | `-ts` values discarded because the `-dev` of the combination has another length.   |
+| `estimatedSeconds` | number       | Rough duration: per item, one load at 1.5 GiB/s plus 10 seconds per repetition.     |
+
+**Errors**: `400` invalid spec; the [model errors](#model-errors).
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/tuning/plan \
+  -H 'content-type: application/json' \
+  -d '{"spec":{"name":"Qwen3 30B offload","modelPath":"/home/demo/models/Qwen3-30B-A3B-Q4_K_M.gguf","preset":"chat","base":{"ngl":"all","fa":"on"},"space":{"ncmoe":[0,8,16]}}}'
+```
+
+## Checks
+
+### Run the system checks
+
+<Endpoint method="GET" path="/api/tuning/checks" />
+
+Checks the drivers, the CPU, the kernel and the `llama-server` build for settings that cost speed (`runChecks()` in
+`server/tuning/checks.ts`). With a model, the checks also use its file, the latest
+[estimate](#estimate-the-flags-for-a-model) of the same model path and its latest
+[disk measurement](#measure-the-model-disks-read-speed); both are kept in memory and lost when llama-webui reloads.
+
+**Query parameters**
+
+| Parameter | Required | Description                                                                  |
+| --------- | -------- | ---------------------------------------------------------------------------- |
+| `model`   | no       | Absolute path of a model. A model that cannot be read is ignored.            |
+
+**Response**: `200` with a `ChecksReport`: `checks` (`Check[]`), `summary` (the count of each state: `warn`, `ok`,
+`unknown`, `na`) and `at` (epoch ms).
+
+`Check`:
+
+| Field         | Type                         | Description                                                                 |
+| ------------- | ---------------------------- | --------------------------------------------------------------------------- |
+| `id`          | string                       | Stable id (below).                                                          |
+| `family`      | string                       | `nvidia`, `amd`, `cpu`, `build` or `kernel`.                                |
+| `label`       | string                       | Short name (`CPU governor`).                                                |
+| `state`       | string                       | `ok`, `warn`, `unknown` or `na` (not applicable).                           |
+| `detail`      | string                       | What was found.                                                             |
+| `command`     | string                       | The exact command that fixes it, when there is one.                         |
+| `persistence` | `"session"` \| `"permanent"`  | Whether the fix lasts until the next reboot or for good.                    |
+| `impact`      | string                       | What the problem costs.                                                     |
+
+Check ids, by family (`<busId>` is a GPU's PCI address):
+
+| Family   | Ids                                                                                                       |
+| -------- | --------------------------------------------------------------------------------------------------------- |
+| `nvidia` | `nvidia.persistence.<busId>`, `nvidia.powerlimit.<busId>`, `nvidia.rebar.<busId>`, `nvidia.pcie.<busId>`, `nvidia.driver`, `nvidia.uvm` |
+| `amd`    | `amd.dpm.<busId>`, `amd.pcie.<busId>`, `amd.hip`, `amd.rocm-gfx`                                          |
+| `cpu`    | `cpu.governor`, `cpu.thp`, `cpu.memlock`, `cpu.swappiness`, `cpu.numa`                                    |
+| `build`  | `build.cuda`, `build.simd`, `build.age`                                                                   |
+| `kernel` | `kernel.iommu`, `kernel.disk`, `kernel.disk-speed`, `kernel.swap`                                         |
+
+The PCIe link checks stay `unknown` until a link was seen under load (idle links train down). `isSetupCheck()` keeps
+the checks that need neither a model nor a running server, for the first-run checklist. What each check means is on the
+[Tuning](/docs/tuning/) and [System](/docs/system/) pages.
+
+```bash title="Terminal"
+curl 'http://127.0.0.1:7860/api/tuning/checks?model=/home/demo/models/Qwen3-30B-A3B-Q4_K_M.gguf'
+```
+
+## Disk speed
+
+### Measure the model disk's read speed
+
+<Endpoint method="POST" path="/api/tuning/disk-speed" />
+
+Times a sequential read of the model file (`measureDiskSpeed()` in `server/tuning/disk.ts`): up to 1 GiB, from a random
+offset to avoid the start of the file that is often already cached. The OS page cache can still inflate the result.
+The measurement is kept in memory for the `kernel.disk-speed` check.
+
+**Body**: strict.
+
+| Field       | Type   | Required | Description                    |
+| ----------- | ------ | -------- | ------------------------------ |
+| `modelPath` | string | yes      | Absolute path to the `.gguf`.  |
+
+**Response**: `200` with a `DiskSpeed`.
+
+| Field          | Type   | Description                      |
+| -------------- | ------ | -------------------------------- |
+| `bytesPerSec`  | number | Read throughput, bytes/s.        |
+| `sampledBytes` | number | Bytes read.                      |
+| `path`         | string | The file.                        |
+| `at`           | number | Time of the measurement (epoch ms). |
+
+**Errors**: `400` invalid body; `409` `A benchmark is running: the measurement would be skewed`; the
+[model errors](#model-errors); `400` `File too small to measure` below 64 MiB.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/tuning/disk-speed \
+  -H 'content-type: application/json' \
+  -d '{"modelPath":"/home/demo/models/Qwen3-30B-A3B-Q4_K_M.gguf"}'
+```
