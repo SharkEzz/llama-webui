@@ -12,7 +12,8 @@ const levelOf = (bytes: number, budget: number): Level =>
 const FILL: Record<Level, string> = { fits: 'bg-chart-1', tight: 'bg-warning', over: 'bg-destructive' };
 
 /**
- * One gauge per device, then RAM: fill = estimated memory over total memory, tick = usable budget.
+ * One gauge per device, then RAM: fill = estimated memory over total memory, tick = usable budget, grey end = VRAM
+ * held by other processes (deducted from the budget).
  * A single hue; “tight” and “over” take the status colors, always with a text label.
  */
 export function MemoryBars({
@@ -44,6 +45,7 @@ function Bar({ d, name, ram = false }: { d: DeviceBudget; name: string; ram?: bo
   const level = levelOf(d.bytes, d.budget);
   const total = Math.max(1, d.totalBytes);
   const pct = (x: number) => `${Math.min(100, (x / total) * 100)}%`;
+  const other = d.otherBytes ?? 0;
   return (
     <Tooltip>
       <TooltipTrigger
@@ -62,12 +64,22 @@ function Bar({ d, name, ram = false }: { d: DeviceBudget; name: string; ram?: bo
         </div>
         <div className="relative h-2 rounded-full bg-muted">
           <div className={cn('absolute inset-y-0 left-0 rounded-full', FILL[level])} style={{ width: pct(d.bytes) }} />
+          {other > 0 && (
+            <div
+              className="absolute inset-y-0 right-0 rounded-r-full bg-muted-foreground/40"
+              style={{ width: pct(other) }}
+              aria-hidden="true"
+            />
+          )}
           <div
             className="absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground/60"
             style={{ left: pct(d.budget) }}
             aria-hidden="true"
           />
         </div>
+        {other > 0 && (
+          <span className="num text-xs text-muted-foreground">{formatBytes(other)} used by other processes</span>
+        )}
         {level !== 'fits' && (
           <span
             className={cn('flex items-center gap-1 text-xs', level === 'tight' ? 'text-warning' : 'text-destructive')}
@@ -87,6 +99,7 @@ function Bar({ d, name, ram = false }: { d: DeviceBudget; name: string; ram?: bo
         <div>
           {ram ? 'Available' : 'Usable (headroom deducted)'}: {formatBytes(d.budget)}
         </div>
+        {other > 0 && <div>Used by other processes: {formatBytes(other)}</div>}
         <div>Total: {formatBytes(d.totalBytes)}</div>
       </TooltipContent>
     </Tooltip>

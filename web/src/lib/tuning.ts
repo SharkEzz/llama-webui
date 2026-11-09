@@ -1,4 +1,5 @@
 import {
+  type BenchDevice,
   type BenchLive,
   type BenchParams,
   type BenchRun,
@@ -102,6 +103,14 @@ async function guarded(fn: () => Promise<unknown>): Promise<'ok' | 'confirm' | '
     fail(e);
     return 'error';
   }
+}
+
+/** Static -ot patterns: they send MoE experts to RAM (llama.cpp applies the first matching rule). */
+const OT_TO_CPU = ['exps=CPU', 'blk\\.(\\d|1\\d)\\.ffn_.*_exps=CPU', 'blk\\.[0-9]\\.ffn_.*_exps=CPU'];
+
+/** -ot suggestions: the RAM patterns, then the experts on each dedicated card of this machine (#23). */
+export function otSuggestions(devices: BenchDevice[]): string[] {
+  return [...OT_TO_CPU, ...gpuDevices(devices).map((d) => `ffn_.*_exps=${d.id}`)];
 }
 
 /** Space suggested around the recommendation: neighboring -ncmoe (MoE), GPU sets, -ub for the agent preset. */

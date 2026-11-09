@@ -1,4 +1,4 @@
-import type { CacheType } from '@llama-webui/shared';
+import type { BenchDevice, CacheType } from '@llama-webui/shared';
 import type { ModelInfo } from '../models/gguf';
 
 /** Bytes per KV cache element. */
@@ -49,6 +49,12 @@ export const computeBytes = (m: ModelInfo, ub: number): number =>
 
 /** VRAM kept free on a card: CUDA/Vulkan context, fragmentation. */
 export const marginBytes = (totalBytes: number): number => 512 * MiB + 0.04 * totalBytes;
+
+/** What the estimator may fill on a device: total, minus the margin, minus the VRAM other processes hold (#26). */
+export function budgetBytes(d: BenchDevice): number {
+  const total = d.totalMib * MiB;
+  return Math.max(0, total - marginBytes(total) - (d.otherUsedMib ?? 0) * MiB);
+}
 
 export function fmtBytes(n: number): string {
   if (n >= GiB) return `${(n / GiB).toFixed(1)} GiB`;

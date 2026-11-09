@@ -163,6 +163,11 @@ export interface BenchDevice {
   freeMib: number;
   /** Letters of the id: "CUDA", "Vulkan", "BLAS"… */
   backend: string;
+  /**
+   * VRAM used by other processes than the managed llama-server (desktop, another model), from the monitor; the
+   * estimator deducts it from the budget. Missing: unknown (card not matched to the monitor, or not read).
+   */
+  otherUsedMib?: number;
 }
 
 /** Parsed value for a field, or undefined if unreadable (the flag then stays in `rest`). */

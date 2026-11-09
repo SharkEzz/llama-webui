@@ -48,6 +48,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
           readTuningHardware({
             benchBinary: benchBinary(settings.get().binary),
             mem: monitor.latest()?.system?.mem ?? null,
+            gpus: monitor.latest()?.allGpus,
           }),
         ]);
         const plan = planSweep({ model, hw, spec, mmprojBytes: mmproj });

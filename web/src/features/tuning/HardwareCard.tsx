@@ -1,5 +1,5 @@
-import { deviceRole } from '@llama-webui/shared';
-import { Cpu, ListChecks } from 'lucide-react';
+import { DEVICE_ROLE_BADGE, deviceRole } from '@llama-webui/shared';
+import { Cpu, ListChecks, TriangleAlert } from 'lucide-react';
 import { Link } from 'react-router';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,6 @@ import { useTuning } from '@/lib/tuning';
 import { cn } from '@/lib/utils';
 
 const MiB = 1024 ** 2;
-const ROLE = { gpu: null, duplicate: 'duplicate', integrated: 'iGPU', host: 'host' } as const;
 
 /** llama.cpp devices (--list-devices), RAM and CPU: what the estimator splits the model across. */
 export function HardwareCard() {
@@ -29,11 +28,21 @@ export function HardwareCard() {
         <Skeleton className="h-40" />
       ) : (
         <div className="flex flex-col gap-3 text-sm">
+          {hw.devicesError && (
+            <p className="flex items-start gap-1.5 text-xs text-warning">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                {hw.devicesError}
+                {hw.devices.length > 0 ? ': showing the last good list.' : '.'} Stop llama-server and reload if devices
+                are missing.
+              </span>
+            </p>
+          )}
           <ul className="flex flex-col gap-2">
             {hw.devices
               .filter((d) => d.totalMib > 0)
               .map((d) => {
-                const role = ROLE[deviceRole(d, hw.devices)];
+                const role = DEVICE_ROLE_BADGE[deviceRole(d, hw.devices)];
                 return (
                   <li key={d.id} className={cn('flex flex-col', role && 'text-muted-foreground')}>
                     <span className="flex items-baseline gap-2">
@@ -47,10 +56,15 @@ export function HardwareCard() {
                     <span className="truncate text-xs text-muted-foreground" title={d.name}>
                       {d.name}
                     </span>
+                    {!role && (d.otherUsedMib ?? 0) >= 256 && (
+                      <span className="num text-xs text-muted-foreground">
+                        {formatBytes((d.otherUsedMib ?? 0) * MiB)} used by other processes
+                      </span>
+                    )}
                   </li>
                 );
               })}
-            {hw.devices.length === 0 && (
+            {hw.devices.length === 0 && !hw.devicesError && (
               <li className="text-muted-foreground">No devices: check the binary in Settings.</li>
             )}
           </ul>

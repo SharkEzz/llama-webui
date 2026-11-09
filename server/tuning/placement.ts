@@ -8,7 +8,7 @@ import {
 } from '@llama-webui/shared';
 import type { ModelInfo } from '../models/gguf';
 import { EXPERTS } from '../models/sizes';
-import { computeBytes, fmtBytes, kvLayerBytes, MiB, marginBytes, recurrentBytes } from './memory';
+import { budgetBytes, computeBytes, fmtBytes, kvLayerBytes, MiB, recurrentBytes } from './memory';
 
 export interface PlacementInput {
   model: ModelInfo;
@@ -164,14 +164,15 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
 const MIN_FREE_RATIO = 0.95;
 
 /**
- * `fits`: every device under 95% of its budget (total − margin) and enough RAM; `tight`: under budget, or RAM exceeded
+ * `fits`: every device under 95% of its budget (total − margin − other processes) and enough RAM; `tight`: under budget, or RAM exceeded
  * (mmap re-reads the rest from disk: slow, not a failure); otherwise `no`.
  */
 export function fitOf(input: PlacementInput, measured: PlacementMeasure = measurePlacement(input)): Fit {
   const byId = new Map(input.devices.map((d) => [d.id, d]));
   const vram = [...measured.vram].map(([device, bytes]) => {
-    const totalBytes = (byId.get(device)?.totalMib ?? 0) * MiB;
-    return { device, bytes, totalBytes, budget: Math.max(0, totalBytes - marginBytes(totalBytes)) };
+    const d = byId.get(device);
+    const otherBytes = (d?.otherUsedMib ?? 0) * MiB;
+    return { device, bytes, totalBytes: (d?.totalMib ?? 0) * MiB, budget: d ? budgetBytes(d) : 0, otherBytes };
   });
   const base = { vram, ramBytes: measured.ram, ramAvailableBytes: input.ramAvailableBytes };
   const unknown = measured.issues.find((i) => i.startsWith(UNKNOWN_DEVICE));

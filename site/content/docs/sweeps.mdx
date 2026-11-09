@@ -34,7 +34,7 @@ a suggestion to add it, and click × on a value to remove it.
 | `-ncmoe` | Whole numbers                                       | Around the estimate (N−8, N−4, N, N+4, N+8) when it uses `-ncmoe`, otherwise 0, 4, 8, 16 |
 | `-dev`   | Device sets: check cards, then **Add this set**     | **each card alone**, **all CUDA** (two CUDA cards or more), **all** (two cards or more) |
 | `-ts`    | Proportions such as `3,1`                           | None. A value only applies to `-dev` sets with as many cards.                 |
-| `-ot`    | One `pattern=buffer` rule per value                 | `exps=CPU`, `blk\.(\d\|1\d)\.ffn_.*_exps=CPU`, `blk\.[0-9]\.ffn_.*_exps=CPU`, `ffn_.*_exps=Vulkan3` |
+| `-ot`    | One `pattern=buffer` rule per value                 | `exps=CPU`, `blk\.(\d\|1\d)\.ffn_.*_exps=CPU`, `blk\.[0-9]\.ffn_.*_exps=CPU`, then `ffn_.*_exps=<id>` for each of your cards |
 | `-fa`    | Toggle `on`, `off`, `auto`                          |                                                                               |
 | `-ctk`, `-ctv` | Toggle any KV cache type                      |                                                                               |
 | `-sm`    | Toggle `none`, `layer`, `row`, `tensor`             |                                                                               |
@@ -47,8 +47,8 @@ experts in RAM; a few `-dev` sets (the recommended one, all cards, all CUDA card
 more than one; and `-ub` 512 and 2048 for **Agent & RAG**.
 
 The suggested `-ot` patterns move MoE expert tensors to the CPU: all of them, or those of the first 20 or the first 10
-layers. The last suggestion sends every expert to `Vulkan3`; if you have no such device, type your own rule with a device
-id from the **Hardware** card.
+layers. The others send every expert to one of your dedicated cards, one suggestion per card of the **Hardware** card
+(`ffn_.*_exps=CUDA1`, for example).
 
 ### Run settings
 

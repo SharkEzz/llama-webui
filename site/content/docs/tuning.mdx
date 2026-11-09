@@ -17,17 +17,23 @@ running model is not touched. Measure it with a [benchmark](/docs/benchmark/), o
 ## Hardware
 
 The **Hardware** card lists the devices llama.cpp sees, as reported by `llama-bench --list-devices`: their id
-(`CUDA0`, `Vulkan3`, `ROCm0`…), name, and free and total memory. Below them are the available and total RAM, and the
-CPU's physical cores and model.
+(`CUDA0`, `Vulkan3`, `ROCm0`…), name, and free and total memory. The free memory is read live from the
+[monitor](/docs/system/), and a card used by another program (a desktop session, another model) says how much it holds:
+**2.1 GiB used by other processes**. Below them are the available and total RAM, and the CPU's physical cores and
+model.
 
 The estimator only places the model on dedicated cards. Devices it skips carry a badge:
 
-- **duplicate**: a card already listed through another backend, such as an NVIDIA card that also appears through
-  Vulkan;
-- **iGPU**: an integrated GPU that shares system RAM.
+- **duplicate**: a card already listed through another backend, such as an NVIDIA card or an AMD card (ROCm) that
+  also appears through Vulkan;
+- **iGPU**: an integrated GPU that shares system RAM, such as the Ryzen iGPU (`AMD Radeon Graphics` through ROCm).
 
 The device list needs `llama-bench` next to `llama-server`. Without it the card shows **No devices: check the binary in
 Settings.**, and the only placement left is the CPU.
+
+With some llama.cpp builds, `llama-bench --list-devices` crashes while llama-server is running. The card then says so
+above the list and keeps showing the last list read successfully; if there was none, stop the server and reload the
+page.
 
 ## Pick a model
 
@@ -119,14 +125,16 @@ of these fit.
   usable budget.
 - **RAM.** Weights left on the CPU and the KV cache of CPU layers, compared with the available RAM.
 
-The estimate budgets each card's total memory, not what is free right now: it assumes the cards are empty.
+The budget also deducts the memory other programs hold on the card right now. The memory of the server llama-webui
+runs does not count against it: restarting it with the new flags frees that memory first.
 
 ## Memory bars
 
 Next to the table, one bar per card the configuration uses, then one for RAM. Each shows the estimate against the
 usable budget (`14.4 GiB usable`) or, for RAM, the available memory. The fill is the estimate relative to the device's
-total memory, and a tick marks the usable budget. Hover a bar for the device name and the estimated, usable and total
-amounts.
+total memory, and a tick marks the usable budget. When another program holds memory on the card, a grey segment at
+the end of the bar shows it, with **… used by other processes** below. Hover a bar for the device name and the
+estimated, usable and total amounts.
 
 | Message                                    | Meaning                                                                    |
 | ------------------------------------------ | -------------------------------------------------------------------------- |

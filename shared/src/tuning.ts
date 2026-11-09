@@ -88,9 +88,11 @@ export interface DeviceBudget {
   device: string;
   /** Estimated bytes on the device. */
   bytes: number;
-  /** Usable: total minus the margin (CUDA context, fragmentation). */
+  /** Usable: total minus the margin (CUDA context, fragmentation) and minus `otherBytes`. */
   budget: number;
   totalBytes: number;
+  /** VRAM held by other processes than the managed llama-server; missing or 0 when unknown. */
+  otherBytes?: number;
 }
 
 export interface Fit {
@@ -103,6 +105,8 @@ export interface Fit {
 
 export interface TuningHardware {
   devices: BenchDevice[];
+  /** Why the device list is not trusted (`--list-devices` crashed…): `devices` is then the last good list, or empty. */
+  devicesError?: string | null;
   cpu: CpuInfo;
   ramTotalBytes: number;
   ramAvailableBytes: number;
@@ -190,16 +194,31 @@ export interface DiskSpeed {
 }
 
 /**
- * Role of a `--list-devices` device: a dedicated card (`gpu`), the Vulkan copy of a card already seen through CUDA
- * (`duplicate`), an iGPU sharing the RAM (`integrated`: Vulkan named after the processor) or the host (BLAS, CPU).
+ * Native backends first: a card seen by several backends is kept on the best ranked one (CUDA, then ROCm and the
+ * other vendor APIs), the Vulkan copy is a `duplicate`.
+ */
+const BACKEND_RANK: Record<string, number> = { CUDA: 0, ROCm: 1, HIP: 1, MUSA: 1, SYCL: 1, Vulkan: 2 };
+const rankOf = (backend: string) => BACKEND_RANK[backend] ?? 3;
+/** Vulkan appends the driver: “AMD Radeon RX 9070 XT (RADV GFX1201)”. */
+const baseName = (name: string) => name.replace(/\s*\((RADV|AMDVLK|NVK|ANV)[^)]*\)\s*$/i, '').trim();
+
+/**
+ * Role of a `--list-devices` device: a dedicated card (`gpu`), the copy of a card already seen through a native
+ * backend (`duplicate`: Vulkan next to CUDA or ROCm), an iGPU sharing the RAM (`integrated`) or the host (BLAS, CPU).
+ * iGPUs: Vulkan names them after the processor (“AMD Ryzen 5 9600X 6-Core Processor”), ROCm “AMD Radeon Graphics”,
+ * with no model number (the desktop Ryzen iGPU; the large APUs, “Radeon 8060S Graphics”, stay usable GPUs).
  */
 export function deviceRole(d: BenchDevice, all: BenchDevice[]): 'gpu' | 'duplicate' | 'integrated' | 'host' {
   if (d.backend === 'BLAS' || d.backend === 'CPU' || d.totalMib <= 0) return 'host';
-  if (d.backend === 'CUDA') return 'gpu';
-  if (/processor|\bAPU\b/i.test(d.name)) return 'integrated';
-  if (all.some((o) => o.backend === 'CUDA' && d.name.startsWith(o.name))) return 'duplicate';
+  const name = baseName(d.name);
+  if (/processor|\bAPU\b/i.test(name) || /^AMD Radeon(\(TM\))? Graphics$/i.test(name)) return 'integrated';
+  const rank = rankOf(d.backend);
+  if (all.some((o) => rankOf(o.backend) < rank && o.totalMib > 0 && baseName(o.name) === name)) return 'duplicate';
   return 'gpu';
 }
+
+/** Badge shown next to a device that the estimator does not offer (none for a dedicated card). */
+export const DEVICE_ROLE_BADGE = { gpu: null, duplicate: 'duplicate', integrated: 'iGPU', host: 'host' } as const;
 
 /** The dedicated cards, in `--list-devices` order: what a missing `-dev` means for the estimate. */
 export const gpuDevices = (all: BenchDevice[]): BenchDevice[] => all.filter((d) => deviceRole(d, all) === 'gpu');
