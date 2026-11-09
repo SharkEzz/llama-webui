@@ -1,0 +1,34 @@
+# Standalone executables (`bun run compile`) attached to a GitHub Release, for every `v*` tag: the executables report
+# the tag as their version (`git describe`). The tag must match the version of every package.json (`bun run release
+# <version>`, merged before tagging). The quality gate already ran on master (ci.yml); the x64 binary is smoke-tested
+# before publishing.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # tags and history, for `git describe`
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: bun install --frozen-lockfile
+      - run: bun scripts/release.ts --check "$GITHUB_REF_NAME"
+      # Linux only (/proc, /sys); arm64 is cross-compiled, the UI is bundled on this runner.
+      - run: bun run compile --target bun-linux-x64 --outfile release/llama-webui-linux-x64
+      - run: bun run compile --target bun-linux-arm64 --outfile release/llama-webui-linux-arm64
+      - run: bun scripts/smoke-binary.ts release/llama-webui-linux-x64
+      - run: cd release && sha256sum llama-webui-linux-* > SHA256SUMS
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release/* --title "$GITHUB_REF_NAME" --generate-notes --verify-tag

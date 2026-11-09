@@ -242,6 +242,8 @@ Node.js 24 (the React Router CLI that builds the site runs on Node, and Vite 8 n
 | Lint                                         | `bun run lint`                                       |
 | Type check                                   | `bun run check`                                      |
 | Tests                                        | `bun test`                                           |
+| Build the standalone executable              | `bun run compile`                                    |
+| Smoke-test it (help, version, UI)            | `bun scripts/smoke-binary.ts dist/llama-webui`       |
 | Build the site                               | `bun run site:build`                                 |
 | Check the site's links                       | `bun run --cwd site check-links`                     |
 
@@ -251,3 +253,28 @@ change.
 `.github/workflows/site-deploy.yml` publishes `site/dist/` to GitHub Pages: on every push to `master` that changes
 `site/` (or the workflow itself), and when started by hand from the Actions tab (`workflow_dispatch`). A pull request
 never deploys: the site changes it brings go live when it is merged.
+
+## Releases
+
+Every `package.json` (root, `server`, `shared`, `web`, `site`) carries the version of the last release, and the tag
+must match it. A release takes two steps:
+
+```bash title="Terminal"
+# 1. Set the version everywhere, then commit it through a pull request
+bun run release 0.2.0
+# 2. Once it is merged, tag master
+git fetch origin
+git tag v0.2.0 origin/master
+git push origin v0.2.0
+```
+
+`scripts/release.test.ts` fails when the `package.json` versions differ, and `.github/workflows/release.yml`, which
+runs when a `v*` tag is pushed, first checks that they match the tag (`bun scripts/release.ts --check v0.2.0`). The
+executables report the tag as their version (`git describe`, shown in the status bar).
+
+An executable built from an untagged commit reports its short hash instead (`fa823b5`), and `-dirty` when built with
+uncommitted changes.
+
+The workflow compiles `llama-webui-linux-x64` and `llama-webui-linux-arm64` (`bun run compile --target …`),
+smoke-tests the x64 executable, writes `SHA256SUMS`, and creates the GitHub Release with generated notes. The
+[Installation](/docs/getting-started/installation/) page downloads from the latest release.

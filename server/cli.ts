@@ -13,11 +13,16 @@ export type CliResult = { kind: 'run'; options: CliOptions } | { kind: 'help' } 
 export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 7860;
 
-export const HELP_TEXT = `llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Bun process).
+const SOURCE_USAGE = `  bun run dev [options]      development (bun --hot, HMR)
+  bun run start [options]    production`;
+const STANDALONE_USAGE = '  llama-webui [options]';
+
+/** `--help`; the usage lines depend on how it runs: compiled executable or from source. */
+export const helpText = (standalone = Bun.isStandaloneExecutable) => `llama-webui: web UI to drive llama-server \
+(API, WebSocket and UI in a single Bun process).
 
 Usage:
-  bun run dev [options]      development (bun --hot, HMR)
-  bun run start [options]    production
+${standalone ? STANDALONE_USAGE : SOURCE_USAGE}
 
 Options:
   --host <address>       listen address (default: ${DEFAULT_HOST}); 0.0.0.0 to open it to the local network
@@ -88,9 +93,9 @@ export function cliOptionsOrExit(argv = Bun.argv.slice(2)): CliOptions {
   const res = parseCli(argv);
   if (res.kind === 'run') return res.options;
   if (res.kind === 'help') {
-    process.stdout.write(HELP_TEXT);
+    process.stdout.write(helpText());
     process.exit(0);
   }
-  process.stderr.write(`llama-webui: ${res.message}\n\n${HELP_TEXT}`);
+  process.stderr.write(`llama-webui: ${res.message}\n\n${helpText()}`);
   process.exit(2);
 }

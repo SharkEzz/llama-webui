@@ -18,13 +18,14 @@ another machine as described in
 ### Is there a Docker image?
 
 No. The repository has no image and no Dockerfile. llama-webui is meant to run directly on the machine with the GPUs:
-it reads that machine's `/proc` and `/sys` and starts `llama-server` as its own child process. Installing it is a
-`git clone` and a `bun install`, see [Installation](/docs/getting-started/installation/).
+it reads that machine's `/proc` and `/sys` and starts `llama-server` as its own child process. Installing it is
+downloading a single executable, see [Installation](/docs/getting-started/installation/).
 
 ### Do I need Node.js?
 
-No. Bun 1.4.4 or later is the only runtime. It serves the API, the WebSocket and the interface, stores the data in
-SQLite and builds the interface in memory when llama-webui starts: there is no separate build step.
+No. The executable bundles the Bun runtime, the server and the interface: nothing else to install. From source, Bun
+1.4.4 or later is the only runtime: it serves the API, the WebSocket and the interface, stores the data in SQLite and
+builds the interface in memory when llama-webui starts, with no separate build step.
 
 ### Do I need a GPU?
 
@@ -109,7 +110,8 @@ the same page, reads back. An import never overwrites a profile with the same na
 
 ### How do I update llama-webui?
 
-Pull the repository, install the dependencies, then restart llama-webui:
+Download the latest release over the executable, then restart llama-webui. From source, pull the repository and
+install the dependencies instead:
 
 ```bash title="Terminal"
 git pull

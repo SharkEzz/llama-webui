@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # tags and history: the executable's version comes from `git describe`
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
@@ -24,5 +26,8 @@ jobs:
       - run: bun run lint
       - run: bun run check
       - run: bun test
+      # Standalone executable: builds, starts, serves the production UI.
+      - run: bun run compile
+      - run: bun scripts/smoke-binary.ts dist/llama-webui
       - run: bun run site:build
       - run: bun run --cwd site check-links

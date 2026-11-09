@@ -8,7 +8,8 @@ its database. Everything else is changed from the [Settings](/docs/settings/) pa
 
 ## Flags and environment variables
 
-Each flag has an environment variable. Pass flags after `bun run start` (or `bun run dev`):
+Each flag has an environment variable. Pass flags after `llama-webui` (the executable), or after `bun run start` (or
+`bun run dev`) from source:
 
 | Flag                | Environment variable   | Default                                                         | Effect                                                                                        |
 | ------------------- | ---------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -18,9 +19,11 @@ Each flag has an environment variable. Pass flags after `bun run start` (or `bun
 | `-h`, `--help`      |                        |                                                                 | Prints the help and exits.                                                                    |
 
 ```bash title="Terminal"
-bun run start --host 0.0.0.0 --port 8080
+llama-webui --host 0.0.0.0 --port 8080
 # Same thing with environment variables
-LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 bun run start
+LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 llama-webui
+# From source
+bun run start --host 0.0.0.0 --port 8080
 ```
 
 Both `--port 8080` and `--port=8080` work. Once listening, llama-webui prints the address to open, for example
@@ -52,14 +55,13 @@ llama-webui: invalid --port: “70000” (integer from 1 to 65535)
 
 ### The help
 
-`bun run start --help` prints:
+`llama-webui --help` prints:
 
 ```text
 llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Bun process).
 
 Usage:
-  bun run dev [options]      development (bun --hot, HMR)
-  bun run start [options]    production
+  llama-webui [options]
 
 Options:
   --host <address>       listen address (default: 127.0.0.1); 0.0.0.0 to open it to the local network
@@ -81,8 +83,16 @@ Hugging Face downloads (Models page):
   HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
 ```
 
-`bun run start` is the normal way to run llama-webui. `bun run dev` reloads the code when a file changes and is meant
-for working on llama-webui itself; it takes the same options.
+From source, `bun run start --help` prints the same text, with these usage lines instead:
+
+```text
+Usage:
+  bun run dev [options]      development (bun --hot, HMR)
+  bun run start [options]    production
+```
+
+`bun run start` is the normal way to run llama-webui from source. `bun run dev` reloads the code when a file changes
+and is meant for working on llama-webui itself; it takes the same options.
 
 ### In a systemd service
 
@@ -91,9 +101,9 @@ With the user service from [Installation](/docs/getting-started/installation/#ru
 
 ```ini title="~/.config/systemd/user/llama-webui.service"
 [Service]
-WorkingDirectory=%h/llama-webui
+WorkingDirectory=%h
 Environment=LLAMA_WEBUI_HOST=0.0.0.0
-ExecStart=%h/.bun/bin/bun run start --port 8080
+ExecStart=%h/.local/bin/llama-webui --port 8080
 Restart=on-failure
 ```
 
@@ -135,7 +145,7 @@ A second llama-webui with its own `--data-dir` and `--port` has its own settings
 try things without touching your everyday setup:
 
 ```bash title="Terminal"
-bun run start --port 7861 --data-dir ~/llama-webui-test
+llama-webui --port 7861 --data-dir ~/llama-webui-test
 ```
 
 Only one `llama-server` can listen on a given port, and llama-webui treats a `llama-server` it did not start on its
@@ -160,7 +170,7 @@ llama-webui runs is picked up at once, while a change to `HF_TOKEN` needs a rest
 hf auth login
 
 # Or pass it to llama-webui only
-HF_TOKEN=hf_... bun run start
+HF_TOKEN=hf_... llama-webui
 ```
 
 The top of the **Download from Hugging Face** panel shows what llama-webui found: **Signed in as** your user name (or

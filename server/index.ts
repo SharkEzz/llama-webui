@@ -20,6 +20,7 @@ import { buildWebRoutes, unavailableWebRoutes } from './routes/web';
 import { activeProfileId, getRuntime, serverView, startMonitor } from './runtime';
 import { binaryPath, buildCommand, profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
+import { APP_VERSION } from './version';
 import { WsHub } from './ws/hub';
 
 // Flags, else env, else defaults (`--help`). Listens locally by default; --host 0.0.0.0 (or LLAMA_WEBUI_HOST) opens
@@ -53,15 +54,19 @@ const chatRuns = new ChatRuns({
   },
 });
 const { supervisor, logs } = runtime;
+// Compiled executable: NODE_ENV is replaced by "production" at compile time (`scripts/compile.ts`).
 const development = process.env.NODE_ENV !== 'production';
-// Production: front end built (and split per page) once, at startup; development: HTML import with HMR.
-// A front end that fails to build does not block the API or llama-server control.
-const web = development
-  ? { '/*': index }
-  : await buildWebRoutes(`${import.meta.dir}/../web/index.html`).catch((err: unknown) => {
-      console.error('[llama-webui] web UI unavailable:', err);
-      return unavailableWebRoutes(err);
-    });
+const standalone = Bun.isStandaloneExecutable;
+// Development: HTML import with HMR. Standalone executable: the same import, bundled (and split per page) at compile
+// time and embedded. Production from source: front end built (and split per page) once, at startup; a front end that
+// fails to build does not block the API or llama-server control.
+const web =
+  development || standalone
+    ? { '/*': index }
+    : await buildWebRoutes(`${import.meta.dir}/../web/index.html`).catch((err: unknown) => {
+        console.error('[llama-webui] web UI unavailable:', err);
+        return unavailableWebRoutes(err);
+      });
 const monitor = await startMonitor(runtime, settings.get());
 const benchRuns = new BenchRunsRepo(db);
 const sweeps = new SweepsRepo(db);
@@ -184,4 +189,5 @@ g.__llamaWebuiDispose = () => {
   db.close();
 };
 
-console.log(`llama-webui on http://${HOSTNAME}:${server.port}${development ? ' (dev, HMR)' : ''}`);
+const mode = development ? ' (dev, HMR)' : standalone ? ` (standalone ${APP_VERSION})` : '';
+console.log(`llama-webui on http://${HOSTNAME}:${server.port}${mode}`);

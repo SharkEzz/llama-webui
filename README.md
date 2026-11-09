@@ -160,7 +160,7 @@ reconnects on its own.
 | Requirement                                                                      | Notes                                                                                                                                                |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Linux**                                                                        | Hardware discovery and telemetry read `/proc` and `/sys`. `setpriv` (util-linux) is used to tie `llama-server` to llama-webui.                       |
-| **[Bun](https://bun.com) ≥ 1.4.4**                                               | The only runtime needed: no Node.js, no separate build.                                                                                              |
+| **[Bun](https://bun.com) ≥ 1.4.4**                                               | Only to run from source (the executable includes it). The only runtime needed: no Node.js, no separate build.                                        |
 | **[llama.cpp](https://github.com/ggml-org/llama.cpp)** build with `llama-server` | Any backend (CUDA, Vulkan, ROCm, CPU…). Put `llama-bench` next to `llama-server` to enable benchmarks and sweeps.                                    |
 | GGUF models                                                                      | In a folder of your choice (set it in Settings).                                                                                                     |
 | _Optional_: NVIDIA driver                                                        | GPU telemetry through NVML, falling back to `nvidia-smi`.                                                                                            |
@@ -169,6 +169,19 @@ reconnects on its own.
 
 ## Installation
 
+llama-webui ships as a **single executable** for Linux (x64 and arm64), Bun runtime and UI included. Download it from
+the [latest release](https://github.com/SharkEzz/llama-webui/releases/latest) (`llama-webui-linux-arm64` on ARM):
+
+```bash
+mkdir -p ~/.local/bin
+curl -fL -o ~/.local/bin/llama-webui \
+  https://github.com/SharkEzz/llama-webui/releases/latest/download/llama-webui-linux-x64
+chmod +x ~/.local/bin/llama-webui
+llama-webui
+```
+
+Or run it from source (needs Bun):
+
 ```bash
 git clone https://github.com/SharkEzz/llama-webui.git
 cd llama-webui
@@ -176,7 +189,8 @@ bun install
 bun run start
 ```
 
-Then open **<http://127.0.0.1:7860>**.
+Then open **<http://127.0.0.1:7860>**. The status bar shows the running version: the release tag or commit hash of the
+executable, `dev` from source.
 
 On first launch, Home opens a **setup checklist**: it finds your `llama-server` binary (or asks for its path), checks
 the models folder, lists what `llama-bench` and the GPU telemetry can see, and reviews the machine configuration with
@@ -190,8 +204,8 @@ memory fit, started in one click.
 
 ## Configuration
 
-Launch options can be passed as flags or environment variables (a flag wins over its variable). `bun run start --help`
-lists them.
+Launch options can be passed as flags or environment variables (a flag wins over its variable). `llama-webui --help`
+(or `bun run start --help`) lists them.
 
 | Flag                | Environment variable   | Default                                                         |
 | ------------------- | ---------------------- | --------------------------------------------------------------- |
@@ -200,7 +214,7 @@ lists them.
 | `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR` | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` |
 
 ```bash
-bun run start --host 0.0.0.0 --port 8080
+llama-webui --host 0.0.0.0 --port 8080   # from source: bun run start --host 0.0.0.0 --port 8080
 ```
 
 Hugging Face downloads use the same token as the `hf` CLI: `HF_TOKEN` if set, otherwise the token saved by
@@ -227,6 +241,8 @@ directory, along with profiles, conversations, benchmark runs and sweeps.
 ```bash
 bun install
 bun run dev        # bun --hot: HMR for the UI, live reload for the server
+bun run compile    # standalone executable in dist/llama-webui (--target bun-linux-arm64)
+bun run release 0.2.0  # set every package.json version, merge, then tag v0.2.0
 bun run check      # type check (server, shared and web)
 bun run test       # every test (bun test)
 bun run lint       # Biome: format + lint + import order (read-only)
@@ -283,7 +299,11 @@ Every `/api/*` route goes through `guarded()` (`server/http.ts`), which applies 
 - `bun run dev` uses the HTML import of `Bun.serve` (`web/index.html`): HMR, a single bundle.
 - `bun run start` (`NODE_ENV=production`) bundles the front end **in memory at startup** with `Bun.build`, split per
   page (`server/routes/web.ts`). There is no build step and no `dist/` folder. A Bun plugin added to `bunfig.toml` must
-  also be passed there.
+  also be added to `webPlugins()` there.
+- `bun run compile` (`scripts/compile.ts`) builds the standalone executable: the same options bundle the HTML import at
+  compile time (split per page, embedded); it always runs in production and reports `git describe` as its version
+  (`dev` from source). `.github/workflows/release.yml` attaches the x64 and arm64 executables to the release of every
+  `v*` tag, which must match the version of every `package.json` (`bun run release <version>`, merged first).
 
 > [!IMPORTANT]
 > **Hot reload and long-lived state.** The supervisor, the log ring, the monitor and the bench gate live on

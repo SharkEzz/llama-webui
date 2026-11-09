@@ -3,7 +3,7 @@ const GROUPS = [
   ['NVIDIA GPUs', 'Telemetry through NVML, with nvidia-smi as a fallback.'],
   ['AMD GPUs', 'Telemetry through the amdgpu driver in sysfs.'],
   ['Any llama.cpp backend', 'CUDA, Vulkan, ROCm or CPU builds, one model split across them.'],
-  ['Linux and Bun', 'Hardware is read from /proc and /sys. Bun 1.4.4 or later is the only runtime.'],
+  ['Linux, one executable', 'Hardware is read from /proc and /sys. One file to download, the Bun runtime included.'],
 ] as const;
 
 export function HardwareBand() {

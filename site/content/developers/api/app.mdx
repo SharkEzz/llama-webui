@@ -22,7 +22,7 @@ like every API route.
 | Field      | Type    | Description                                                                 |
 | ---------- | ------- | --------------------------------------------------------------------------- |
 | `ok`       | boolean | Always `true`.                                                              |
-| `version`  | string  | The `version` of `server/package.json`.                                     |
+| `version`  | string  | `APP_VERSION` (`server/version.ts`): `dev` from source; in the executable, `git describe` at compile time (tag, else short commit hash). Shown in the status bar. |
 | `uptimeMs` | number  | Milliseconds since `server/app.ts` was loaded (`startedAt`).                |
 
 ```bash title="Terminal"
@@ -30,7 +30,7 @@ curl http://127.0.0.1:7860/api/health
 ```
 
 ```json
-{ "ok": true, "version": "0.1.0", "uptimeMs": 5234871 }
+{ "ok": true, "version": "fa823b5", "uptimeMs": 5234871 }
 ```
 
 ## Settings

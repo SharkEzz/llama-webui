@@ -23,5 +23,5 @@
       "@llama-webui/shared": ["./shared/src/index.ts"]
     }
   },
-  "include": ["server", "shared"]
+  "include": ["server", "shared", "scripts"]
 }
