@@ -129,3 +129,25 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Site web et documentation (`site/`)
+
+Le site public (page d'accueil, doc utilisateur, doc développeur) vit dans `site/` et sera publié sur GitHub Pages (`https://sharkezz.github.io/llama-webui/`, base `/llama-webui/`). Plan et jalons : `docs/superpowers/plans/2026-11-08-website.md`.
+
+- **Exception à « pas de Vite » :** `site/` utilise Vite + React Router (mode framework, `ssr: false` + prérendu statique) + Tailwind 4 + shadcn + MDX. C'est un package autonome, hors des workspaces Bun (son propre `package.json` et `bun.lock`), mais toujours géré avec Bun (`bun install`, `bun run`, `bun test`). Il n'importe aucun code de `web/` : les composants repris (tokens, verre, jauges…) sont copiés et adaptés.
+- Mêmes règles qualité que l'app (Biome sans warning, type check, tests verts) ; le contenu est en anglais, URLs avec slash final.
+- **Synchroniser la doc avec le code (obligatoire) :** toute modification d'une fonctionnalité, de l'UI, d'une route API, d'un message WebSocket, d'un flag CLI, d'un réglage ou de l'architecture met à jour, **dans la même PR**, la ou les pages correspondantes de `site/content/` (la référence API est écrite à la main : elle dérive si on l'oublie). Correspondance code → pages (chemins sous `site/content/`, finalisée au jalon M8) :
+
+| Code modifié                                                                      | Pages à mettre à jour                                                            |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `server/routes/<domaine>.ts`, schémas zod de `shared/src/`                        | `developers/api/<domaine>.mdx` + la page utilisateur de la fonctionnalité        |
+| `shared/src/ws.ts`, `server/ws/`                                                  | `developers/api/websocket.mdx`                                                   |
+| `server/cli.ts`, `server/paths.ts`, variables d'environnement                     | `docs/configuration.mdx`                                                         |
+| `server/security.ts`, `server/http.ts`                                            | `docs/security.mdx`, `developers/api/overview.mdx`, page serveur « Security »    |
+| `web/src/features/home/setup/**`                                                  | `docs/getting-started/first-run.mdx`                                             |
+| `web/src/features/<page>/**`                                                      | la page utilisateur de cette page (`docs/<page>.mdx`) et ses captures            |
+| `shared/src/settings.ts`, page Settings                                           | `docs/settings.mdx`                                                              |
+| `shared/src/tuning.ts`, `server/tuning/**`                                        | `docs/tuning.mdx`, `docs/sweeps.mdx`, guides concernés, page serveur « Tuning »  |
+| `server/index.ts`, `server/runtime.ts`, `server/routes/web.ts`, piège `bun --hot` | `developers/architecture.mdx`                                                    |
+| prérequis / installation (README)                                                 | `docs/getting-started/requirements.mdx`, `docs/getting-started/installation.mdx` |
+| conventions de ce fichier (Biome, langue, tests)                                  | `developers/contributing/*.mdx`                                                  |
