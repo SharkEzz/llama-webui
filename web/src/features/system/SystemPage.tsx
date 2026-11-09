@@ -26,7 +26,7 @@ export function SystemPage() {
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-baseline gap-3">
         <h1 className="text-3xl font-semibold tracking-tight">System</h1>
-        {info && (
+        {info && snapshot?.allGpus.some((g) => g.vendor === 'nvidia') && (
           <span className="text-sm text-muted-foreground">
             NVIDIA source: {info.nvidiaSource === 'nvml' ? 'NVML' : 'nvidia-smi'}
           </span>

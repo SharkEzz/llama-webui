@@ -49,6 +49,11 @@ export interface PlacementBuffer {
   /** KV cache, plus the recurrent state (“RS”) of hybrid models. */
   kvBytes: number;
   computeBytes: number;
+  /**
+   * Spread from the `Meta()` buffers of -sm tensor (by -ts, equal parts without it): llama-server only logs the
+   * largest part of each one.
+   */
+  estimated?: boolean;
 }
 
 export interface ModelPlacement {

@@ -77,6 +77,18 @@ describe('groupRepoFiles', () => {
   });
 });
 
+test('imatrix files in GGUF format are not offered as variants (#31)', () => {
+  const f = (path: string, size: number) => ({ path, size, sha256: null });
+  const { variants, projectors } = groupRepoFiles([
+    f('Model-Q4_K_M.gguf', 30),
+    f('imatrix.gguf', 3),
+    f('imatrix_unsloth.gguf', 3),
+    f('Q8_0/imatrix-Model.gguf', 3),
+  ]);
+  expect(variants.map((v) => v.key)).toEqual(['Model-Q4_K_M.gguf']);
+  expect(projectors).toEqual([]);
+});
+
 describe('HfClient', () => {
   const client = (handler: (url: string, init: RequestInit) => Response | Promise<Response>, env = {}) => {
     const calls: { url: string; auth: string | null }[] = [];

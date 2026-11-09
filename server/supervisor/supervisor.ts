@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { LAUNCH_LOG_PREFIX, type ServerState } from '@llama-webui/shared';
 import type { LogBuffer } from '../logs/buffer';
-import { LineSplitter } from '../logs/lines';
+import { isIdleNoise, LineSplitter } from '../logs/lines';
 import type { BuiltCommand } from './args';
 import { findLlamaServerPid } from './discovery';
 import { probeHealth, probeLlamaServer } from './health';
@@ -166,9 +166,9 @@ export class Supervisor {
     const dec = new TextDecoder();
     try {
       for await (const chunk of stream)
-        for (const l of split.push(dec.decode(chunk, { stream: true }))) this.logs.push(l);
+        for (const l of split.push(dec.decode(chunk, { stream: true }))) if (!isIdleNoise(l)) this.logs.push(l);
     } catch {}
-    for (const l of split.flush()) this.logs.push(l);
+    for (const l of split.flush()) if (!isIdleNoise(l)) this.logs.push(l);
   }
 
   private async pollHealth(proc: Child, cmd: BuiltCommand) {

@@ -34,7 +34,7 @@ listens by default.
 
 | Field             | Default        | Effect                                                                                                                                                                                                          |
 | ----------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Binary**        | `llama-server` | The `llama-server` to run: an absolute path, or a name found in the `PATH` (`~` is not expanded). Also used to read its build number and its `--help`, and to find `llama-bench` in the same folder.            |
+| **Binary**        | `llama-server` | The `llama-server` to run: an absolute path (`~` for your home works), or a name found in the `PATH`. Also used to read its build number and its `--help`, and to find `llama-bench` in the same folder.            |
 | **Models folder** | `~/models`     | The folder scanned for GGUF files, with its subfolders. [Hugging Face downloads](/docs/hugging-face/) are saved there, and it becomes the working directory of a new profile when you pick its model.          |
 | **Default host**  | `127.0.0.1`    | The `--host` given to `llama-server` for profiles that leave **Host** empty. Below the field, a warning says when it opens `llama-server` to your network.                                                     |
 | **Default port**  | `8080`         | The `--port` given to `llama-server` for profiles that leave **Port** empty. Also the port of the temporary servers of benchmark runs, and the port where llama-webui looks for a `llama-server` it did not start. |

@@ -10,7 +10,7 @@ import { guarded } from '../http';
 import { scanModels } from '../models/scan';
 import type { Monitor } from '../monitor/monitor';
 import { buildLaunchpad, buildSetupReport, readPerfParanoid } from '../setup';
-import { expandHome, profilePaths } from '../supervisor/args';
+import { binaryPath, expandHome, profilePaths } from '../supervisor/args';
 import { estimate } from '../tuning/estimate';
 import { readTuningHardware } from '../tuning/hardware';
 import { loadModel, mmprojBytes } from '../tuning/models';
@@ -53,7 +53,7 @@ export function setupRoutes({ db, settings, profiles, benchRuns, monitor, hostna
         const s = settings.get();
         // Read once for every profile (llama-bench --list-devices is cached anyway).
         const hw = readTuningHardware({
-          benchBinary: benchBinary(s.binary),
+          benchBinary: benchBinary(binaryPath(s)),
           mem: monitor.latest()?.system?.mem ?? null,
           gpus: monitor.latest()?.allGpus,
         });

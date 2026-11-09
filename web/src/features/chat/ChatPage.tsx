@@ -1,3 +1,4 @@
+import { contextUsed } from '@llama-webui/shared';
 import { SlidersHorizontal } from 'lucide-react';
 import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -16,19 +17,19 @@ import { SamplingPanel } from './SamplingPanel';
 import { Thread } from './Thread';
 import { type ServerProps, useServerProps } from './useServerProps';
 
-/** Context used by the last reply (prompt + generated tokens) out of the server context. */
+/** Context used by the conversation after the last reply (cached prompt + new prompt + reply) out of the server's. */
 function ContextGauge({ props }: { props: ServerProps | null }) {
   const current = useChat((s) => s.current);
   const nCtx = props?.default_generation_settings?.n_ctx;
   const last = current?.messages.findLast((m) => m.role === 'assistant' && m.stats);
   if (!nCtx || !last?.stats) return null;
-  const used = last.stats.promptTokens + last.stats.genTokens;
+  const used = contextUsed(last.stats);
   const pct = Math.min(100, (used / nCtx) * 100);
   const high = pct >= 85;
   return (
     <div
       className="flex min-w-48 flex-col gap-1"
-      title="Prompt and reply of the last exchange, out of the server context"
+      title="Conversation so far (cached prompt, new message and the last reply), out of the server context"
     >
       <div className={cn('num flex justify-between gap-3 text-xs', high ? 'text-warning' : 'text-muted-foreground')}>
         <span>Context</span>

@@ -14,6 +14,7 @@ import {
   type SetupReport,
 } from '@llama-webui/shared';
 import type { ModelInfo } from './models/gguf';
+import { expandHome } from './supervisor/args';
 
 /** What the first-run report reads from the machine (injected: tested without the real binary, GPUs or perf). */
 export interface SetupDeps {
@@ -48,9 +49,9 @@ const isDir = (path: string) =>
 
 export async function buildSetupReport(d: SetupDeps): Promise<SetupReport> {
   const { binary, modelsDir: modelsSetting } = d.settings;
-  const bench = d.benchBinary(binary);
+  const bench = d.benchBinary(expandHome(binary));
   const [resolved, exists, devices, perfParanoid] = await Promise.all([
-    d.resolveBinary(binary),
+    d.resolveBinary(expandHome(binary)),
     isDir(d.modelsDir),
     d.listDevices(bench),
     d.readPerfParanoid(),

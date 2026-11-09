@@ -89,11 +89,12 @@ The `llama-server` part of `argv` is assembled in this order:
 
 ```ts title="server/supervisor/args.ts"
 const server = [
-  settings.binary,
+  binaryPath(settings, home),
   '-m',
   expandHome(profile.model, home),
   ...(profile.mmproj ? ['-mm', expandHome(profile.mmproj, home)] : []),
   ...profile.args,
+  ...(setsVerbosity(profile) ? [] : ['-lv', DEFAULT_VERBOSITY]),
   '--host',
   host,
   '--port',
@@ -104,10 +105,14 @@ const server = [
 ];
 ```
 
-- **Binary**: the `binary` setting (`llama-server` by default).
+- **Binary**: the `binary` setting (`llama-server` by default), `~` expanded by `binaryPath()`. Every caller that
+  runs it or `llama-bench` next to it (flags, setup, tuning, benchmarks) goes through `binaryPath()`.
 - **Model and projector**: `-m` and, when the profile has one, `-mm`.
 - **Profile arguments**: `profile.args`, as stored, one array element per argument. They never go through a shell.
 - **Address**: `host` is `profile.host ?? settings.host` and `port` is `profile.port ?? settings.port`.
+- **Verbosity**: `-lv 4`, the first level at which `llama-server` logs the buffer sizes the
+  [placement](/developers/server/monitor/#model-placement) reads, unless the profile sets its own (`-lv`,
+  `--verbosity`, `--log-verbosity`, `-v`, `--verbose`, `--log-verbose`, or `LLAMA_ARG_LOG_VERBOSITY` in `env`).
 - **Flags llama-webui adds**: `--metrics`, `--slots` and `--props`, which the [monitor](/developers/server/monitor/)
   and the Server page read. A profile cannot set these, nor `--host`, `--port`, `-m`, `--model`, `-mm` or `--mmproj`:
   `ProfileInputSchema` (`shared/src/profile.ts`) rejects them through `RESERVED_FLAGS`.

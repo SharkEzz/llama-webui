@@ -218,3 +218,34 @@ test('PlacementTracker: the launch evicted from the ring keeps the placement of 
   expect(reloaded.current).toBeNull();
   reloaded.dispose();
 });
+
+test('parsePlacement: -sm tensor spreads the Meta() buffers over its devices by -ts, marked estimated (#17)', async () => {
+  const text = (await Bun.file(`${import.meta.dir}/../../testdata/llama-server-load-tensor.txt`).text()).trimEnd();
+  const p = parsePlacement(lines(text))!;
+  expect(p.layers).toEqual({ offloaded: 66, total: 66 });
+  expect(p.buffers.some((b) => b.device.startsWith('Meta'))).toBe(false);
+  const by = new Map(p.buffers.map((b) => [b.device, b]));
+  // Meta() logs the largest part: CUDA1 (58) has it, CUDA0 gets 51/58 of it.
+  expect(by.get('CUDA1')).toEqual({
+    device: 'CUDA1',
+    busId: null,
+    modelBytes: 5931.79 * MiB,
+    kvBytes: (320 + 336.66) * MiB,
+    computeBytes: 150.14 * MiB,
+    estimated: true,
+  });
+  expect(by.get('CUDA0')!.modelBytes).toBeCloseTo((5931.79 * 51 * MiB) / 58, 0);
+  expect(by.get('CUDA0')!.computeBytes).toBe(150.14 * MiB);
+  expect(by.get('CPU_Mapped')!.modelBytes).toBe(388.38 * MiB);
+  expect(by.get('CPU_Mapped')!.estimated).toBeUndefined();
+});
+
+test('parsePlacement: -sm tensor without -ts gives each device an equal part (#17)', async () => {
+  const text = (await Bun.file(`${import.meta.dir}/../../testdata/llama-server-load-tensor.txt`).text())
+    .trimEnd()
+    .replace(' -ts 51,58', '');
+  const p = parsePlacement(lines(text))!;
+  const by = new Map(p.buffers.map((b) => [b.device, b]));
+  expect(by.get('CUDA0')!.modelBytes).toBe(5931.79 * MiB);
+  expect(by.get('CUDA1')!.modelBytes).toBe(5931.79 * MiB);
+});

@@ -32,6 +32,10 @@ to the terminal or service journal it runs in, not to this page.
 llama-webui keeps the last 10,000 lines in memory; older lines are dropped as new ones arrive. Lines from earlier
 launches stay until they are pushed out, so you can read why the previous server stopped after starting a new one.
 
+llama-webui starts `llama-server` with `-lv 4` (see [Flags llama-webui sets itself](/docs/profiles/#flags-llama-webui-sets-itself)):
+loading writes a few hundred lines, and each request a few dozen. The `update_slots: all slots are idle` line, which
+this level repeats every time the monitor polls the server, is left out of the buffer.
+
 The buffer is never written to disk: restarting llama-webui empties it. When the browser connects, or reconnects
 after a network drop, it loads the lines already in the buffer, then receives new ones live.
 
@@ -85,8 +89,9 @@ back to the bottom to follow again. Changing the filters does not stop following
 
 - **No logs** with **Start llama-server from the Server page.** The buffer is empty: nothing has been launched since
   llama-webui started. Start a profile from [Home](/docs/home/) or the [Server](/docs/server/) page.
+- **View cleared** with **New lines will appear here.** You clicked **Clear view** and no line has arrived since.
 - **No lines match the filters** with **Lower the minimum level or change the search.** Lines exist, but the level
-  filter or the search hides all of them. The same message appears after **Clear view**, until a new line arrives.
+  filter or the search hides all of them.
 
 ## Latest lines on the Server page
 

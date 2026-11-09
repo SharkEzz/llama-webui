@@ -75,7 +75,8 @@ Without a token, the gated and not-found messages end with ``(set HF_TOKEN or ru
 `groupRepoFiles(files)` (`server/hf/variants.ts`) turns the repository's file list into what the download sheet
 offers:
 
-- Only `.gguf` files are kept; README, safetensors and the rest are ignored.
+- Only `.gguf` files are kept; README, safetensors and the rest are ignored, and so are the GGUF files whose name
+  starts with `imatrix` (`imatrix.gguf`, `imatrix_unsloth.gguf`): calibration data, not a model.
 - Shards (`…-00001-of-00003.gguf`, possibly in a subfolder) are grouped by prefix and total into one variant; any
   other file is a variant of its own.
 - A variant's `key` is the path of its first file (files sorted by path): it identifies the variant in requests and

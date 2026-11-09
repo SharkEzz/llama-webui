@@ -10,7 +10,8 @@ import type { LogBuffer } from '../logs/buffer';
 /*
  * How the loaded model is split across devices, read from llama-server's startup logs: “using device CUDA0
  * (…) (0000:01:00.0)”, “CUDA0 model buffer size = 12441.95 MiB”, “offloaded 49/49 layers to GPU”… llama-server
- * doesn't expose these figures through its API. The lines are at INFO level: present whatever the verbosity (-lv).
+ * doesn't expose these figures through its API, and only logs the buffer sizes from -lv 4 on: `buildCommand()` adds
+ * `-lv 4` to a profile that sets no verbosity.
  */
 
 const MiB = 1024 ** 2;
@@ -34,9 +35,14 @@ const MMPROJ = /^(?:clip\w*|(?:reserve|alloc)_compute_meta):/;
  */
 const FIT_START = /fitting params to device memory \.\.\./;
 const FIT_DONE = /common_fit_params: fitting params to free memory took/;
+/** One device of the Meta device that -sm tensor creates: its buffers are logged as `Meta()`, at their largest. */
+const META_MEMBER = /llama_prepare_model_devices: - device \d+: (\S+)/;
+const META = /^Meta\(/;
+/** -ts / --tensor-split on the launch line: “3,1”, “3/1”, “-ts=3,1”. */
+const TENSOR_SPLIT = /(?:^|\s)(?:-ts|--tensor-split)(?:=|\s+)(\S+)/;
 
 /** A line that can change the placement: avoids rereading the whole ring on every batch of request logs. */
-export const RELEVANT = /\[llama-webui\] launch:|using device|buffer size =|offloaded \d+\/\d+ layers/;
+export const RELEVANT = /\[llama-webui\] launch:|using device|buffer size =|offloaded \d+\/\d+ layers|- device \d+:/;
 
 /**
  * Placement of the main model from the last launch found in `lines`; null without a launch line (ring cleared or
@@ -61,6 +67,7 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
   const contexts: Map<string, number>[] = [new Map()];
   let constructed = false;
   let fitting = false;
+  const metaMembers: string[] = [];
   for (let i = start + 1; i < lines.length; i++) {
     const body = lines[i]!.text.replace(PREFIX, '');
     if (FIT_START.test(body)) fitting = true;
@@ -75,7 +82,12 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
       contexts.at(-1)!.clear();
       continue;
     }
-    let m = USING.exec(body);
+    let m = META_MEMBER.exec(body);
+    if (m) {
+      metaMembers.push(m[1]!);
+      continue;
+    }
+    m = USING.exec(body);
     if (m) {
       busIds.set(m[1]!, m[2]!.toLowerCase());
       continue;
@@ -104,7 +116,46 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
   }
   for (const ctx of contexts) for (const [device, bytes] of ctx) buffers.get(device)!.computeBytes += bytes;
   for (const b of buffers.values()) b.busId = busIds.get(b.device) ?? null;
-  return { launchSeq: lines[start]!.seq, layers, buffers: [...buffers.values()] };
+  const out = spreadMeta([...buffers.values()], metaMembers, lines[start]!.text, busIds);
+  return { launchSeq: lines[start]!.seq, layers, buffers: out };
+}
+
+/**
+ * With -sm tensor, llama-server logs the buffers of the Meta device that groups the GPUs (`Meta()`), each at the size
+ * of its largest per-device part. Each member gets its share: `size × ts[i] / max(ts)` for the model and the cache
+ * (equal parts without -ts), the whole compute buffer (each device has its own). These figures are `estimated`.
+ */
+function spreadMeta(
+  buffers: PlacementBuffer[],
+  members: string[],
+  launch: string,
+  busIds: Map<string, string>,
+): PlacementBuffer[] {
+  const meta = buffers.filter((b) => META.test(b.device));
+  if (meta.length === 0 || members.length === 0) return buffers;
+  const split = TENSOR_SPLIT.exec(launch)?.[1]?.split(/[,/]/).map(Number) ?? [];
+  const weights = members.map((_, i) => {
+    const w = split[i];
+    return split.length === 0 ? 1 : w !== undefined && Number.isFinite(w) && w >= 0 ? w : 0;
+  });
+  const max = Math.max(...weights);
+  if (!(max > 0)) return buffers;
+  const out = buffers.filter((b) => !META.test(b.device));
+  members.forEach((device, i) => {
+    const share = weights[i]! / max;
+    let b = out.find((x) => x.device === device);
+    if (!b) {
+      b = { device, busId: busIds.get(device) ?? null, modelBytes: 0, kvBytes: 0, computeBytes: 0 };
+      out.push(b);
+    }
+    for (const m of meta) {
+      b.modelBytes += m.modelBytes * share;
+      b.kvBytes += m.kvBytes * share;
+      b.computeBytes += share > 0 ? m.computeBytes : 0;
+    }
+    b.estimated = true;
+  });
+  return out;
 }
 
 /** Last placement read, with the PID of the server that wrote it. */

@@ -18,7 +18,7 @@ import { PlacementTracker } from './monitor/placement';
 import { dbPath } from './paths';
 import { buildWebRoutes, unavailableWebRoutes } from './routes/web';
 import { activeProfileId, getRuntime, serverView, startMonitor } from './runtime';
-import { buildCommand, profilePaths } from './supervisor/args';
+import { binaryPath, buildCommand, profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
 import { WsHub } from './ws/hub';
 
@@ -88,7 +88,7 @@ const benchRunner = new BenchRunner({
   sweeps,
   gate: benchGate,
   executor,
-  hardware: () => readHardware(settings.get().binary, allGpus()),
+  hardware: () => readHardware(binaryPath(settings.get()), allGpus()),
   onLive: (l) => hub.broadcast({ type: 'bench-progress', payload: l }),
   onRun: (r) => hub.broadcast({ type: 'bench-run', payload: r }),
   onSweep: (s) => hub.broadcast({ type: 'sweep', payload: s }),

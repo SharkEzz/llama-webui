@@ -127,7 +127,8 @@ suspended card can answer `0xFFFF` to a config read) is treated as unknown.
 its API (`parsePlacement()` in `server/monitor/placement.ts`). The tracker reads the log ring from the last
 `[llama-webui] launch:` line: the `using device … (<busId>)` lines, the `… model|KV|RS|compute buffer size = N MiB`
 lines and `offloaded N/M layers to GPU`. A second `offloaded` line opens the draft model and ends the parsing; the
-projector's buffers and the fitting probes of `-fit` are skipped.
+projector's buffers and the fitting probes of `-fit` are skipped. The sizes are only logged from `-lv 4` on, which
+llama-webui adds to a profile that sets no verbosity.
 
 `placement` is null when no managed server is `starting`, `ready` or `stopping`, before the launch line appears in the
 logs, and for an external server (it writes nothing to the ring). Once the launch line is evicted from the ring, the
@@ -148,6 +149,7 @@ last placement read stays valid as long as the server has the same PID.
 | `modelBytes`   | number         | Weights on the device.                                                                   |
 | `kvBytes`      | number         | KV cache, plus the recurrent state (`RS`) of hybrid models.                              |
 | `computeBytes` | number         | Compute buffers, summed over the contexts (an MTP's adds to the model's); a context reserved again keeps only its last size. |
+| `estimated`    | `true`, optional | Spread from the `Meta()` buffers of `-sm tensor`, which only give the largest part: by `-ts`, equal parts without it. Absent otherwise. |
 
 Every change is pushed as the `placement` message of the [WebSocket](/developers/api/websocket/), with the same
 `ModelPlacement | null` payload.

@@ -104,7 +104,7 @@ over variables of the same name.
 llama-webui builds the command line from the profile fields, then adds the flags it needs to monitor the server:
 
 ```text title="Effective command"
-llama-server -m <model> [-mm <projector>] <your arguments> --host <host> --port <port> --metrics --slots --props
+llama-server -m <model> [-mm <projector>] <your arguments> [-lv 4] --host <host> --port <port> --metrics --slots --props
 ```
 
 | Flag                             | Why                                                                                                  |
@@ -113,9 +113,11 @@ llama-server -m <model> [-mm <projector>] <your arguments> --host <host> --port 
 | `-mm`, `--mmproj`                | From **Multimodal projector**, when set.                                                             |
 | `--host`, `--port`               | From **Host** and **Port**, or Settings.                                                             |
 | `--metrics`, `--slots`, `--props` | Turn on the endpoints the [Dashboard](/docs/dashboard/), the [Server](/docs/server/) page and [Chat](/docs/chat/) read. |
+| `-lv 4`                          | Logs the buffer sizes the [Topology](/docs/topology/) page reads. Only added when your arguments set no verbosity (`-lv`, `-v`) and the environment has no `LLAMA_ARG_LOG_VERBOSITY`: yours wins. |
 
 Because these come from the profile fields, you cannot write them in the arguments: the editor flags them, and saving
-is refused. The binary itself is the one set in Settings. The [Server](/docs/server/) page shows the exact command of
+is refused (`-lv 4` is the exception: you can set another verbosity). The binary itself is the one set in Settings,
+with `~` expanded. The [Server](/docs/server/) page shows the exact command of
 the last launch.
 
 ## Save, start and other actions

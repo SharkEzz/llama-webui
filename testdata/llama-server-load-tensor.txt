@@ -1,0 +1,18 @@
+[llama-webui] launch: llama-server -m Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf -dev CUDA0,CUDA1 -ts 51,58 -sm tensor -c 8192 -fa on -lv 4 --host 127.0.0.1 --port 8080 --metrics --slots --props
+0.00.529.041 I cmn  common_fit_a: fitting params to device memory ...
+0.00.529.097 W common_fit_params: failed to fit params to free device memory: llama_params_fit is not implemented for SPLIT_MODE_TENSOR, abort
+0.00.529.104 I common_fit_params: fitting params to free memory took 0.00 seconds
+0.00.558.103 I llama_prepare_model_devices: creating a Meta device with 2 devices
+0.00.558.104 I llama_prepare_model_devices: - device 0: CUDA0
+0.00.558.105 I llama_prepare_model_devices: - device 1: CUDA1
+0.00.558.240 I llama_prepare_model_devices: using device Meta() (Meta()) (unknown id) - 31443 MiB free
+0.00.718.571 I load_tensors: offloaded 66/66 layers to GPU
+0.00.718.578 I load_tensors:   CPU_Mapped model buffer size =   388.38 MiB
+0.00.718.579 I load_tensors:       Meta() model buffer size =  5931.79 MiB
+0.01.826.387 I llama_context: constructing llama_context
+0.02.026.489 I llama_context:  CUDA_Host  output buffer size =     3.79 MiB
+0.02.027.959 I llama_kv_cache:     Meta() KV buffer size =   320.00 MiB
+0.02.029.638 I llama_memory_recurrent:     Meta() RS buffer size =   336.66 MiB
+0.02.029.651 I sched_reserve: reserving ...
+0.02.041.494 I sched_reserve:     Meta() compute buffer size =   150.14 MiB
+0.02.041.497 I sched_reserve:  CUDA_Host compute buffer size =    48.15 MiB

@@ -13,6 +13,7 @@ import type { SettingsRepo } from '../db/settings';
 import { guarded, HttpError, jsonObject } from '../http';
 import type { Monitor } from '../monitor/monitor';
 import type { Runtime } from '../runtime';
+import { binaryPath } from '../supervisor/args';
 import { runChecks, summarize } from '../tuning/checks';
 import { measureDiskSpeed } from '../tuning/disk';
 import { estimate } from '../tuning/estimate';
@@ -86,7 +87,7 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
           hardware(),
           modelPath ? loadModel(modelPath).catch(() => null) : Promise.resolve(null),
           readSys({
-            binary: settings.get().binary,
+            binary: binaryPath(settings.get()),
             modelPath,
             logLines: () => runtime.logs.since(0),
             nvml: monitor.nvmlSystem,

@@ -19,7 +19,7 @@ import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
 import type { SweepsRepo } from '../db/sweeps';
 import { guarded, HttpError, idParam, jsonObject, notFound } from '../http';
-import { profilePaths } from '../supervisor/args';
+import { binaryPath, profilePaths } from '../supervisor/args';
 import type { WsHub } from '../ws/hub';
 
 export interface BenchRouteDeps {
@@ -78,7 +78,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
       }),
     },
     '/api/bench/devices': {
-      GET: guarded(async () => Response.json(await listDevices(benchBinary(settings.get().binary)))),
+      GET: guarded(async () => Response.json(await listDevices(benchBinary(binaryPath(settings.get()))))),
     },
     '/api/bench/:id': {
       DELETE: guarded((req) => {
