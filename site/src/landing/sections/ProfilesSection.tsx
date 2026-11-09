@@ -1,6 +1,6 @@
 import { Boxes, Home, MessageSquare, SlidersHorizontal } from 'lucide-react';
+import { Shot } from '@/components/Shot';
 import { BentoCard, FeatureSection, SHOT_FRAME } from '../Bento';
-import { Shot } from '../Shot';
 import { ArgsEditorDemo } from './ArgsEditorDemo';
 
 export function ProfilesSection() {

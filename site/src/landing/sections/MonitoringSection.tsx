@@ -1,6 +1,6 @@
 import { Activity, Cpu, Network, ScrollText } from 'lucide-react';
+import { Shot } from '@/components/Shot';
 import { BentoCard, FeatureSection, SHOT_FRAME } from '../Bento';
-import { Shot } from '../Shot';
 
 /** What the Topology HUD shows (web/src/features/topology/Hud.tsx). */
 const HUD = [

@@ -29,7 +29,7 @@ interface ShotProps {
  * A region of an app capture, in both themes (the .dark class picks one, like ThemedImage). The image is scaled so
  * the region fills the container's width, then moved so the region's top-left corner sits at the container's.
  */
-export function Shot({ name, alt, crop = { x: 0, y: 0, w: 1 }, width = '50vw', fade, className }: ShotProps) {
+export function Shot({ name, alt, crop = { x: 0, y: 0, w: 1, h: 1 }, width = '50vw', fade, className }: ShotProps) {
   const img = {
     width: 1600,
     height: 1000,

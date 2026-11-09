@@ -1,6 +1,6 @@
 import { Gauge } from 'lucide-react';
+import { Shot } from '@/components/Shot';
 import { BentoCard, FeatureSection, SHOT_FRAME } from '../Bento';
-import { Shot } from '../Shot';
 
 /** Run #5 of the demo instance: a server run started from the 27B profile. */
 const RUN = {

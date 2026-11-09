@@ -1,10 +1,196 @@
-# Installation
+---
+title: Installation
+description: Install llama-webui on Linux with Bun, point it at your llama.cpp build, and open it in your browser.
+---
+
+llama-webui runs from a clone of its repository: there is no package to install and no build step. Bun serves the
+API, the WebSocket and the interface from one process, and builds the interface in memory when it starts.
+
+## What you need
+
+| Requirement                                       | Why                                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Linux**                                         | Hardware discovery and telemetry read `/proc` and `/sys`. `setpriv` (util-linux) ties `llama-server` to llama-webui. |
+| **[Bun](https://bun.com) 1.4.4 or later**         | The only runtime: no Node.js, no separate build.                                                       |
+| **A [llama.cpp](https://github.com/ggml-org/llama.cpp) build** | `llama-server` is required. `llama-bench`, next to it, enables benchmarks and sweeps.       |
+| **GGUF models**                                   | In a folder of your choice, set during the first run.                                                  |
+
+GPU telemetry is optional: NVIDIA cards are read through NVML (falling back to `nvidia-smi`), AMD cards through the
+`amdgpu` driver's sysfs files. Without them, llama-webui still runs models and shows CPU and memory.
+
+## Install
+
+<Steps>
+  <Step title="Install Bun">
+
+Skip this step if `bun --version` already prints 1.4.4 or later.
+
+```bash title="Terminal"
+curl -fsSL https://bun.com/install | bash
+```
+
+The installer puts `bun` in `~/.bun/bin` and adds it to your shell's `PATH`: open a new terminal afterwards.
+
+  </Step>
+  <Step title="Build llama.cpp">
+
+If you already have a build with `llama-server`, keep it: llama-webui only needs the path to the binary. Otherwise,
+build it for your GPUs. The binaries land in `build/bin/`.
+
+<Tabs>
+  <Tab title="NVIDIA (CUDA)">
+
+Needs the CUDA toolkit.
 
 ```bash
+git clone https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp
+cmake -B build -DGGML_CUDA=ON
+cmake --build build --config Release -j
+```
+
+  </Tab>
+  <Tab title="AMD (ROCm)">
+
+Needs ROCm. Set `GPU_TARGETS` to your card's architecture (`gfx1100` for a Radeon RX 7900), or leave it out to build
+for every GPU in the machine.
+
+```bash
+git clone https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp
+HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
+  cmake -S . -B build -DGGML_HIP=ON -DGPU_TARGETS=gfx1100 -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j
+```
+
+  </Tab>
+  <Tab title="Vulkan">
+
+Works with NVIDIA, AMD and Intel cards. Needs the Vulkan headers and `glslc`; check that `vulkaninfo` lists your GPUs
+first.
+
+```bash
+git clone https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp
+cmake -B build -DGGML_VULKAN=ON
+cmake --build build --config Release -j
+```
+
+  </Tab>
+  <Tab title="CPU only">
+
+```bash
+git clone https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp
+cmake -B build
+cmake --build build --config Release -j
+```
+
+  </Tab>
+</Tabs>
+
+Backends can be combined in one build, for example `-DGGML_CUDA=ON` and `-DGGML_VULKAN=ON` for a machine with NVIDIA and AMD
+cards: llama-webui then lists every device and can split a model across them.
+
+  </Step>
+  <Step title="Get llama-webui">
+
+```bash title="Terminal"
 git clone https://github.com/SharkEzz/llama-webui.git
 cd llama-webui
 bun install
+```
+
+  </Step>
+  <Step title="Start it">
+
+```bash title="Terminal"
 bun run start
 ```
 
-This page is a placeholder; the full installation guide is written with the docs engine.
+When it prints `llama-webui on http://127.0.0.1:7860`, open that address in your browser.
+
+  </Step>
+</Steps>
+
+On the first launch, Home opens a setup checklist: it looks for `llama-server` (or asks for its path), checks the
+models folder, lists what `llama-bench` and the GPU telemetry can see, and reviews the machine configuration. Only the
+binary and the models folder are required.
+
+## Open it from another machine
+
+llama-webui listens on `127.0.0.1` by default, so only the machine it runs on can reach it. To use it from a laptop on
+the same network, listen on every interface, then open `http://<server-address>:7860`:
+
+```bash title="Terminal"
+bun run start --host 0.0.0.0
+```
+
+<Callout type="warning" title="No authentication">
+
+Whoever can reach llama-webui can start processes on your machine. The API rejects cross-site requests and
+DNS-rebinding attempts, but only use `--host 0.0.0.0` on a network you trust, and never expose it to the internet.
+
+</Callout>
+
+`--port` changes the port and `--data-dir` the folder that holds the database. Each flag has an environment variable
+(`LLAMA_WEBUI_HOST`, `LLAMA_WEBUI_PORT`, `LLAMA_WEBUI_DATA_DIR`); `bun run start --help` lists them.
+
+## Run it as a service
+
+A systemd user service starts llama-webui with your session and restarts it if it stops. It runs as your user, so
+`llama-server` can read your models and GPUs as it does from a terminal. This example assumes the clone is in
+`~/llama-webui` and Bun in `~/.bun/bin`:
+
+```ini title="~/.config/systemd/user/llama-webui.service"
+[Unit]
+Description=llama-webui
+
+[Service]
+WorkingDirectory=%h/llama-webui
+ExecStart=%h/.bun/bin/bun run start
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+```
+
+```bash title="Terminal"
+systemctl --user daemon-reload
+systemctl --user enable --now llama-webui
+journalctl --user -u llama-webui -f   # follow its output
+```
+
+User services stop when you log out. To keep llama-webui running without a session, for example on a headless
+server, enable lingering once:
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+<Callout type="note">
+
+`llama-server` is tied to llama-webui: stopping the service, or llama-webui crashing, stops the model too, so no
+orphan process keeps your VRAM.
+
+</Callout>
+
+## Update
+
+```bash title="Terminal"
+cd llama-webui
+git pull
+bun install
+```
+
+Then restart llama-webui (`systemctl --user restart llama-webui` for the service). The database is migrated on
+startup: profiles, conversations, benchmark runs and settings are kept.
+
+## Uninstall
+
+Stop llama-webui, then delete the clone and the data folder (`$XDG_DATA_HOME/llama-webui`, by default
+`~/.local/share/llama-webui`). Your models and your llama.cpp build are never touched.
+
+```bash title="Terminal"
+rm -rf ~/llama-webui ~/.local/share/llama-webui
+```

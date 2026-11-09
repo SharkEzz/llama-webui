@@ -1,7 +1,7 @@
 import { CircleCheck, TriangleAlert, Wand2 } from 'lucide-react';
+import { Shot } from '@/components/Shot';
 import { cn } from '@/lib/utils';
 import { BentoCard, FeatureSection, SHOT_FRAME } from '../Bento';
-import { Shot } from '../Shot';
 
 /**
  * Output of the app's estimator (server/tuning/estimate.ts) for the "Responsive chat" preset, run on the real GGUF of
