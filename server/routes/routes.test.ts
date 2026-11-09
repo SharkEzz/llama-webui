@@ -175,6 +175,7 @@ test('GET /api/bench/runs caps an explicit limit at the sweep default, 10,000 (#
       },
     } as never,
     benchRunner: { live: null } as never,
+    sweeps: null!,
     settings: null!,
     profiles: null!,
     hub: null!,
