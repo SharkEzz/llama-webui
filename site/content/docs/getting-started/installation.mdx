@@ -1,17 +1,18 @@
 ---
 title: Installation
-description: Install llama-webui on Linux with Bun, point it at your llama.cpp build, and open it in your browser.
+description: Install llama-webui on Linux from a single executable or from source, point it at your llama.cpp build, and open it in your browser.
 ---
 
-llama-webui runs from a clone of its repository: there is no package to install and no build step. Bun serves the
-API, the WebSocket and the interface from one process, and builds the interface in memory when it starts.
+llama-webui ships as a single executable for Linux (x64 and arm64): it holds the Bun runtime, the server and the
+interface, so there is nothing else to install. You can also run it from a clone of its repository with
+[Bun](https://bun.com). Either way, one process serves the API, the WebSocket and the interface.
 
 ## What you need
 
 | Requirement                                       | Why                                                                                                    |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | **Linux**                                         | Hardware discovery and telemetry read `/proc` and `/sys`. `setpriv` (util-linux) ties `llama-server` to llama-webui. |
-| **[Bun](https://bun.com) 1.4.4 or later**         | The only runtime: no Node.js, no separate build.                                                       |
+| **[Bun](https://bun.com) 1.4.4 or later**         | Only to run from source. The executable includes it.                                                   |
 | **A [llama.cpp](https://github.com/ggml-org/llama.cpp) build** | `llama-server` is required. `llama-bench`, next to it, enables benchmarks and sweeps.       |
 | **GGUF models**                                   | In a folder of your choice, set during the first run.                                                  |
 
@@ -22,17 +23,6 @@ GPU telemetry is optional: NVIDIA cards are read through NVML (falling back to `
 ## Install
 
 <Steps>
-  <Step title="Install Bun">
-
-Skip this step if `bun --version` already prints 1.4.4 or later.
-
-```bash title="Terminal"
-curl -fsSL https://bun.com/install | bash
-```
-
-The installer puts `bun` in `~/.bun/bin` and adds it to your shell's `PATH`: open a new terminal afterwards.
-
-  </Step>
   <Step title="Build llama.cpp">
 
 If you already have a build with `llama-server`, keep it: llama-webui only needs the path to the binary. Otherwise,
@@ -96,18 +86,57 @@ cards: llama-webui then lists every device and can split a model across them.
   </Step>
   <Step title="Get llama-webui">
 
+<Tabs>
+  <Tab title="Executable">
+
+Download the executable for your processor from the
+[latest release](https://github.com/SharkEzz/llama-webui/releases/latest) (`llama-webui-linux-x64` or
+`llama-webui-linux-arm64`) into a folder of your `PATH`, and make it executable:
+
+```bash title="Terminal"
+mkdir -p ~/.local/bin
+curl -fL -o ~/.local/bin/llama-webui \
+  https://github.com/SharkEzz/llama-webui/releases/latest/download/llama-webui-linux-x64
+chmod +x ~/.local/bin/llama-webui
+```
+
+The release also lists the SHA-256 of each file (`SHA256SUMS`), to check the download with `sha256sum`.
+
+  </Tab>
+  <Tab title="From source">
+
+Needs [Bun](https://bun.com) 1.4.4 or later (`curl -fsSL https://bun.com/install | bash`, then open a new terminal).
+
 ```bash title="Terminal"
 git clone https://github.com/SharkEzz/llama-webui.git
 cd llama-webui
 bun install
 ```
 
+  </Tab>
+</Tabs>
+
   </Step>
   <Step title="Start it">
+
+<Tabs>
+  <Tab title="Executable">
+
+```bash title="Terminal"
+llama-webui
+```
+
+  </Tab>
+  <Tab title="From source">
 
 ```bash title="Terminal"
 bun run start
 ```
+
+The interface is built in memory when it starts (under a second).
+
+  </Tab>
+</Tabs>
 
 When it prints `llama-webui on http://127.0.0.1:7860`, open that address in your browser.
 
@@ -124,7 +153,7 @@ llama-webui listens on `127.0.0.1` by default, so only the machine it runs on ca
 the same network, listen on every interface, then open `http://<server-address>:7860`:
 
 ```bash title="Terminal"
-bun run start --host 0.0.0.0
+llama-webui --host 0.0.0.0        # from source: bun run start --host 0.0.0.0
 ```
 
 <Callout type="warning" title="No authentication">
@@ -136,27 +165,30 @@ DNS-rebinding attempts, but only use `--host 0.0.0.0` on a network you trust, an
 </Callout>
 
 `--port` changes the port and `--data-dir` the folder that holds the database. Each flag has an environment variable
-(`LLAMA_WEBUI_HOST`, `LLAMA_WEBUI_PORT`, `LLAMA_WEBUI_DATA_DIR`); `bun run start --help` lists them, and
+(`LLAMA_WEBUI_HOST`, `LLAMA_WEBUI_PORT`, `LLAMA_WEBUI_DATA_DIR`); `llama-webui --help` (or `bun run start --help`)
+lists them, and
 [Launch options](/docs/configuration/) describes each one.
 
 ## Run it as a service
 
 A systemd user service starts llama-webui with your session and restarts it if it stops. It runs as your user, so
-`llama-server` can read your models and GPUs as it does from a terminal. This example assumes the clone is in
-`~/llama-webui` and Bun in `~/.bun/bin`:
+`llama-server` can read your models and GPUs as it does from a terminal. This example assumes the executable is in
+`~/.local/bin`:
 
 ```ini title="~/.config/systemd/user/llama-webui.service"
 [Unit]
 Description=llama-webui
 
 [Service]
-WorkingDirectory=%h/llama-webui
-ExecStart=%h/.bun/bin/bun run start
+WorkingDirectory=%h
+ExecStart=%h/.local/bin/llama-webui
 Restart=on-failure
 
 [Install]
 WantedBy=default.target
 ```
+
+From source, point `WorkingDirectory` at the clone (`%h/llama-webui`) and use `ExecStart=%h/.bun/bin/bun run start`.
 
 ```bash title="Terminal"
 systemctl --user daemon-reload
@@ -180,6 +212,10 @@ orphan process keeps your VRAM.
 
 ## Update
 
+The status bar, at the top right of every page, shows the version that runs: the release tag (or the short commit
+hash of the build), `dev` from source. With the executable, download the latest release again over the old file
+(same `curl` command as above). From source:
+
 ```bash title="Terminal"
 cd llama-webui
 git pull
@@ -191,9 +227,9 @@ startup: profiles, conversations, benchmark runs and settings are kept.
 
 ## Uninstall
 
-Stop llama-webui, then delete the clone and the data folder (`$XDG_DATA_HOME/llama-webui`, by default
-`~/.local/share/llama-webui`). Your models and your llama.cpp build are never touched.
+Stop llama-webui, then delete the executable (or the clone) and the data folder (`$XDG_DATA_HOME/llama-webui`, by
+default `~/.local/share/llama-webui`). Your models and your llama.cpp build are never touched.
 
 ```bash title="Terminal"
-rm -rf ~/llama-webui ~/.local/share/llama-webui
+rm -rf ~/.local/bin/llama-webui ~/.local/share/llama-webui   # from source: also rm -rf ~/llama-webui
 ```

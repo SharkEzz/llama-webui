@@ -57,7 +57,8 @@ cd ..
 
 ## Run llama-webui
 
-There is no build step in either mode: Bun runs the TypeScript sources directly.
+There is no build step in either mode: Bun runs the TypeScript sources directly. A third way, the standalone
+executable, is built with `bun run compile` (see [Standalone executable](#standalone-executable)).
 
 <Tabs>
   <Tab title="Development">
@@ -89,6 +90,22 @@ and the WebSocket still start and every page answers `503` with the build error.
   </Tab>
 </Tabs>
 
+### Standalone executable
+
+```bash title="Terminal"
+bun run compile                                   # dist/llama-webui, for this machine
+bun run compile --target bun-linux-arm64 --outfile dist/llama-webui-arm64
+bun scripts/smoke-binary.ts dist/llama-webui      # starts it and checks the UI it serves
+```
+
+`scripts/compile.ts` builds one file holding the Bun runtime, the server and the UI, always in production mode: the
+UI is bundled and split per page at compile time and embedded, so the executable needs neither the sources nor
+`node_modules`. `--target` accepts the Linux targets of `bun build --compile`; arm64 is cross-compiled. It prints
+`llama-webui on http://127.0.0.1:7860 (standalone fa823b5)` when it starts: its version, also shown in the status bar,
+is `git describe --tags --always --dirty` at compile time (the tag, else the short commit hash; `--version <name>`
+overrides it). From source, the status bar shows `dev`.
+[Serving the UI](/developers/architecture/#serving-the-ui) explains what changes inside the executable.
+
 Both scripts accept the launch options (`--host`, `--port`, `--data-dir`, or their `LLAMA_WEBUI_*` variables), listed
 by `bun run start --help` and documented in [Launch options](/docs/configuration/). Two habits keep development away
 from your everyday instance:
@@ -109,6 +126,8 @@ The root `package.json` defines every script. The `shared`, `server` and `web` w
 | --- | --- | --- |
 | `bun run dev` | `bun --hot server/index.ts` | Development server with HMR and hot reload. |
 | `bun run start` | `NODE_ENV=production bun server/index.ts` | Production server, UI built in memory at startup. |
+| `bun run compile` | `bun scripts/compile.ts` | Standalone executable in `dist/llama-webui` (`--target`, `--outfile`, `--version`). |
+| `bun run release` | `bun scripts/release.ts` | Sets the version of every `package.json` before a release tag ([Releases](/developers/contributing/workflow/#releases)). |
 | `bun run check` | `bun check --no-script && bun check -p web && bun run --cwd site typecheck` | Type checks `server/` and `shared/` (root `tsconfig.json`), then `web/` (its own `tsconfig.json`, with the DOM types and the `@/` alias), then the website. |
 | `bun run lint` | `biome check` | Format, lint and import order, read-only. |
 | `bun run lint:fix` | `biome check --write` | Applies Biome's safe fixes. |
@@ -134,7 +153,7 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
   - `security.ts` the request guard (Host, Origin, JSON-only writes)
   - `setup.ts` first-run report and launch pad
   - `llamatui.ts` llama-tui config import
-  - `routes/` one module per API domain, plus `web.ts` for the production UI build
+  - `routes/` one module per API domain, plus `web.ts` for the production UI build and its shared bundler options
   - `supervisor/` the managed `llama-server`: command line, health, external server detection, `--help` flags
   - `monitor/` the sampling tick, history ring, model placement
   - `collectors/` NVML (in `nvml/`, through `bun:ffi` in a worker), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
@@ -167,9 +186,10 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
 - `testdata/` captured outputs used by the tests
   - `fake/` stand-ins for `llama-server` and `llama-bench`, with their fixtures
   - `llama-bench/` `llama-bench` JSON, stderr and `--list-devices` captures
+- `scripts/` `compile.ts` (standalone executable), `smoke-binary.ts` (its smoke test) and `release.ts` (versions)
 - `docs/` README assets and design plans
 - `package.json` workspaces and scripts
-- `tsconfig.json` type check of `server/` and `shared/`
+- `tsconfig.json` type check of `server/`, `shared/` and `scripts/`
 - `biome.json` format and lint rules
 - `bunfig.toml` the Tailwind plugin for the HTML import
 </FileTree>

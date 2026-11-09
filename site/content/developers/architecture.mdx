@@ -25,8 +25,8 @@ on every reload, so it is written to run more than once. In order, it:
    replies left `streaming` by a killed process are marked `stopped` (`conversations.stopOrphans()`).
 6. Creates `ChatRuns`. Its `target()` sends generations to the managed server when it is `ready`, or to an external
    server.
-7. Prepares the web routes: the HTML import in development, `Bun.build` in production (see
-   [Serving the UI](#serving-the-ui)).
+7. Prepares the web routes: the HTML import in development and in the standalone executable, `Bun.build` in
+   production from source (see [Serving the UI](#serving-the-ui)).
 8. Starts the monitor with `startMonitor()`, once per process: later calls return the running one.
 9. Creates the bench repositories, the `RunExecutor` and the `BenchRunner`, and calls `benchRunner.resume()`. On a cold
    start (bench gate not held), runs and sweeps left `running` are first marked `interrupted`.
@@ -123,7 +123,9 @@ prompt can be processed without sending anything. A client that leaves only unsu
 
 ## Serving the UI
 
-The UI is never built ahead of time. `server/index.ts` picks one of two route sets depending on `NODE_ENV`.
+From source, the UI is never built ahead of time. `server/index.ts` picks one of three route sets: the HTML import
+in development, a build at startup in production, and the HTML import again, bundled at compile time, in the
+standalone executable (`Bun.isStandaloneExecutable`).
 
 ### Development
 
@@ -138,15 +140,19 @@ With `NODE_ENV=production`, `buildWebRoutes()` in `server/routes/web.ts` builds 
 memory:
 
 ```ts title="server/routes/web.ts"
-const result = await Bun.build({
-  entrypoints: [entry],
-  target: 'browser',
+export const WEB_BUILD_OPTIONS = {
   splitting: true,
   minify: true,
   // Absolute paths: a deep URL (/chat/12) must not look for its chunks under /chat/.
   publicPath: '/',
-  plugins: [tailwind],
   define: { 'process.env.NODE_ENV': '"production"' },
+} as const satisfies Partial<Bun.BuildConfig>;
+
+const result = await Bun.build({
+  ...WEB_BUILD_OPTIONS,
+  entrypoints: [entry],
+  target: 'browser',
+  plugins: await webPlugins(), // [tailwind], imported lazily
 });
 ```
 
@@ -157,10 +163,35 @@ chunks. Nothing is written to disk.
 `Bun.serve`'s HTML import would also bundle the page in production, but into a single file: it ignores code splitting
 and inlines the router's `import()` calls, so every page would load everything, including the Topology page's
 three.js (about 1 MB). `Bun.build` splits, so each page loads only its own chunks. The `[serve.static]` plugins of
-`bunfig.toml` only apply to the HTML import, so a Bun plugin added there must also be passed to `Bun.build` here.
+`bunfig.toml` only apply to the HTML import, so a Bun plugin added there must also be added to `webPlugins()`, which
+both this build and the executable's use.
 
 If the build fails (a broken import, a failing plugin), `unavailableWebRoutes()` serves a `503` with the error for
 every page until the next startup. The API, the WebSocket and `llama-server` control keep working.
+
+### Standalone executable
+
+`bun run compile` (`scripts/compile.ts`) runs `Bun.build` with `compile` on `server/index.ts`, with the same
+`WEB_BUILD_OPTIONS` and `webPlugins()`. The `web/index.html` import is then bundled at compile time, split per page
+(unlike the on-the-fly bundling of `Bun.serve`) and embedded under `/$bunfs/root/`; `Bun.serve` serves that manifest
+from `{ '/*': index }`, with an ETag per file. The `define` also replaces `process.env.NODE_ENV` in the server code,
+so the executable always runs in production, without HMR. A second constant, `LLAMA_WEBUI_VERSION`, carries
+`git describe --tags --always --dirty` (or `--version <name>`) into `APP_VERSION` (`server/version.ts`), which
+`/api/health` reports and the status bar shows: the tag, else the short commit hash. From source, it is `dev`.
+
+Inside the executable, `import.meta.dir` is `/$bunfs/root`, so nothing may read the source tree at runtime:
+
+- the startup build is skipped, and `bun-plugin-tailwind` (with its native binding) is imported lazily by
+  `webPlugins()` and marked `external`, so it stays out of the binary;
+- the NVML worker (`server/collectors/nvml/worker.ts`) is a second compile entrypoint. Bundled, `monitor.ts` lives in
+  the entrypoint, so `workerUrl()` resolves the worker against `Bun.main` (`collectors/nvml/worker.ts`, relative to
+  `server/`, the entrypoints' root) instead of `import.meta.url`. Without it, NVML would silently fall back to
+  `nvidia-smi`;
+- `bunfig.toml` autoloading is off (`autoloadBunfig: false`); `.env` in the working directory is still loaded, as
+  with `bun run start`.
+
+`.github/workflows/release.yml` builds `llama-webui-linux-x64` and `llama-webui-linux-arm64` for every `v*` tag,
+smoke-tests the x64 one and attaches both, with `SHA256SUMS`, to the GitHub Release.
 
 ## Launch options
 

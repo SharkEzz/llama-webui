@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { GpuReading } from '../gpu';
-import { NvmlMonitor, type WorkerLike } from './monitor';
+import { NVML_WORKER, NvmlMonitor, type WorkerLike, workerUrl } from './monitor';
 
 const GPU_A: GpuReading = {
   key: 'nvidia:GPU-a',
@@ -52,4 +52,13 @@ test('lowering the interval keeps the last sample fresh until the worker samples
   w.emit({ type: 'sample', snapshot: { gpus: [GPU_A], procs: [], system: { driver: null, cudaDriver: null } } });
   now = 1500 + 1000; // new pace: 3 × 250 ms without a sample is stale
   expect(mon.gpus()).toEqual([]);
+});
+
+test('workerUrl: next to the module from source, under the entrypoint root in the compiled executable', async () => {
+  const fromSource = workerUrl(false);
+  expect(fromSource).toBe(new URL('./worker.ts', import.meta.url).href);
+  expect(await Bun.file(Bun.fileURLToPath(fromSource)).exists()).toBe(true);
+  // The compile entrypoints' root is server/: the worker is embedded at server/<NVML_WORKER>.
+  expect(await Bun.file(`${import.meta.dir}/../../${NVML_WORKER}`).exists()).toBe(true);
+  expect(workerUrl(true)).toBe(new URL(`./${NVML_WORKER}`, Bun.pathToFileURL(Bun.main)).href);
 });

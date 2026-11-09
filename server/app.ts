@@ -12,7 +12,6 @@ import type { DownloadQueue } from './hf/downloader';
 import { guarded, withMethodNotAllowed } from './http';
 import type { Monitor } from './monitor/monitor';
 import type { PlacementTracker } from './monitor/placement';
-import pkg from './package.json';
 import { benchRoutes } from './routes/bench';
 import { chatRoutes } from './routes/chat';
 import { hfRoutes } from './routes/hf';
@@ -27,6 +26,7 @@ import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
 import type { WebRoutes } from './routes/web';
 import type { Runtime } from './runtime';
+import { APP_VERSION } from './version';
 import type { WsHub } from './ws/hub';
 
 export interface AppDeps {
@@ -65,7 +65,7 @@ export function createApp(deps: AppDeps) {
     development: development ? { hmr: true, console: true } : false,
     routes: withMethodNotAllowed({
       '/api/health': {
-        GET: guarded(() => Response.json({ ok: true, version: pkg.version, uptimeMs: Date.now() - startedAt })),
+        GET: guarded(() => Response.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt })),
       },
       ...settingsRoutes({ settings, monitor }),
       ...profileRoutes(deps),

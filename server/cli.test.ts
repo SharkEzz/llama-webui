@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { DEFAULT_HOST, DEFAULT_PORT, parseCli } from './cli';
+import { DEFAULT_HOST, DEFAULT_PORT, helpText, parseCli } from './cli';
 
 test('parseCli: defaults without flag or env', () => {
   expect(parseCli([], {})).toEqual({ kind: 'run', options: { host: DEFAULT_HOST, port: DEFAULT_PORT } });
@@ -45,4 +45,15 @@ test('parseCli: unknown option, missing value, positional, empty value', () => {
   expect(parseCli(['serve'], {}).kind).toBe('error');
   expect(parseCli(['--host='], {}).kind).toBe('error');
   expect(parseCli(['--data-dir='], {}).kind).toBe('error');
+});
+
+test('helpText: binary usage in the compiled executable, bun scripts from source', () => {
+  const standalone = helpText(true);
+  expect(standalone).toContain('  llama-webui [options]');
+  expect(standalone).not.toContain('bun run');
+  const source = helpText(false);
+  expect(source).toContain('bun run dev [options]');
+  expect(source).toContain('bun run start [options]');
+  expect(source.split('\n')[0]).toBe(standalone.split('\n')[0]);
+  expect(source).toContain('--data-dir <path>');
 });
