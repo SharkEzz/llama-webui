@@ -28,7 +28,7 @@ export function BenchmarkSection() {
         visual={
           <Shot
             name="benchmark"
-            alt="Benchmark history: five runs with their tool, flags, prompt and generation speed, MTP acceptance, peak VRAM and duration"
+            alt="Benchmark history: five runs with their tool, flags, prompt and generation speed, draft acceptance, peak VRAM and duration"
             crop={{ x: 0.16, y: 0.585, w: 0.835, h: 0.39 }}
             width="min(68rem, 90vw)"
             className={SHOT_FRAME}

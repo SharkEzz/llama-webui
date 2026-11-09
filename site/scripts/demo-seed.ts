@@ -31,7 +31,7 @@ const M27B = 'Qwen3.8-27B-GSQ-RCO-IQ3_S-mtp.gguf';
 const MOE =
   'ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf';
 const MOE_Q2 = 'Q2_0/Qwen3.8-Flash-Next-GSQ-RCO-Q2_0-00001-of-00002.gguf';
-const IGPU_KEY = 'amd:0000:0d:00.0';
+const IGPU_KEY = '0000:0d:00.0';
 
 const PROFILES = [
   {
@@ -39,16 +39,13 @@ const PROFILES = [
     model: M27B,
     mmproj: 'mmproj-Qwen3.8-27B-BF16.gguf',
     cwd: '~/models',
-    // -lv 4: this llama.cpp build only logs the model placement (buffers, offloaded layers) at that verbosity.
     // -sm layer (not tensor): with tensor split the buffers are reported on a "Meta()" device, so the Topology page
-    // could not show the split per card.
+    // could only show an estimated split per card.
     args: ['-c', '32768', '-ngl', '99', '-dev', 'CUDA0,CUDA1', '-ts', '51,58', '-sm', 'layer', '-fa', 'on'].concat([
       '--spec-type',
       'draft-mtp',
       '-np',
       '1',
-      '-lv',
-      '4',
     ]),
     env: {},
   },

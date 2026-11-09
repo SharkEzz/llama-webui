@@ -63,7 +63,7 @@ export function ProfilesSection() {
         visual={
           <Shot
             name="chat-stats"
-            alt="End of a chat answer with code, followed by its stats: time to first token, prompt and generation speed, tokens and MTP acceptance"
+            alt="End of a chat answer with code, followed by its stats: time to first token, prompt and generation speed, tokens and draft acceptance"
             crop={{ x: 0.335, y: 0.79, w: 0.42, h: 0.19 }}
             width="min(36rem, 90vw)"
             className={SHOT_FRAME}
