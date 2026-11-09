@@ -1,0 +1,137 @@
+---
+title: Chat
+description: Chat with the running model, with streamed replies, reasoning, per-conversation sampling settings and speed stats under every answer.
+---
+
+The Chat page talks to the model `llama-server` is serving. Use it to try a profile, see how fast it answers, or work
+with your local model. Conversations are stored by llama-webui, and a reply keeps being written on the server
+even if you leave the page.
+
+<Screenshot name="chat" alt="The Chat page: the conversation list on the left with a New conversation button, and on the right a conversation titled Tensor split for two GPUs, with the model name under the title, a context gauge at 10,732 / 32,768 tokens, a Settings button, a collapsed Reasoning section and a reply with highlighted code blocks." />
+
+## Before you chat
+
+Chat needs a server that is **Ready**: start a profile from the [launch pad](/docs/home/) or the
+[Server](/docs/server/) page first. A `llama-server` started outside llama-webui (state **External**) works too.
+Otherwise the message box is disabled and a notice links to the Server page.
+
+## Conversations
+
+The list on the left holds your conversations, most recently active first.
+
+- **New conversation** starts an empty one. You can also type in the message box with no conversation open: the first
+  message creates it.
+- A new conversation is titled **New conversation** until its first message, which gives it a title made of that
+  message's first words (six at most).
+- To rename or delete a conversation, hover it and open its menu (the three dots): **Rename** turns the title into a
+  text box (<Kbd>Enter</Kbd> saves, <Kbd>Esc</Kbd> cancels), **Delete** asks for confirmation, then deletes the
+  conversation and all its messages. Deleting a conversation stops its reply if one is being written.
+- A pulsing green dot in front of a title means a reply is being written in that conversation.
+
+Conversations live in llama-webui's database on the server, not in your browser: they are the same from every browser
+and every machine that opens llama-webui, and they are kept across restarts and updates.
+
+Under the title, the conversation shows the model it was started with (the file name). If the server now serves
+another model, it adds **— the server now serves** and the other model's name: the next replies come from that model,
+with the earlier messages sent to it as history.
+
+## Send a message
+
+Type in the box at the bottom and press <Kbd>Enter</Kbd> to send. <Kbd>Shift</Kbd> + <Kbd>Enter</Kbd> adds a new
+line.
+
+Each message sends the whole conversation to `llama-server`: the system prompt, then every earlier message and reply.
+Reasoning is not sent back, and failed replies are left out.
+
+The reply streams in as the model writes it. Meanwhile the send button becomes a stop button; stopping keeps the text
+written so far, marked **stopped**. One reply at a time runs in a conversation; you can open another
+conversation in the meantime, and the reply goes on.
+
+Two buttons sit at the end of a reply's stats line:
+
+- **Copy the reply** (the copy icon) copies its text, without the reasoning.
+- **Regenerate the reply** (the circular arrow), on the last reply only, deletes it and asks the model again, with the
+  current settings. It is available when the server is ready and nothing is being written.
+
+If a reply fails, it shows an **error** badge and the reason. When a conversation becomes longer than the model's
+context, the error says so: start a new conversation, or use a profile with a larger context (`-c`).
+
+### Context gauge
+
+At the top right, **Context** shows how many tokens the last exchange used (the prompt plus the reply, reasoning
+included) out of the server's context size, as `10,732 / 32,768 tokens`. From 85% it turns amber and suggests starting
+a new conversation.
+
+## Reasoning
+
+With a model that thinks before answering, its reasoning appears above the reply in a collapsible section. While the
+model is still thinking, the section is open and titled **Thinking…**; once the answer starts it closes, titled
+**Reasoning**, and a click opens it again.
+
+Reasoning is on by default for every conversation. Turn it off with the **Reasoning** switch in the conversation
+settings: llama-webui then asks the model's chat template not to think. It only works with models whose template
+supports it.
+
+## Conversation settings
+
+**Settings** at the top right opens the settings of the open conversation. They are saved with the conversation as
+you change them, and apply from the next reply.
+
+- **System prompt**: instructions sent before the conversation. Empty by default (**None**).
+- **Reasoning**: on or off (see above).
+- Sampling settings, described below.
+
+Each sampling field is empty by default: the value then comes from `llama-server`, which uses the profile's arguments
+(for example `--temp 0.6`) or its own defaults. The gray placeholder in each field shows that value, read from the
+server's `/props`. Type a number to override it for this conversation; clear the field to go back to the server's
+value.
+
+| Setting              | Range                     | What it changes                                                                                      |
+| -------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Temperature**      | 0 to 5                    | Randomness of the choice of the next token. Lower is more deterministic.                             |
+| **Top-p**            | 0 to 1                    | Keeps the most likely tokens until their probabilities add up to this value.                         |
+| **Top-k**            | 0 to 1,000 (integer)      | Keeps only this many most likely tokens.                                                             |
+| **Min-p**            | 0 to 1                    | Drops tokens less likely than this fraction of the most likely one.                                  |
+| **Presence penalty** | −2 to 2                   | Penalizes tokens that already appeared, to push toward new topics.                                   |
+| **Repeat penalty**   | 0 to 5                    | Penalizes repeating recent tokens.                                                                   |
+| **Max tokens**       | 1 to 1,000,000 (integer)  | Maximum length of a reply. The placeholder reads **unlimited** when the server sets no limit.         |
+| **Seed**             | Any integer               | Fixed seed for reproducible replies. The placeholder reads **random** when the server picks one.     |
+
+## Stats under every reply
+
+When a reply is complete, a line under it gives the numbers `llama-server` reported for it:
+
+<Screenshot name="chat-stats" alt="The end of a reply, with highlighted code blocks and the stats line 0.3 s to first token · 533 t/s prompt · 71.9 t/s · 10,608 tokens · MTP 51%, followed by copy and regenerate buttons." />
+
+| Stat                       | Meaning                                                                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0.3 s to first token**   | Time from sending the request to the first token of reasoning or text. It includes processing the prompt.                                      |
+| **533 t/s prompt**         | Prompt processing speed. Only the tokens processed for this reply count: the part of the conversation already in the server's cache is skipped. |
+| **71.9 t/s**               | Generation speed of the reply.                                                                                                                 |
+| **10,608 tokens**          | Tokens generated, reasoning included.                                                                                                          |
+| **MTP 51%**                | Share of drafted tokens the model accepted. Only shown when the profile uses speculative decoding, with a draft model or MTP.                  |
+
+These are the same measures the [Dashboard](/docs/dashboard/) shows live, for one reply. To compare profiles on a
+fixed workload, use the [Benchmark](/docs/benchmark/) page. See
+[Speculative decoding and MTP](/docs/guides/speculative-decoding/) for what raises the acceptance rate.
+
+## Leave, reload or close the tab
+
+Replies are generated by llama-webui's server, not by your browser. Leaving the page, reloading it or closing the tab
+during a reply does not stop it:
+
+- The reply keeps being written on the server, and saved to the database as it goes (about once per second).
+- When you open the conversation again, from any browser, it shows the text written so far and follows the rest live.
+- Only the stop button, deleting the conversation, or stopping or switching `llama-server` ends it early.
+
+If llama-webui itself stops during a reply, the text written so far is kept, marked **stopped**. If `llama-server`
+stops or crashes during a reply, the reply ends with an error saying that `llama-server` cut it short.
+
+## Formatting
+
+Replies are rendered as Markdown, with GitHub extensions: headings, lists, quotes, links (opened in a new tab), tables
+and task lists. Raw HTML in a reply is shown as text, never run.
+
+Code blocks show their language and a copy button, and are syntax highlighted. While a reply streams, a code block
+appears as plain text first and is highlighted as soon as it stops changing for a moment. Your own messages are shown
+as plain text.

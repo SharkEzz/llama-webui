@@ -1,0 +1,178 @@
+---
+title: Requirements
+description: What llama-webui needs to run, and the optional pieces (llama-bench, GPU drivers, perf) that unlock benchmarks, GPU telemetry and DRAM bandwidth.
+---
+
+llama-webui needs Linux, Bun and a llama.cpp build with `llama-server`. Everything else is optional: each extra piece
+unlocks part of the app, and the [setup checklist](/docs/getting-started/first-run/) shows which ones it found on
+your machine. The install steps themselves are on the [Installation](/docs/getting-started/installation/) page.
+
+## At a glance
+
+| Piece                                 | Required | What it gives you                                                              | Without it                                                       |
+| ------------------------------------- | -------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Linux, with `/proc` and `/sys`        | Yes      | Hardware discovery and telemetry                                               | llama-webui does not run                                         |
+| `setpriv` (util-linux)                | Yes      | Ties every `llama-server` and `llama-bench` to llama-webui                     | Nothing can be started                                           |
+| Bun 1.4.4 or later                    | Yes      | Runs llama-webui                                                               | llama-webui does not run                                         |
+| `llama-server`                        | Yes      | Runs your models                                                               | The setup checklist cannot be finished                           |
+| GGUF models                           | Yes      | Something to run                                                               | Nothing to start: download some from the Models page             |
+| `llama-bench`                         | No       | llama-bench benchmarks, sweeps, Tuning's view of your GPUs                     | Only real-server benchmarks; no sweeps                           |
+| NVIDIA driver                         | No       | NVIDIA telemetry through NVML (or `nvidia-smi`)                                | No readings for NVIDIA cards                                     |
+| `amdgpu` driver                       | No       | AMD telemetry through sysfs                                                    | No readings for AMD cards                                        |
+| `perf`, on an AMD Zen 4 or Zen 5 CPU  | No       | DRAM bandwidth, for the machine and for `llama-server`                         | CPU activity is shown instead                                    |
+| Hugging Face token                    | No       | Gated and private repositories, higher rate limits                             | Public models only                                               |
+
+## Linux
+
+llama-webui reads the machine directly from the kernel's virtual file systems, so it only runs on Linux:
+
+- **`/proc`**: CPU usage, memory, disk activity, the kernel settings reviewed by the system checks, and the running
+  processes. Reading process command lines is how llama-webui recognizes a `llama-server` started outside of it on the
+  configured port, and how it measures the VRAM `llama-server` uses on AMD cards.
+- **`/sys`**: AMD GPUs, PCI devices and their links (for the [Topology](/docs/topology/) page and the PCIe checks),
+  disks, and the CPU frequency governor.
+
+Every `llama-server` and `llama-bench` is started through `setpriv --pdeathsig KILL` from util-linux: the kernel stops
+the child process when llama-webui exits, even after a crash, so no orphan keeps your VRAM. util-linux is installed by
+default on most distributions; check with:
+
+```bash title="Terminal"
+setpriv --version
+```
+
+If `setpriv` is missing, every launch fails: the server ends in the crashed state, and the [Logs](/docs/logs/) page
+shows a line starting with `[llama-webui] launch failed:`.
+
+## Bun
+
+Bun 1.4.4 or later is the only runtime: no Node.js, no separate build step. The interface is bundled in memory when
+llama-webui starts. Check your version with `bun --version`; the
+[Installation](/docs/getting-started/installation/#install) page shows how to install or update it.
+
+## llama.cpp
+
+You build llama.cpp yourself, with any backend: CUDA, ROCm, Vulkan, CPU, or several of them in one build. llama-webui
+only needs to know where `llama-server` is.
+
+### llama-server (required)
+
+llama-webui finds `llama-server` through the **Binary** setting: an absolute path, or a name looked up in the `PATH`
+(the default is `llama-server`). Write the full path: `~` is not expanded in this field. The file must exist and be
+executable.
+
+From this binary, llama-webui uses:
+
+- `llama-server --version`, for the build number shown in the setup checklist and recorded with each benchmark;
+- `llama-server --help`, for the flag autocompletion and inline help of the [profile](/docs/profiles/) editor;
+- the server itself, started with your profile's arguments plus `--host`, `--port`, `--metrics`, `--slots` and
+  `--props`. The last three enable the endpoints that feed the [Dashboard](/docs/dashboard/).
+
+### llama-bench (optional)
+
+`llama-bench` ships with every llama.cpp build, in the same `build/bin/` folder. llama-webui looks for it next to
+`llama-server`: same folder, same file name with `llama-server` replaced by `llama-bench`. When **Binary** is a bare
+name, `llama-bench` is looked up in the `PATH` too.
+
+With `llama-bench`, you get:
+
+- **llama-bench runs** on the [Benchmark](/docs/benchmark/) page (raw llama.cpp speed);
+- **sweeps** on the [Tuning](/docs/tuning/) page, which explore flag combinations with `llama-bench`;
+- **Tuning's view of your GPUs**: the device list comes from `llama-bench --list-devices`, so without it Tuning does
+  not see your cards;
+- the **memory-fit badge** on the launch pad cards, on a machine with GPUs.
+
+Without it, the Benchmark page can still measure a real `llama-server` run (the **Server** tool). To check that
+`llama-bench` sees your GPUs:
+
+```bash title="Terminal"
+/path/to/llama.cpp/build/bin/llama-bench --list-devices
+```
+
+## GGUF models
+
+llama-webui runs GGUF files, the format of llama.cpp. Put them in one folder, the **Models folder** setting
+(`~/models` by default), or download them from Hugging Face on the [Models](/docs/models/) page.
+
+- The folder is scanned with its subfolders. Names starting with `.` are skipped; links to files are followed, links to
+  folders are not.
+- Split models (`name-00001-of-00003.gguf` and so on) appear as one model, and missing parts are reported.
+- Multimodal projectors (`mmproj` files) are recognized and offered with their model.
+
+llama-webui reads each file's GGUF header (architecture, quantization, layers, context length, experts) to fill the
+Models page and to estimate how much memory a model needs.
+
+## GPU telemetry
+
+GPU readings are optional: without them, llama-webui still runs models and shows CPU and memory. It reads NVIDIA and
+AMD cards; other GPUs get no telemetry.
+
+<Tabs>
+  <Tab title="NVIDIA">
+
+llama-webui reads NVIDIA cards through **NVML**, the management library installed with the NVIDIA driver
+(`libnvidia-ml.so.1`). The CUDA toolkit is not needed for telemetry. NVML gives utilization, VRAM, temperature, power
+and power limit, clocks, fan speed, the PCIe link and its traffic, and the VRAM used by each process.
+
+If NVML cannot be loaded, or if you turn off **NVML for NVIDIA GPUs** in [Settings](/docs/settings/#monitoring),
+llama-webui polls `nvidia-smi` instead. That fallback reads utilization, VRAM, temperature, power and per-process VRAM,
+but not the PCIe traffic, clocks or fans. The choice between the two is made when llama-webui starts.
+
+  </Tab>
+  <Tab title="AMD">
+
+llama-webui reads AMD cards from the files of the `amdgpu` kernel driver under `/sys/class/drm`: utilization, VRAM,
+memory controller activity, temperature, power and power cap, graphics and memory clocks, fan speed, and the PCIe link
+generation and width. ROCm is not needed for telemetry. PCIe traffic is not available for AMD cards.
+
+Card names come from the `pci.ids` database (`/usr/share/hwdata/pci.ids` or `/usr/share/misc/pci.ids`); without it, a
+card shows as `AMD GPU` followed by its PCI address. A card that is asleep (runtime suspended) is listed but not read,
+so llama-webui does not wake it up.
+
+  </Tab>
+</Tabs>
+
+To stop reading a card, for example an integrated GPU you do not use for models, hide it in
+[Settings](/docs/settings/#monitoring): a hidden card is no longer read.
+
+## DRAM bandwidth with perf
+
+The [System](/docs/system/) and [Topology](/docs/topology/) pages can show how many bytes per second go through
+system memory, for the whole machine and for `llama-server` alone. This needs three things:
+
+- **`perf`** in the `PATH` (the `perf` or `linux-tools` package, depending on your distribution);
+- an **AMD Zen 4 or Zen 5 CPU**: llama-webui reads the memory controller events `umc_cas_cmd.rd` and
+  `umc_cas_cmd.wr`, and the core event `ls_any_fills_from_sys.dram_io_all` for `llama-server`'s own traffic;
+- **permission** to read these events without root: `kernel.perf_event_paranoid` set to `0` or lower, or the
+  `cap_perfmon` capability on the `perf` binary.
+
+To lower `perf_event_paranoid`, use one of the commands the setup checklist suggests:
+
+```bash title="Terminal"
+# Until the next reboot
+sudo sysctl kernel.perf_event_paranoid=0
+
+# Permanently
+echo 'kernel.perf_event_paranoid = 0' | sudo tee /etc/sysctl.d/99-perf.conf
+```
+
+Or give the capability to `perf` only:
+
+```bash title="Terminal"
+sudo setcap cap_perfmon=ep "$(command -v perf)"
+```
+
+When the measurement is not available, llama-webui shows CPU activity instead. After a failure it tries again about
+once a minute, so a permission change is picked up without restarting llama-webui. DRAM bandwidth follows the
+**CPU and memory** collector in Settings: turning it off also stops `perf`. The
+[Monitor DRAM bandwidth](/docs/guides/dram-bandwidth/) guide goes further.
+
+## Hugging Face access
+
+Downloading models from the Models page needs access to `huggingface.co`, or to a mirror set with `HF_ENDPOINT`. A
+token is only needed for gated or private repositories, and gives higher rate limits. llama-webui uses the same token
+as the `hf` command-line tool: see [Launch options](/docs/configuration/#hugging-face).
+
+## Browser
+
+Any recent desktop browser works. The [Topology](/docs/topology/) page draws a 3D scene and needs WebGL. If
+llama-webui runs on another machine, read [Security](/docs/security/) before opening it to your network.

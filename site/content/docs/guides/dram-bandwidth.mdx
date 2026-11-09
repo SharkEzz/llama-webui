@@ -1,0 +1,192 @@
+---
+title: Monitor DRAM bandwidth
+description: Let llama-webui measure your memory bandwidth with perf on AMD Zen 4 and Zen 5 CPUs. Install perf, grant it access, and check the result.
+---
+
+When part of a model runs from system RAM, generation speed depends on how fast the memory can feed the CPU. llama-webui
+can show the machine's real DRAM traffic, read from the memory controller through `perf`. This guide installs `perf`,
+gives it the permission it needs, and checks that the figures show up.
+
+## What you need
+
+- **An AMD Zen 4 or Zen 5 CPU.** llama-webui asks `perf` for the memory controller events `umc_cas_cmd.rd` and
+  `umc_cas_cmd.wr`, which these CPUs provide. It does not check the CPU model: if `perf` knows the events, the
+  measurement works; on other CPUs, Intel included, `perf` refuses them and llama-webui shows CPU activity instead.
+- **`perf`**, on the `PATH` llama-webui runs with.
+- **Permission to read system-wide counters**: by default, Linux reserves them to root.
+- **The CPU and memory collector**, on the **Monitoring** tab of [Settings](/docs/settings/). It is on by default, and
+  the DRAM measurement stops when you turn it off.
+
+## What llama-webui measures
+
+llama-webui runs `perf` in the background, sampled at the polling interval (1,000 ms by default), and reads two
+figures:
+
+- **The machine's DRAM traffic**, read and write: every access the memory controller serves, whether it comes from the
+  CPU cores, a GPU copying over PCIe or an NVMe drive. Each counted command is 64 bytes.
+- **The traffic of `llama-server` alone**: the data its threads fetch from DRAM, followed on its process while a
+  server runs.
+
+## Set it up
+
+<Steps>
+  <Step title="Install perf">
+
+`perf` comes from your distribution, usually in a package tied to your kernel.
+
+<Tabs>
+  <Tab title="Arch, CachyOS">
+
+```bash title="Terminal"
+sudo pacman -S perf
+```
+
+  </Tab>
+  <Tab title="Fedora">
+
+```bash title="Terminal"
+sudo dnf install perf
+```
+
+  </Tab>
+  <Tab title="Debian">
+
+```bash title="Terminal"
+sudo apt install linux-perf
+```
+
+  </Tab>
+  <Tab title="Ubuntu">
+
+```bash title="Terminal"
+sudo apt install linux-tools-common linux-tools-$(uname -r)
+```
+
+  </Tab>
+  <Tab title="openSUSE">
+
+```bash title="Terminal"
+sudo zypper install perf
+```
+
+  </Tab>
+</Tabs>
+
+  </Step>
+  <Step title="Check that your CPU has the events">
+
+```bash title="Terminal"
+perf list 2>/dev/null | grep umc_cas_cmd
+```
+
+The output must include `umc_cas_cmd.rd` and `umc_cas_cmd.wr`. If it is empty, either the CPU does not have these
+events, or the kernel or `perf` is too old to know them: the memory controller then has no `amd_umc` entry in
+`/sys/bus/event_source/devices/`. Without the events, llama-webui cannot measure DRAM bandwidth on this machine.
+
+  </Step>
+  <Step title="Allow perf to read the memory controller">
+
+Pick one of the two options. Both work without running llama-webui as root.
+
+<Tabs>
+  <Tab title="Lower perf_event_paranoid">
+
+`kernel.perf_event_paranoid` sets what unprivileged users may monitor. Check its value, then set it to 0, first for
+the current session, then permanently:
+
+```bash title="Terminal"
+sysctl kernel.perf_event_paranoid
+sudo sysctl kernel.perf_event_paranoid=0
+echo 'kernel.perf_event_paranoid = 0' | sudo tee /etc/sysctl.d/99-perf.conf
+```
+
+The second command applies until the next reboot; the file written by the third one applies it at every boot. These
+are the commands the [first-run checklist](/docs/getting-started/first-run/) suggests.
+
+**Trade-off:** the setting applies to every user and every program: any of them can then monitor the whole machine,
+kernel included. That is usually fine on a personal workstation, less so on a machine you share.
+
+  </Tab>
+  <Tab title="Give perf the capability">
+
+Grant the `CAP_PERFMON` capability to the `perf` binary only, and leave the system setting at its default:
+
+```bash title="Terminal"
+sudo setcap cap_perfmon=ep "$(command -v perf)"
+getcap "$(command -v perf)"
+```
+
+`getcap` must print the path of `perf` followed by `cap_perfmon=ep`.
+
+`setcap` has no effect on a script. On some distributions, Ubuntu among them, `perf` is a wrapper script that runs a
+binary matching your kernel: `file "$(command -v perf)"` tells you. If it reports a shell script, apply `setcap` to
+the binary the script runs.
+
+**Trade-off:** only `perf` gets the right, but anyone who can run that binary gets it. Updating the `perf` package
+replaces the binary and drops the capability: run `setcap` again after each update.
+
+  </Tab>
+</Tabs>
+
+  </Step>
+  <Step title="Test it from a terminal">
+
+As the user that runs llama-webui, without `sudo`:
+
+```bash title="Terminal"
+perf stat -a -e umc_cas_cmd.rd,umc_cas_cmd.wr -- sleep 1
+```
+
+`perf` prints a count for each event over one second; multiplied by 64, they give the bytes read and written. A
+permission error means the previous step did not take effect. An error about the event names means the CPU or `perf`
+does not support them (see the second step).
+
+  </Step>
+  <Step title="Check in llama-webui">
+
+You do not need to restart llama-webui. After a failure, it starts `perf` again at most once a minute, so the figures
+appear within a minute. To retry at once, turn **CPU and memory** off and on again on the **Monitoring** tab of
+Settings.
+
+Open the [System](/docs/system/) page: in the **Memory** card, the **DRAM bandwidth** row shows the read (↓) and write
+(↑) traffic, and a **Read** and **Write** chart appears below the list.
+
+The figure for `llama-server` alone is attached to the server's process when it starts. If it is missing from the
+Topology page (see below), restart the server.
+
+  </Step>
+</Steps>
+
+## Where the bandwidth appears
+
+| Place                                                                 | What you see                                                                                                                                       |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [System](/docs/system/), **Memory** card                              | The **DRAM bandwidth** row and a **Read** and **Write** chart over the history.                                                                    |
+| [Topology](/docs/topology/), scene                                    | Particles on the link between the CPU and **Memory**: writes on one side, reads on the other. The **Memory** label shows read plus write.         |
+| [Topology](/docs/topology/), **Memory** details                       | **Read**, **Write** and **llama-server (DRAM)**, the traffic of `llama-server` alone.                                                              |
+| [Topology](/docs/topology/), **Throughput** card                      | **DRAM read** and **DRAM write**.                                                                                                                 |
+| [First run](/docs/getting-started/first-run/) checklist, **GPUs and telemetry** | Under **DRAM bandwidth**: **Measured with perf.**                                                                                        |
+
+## Without perf
+
+When the measurement is not available, because `perf` is missing, lacks permission or the CPU has no such events,
+llama-webui keeps working and says so:
+
+- The **DRAM bandwidth** row of the System page reads **not measured (perf)**, and the bandwidth chart is not shown.
+- On the Topology page, the link between the CPU and memory pulses with CPU activity instead: the legend says **CPU ↔
+  memory pulse: CPU activity, for lack of a DRAM measurement (perf).** The **Memory** details read **Bandwidth: not
+  measured (perf): the link shows CPU activity**, and **DRAM read** and **DRAM write** show `—`.
+- The first-run checklist explains why. When `kernel.perf_event_paranoid` is above 0, it shows the two commands of the
+  first option; otherwise it says the measurement needs `perf` and an AMD Zen 4/5 CPU.
+
+## Read the numbers
+
+The figure counts everything that touches RAM, not only the model: loading a model from disk, copies to the GPUs and
+other programs add to it. For the share of `llama-server`'s own threads, read **llama-server (DRAM)** in the Topology
+page's **Memory** details.
+
+To compare with what your memory can do, its theoretical peak is the transfer rate times 8 bytes times the number of
+channels: dual-channel DDR5-6000 gives 96 GB/s, about 89 GiB/s in the unit llama-webui shows. Real traffic stays
+below that peak. If DRAM reads sit close to what your system reaches while a model generates with weights in RAM,
+memory is the bottleneck, and keeping more of the model in VRAM is what speeds it up. See
+[Run a 100 GB MoE model on consumer GPUs](/docs/guides/big-moe-models/) for a setup where this matters.

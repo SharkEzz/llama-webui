@@ -1,0 +1,146 @@
+---
+title: First run
+description: The setup checklist llama-webui opens on its first launch, step by step, with what each check needs from you and how to fix it.
+---
+
+On its first launch, Home opens a setup checklist titled **Welcome to llama-webui**. It finds `llama-server`, checks
+the models folder, shows what `llama-bench` and the GPU telemetry can see, and reviews the machine configuration. Only
+the first two steps are required; you can come back to the others at any time.
+
+<Screenshot
+  name="setup"
+  alt="The setup checklist: the llama-server step found the binary with its build number, the models folder step counts 5 models in ~/models, the llama-bench step lists five devices (CUDA0, CUDA1, ROCm0, ROCm1, ZenDNN), and the GPUs and telemetry step shows one switch per card. Each step is marked Done."
+/>
+
+## How the checklist works
+
+All the steps are on one page, in a fixed order. Each card shows its state on the right:
+
+| State          | Meaning                                       |
+| -------------- | --------------------------------------------- |
+| **Done**       | The check passes.                             |
+| **Required**   | A required step fails: fix it to continue.    |
+| **To improve** | An optional step works, but could be better.  |
+| **Note**       | Information only, nothing to do.              |
+| **Checking…**  | The check is still running.                   |
+
+Optional steps carry an **optional** badge. The fields of the checklist are saved when you press <Kbd>Enter</Kbd> or
+leave the field, and the checks then run again. After changing something outside the app (building llama.cpp,
+creating a folder), click **Check again** at the top of the page.
+
+The card at the bottom counts the required steps, for example "1 of 2 required steps done: llama-server and the models
+folder.", and holds the **Finish** button, available once both pass.
+
+## llama-server
+
+**Required.** This step checks the **Binary** field (default `llama-server`): it must point to an existing, executable
+file, given as an absolute path or as a name found in the `PATH` of the llama-webui process. `~` is not expanded here,
+so type the full path.
+
+- **When it passes**, the card shows **Found at** with the resolved path and the build number read from
+  `llama-server --version`, for example `build b12211 (7d7f02875)`.
+- **When it fails**, the card says the binary "cannot be found or is not executable" and links to llama.cpp's build
+  instructions. Build llama.cpp (see [Installation](/docs/getting-started/installation/#install)), then type the path
+  to its `llama-server`, usually `…/llama.cpp/build/bin/llama-server`, and press <Kbd>Enter</Kbd>.
+
+If you run llama-webui as a service, its `PATH` may not include the folders of your interactive shell: an absolute path
+avoids the surprise.
+
+## Models folder
+
+**Required.** This step checks that the **Folder** field (default `~/models`) is an existing directory. llama-webui
+does not create it: create it first, or type the path of the folder that already holds your models.
+
+```bash title="Terminal"
+mkdir -p ~/models
+```
+
+- **When it passes**, the card counts the models found in the folder and its subfolders, with their total size, and
+  links to the Models page (**browse**). Multimodal projectors are not counted.
+- **When the folder is empty**, the step still passes and suggests downloading GGUF files from Hugging Face into it.
+  You can also do that later from the [Models](/docs/models/) page, which downloads them for you.
+- **When it fails**, the card shows **Folder not found** with the expanded path.
+
+The models folder is also where [Hugging Face downloads](/docs/hugging-face/) are saved, and the default working
+directory of new profiles.
+
+## llama-bench
+
+**Optional.** llama-webui looks for `llama-bench` next to `llama-server` and runs `llama-bench --list-devices`.
+
+- **When it passes**, the card shows the path and every device `llama-bench` sees, with its llama.cpp name (`CUDA0`,
+  `ROCm0`…), its model and its memory.
+- **When it is missing or lists no device**, the step is marked **To improve**. Keep `llama-bench` in the same folder
+  as `llama-server`, as llama.cpp builds it. Without it, llama-bench benchmarks and sweeps are unavailable and Tuning
+  does not see your GPUs (see [Requirements](/docs/getting-started/requirements/#llama-bench-optional)).
+
+## GPUs and telemetry
+
+**Optional.** This step shows what the live monitoring reads. It stays on **Checking…** until the first sample
+arrives.
+
+- **GPU sources.** The card says how each vendor is read: "NVIDIA read through NVML" (or "through nvidia-smi", the
+  fallback) and "AMD read through the amdgpu driver". When no card is found, it says
+  "No GPU detected: llama-server will run on the CPU."
+- **One switch per card**, with its PCI address and VRAM. Turn a card off to hide it, an integrated GPU for example: a
+  hidden card is no longer read, and stays asleep if it is. The same switches are in
+  [Settings](/docs/settings/#monitoring).
+- **DRAM bandwidth.** "Measured with perf." when it works. When `perf` is present but not allowed to read the memory
+  controller, the card shows the current `kernel.perf_event_paranoid` value and two commands to copy: one valid until
+  the next reboot, one permanent. Otherwise it explains that the measurement needs `perf` and an AMD Zen 4 or Zen 5 CPU.
+  Without it, CPU activity is shown instead.
+
+The step is marked **To improve** only when `perf` is blocked by `kernel.perf_event_paranoid`. The details are on the
+[Requirements](/docs/getting-started/requirements/#dram-bandwidth-with-perf) page.
+
+## Machine configuration
+
+**Optional.** A read-only review of the system settings that affect llama.cpp speed. Nothing is changed for you: each
+item that could be better comes with the command to run yourself.
+
+The checks are grouped by family: **NVIDIA**, **AMD**, **CPU**, **llama.cpp build** and **Kernel and disk**. They
+cover, depending on your hardware, NVIDIA persistence mode, power limit, Resizable BAR, driver and `nvidia_uvm`
+module; AMD power level (DPM) and ROCm support; the CPU governor, transparent hugepages and NUMA nodes; the CUDA
+backend and the age of your llama.cpp build; and the IOMMU.
+
+Each line shows a state, a label and a detail. An item to improve adds its impact and a command with a copy button,
+tagged **until reboot** or **permanent**. Passing checks are folded under a line such as "4 checks ok". The step is
+marked **To improve** when at least one item is.
+
+These checks are read when the page opens: reload it to see the effect of a command you ran. Checks that need a model
+or a running server, such as the PCIe link under load, are on the [System](/docs/system/) page.
+
+## First profile
+
+**Optional.** A profile is a model plus its `llama-server` arguments, started in one click from Home. The step is
+**Done** once at least one profile exists, and lists their names. Otherwise it offers two ways to create one:
+
+- **Create a profile** opens the [Profiles](/docs/profiles/) page.
+- **Get a recommendation** opens [Tuning](/docs/tuning/), which suggests flags for your hardware and can create the
+  profile for you.
+
+If you used llama-tui and have no profile yet, the step also lists the profiles found in its configuration
+(`~/.config/llama-tui/config.json`, or under `$XDG_CONFIG_HOME`) with an **Import** button.
+
+## Network access
+
+This card only appears when llama-webui listens on an address other than the loopback, for example after
+`--host 0.0.0.0`. It is a reminder that llama-webui has no authentication: anyone who can reach it can start processes
+on the machine. Read [Security](/docs/security/) before using it this way.
+
+## Finish
+
+Click **Finish** once the two required steps pass. llama-webui records that the setup is done, and Home becomes the
+[launch pad](/docs/home/): one card per profile, started in one click. Next, follow the
+[Quick start](/docs/getting-started/quick-start/) to download a model and run a first chat.
+
+## Come back to the checklist
+
+The checklist stays available after the first run:
+
+- In [Settings](/docs/settings/), click **Run setup again**.
+- On the launch pad, click **Setup checklist**, at the top right.
+- If `llama-server` or the models folder goes missing later (a moved build, an unmounted disk), the launch pad shows a
+  **Setup incomplete** alert that says what broke, with a **Fix** button that opens the checklist.
+
+When you reopen it this way, **Finish** takes you back to Home.

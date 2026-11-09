@@ -1,0 +1,109 @@
+---
+title: Settings
+description: Every option of the Settings page, tab by tab, with its default value and what it changes in llama-webui and llama-server.
+---
+
+The Settings page holds the options you change while llama-webui runs: where `llama-server` and your models are, how
+the monitoring samples the machine, and the theme. Open it from **Settings** at the bottom of the sidebar. Options
+that must be known before llama-webui starts (its own address, port and data folder) are
+[launch options](/docs/configuration/) instead.
+
+<Screenshot
+  name="settings"
+  alt="The Settings page on its General tab: a llama-server card with the Binary, Models folder, Default host and Default port fields, and a Run setup again button at the top right."
+/>
+
+## How settings are saved
+
+Each option is saved on its own, as soon as you change it; there is no Save button.
+
+- **Text fields** are saved when you press <Kbd>Enter</Kbd> or leave the field, if the value changed. Leading and
+  trailing spaces are removed.
+- **Switches, menus and the slider** are saved when you change them (the slider when you release it).
+
+A **Setting saved** notification confirms each change. An invalid value is not saved: its error appears under the
+field, for example "Port between 1 and 65535". Settings are stored in llama-webui's database, so they are the same in
+every browser.
+
+The **Run setup again** button, at the top of the page, reopens the [setup checklist](/docs/getting-started/first-run/).
+
+## General
+
+The **llama-server** card tells llama-webui where to find `llama-server` and your models, and where `llama-server`
+listens by default.
+
+| Field             | Default        | Effect                                                                                                                                                                                                          |
+| ----------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Binary**        | `llama-server` | The `llama-server` to run: an absolute path, or a name found in the `PATH` (`~` is not expanded). Also used to read its build number and its `--help`, and to find `llama-bench` in the same folder.            |
+| **Models folder** | `~/models`     | The folder scanned for GGUF files, with its subfolders. [Hugging Face downloads](/docs/hugging-face/) are saved there, and it becomes the working directory of a new profile when you pick its model.          |
+| **Default host**  | `0.0.0.0`      | The `--host` given to `llama-server` for profiles that leave **Host** empty.                                                                                                                                     |
+| **Default port**  | `8080`         | The `--port` given to `llama-server` for profiles that leave **Port** empty. Also the port of the temporary servers of benchmark runs, and the port where llama-webui looks for a `llama-server` it did not start. |
+
+Changes apply to the next start: a running `llama-server` keeps its binary, host and port until you restart it.
+
+<Callout type="important" title="llama-server listens on every interface by default">
+
+With the default host `0.0.0.0`, the model's API on port 8080 is reachable from your whole network. Set
+**Default host** to `127.0.0.1` if only this machine should use it. llama-webui talks to `llama-server` on
+`127.0.0.1`, so keep a host that accepts local connections (`127.0.0.1` or `0.0.0.0`). See
+[Security](/docs/security/#how-llama-server-is-exposed).
+
+</Callout>
+
+## Monitoring
+
+The Monitoring tab controls what llama-webui reads from the machine, how often, and how much history it keeps.
+
+<Screenshot
+  name="settings-monitoring"
+  alt="The Monitoring tab: a Collection card with switches for NVML for NVIDIA GPUs, CPU and memory, and Disks, a Polling interval menu set to 1000 ms and a History kept slider at 5 min 00 s; a Displayed GPUs card with one switch per graphics card, each with its PCI address and VRAM."
+/>
+
+### Collection
+
+| Option                    | Default | Effect                                                                                                                                                                                                  |
+| ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **NVML for NVIDIA GPUs**  | On      | Reads NVIDIA cards through NVML. Off: through `nvidia-smi`, which gives no PCIe bandwidth, clocks or fans. **Applied on the next llama-webui start.**                                                      |
+| **CPU and memory**        | On      | CPU usage, memory, and the DRAM bandwidth measured with `perf`. Off: none of them is read, and `perf` is stopped.                                                                                         |
+| **Disks**                 | On      | Read and write rates of the disks, including the reads from the disk that holds the running model.                                                                                                      |
+| **Polling interval**      | 1000 ms | How often every collector is read and the figures are sent to your browser: 250 ms, 500 ms, 1000 ms or 2000 ms. A new sample arrives once per interval.                                                    |
+| **History kept**          | 5 min   | How far back the live charts of the Dashboard and the System page go, from 30 s to 30 min in steps of 30 s.                                                                                             |
+
+Apart from the NVML switch, these options take effect at once. The history is kept in llama-webui's memory, not in the
+browser: a page you open later still shows the last minutes, but restarting llama-webui empties it. Monitoring never
+writes to the database.
+
+The `llama-server` figures (tokens per second, slots, context) are read at every interval as long as a server runs;
+they have no switch.
+
+### Displayed GPUs
+
+One switch per GPU llama-webui detected, with its name, PCI address and VRAM. All cards are shown by default. A
+hidden card is no longer read: it disappears from the Dashboard gauges, the System page marks it as hidden, and a card
+that is asleep is not woken up. Use it for an integrated GPU, or a card you keep for another task. The same
+switches appear in the setup checklist.
+
+Hiding a card only changes what llama-webui reads. `llama-server` can still use it: to keep a model off a card, use
+the profile's flags or environment variables (see [Profiles](/docs/profiles/)).
+
+## Appearance
+
+The **Theme** card has one option, **Interface theme**:
+
+| Value      | Effect                                                         |
+| ---------- | -------------------------------------------------------------- |
+| **System** | Default. Follows the light or dark setting of your system.     |
+| **Light**  | Always light.                                                  |
+| **Dark**   | Always dark.                                                   |
+
+The theme button at the top right of every page sets the same option. The choice is saved in your browser and in
+llama-webui's database; when a page loads, the database value wins, so a theme chosen in one browser follows you to
+the others.
+
+## Values saved without a field
+
+llama-webui also stores a few values in its settings that have no field on this page:
+
+- whether the setup checklist is finished, which decides whether Home shows the checklist or the launch pad;
+- the last profile you started, preselected on the [Server](/docs/server/) page;
+- whether you dismissed the offer to import llama-tui profiles on the Profiles page.

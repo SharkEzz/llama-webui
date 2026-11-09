@@ -1,0 +1,110 @@
+---
+title: Find the best flags with a sweep
+description: Go from a model to a measured, validated profile. Get a recommendation, sweep the flags around it, check the winner on a real server and keep it.
+---
+
+This guide takes one model from a first estimate to a profile whose flags were measured on your machine. You start
+from the [Tuning](/docs/tuning/) recommendation, let a [sweep](/docs/sweeps/) benchmark the variations around it,
+confirm the best ones on a real `llama-server`, and check the result on the [Dashboard](/docs/dashboard/).
+
+You need `llama-bench` next to `llama-server` (the [Benchmark](/docs/benchmark/) and Tuning pages rely on it) and a
+model in your models folder. The sweep stops the running model while it works, so pick a moment when you do not need
+[Chat](/docs/chat/).
+
+<Steps>
+  <Step title="Pick the model on the Tuning page">
+
+Open **Tuning**. In the **Model** card, choose your current profile for this model in **Start from a profile**, or
+type the model path in **Model**.
+
+Starting from a profile is the better choice when it sets a context size (`-c`) or speculative decoding: these flags
+appear under **Other profile flags**, and the server validation later in this guide uses them. Without them,
+`llama-server` runs with the context stored in the model.
+
+  </Step>
+  <Step title="Choose a goal and read the recommendation">
+
+In the **Preset** card, pick what you care about: **Responsive chat** for generation speed, **Agent & RAG** for long
+prompts, **Max context**, **Make the model fit**, or **100 GB model** for a MoE model larger than your VRAM. The preset
+also decides how the sweep ranks its results.
+
+The **Recommendation (estimate)** card lists each flag with the reason for its value, and the memory bars show what
+lands on each card and in RAM. If you want to keep a value fixed (say, a given set of cards), click the pencil next to
+it and **Pin** it: the estimate is recomputed around it.
+
+If the card says **Does not fit**, remove your pinned values or try another preset (**Make the model fit**, or
+**100 GB model** for a MoE model) before going on.
+
+  </Step>
+  <Step title="Build the search space">
+
+In the **Search space** card, click **Start from the recommendation**. The recommended flags become the **Base**, and a
+few rows get values around them: `-ncmoe` around the recommended value for a MoE model with experts in RAM, a few `-dev`
+sets when you have several cards, and two `-ub` values for **Agent & RAG**.
+
+Add the values you want to compare, for example `q8_0` next to `f16` in `-ctk`, or `layer` and `tensor` in `-sm`. Each
+value multiplies the number of configurations, so add a few at a time.
+
+Check the plan under the fields: the number of configurations, how many the estimator excluded because they do not
+fit, and the estimated duration. Each configuration is one model load plus about 10 seconds per repetition.
+
+  </Step>
+  <Step title="Run the sweep">
+
+Give the sweep a name, or keep the automatic one, and leave **p (prompt)**, **n (generation)** and **r (repetitions)**
+at 512, 128 and 3 unless you have a reason to change them. Click **Run sweep**.
+
+If a profile is running, confirm **Stop and run**: the server is stopped once for the whole sweep and restarted with
+the same command at the end. The sweep card shows each configuration as it runs, with an estimate of the time left. A
+configuration that runs out of memory is recorded as such and the sweep moves on.
+
+  </Step>
+  <Step title="Read the exploration ranking">
+
+When the status turns **done**, the **Exploration (llama-bench)** table ranks every configuration by the preset's
+score, with prompt and generation speed, peak VRAM and duration. `1=` marks configurations whose gap to the first is
+within llama-bench's measurement noise: treat them as equally fast.
+
+llama-bench does not allocate the context and does not measure speculative decoding, so this ranking is a shortlist,
+not the final answer.
+
+  </Step>
+  <Step title="Validate the best on the server">
+
+Leave **Top 3** selected (or pick up to **Top 5**) and click **Validate on the server**. Each of these configurations
+runs again on a real `llama-server`, with your profile's other flags, and lands in the **Validation (server)** table.
+Confirm **Stop and run** again if a model is running.
+
+When validation finishes, the star moves to the best validated run. The **MTP** column shows the draft acceptance
+rate if your profile uses speculative decoding.
+
+  </Step>
+  <Step title="Keep it as a profile">
+
+Open the **…** menu of the starred row and click **Create profile**. llama-webui saves a new profile with the
+configuration's flags, your profile's other flags and its environment variables, and opens it on the
+[Profiles](/docs/profiles/) page. Rename it if you like, then click **Save**.
+
+Your original profile is not changed: you can compare the two later.
+
+  </Step>
+  <Step title="Check it on the Dashboard">
+
+On the Profiles page, click **Start this profile** (or **Start** on its card on Home). Send a few messages in
+[Chat](/docs/chat/), then open the **Dashboard**: **Generation** and **Prompt** show the live speeds, and the VRAM
+gauges show how full each card is.
+
+Expect numbers close to the validation run, not identical: your prompts and context use differ from the benchmark's
+fixed text.
+
+  </Step>
+</Steps>
+
+## Go further
+
+- To measure the old and new profiles under the same conditions, start a **Server** run from each one on the
+  [Benchmark](/docs/benchmark/) page (**Start from a profile**), then select both runs and click **Compare**.
+- If the winner sits at the edge of the space you explored (the smallest `-ncmoe` you listed, for example), run another
+  sweep with values beyond it.
+- A sweep stopped by a restart of llama-webui can be picked up again: see
+  [Resume an interrupted sweep](/docs/sweeps/#resume-an-interrupted-sweep).

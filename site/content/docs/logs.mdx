@@ -1,0 +1,94 @@
+---
+title: Logs
+description: Follow llama-server's output live in a 10,000-line buffer, with a level filter, search, auto-follow and copy.
+---
+
+The Logs page shows the output of `llama-server` as it runs, along with the lines llama-webui adds about launches and
+benchmarks. Open it when a model fails to load, to read what `llama-server` reports while it starts, or to follow
+requests slot by slot.
+
+<Screenshot
+  name="logs"
+  alt="Logs page: a toolbar with the level filter set to Debug and above, a search field, the Auto-follow switch on, and Copy and Clear view buttons, above a list of llama-server slot lines with generation timings."
+/>
+
+## What is captured
+
+The buffer collects:
+
+- **Everything `llama-server` writes**, on standard output and standard error, for every server llama-webui launches.
+  Color codes and empty lines are removed.
+- **llama-webui's own lines**, which start with `[llama-webui]` and stand out in the accent color: the command of each
+  launch (`[llama-webui] launch: …`), a launch that failed, the server's exit code, and a forced stop when the server
+  does not stop in time.
+- **Benchmark lines**, which start with `[bench]`: the command of each run, the output of `llama-bench` or of the
+  temporary server, and the managed server being stopped for the benchmark and restarted afterwards.
+
+The output of an external server, one llama-webui did not launch, never reaches it. Errors of llama-webui itself go
+to the terminal or service journal it runs in, not to this page.
+
+## The buffer
+
+llama-webui keeps the last 10,000 lines in memory; older lines are dropped as new ones arrive. Lines from earlier
+launches stay until they are pushed out, so you can read why the previous server stopped after starting a new one.
+
+The buffer is never written to disk: restarting llama-webui empties it. When the browser connects, or reconnects
+after a network drop, it loads the lines already in the buffer, then receives new ones live.
+
+<Callout type="note">
+
+The [Topology](/docs/topology/) page reads the model's split across devices from the startup lines of the last
+launch. Clearing the view on this page does not affect it.
+
+</Callout>
+
+## Filter and search
+
+The toolbar above the lines narrows what you see. The line count next to the title shows how many lines pass the
+filters, followed by the total when they hide some (`120 lines of 915`).
+
+**Minimum level** keeps the lines at or above a level:
+
+| Option                  | Shows                                  |
+| ----------------------- | -------------------------------------- |
+| **Debug and above**     | Every line (the default).              |
+| **Info and above**      | Everything except debug lines.         |
+| **Warnings and errors** | Warnings and errors.                   |
+| **Errors only**         | Errors.                                |
+
+`llama-server` marks each line with a level letter after its timestamp (`I`, `W`, `E`, `D`), and llama-webui uses
+it; trace lines count as debug. A line without a letter is classified by its words: `error`, `failed` or `abort` make
+it an error, `warn` or `warning` a warning, and anything else is info.
+
+**Search** keeps the lines that contain your text, without regard to case, and highlights the first match in each
+line. It combines with the level filter.
+
+Lines from `llama-server`'s server and slot components carry a `srv` or `slot` tag in the left margin. Errors are
+shown in red, warnings in amber and debug lines dimmed.
+
+## Follow new lines
+
+With **Auto-follow** on (the default), the view stays at the bottom and scrolls as lines arrive. Scrolling up, with
+the wheel, the scrollbar or the <Kbd>↑</Kbd>, <Kbd>Page Up</Kbd> and <Kbd>Home</Kbd> keys, turns it off so you can
+read in peace; a **Resume following** button then appears in the corner. Click it, turn the switch back on, or scroll
+back to the bottom to follow again. Changing the filters does not stop following.
+
+## Copy and clear
+
+- **Copy** puts the lines currently shown, after filters and search, on the clipboard as plain text, one per line. A
+  message confirms how many lines were copied.
+- **Clear view** hides every line received so far, to start reading from a clean slate before you reproduce a
+  problem. It only affects this browser tab: the buffer on the server is untouched, and reloading the page shows the
+  hidden lines again.
+
+## Empty states
+
+- **No logs** with **Start llama-server from the Server page.** The buffer is empty: nothing has been launched since
+  llama-webui started. Start a profile from [Home](/docs/home/) or the [Server](/docs/server/) page.
+- **No lines match the filters** with **Lower the minimum level or change the search.** Lines exist, but the level
+  filter or the search hides all of them. The same message appears after **Clear view**, until a new line arrives.
+
+## Latest lines on the Server page
+
+The [Server](/docs/server/) page has a **Latest logs** card with the last 20 lines of the same buffer, unfiltered. Its
+**All logs** button opens this page.

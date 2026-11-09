@@ -1,0 +1,176 @@
+---
+title: Profiles
+description: Create and edit profiles, the named llama-server launch configurations, with flag autocompletion and inline help, and import or export them as JSON.
+---
+
+A profile is a named way to launch `llama-server`: the model to load, an optional multimodal projector, the
+`llama-server` arguments and environment variables, and where to listen. You start profiles from the
+[launch pad](/docs/home/) or the [Server](/docs/server/) page; the Profiles page is where you write them.
+
+<Screenshot name="profiles" alt="The Profiles page: a list of three profiles on the left, the first marked with a green dot, and the editor on the right with Name, Working directory, Model (GGUF), Multimodal projector, Host and Port fields, and the llama-server arguments box with one flag per line and an autocomplete list open under --f." />
+
+## The Profiles page
+
+The list on the left shows every profile in alphabetical order, with its model file below the name. A green dot marks
+the profile `llama-server` is running. Click a profile to open it in the editor on the right.
+
+Above the list:
+
+- **New profile** opens an empty editor.
+- **Import** loads profiles from a JSON file (see [Import and export](#import-and-export)).
+- **Export all** downloads every profile as one JSON file.
+
+Other pages create profiles for you, already filled in: **Create profile** in a model's details on the
+[Models](/docs/models/) page, on a [Tuning](/docs/tuning/) recommendation or sweep result, and on a run of the
+[Benchmark](/docs/benchmark/) history.
+
+## Profile fields
+
+| Field                    | What it holds                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**                 | Required, and unique among your profiles. It is what the launch pad, the Server page and the status bar show.                                 |
+| **Working directory**    | The folder `llama-server` runs in. Relative paths in the model and projector fields start from here.                                           |
+| **Model (GGUF)**         | Required. The model file; for a split model, its first part.                                                                                   |
+| **Multimodal projector** | Optional. The `mmproj` file that lets the model read images (and audio or video for some models).                                               |
+| **Host**                 | The address `llama-server` listens on. Empty: the value from [Settings](/docs/settings/) (`0.0.0.0` by default).                                |
+| **Port**                 | The port `llama-server` listens on, from 1 to 65535. Empty: the value from Settings (`8080` by default).                                        |
+
+In the working directory, model and projector fields, a leading `~` stands for your home folder. Without a working
+directory, `llama-server` runs in llama-webui's own working directory and relative paths start from there: set one, or
+use absolute paths.
+
+The folder button at the end of the model and projector fields opens a searchable list of the files of your models
+folder: models for the first field, projectors for the second. Picking a file fills the field with a path relative to
+the working directory when the file is inside it, an absolute path otherwise. If the working directory is empty, it is
+set to your models folder.
+
+## The argument editor
+
+The **llama-server arguments** box takes the arguments you would type after `llama-server` on a command line:
+
+```text title="llama-server arguments"
+-c 32768
+-ngl 99
+-fa on
+-ot "blk\.(2[0-9]|3[0-9])\.ffn_.*_exps\.=CPU"
+```
+
+Write them on one line or on several: line breaks count as spaces. The text is split the way a shell would, but
+without any expansion:
+
+- Separate arguments with spaces. Put a value that contains spaces or special characters in single or double quotes,
+  or escape a character with a backslash.
+- `$VARIABLES`, `~` and wildcards are passed to `llama-server` as written. `llama-server` is not run through a shell.
+- An unclosed quote or a trailing backslash shows **Could not parse:** with the reason, and the profile cannot be
+  saved until you fix it.
+
+The profile stores the arguments as a list. When you open it again, the editor shows one flag per line, followed by
+its values, with quotes only where they are needed.
+
+### Autocomplete and inline help
+
+The editor knows every flag of your `llama-server`: llama-webui runs the configured binary with `--help` and reads its
+output, so the list matches your build of llama.cpp.
+
+- Type `-` to see the flags that start with what you typed, with their value and description (8 suggestions at most).
+- <Kbd>Tab</Kbd> completes the highlighted suggestion. <Kbd>↑</Kbd> and <Kbd>↓</Kbd> move through the list, then
+  <Kbd>Enter</Kbd> picks one. Otherwise <Kbd>Enter</Kbd> starts a new line. <Kbd>Esc</Kbd> closes the list.
+- Below the box, a help line describes the flag under the cursor, or the flag whose value you are typing: its names,
+  its value and its help text from `llama-server --help`.
+
+If `llama-server --help` cannot run (wrong binary path in Settings, for example), the editor still works without help
+and shows **Flag help unavailable:** with the error.
+
+### Highlighting and warnings
+
+| Shown as                         | Meaning                                                                                                                                              |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Blue flag                        | A flag your `llama-server` knows.                                                                                                                    |
+| Amber flag, dotted underline     | A flag your `llama-server` does not list. A warning, **Unknown to this llama-server:**, names it. You can still save: it may come from another build. |
+| Rose flag, wavy underline        | A flag llama-webui sets itself (see below). An error explains which field to use instead, and the profile cannot be saved.                           |
+| Green text                       | A quoted value.                                                                                                                                      |
+
+## Environment variables
+
+The **Environment variables** box takes one `KEY=value` per line, for example `CUDA_VISIBLE_DEVICES=0,1`. Empty lines
+are ignored. A line without `=` or with an invalid name is underlined, and the profile cannot be saved until you fix
+it.
+
+`llama-server` inherits the environment llama-webui was started with; the profile's variables are added to it and win
+over variables of the same name.
+
+## Flags llama-webui sets itself
+
+llama-webui builds the command line from the profile fields, then adds the flags it needs to monitor the server:
+
+```text title="Effective command"
+llama-server -m <model> [-mm <projector>] <your arguments> --host <host> --port <port> --metrics --slots --props
+```
+
+| Flag                             | Why                                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `-m`, `--model`                  | From **Model (GGUF)**.                                                                               |
+| `-mm`, `--mmproj`                | From **Multimodal projector**, when set.                                                             |
+| `--host`, `--port`               | From **Host** and **Port**, or Settings.                                                             |
+| `--metrics`, `--slots`, `--props` | Turn on the endpoints the [Dashboard](/docs/dashboard/), the [Server](/docs/server/) page and [Chat](/docs/chat/) read. |
+
+Because these come from the profile fields, you cannot write them in the arguments: the editor flags them, and saving
+is refused. The binary itself is the one set in Settings. The [Server](/docs/server/) page shows the exact command of
+the last launch.
+
+## Save, start and other actions
+
+The buttons under the editor:
+
+- **Save** (**Create profile** for a new one) is enabled once something changed. A name already used by another
+  profile is refused.
+- **Start this profile** launches it. It is disabled while there are unsaved changes, or while a server is already
+  running: use **Switch** on the launch pad or the Server page to change profiles.
+- **Duplicate** creates a copy named `<name> (copy)` (then `(copy 2)`…) and opens it.
+- **Export** downloads this profile alone as a JSON file.
+- **Delete** asks for confirmation, then deletes the profile. It is disabled while `llama-server` runs this profile:
+  stop it first.
+
+Editing a profile does not change a server that is already running. Click **Restart** on the
+[Server](/docs/server/) page to relaunch it with the saved changes.
+
+## Import and export
+
+**Export all** downloads a file with every profile; **Export** in the editor downloads one. The format is the one
+llama-tui uses for its profiles:
+
+```json title="profiles.json"
+{
+  "profiles": [
+    {
+      "name": "Qwen3.8 27B · chat",
+      "model": "Qwen3.8-27B-IQ3_S.gguf",
+      "mmproj": "mmproj-Qwen3.8-27B-BF16.gguf",
+      "cwd": "~/models",
+      "port": 8091,
+      "args": ["-c", "32768", "-ngl", "99", "-fa", "on"],
+      "env": { "CUDA_VISIBLE_DEVICES": "0,1" }
+    }
+  ]
+}
+```
+
+Only `name` and `model` are required; `mmproj`, `cwd`, `host`, `port`, `args` and `env` are optional.
+
+**Import** accepts a file in that format, a whole llama-tui configuration file (its other settings are ignored), a
+plain array of profiles, or a single profile. Each profile is checked on its own:
+
+- Valid profiles are added.
+- A profile whose name already exists is skipped: an import never overwrites a profile.
+- A profile with a missing or invalid field, an unknown field, or a flag llama-webui sets itself is skipped, with the
+  reason.
+
+A notification sums up the result, for example `2 profiles imported, 1 skipped`, and lists the skipped profiles with
+their reasons.
+
+### Import from llama-tui
+
+When you have no profile yet and a llama-tui configuration exists (`~/.config/llama-tui/config.json`, or under
+`$XDG_CONFIG_HOME`), the Profiles page shows a **llama-tui profiles found** card with the names it contains. Click
+**Import** to add them all, with the same rules as a file import. If llama-tui had a default profile and you have
+not started any profile yet, it becomes the one preselected on the Server page. **Dismiss** hides the card for good.

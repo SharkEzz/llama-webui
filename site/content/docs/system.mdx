@@ -1,0 +1,178 @@
+---
+title: System
+description: Live hardware telemetry, with a card per GPU for utilization, VRAM, PCIe, power, clocks and temperature, plus CPU, memory, disks and system checks.
+---
+
+The System page shows every GPU in the machine, the CPU, the memory and the disks, whether a model runs or not. Use it
+to see what a card is doing, check that its PCIe link runs at full speed, and find the system settings that slow
+llama.cpp down.
+
+<Screenshot
+  name="system"
+  alt="System page with four GPU cards, two NVIDIA GeForce and two Radeon. Each card has utilization and VRAM gauges, a list with total VRAM, PCIe link, PCIe traffic, power, clocks, temperature and fan, and a utilization and VRAM chart."
+/>
+
+The values refresh at every polling interval (1,000 ms by default) and the charts cover the history kept in memory
+(300 s by default). Both are set on the **Monitoring** tab of [Settings](/docs/settings/). Next to the page title,
+**NVIDIA source** tells you which reader feeds the NVIDIA cards: **NVML** or **nvidia-smi** (see
+[NVIDIA: NVML or nvidia-smi](#nvidia-nvml-or-nvidia-smi)).
+
+## GPU cards
+
+There is one card per GPU, sorted by PCI address: every NVIDIA card the driver sees and every card driven by `amdgpu`,
+integrated GPUs included. Intel GPUs are not read. The card's header shows its name and its PCI address
+(`0000:01:00.0`).
+
+Two gauges come first:
+
+- **Utilization**: how busy the GPU is, in percent.
+- **VRAM**: memory in use as a share of the total, with the amount in the label. It counts every process on the card,
+  not only `llama-server`.
+
+Then a list of readings:
+
+| Row                     | What it shows                                                                                                                       |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Total VRAM**          | The card's memory.                                                                                                                  |
+| **PCIe**                | Current link generation and width, and in brackets the most the link supports: `Gen5 x8 (max Gen5 x16)`.                            |
+| **PCIe RX / TX**        | Traffic over the link: RX from the host to the card, TX from the card to the host.                                                  |
+| **Power**               | Current draw, and the power limit after a slash when the card reports it: `120 W / 300 W`.                                          |
+| **GPU / memory clocks** | Current graphics and memory clocks.                                                                                                 |
+| **Temperature**         | GPU temperature.                                                                                                                    |
+| **Fan**                 | Fan speed, in percent of its maximum.                                                                                               |
+
+A chart at the bottom plots **Utilization** and **VRAM** over the history.
+
+<Callout type="tip" title="Read the PCIe link under load">
+
+GPUs lower their link speed when idle to save power, so an idle card often shows less than its maximum. Compare the
+two values while a model generates. A link still below its maximum under load points to the slot, a riser or a BIOS
+setting; the **PCIe link** check in [Checks](#checks) flags it.
+
+</Callout>
+
+For an AMD card with its own PCIe switch on board, the **PCIe** row shows the link to the motherboard slot, which is
+the one that limits transfers. Its maximum is the lower of what the card and the slot support.
+
+### What each source reports
+
+A value the source cannot read shows `—`. A card can also lack a sensor: an integrated GPU has no fan, for example.
+
+| Reading                                       | NVIDIA through NVML | NVIDIA through `nvidia-smi` | AMD through `amdgpu` |
+| --------------------------------------------- | :-----------------: | :-------------------------: | :------------------: |
+| Utilization, VRAM, temperature, power draw    |         Yes         |             Yes             |         Yes          |
+| Power limit                                   |         Yes         |             No              |         Yes          |
+| PCIe link (current and maximum)               |         Yes         |             No              |         Yes          |
+| PCIe RX / TX                                  |         Yes         |             No              |          No          |
+| GPU and memory clocks                         |         Yes         |             No              |         Yes          |
+| Fan                                           |         Yes         |             No              |         Yes          |
+
+Without PCIe traffic, the [Topology](/docs/topology/) page draws no particles on that card's link.
+
+### NVIDIA: NVML or nvidia-smi
+
+NVML is the library installed with the NVIDIA driver (`libnvidia-ml.so.1`). llama-webui loads it when it starts and
+reads every card from a background thread. If NVML cannot be loaded or does not
+answer within 3 seconds, llama-webui falls back to `nvidia-smi`, which reports fewer values (see the table above).
+
+To use `nvidia-smi` on purpose, turn off **NVML for NVIDIA GPUs** on the **Monitoring** tab of Settings. The change
+applies the next time llama-webui starts. If NVML stops answering while llama-webui runs, the NVIDIA readings are
+dropped rather than shown stale.
+
+### AMD: amdgpu
+
+AMD cards are read from the files the `amdgpu` driver exposes in `/sys`: no extra tool is needed. The card's name
+comes from the system's PCI ID database; a card missing from it is named `AMD GPU` followed by its PCI address.
+
+## Sleeping and hidden GPUs
+
+Some cards are listed without readings, with a badge next to their address:
+
+- **suspended**: an AMD card the kernel has put to sleep, such as a laptop's discrete GPU or an idle second card.
+  llama-webui does not read it, because reading it would wake it up: **Card suspended: it is not read, so as not to
+  wake it up.** The readings come back when the card wakes, for example when `llama-server` loads a model on it.
+- **hidden**: a card you turned off under **Displayed GPUs** on the **Monitoring** tab of Settings, or in the
+  first-run checklist: **Card hidden in Settings: it is not read.** A hidden card is not read anywhere: it has no VRAM
+  gauge on the [Dashboard](/docs/dashboard/) and is dimmed on the [Topology](/docs/topology/) page. A hidden card
+  that is asleep is not woken up.
+
+Hiding a card only stops llama-webui from reading it: `llama-server` can still use it. To keep a model off a GPU, set
+it in the [profile](/docs/profiles/), for example with `--device` or `CUDA_VISIBLE_DEVICES`.
+
+## CPU
+
+The CPU card is titled with the processor's model.
+
+| Row                              | What it shows                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------ |
+| **Total load**                   | CPU load of the whole machine.                                                       |
+| **Cores / threads**              | Physical cores and logical threads.                                                  |
+| **Frequency**                    | Average current frequency of all cores.                                              |
+| **Temperature**                  | From the `k10temp` (AMD) or `coretemp` (Intel) sensor; `—` when there is none.       |
+| **Load average (1, 5, 15 min)**  | The kernel's load averages.                                                          |
+
+Below the list, a grid has one cell per logical core, filled from the bottom by its load. Hover a cell, or focus the
+grid with <Kbd>Tab</Kbd> and move with the arrow keys, <Kbd>Home</Kbd> and <Kbd>End</Kbd>, to read a core's exact
+load. A chart plots the total load over the history.
+
+## Memory
+
+The **Memory** card shows the RAM in use (total minus available) out of the total, as a bar and a percentage, then:
+
+| Row                | What it shows                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------- |
+| **Available**      | The kernel's estimate of memory available to programs, reclaimable cache included.                    |
+| **Cache**          | Page cache, including the parts of a memory-mapped model the kernel keeps in RAM.                    |
+| **Swap**           | Swap used out of the total, or `none` without swap.                                                   |
+| **DRAM bandwidth** | Read (↓) and write (↑) traffic of the memory controller, or `not measured (perf)`.                    |
+
+When DRAM bandwidth is measured, a **Read** and **Write** chart appears. It needs `perf` and an AMD Zen 4 or Zen 5
+CPU: [Monitor DRAM bandwidth](/docs/guides/dram-bandwidth/) explains how to set it up. A second chart plots the share
+of RAM in use.
+
+## Disks
+
+The **Disks** card shows the traffic of the machine's physical disks. Loop devices, RAM disks and zram are left out.
+
+| Row                    | What it shows                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------- |
+| **Read (machine)**     | Read throughput of all disks together.                                           |
+| **Write (machine)**    | Write throughput of all disks together.                                          |
+| **Model disk read**    | Read throughput of the disk that holds the running profile's model, with its name. |
+
+The model disk is the one a model streams from when it does not fit in memory, which makes it worth watching for big
+models. It is unknown (`—`) for an external server and for a model on btrfs, tmpfs or a network filesystem. The chart
+plots **Read**, **Write** and **Model disk**.
+
+## Checks
+
+The **Checks** card reviews system settings that affect llama.cpp's speed. It is collapsed by default; its header
+counts the results (**to improve**, **ok**, **unknown**). Click **Show** to expand it.
+
+Nothing is changed for you: each check that can be improved comes with the command to run yourself, and a copy
+button. A badge says whether the fix lasts **until reboot** or is **permanent**.
+
+| Group               | Checks                                                                                    |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| **NVIDIA**          | PCIe link, persistence mode, power limit, Resizable BAR, driver version, `nvidia_uvm` module |
+| **AMD**             | DPM level, PCIe link, ROCm/HIP backend, card recognized by ROCm                           |
+| **CPU**             | CPU governor, transparent hugepages, memlock limit, `vm.swappiness`, NUMA nodes           |
+| **llama.cpp build** | CUDA backend, SIMD instructions, build age                                                |
+| **Kernel and disk** | IOMMU, model disk, model disk bandwidth, swap                                             |
+
+Within each group, the checks that need attention come first; the passing ones are folded under a line such as
+**4 checks ok**. A check for a GPU that `llama-server` will not use is marked not applicable.
+
+Some checks depend on a model (the disk it sits on, whether it spills out of VRAM). Pick it in the selector at the top
+of the card: it starts on the running profile's model, or the first model of your folder, and **No model** skips
+those checks. **Measure disk** reads the selected model's file to measure the disk's sequential read speed, which the
+**Model disk bandwidth** check then uses; the system cache may inflate the result if the file was read recently.
+
+While expanded, the card refreshes every 10 seconds; the reload button refreshes it at once. The checks that do not
+depend on a model also appear in the first-run checklist (see [First run](/docs/getting-started/first-run/)).
+
+## When a collector is off
+
+The **Monitoring** tab of Settings has a switch per collector. With **CPU and memory** off, the CPU and Memory cards
+show **System collector disabled in Settings.**, and DRAM bandwidth is no longer measured. With **Disks** off, the
+Disks card shows **Disk collector disabled in Settings.** GPUs are always read, except hidden and sleeping ones.

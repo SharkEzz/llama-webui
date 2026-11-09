@@ -1,0 +1,95 @@
+---
+title: Quick start
+description: Go from a fresh install to a first chat by getting a GGUF model, creating a profile, starting it from the launch pad and watching the Dashboard.
+---
+
+This page takes you from a fresh install to a first answer from your own `llama-server`. It assumes llama-webui is [installed](/docs/getting-started/installation/) and open in your browser.
+
+<Steps>
+  <Step title="Finish the setup checklist">
+
+If Home still shows **Welcome to llama-webui**, give it the path to `llama-server` and a models folder, then click
+**Finish**. The [First run](/docs/getting-started/first-run/) page explains each step. Home then becomes the
+**Launch pad**.
+
+  </Step>
+  <Step title="Get a GGUF model">
+
+**To download one**, open **Models** in the sidebar and click **Download**. In the **Download from Hugging Face**
+panel:
+
+1. Type a model name in the search box, or paste a repository id (`org/name`) or a Hugging Face URL.
+2. Click a repository in the results.
+3. Pick a quantization and click its **Download** button. A badge tells you whether it fits your GPUs: **Fits in
+   VRAM**, **Tight** or **Partial offload**. For a first try, pick one that fits.
+
+The file lands in `<models folder>/<org>/<name>/`. The **Download** button of the Models page shows the progress, and
+the model list refreshes when the download completes. Gated repositories need a Hugging Face token: see
+[Launch options](/docs/configuration/#hugging-face).
+
+**If you already have GGUF files**, copy or move them into the models folder (subfolders are fine), then click
+**Rescan** on the Models page.
+
+  </Step>
+  <Step title="Create a profile">
+
+A profile is a model plus the arguments `llama-server` starts with. Two ways to create one:
+
+**From the Models page.** Click the model's row, then **Create profile** in the dialog. The Profiles page opens with
+the **Name**, the **Working directory**, the **Model (GGUF)** and, when there is a matching one, the **Multimodal
+projector** already filled in. Add your flags in **llama-server arguments**, for example a context size:
+
+```text
+-c 16384
+```
+
+Without `-c`, `llama-server` uses the context length stored in the model, which can need much more memory. Click
+**Create profile**.
+
+**From Tuning.** Open **Tuning**, pick the model, choose a preset such as **Responsive chat**, and click
+**Create profile** on the **Recommendation (estimate)** card. The profile gets the recommended flags and a name made
+of the model and the preset, and opens on the Profiles page.
+
+Leave out `--host`, `--port`, `-m`, `-mm`, `--metrics`, `--slots` and `--props`: llama-webui sets them itself, and the
+editor flags them if you type them.
+
+  </Step>
+  <Step title="Start it from the launch pad">
+
+Click **Home**. Each profile has a card with its model, quantization and size, its last benchmark ("No benchmark yet"
+for now) and a memory estimate such as **Fits in VRAM**. Click **Start**.
+
+The button reads **Starting…** while the model loads. When `llama-server` answers, the card is marked **Ready** and
+shows **Chat**, **Dashboard** and **Stop**. If the server crashes instead, the card says how it exited: open
+[Logs](/docs/logs/) to read `llama-server`'s output.
+
+  </Step>
+  <Step title="Chat">
+
+Click **Chat** on the card. Type in the message box and press <Kbd>Enter</Kbd> to send (<Kbd>Shift</Kbd> +
+<Kbd>Enter</Kbd> for a new line): the first message creates a conversation. The answer streams in, and a line under it
+gives the time to first token, the prompt and generation speeds and the number of tokens.
+
+The **Settings** button at the top of a conversation holds its sampling settings and system prompt. The
+[Chat](/docs/chat/) page covers the rest.
+
+  </Step>
+  <Step title="Watch the Dashboard">
+
+Open **Dashboard** while a reply is being written. The top row shows the **Generation** and **Prompt** speeds in
+tok/s, the **Speculative acceptance** when the profile uses a draft model or MTP, and the **Context used**. Below:
+gauges for CPU, RAM and the VRAM of each GPU the server uses, the reads from the model's disk, the **Throughput (tok/s)** chart,
+**Slots and context**, and **Recent requests**. See [Dashboard](/docs/dashboard/) for every figure.
+
+  </Step>
+</Steps>
+
+## Next steps
+
+- Measure the profile with a real run on the [Benchmark](/docs/benchmark/) page; the result then appears on its
+  launch pad card.
+- Let [Tuning](/docs/tuning/) recommend flags for your hardware, or [find the best flags with a
+  sweep](/docs/guides/find-best-flags/).
+- Running a model larger than your VRAM? Follow
+  [Run a 100 GB MoE model on consumer GPUs](/docs/guides/big-moe-models/).
+- To reach llama-webui from another machine, read [Security](/docs/security/) first.

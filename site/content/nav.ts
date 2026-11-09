@@ -13,8 +13,64 @@ export const NAV: NavSection[] = [
       {
         title: 'Getting started',
         pages: [
-          { path: 'docs', title: 'Overview' },
+          { path: 'docs', title: 'Introduction' },
+          { path: 'docs/getting-started/requirements', title: 'Requirements' },
           { path: 'docs/getting-started/installation', title: 'Installation' },
+          { path: 'docs/getting-started/first-run', title: 'First run' },
+          { path: 'docs/getting-started/quick-start', title: 'Quick start' },
+        ],
+      },
+      {
+        title: 'Configuration',
+        pages: [
+          { path: 'docs/configuration', title: 'Launch options' },
+          { path: 'docs/settings', title: 'Settings' },
+          { path: 'docs/security', title: 'Security' },
+        ],
+      },
+      {
+        title: 'Run models',
+        pages: [
+          { path: 'docs/home', title: 'Home and launch pad' },
+          { path: 'docs/models', title: 'Models' },
+          { path: 'docs/hugging-face', title: 'Hugging Face downloads' },
+          { path: 'docs/profiles', title: 'Profiles' },
+          { path: 'docs/server', title: 'Server' },
+          { path: 'docs/chat', title: 'Chat' },
+        ],
+      },
+      {
+        title: 'Monitor',
+        pages: [
+          { path: 'docs/dashboard', title: 'Dashboard' },
+          { path: 'docs/system', title: 'System' },
+          { path: 'docs/topology', title: 'Topology' },
+          { path: 'docs/logs', title: 'Logs' },
+        ],
+      },
+      {
+        title: 'Measure and tune',
+        pages: [
+          { path: 'docs/benchmark', title: 'Benchmark' },
+          { path: 'docs/tuning', title: 'Tuning' },
+          { path: 'docs/sweeps', title: 'Sweeps' },
+        ],
+      },
+      {
+        title: 'Guides',
+        pages: [
+          { path: 'docs/guides/big-moe-models', title: 'Run a 100 GB MoE model' },
+          { path: 'docs/guides/mixed-gpus', title: 'Split a model across mixed GPUs' },
+          { path: 'docs/guides/find-best-flags', title: 'Find the best flags with a sweep' },
+          { path: 'docs/guides/speculative-decoding', title: 'Speculative decoding and MTP' },
+          { path: 'docs/guides/dram-bandwidth', title: 'Monitor DRAM bandwidth' },
+        ],
+      },
+      {
+        title: 'Help',
+        pages: [
+          { path: 'docs/troubleshooting', title: 'Troubleshooting' },
+          { path: 'docs/faq', title: 'FAQ' },
         ],
       },
     ],

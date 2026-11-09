@@ -1,0 +1,174 @@
+---
+title: Run a 100 GB MoE model on consumer GPUs
+description: Keep the experts of a large mixture-of-experts model in system RAM and the rest on your GPUs with the 100 GB model preset, then measure what it costs.
+---
+
+A mixture-of-experts (MoE) model can be several times larger than your VRAM and still run, because each token only uses
+a few of its experts. This guide uses the **100 GB model** preset of the [Tuning](/docs/tuning/) page to keep the
+experts in system RAM and everything else on your GPUs, explains what limits the result, and shows how to measure it.
+
+You need `llama-bench` next to `llama-server`: the Tuning page reads your cards through it, and the benchmarks below use
+it.
+
+## Why experts can live in RAM
+
+In each layer of a MoE model, a router picks a few experts for every token. The Tuning page shows it in the **Model**
+card, for example **Experts** `8 active of 128`. The expert tensors (`ffn_gate_exps`, `ffn_up_exps`, `ffn_down_exps`)
+hold most of the model's weights, but a token only reads the active ones. Attention, norms and the other tensors are used
+by every token.
+
+That is what makes the split work: llama.cpp keeps the expert tensors in system RAM, where the CPU computes the few
+experts each token needs, and the rest of every layer on the GPUs. llama-webui's estimate of disk reads (below) uses the
+same proportion: the active share of the experts left in RAM.
+
+## The flags involved
+
+| Flag                        | Long form                          | What it does in llama.cpp                                              | How llama-webui uses it                                                                                     |
+| --------------------------- | ---------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `-ncmoe N`                  | `--n-cpu-moe N`                    | Keeps the MoE weights of the first N layers on the CPU.                | The preset's main lever: it picks N for you. A field on the Benchmark page, a row in sweeps.                |
+| `-cmoe`                     | `--cpu-moe`                        | Keeps all MoE weights on the CPU.                                      | Never recommended. A llama-bench run ignores it and the form suggests `-ncmoe` (the layer count moves every expert). |
+| `-ngl`                      | `--gpu-layers`, `--n-gpu-layers`   | Maximum number of layers in VRAM: a number, `auto` or `all`.           | `all`: every layer on the GPUs, except the experts `-ncmoe` moves to RAM.                                   |
+| `-ot`                       | `--override-tensor`                | Puts the tensors whose name matches a pattern on a given buffer (`pattern=buffer`). | Never recommended, but counted by the estimator (the first matching rule wins). Sweeps suggest expert patterns. |
+| `-dev`, `-ts`               | `--device`, `--tensor-split`       | The cards to use, and each card's share of the layers.                 | Every dedicated card, split by usable VRAM.                                                                 |
+| `-ctk`, `-ctv`, `-fa`       | `--cache-type-k`, `--cache-type-v`, `--flash-attn` | KV cache types; flash attention.                       | `q8_0` with `-fa on`: half the KV cache of `f16`.                                                           |
+| `--fit off`                 |                                    |                                                                        | Always added: what gets measured is exactly what gets written.                                              |
+| `--mlock`                   |                                    | Locks the model in RAM.                                                | Never added together with `-ncmoe`.                                                                         |
+
+## How llama-webui picks the split
+
+With the **100 GB model** preset, the estimator:
+
+1. Uses every dedicated card at once: CUDA cards first, then the others, without the duplicates and the iGPU listed in
+   the **Hardware** card. `-ts` shares the layers in proportion to each card's usable VRAM, minus the compute buffers on
+   the first card.
+2. Sets `-ngl all` and looks for the smallest `-ncmoe` for which every card stays within its usable VRAM. The fewer
+   expert layers go to RAM, the more experts the GPUs compute.
+3. Aims for a 32,768-token context with a `q8_0` KV cache. If nothing fits, it lowers the context in steps of 4,096
+   tokens, down to 8,192.
+4. Accepts weights in RAM beyond the available RAM: the rest is re-read from disk (see
+   [When the model is larger than your RAM](#when-the-model-is-larger-than-your-ram)).
+
+For a dense model, the same preset puts fewer layers on the GPUs (`-ngl` N) instead, and then falls back to the CPU.
+
+The other presets first try to fit the whole model on the cards, then use `-ncmoe` too, but they refuse weights in RAM
+beyond the available RAM. With enough RAM they reach a similar placement; **100 GB model** is the one that still answers
+when your RAM is too small.
+
+`-ncmoe` always moves the experts of the first layers, and `-ts` splits the layers in order across the cards. The layers
+that keep their experts on the GPUs are therefore the last ones, and they land on the last card of `-dev`. The
+[worked example](#worked-example) shows the effect.
+
+## RAM requirements
+
+The **RAM** bar adds up what stays in system memory: the token embeddings, the experts moved by `-ncmoe`, and the
+weights and KV cache of any layer left on the CPU. It compares this with the **available** RAM shown in the
+**Hardware** card, not the total: close memory-hungry programs before you load the model.
+
+- **Enough RAM**: when the RAM bar stays under the available amount, the experts are read from memory and the disk only
+  matters while the model loads.
+- **Swap**: weights pushed out to swap slow generation down. When the recommendation leaves part of the model in RAM,
+  the [System](/docs/system/) checks flag a `vm.swappiness` above 10 (fix: `sudo sysctl vm.swappiness=10`) and any swap
+  in use (advice: lower `-c` or raise `--n-cpu-moe`).
+- **`--mlock`**: llama-webui does not recommend it with `-ncmoe`. It only adds it when `-ngl` leaves whole layers in
+  RAM, nothing overflows and at least 2 GiB of RAM is left.
+
+## When the model is larger than your RAM
+
+llama.cpp maps the GGUF file into memory. When the weights placed in RAM exceed the available RAM, the system keeps
+only part of them in memory and reads the rest back from the model file as they are needed. llama-webui calls this an
+overflow:
+
+- the **RAM** bar shows `… over: read back from disk (mmap)`, and the configuration is rated tight rather than
+  impossible;
+- a warning gives the overflow and the disk reads it costs, for example
+  `overflows RAM by 35.6 GiB: NVMe read ≈ 2.2 GiB per generated token`;
+- a line under the bars turns that into a bandwidth at 10 tok/s.
+
+The reads per token are the active share of the experts in RAM, times the share of RAM weights that do not fit. Divide
+your disk's read bandwidth by that number for a ceiling on generation speed.
+
+To measure the disk, open the **Checks** card on the [System](/docs/system/) page (click **Show**), pick the model and
+click **Measure disk**. It reads up to 1 GiB from a random point of the model file; the system cache can inflate the
+result. The **Model disk bandwidth** check flags a disk under 2 GiB/s, and **Model disk** flags a spinning disk or a
+network file system. Once measured, the Tuning page shows the speed next to the overflow line.
+
+<Callout type="warning" title="Overflow is slow">
+
+A model that overflows RAM starts and replies, but every generated token waits for the disk. Treat it as a way to try
+a model, and add RAM or pick a smaller quantization for daily use.
+
+</Callout>
+
+## Worked example
+
+This is the case llama-webui's own estimator tests use. The model is synthetic: a 106.1 GiB MoE GGUF with 48 layers and
+128 experts, 8 of them active, with about 2.1 GiB of experts and 100 MiB of other weights per layer. The machine has:
+
+| Device    | Card                                | Memory                     |
+| --------- | ----------------------------------- | -------------------------- |
+| `CUDA0`   | NVIDIA GeForce RTX 5070 Ti          | 15.6 GiB                   |
+| `CUDA1`   | NVIDIA GeForce RTX 5060 Ti          | 15.6 GiB                   |
+| `Vulkan3` | AMD Radeon RX 9070 XT (Vulkan)      | 15.9 GiB                   |
+| RAM       |                                     | 55.0 GiB available of 61.0 GiB |
+| CPU       | AMD Ryzen 5 9600X                   | 6 physical cores           |
+
+With **100 GB model**, the recommendation is:
+
+```text
+-ngl all -ncmoe 43 -dev CUDA0,CUDA1,Vulkan3 -ts 56,58,59 -fa on -ctk q8_0 -ctv q8_0 -t 6 -b 2048 -ub 512 -c 32768 --fit off
+```
+
+| Device    | Estimated | Budget              |
+| --------- | --------- | ------------------- |
+| `CUDA0`   | 2.6 GiB   | 14.4 GiB usable     |
+| `CUDA1`   | 2.1 GiB   | 14.4 GiB usable     |
+| `Vulkan3` | 12.9 GiB  | 14.8 GiB usable     |
+| RAM       | 90.6 GiB  | 55.0 GiB available  |
+
+What the numbers say:
+
+- **The split.** The experts of layers 0 to 42 go to RAM: with `-ncmoe 42`, `Vulkan3` would need 15.0 GiB. The
+  experts that stay on the GPUs belong to layers 43 to 47, which `-ts` places on `Vulkan3`; the NVIDIA cards hold
+  attention, norms, their share of the KV cache and, for `CUDA0`, the compute buffers.
+- **The overflow.** 90.6 GiB must stay in RAM for 55.0 GiB available: 35.6 GiB is re-read from disk, about 2.2 GiB per
+  generated token, or 22.2 GiB/s at 10 tok/s. On a disk that reads 2 GiB/s, generation cannot exceed about 0.9 tok/s.
+- **The other presets** all answer **Does not fit** on this machine, since none of them accepts an overflow.
+- **With more RAM.** With 91 GiB available, the same preset gives the same flags with no overflow.
+
+Two cards with free VRAM next to a nearly full one suggest room for improvement: a [sweep](/docs/sweeps/) over
+`-ncmoe` values and `-ts` proportions, or over `-ot` rules that send chosen expert layers to a card, can find a better
+spread. The estimator drops the combinations that do not fit before anything runs.
+
+## Measure the result
+
+<Steps>
+  <Step title="Benchmark the recommendation">
+
+On the Tuning page, click **Run a benchmark**. The [Benchmark](/docs/benchmark/) form opens with the recommended flags
+and llama-bench selected; click **Run**. Compare **Peak VRAM** (hover it for each card) with the memory bars, and note
+the prompt and generation speeds. Loading a model this size takes a while: the progress card shows **Loading** until it
+is done.
+
+  </Step>
+  <Step title="Measure it in real conditions">
+
+In the same form, switch the tool to **Server** and click **Run** again: the context and the profile's other flags now
+count. A server run waits up to 10 minutes for the model to load.
+
+  </Step>
+  <Step title="Sweep around the estimate">
+
+In the **Search space** card, **Start from the recommendation** adds `-ncmoe` values around the recommended one (N−8,
+N−4, N, N+4, N+8). The plan counts each configuration as one model load (at about 1.5 GiB/s) plus 10 seconds per
+repetition: for a 106 GiB model and 3 repetitions, about 100 seconds per configuration. See [Sweeps](/docs/sweeps/).
+
+  </Step>
+  <Step title="Watch it while you chat">
+
+Create a profile from the recommendation (or from the best sweep run), start it and chat with it. On the
+[Dashboard](/docs/dashboard/), **Generation** shows the speed and the
+**Model disk** reading shows how fast the model file is read: steady reads during generation mean the overflow is being
+re-read. The [Topology](/docs/topology/) page shows how `llama-server` actually split the model across your devices.
+
+  </Step>
+</Steps>

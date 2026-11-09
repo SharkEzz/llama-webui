@@ -1,0 +1,123 @@
+---
+title: Security
+description: llama-webui has no authentication. What it checks, what opening it to the network exposes, how llama-server is exposed, and how to reach it safely.
+---
+
+llama-webui is built for one person on a machine they own. It has no accounts, passwords or API keys: anyone who can
+send it requests can do everything you can do from the interface. Its protection comes from where it listens, and
+from a few checks that keep other websites in your browser away from it.
+
+## Defaults at a glance
+
+| Process                          | Listens on by default         | Change it with                                                                                  |
+| -------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
+| llama-webui                      | `127.0.0.1:7860`              | `--host` and `--port` ([Launch options](/docs/configuration/))                                   |
+| `llama-server`, from a profile   | `0.0.0.0:8080`                | **Default host** and **Default port** in [Settings](/docs/settings/#general), or the profile's **Host** and **Port** |
+| `llama-server`, for a benchmark  | `127.0.0.1`, on the default port | **Default port** in Settings                                                                |
+
+On the default address, only programs running on the same machine can reach llama-webui. `llama-server` is a
+different story: see [How llama-server is exposed](#how-llama-server-is-exposed).
+
+## What anyone who reaches it can do
+
+There is no login, so whoever can reach llama-webui's port can:
+
+- start, stop, restart and switch `llama-server`;
+- change the **Binary** setting to any program and start it, with the arguments and environment variables of their
+  choice: in effect, run commands as the user who runs llama-webui;
+- read your conversations, profiles, benchmark history and the `llama-server` logs;
+- point the models folder at any directory and list its GGUF files, and read the metadata of any `.gguf` file
+  llama-webui can open;
+- download files from Hugging Face into your models folder;
+- change any setting.
+
+<Callout type="warning" title="Never expose llama-webui to the internet">
+
+Keep it on `127.0.0.1`, or on a network where you trust every device. Do not forward its port on your router or open
+it on a public interface.
+
+</Callout>
+
+## What the server checks
+
+These checks protect llama-webui from **other websites open in your browser**: they stop a page you visit from
+driving the API behind your back. They do not protect it from people on your network, who can send any request they
+like. They apply to every API request and to the WebSocket.
+
+| Check            | Rule                                                                                                   | Otherwise                      | Protects against                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `Host` header    | `localhost`, a name ending in `.localhost`, or an IP address (IPv4 or IPv6)                            | `403`, "Host not allowed"      | DNS rebinding: a site whose domain name is made to point to your machine                            |
+| `Origin` header  | When present, exactly the page's own origin: same scheme, host and port                                | `403`, "Origin not allowed"    | Cross-site requests, including a WebSocket opened by another site                                    |
+| Request body     | A `POST`, `PUT`, `PATCH` or `DELETE` with a body must be sent as `application/json`                    | `415`                          | Cross-site form submissions, which browsers send without asking                                      |
+
+llama-webui also sends no CORS headers, so your browser does not let other sites read its responses.
+
+A few other rules limit what a request can do:
+
+- A profile's arguments cannot contain `--host`, `--port`, `-m`, `--model`, `-mm`, `--mmproj`, `--metrics`, `--slots`
+  or `--props`: llama-webui sets them itself, from the profile's fields.
+- A Hugging Face download only writes inside `<models folder>/<org>/<name>/`; a file path that would leave this folder
+  is refused.
+- Your Hugging Face token is never stored by llama-webui (see
+  [Launch options](/docs/configuration/#hugging-face)).
+
+### Open it by IP address
+
+Because of the `Host` check, the API only answers requests addressed to `localhost` or to an IP address. If you open
+llama-webui through a host name, for example `http://myserver.lan:7860`, the page loads but every request it makes is
+refused with "Host not allowed". Use the machine's IP address instead: `http://192.168.1.20:7860`. The same applies
+behind a reverse proxy that passes a domain name in the `Host` header.
+
+## Open it to your network
+
+`--host 0.0.0.0` (or `LLAMA_WEBUI_HOST=0.0.0.0`) makes llama-webui listen on every network interface, so every device
+that can reach port 7860 gets the full control listed [above](#what-anyone-who-reaches-it-can-do). While it listens on
+anything other than the loopback, the [setup checklist](/docs/getting-started/first-run/#network-access) shows a
+**Network access** reminder.
+
+If you do it:
+
+- **Trust the network.** A home network where you know every device, not a shared, public or office network.
+- **Listen on one address rather than all of them.** `--host 192.168.1.20` listens on that interface only, not on a
+  VPN or a public interface the machine may also have. llama-webui is then reached at that address, including from the
+  machine itself.
+- **Filter the port.** A firewall rule that only lets the machines you use reach port 7860 narrows the exposure
+  further.
+
+## Use an SSH tunnel instead
+
+If you can log in to the machine over SSH, you do not need to open llama-webui to the network at all. Keep it on
+`127.0.0.1`, and forward its port from your laptop:
+
+```bash title="Terminal (on your laptop)"
+ssh -N -L 7860:127.0.0.1:7860 user@server
+```
+
+Then open `http://127.0.0.1:7860` on your laptop. The traffic is encrypted, and only someone with an SSH login on the
+machine can use the tunnel. `-N` keeps the session open for forwarding only; stop it with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd>.
+
+- To use another port on your laptop, change the first number: `-L 8000:127.0.0.1:7860`, then open
+  `http://127.0.0.1:8000`.
+- To reach `llama-server`'s API from your laptop as well, add a second forward, for example
+  `-L 8080:127.0.0.1:8080` for the default port.
+
+## How llama-server is exposed
+
+llama-webui's `--host` only concerns llama-webui. Each `llama-server` it starts gets its own `--host` and `--port`:
+the profile's **Host** and **Port** when they are set, otherwise the **Default host** and **Default port** from
+[Settings](/docs/settings/#general), which are `0.0.0.0` and `8080`.
+
+So by default, **`llama-server` listens on every interface**, even when llama-webui itself only listens on
+`127.0.0.1`. Any device on your network can then send prompts to the loaded model through `llama-server`'s HTTP API,
+which is useful for other machines and tools, but open to everyone who can reach the port. llama-webui always adds
+`--metrics`, `--slots` and `--props`, which enable those endpoints as well.
+
+To keep `llama-server` on this machine, set **Default host** to `127.0.0.1` in Settings, or the **Host** of a profile.
+Keep a host that accepts local connections (`127.0.0.1` or `0.0.0.0`): llama-webui talks to `llama-server` through
+`127.0.0.1`, and with a host that refuses local connections it would not see the server become ready.
+
+llama-webui does not send an API key to `llama-server`, so `--api-key` is not a way to protect it here: limit the
+address instead.
+
+The temporary `llama-server` of a benchmark run always listens on `127.0.0.1`, on the **Default port**, so it is never
+reachable from the network.

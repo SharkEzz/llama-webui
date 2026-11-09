@@ -17,6 +17,7 @@ API, the WebSocket and the interface from one process, and builds the interface 
 
 GPU telemetry is optional: NVIDIA cards are read through NVML (falling back to `nvidia-smi`), AMD cards through the
 `amdgpu` driver's sysfs files. Without them, llama-webui still runs models and shows CPU and memory.
+[Requirements](/docs/getting-started/requirements/) details each piece and what it unlocks.
 
 ## Install
 
@@ -115,7 +116,7 @@ When it prints `llama-webui on http://127.0.0.1:7860`, open that address in your
 
 On the first launch, Home opens a setup checklist: it looks for `llama-server` (or asks for its path), checks the
 models folder, lists what `llama-bench` and the GPU telemetry can see, and reviews the machine configuration. Only the
-binary and the models folder are required.
+binary and the models folder are required. [First run](/docs/getting-started/first-run/) goes through each step.
 
 ## Open it from another machine
 
@@ -130,11 +131,13 @@ bun run start --host 0.0.0.0
 
 Whoever can reach llama-webui can start processes on your machine. The API rejects cross-site requests and
 DNS-rebinding attempts, but only use `--host 0.0.0.0` on a network you trust, and never expose it to the internet.
+[Security](/docs/security/) explains what is exposed and how to use an SSH tunnel instead.
 
 </Callout>
 
 `--port` changes the port and `--data-dir` the folder that holds the database. Each flag has an environment variable
-(`LLAMA_WEBUI_HOST`, `LLAMA_WEBUI_PORT`, `LLAMA_WEBUI_DATA_DIR`); `bun run start --help` lists them.
+(`LLAMA_WEBUI_HOST`, `LLAMA_WEBUI_PORT`, `LLAMA_WEBUI_DATA_DIR`); `bun run start --help` lists them, and
+[Launch options](/docs/configuration/) describes each one.
 
 ## Run it as a service
 

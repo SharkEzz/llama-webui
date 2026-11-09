@@ -1,0 +1,195 @@
+---
+title: Launch options
+description: The flags and environment variables llama-webui reads at startup, where it keeps its data, and how it finds your Hugging Face token.
+---
+
+A few options are read once, when llama-webui starts: the address and port it listens on, and the folder that holds
+its database. Everything else is changed from the [Settings](/docs/settings/) page while llama-webui runs.
+
+## Flags and environment variables
+
+Each flag has an environment variable. Pass flags after `bun run start` (or `bun run dev`):
+
+| Flag                | Environment variable   | Default                                                         | Effect                                                                                        |
+| ------------------- | ---------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `--host <address>`  | `LLAMA_WEBUI_HOST`     | `127.0.0.1`                                                     | Address the interface, API and WebSocket listen on. `0.0.0.0` listens on every interface.     |
+| `--port <port>`     | `LLAMA_WEBUI_PORT`     | `7860`                                                          | HTTP port of the interface, API and WebSocket: an integer from 1 to 65535.                    |
+| `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR` | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` | Folder of the database (see [Data directory](#data-directory)).                              |
+| `-h`, `--help`      |                        |                                                                 | Prints the help and exits.                                                                    |
+
+```bash title="Terminal"
+bun run start --host 0.0.0.0 --port 8080
+# Same thing with environment variables
+LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 bun run start
+```
+
+Both `--port 8080` and `--port=8080` work. Once listening, llama-webui prints the address to open, for example
+`llama-webui on http://127.0.0.1:7860`.
+
+<Callout type="warning" title="Before using --host 0.0.0.0">
+
+llama-webui has no authentication: whoever can reach it can start processes on your machine. Only open it on a network
+you trust, and read [Security](/docs/security/) first.
+
+</Callout>
+
+### Precedence
+
+For each option, llama-webui takes the first value it finds:
+
+1. the flag;
+2. the environment variable (an empty variable counts as unset);
+3. the default.
+
+### Invalid options
+
+An unknown option, a missing value, an empty value (`--host=`), an extra argument or a port outside 1 to 65535 stops
+llama-webui before it starts: it prints the error followed by the help, and exits with status 2.
+
+```text
+llama-webui: invalid --port: “70000” (integer from 1 to 65535)
+```
+
+### The help
+
+`bun run start --help` prints:
+
+```text
+llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Bun process).
+
+Usage:
+  bun run dev [options]      development (bun --hot, HMR)
+  bun run start [options]    production
+
+Options:
+  --host <address>       listen address (default: 127.0.0.1); 0.0.0.0 to open it to the local network
+                         (no authentication)
+                         env: LLAMA_WEBUI_HOST
+  --port <port>          HTTP port of the UI, API and WebSocket (default: 7860)
+                         env: LLAMA_WEBUI_PORT
+  --data-dir <path>      data directory (SQLite database); default: $XDG_DATA_HOME/llama-webui,
+                         else ~/.local/share/llama-webui
+                         env: LLAMA_WEBUI_DATA_DIR
+  -h, --help             show this help
+
+A flag takes precedence over the matching environment variable.
+
+Hugging Face downloads (Models page):
+  HF_TOKEN               access token (gated or private repos, higher rate limits); without it, the token
+                         saved by `hf auth login` is used (HF_TOKEN_PATH, else $HF_HOME/token,
+                         default ~/.cache/huggingface/token)
+  HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
+```
+
+`bun run start` is the normal way to run llama-webui. `bun run dev` reloads the code when a file changes and is meant
+for working on llama-webui itself; it takes the same options.
+
+### In a systemd service
+
+With the user service from [Installation](/docs/getting-started/installation/#run-it-as-a-service), add flags to
+`ExecStart`, or set variables with `Environment=` lines:
+
+```ini title="~/.config/systemd/user/llama-webui.service"
+[Service]
+WorkingDirectory=%h/llama-webui
+Environment=LLAMA_WEBUI_HOST=0.0.0.0
+ExecStart=%h/.bun/bin/bun run start --port 8080
+Restart=on-failure
+```
+
+Run `systemctl --user daemon-reload` and `systemctl --user restart llama-webui` after editing the file.
+
+### Environment of llama-server
+
+`llama-server` inherits llama-webui's environment, then gets the variables of its profile on top. A variable you set
+when starting llama-webui (for example `CUDA_VISIBLE_DEVICES`) therefore applies to every profile, while a variable in
+a profile's **Environment variables** field applies to that profile only. See [Profiles](/docs/profiles/).
+
+## Data directory
+
+llama-webui keeps its data in one folder, chosen in this order:
+
+1. `--data-dir`;
+2. `LLAMA_WEBUI_DATA_DIR`;
+3. `$XDG_DATA_HOME/llama-webui`;
+4. `~/.local/share/llama-webui`.
+
+The folder is created if it does not exist. It holds one SQLite database, `llama-webui.sqlite`, next to the
+`llama-webui.sqlite-wal` and `llama-webui.sqlite-shm` files SQLite uses while it is open.
+
+| Stored in the database                         | Not stored                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| Settings                                       | Monitoring history and logs: kept in memory, lost when llama-webui restarts  |
+| Profiles                                       | Models and downloaded files: they live in the models folder                  |
+| Conversations and their messages               | Your Hugging Face token                                                      |
+| Benchmark runs and sweeps                      |                                                                              |
+| The Hugging Face download queue                |                                                                              |
+| A cache of the GGUF headers already read       |                                                                              |
+
+When you update llama-webui, the database is migrated on startup; your data is kept. To back it up, stop llama-webui
+and copy the folder.
+
+### Run a separate instance
+
+A second llama-webui with its own `--data-dir` and `--port` has its own settings, profiles and history, for example to
+try things without touching your everyday setup:
+
+```bash title="Terminal"
+bun run start --port 7861 --data-dir ~/llama-webui-test
+```
+
+Only one `llama-server` can listen on a given port, and llama-webui treats a `llama-server` it did not start on its
+configured port as an external server. If both instances run models, give them different **Default port** values in
+[Settings](/docs/settings/#general).
+
+## Hugging Face
+
+Downloads from the [Models](/docs/models/) page use the same token as Hugging Face's `hf` command-line tool. llama-webui
+looks for it in this order:
+
+1. the `HF_TOKEN` environment variable (or its older name, `HUGGING_FACE_HUB_TOKEN`);
+2. the file written by `hf auth login`: `HF_TOKEN_PATH` if set, else `$HF_HOME/token`. `HF_HOME` defaults to
+   `$XDG_CACHE_HOME/huggingface`, else `~/.cache/huggingface`.
+
+The token is only needed for gated or private repositories, and gives higher rate limits. Without one, public models
+download normally. llama-webui reads it again for every request and never stores it: an `hf auth login` done while
+llama-webui runs is picked up at once, while a change to `HF_TOKEN` needs a restart.
+
+```bash title="Terminal"
+# Either save a token once, for every tool that uses Hugging Face
+hf auth login
+
+# Or pass it to llama-webui only
+HF_TOKEN=hf_... bun run start
+```
+
+The top of the **Download from Hugging Face** panel shows what llama-webui found: **Signed in as** your user name (or
+**Token found**), followed by where the token comes from; "No token: public models only." without one; or a message
+saying the token was rejected.
+
+| Variable        | Default                                                   | Effect                                              |
+| --------------- | --------------------------------------------------------- | --------------------------------------------------- |
+| `HF_TOKEN`      | unset                                                     | Access token, takes precedence over the token file  |
+| `HF_TOKEN_PATH` | `$HF_HOME/token`                                          | Path of the token file                              |
+| `HF_HOME`       | `$XDG_CACHE_HOME/huggingface`, else `~/.cache/huggingface` | Hugging Face folder holding the token file          |
+| `HF_ENDPOINT`   | `https://huggingface.co`                                  | Hub endpoint, for example a mirror                  |
+
+Downloaded files go to `<models folder>/<org>/<name>/`; see [Hugging Face downloads](/docs/hugging-face/).
+
+## Everything else is in Settings
+
+The options below are not launch options: they are stored in the database and changed from the
+[Settings](/docs/settings/) page, and apply without restarting llama-webui (except the NVML switch).
+
+| Setting                                                                   | Settings tab   |
+| ------------------------------------------------------------------------- | -------------- |
+| `llama-server` binary, models folder, default host and port of `llama-server` | **General**    |
+| Collectors (NVML, CPU and memory, disks), polling interval, history kept, displayed GPUs | **Monitoring** |
+| Interface theme                                                           | **Appearance** |
+
+<Callout type="note">
+
+`--host` and `--port` set where llama-webui itself listens. Where `llama-server` listens is a different pair: the
+**Default host** and **Default port** in Settings, or the **Host** and **Port** of a profile.
+
+</Callout>

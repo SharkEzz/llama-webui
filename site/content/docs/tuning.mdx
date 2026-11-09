@@ -1,0 +1,195 @@
+---
+title: Tuning
+description: Get a full set of llama-server flags for a model, your hardware and a goal, with the reason for each value and a per-device memory estimate.
+---
+
+The Tuning page recommends a complete set of `llama-server` flags for a model: which cards to use, how to split the
+model across them, what stays in RAM, the context size and the KV cache type. Every value comes with the reason it was
+chosen, and memory bars show what lands on each card. Use it when you add a model, or when a profile does not fit or
+runs slower than you expect.
+
+The recommendation is an estimate computed from the model's GGUF header and your hardware: nothing is loaded and the
+running model is not touched. Measure it with a [benchmark](/docs/benchmark/), or refine it with a
+[sweep](/docs/sweeps/).
+
+<Screenshot name="tuning" alt="Tuning page: the Hardware card listing four devices with free and total memory, the Model card with a 70.6 GiB MoE model picked from a profile, the Preset card with 100 GB model selected, and the recommendation table with per-device memory bars" />
+
+## Hardware
+
+The **Hardware** card lists the devices llama.cpp sees, as reported by `llama-bench --list-devices`: their id
+(`CUDA0`, `Vulkan3`, `ROCm0`…), name, and free and total memory. Below them are the available and total RAM, and the
+CPU's physical cores and model.
+
+The estimator only places the model on dedicated cards. Devices it skips carry a badge:
+
+- **duplicate**: a card already listed through another backend, such as an NVIDIA card that also appears through
+  Vulkan;
+- **iGPU**: an integrated GPU that shares system RAM.
+
+The device list needs `llama-bench` next to `llama-server`. Without it the card shows **No devices: check the binary in
+Settings.**, and the only placement left is the CPU.
+
+## Pick a model
+
+In the **Model** card, either pick a profile in **Start from a profile**, or type the path of a model in **Model** (the
+folder button lists your models) and, optionally, a **Projector**.
+
+Starting from a profile fills in the model and the projector and keeps the profile's other flags, those the estimator
+does not set itself (`-c`, `--spec-type`…). They appear under **Other profile flags (carried over to the created
+profile and the server validation)**, with the ones llama-bench ignores listed below.
+
+Once a model is set, the card shows what the estimator reads from its header: **Architecture** (with the quantization
+and parameter count), **Size**, **Layers**, **Experts** (for example `8 active of 128`, or `dense`) and **Max context**.
+
+## Presets
+
+The **Preset** card sets the goal. It changes the context the estimator aims for, the KV cache type, the micro-batch
+size, and how [sweep](/docs/sweeps/) results are ranked.
+
+| Preset                 | Shown as                                              | Context (target, minimum)           | KV cache        | `-ub`        | Sweeps rank by                       |
+| ---------------------- | ----------------------------------------------------- | ----------------------------------- | --------------- | ------------ | ------------------------------------ |
+| **Responsive chat**    | generation throughput first, 32k context              | 32,768, 8,192                       | f16, else q8_0  | 512          | Generation speed                     |
+| **Agent & RAG**        | long prompts: prompt processing and generation        | 65,536, 16,384                      | q8_0            | 2048, else 512 | 0.6 × prompt speed + 0.4 × generation speed |
+| **Max context**        | the largest context that fits, then generation        | The largest that fits, 8,192        | q8_0            | 512          | Context, then generation speed       |
+| **Make the model fit** | get it to start and reply, even slowly                | 8,192, 8,192                        | q8_0            | 512          | Generation speed                     |
+| **100 GB model**       | MoE experts in RAM, attention and norms on all cards  | 32,768, 8,192                       | q8_0            | 512          | Generation speed                     |
+
+The target context is capped at the model's own maximum. All presets except **100 GB model** require the weights placed in
+RAM to fit in the available RAM. **100 GB model** works differently: it goes straight to all your cards with the MoE
+experts in RAM, and accepts a model larger than your RAM, re-read from disk. See
+[Run a 100 GB MoE model on consumer GPUs](/docs/guides/big-moe-models/).
+
+## The recommendation
+
+The **Recommendation (estimate)** card updates as soon as you change the model, the preset or a pinned value. Its table
+has three columns: **Flag**, **Value** and **Why**.
+
+| Flag                  | When it appears                                     | What the value means                                                                  |
+| --------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `-ncmoe`              | MoE model with part of its experts in RAM           | The experts of the first N layers stay in RAM.                                        |
+| `-ngl`                | Always                                              | `all` layers on the cards, a number of layers (the rest in RAM), or `0`.             |
+| `-dev`                | At least one card is used                           | The cards, in order. With several, the first one holds the compute buffers.          |
+| `-ts`                 | Several cards                                       | The split, in proportion to each card's usable VRAM.                                  |
+| `-c`                  | Always                                              | The context. **Why** gives the total memory estimated for the whole configuration.    |
+| `-fa`                 | Always                                              | `on`: faster attention, and required for a quantized KV cache.                        |
+| `-ctk / -ctv`         | Always                                              | The KV cache type: `f16`, or `q8_0` (half the size, negligible loss).                 |
+| `-t`                  | Always                                              | The number of physical CPU cores.                                                     |
+| `-b / -ub`            | Always                                              | Batch 2048, micro-batch from the preset.                                              |
+| `--fit`               | Always                                              | `off`: what gets measured is exactly what gets written.                               |
+| `--mlock`             | `-ngl` leaves whole layers in RAM                   | Locks the model in memory. Only when no `-ncmoe` is used, nothing overflows RAM and at least 2 GiB of RAM is left. |
+| `--numa`              | The CPU has several NUMA nodes                      | `distribute`.                                                                         |
+
+Warnings below the table point out what costs speed: layers or experts left in RAM, a model that overflows RAM, a card
+with a thin margin, or a device or `-ot` pattern the estimator does not recognize.
+
+When nothing fits, even on the CPU, a **Does not fit** alert gives the reason and the card shows the simplest command
+instead of the table, without any action.
+
+### How the estimator places the model
+
+For every preset except **100 GB model**, the estimator tries these placements in order and keeps the first one that
+fits:
+
+1. The whole model on the cards: each CUDA card alone, all CUDA cards together, each other card alone, then all
+   cards. CUDA cards come first, in the order llama.cpp lists them.
+2. For a MoE model: all cards, with the experts of the first N layers in RAM (`-ncmoe`), N as small as possible.
+3. All cards with fewer layers on the GPUs (`-ngl` N), N as large as possible.
+4. The CPU alone.
+
+It first looks for a whole-model placement at the preset's target context and preferred KV cache; one with headroom
+wins over one that is tight. If none fits, it goes through the placements again and, for each one, lowers the context
+in steps of 4,096 tokens down to the preset's minimum (and tries `q8_0` for **Responsive chat**) before moving on to the
+next placement. **Max context** instead looks for the largest context, in multiples of 1,024, that each whole-model
+placement can hold and keeps the largest; it only falls back to the other placements when no whole-model placement
+fits.
+
+### What the estimate counts
+
+- **Weights.** Every tensor of the GGUF, placed on a card or in RAM according to the flags: `-ot` rules first (the first
+  matching rule wins, as in llama.cpp), then the experts moved by `-ncmoe`. The token embeddings stay in RAM. Layers
+  are split in order across the cards, in proportion to `-ts`, and the output layer goes on the last card when every
+  layer is on a GPU.
+- **KV cache.** For each layer, at the chosen context and cache types, on the device that holds the layer. Sliding-window
+  layers only keep their window; recurrent layers and MTP layers have no KV cache.
+- **Compute buffers.** On the first card; they grow with `-ub`.
+- **Projector.** Its file size, on the first card.
+- **Margin.** Each card keeps 512 MiB plus 4% of its memory free for the driver and fragmentation. What remains is its
+  usable budget.
+- **RAM.** Weights left on the CPU and the KV cache of CPU layers, compared with the available RAM.
+
+The estimate budgets each card's total memory, not what is free right now: it assumes the cards are empty.
+
+## Memory bars
+
+Next to the table, one bar per card the configuration uses, then one for RAM. Each shows the estimate against the
+usable budget (`14.4 GiB usable`) or, for RAM, the available memory. The fill is the estimate relative to the device's
+total memory, and a tick marks the usable budget. Hover a bar for the device name and the estimated, usable and total
+amounts.
+
+| Message                                    | Meaning                                                                    |
+| ------------------------------------------ | -------------------------------------------------------------------------- |
+| None                                       | Under 95% of the usable budget.                                            |
+| **tight: less than 5% headroom**           | Between 95% and 100% of the usable budget.                                 |
+| **… over**                                 | Over the usable budget: the configuration does not fit.                    |
+| **… over: read back from disk (mmap)**     | RAM only: weights beyond the available RAM are re-read from the model file. |
+
+When the RAM overflows (only possible with **100 GB model**), a line under the bars gives the overflow and the disk
+reads it implies at 10 tok/s, for example `Overflow of 35.6 GiB: at 10 t/s, NVMe reads ≈ 22.2 GiB/s`. If you measured
+the model's disk with **Measure disk** on the [System](/docs/system/) page, its speed is shown next to it.
+
+## Pin a value
+
+The pencil button next to a value pins it: type the value you want, then click **Pin**. The estimator then looks for the
+best placement with that value fixed. You can pin `-ngl` (a number or `all`), `-ncmoe`, `-dev` (device ids such as
+`CUDA0,Vulkan3`), `-ts` (at least two proportions, such as `3,1`), the KV cache type, `-t` and `-ub`.
+
+Pinned values are listed above the table under **Pinned:**; the × next to one removes it. Pinning `-ncmoe` on a dense
+model only adds a warning: it has no effect there.
+
+## Use the recommendation
+
+- **Create profile** saves the recommendation as a [profile](/docs/profiles/) named `<model> — <preset>` (with a number
+  added if the name is taken) and opens it. The profile gets the recommended flags, the other flags of the profile you
+  started from (minus those the recommendation already sets, such as `-c`), and that profile's environment variables.
+- **Run a benchmark** fills in the [Benchmark](/docs/benchmark/) form with the recommended flags, tool set to
+  llama-bench, and opens the page. The context and your profile's other flags go into **Other server flags**: switch
+  the tool to **Server** to measure with them. The run does not start until you click **Run**.
+- **Start from the recommendation**, in the **Search space** card below, uses it as the base of a
+  [sweep](/docs/sweeps/).
+
+## System checks
+
+The **Checks** button of the **Hardware** card opens the [System](/docs/system/) page, where the **Checks** card reviews
+the system settings that affect llama.cpp. It is read-only: for each item it shows the state (ok, to improve, unknown or
+not applicable), the impact, and, when there is one, the command to copy. A badge says whether the fix lasts **until
+reboot** or is **permanent**.
+
+The checks look at the model picked in that card and at the last recommendation computed for it on the Tuning page: the
+memlock limit is only checked when `--mlock` is recommended, and swappiness and swap are only flagged when the
+recommendation leaves part of the model in RAM.
+
+| Check                         | To improve when                                          | Fix shown                                                                       |
+| ----------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Persistence (NVIDIA)          | Persistence mode is off                                  | `sudo nvidia-smi -i <card> -pm 1`                                               |
+| Power limit (NVIDIA)          | The limit is below the card's default                    | `sudo nvidia-smi -i <card> -pl <default watts>`                                 |
+| Resizable BAR (NVIDIA)        | BAR1 is smaller than the VRAM                            | Enable Resizable BAR / Above 4G decoding in the BIOS                            |
+| NVIDIA driver                 | Too old for the build's CUDA                             | Update the driver                                                               |
+| Module nvidia_uvm             | The module is not loaded                                 | `sudo modprobe nvidia_uvm`                                                      |
+| DPM level (AMD)               | The level is `auto`                                      | `echo high \| sudo tee /sys/class/drm/<card>/device/power_dpm_force_performance_level` |
+| Backend ROCm/HIP (AMD)        | The build has no HIP backend                             | Rebuild llama.cpp with `-DGGML_HIP=ON`                                          |
+| PCIe link                     | The link runs below its maximum under load               | Check the slot, riser or BIOS                                                   |
+| CPU governor                  | A core is not on `performance`                           | `echo performance \| sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor` |
+| Transparent hugepages         | Set to `never`                                           | `echo madvise \| sudo tee /sys/kernel/mm/transparent_hugepage/enabled`          |
+| memlock limit                 | Lower than the model while `--mlock` is recommended      | `ulimit -l unlimited`                                                           |
+| vm.swappiness                 | Above 10 while the model spills into RAM                 | `sudo sysctl vm.swappiness=10`                                                  |
+| NUMA nodes                    | Several nodes without `--numa`                           | Add `--numa distribute` to the profile                                          |
+| Backend CUDA                  | An NVIDIA card but no CUDA backend                       | Rebuild llama.cpp with `-DGGML_CUDA=ON`                                         |
+| Build SIMD instructions       | AVX2 or AVX-512 available but unused                     | Rebuild with `-DGGML_NATIVE=ON`                                                 |
+| Build age                     | The build is older than 60 days                          | `git pull && cmake --build build`                                               |
+| IOMMU                         | Active without passthrough, with several cards           | Add `iommu=pt` to the kernel command line                                       |
+| Model disk                    | A spinning disk or a network file system                 | Move the model to a local SSD                                                   |
+| Model disk bandwidth          | Under 2 GiB/s (unknown until measured)                   | Click **Measure disk** to measure it                                            |
+| Swap                          | Swap in use while the model spills into RAM              | Lower `-c` or raise `--n-cpu-moe`                                               |
+
+Some checks can only be answered once a server has run: the PCIe link is measured under load, and the SIMD check reads
+the `system_info` line of the server's logs.

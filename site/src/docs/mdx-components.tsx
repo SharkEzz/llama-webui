@@ -28,7 +28,7 @@ function Anchor({ href = '', children, ...props }: React.ComponentProps<'a'>) {
 function Table(props: React.ComponentProps<'table'>) {
   return (
     <div className="my-6 overflow-x-auto rounded-xl ring-1 ring-border">
-      <table className="w-full text-sm" {...props} />
+      <table className="w-full text-sm [&_td:first-child_code]:whitespace-nowrap" {...props} />
     </div>
   );
 }

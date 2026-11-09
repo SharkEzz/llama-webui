@@ -1,0 +1,227 @@
+---
+title: Split a model across mixed GPUs
+description: Run one model across several GPUs, NVIDIA and AMD cards together. Device names, -dev, -ts and -sm, what Tuning picks, and how to check the split.
+---
+
+When a model does not fit on one card, `llama-server` can spread it across several, including cards from different
+vendors: NVIDIA cards through CUDA and an AMD card through ROCm or Vulkan, in the same process. This guide goes from
+the build to a profile that splits the model, then shows where llama-webui tells you how the split turned out.
+
+## Build llama.cpp with several backends
+
+One llama.cpp build can hold several backends. Start from the commands on the
+[Installation](/docs/getting-started/installation/#install) page and combine the options of each backend you need.
+
+<Tabs>
+  <Tab title="CUDA and Vulkan">
+
+CUDA for the NVIDIA cards, Vulkan for the AMD (or Intel) card. Needs the CUDA toolkit, the Vulkan headers and
+`glslc`.
+
+```bash title="Terminal"
+cmake -B build -DGGML_CUDA=ON -DGGML_VULKAN=ON
+cmake --build build --config Release -j
+```
+
+  </Tab>
+  <Tab title="CUDA and ROCm">
+
+ROCm is usually faster than Vulkan on a supported AMD card. With CUDA in the same build, add `-DGGML_BACKEND_DL=ON`:
+each backend is then built as its own library, loaded when `llama-server` starts. Set `GPU_TARGETS` to your AMD card's
+architecture (`gfx1100` for a Radeon RX 7900).
+
+```bash title="Terminal"
+HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
+  cmake -S . -B build -DGGML_BACKEND_DL=ON -DGGML_CUDA=ON -DGGML_HIP=ON \
+  -DGPU_TARGETS=gfx1100 -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release -j
+```
+
+  </Tab>
+</Tabs>
+
+Keep `llama-bench` next to `llama-server` (both land in `build/bin/`): llama-webui reads the device list from it, and
+Tuning cannot see your GPUs without it.
+
+The **Checks** card on the [System](/docs/system/) page tells you when the build misses a backend for a card in the
+machine: **Backend CUDA** warns `missing: rebuild llama.cpp with -DGGML_CUDA=ON`, and **Backend ROCm/HIP** warns
+`missing: rebuild llama.cpp with -DGGML_HIP=ON, otherwise Vulkan`.
+
+## How devices are named
+
+llama.cpp names each device after its backend, with a number that restarts at 0 for every backend: `CUDA0`, `CUDA1`,
+`ROCm0`, `Vulkan0`… These are the names `-dev` expects. To list them, run `llama-server --list-devices`:
+
+```text title="llama-server --list-devices"
+Available devices:
+  CUDA0: NVIDIA GeForce RTX 5070 Ti (15901 MiB, 15670 MiB free)
+  CUDA1: NVIDIA GeForce RTX 5060 Ti (15909 MiB, 15772 MiB free)
+  ROCm0: AMD Radeon RX 9070 XT (16304 MiB, 16238 MiB free)
+  ROCm1: AMD Radeon Graphics (31335 MiB, 31331 MiB free)
+```
+
+Here `ROCm1` is the processor's integrated GPU: its 31 GiB are the system RAM it shares with the CPU, not dedicated
+memory.
+
+You do not need a terminal to read this list in llama-webui. The same devices, read from `llama-bench --list-devices`,
+appear in three places:
+
+- the **llama-bench** step of the [setup checklist](/docs/getting-started/first-run/), with each device's name and
+  memory;
+- the **Hardware** card on the [Tuning](/docs/tuning/) page, with free and total memory per device and a badge for the
+  devices the estimator leaves out: **duplicate**, **iGPU** or **host**;
+- the **-dev and -ts** group of the [Benchmark](/docs/benchmark/) form, one checkbox per device.
+
+<Callout type="important" title="Vulkan sees every card">
+
+Vulkan lists every GPU that has a Vulkan driver, NVIDIA cards included. In a CUDA and Vulkan build, an NVIDIA card
+therefore shows up twice, for example as `CUDA0` and `Vulkan0`, and the AMD card may be `Vulkan1` or `Vulkan2`. Read
+the names in the list before writing `-dev`.
+
+</Callout>
+
+## The flags that place the model
+
+| Flag                          | Value                                    | What it does                                                                                                                           |
+| ----------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `-dev`, `--device`            | `CUDA0,ROCm0`, or `none`                 | The devices to offload to, comma-separated; `none` keeps everything on the CPU. Without it, llama.cpp picks the GPUs itself.           |
+| `-ts`, `--tensor-split`       | `3,1`                                    | The share of the model each device gets, as proportions, in the order of `-dev`. Without it, the split follows each device's memory.   |
+| `-sm`, `--split-mode`         | `none`, `layer`, `row`, `tensor`         | How the model is split across the GPUs (below). Default: `layer`.                                                                      |
+| `-mg`, `--main-gpu`           | an index, default `0`                    | The GPU that holds the whole model with `-sm none`, or the intermediate results and KV cache with `-sm row`.                           |
+| `-ngl`, `--n-gpu-layers`      | a number, `auto` or `all`                | How many layers go to the GPUs at all. Default: `auto`.                                                                                |
+
+`-mg` counts in the list of devices in use: with `-dev CUDA1,ROCm0 -sm none -mg 1`, the model goes to `ROCm0`.
+
+The split modes, as `llama-server --help` describes them:
+
+- `none`: use one GPU only.
+- `layer` (default): split layers and KV across GPUs (pipelined). Each card holds a contiguous block of layers and its
+  part of the KV cache; a token goes through the cards one after the other. This is the mode that works across vendors.
+- `row`: split weights across GPUs by rows (parallelized).
+- `tensor`: split weights and KV across GPUs (parallelized, marked experimental).
+
+For cards from different vendors, stay with `layer`. llama.cpp's
+[multi-GPU guide](https://github.com/ggml-org/llama.cpp/blob/master/docs/multi-gpu.md) explains the requirements and
+limits of `row` and `tensor`.
+
+### Write them in a profile
+
+Open the profile on the [Profiles](/docs/profiles/) page and add the flags to **llama-server arguments**. Type `-` to
+get the flags your own `llama-server --help` lists, with their help inline. For two 16 GB cards from different vendors:
+
+```text title="llama-server arguments"
+-ngl all -dev CUDA0,ROCm0 -ts 1,1 -fa on
+```
+
+Then save and start the profile. To check what was actually run, the [Server](/docs/server/) page shows the effective
+command line.
+
+Prefer `-dev` to environment variables for choosing cards. A variable such as `CUDA_VISIBLE_DEVICES` (the placeholder
+of the profile's **Environment variables** field) hides cards from the backend itself, and the cards that remain are
+numbered from 0 again, so `-dev` names change with it.
+
+## Let Tuning pick the devices and the split
+
+[Tuning](/docs/tuning/) proposes `-dev` and `-ts` along with the other flags. Pick a model, or a profile in **Start
+from a profile**, then a goal in the **Preset** card. The **Recommendation (estimate)** table gives a value and a reason
+for each flag, and the bars next to it show the estimated memory on each device against what is usable.
+
+How it chooses the cards:
+
+1. It takes the devices from `llama-bench --list-devices` and keeps the dedicated cards. A Vulkan device whose name
+   matches a CUDA card is a **duplicate**, a Vulkan device named after the processor is an **iGPU**, and the CPU is a
+   **host**: none of them is offered.
+2. It orders the cards CUDA first, in `--list-devices` order, then the others.
+3. It tries sets of cards in this order: each CUDA card alone, all CUDA cards together, each of the other cards alone,
+   then every card. The first set that holds the model at the goal's context, with headroom, wins. A model that fits
+   on one card stays on one card: the reason reads `single card: no PCIe hop`.
+4. When no set leaves headroom, it lowers the context and the KV cache type, then keeps MoE experts in RAM (`-ncmoe`)
+   or some layers on the CPU (`-ngl`) across all the cards, and finally runs on the CPU alone.
+
+Two goals work differently: **Max context** keeps the set of cards that allows the largest context, and **100 GB
+model** skips the search, uses every card at once and keeps MoE experts in RAM.
+
+Tuning starts from the model and from the profile's other flags; the profile's own `-dev`, `-ts` and `-sm` are not
+reused. Pin `-dev` and `-ts` (below) to keep them, and add `-sm` back to the created profile if you used one.
+
+With several cards, `-dev` lists them in that order (`2 cards, CUDA0 gets the compute buffers`), and `-ts` is
+proportional to each card's usable VRAM, its total minus a margin of 512 MiB plus 4 %, with the compute buffers taken
+off the first card: `split by the usable VRAM of each card`. Tuning does not set `-sm` or `-mg`: the profile keeps
+llama.cpp's default `layer` split.
+
+To force a choice, click the pencil next to the `-dev` value, type the devices (`CUDA0,ROCm0`) and click **Pin**: the
+estimator then looks for the best placement on those cards. `-ts` can be pinned the same way, with one proportion per
+pinned device. When the result suits you, click **Create profile**, or **Run a benchmark** to measure it first.
+
+<Callout type="warning" title="An AMD iGPU under ROCm">
+
+ROCm names an AMD integrated GPU `AMD Radeon Graphics`, not after the processor. The **Hardware** card then shows it
+without the **iGPU** badge, and the estimator counts its shared memory as a card. If an integrated GPU appears in the
+recommended `-dev`, pin `-dev` to your dedicated cards.
+
+</Callout>
+
+### Compare device sets with a sweep
+
+When two placements look close, measure them. In the **Search space** card on the Tuning page, the **-dev** row takes
+one device set per configuration: tick the devices, then click **Add this set**, or use the suggestions **each card
+alone**, **all CUDA** and **all**. The **-ts** row only applies to device sets with as many devices as proportions; the
+plan says how many combinations it ignored. The **-sm** row tries split modes. See [Sweeps](/docs/sweeps/) and
+[Find the best flags with a sweep](/docs/guides/find-best-flags/).
+
+## Check the split
+
+<Screenshot
+  name="topology"
+  alt="Topology page during a generation: the Model card lists CUDA0 with 4.3 GiB (38.5%), CUDA1 with 6.6 GiB (58.1%) and Host (RAM) with 388.4 MiB, offloaded layers 66/66. The GPU blocks in the scene use the same colors."
+  caption="The Model card on Topology: the share of the weights on each device."
+/>
+
+Once the profile runs, several pages show where the model landed:
+
+- **Topology**: the **Model** card lists each device by its llama.cpp name (`CUDA0`, `ROCm0`, `Vulkan1`…) with the
+  size and share of the weights it holds, then **Host (RAM)** for what stayed in memory, the total and the offloaded
+  layers. Each device has the color of its GPU block in the scene; hover a block for its **Model** and **KV cache**.
+  The split is read from the loading logs of a server llama-webui started. See [Topology](/docs/topology/).
+- **Logs**: `llama-server` writes one `using device` line per device it loads onto, with its PCI address, then
+  `offloaded N/M layers to GPU` and a `model buffer size` line per device. Search the [Logs](/docs/logs/) page for
+  `using device`.
+- **Dashboard**: the system strip shows a VRAM gauge for each card on which `llama-server` holds more than 64 MiB,
+  that is, the cards in the split. See [Dashboard](/docs/dashboard/).
+- **System**: one card per physical GPU, with its VRAM in use by every process. A card that two backends can reach
+  still appears once here, by its PCI address.
+
+## Pitfalls
+
+### The same card through two backends
+
+Never list two names of the same card in `-dev` (`CUDA0` and its Vulkan copy, for example). llama.cpp would treat them
+as two cards: both parts of the split land in the same VRAM, and the card's memory counts twice. Without `-dev`, recent
+llama.cpp builds skip a device that has the same id as one already in use, and log a `skipping device` line. Tuning
+marks such a device **duplicate** and never offers it.
+
+### Hidden GPUs only affect monitoring
+
+The **Displayed GPUs** switches on the **Monitoring** tab of [Settings](/docs/settings/) control what llama-webui
+reads, not what `llama-server` uses. A hidden card is no longer read (and is not woken up if asleep), but `llama-server`
+still sees it and can load layers onto it. To keep the model off a card, leave the card out of `-dev`. A hidden card
+that `llama-server` uses also shows no VRAM or utilization on the System and Dashboard pages.
+
+### A new build needs a restart
+
+llama-webui reads the device list from `llama-bench --list-devices` once, and keeps it until it restarts. The flag list
+of the argument editor is also read once from `llama-server --help`. After rebuilding llama.cpp with another backend,
+or adding or removing a card, restart llama-webui so that Tuning and the editor see the new names.
+
+### A slow card slows the whole model
+
+With the `layer` split, a token goes through every card in turn, so the slower card's block of layers costs more time
+than the same block on the faster one. Give the slower card a smaller `-ts` share, or leave it out, and compare with a
+[benchmark](/docs/benchmark/). The **Checks** card on the System page also flags what slows copies between cards: a
+PCIe link below its maximum, and an IOMMU active without passthrough (`add iommu=pt to the kernel cmdline`).
+
+### ROCm rejects the card
+
+Some AMD cards are not on ROCm's list of supported architectures. The **Card recognized by ROCm** check reminds you of
+the usual workaround: add `HSA_OVERRIDE_GFX_VERSION=…` to the profile's **Environment variables**, with the version
+that matches your card. Otherwise, use the card through Vulkan.

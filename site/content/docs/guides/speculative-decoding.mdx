@@ -1,0 +1,167 @@
+---
+title: Speculative decoding and MTP
+description: Speed up generation with a draft model, MTP heads or n-gram drafts. Set it in a profile, watch the acceptance rate and measure the gain.
+---
+
+Speculative decoding makes generation faster without changing the model: something cheap guesses the next few tokens,
+and the model checks all the guesses in one pass. This guide explains the options `llama-server` offers, how to turn
+them on in a profile, and where llama-webui shows whether they pay off.
+
+## How it works
+
+Generating one token at a time leaves a GPU mostly waiting on memory: checking several tokens in one pass costs about
+the same as producing one. Speculative decoding uses that. A drafter proposes a short run of tokens, the main model
+verifies them together, keeps the ones it agrees with, and writes the next token itself. Every guess it keeps is a token
+it did not have to generate on its own.
+
+The main model still decides every token: speculative decoding changes the speed, not what the model writes. The gain
+depends on the **acceptance rate**, the share of drafted tokens the model keeps. It is high on predictable text (code
+edits, text that repeats earlier parts of the conversation, structured output) and lower on free-form writing. When
+too few drafts are kept, drafting costs more than it saves and generation gets slower.
+
+## The options in llama-server
+
+`--spec-type` turns it on, with one or more types separated by commas (default: `none`):
+
+| Type                                           | Where the drafts come from                                                            | What it needs                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `draft-simple`                                 | A much smaller model of the same family.                                              | A draft model, given with `-md`.                 |
+| `draft-mtp`                                    | The main model's own MTP (multi-token prediction) layers.                             | A GGUF that contains MTP layers.                 |
+| `draft-eagle3`, `draft-dflash`, `draft-dspark` | Small draft models trained for one specific main model.                               | The matching draft model, given with `-md`.      |
+| `ngram-simple`, `ngram-map-k`, `ngram-map-k4v`, `ngram-mod`, `ngram-cache` | Token sequences already present in the context.                | Nothing: no second model.                        |
+
+To know whether a model has MTP layers, click it on the [Models](/docs/models/) page: the **MTP layers** row of its
+details gives their number, or `—` when it has none.
+
+The settings that matter most:
+
+| Flag                                              | Default              | What it sets                                                                    |
+| ------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------- |
+| `-md`, `--spec-draft-model`, `--model-draft`       | unused               | The draft model file.                                                           |
+| `--spec-draft-n-max`                              | `3`                  | The number of tokens to draft each time.                                        |
+| `--spec-draft-n-min`                              | `0`                  | The minimum number of draft tokens to use.                                      |
+| `--spec-draft-p-min`                              | `0.00`               | The minimum probability for a drafted token (greedy drafting).                  |
+| `-ngld`, `--spec-draft-ngl`                       | `auto`               | How many draft model layers go to VRAM: a number, `auto` or `all`.              |
+| `-devd`, `--spec-draft-device`                    | follows `--device`   | The devices for the draft model.                                                |
+| `-ctkd`, `-ctvd`                                  | `f16`                | The KV cache types of the draft model.                                          |
+| `--spec-draft-sampling`                           | `greedy`             | `greedy` takes the draft's top token; `probabilistic` samples it.               |
+| `--spec-ngram-mod-n-match`                        | `24`                 | The lookup length of `ngram-mod`.                                               |
+| `--spec-ngram-mod-n-min`, `--spec-ngram-mod-n-max` | `48`, `64`          | The minimum and maximum number of n-gram tokens `ngram-mod` drafts.             |
+
+`--spec-default` turns on llama.cpp's default speculative configuration.
+
+<Callout type="note" title="Flag names change between builds">
+
+These names come from a recent `llama-server --help`. Older builds used `--draft-max` and `--draft-min`; recent ones
+have removed them in favor of `--spec-draft-n-max` and `--spec-draft-n-min`. The argument editor of a profile only
+suggests the flags of your own build: type `--spec` or `--draft` to see which spelling it accepts.
+
+</Callout>
+
+## Turn it on in a profile
+
+<Steps>
+  <Step title="Get the model">
+
+For MTP, use a GGUF whose details show **MTP layers**. For a draft model, put a small model of the same family next to
+the main one, so that both share the same vocabulary. The n-gram types need nothing.
+
+  </Step>
+  <Step title="Add the flags">
+
+Open the profile on the [Profiles](/docs/profiles/) page and add the flags to **llama-server arguments**. With MTP:
+
+```text title="llama-server arguments"
+--spec-type draft-mtp --spec-draft-n-max 3
+```
+
+With a draft model, fully on the GPU:
+
+```text title="llama-server arguments"
+-md Qwen3-0.6B-Q8_0.gguf --spec-type draft-simple -ngld all
+```
+
+A relative path starts from the profile's **Working directory**. Arguments are passed without a shell, so `~` is not
+expanded there: write the path in full or relative to that folder.
+
+  </Step>
+  <Step title="Start it and check">
+
+Save, then start the profile, or click **Restart** on the [Server](/docs/server/) page if it already runs. After the
+first reply, the **Speculative acceptance** tile appears on the Dashboard (see below).
+
+A flag your build does not know makes `llama-server` stop right away, with the reason on the [Logs](/docs/logs/) page.
+With `-lv 4` in the arguments, the logs also show `adding speculative implementation` followed by the type in use.
+
+  </Step>
+</Steps>
+
+## Read the acceptance rate
+
+<Screenshot
+  name="dashboard"
+  alt="Dashboard during a generation: Generation 53.0 tok/s, Speculative acceptance 41% with 1.2 tokens accepted per draft, Context used 9.9%. The Recent requests table at the bottom has an Acceptance column with 33%, 46% and 47%."
+  caption="The Speculative acceptance tile and the Acceptance column of Recent requests."
+/>
+
+llama-webui shows the acceptance rate in three places:
+
+- **Dashboard**: the **Speculative acceptance** tile appears once the server has drafted tokens. It gives the share of
+  drafted tokens accepted since the server started, and below it the average number of **tokens accepted per draft**.
+  The **Recent requests** table has an **Acceptance** column, one value per request. These figures come from
+  `llama-server`'s metrics, which llama-webui turns on for the servers it starts; a server started outside llama-webui
+  shows them only if it runs with `--metrics`. See [Dashboard](/docs/dashboard/).
+- **Chat**: the stats line under a reply ends with the acceptance of that reply, for example `MTP 51%`. The label reads
+  MTP whatever the speculative type. See [Chat](/docs/chat/).
+- **Benchmark**: server runs record the acceptance over their measured requests, in the **MTP** column of the history
+  and as **MTP accepted** on the live card and in comparisons. llama-bench runs show `—`.
+
+Compare the tokens accepted per draft with `--spec-draft-n-max`. When drafts are often kept in full, a longer draft may
+be worth trying; when only a token or so is kept, a shorter one wastes less work. Either way, measure the result.
+
+## Measure the gain with a benchmark
+
+`llama-bench` does not run speculative decoding: on the [Benchmark](/docs/benchmark/) page, the **llama-bench** tool
+says `Raw llama.cpp measurement: no speculative decoding, no profile context.` When you start from a profile that uses
+it, the form warns **llama-bench will not reproduce the whole profile** and lists flags such as `--spec-type` with
+`speculative decoding not measured`.
+
+Use the **Server** tool instead. It starts a real `llama-server` with the model, the fields and the **Other server
+flags**, which are passed as they are (the field's placeholder shows `--spec-type draft-mtp`). After a warm-up, it sends
+`r` chat requests: about `p` tokens of text followed by an instruction to write a new story, and `n` generated tokens.
+Going through chat, rather than repeating a raw prompt, keeps the acceptance close to a real conversation: a model
+asked to repeat a prompt would accept almost every draft.
+
+To measure the gain:
+
+1. Run a **Server** benchmark from the profile, with the speculative flags in **Other server flags**.
+2. Run it again without them.
+3. Select both runs in the history and click **Compare**: generation tok/s shows the speedup, **MTP accepted** the
+   acceptance.
+
+Do not compare a llama-bench run with a server run here: the comparison warns that llama-bench does not measure
+speculative decoding (MTP, draft) or the profile's context.
+
+## Tuning and sweeps
+
+[Tuning](/docs/tuning/) estimates the memory of the main model and its projector. A separate draft model loaded with
+`-md`, and its KV cache, are not part of the estimate: keep some headroom on the card that holds it, or place it with
+`-devd` and `-ngld`.
+
+When you start Tuning from a profile, the **Model** card lists the profile's other flags, speculative ones included,
+under **Other profile flags (carried over to the created profile and the server validation)**, and adds
+`Ignored by llama-bench: --spec-type` (or the flag you used). **Create profile** keeps those flags in the new profile.
+
+A [sweep](/docs/sweeps/) explores its configurations with llama-bench, so its first ranking ignores speculative
+decoding. **Validate on the server** then reruns the best configurations with a real `llama-server` and the sweep's
+other flags: the speculative flags take effect there, and once a validation succeeds, the sweep's best run is chosen
+among the validated ones.
+
+## Where the draft model goes
+
+The draft model is loaded on the same devices as the main model unless `-devd` says otherwise. With mixed GPUs, you can
+put it on a card with room to spare, for example `-md draft.gguf --spec-type draft-simple -devd ROCm0 -ngld all`. See
+[Split a model across mixed GPUs](/docs/guides/mixed-gpus/) for device names.
+
+The **Model** card on the [Topology](/docs/topology/) page shows how the main model is split; the draft model's buffers
+are not part of it. The VRAM gauges on the System and Dashboard pages count everything `llama-server` allocates.
