@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { autoTitle, DEFAULT_TITLE, isDefaultTitle, statsFromTimings } from './chat';
+import { autoTitle, contextUsed, DEFAULT_TITLE, isDefaultTitle, statsFromTimings } from './chat';
 
 test('statsFromTimings maps llama-server timings', () => {
   const t = {
@@ -40,4 +40,9 @@ test('isDefaultTitle accepts the current and the legacy default title', () => {
   expect(isDefaultTitle(DEFAULT_TITLE)).toBe(true);
   expect(isDefaultTitle('Nouvelle conversation')).toBe(true);
   expect(isDefaultTitle('Explain speculative decoding')).toBe(false);
+});
+
+test('contextUsed counts the cached prompt too, not only the new tokens (#29)', () => {
+  // Second turn: 1,200 tokens reused from the cache, 40 new ones, a 300-token reply.
+  expect(contextUsed({ cachedTokens: 1200, promptTokens: 40, genTokens: 300 })).toBe(1540);
 });

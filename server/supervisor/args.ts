@@ -19,6 +19,26 @@ export function expandHome(p: string, home: string = homedir()): string {
   return p;
 }
 
+/** The `binary` setting as a path to run: `~` expanded (a bare name stays bare, looked up in the PATH). */
+export function binaryPath(settings: Pick<Settings, 'binary'>, home: string = homedir()): string {
+  return expandHome(settings.binary, home);
+}
+
+/** Flags that set llama-server's log verbosity; with none, `buildCommand()` adds `-lv 4`. */
+const VERBOSITY_FLAGS = new Set(['-lv', '--verbosity', '--log-verbosity', '-v', '--verbose', '--log-verbose']);
+
+/**
+ * Verbosity llama-webui runs llama-server at: 4 is the first level that logs the buffer sizes (model, KV, compute) the
+ * Topology page reads. A profile that sets its own (a flag above, or `LLAMA_ARG_LOG_VERBOSITY` in its environment)
+ * keeps it.
+ */
+export const DEFAULT_VERBOSITY = '4';
+
+function setsVerbosity(profile: Pick<Profile, 'args' | 'env'>): boolean {
+  if (profile.args.some((a) => VERBOSITY_FLAGS.has(a.split('=')[0]!))) return true;
+  return 'LLAMA_ARG_LOG_VERBOSITY' in profile.env;
+}
+
 export interface ProfilePaths {
   /** Where llama-server runs: the profile's cwd (`~` expanded), else the app's. */
   cwd: string;
@@ -46,11 +66,12 @@ export function buildCommand(
   const port = profile.port ?? settings.port;
   // llama-server runs without a shell: `~` is expanded here, relative paths stay relative to its cwd.
   const server = [
-    settings.binary,
+    binaryPath(settings, home),
     '-m',
     expandHome(profile.model, home),
     ...(profile.mmproj ? ['-mm', expandHome(profile.mmproj, home)] : []),
     ...profile.args,
+    ...(setsVerbosity(profile) ? [] : ['-lv', DEFAULT_VERBOSITY]),
     '--host',
     host,
     '--port',

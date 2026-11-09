@@ -97,7 +97,7 @@ tested against them rather than against hand-written strings. Biome does not che
 | File                                                   | What it is                                               | Read by                                 |
 | ------------------------------------------------------ | -------------------------------------------------------- | --------------------------------------- |
 | `llama-server-help.txt`                                | `llama-server --help`                                    | `shared/src/flags.test.ts`              |
-| `llama-server-load.txt`, `llama-server-load-mtp.txt`, `llama-server-load-mtp-lv5.txt` | Startup logs (with MTP, and at `-lv 5`) | `server/monitor/placement.test.ts` |
+| `llama-server-load.txt`, `llama-server-load-mtp.txt`, `llama-server-load-mtp-lv5.txt`, `llama-server-load-tensor.txt` | Startup logs (with MTP, at `-lv 5`, and the `Meta()` buffers of `-sm tensor`) | `server/monitor/placement.test.ts` |
 | `metrics-idle.txt`, `metrics-after.txt`                | Prometheus `/metrics`, idle and after generating tokens  | `server/collectors/llama.test.ts`       |
 | `slots-idle.json`, `slots-busy.json`                   | `/slots`, idle and busy                                  | `server/collectors/llama.test.ts`       |
 | `nvidia-gpu.csv`, `nvidia-apps.csv`                    | `nvidia-smi` CSV queries (GPUs, compute apps)            | `server/collectors/nvidia.test.ts`      |

@@ -3,7 +3,7 @@ import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
 import { guarded, HttpError, jsonObject, notFound } from '../http';
 import { type Runtime, serverView } from '../runtime';
-import { buildCommand } from '../supervisor/args';
+import { binaryPath, buildCommand } from '../supervisor/args';
 import { getFlags } from '../supervisor/flags';
 import { probeUrl } from '../supervisor/health';
 
@@ -96,7 +96,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
     },
     '/api/flags': {
       GET: guarded(async () => {
-        const { binary } = settings.get();
+        const binary = binaryPath(settings.get());
         const flags = await getFlags(binary);
         if (!flags) throw new HttpError(503, `llama-server --help failed (${binary})`);
         return Response.json({ flags });

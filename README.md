@@ -133,7 +133,7 @@ and automatic resume after a network error or a restart.
 ### 🪄 Tuning and sweeps
 
 - Detects your GPUs, RAM and CPU and **recommends a full set of flags** for a goal: _responsive chat_, _agent & RAG_,
-  _max context_, _just make it fit_, or _100 GB model_ (MoE experts in RAM, attention and norms on every GPU).
+  _max context_, _make the model fit_, or _100 GB model_ (MoE experts in RAM, attention and norms on every GPU).
 - Every recommended flag comes with **why**, and a per-device VRAM/RAM estimate tells you what fits, what spills, and
   how much NVMe bandwidth an `mmap` overflow will cost per generated token.
 - **Sweeps** explore a search space you define (values per flag, devices, `--override-tensor` patterns): the cartesian

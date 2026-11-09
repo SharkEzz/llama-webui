@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { Button } from '@/components/ui/button';
+import { useProfiles } from '@/lib/profiles';
 import type { SettingsErrors } from '@/lib/settings';
 import { getSetup } from '@/lib/setup';
+import { useTuning } from '@/lib/tuning';
 import { cn } from '@/lib/utils';
 import { BenchStep, BinaryStep, GpuStep, MachineStep, ModelsStep, NetworkStep, ProfileStep } from './steps';
 
@@ -36,6 +38,13 @@ export function SetupChecklist({
 
   useEffect(() => void refresh(), [refresh]);
 
+  // Every step: the setup report, the machine checks (Tuning store) and the profiles.
+  const checkAgain = () => {
+    void useTuning.getState().loadChecks(null);
+    void useProfiles.getState().reload();
+    void refresh();
+  };
+
   const saveAndCheck = async (patch: Partial<Settings>) => {
     if (await save(patch)) await refresh();
   };
@@ -52,7 +61,7 @@ export function SetupChecklist({
             be done later, from Settings or the System page.
           </p>
         </div>
-        <Button variant="ghost" size="sm" disabled={loading} onClick={() => void refresh()}>
+        <Button variant="ghost" size="sm" disabled={loading} onClick={checkAgain}>
           <RefreshCw className={cn(loading && 'animate-spin')} /> Check again
         </Button>
       </header>

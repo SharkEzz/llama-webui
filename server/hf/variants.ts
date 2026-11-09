@@ -14,7 +14,8 @@ const stem = (p: string) => basename(p).replace(/(-\d{5}-of-\d{5})?\.gguf$/i, ''
 export function groupRepoFiles(files: HfFile[]): { variants: RepoVariant[]; projectors: RepoVariant[] } {
   const groups = new Map<string, HfFile[]>();
   for (const f of files) {
-    if (!/\.gguf$/i.test(f.path)) continue;
+    // imatrix files can be GGUF too (`imatrix.gguf`, `imatrix_unsloth.gguf`): calibration data, not a model.
+    if (!/\.gguf$/i.test(f.path) || /^imatrix/i.test(basename(f.path))) continue;
     const shard = parseGgufShardFilename(f.path);
     const id = shard ? `${shard.prefix}\0${shard.total}` : f.path;
     const g = groups.get(id);

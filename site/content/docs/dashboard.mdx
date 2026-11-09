@@ -83,8 +83,9 @@ many there are. The **Slots and context** card lists them.
   slot's size, with a bar.
 - The tokens in a slot are the whole conversation: the prompt plus everything generated so far. They stay there after
   the request ends, kept for the next one, so a free slot can still show a full context.
-- The message **/slots unavailable for this server.** appears when the server does not answer on `/slots`, for
-  example an external server started with `--no-slots`, or a server still loading its model.
+- While the model loads, the card says **Loading the model…**.
+- The message **/slots unavailable for this server.** appears when a ready server does not answer on `/slots`, for
+  example an external server started with `--no-slots`.
 
 The three figures at the bottom come from `llama-server`'s metrics:
 

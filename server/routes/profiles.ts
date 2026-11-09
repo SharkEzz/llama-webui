@@ -34,7 +34,7 @@ export function profileRoutes({ profiles, settings, activeProfileId }: ProfileRo
       POST: guarded(async (req) => Response.json(profiles.create(await req.json()), { status: 201 })),
     },
     '/api/profiles/export': {
-      GET: guarded(() => attachment('llama-webui-profils.json', { profiles: profiles.list().map(toInput) })),
+      GET: guarded(() => attachment('llama-webui-profiles.json', { profiles: profiles.list().map(toInput) })),
     },
     '/api/profiles/import': {
       POST: guarded(async (req) => {

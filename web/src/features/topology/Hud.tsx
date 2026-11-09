@@ -98,7 +98,7 @@ export function Hud({ phase, snapshot, graph, placement, flows, tones, reducedMo
               ? 'No managed server: split unknown.'
               : phase === 'loading'
                 ? 'Loading: the split arrives with the logs.'
-                : 'Split unknown (external server or logs evicted).'}
+                : 'Split unknown: an external server, or a profile whose -lv is below 4 (buffer sizes not logged).'}
           </p>
         ) : (
           <>
@@ -136,6 +136,7 @@ export function Hud({ phase, snapshot, graph, placement, flows, tones, reducedMo
                   </span>
                 </>
               )}
+              {placement?.buffers.some((b) => b.estimated) && ' · estimate (tensor parallel)'}
             </p>
           </>
         )}

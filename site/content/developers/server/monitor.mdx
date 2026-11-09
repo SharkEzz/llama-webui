@@ -266,7 +266,13 @@ export interface GpuNeeds {
 the API does not expose: `using device … (<bus id>)`, `<device> model|KV|RS|compute buffer size = … MiB`,
 `offloaded N/M layers to GPU`. `parsePlacement()` starts from the last launch line (`LAUNCH_LOG_PREFIX`) in the log
 ring, skips the `-fit` probes, counts compute buffers per context, and stops at the second "offloaded" line, which
-belongs to a draft model.
+belongs to a draft model. `llama-server` logs the buffer sizes from `-lv 4` on, which `buildCommand()` adds to a
+profile without a verbosity of its own.
+
+With `-sm tensor`, the buffers are logged on one `Meta()` device, at the size of its largest per-device part
+(`ggml-backend-meta.cpp` reports the maximum). `spreadMeta()` replaces them with one buffer per member, read from the
+`llama_prepare_model_devices: - device N: <name>` lines: model and cache scaled by `ts[i] / max(ts)` (`-ts` from the
+launch line, equal parts without it), the whole compute buffer on each, and `estimated: true`.
 
 Unlike the rest of `server/monitor/`, the tracker is recreated on every reload by `server/index.ts`: it replays the log
 ring, which survives, and keeps the last placement on `globalThis.__llamaWebuiPlacement`, so a reload after the

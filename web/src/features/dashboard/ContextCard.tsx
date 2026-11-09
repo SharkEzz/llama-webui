@@ -5,14 +5,16 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { formatInt, formatPct } from '@/lib/format';
 
-/** Slots (context used per slot) and request queue. */
-export function ContextCard({ snapshot }: { snapshot: Snapshot }) {
+/** Slots (context used per slot) and request queue; `loading` while the model loads (no /slots yet). */
+export function ContextCard({ snapshot, loading = false }: { snapshot: Snapshot; loading?: boolean }) {
   const { slots, queue } = snapshot;
   return (
     <GlassCard title="Slots and context" icon={Layers}>
       <div className="flex flex-col gap-4">
         {!slots || slots.length === 0 ? (
-          <p className="text-sm text-muted-foreground">/slots unavailable for this server.</p>
+          <p className="text-sm text-muted-foreground">
+            {loading ? 'Loading the model…' : '/slots unavailable for this server.'}
+          </p>
         ) : (
           slots.map((s) => {
             const used = slotContextTokens(s);

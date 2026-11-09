@@ -153,7 +153,7 @@ export function nodeLive(
           fillPct: null,
           dim: true,
           headline: g.hidden ? 'hidden' : 'suspended',
-          facts: [{ label: 'State', value: g.hidden ? 'Hidden (hiddenGpus setting)' : 'Suspended, not read' }],
+          facts: [{ label: 'State', value: g.hidden ? 'Hidden in Settings' : 'Suspended, not read' }],
         });
         continue;
       }

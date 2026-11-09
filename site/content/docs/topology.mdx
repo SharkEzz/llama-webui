@@ -35,8 +35,8 @@ Each GPU gets its own color, used again in the legend and the model split. The C
 drives and chipsets are neutral.
 
 A block glows brighter with its load: GPU utilization, CPU load, the share of RAM in use, or an NVMe drive's
-throughput against its link's capacity. Hidden and sleeping GPUs are dimmed and labeled **hidden** or **suspended**
-(see [Sleeping and hidden GPUs](/docs/system/#sleeping-and-hidden-gpus)).
+throughput against its link's capacity. Hidden and sleeping GPUs are dimmed and labeled **hidden** or **suspended**, with
+**Hidden in Settings** in their details (see [Sleeping and hidden GPUs](/docs/system/#sleeping-and-hidden-gpus)).
 
 ### Labels and details
 
@@ -112,8 +112,11 @@ When the split is not known, the card says why:
 
 - **No managed server: split unknown.** No server runs.
 - **Loading: the split arrives with the logs.** The server is still reading the model.
-- **Split unknown (external server or logs evicted).** The server was not launched by llama-webui, or its startup
-  lines are no longer in the log buffer.
+- **Split unknown: an external server, or a profile whose -lv is below 4.** The server was not launched by
+  llama-webui, or the profile sets a log verbosity under 4 (`-lv 3`, say), at which `llama-server` does not log its
+  buffer sizes.
+
+With `-sm tensor`, the card adds **estimate (tensor parallel)**: see below.
 
 ### Legend and throughput
 
@@ -142,9 +145,14 @@ llama-webui reads those lines from the [logs](/docs/logs/) of the last launch:
 - the size of the model, KV cache and compute buffers on each device;
 - the number of layers offloaded to the GPUs.
 
-The card fills in while the model loads and updates live. This only works for a server llama-webui launched: an
-external server's output never reaches llama-webui. If the logs do not give a device's PCI address, its slice is shown
-in gray.
+`llama-server` only writes the buffer sizes from log verbosity 4 on, so llama-webui starts it with `-lv 4` unless the
+profile sets a verbosity itself (`-lv`, `-v` or `LLAMA_ARG_LOG_VERBOSITY`). The card fills in while the model loads and
+updates live. This only works for a server llama-webui launched: an external server's output never reaches
+llama-webui. If the logs do not give a device's PCI address, its slice is shown in gray.
+
+With `-sm tensor` (tensor parallelism), `llama-server` groups the GPUs into one `Meta()` device and logs each buffer at
+the size of its largest part. llama-webui spreads it over the GPUs listed in the logs by `-ts` (equal parts without
+it), and the card says **estimate (tensor parallel)**. Those slices are gray: the logs give no PCI address for them.
 
 ## Move the camera
 

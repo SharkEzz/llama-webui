@@ -25,6 +25,12 @@ const LEVELS: { value: LogLevel; label: string }[] = [
 
 const BOTTOM_SLACK_PX = 40;
 
+const EMPTY = {
+  none: { title: 'No logs', description: 'Start llama-server from the Server page.' },
+  cleared: { title: 'View cleared', description: 'New lines will appear here.' },
+  filtered: { title: 'No lines match the filters', description: 'Lower the minimum level or change the search.' },
+} as const;
+
 export function LogsPage() {
   const all = useLogs((s) => s.lines);
   const hiddenBefore = useLogs((s) => s.hiddenBefore);
@@ -39,6 +45,9 @@ export function LogsPage() {
       filterLogs(hiddenBefore < 0 ? all : all.filter((l) => l.seq >= hiddenBefore), { minLevel, query: query.trim() }),
     [all, minLevel, query, hiddenBefore],
   );
+
+  const visible = hiddenBefore < 0 ? all.length : all.filter((l) => l.seq >= hiddenBefore).length;
+  const empty: keyof typeof EMPTY = all.length === 0 ? 'none' : visible === 0 ? 'cleared' : 'filtered';
 
   const virtualizer = useVirtualizer({
     count: lines.length,
@@ -149,12 +158,8 @@ export function LogsPage() {
           {lines.length === 0 ? (
             <Alert>
               <ScrollText />
-              <AlertTitle>{all.length === 0 ? 'No logs' : 'No lines match the filters'}</AlertTitle>
-              <AlertDescription>
-                {all.length === 0
-                  ? 'Start llama-server from the Server page.'
-                  : 'Lower the minimum level or change the search.'}
-              </AlertDescription>
+              <AlertTitle>{EMPTY[empty].title}</AlertTitle>
+              <AlertDescription>{EMPTY[empty].description}</AlertDescription>
             </Alert>
           ) : (
             <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>

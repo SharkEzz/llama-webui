@@ -22,3 +22,13 @@ export class LineSplitter {
 function clean(line: string): string {
   return line.replace(ANSI, '').replace(/\r$/, '').trimEnd();
 }
+
+/**
+ * A line llama-server writes from -lv 4 on each time a request (the monitor's `/slots` and `/metrics`, every
+ * second) wakes its idle loop: kept out of the ring, it would push everything else out of it within the hour.
+ */
+const IDLE_NOISE = /\bupdate_slots: all slots are idle\s*$/;
+
+export function isIdleNoise(line: string): boolean {
+  return IDLE_NOISE.test(line);
+}

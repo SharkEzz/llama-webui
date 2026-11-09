@@ -58,8 +58,9 @@ context, the error says so: start a new conversation, or use a profile with a la
 
 ### Context gauge
 
-At the top right, **Context** shows how many tokens the last exchange used (the prompt plus the reply, reasoning
-included) out of the server's context size, as `10,732 / 32,768 tokens`. From 85% it turns amber and suggests starting
+At the top right, **Context** shows how many tokens the conversation fills after the last reply (the prompt reused from
+the cache, the new message and the reply, reasoning included) out of the server's context size, as
+`10,732 / 32,768 tokens`. From 85% it turns amber and suggests starting
 a new conversation.
 
 ## Reasoning

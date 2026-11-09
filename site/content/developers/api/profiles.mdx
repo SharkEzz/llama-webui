@@ -166,7 +166,7 @@ The profiles are exported as `ProfileInput`, without `id`, `source` or dates.
 
 <Endpoint method="GET" path="/api/profiles/export" />
 
-**Response**: `200` with `{ "profiles": ProfileInput[] }`, in the list order, as the file `llama-webui-profils.json`.
+**Response**: `200` with `{ "profiles": ProfileInput[] }`, in the list order, as the file `llama-webui-profiles.json`.
 
 ```bash title="Terminal"
 curl -o profiles.json http://127.0.0.1:7860/api/profiles/export

@@ -191,8 +191,8 @@ export function GpuStep({ report, settings, save }: StepProps) {
                 ]
                   .filter(Boolean)
                   .join(' · ')}
-                . Hide the cards llama-server should not watch (an integrated GPU, say): a hidden card is no longer read
-                and stays asleep.
+                . Hide the cards llama-webui should not monitor (an integrated GPU, say): a hidden card is no longer
+                read and stays asleep.
               </p>
               <div className="flex flex-col gap-4">
                 <GpuSwitches

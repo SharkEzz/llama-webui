@@ -43,6 +43,15 @@ export interface MessageStats {
   durationMs: number;
 }
 
+/**
+ * Context the conversation fills after a reply: the prompt reused from the cache, the prompt evaluated, the reply.
+ * `promptTokens` alone (llama-server's `prompt_n`) only counts what was not cached: from the second turn on, it is
+ * the new message.
+ */
+export function contextUsed(s: Pick<MessageStats, 'cachedTokens' | 'promptTokens' | 'genTokens'>): number {
+  return s.cachedTokens + s.promptTokens + s.genTokens;
+}
+
 export interface ChatMessage {
   id: number;
   conversationId: number;

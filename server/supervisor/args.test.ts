@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { type Profile, type ProfileInput, shellQuote, shellSplit } from '@llama-webui/shared';
-import { buildCommand, profilePaths } from './args';
+import { binaryPath, buildCommand, profilePaths } from './args';
 
 const settings = { binary: 'llama-server', host: '0.0.0.0', port: 8080 };
 const p = (input: ProfileInput): Profile => ({ ...input, id: 1, source: 'ui', createdAt: 0, updatedAt: 0 });
@@ -23,6 +23,8 @@ test('builds argv with pdeathsig and mandatory flags', () => {
     'p.gguf',
     '-c',
     '40000',
+    '-lv',
+    '4',
     '--host',
     '0.0.0.0',
     '--port',
@@ -119,4 +121,27 @@ test('shellSplit says why it cannot read a line', () => {
   expect(shellSplit(`a "b`)).toEqual({ error: 'unclosed quote' });
   expect(shellSplit("a 'b")).toEqual({ error: 'unclosed quote' });
   expect(shellSplit('a \\')).toEqual({ error: 'trailing backslash' });
+});
+
+test('adds -lv 4 so the buffer sizes are logged, unless the profile sets a verbosity (#16)', () => {
+  const argv = (args: string[], env: Record<string, string> = {}) =>
+    buildCommand(p({ name: 'q', model: 'm.gguf', args, env }), settings, '/home/x').argv;
+  expect(argv([]).join(' ')).toContain(' -lv 4 --host');
+  for (const own of [['-lv', '2'], ['--verbosity', '5'], ['--log-verbosity=1'], ['-v'], ['--verbose']]) {
+    expect(argv(own).join(' ')).not.toContain('-lv 4');
+  }
+  expect(argv([], { LLAMA_ARG_LOG_VERBOSITY: '3' }).join(' ')).not.toContain('-lv 4');
+});
+
+test('the binary setting is run with ~ expanded (#32)', () => {
+  expect(binaryPath({ binary: '~/llama.cpp/build/bin/llama-server' }, '/home/x')).toBe(
+    '/home/x/llama.cpp/build/bin/llama-server',
+  );
+  expect(binaryPath({ binary: 'llama-server' }, '/home/x')).toBe('llama-server');
+  const cmd = buildCommand(
+    p({ name: 'q', model: 'm.gguf', args: [], env: {} }),
+    { ...settings, binary: '~/b/llama-server' },
+    '/home/x',
+  );
+  expect(cmd.argv[4]).toBe('/home/x/b/llama-server');
 });

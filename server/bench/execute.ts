@@ -14,7 +14,7 @@ import {
 import type { BenchFinish } from '../db/benchRuns';
 import type { LogBuffer } from '../logs/buffer';
 import { LineSplitter } from '../logs/lines';
-import { type BuiltCommand, buildCommand } from '../supervisor/args';
+import { type BuiltCommand, binaryPath, buildCommand } from '../supervisor/args';
 import { benchBinary, benchFailure, parseBenchJson, parseBenchProgress } from './parse';
 import { runServerTrial, TrialCancelled } from './server';
 import { VramProbe } from './vram';
@@ -99,7 +99,7 @@ export class RunExecutor {
       const cmd = buildCommand(profile, this.deps.settings());
       return { argv: cmd.argv, display: cmd.display, cmd };
     }
-    const bin = benchBinary(this.deps.settings().binary);
+    const bin = benchBinary(binaryPath(this.deps.settings()));
     const argv = [
       'setpriv',
       '--pdeathsig',
