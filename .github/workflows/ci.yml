@@ -1,0 +1,27 @@
+# Quality gate for the whole repo (app + website): Biome, type check, tests, website build.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      # The React Router CLI (site build) runs on Node; Vite 8 needs a recent one.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: site
+      - run: bun run lint
+      - run: bun run check
+      - run: bun test
+      - run: bun run site:build

@@ -8,13 +8,16 @@
     "web"
   ],
   "scripts": {
-    "check": "bun check --no-script && bun check -p web",
+    "check": "bun check --no-script && bun check -p web && bun run --cwd site typecheck",
     "dev": "bun --hot server/index.ts",
     "format": "biome format --write",
     "lint": "biome check",
     "lint:fix": "biome check --write",
+    "site:build": "bun run --cwd site build",
+    "site:dev": "bun run --cwd site dev",
+    "site:preview": "bun run --cwd site preview",
     "start": "NODE_ENV=production bun server/index.ts",
-    "test": "bun test server shared"
+    "test": "bun test server shared site"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
