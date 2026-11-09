@@ -1,0 +1,318 @@
+---
+title: Monitor and system
+description: The latest monitoring snapshot, the full history of the series, and the machine's CPU and GPU identity, with the Snapshot structure field by field.
+---
+
+These routes expose what the monitor samples on every tick: the latest `Snapshot`, the history of every series, and
+the identity of the CPU and GPUs. They live in `server/routes/monitor.ts`; the types are in `shared/src/monitor.ts`,
+the sampling in `server/monitor/` and `server/collectors/` (see [Monitor and collectors](/developers/server/monitor/)).
+The [Dashboard](/docs/dashboard/) and [System](/docs/system/) pages are built on them.
+
+The guard and the error shape follow the common rules of the [API overview](/developers/api/overview/). None of these
+routes takes a parameter or a body.
+
+## Snapshots and history
+
+The monitor (`Monitor` in `server/monitor/monitor.ts`) ticks every `pollIntervalMs` (setting, 1000 ms by default),
+whether a client is connected or not. Each tick builds a `Snapshot`, broadcasts it as the `snapshot` message of the
+[WebSocket](/developers/api/websocket/), and appends one point to every history series.
+
+A client keeps a live copy of the history this way (`web/src/lib/monitor.ts`):
+
+1. On every WebSocket connection, `GET /api/monitor/history` loads the whole history.
+2. Each `snapshot` message carries the values added on that tick in `points`: append them to the copy.
+3. When `snapshot.history` (`intervalMs`, `capacity`) differs from the copy's, the settings changed the history's
+   shape: load it again.
+4. When the `hello` message brings another `bootId`, llama-webui restarted: drop the copy.
+
+### Get the latest snapshot
+
+<Endpoint method="GET" path="/api/monitor/snapshot" />
+
+**Response**: `200` with the latest [`Snapshot`](#the-snapshot-structure), or `null` before the first tick.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/monitor/snapshot
+```
+
+### Get the history
+
+<Endpoint method="GET" path="/api/monitor/history" />
+
+Returns every series of the history in full. There is no query parameter: the size of the history is set by two
+[settings](/docs/settings/).
+
+| Setting          | Default | Limits         |
+| ---------------- | ------- | -------------- |
+| `historySeconds` | 300     | 30 to 1800 s   |
+| `pollIntervalMs` | 1000    | at least 250 ms |
+
+The number of points kept is `capacity = ceil(historySeconds × 1000 / pollIntervalMs)` (`historyPoints()` in
+`server/monitor/history.ts`): 300 points by default, 7200 at most (1800 s every 250 ms). Changing either setting resizes
+the history and keeps its most recent points.
+
+**Response**: `200` with a `HistoryDump` plus the `bootId` of this llama-webui process.
+
+| Field        | Type                                 | Description                                                              |
+| ------------ | ------------------------------------ | ------------------------------------------------------------------------ |
+| `intervalMs` | number                               | Interval between two points.                                             |
+| `capacity`   | number                               | Points kept per series.                                                  |
+| `at`         | number                               | Time of the last point (epoch ms); the current time when empty.          |
+| `times`      | number[]                             | Time of each point, oldest first.                                        |
+| `series`     | `Record<string, (number \| null)[]>`  | One array per [series key](#history-series), the same length as `times`. |
+| `bootId`     | string                               | Random id of the process, the same as in the WebSocket `hello`.          |
+
+Every existing series moves by one point per tick, so all arrays line up with `times`; `null` is a gap (no value on
+that tick). A series is created at its first known value: one that started later is padded with `null` on the left.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/monitor/history
+```
+
+```json
+{
+  "intervalMs": 1000,
+  "capacity": 300,
+  "at": 1762700003000,
+  "times": [1762700001000, 1762700002000, 1762700003000],
+  "series": {
+    "llama.genTps": [0, 41.8, 96.2],
+    "sys.cpu": [4.1, 12.6, 11.9],
+    "gpu.nvidia:GPU-6f1e6543-7c2b-4a1d-9e0f-3b5a8c9d2e10.util": [0, 87, 98],
+    "sys.tempC": [null, 52.1, 53]
+  },
+  "bootId": "9b7c4f3e-1d2a-4c8b-a6e5-0f9d8c7b6a51"
+}
+```
+
+### Get the system info
+
+<Endpoint method="GET" path="/api/system/info" />
+
+The static identity of the machine, for the [System](/docs/system/) and [Settings](/docs/settings/) pages.
+
+**Response**: `200` with:
+
+| Field          | Type                         | Description                                                                                  |
+| -------------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
+| `cpu`          | `CpuInfo`                    | Read once from `/proc/cpuinfo` and `/sys` (`readCpuInfo()` in `server/hardware/cpu.ts`), then cached. |
+| `gpus`         | object[]                     | `key`, `name`, `vendor`, `busId` and `vramTotalBytes` of every GPU of the latest snapshot's `allGpus` (empty before the first tick). |
+| `nvidiaSource` | `"nvml"` \| `"nvidia-smi"`    | How NVIDIA cards are read: NVML, or the `nvidia-smi` fallback. Chosen once at startup.       |
+
+`CpuInfo`:
+
+| Field            | Type     | Description                                                                 |
+| ---------------- | -------- | --------------------------------------------------------------------------- |
+| `model`          | string   | `model name` of the first processor.                                        |
+| `physicalCores`  | number   | Distinct `physical id` and `core id` pairs, at least 1.                     |
+| `logicalThreads` | number   | Processor entries, at least 1.                                              |
+| `flags`          | string[] | CPU flags (`avx2`, `avx512f`…).                                             |
+| `numaNodes`      | number   | `node*` entries of `/sys/devices/system/node`, 1 when unreadable.           |
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/system/info
+```
+
+## The Snapshot structure
+
+A `Snapshot` (`shared/src/monitor.ts`) is the state of one tick. When no server is active (supervisor `idle` or
+`crashed`), the `llama-server` fields are null or empty and only the machine is sampled; `starting`, `ready`,
+`stopping` and `external` count as active.
+
+| Field            | Type                    | Description                                                                                     |
+| ---------------- | ----------------------- | ----------------------------------------------------------------------------------------------- |
+| `at`             | number                  | Time of the tick (epoch ms).                                                                    |
+| `tick`           | number                  | Tick counter, from 1 when the monitor starts.                                                   |
+| `health`         | string \| null           | `llama-server`'s `/health`: `ok` (200), `loading` (503), `error` (any other status), `down` (no answer); null with no active server. |
+| `rates`          | object                  | `genTps`, `ppTps`: live tokens/s from the [slots](#slots), 0 when idle.                         |
+| `slots`          | `SlotView[]` \| null     | [Slots](#slots) from `/slots`; null when the server is not healthy or the read failed.          |
+| `kv`             | object \| null           | `usedTokens`, `totalTokens`: context used and allocated, summed over the slots.                 |
+| `queue`          | object \| null           | [Request queue](#queue) from `/metrics`.                                                        |
+| `lastRequest`    | `RequestStats` \| null   | [Rates of the last request](#lastrequest).                                                      |
+| `spec`           | `SpecStats` \| null      | [Speculative decoding](#spec) counters.                                                         |
+| `recentRequests` | `RequestRecord[]`       | [Recent requests](#recentrequests), most recent first.                                          |
+| `gpus`           | `GpuSample[]`           | The GPUs `llama-server` uses: those where its process holds more than 64 MiB (`USED_GPU_THRESHOLD_BYTES`), sorted by `busId`. |
+| `allGpus`        | `GpuSample[]`           | [Every GPU](#gpusample), sorted by `busId`, hidden and sleeping ones included.                  |
+| `proc`           | object \| null           | [The `llama-server` process](#proc).                                                            |
+| `system`         | `SystemSample` \| null   | [The machine](#system); null when the system collector is off or failed.                        |
+| `disk`           | `DiskSample` \| null     | [Disk throughput](#disk); null when the disk collector is off or failed.                        |
+| `points`         | `Record<string, number \| null>` | The value appended to each [history series](#history-series) on this tick (a gap is null). |
+| `history`        | object                  | `intervalMs` and `capacity` of the history: a change invalidates the client's copy.             |
+
+The counters behind `lastRequest`, `spec` and `recentRequests` start over when the server's PID changes (restart,
+another profile).
+
+### `slots`
+
+`SlotView`, one per `llama-server` slot (`parseSlots()` in `server/collectors/llama.ts`):
+
+| Field              | Type           | Description                                                                         |
+| ------------------ | -------------- | ----------------------------------------------------------------------------------- |
+| `id`               | number         | Slot id.                                                                            |
+| `nCtx`             | number         | Context size of the slot.                                                           |
+| `processing`       | boolean        | A request is running in it.                                                         |
+| `idTask`           | number \| null  | Task id of the request.                                                             |
+| `nPromptTokens`    | number         | Tokens in the slot's context: the prompt plus what was generated so far.            |
+| `nPromptProcessed` | number         | Prompt tokens processed (without those reused from the cache).                      |
+| `nDecoded`         | number         | Tokens generated for the current request.                                           |
+| `nRemain`          | number \| null  | Tokens left before `n_predict`, if any.                                             |
+
+`rates` compares the slots with the previous tick: generated and processed tokens of the busy slots divided by the
+elapsed time. `kv.usedTokens` is the sum of `nPromptTokens` (`slotContextTokens()`): adding `nDecoded` would count the
+output twice.
+
+### `queue`
+
+From the `llamacpp:` metrics of `/metrics`; null when they could not be read.
+
+| Field        | Metric                    |
+| ------------ | ------------------------- |
+| `processing` | `requests_processing`     |
+| `deferred`   | `requests_deferred`       |
+| `busySlots`  | `n_busy_slots_per_decode` |
+
+### `lastRequest`
+
+`RequestStats`, computed from the deltas of the `/metrics` counters between two ticks (`lastRequestStats()`):
+
+| Field        | Type           | Description                                          |
+| ------------ | -------------- | ---------------------------------------------------- |
+| `genTps`     | number \| null  | Generation speed, tokens/s.                          |
+| `ppTps`      | number \| null  | Prompt processing speed, tokens/s.                   |
+| `specAccept` | number \| null  | Accepted draft tokens / drafted tokens (0 to 1).     |
+
+`llama-server` publishes prompt counters when the prompt ends and generation counters when the request ends, so one
+request can arrive in two deltas: a delta with a prompt rate starts a new request, a generation-only delta completes it
+(`mergeRequestStats()`).
+
+### `spec`
+
+`SpecStats`, the cumulative speculative decoding counters of `/metrics` (`specStats()`):
+
+| Field                  | Type           | Description                                                                 |
+| ---------------------- | -------------- | --------------------------------------------------------------------------- |
+| `acceptCum`            | number \| null  | `accepted / draftTokens` since the server started.                          |
+| `drafts`               | number         | Drafts proposed.                                                            |
+| `draftTokens`          | number         | Tokens drafted.                                                             |
+| `accepted`             | number         | Draft tokens accepted.                                                      |
+| `meanAcceptedPerDraft` | number \| null  | `accepted / drafts`.                                                        |
+| `perPos`               | number[]       | Per draft position: accepted tokens at that position divided by `drafts`.   |
+
+### `recentRequests`
+
+`RequestRecord`, at most 40, most recent first (`foldRecent()`). Like `lastRequest`, a record is a per-tick
+approximation: with several busy slots, it aggregates their requests.
+
+| Field          | Type           | Description                                   |
+| -------------- | -------------- | --------------------------------------------- |
+| `at`           | number         | Tick that recorded it (epoch ms).             |
+| `promptTokens` | number         | Prompt tokens.                                |
+| `cachedTokens` | number         | Prompt tokens reused from the cache.          |
+| `genTokens`    | number         | Generated tokens.                             |
+| `promptSec`    | number \| null  | Prompt processing time, seconds.              |
+| `genSec`       | number \| null  | Generation time, seconds.                     |
+| `ppTps`        | number \| null  | Prompt tokens/s.                              |
+| `genTps`       | number \| null  | Generated tokens/s.                           |
+| `specAccept`   | number \| null  | Draft acceptance (0 to 1).                    |
+
+### `GpuSample`
+
+One GPU, NVIDIA (NVML or `nvidia-smi`) or AMD (`amdgpu` sysfs). The optional fields are missing or null when the
+vendor or the card does not provide them.
+
+| Field                | Type                     | Description                                                                 |
+| -------------------- | ------------------------ | --------------------------------------------------------------------------- |
+| `key`                | string                   | `nvidia:<uuid>` or `amd:<pci device>`: the stable id used in series keys.   |
+| `vendor`             | `"nvidia"` \| `"amd"`     |                                                                             |
+| `name`               | string                   | Card name.                                                                  |
+| `busId`              | string                   | PCI address, `0000:01:00.0`.                                                |
+| `utilPct`            | number \| null            | GPU utilization, %.                                                         |
+| `vramUsedBytes`      | number                   | VRAM used on the card.                                                      |
+| `vramTotalBytes`     | number                   | VRAM of the card.                                                           |
+| `tempC`              | number \| null            | Temperature, °C.                                                            |
+| `powerW`             | number \| null            | Power draw, W.                                                              |
+| `procVramBytes`      | number                   | VRAM held by the `llama-server` process on this card (0 without a server).  |
+| `memUtilPct`         | number \| null            | Memory controller utilization, %.                                           |
+| `fanPct`             | number \| null            | Fan speed, %.                                                               |
+| `powerLimitW`        | number \| null            | Current power limit, W.                                                     |
+| `powerDefaultLimitW` | number \| null            | Factory power limit (NVIDIA); differs from `powerLimitW` if it was lowered. |
+| `persistence`        | boolean \| null           | NVIDIA persistence mode.                                                    |
+| `clockGrMhz`         | number \| null            | Graphics clock, MHz.                                                        |
+| `clockGrMaxMhz`      | number \| null            | Maximum graphics clock, MHz.                                                |
+| `clockMemMhz`        | number \| null            | Memory clock, MHz.                                                          |
+| `pcieGen`            | number \| null            | Current PCIe generation.                                                    |
+| `pcieWidth`          | number \| null            | Current PCIe width.                                                         |
+| `pcieGenMax`         | number \| null            | Maximum PCIe generation.                                                    |
+| `pcieWidthMax`       | number \| null            | Maximum PCIe width.                                                         |
+| `pcieRxBps`          | number \| null            | PCIe receive throughput, bytes/s.                                           |
+| `pcieTxBps`          | number \| null            | PCIe transmit throughput, bytes/s.                                          |
+| `suspended`          | boolean                  | Sleeping card (runtime-suspended): deliberately not read, since any read would wake it up. |
+| `hidden`             | boolean                  | Card listed in the `hiddenGpus` setting: listed but not read.               |
+
+### `proc`
+
+The `llama-server` process; null without a PID or when it could not be read.
+
+| Field      | Type           | Description                                                                          |
+| ---------- | -------------- | ------------------------------------------------------------------------------------ |
+| `cpuPct`   | number         | CPU time over the tick, % of one core (above 100 with several threads).              |
+| `rssBytes` | number         | Resident memory.                                                                     |
+| `dramBps`  | number \| null  | Bytes/s fetched from DRAM by the process (`perf`, core event); null when unknown.   |
+
+### `system`
+
+`SystemSample`, the whole machine:
+
+| Field     | Type                       | Description                                                             |
+| --------- | -------------------------- | ----------------------------------------------------------------------- |
+| `cpuPct`  | number                     | CPU use of the machine, %.                                              |
+| `corePct` | number[]                   | CPU use of each core, %.                                                |
+| `freqMhz` | number \| null              | Average current frequency of the cores, MHz.                            |
+| `tempC`   | number \| null              | CPU temperature (`k10temp` or `coretemp` sensor), °C.                   |
+| `load`    | `[number, number, number]` \| null | Load average over 1, 5 and 15 minutes.                           |
+| `mem`     | `MemInfo` \| null           | From `/proc/meminfo`: `totalBytes`, `availableBytes`, `cachedBytes`, `swapTotalBytes`, `swapUsedBytes`. |
+| `memBw`   | `MemBandwidth` \| null      | DRAM bandwidth of the machine through `perf` (memory controller): `readBps`, `writeBps`; null when not measurable (no `perf`, unknown PMU, permissions). |
+
+### `disk`
+
+`DiskSample`, read and write throughput of the physical disks (`/proc/diskstats`):
+
+| Field      | Type                                    | Description                                                         |
+| ---------- | --------------------------------------- | ------------------------------------------------------------------- |
+| `readBps`  | number                                  | Total read throughput, bytes/s.                                     |
+| `writeBps` | number                                  | Total write throughput, bytes/s.                                    |
+| `perDisk`  | `Record<string, { readBps, writeBps }>` | Each disk by block name (`nvme0n1`).                                |
+| `model`    | `{ disk, readBps }` \| null              | The disk holding the current profile's model, once it was found; null for an external server. |
+
+## History series
+
+The keys of `series` and `points`, from `SERIES` in `shared/src/monitor.ts`. `<key>` is a `GpuSample.key`.
+
+| Key                      | Value                                                 |
+| ------------------------ | ----------------------------------------------------- |
+| `llama.genTps`           | `rates.genTps`                                        |
+| `llama.ppTps`            | `rates.ppTps`                                         |
+| `llama.specAccept`       | `lastRequest.specAccept`, the previous value otherwise |
+| `llama.kvPct`            | Context used, % of `kv.totalTokens`                   |
+| `llama.reqProcessing`    | `queue.processing`                                    |
+| `llama.reqDeferred`      | `queue.deferred`                                      |
+| `llama.busySlots`        | `queue.busySlots`                                     |
+| `proc.cpuPct`            | `proc.cpuPct`                                         |
+| `proc.dram`              | `proc.dramBps`                                        |
+| `gpu.<key>.util`         | `utilPct` (gap for a sleeping or hidden card)         |
+| `gpu.<key>.vramPct`      | `vramUsedBytes`, % of `vramTotalBytes`                |
+| `gpu.<key>.pcieRx`       | `pcieRxBps`                                           |
+| `gpu.<key>.pcieTx`       | `pcieTxBps`                                           |
+| `gpu.<key>.power`        | `powerW`                                              |
+| `gpu.<key>.temp`         | `tempC`                                               |
+| `sys.cpu`                | `system.cpuPct`                                       |
+| `sys.memPct`             | RAM used (`totalBytes - availableBytes`), %           |
+| `sys.tempC`              | `system.tempC`                                        |
+| `mem.read`               | `system.memBw.readBps`                                |
+| `mem.write`              | `system.memBw.writeBps`                               |
+| `disk.read`              | `disk.readBps`                                        |
+| `disk.write`             | `disk.writeBps`                                       |
+| `disk.modelRead`         | `disk.model.readBps`                                  |
+
+With no active server, the `llama.*` series and `proc.cpuPct` get 0 (`llama.specAccept` keeps its last value). A
+series whose collector is off gets gaps.

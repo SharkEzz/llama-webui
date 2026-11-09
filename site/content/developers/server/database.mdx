@@ -1,0 +1,199 @@
+---
+title: Database
+description: The SQLite database behind llama-webui, where it lives, its pragmas, the append-only migrations, the repositories, settings storage and the GGUF cache.
+---
+
+llama-webui stores everything that must outlive a restart in one SQLite database, opened with `bun:sqlite`. The code
+lives in `server/db/`: `open.ts` opens the file, `migrations.ts` creates and evolves the schema, and one repository
+class per table (or pair of tables) reads and writes it.
+
+| File                          | Role                                                                          |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| `server/db/open.ts`           | `openDb(path)`: opens the file, sets the pragmas, runs the migrations.        |
+| `server/db/migrations.ts`     | `MIGRATIONS` and `runMigrations()`.                                           |
+| `server/db/settings.ts`       | `SettingsRepo`: the `settings` table.                                         |
+| `server/db/profiles.ts`       | `ProfilesRepo`: the `profiles` table.                                         |
+| `server/db/conversations.ts`  | `ConversationsRepo`: the `conversations` and `messages` tables.               |
+| `server/db/benchRuns.ts`      | `BenchRunsRepo`: the `bench_runs` table (one-off runs and sweep items).       |
+| `server/db/sweeps.ts`         | `SweepsRepo`: the `sweeps` table.                                             |
+| `server/db/downloads.ts`      | `DownloadsRepo`: the `downloads` table (Hugging Face queue).                  |
+| `server/db/modelCache.ts`     | `ModelCacheRepo`: the `model_cache` table.                                    |
+| `server/paths.ts`             | `dataDir()` and `dbPath()`: where the file lives.                              |
+| `shared/src/settings.ts`      | `SettingsSchema` and `DEFAULT_SETTINGS`.                                       |
+
+Monitoring history and logs are not in the database: they live in memory (see
+[Monitor and collectors](/developers/server/monitor/)).
+
+## Where the file lives
+
+`server/index.ts` opens `dbPath(cli.dataDir)`. `dataDir()` picks the first of:
+
+1. the `--data-dir` flag;
+2. `$LLAMA_WEBUI_DATA_DIR`;
+3. `$XDG_DATA_HOME/llama-webui`;
+4. `~/.local/share/llama-webui`.
+
+It creates the folder if needed, and `dbPath()` appends the file name, `llama-webui.sqlite`. Users set it as described
+in [Configuration](/docs/configuration/#data-directory).
+
+## Opening and pragmas
+
+```ts title="server/db/open.ts"
+export function openDb(path: string): Database {
+  mkdirSync(dirname(path), { recursive: true });
+  const db = new Database(path, { create: true });
+  db.run('PRAGMA journal_mode = WAL');
+  db.run('PRAGMA foreign_keys = ON');
+  runMigrations(db);
+  return db;
+}
+```
+
+- `journal_mode = WAL`: SQLite's write-ahead log, so `llama-webui.sqlite-wal` and `llama-webui.sqlite-shm` sit next
+  to the database while it is open.
+- `foreign_keys = ON`: SQLite does not enforce foreign keys without it, and the schema relies on `ON DELETE CASCADE`
+  and `ON DELETE SET NULL` (see [Tables](#tables)).
+
+The database handle is not kept in the runtime. `server/index.ts` opens it on each evaluation and closes it in its
+dispose function, so a `bun --hot` reload closes the old handle and opens a new one, which also runs any new
+migration. Tests open a migrated database in memory with `openDb(':memory:')`.
+
+## Migrations
+
+`MIGRATIONS` is an array of SQL strings, one per schema version. The rule is written above it:
+
+```ts title="server/db/migrations.ts"
+/** One entry per schema version; never change a migration that has shipped, add a new one. */
+export const MIGRATIONS: string[] = [
+  // 1 — key/value settings
+  `CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL);`,
+  // …
+];
+```
+
+`runMigrations(db)` keeps the current version in a one-row `schema_version` table (created, with version `0`, on a new
+database). It applies each entry after the current version in order, each in its own transaction together with the
+version update, so a failed migration leaves the database at the previous version. There are 16 entries: a database
+created by the current code is at version 16.
+
+### Write a migration
+
+1. Append an entry at the end of `MIGRATIONS`, with a comment giving its number and purpose (`// 17 — …`), like the
+   existing ones. Each existing entry holds a single SQL statement.
+2. Never edit, reorder or remove an entry that has shipped: databases that already ran it would never see the change,
+   and new ones would diverge from them.
+3. For a change `ALTER TABLE` cannot make, rebuild the table as entries 10 to 14 do for `bench_runs`: create the new
+   table, copy the rows, drop the old one, rename the new one, then recreate its indexes.
+4. Update the repository that owns the table, and its tests.
+
+The migration runs at the next start, or at the next `bun --hot` reload in development.
+
+## Tables
+
+Columns are `snake_case`. Columns ending in `_json` hold JSON text that the repository parses; timestamps are
+`Date.now()` milliseconds in `INTEGER` columns.
+
+| Table           | Repository          | Main columns                                                                                                                 |
+| --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `settings`      | `SettingsRepo`      | `key` (primary key), `value_json`                                                                                           |
+| `profiles`      | `ProfilesRepo`      | `id`, `name` (unique), `model_path`, `mmproj_path`, `cwd`, `host`, `port`, `args_json`, `env_json`, `source`, `created_at`, `updated_at` |
+| `model_cache`   | `ModelCacheRepo`    | `path` (primary key), `stamp`, `summary_json`, `read_at`                                                                    |
+| `conversations` | `ConversationsRepo` | `id`, `title`, `profile_id`, `model_path`, `sampling_json`, `system_prompt`, `thinking`, `created_at`, `updated_at`          |
+| `messages`      | `ConversationsRepo` | `id`, `conversation_id`, `role`, `content`, `reasoning`, `status`, `error`, `stats_json`, `model_path`, `created_at`         |
+| `bench_runs`    | `BenchRunsRepo`     | `id` (`AUTOINCREMENT`), `kind`, `status`, `model_path`, `profile_id`, `args_json`, `command`, `hardware_json`, `pp_tps`, `tg_tps`, `stats_json`, `vram_mib_json`, `error`, `log_excerpt`, `duration_ms`, `sweep_id`, `sweep_label`, `fit`, `created_at` |
+| `sweeps`        | `SweepsRepo`        | `id` (`AUTOINCREMENT`), `name`, `status`, `model_path`, `profile_id`, `spec_json`, `best_run_id`, `created_at`, `finished_at` |
+| `downloads`     | `DownloadsRepo`     | `id` (`AUTOINCREMENT`), `repo`, `revision`, `variant_key`, `name`, `quant`, `kind`, `dir`, `files_json`, `status`, `bytes_done`, `total_bytes`, `error`, `code`, `created_at`, `finished_at` |
+
+Foreign keys:
+
+| Column                        | References          | On delete  |
+| ----------------------------- | ------------------- | ---------- |
+| `conversations.profile_id`    | `profiles(id)`      | `SET NULL` |
+| `messages.conversation_id`    | `conversations(id)` | `CASCADE`  |
+| `bench_runs.profile_id`       | `profiles(id)`      | `SET NULL` |
+| `bench_runs.sweep_id`         | `sweeps(id)`        | `CASCADE`  |
+| `sweeps.profile_id`           | `profiles(id)`      | `SET NULL` |
+| `sweeps.best_run_id`          | `bench_runs(id)`    | `SET NULL` |
+
+Deleting a profile keeps its conversations, runs and sweeps, which still record the model path. Deleting a sweep
+deletes its runs. `bench_runs` uses `AUTOINCREMENT` so that a deleted ID is never handed out again:
+`sweeps.best_run_id` relies on it.
+
+Indexes: `messages_by_conversation` on `messages(conversation_id, id)`, `bench_runs_by_date` on
+`bench_runs(created_at DESC)`, `bench_runs_by_sweep` on `bench_runs(sweep_id, id)`.
+
+## Repositories
+
+Each repository takes the `Database` and, except `SettingsRepo`, an optional `now` function (default `Date.now`)
+for tests. `server/index.ts` creates them on each evaluation; `ModelCacheRepo` is created by the models and setup
+routes. They convert rows to the shared types (`Profile`, `Conversation`, `ChatMessage`, `BenchRun`, `Sweep`,
+`DownloadItem`) and back, and some validate their input:
+
+- `ProfilesRepo.create()` and `update()` parse the input with `ProfileInputSchema` (a `ZodError` becomes a `400`) and
+  refuse a name already in use with `409`, code `name-taken`. `importMany()` skips names that exist instead of
+  overwriting them.
+- `ConversationsRepo.patch()` parses `ConversationPatchSchema`. `addMessage()` and `updateMessage()` also refresh the
+  conversation's `updated_at`; `deleteFrom()` deletes a message and every later one (regeneration).
+- `BenchRunsRepo` covers both one-off runs and sweep items: `enqueue()` adds a sweep's items as `queued`, `begin()`
+  freezes the command and hardware of an item when it starts, `requeue()` puts an item back after a reload, and
+  `list()` returns one-off runs by default (`sweepId: 'none'`), 200 at most.
+- `SweepsRepo` computes each sweep's item counts and best run from `bench_runs` when it reads it.
+- `DownloadsRepo.next()` returns an item left `downloading` (interrupted) before the oldest `queued` one.
+
+### Interrupted work at startup
+
+A row can be left in a running state if Bun was killed. On startup `server/index.ts` resets them:
+
+- `ConversationsRepo.stopOrphans()`: messages left `streaming` become `stopped`.
+- `BenchRunsRepo.stopOrphans()`: runs left `running` become `interrupted`, with the error
+  `interrupted (llama-webui stopped)` unless they had one.
+- `SweepsRepo.stopOrphans()`: sweeps left `running` become `interrupted` (the Sweeps page offers to resume them).
+
+The bench and sweep resets are skipped when the bench gate is still held, which only happens on a `bun --hot` reload:
+the sweep then continues in the new module (see [Benchmarks and sweeps](/developers/server/bench/)). Downloads left
+`downloading` are resumed by the download queue rather than reset.
+
+## Settings
+
+Settings are one row per key in `settings`, the value stored as JSON. The keys and their defaults come from
+`SettingsSchema` (`shared/src/settings.ts`), and `DEFAULT_SETTINGS` is `SettingsSchema.parse({})`:
+
+| Key                       | Default                                     | Constraint                       |
+| ------------------------- | ------------------------------------------- | -------------------------------- |
+| `binary`                  | `'llama-server'`                            | non-empty                        |
+| `host`                    | `'0.0.0.0'`                                 | non-empty                        |
+| `port`                    | `8080`                                      | integer, 1 to 65535              |
+| `modelsDir`               | `'~/models'`                                | non-empty                        |
+| `pollIntervalMs`          | `1000`                                      | integer, at least 250            |
+| `historySeconds`          | `300`                                       | integer, 30 to 1800              |
+| `hiddenGpus`              | `[]`                                        | PCI bus IDs                      |
+| `defaultProfileId`        | `null`                                      | integer or `null`                |
+| `llamaTuiImportDismissed` | `false`                                     | boolean                          |
+| `onboardingDone`          | `false`                                     | boolean                          |
+| `collectors`              | `{ nvml: true, system: true, disk: true }`  | three booleans                   |
+| `theme`                   | `'system'`                                  | `system`, `light` or `dark`      |
+
+`host` and `port` are the defaults for `llama-server`, not llama-webui's own address (that comes from the command
+line, see [Configuration](/docs/configuration/)).
+
+`SettingsRepo.get()` starts from `DEFAULT_SETTINGS` and overlays the stored rows. A row whose key the schema does not
+know is ignored. A row whose JSON does not parse, or whose value no longer passes its field's schema (a rule became
+stricter), is skipped with a console warning, so that key falls back to its default.
+
+`SettingsRepo.patch(partial)` validates the whole merged object with `SettingsSchema.parse()` (a `ZodError` becomes a
+`400`), then writes only the keys present in `partial`, in one transaction. Keys a user never changed have no row,
+so a new default in the schema applies to them on the next read. Users see these settings on the
+[Settings page](/docs/settings/).
+
+## The model cache
+
+`scanModels()` (`server/models/scan.ts`) keeps the summary of each GGUF it reads in `model_cache`, so a scan of the
+models folder does not parse unchanged files again:
+
+- `path` is the absolute path of the model's main file (the first part of a split model).
+- `stamp` is the `mtimeMs:size` of each part, joined with `|`. A cached summary is used only while the stamp is
+  unchanged: rewriting or replacing any part invalidates it.
+- `summary_json` is the `ModelSummary`, and `read_at` the time it was read.
+
+A file that cannot be read is reported as an `ok: false` entry and never cached. After each scan, `prune()` deletes the
+rows of files the scan did not see, so the cache only holds the current models folder.

@@ -1,0 +1,178 @@
+---
+title: Security
+description: The threat model of an unauthenticated local API, the request guard rule by rule, where it applies, the error shape, and how paths and processes are handled.
+---
+
+llama-webui has no authentication: whoever can send it a request can do anything the interface can, including run a
+program of their choice (the **Binary** setting). Its protection is where it listens, plus one request guard that keeps
+other websites in the browser away from the API. The guard is `guard()` in `server/security.ts`, applied by
+`guarded()` in `server/http.ts`.
+
+| File                       | Role                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| `server/security.ts`       | `guard(req)`: the `Host`, `Origin` and content-type checks.                          |
+| `server/http.ts`           | `guarded()`, `HttpError`, `errorResponse()`, `notFound()`, `idParam()`, `jsonObject()`. |
+| `server/security.test.ts`  | Tests of each rule of the guard.                                                     |
+| `server/cli.ts`            | `--host` (default `127.0.0.1`) and `--port` (default `7860`).                          |
+| `server/hf/paths.ts`       | `repoDir()` and `fileDest()`: download paths kept inside the models folder.           |
+
+The user-facing version of this page is [Security](/docs/security/).
+
+## Threat model
+
+| Who                                               | What they can do                                       | What stops them                                     |
+| ------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
+| Programs and users on the same machine            | Everything                                             | Nothing: same trust as the user running llama-webui |
+| Devices on the network, once `--host` opens it    | Everything                                             | Nothing in llama-webui: the network and a firewall  |
+| Another website open in the browser               | Make the browser send requests to `127.0.0.1:7860`      | `guard()`                                           |
+
+The guard handles three ways a web page can reach a local API:
+
+- **DNS rebinding**: a page served from `attacker.example` makes that name resolve to `127.0.0.1`. Its requests are
+  then same-origin for the browser, but they carry `Host: attacker.example:7860`.
+- **Cross-site requests**: a page on another origin calls `fetch()` on the API or opens a WebSocket to it. The browser
+  sends that page's `Origin`.
+- **Simple-request CSRF**: an HTML form, or a `fetch()` with a `text/plain`, `application/x-www-form-urlencoded` or
+  `multipart/form-data` body, is sent cross-site without a CORS preflight.
+
+llama-webui sends no CORS headers (`Access-Control-*`), so the browser never lets another origin read a response.
+
+## The guard
+
+```ts title="server/security.ts"
+/** Safe hostname: localhost or a literal IP address. A domain name can be rebound to 127.0.0.1. */
+function trustedHostname(hostname: string): boolean {
+  const h = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  return h === 'localhost' || h.endsWith('.localhost') || isIP(h) !== 0;
+}
+```
+
+`guard(req)` returns a `Response` that refuses the request, or `undefined` to let it through. The rules run in this
+order, and the first that fails answers:
+
+| Rule                                                                                                                | Response                                                                     |
+| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| The `Host` header (or the URL's host when there is none) parses as `http://<host>`                                  | `403` `{"error":"Invalid host"}`                                             |
+| Its hostname is `localhost`, ends with `.localhost`, or is an IPv4 or IPv6 literal (brackets removed, any case)     | `403` `{"error":"Host not allowed"}`                                         |
+| When an `Origin` header is present, it equals `` `${url.protocol}//${host}` `` exactly                              | `403` `{"error":"Origin not allowed"}`                                       |
+| For `POST`, `PUT`, `PATCH` and `DELETE`: a `Content-Type`, when present, matches `/^application\/json\b/i`, and a request with a body has one | `415` `{"error":"JSON body expected (content-type: application/json)"}` |
+
+What follows from these rules:
+
+- Any IP address passes the `Host` check, so `http://192.168.1.20:7860` works from the network when llama-webui
+  listens there, while `http://myserver.lan:7860` is refused. The rule does not depend on `--host`.
+- The `Origin` comparison is a plain string comparison with the `Host` the request carries: a page on
+  `http://localhost:7860` calling `http://127.0.0.1:7860` is refused, even though both reach the same server.
+- A request without `Origin` passes the `Origin` rule: `curl` sends none, and browsers omit it on many same-origin
+  requests.
+- `application/json; charset=utf-8` passes the content-type rule. A write without a body and without a
+  `Content-Type` (for example `POST /api/server/stop`) passes too; with a body, it must be JSON. A cross-site
+  `fetch()` that sends `application/json` triggers a CORS preflight, which gets no CORS headers back.
+
+## Where it applies
+
+`guarded(handler)` wraps a route handler: it runs `guard()` first, then the handler inside a `try`, and turns any
+exception into a JSON response with `errorResponse()`.
+
+```ts title="server/http.ts"
+export function guarded(handler: Handler): Handler {
+  return async (req, server) => {
+    const refused = guard(req);
+    if (refused) return refused;
+    try {
+      return await handler(req, server);
+    } catch (err) {
+      return errorResponse(err);
+    }
+  };
+}
+```
+
+- Every API handler in `server/app.ts` and `server/routes/*.ts` is wrapped, including the `/api/*` fallback that
+  answers `404` `{"error":"Unknown route"}`.
+- The WebSocket endpoint is a guarded route too: `/ws` runs `guard()` on the upgrade request before
+  `server.upgrade(req)`, so another site cannot open the socket (browsers always send `Origin` on a WebSocket
+  handshake). A request to `/ws` that is not an upgrade gets `426` `WebSocket upgrade expected`.
+- The web interface itself (the HTML page, its bundles and the SPA fallback, `server/routes/web.ts`) is not guarded:
+  it is static and holds no data. That is why a page opened through a host name loads, then has all its API calls
+  refused with `Host not allowed`.
+
+A new route must be wrapped in `guarded()` like the others.
+
+## Errors and `HttpError`
+
+Every error an `/api` route returns is a JSON object with an `error` string, and sometimes more:
+
+| Thrown                                 | Status          | Body                                                             |
+| -------------------------------------- | --------------- | ---------------------------------------------------------------- |
+| `new HttpError(status, message)`       | `status`        | `{ "error": message }`                                           |
+| `new HttpError(status, message, code)` | `status`        | `{ "error": message, "code": code }`                             |
+| A `ZodError`                           | `400`           | `{ "error": "Invalid data: <first issue> (<path>)", "issues": [...] }`, the path only when the issue has one |
+| A `SyntaxError` (body is not JSON)     | `400`           | `{ "error": "Invalid JSON" }`                                    |
+| Anything else                          | `500`           | `{ "error": "Internal error" }`, and the error is logged         |
+
+The helpers in `server/http.ts` build the common cases: `notFound(what)` is a `404` `<what> not found`, `idParam()` a
+`404` for an `:id` that is not a positive integer, and `jsonObject(req)` a `400` `JSON object expected` for a body
+that is not a JSON object. `code` is the machine-readable reason (`server-running`, `name-taken`, `hf-gated`…): the
+web app reads it instead of the message text. [API overview](/developers/api/overview/) lists the conventions for
+clients.
+
+## What `--host` changes
+
+`server/index.ts` passes `--host` (or `LLAMA_WEBUI_HOST`, default `DEFAULT_HOST = '127.0.0.1'`) as Bun's `hostname`.
+That decides who can connect, and nothing else: the guard applies the same rules on every address, and no
+authentication appears. With a non-loopback address, `GET /api/setup` reports `listen.exposed: true` (from
+`isLoopback()`, `shared/src/setup.ts`), and the setup checklist shows a network access reminder.
+
+## llama-server's own exposure
+
+`llama-server` is a separate HTTP server with its own address. `buildCommand()` passes `--host` and `--port` from the
+profile, else from the `host` and `port` settings, whose defaults are `0.0.0.0` and `8080` (`shared/src/settings.ts`).
+So by default `llama-server` listens on every interface, even when llama-webui listens on `127.0.0.1`. This default
+is a known open issue. The benchmark's temporary `llama-server` always gets `host: '127.0.0.1'`
+(`server/bench/execute.ts`). llama-webui itself always talks to `llama-server` through `127.0.0.1`.
+
+[How llama-server is exposed](/docs/security/#how-llama-server-is-exposed) gives users the settings to change.
+
+## Processes and arguments
+
+Every process llama-webui starts (`llama-server`, `llama-bench`, `nvidia-smi`, `perf`…) goes through `Bun.spawn` with
+an argument array, never through a shell. A profile argument such as `$(whoami)` reaches `llama-server` as a literal
+string. `shellQuote()` only builds the displayed command.
+
+That does not make the API safe to expose: the `binary` setting can name any program, and profiles set its arguments
+(except the reserved flags in `RESERVED_FLAGS`, see [Supervisor](/developers/server/supervisor/#building-the-command))
+and environment variables.
+
+## Paths the API reads and writes
+
+The API reads files where the user points it, by design: there is no allowlist of folders.
+
+- **Models folder**: the `modelsDir` setting, `~`-expanded, can be any directory. `GET /api/models` walks it for
+  `*.gguf` files, skipping names that start with `.` and not following directory symlinks (a symlinked `.gguf` file is
+  followed).
+- **GGUF info**: `GET /api/models/info?path=` reads the header of any absolute path that ends in `.gguf` and is a
+  regular file: `400` `Absolute path to a .gguf file expected` otherwise, `404` `File not found` when it does not
+  exist, `422` when the file does not parse. It is not limited to the models folder.
+- **Profile paths**: a profile's model, projector and working directory can be anywhere. `profilePaths()` resolves
+  them the way `llama-server` will (`~` expanded, relative to the profile's `cwd`) wherever llama-webui reads the
+  model itself, for example for the launch pad and benchmarks.
+- **llama-tui import**: reads only `$XDG_CONFIG_HOME/llama-tui/config.json` (else `~/.config/llama-tui/config.json`);
+  the request cannot choose the path.
+- **Hugging Face downloads** are the only writes into a user-chosen folder, and they are confined. `repoDir()` accepts
+  only an `org/name` repository ID matching `HF_REPO_RE` (`400` `Invalid repository id: …`) and maps it to
+  `<modelsDir>/<org>/<name>`. `fileDest()` refuses a file path that is absolute or resolves outside that folder
+  (`400` `Invalid file path in the repository: …`).
+
+## Tests
+
+`server/security.test.ts` calls `guard()` on plain `Request` objects:
+
+- `127.0.0.1`, `localhost`, a LAN IP and `[::1]` are accepted as `Host`, and `evil.example` gets `403`;
+- an `Origin` from another site gets `403`, the same origin passes, and `http://localhost:7860` is refused for a
+  request to `127.0.0.1:7860`;
+- a `PATCH` with `text/plain` and a `POST` with a body and no `Content-Type` get `415`;
+  `application/json; charset=utf-8` passes, and so does a `POST` without a body.
+
+`server/hf/hf.test.ts` checks that `repoDir()` and `fileDest()` refuse `..`, absolute and empty paths, and
+`shared/src/profile.test.ts` that an import with a reserved flag is rejected.

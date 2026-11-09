@@ -442,6 +442,8 @@
   }
   .docs-prose :where(:not(pre) > code):not(:where(.not-prose *)) {
     @apply rounded-md bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground;
+    /* Long paths and metric names break only when they would overflow the line (narrow screens). */
+    overflow-wrap: break-word;
   }
   .docs-prose :where(blockquote):not(:where(.not-prose *)) {
     @apply my-6 border-l-2 border-border pl-4 text-muted-foreground;

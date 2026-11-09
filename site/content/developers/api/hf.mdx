@@ -1,0 +1,309 @@
+---
+title: Hugging Face
+description: Routes that search the Hugging Face Hub, describe a repository's GGUF variants and run the download queue.
+---
+
+These routes back the download sheet of the [Models](/docs/models/) page: the Hub token status, the search, a
+repository's GGUF variants with what is already on disk, and the download queue. They live in `server/routes/hf.ts`;
+the types and the request schema are in `shared/src/hf.ts`, the Hub client and the queue in `server/hf/` (see
+[Hugging Face downloads](/developers/server/hugging-face/)). The user side is described on the
+[Hugging Face](/docs/hugging-face/) page.
+
+The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
+
+## Hub errors
+
+The Hub client (`server/hf/client.ts`) turns every failed Hub call into an `HttpError` with a `code`
+(`hfHttpError()`): it reads the `X-Error-Code` header first, then the status. These codes can come back from
+`GET /api/hf/search`, `GET /api/hf/repo` and `POST /api/downloads`, and they are stored in `DownloadItem.code` when a
+download fails.
+
+| Status | `code`             | When                                                                                         |
+| ------ | ------------------ | -------------------------------------------------------------------------------------------- |
+| `403`  | `hf-gated`         | `GatedRepo`, or a `403`: the license of the repository was not accepted on Hugging Face.     |
+| `404`  | `hf-not-found`     | `RepoNotFound`, `RevisionNotFound`, `EntryNotFound`, or a `404` (also a private repository). |
+| `401`  | `hf-unauthorized`  | Hugging Face rejected the token.                                                             |
+| `429`  | `hf-rate-limited`  | Hugging Face rate limit.                                                                     |
+| `502`  | `hf-unreachable`   | Network failure, timeout, any other status, or a response that is not JSON.                  |
+
+Each Hub API call times out after 10 seconds. The search and the repository routes pass the client's request signal
+to the Hub call: a client that goes away (a closed sheet, a new keystroke) cancels it.
+
+## Hub
+
+### Get the token status
+
+<Endpoint method="GET" path="/api/hf/status" />
+
+Says which Hugging Face token llama-webui uses and whose account it is. The token is resolved on every call with the
+rules of the `hf` CLI (`server/hf/token.ts`): `HF_TOKEN` (or the legacy `HUGGING_FACE_HUB_TOKEN`), otherwise the file
+`hf auth login` writes (`HF_TOKEN_PATH`, else `$HF_HOME/token`, default `~/.cache/huggingface/token`). A login made
+while llama-webui runs is picked up.
+
+The account name comes from the Hub's `/api/whoami-v2`, cached per token. A rejected token stays cached as invalid; a
+network failure is not cached and is retried on the next call.
+
+**Response**: `200` with an `HfStatus`.
+
+| Field          | Type                       | Description                                                                         |
+| -------------- | -------------------------- | ----------------------------------------------------------------------------------- |
+| `token`        | `"env"` \| `"file"` \| null | Where the token was found: the environment, the token file, or no token.           |
+| `user`         | string \| null              | Account name of the token; null without a token or when it could not be checked.   |
+| `tokenInvalid` | boolean                    | Hugging Face rejected the token (`401`).                                            |
+| `endpoint`     | string                     | Hub endpoint: `HF_ENDPOINT`, default `https://huggingface.co`, no trailing slash.  |
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/hf/status
+```
+
+```json
+{ "token": "file", "endpoint": "https://huggingface.co", "user": "demo", "tokenInvalid": false }
+```
+
+### Search repositories
+
+<Endpoint method="GET" path="/api/hf/search" />
+
+Searches the Hub's model repositories that hold GGUF files (`filter=gguf`), most downloaded first, 30 results at most.
+
+**Query parameters**
+
+| Parameter | Required | Description                                       |
+| --------- | -------- | ------------------------------------------------- |
+| `q`       | yes      | Search text, trimmed: 1 to 200 characters.        |
+
+**Response**: `200` with an array of `HfSearchHit`.
+
+| Field          | Type           | Description                                      |
+| -------------- | -------------- | ------------------------------------------------ |
+| `id`           | string         | Repository id, `org/name`.                       |
+| `downloads`    | number         | Download count reported by the Hub.              |
+| `likes`        | number         | Like count.                                      |
+| `lastModified` | string \| null | ISO date of the last change.                     |
+| `gated`        | boolean        | The repository requires accepting a license.     |
+
+**Errors**: `400` `Search text expected (200 characters at most)` when `q` is missing, blank or too long; the
+[Hub errors](#hub-errors).
+
+```bash title="Terminal"
+curl 'http://127.0.0.1:7860/api/hf/search?q=qwen3%208b'
+```
+
+### Describe a repository
+
+<Endpoint method="GET" path="/api/hf/repo" />
+
+Lists the GGUF files of a repository at a revision, grouped into downloadable variants (`describeRepo()` in
+`server/hf/repo.ts`), and checks which ones are already in the models folder.
+
+Grouping (`groupRepoFiles()` in `server/hf/variants.ts`): one variant per `.gguf` file, or one per shard set
+(`…-00001-of-00003.gguf`, possibly in a subfolder). Files with `mmproj` in their name go to `projectors`; other files
+(README, safetensors, imatrix…) are ignored. Both lists are sorted smallest first.
+
+**Query parameters**
+
+| Parameter  | Required | Description                                                                 |
+| ---------- | -------- | --------------------------------------------------------------------------- |
+| `id`       | yes      | Repository id, `org/name` (`HF_REPO_RE`).                                    |
+| `revision` | no       | Branch, tag or commit to list; `main` when omitted.                          |
+
+**Response**: `200` with an `HfRepo`.
+
+| Field        | Type          | Description                                                                         |
+| ------------ | ------------- | ----------------------------------------------------------------------------------- |
+| `id`         | string        | Repository id as the Hub spells it.                                                 |
+| `sha`        | string        | Commit the files were listed at. A download request must send it back: downloads are pinned to it. |
+| `gated`      | boolean       | Gated repository.                                                                   |
+| `url`        | string        | Repository page on the Hub endpoint.                                                |
+| `dir`        | string        | Local folder of its downloads: `<modelsDir>/<org>/<name>`.                          |
+| `variants`   | `HfVariant[]` | Models, smallest first.                                                             |
+| `projectors` | `HfVariant[]` | Multimodal projectors (mmproj), smallest first.                                     |
+
+`HfVariant`:
+
+| Field        | Type                                      | Description                                                              |
+| ------------ | ----------------------------------------- | ------------------------------------------------------------------------ |
+| `key`        | string                                    | Path of its first file in the repository: identifies the variant.       |
+| `name`       | string                                    | File name without folder, shard suffix or extension.                    |
+| `quant`      | string \| null                             | Quantization read from the file name (`Q4_K_M`, `UD-Q4_K_XL`, `BF16`…). |
+| `kind`       | `"model"` \| `"mmproj"`                    | Model or projector.                                                      |
+| `files`      | `HfFile[]`                                | `path`, `size` and `sha256` (the LFS hash; null for a non-LFS file).    |
+| `totalBytes` | number                                    | Sum of the file sizes.                                                   |
+| `present`    | `"none"` \| `"partial"` \| `"complete"`     | Local state: all files with the right size, some of them (or a `.part`), or none. |
+
+**Errors**: `400` `Invalid repository id` when `id` is missing or malformed; the [Hub errors](#hub-errors).
+
+```bash title="Terminal"
+curl 'http://127.0.0.1:7860/api/hf/repo?id=unsloth/Qwen3-8B-GGUF'
+```
+
+```json
+{
+  "id": "unsloth/Qwen3-8B-GGUF",
+  "sha": "28c7ecbbe6c941dfd521f801c6707af0870f1013",
+  "gated": false,
+  "url": "https://huggingface.co/unsloth/Qwen3-8B-GGUF",
+  "dir": "/home/demo/models/unsloth/Qwen3-8B-GGUF",
+  "variants": [
+    {
+      "key": "Qwen3-8B-Q4_K_M.gguf",
+      "name": "Qwen3-8B-Q4_K_M",
+      "quant": "Q4_K_M",
+      "kind": "model",
+      "files": [
+        {
+          "path": "Qwen3-8B-Q4_K_M.gguf",
+          "size": 5027783488,
+          "sha256": "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+        }
+      ],
+      "totalBytes": 5027783488,
+      "present": "none"
+    }
+  ],
+  "projectors": []
+}
+```
+
+## Download queue
+
+The queue (`DownloadQueue` in `server/hf/downloader.ts`) downloads one item at a time. Each file goes to
+`<file>.part`, is resumed with a `Range` request after an error or a restart, is checked against its sha256, then is
+renamed into place. Items are rows of the `downloads` table, so the queue survives a restart of llama-webui.
+
+Every change is pushed over the [WebSocket](/developers/api/websocket/):
+
+| Message             | Payload                     | When                                                                   |
+| ------------------- | --------------------------- | ---------------------------------------------------------------------- |
+| `download`          | `DownloadItem`              | An item is queued, starts, ends, is canceled or requeued.              |
+| `download-progress` | `DownloadLive` \| null       | Progress of the running item, at most every 250 ms; null when the queue goes idle. |
+| `download-deleted`  | `{ ids: number[] }`         | Items removed from the list.                                           |
+
+`DownloadItem`:
+
+| Field        | Type                 | Description                                                                         |
+| ------------ | -------------------- | ----------------------------------------------------------------------------------- |
+| `id`         | number               | Item id.                                                                            |
+| `repo`       | string               | Repository id.                                                                      |
+| `revision`   | string               | Commit the files are downloaded from.                                               |
+| `key`        | string               | Key of the variant (`HfVariant.key`).                                               |
+| `name`       | string               | Variant name.                                                                       |
+| `quant`      | string \| null        | Quantization.                                                                       |
+| `kind`       | `"model"` \| `"mmproj"` | Model or projector.                                                              |
+| `dir`        | string               | Absolute destination folder, fixed when the item was queued.                        |
+| `files`      | `DownloadFile[]`     | The files to download (`HfFile` plus `done`); those already in place were left out. |
+| `status`     | string               | `queued`, `downloading`, `done`, `error` or `canceled`.                             |
+| `bytesDone`  | number               | Bytes of the finished files (live progress comes in `DownloadLive`).               |
+| `totalBytes` | number               | Bytes of all its files.                                                             |
+| `error`      | string \| null        | Error message of a failed item.                                                     |
+| `code`       | string \| null        | Machine-readable reason of the error: a [Hub error](#hub-errors) code, `checksum-mismatch`, `disk-full`, `download-failed`. |
+| `createdAt`  | number               | Epoch ms.                                                                           |
+| `finishedAt` | number \| null        | Epoch ms.                                                                           |
+
+`DownloadLive`:
+
+| Field        | Type                                              | Description                                              |
+| ------------ | ------------------------------------------------- | -------------------------------------------------------- |
+| `id`         | number                                            | Item being downloaded.                                   |
+| `phase`      | `"downloading"` \| `"verifying"` \| `"retrying"`     | `verifying` rehashes an existing `.part` before resuming it; `retrying` waits before the next attempt. |
+| `file`       | string                                            | File being downloaded (path in the repository).          |
+| `bytesDone`  | number                                            | Bytes of the item written so far.                        |
+| `totalBytes` | number                                            | Bytes of the item.                                       |
+| `bps`        | number                                            | Smoothed throughput, bytes/s.                            |
+| `retryAt`    | number \| null                                     | `retrying`: when the next attempt starts (epoch ms).     |
+
+### List downloads
+
+<Endpoint method="GET" path="/api/downloads" />
+
+Returns every item of the list, oldest first, and the live progress of the running one.
+
+**Response**: `200` with `{ items: DownloadItem[], live: DownloadLive | null }`.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/downloads
+```
+
+### Queue downloads
+
+<Endpoint method="POST" path="/api/downloads" />
+
+Queues one or more variants of a repository. The server lists the repository again at the pinned commit
+(`downloadInputs()`), so sizes and sha256 come from the Hub, not from the client. Files already in place with the right
+size are left out, and a variant with nothing left to download is skipped: the response can hold fewer items than
+`keys`, or none.
+
+**Body**: `DownloadRequest` (`DownloadRequestSchema`, `shared/src/hf.ts`), strict.
+
+| Field      | Type     | Required | Description                                                                     |
+| ---------- | -------- | -------- | ------------------------------------------------------------------------------- |
+| `repo`     | string   | yes      | Repository id, `org/name`.                                                      |
+| `revision` | string   | yes      | Commit sha, 40 lowercase hex characters: the `sha` of `GET /api/hf/repo`.       |
+| `keys`     | string[] | yes      | Keys of the variants to download (`HfVariant.key`): 1 to 16, each 1 to 1024 characters. |
+
+The disk check adds what the new items still need (a `.part` counts as written) to what the active items still have
+to write, and refuses the request when the free space of the destination is below that plus a 1 GiB margin.
+
+**Response**: `202` with `{ items: DownloadItem[] }`. Each new item is also broadcast as a `download` message.
+
+**Errors**:
+
+- `400`: invalid body; a key listed twice; a file path that would leave the repository folder.
+- `404` `hf-not-found`: a key is not a GGUF of the repository, or the repository or commit does not exist.
+- `409` `already-queued`: one of the variants is already queued or downloading.
+- `507` `disk-full`: not enough free space.
+- The other [Hub errors](#hub-errors).
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/downloads \
+  -H 'content-type: application/json' \
+  -d '{"repo":"unsloth/Qwen3-8B-GGUF","revision":"28c7ecbbe6c941dfd521f801c6707af0870f1013","keys":["Qwen3-8B-Q4_K_M.gguf"]}'
+```
+
+### Clear finished downloads
+
+<Endpoint method="POST" path="/api/downloads/clear" />
+
+Removes the finished items (`done`, `error`, `canceled`) from the list. Their files stay on disk.
+
+**Response**: `200` with `{ deleted: number }`, the number of removed items. A `download-deleted` message lists their
+ids when there is at least one.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/downloads/clear
+```
+
+### Cancel or remove a download
+
+<Endpoint method="DELETE" path="/api/downloads/:id" />
+
+Depends on the item's status:
+
+- **Queued or downloading**: cancels it. Its `.part` files and the files it already put in place are deleted, then the
+  folders left empty. For the running item, the transfer is aborted and the response comes back before the cleanup:
+  the `download` message with status `canceled` follows.
+- **Finished** (`done`, `error`, `canceled`): removes it from the list (`download-deleted`). Its files stay.
+
+**Response**: `204`.
+
+**Errors**: `404` unknown item.
+
+```bash title="Terminal"
+curl -X DELETE http://127.0.0.1:7860/api/downloads/12
+```
+
+### Retry a download
+
+<Endpoint method="POST" path="/api/downloads/:id/retry" />
+
+Puts a failed or canceled item back in the queue. No file is trusted as done any more: each one is checked on disk again
+when the item runs, and those still in place are kept. The disk check is the same as when queuing.
+
+**Response**: `202` with the requeued `DownloadItem` (status `queued`).
+
+**Errors**: `404` unknown item; `409` `not-finished` (the item is not `error` or `canceled`); `409` `already-queued`
+(the same variant is in the queue again); `507` `disk-full`.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/downloads/12/retry
+```

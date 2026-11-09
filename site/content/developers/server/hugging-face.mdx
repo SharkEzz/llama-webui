@@ -1,0 +1,286 @@
+---
+title: Hugging Face downloads
+description: The Hub client, how repository files become variants, and the persistent download queue with .part resume, retries, sha256 checks and path safety.
+---
+
+The Hugging Face module searches the Hub, lists a repository's GGUF files as downloadable variants, and downloads them
+into the models folder through a persistent queue that survives restarts and reloads. It lives in `server/hf/`, with
+its routes in `server/routes/hf.ts`, its table in `server/db/downloads.ts` and its types in `shared/src/hf.ts`. For
+what users see, read [Hugging Face downloads](/docs/hugging-face/).
+
+| File                        | Role                                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| `server/hf/client.ts`       | `HfClient`: search, repository files at a revision, token account; `hfHttpError()`       |
+| `server/hf/repo.ts`         | `describeRepo()` for the download sheet, `downloadInputs()` for the queue                |
+| `server/hf/variants.ts`     | `groupRepoFiles()`: files grouped into variants and projectors                           |
+| `server/hf/downloader.ts`   | `DownloadQueue`, `freeBytesOf()`, the reload handover                                    |
+| `server/hf/paths.ts`        | `repoDir()`, `fileDest()`, `partPath()`, `sizeOf()`                                      |
+| `server/hf/token.ts`        | `resolveHfToken()`, `hfTokenPath()`, `hfEndpoint()`                                      |
+| `server/db/downloads.ts`    | `DownloadsRepo`: the `downloads` table                                                   |
+| `server/routes/hf.ts`       | The HTTP routes (see [Hugging Face API](/developers/api/hf/))                            |
+| `shared/src/hf.ts`          | Types, `HF_REPO_RE`, `parseHfInput()`, `DownloadRequestSchema`, `vramFit()`              |
+
+## From a search to a file
+
+1. The web app reads what the user typed with `parseHfInput()` (`shared/src/hf.ts`): a repository id (`org/name`), the
+   llama.cpp `-hf` syntax (`org/name:Q4_K_M`), a `huggingface.co` or `hf.co` URL (a `blob` or `resolve` URL also gives
+   the file), or free text.
+2. Free text goes to `GET /api/hf/search`, which calls `HfClient.search()`.
+3. A repository goes to `GET /api/hf/repo`, which calls `describeRepo()`: the repository's files at a revision
+   (`main` by default), grouped into variants, with what is already on disk and the commit they were listed at
+   (`sha`).
+4. `POST /api/downloads` sends `{ repo, revision, keys }` (`DownloadRequestSchema`: `revision` must be a 40-character
+   commit sha, 1 to 16 keys). `downloadInputs()` reads the repository again **at that commit**, so sizes and checksums
+   come from the Hub and not from the client, then `DownloadQueue.enqueue()` queues them.
+5. The queue downloads each file to `<file>.part`, checks its sha256 and renames it into place. The web app follows it
+   over the WebSocket and rescans the models when an item is done.
+
+Pinning the commit guarantees that all the shards of a split model come from the same version, even if the
+repository changes while they download.
+
+## The Hub client
+
+`HfClient` (`server/hf/client.ts`) calls the Hub's JSON API at the [endpoint](#token-and-endpoint), with the header
+`user-agent: llama-webui` and, when there is a token, `authorization: Bearer <token>`. Every call times out after
+10 seconds (`timeoutMs`). Searches and repository listings are also dropped when the browser's request is (a closed
+sheet, a new keystroke).
+
+| Method                  | Hub request                                                            | Returns                                                                                  |
+| ----------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `search(q)`             | `/api/models?search=<q>&filter=gguf&sort=downloads&direction=-1&limit=30`, with `downloads`, `likes`, `gated` and `lastModified` expanded | `HfSearchHit[]`, most downloaded first |
+| `repoFiles(id, revision)` | `/api/models/<id>/revision/<revision>?blobs=true`                    | The resolved commit (`sha`), `gated`, and each file's path, size and sha256              |
+| `status()`              | `/api/whoami-v2`, only with a token                                    | `HfStatus`: token source, account name, whether the token was rejected, endpoint        |
+
+For a file stored with Git LFS, the size and the sha256 come from its `lfs` entry. Other files have no sha256: they
+are not verified. `status()` caches the account per token; a network failure is not cached (it is tried again next
+time), a rejected token is.
+
+### Errors
+
+`hfHttpError()` turns a Hub error into an `HttpError` with a `code`. It reads the `X-Error-Code` header first, because
+a missing or private repository answers `401 RepoNotFound` to an anonymous request.
+
+| Code               | Status | When                                                                                     |
+| ------------------ | ------ | ---------------------------------------------------------------------------------------- |
+| `hf-gated`         | 403    | `X-Error-Code: GatedRepo`, or a `403`                                                    |
+| `hf-not-found`     | 404    | `RepoNotFound`, `RevisionNotFound`, `EntryNotFound`, or a `404`                          |
+| `hf-unauthorized`  | 401    | Any other `401`: the token was rejected                                                  |
+| `hf-rate-limited`  | 429    | `429`                                                                                    |
+| `hf-unreachable`   | 502    | Any other status, a network failure, or a `200` that is not JSON (a proxy or captive portal) |
+
+Without a token, the gated and not-found messages end with ``(set HF_TOKEN or run `hf auth login`)``.
+
+## Variants
+
+`groupRepoFiles(files)` (`server/hf/variants.ts`) turns the repository's file list into what the download sheet
+offers:
+
+- Only `.gguf` files are kept; README, safetensors and the rest are ignored.
+- Shards (`…-00001-of-00003.gguf`, possibly in a subfolder) are grouped by prefix and total into one variant; any
+  other file is a variant of its own.
+- A variant's `key` is the path of its first file (files sorted by path): it identifies the variant in requests and
+  in the queue. Its `name` is the file name without folder, shard suffix or extension, and its `quant` is read from
+  the name by `parseGGUFQuantLabel()` (`Q4_K_M`, `UD-Q4_K_XL`, `BF16`…), or `null`.
+- A variant whose first file name contains `mmproj` is a projector, listed apart.
+- Both lists are sorted by total size, smallest first.
+
+Only the extension is checked: a `.gguf` that is not a model, such as an importance matrix shipped as GGUF, is listed
+as a variant too.
+
+`describeRepo()` adds the local state of each variant (`HfPresence`): `complete` when every file is at its destination
+with the expected size, `partial` when some are, or when a `.part` or a file of another size exists, `none` otherwise. Whether a variant is queued is
+left to the web app, which has the queue. The fit badge comes from `vramFit(bytes, vramBytes)` in the web app: up to
+85% of the VRAM `fits`, up to 100% `tight`, beyond `offload`, and no badge without a GPU.
+
+## Destination paths
+
+Downloads land in `<models folder>/<org>/<name>/`, keeping the repository's subfolders.
+
+- `repoDir(modelsDir, repo)` checks the id against `HF_REPO_RE` (two segments that start and end with a word
+  character, which rules out `..`) and returns `join(resolve(modelsDir), org, name)`. The models folder comes from
+  [Settings](/docs/settings/), with `~` expanded.
+- `fileDest(dir, path)` refuses an absolute path, and any path that resolves outside the repository's folder, with
+  `400 Invalid file path in the repository: …`. `downloadInputs()` calls it for every file before anything is queued,
+  and the queue calls it again before every file operation.
+- `partPath(dest)` is `<dest>.part`. The models scan only keeps `*.gguf` files, so a download in progress never shows
+  up as a model.
+
+A `DownloadItem` stores its absolute folder (`dir`) when it is queued: changing the models folder later does not move
+it.
+
+## The download queue
+
+`DownloadQueue` (`server/hf/downloader.ts`) downloads one item at a time, one file after another.
+
+### Enqueue
+
+`enqueue(inputs)` and `retry(id)` run one after the other (`exclusive()`), so that the duplicate and disk space checks
+of two concurrent requests see each other's rows. `enqueue()`:
+
+1. Refuses a variant listed twice in the request (`400 … is listed twice`) and a variant already queued or
+   downloading, matched by repository and key (`409`, `code: "already-queued"`).
+2. Leaves out the files already at their destination with the expected size. A variant with nothing left is skipped;
+   when every variant is skipped, the response has no item and the web app says the model is already downloaded.
+3. Checks the disk space: the bytes still needed (a `.part` counts as written), plus what the active items still have
+   to write, plus `marginBytes` (1 GiB), against the free space of the folder's file system (`freeBytesOf()`:
+   `statfs` of the folder or of its nearest existing parent, `bavail × bsize`). It refuses with `507`,
+   `code: "disk-full"`, and `Not enough disk space: …`. When the free space is unknown, there is no check.
+4. Creates one row per variant (status `queued`), emits each one, and starts the loop.
+
+### Processing a file
+
+The loop takes `DownloadsRepo.next()`: an item left `downloading` first (interrupted by a restart or a reload), then
+the oldest queued one. For each file not yet done, an attempt:
+
+<Steps>
+  <Step title="Wait for the previous writer">
+
+After a reload, the old module may still be writing this `.part`: the attempt waits for the
+[handover](#reloads-and-restarts) first.
+
+  </Step>
+  <Step title="Look at the disk">
+
+A destination file with the expected size counts as done. Otherwise the offset is the size of the `.part`; a `.part`
+larger than the file cannot be this file and is deleted.
+
+  </Step>
+  <Step title="Prepare the checksum">
+
+The sha256 of the bytes already in the `.part` is needed to finish the computation. It is kept in memory between the
+attempts of an item; after a restart, a reload, or a write that failed half-way, the `.part` is read back from disk
+(the `verifying` phase).
+
+  </Step>
+  <Step title="Transfer">
+
+A `GET` of the file from the offset, appended to the `.part` (see [Range resume](#range-resume)). Each chunk is written
+first, then added to the hash: a chunk that failed to reach the disk is never hashed.
+
+  </Step>
+  <Step title="Verify and rename">
+
+A `.part` shorter than the file is kept, a longer one is deleted, and the attempt is retried. On a sha256 mismatch the
+`.part` is deleted and the item fails with `422`, `code: "checksum-mismatch"`
+(`Checksum mismatch for <file>: the file was deleted`). Otherwise the `.part` is renamed to its final name and the file
+is marked done.
+
+  </Step>
+</Steps>
+
+When every file is done, the item becomes `done`. The `.part` is opened with `node:fs` in append mode: the code notes
+that `Bun.file().writer()` always truncates.
+
+### Range resume
+
+`request()` asks for `<endpoint>/<repo>/resolve/<revision>/<path>`, with `range: bytes=<offset>-` when the offset is
+above 0. It follows redirects itself (`redirect: "manual"`) so that the token is only sent to the Hub's origin, never
+to the CDN that serves the file; the signed CDN URL is requested again on every attempt, since it expires. After six
+responses that are all redirects, the item fails with `502 Too many redirects from Hugging Face`.
+
+| Response                                     | What the queue does                                                   |
+| -------------------------------------------- | --------------------------------------------------------------------- |
+| `206` with `content-range: bytes <offset>-…` | Appends to the `.part`                                                |
+| `206` starting elsewhere                     | Deletes the `.part`, retries                                          |
+| `200` while the offset is above 0            | The server ignored the range: rewrites the `.part` from zero and restarts the hash |
+| `416`                                        | The `.part` no longer matches the file: deletes it, retries from zero |
+| `408`, `429`, `5xx`                          | Retries                                                               |
+| Any other error                              | Fails the item with the [Hub error](#errors) and its code (`hf-gated`…) |
+
+### Retries
+
+An attempt is retried after a network error, a `408`, `429` or `5xx`, a body that ends early, a range mismatch, or a
+stall: no data for `stallMs` (60 seconds), measured from the start of the request. The pauses are `retryDelaysMs`
+(2, 4, 8, 16 and 30 seconds); during a pause the live phase is `retrying`, with `retryAt`. An attempt that received
+data resets the count. When the pauses run out, the item fails with `502`, `code: "hf-unreachable"`, and the last
+message.
+
+Any other error during the transfer is retried too. These failures end the item at once: a [Hub error](#errors), a
+checksum mismatch, a full disk while writing (`507 Disk full`, `code: "disk-full"`), and an error outside the
+transfer, such as a failed rename (`500`, `code: "download-failed"`). The item keeps the message and the code in
+`error` and `code`.
+
+### Cancel, remove, retry, clear
+
+- `cancel(id)` acts on a queued or downloading item, otherwise `409`, `code: "not-active"`. A running item is aborted,
+  and the loop then deletes its files; a queued one is marked `canceled` first, so the loop cannot pick it up while its
+  files are deleted. Deleting removes the `.part` files, the files it had already put in place, then the folders left
+  empty, deepest first, up to the organization's folder.
+- `remove(id)` drops a finished item from the list and keeps its files; an active one is refused with `409`,
+  `code: "active"`.
+- `retry(id)` puts a failed or canceled item back in the queue (`409`, `code: "not-finished"` otherwise), with the
+  same duplicate and disk space checks as a new download. No file is trusted as done any more: each one is checked on
+  disk again, and those still in place are kept.
+- `clearFinished()` deletes the `done`, `error` and `canceled` rows.
+
+`DELETE /api/downloads/:id` cancels an active item and removes a finished one.
+
+## Persistence
+
+The queue is the `downloads` table (`DownloadsRepo`, `server/db/downloads.ts`). A row holds the repository, the pinned
+revision, the variant's key, name, quant and kind, the absolute folder, the files (`files_json`: path, size, sha256,
+`done`), the status, `bytes_done`, `total_bytes`, `error`, `code`, `created_at` and `finished_at`. The full schema is
+on the [Database](/developers/server/database/) page.
+
+A status (`DownloadStatus`) is `queued`, `downloading`, `done`, `error` or `canceled`; `isDownloadActive()` is true for
+the first two. `bytes_done` only counts the files already renamed into place: the bytes of the file in progress are in
+the live state.
+
+## Reloads and restarts
+
+| Event                          | What happens                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Shutdown (`SIGINT`, `SIGTERM`) | `dispose()` aborts the transfer and keeps the `.part` and the row, still `downloading`                       |
+| Bun killed                     | Same state on disk: the `.part` and a `downloading` row                                                       |
+| Next start                     | `downloads.resume()` in `server/index.ts` starts the loop, which takes the `downloading` item first and resumes it from its `.part` |
+| `bun --hot` reload             | The old queue's `dispose()` aborts the transfer, the new queue resumes it once the old writer has let go     |
+
+There is no orphan cleanup for downloads: an interrupted item carries on where it stopped.
+
+On a reload, the old and the new module could write the same `.part` at the same time. The **handover** prevents it: a
+`Handover` object on `globalThis` (`__llamaWebuiDownloadHandover`, from `globalHandover()`) holds a promise chain. Each
+attempt chains its own promise behind the previous holder's and waits for it before touching the file; the old
+module's attempt releases its link only after it has closed the `.part`. The new queue's loop also waits for the chain
+before it starts.
+
+## Token and endpoint
+
+`resolveHfToken()` (`server/hf/token.ts`) follows the rules of the `hf` command-line tool:
+
+1. `HF_TOKEN`, or the older `HUGGING_FACE_HUB_TOKEN`, from the environment;
+2. otherwise the file written by `hf auth login`, at `hfTokenPath()`: `HF_TOKEN_PATH` when set, else
+   `$HF_HOME/token`, with `HF_HOME` defaulting to `$XDG_CACHE_HOME/huggingface`, then `~/.cache/huggingface`.
+
+It runs on every call (each API request and each download attempt), so an `hf auth login` done while llama-webui runs
+is picked up without a restart. The environment variables are read from Bun's environment, set at launch. The token is
+never stored by llama-webui; `HfStatus.token` only says where it came from (`env`, `file` or `null`).
+
+`hfEndpoint()` returns `HF_ENDPOINT` (a mirror, for example), trimmed and without trailing slashes, or
+`https://huggingface.co`. It is the base of the API calls and of the `resolve` URLs, the origin the token is sent to,
+and the start of the repository page link (`HfRepo.url`). See
+[Launch options](/docs/configuration/#hugging-face) for how users set these variables.
+
+## WebSocket messages
+
+`server/index.ts` turns the queue's callbacks into broadcasts; see [WebSocket](/developers/api/websocket/).
+
+| Message             | Payload                | When                                                                                                                   |
+| ------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `download`          | `DownloadItem`         | An item is queued, starts downloading, is done, fails, is canceled, or is retried                                      |
+| `download-progress` | `DownloadLive \| null` | A phase change (`downloading`, `verifying`, `retrying`), progress at most every `liveEveryMs` (250 ms); `null` when an item ends |
+| `download-deleted`  | `{ ids }`              | Finished items are removed or cleared                                                                                  |
+
+`DownloadLive` gives the item, the phase, the file in progress, the bytes done over the total, and `bps`, an
+exponential average of the throughput (70% of the previous value, 30% of the latest measure). A client that connects
+late reads `GET /api/downloads`, which returns the items and `live`.
+
+## Tests
+
+- `server/hf/hf.test.ts`: token resolution and the token file location, the endpoint, destination paths and path
+  safety, `groupRepoFiles()`, and `HfClient` against a stubbed `fetch` (pinned commit, search parameters, error codes,
+  `status()`).
+- `server/hf/downloader.test.ts`: the queue against a fake Hub, an injected `fetch` that redirects `/resolve` to a fake
+  CDN with range support and scripted failures: shards, resume with `Range`, a server that ignores it, connections cut
+  mid-file, retries, gated repositories, checksum mismatches, cancel and retry, duplicates, disk space, and resuming
+  after a restart from a database file.
+- `shared/src/hf.test.ts`: `parseHfInput()`, `vramFit()` and `DownloadRequestSchema`.

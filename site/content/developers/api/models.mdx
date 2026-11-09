@@ -1,0 +1,191 @@
+---
+title: Models
+description: Scan the models folder for GGUF files, and read the header and weight breakdown of one GGUF, with every field of ModelSummary and ModelDetail.
+---
+
+Two read-only routes list the GGUF files of the models folder and describe one of them (`server/routes/models.ts`).
+The scan is `scanModels()` (`server/models/scan.ts`), the GGUF reader `readModel()` (`server/models/gguf.ts`), the
+weight breakdown `weightSizes()` (`server/models/sizes.ts`), and the types `ModelList`, `ModelEntry`, `ModelSummary`
+and `ModelDetail` (`shared/src/models.ts`). The common rules are on the [API overview](/developers/api/overview/); the
+Models page is described on [Models](/docs/models/).
+
+## Scan the models folder
+
+### List the models
+
+<Endpoint method="GET" path="/api/models" />
+
+Scans the folder of the `modelsDir` setting (with `~` expanded) on every call:
+
+- every subfolder is visited; names that start with `.` are skipped, symbolic links to folders are not followed, a
+  symbolic link to a `.gguf` file is kept;
+- only names ending in `.gguf` are kept, so partial downloads (`.gguf.part`) are not;
+- the parts of a split model, `<name>-0000k-of-0000N.gguf`, are grouped under the first one (`groupGgufFiles()`);
+- the entries are sorted by the relative path of their main file.
+
+Each file's header is read once: the summary is cached in the `model_cache` table, keyed by path, and reused as long as
+the modification time and size of every part are unchanged. An unreadable file is never cached, and does not stop the
+scan: it becomes an entry with `ok: false`. Cache rows of files this scan did not see are pruned. A folder that does
+not exist gives an empty list, not an error.
+
+**Response**: `200` with a `ModelList`.
+
+| Field       | Type           | Description                                                      |
+| ----------- | -------------- | ---------------------------------------------------------------- |
+| `dir`       | string         | The models folder, expanded (absolute).                          |
+| `setting`   | string         | The `modelsDir` setting as typed (`~` included).                 |
+| `home`      | string         | The home directory of the user running llama-webui.              |
+| `scannedAt` | number         | When the scan ran (epoch ms).                                    |
+| `models`    | `ModelEntry[]` | One entry per model (a split model counts once).                 |
+
+`home` and `setting` let a client write paths the way a profile stores them (`profileModelPath()`,
+`shared/src/models.ts`).
+
+### ModelEntry
+
+A `ModelEntry` is either `{ ok: true }` with every field of a [`ModelSummary`](#modelsummary), or an unreadable
+file:
+
+| Field       | Type     | Description                                                                                         |
+| ----------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `ok`        | `false`  |                                                                                                     |
+| `path`      | string   | Absolute path of the file (the first part of a split model).                                        |
+| `relPath`   | string   | Path relative to the models folder.                                                                 |
+| `files`     | string[] | Absolute paths of the parts found.                                                                  |
+| `fileBytes` | number   | Their total size in bytes.                                                                          |
+| `error`     | string   | Why it cannot be read: `missing shard: <names>`, `unreadable GGUF: …`, `permission denied: <path>`… |
+
+### ModelSummary
+
+What the header of a GGUF says (`toSummary()`, `server/models/scan.ts`). `<arch>` is the value of
+`general.architecture`.
+
+| Field             | Type                     | Description                                                                                               |
+| ----------------- | ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `path`            | string                   | Absolute path of the file (the first part of a split model).                                              |
+| `relPath`         | string                   | Path relative to the models folder.                                                                       |
+| `files`           | string[]                 | Absolute paths of every part, in order.                                                                   |
+| `fileBytes`       | number                   | Total size of the parts, in bytes.                                                                        |
+| `kind`            | `'model' \| 'mmproj'`    | `mmproj` for a multimodal projector (`general.type` is `mmproj`, or the architecture is `clip`).          |
+| `arch`            | string                   | `general.architecture`, `?` when missing.                                                                 |
+| `name`            | string                   | `general.name`, empty when missing.                                                                       |
+| `quant`           | string                   | The label of `general.file_type` (`Q4_K_M`, `IQ3_S`…), `?` when unknown.                                  |
+| `params`          | number                   | Parameter count, computed from the tensors.                                                               |
+| `blockCount`      | number                   | `<arch>.block_count`: number of layers.                                                                   |
+| `contextLength`   | number                   | `<arch>.context_length`: the context the model was trained for, `0` when missing.                         |
+| `embeddingLength` | number                   | `<arch>.embedding_length`.                                                                                |
+| `headCount`       | number                   | `<arch>.attention.head_count`.                                                                            |
+| `headCountKv`     | number                   | `<arch>.attention.head_count_kv`, the maximum across layers.                                              |
+| `expertCount`     | number                   | `<arch>.expert_count`, `0` for a dense model.                                                             |
+| `expertUsedCount` | number                   | `<arch>.expert_used_count`: experts used per token.                                                       |
+| `nextnLayers`     | number                   | `<arch>.nextn_predict_layers`: multi-token prediction layers, `0` when none.                              |
+| `recurrent`       | boolean                  | The model has a `blk.N.ssm_*` tensor, or a `blk.N.` tensor whose name contains `linear_attn`.             |
+| `slidingWindow`   | number \| null           | `<arch>.attention.sliding_window`, `null` when the model has none.                                       |
+| `hasChatTemplate` | boolean                  | The header has a `tokenizer.chat_template`.                                                               |
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/models
+```
+
+```json
+{
+  "dir": "/home/me/models",
+  "setting": "~/models",
+  "home": "/home/me",
+  "scannedAt": 1794210000000,
+  "models": [
+    {
+      "ok": true,
+      "path": "/home/me/models/qwen3-32b-q4_k_m.gguf",
+      "relPath": "qwen3-32b-q4_k_m.gguf",
+      "files": ["/home/me/models/qwen3-32b-q4_k_m.gguf"],
+      "fileBytes": 19762149376,
+      "kind": "model",
+      "arch": "qwen3",
+      "name": "Qwen3 32B",
+      "quant": "Q4_K_M",
+      "params": 32762123264,
+      "blockCount": 64,
+      "contextLength": 40960,
+      "embeddingLength": 5120,
+      "headCount": 64,
+      "headCountKv": 8,
+      "expertCount": 0,
+      "expertUsedCount": 0,
+      "nextnLayers": 0,
+      "recurrent": false,
+      "slidingWindow": null,
+      "hasChatTemplate": true
+    },
+    {
+      "ok": false,
+      "path": "/home/me/models/big/model-00001-of-00003.gguf",
+      "relPath": "big/model-00001-of-00003.gguf",
+      "files": ["/home/me/models/big/model-00001-of-00003.gguf", "/home/me/models/big/model-00002-of-00003.gguf"],
+      "fileBytes": 99857989632,
+      "error": "missing shard: model-00003-of-00003.gguf"
+    }
+  ]
+}
+```
+
+## Read one model
+
+### Read a model's details
+
+<Endpoint method="GET" path="/api/models/info" />
+
+Reads one GGUF and breaks its weights down by kind. The file does not have to be in the models folder: any absolute
+path to a `.gguf` file works. For a split model, pass the first part: every part is read. Parsed models are kept in
+memory (the 8 most recent, as long as the parts are unchanged), not in the database.
+
+**Query**
+
+| Parameter | Type   | Required | Description                               |
+| --------- | ------ | -------- | ----------------------------------------- |
+| `path`    | string | yes      | Absolute path of the `.gguf` file, URL-encoded. |
+
+**Response**: `200` with a `ModelDetail`: every field of a [`ModelSummary`](#modelsummary), plus:
+
+| Field                 | Type   | Description                                                                                             |
+| --------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| `tensorCount`         | number | Number of tensors, across every part.                                                                   |
+| `weights.embedBytes`  | number | `token_embd.*` tensors.                                                                                 |
+| `weights.outputBytes` | number | `output.*` tensors.                                                                                     |
+| `weights.layersBytes` | number | The `blk.N.*` tensors that are not experts, all layers together.                                       |
+| `weights.expertsBytes`| number | The expert tensors (`ffn_gate_exps`, `ffn_up_exps`, `ffn_down_exps` and their `_chexps` forms): what `--n-cpu-moe` moves to the CPU. Shared experts (`_shexp`) count as layers. |
+| `weights.otherBytes`  | number | Every other tensor.                                                                                     |
+| `weights.totalBytes`  | number | All tensors.                                                                                            |
+
+All sizes are bytes. A tensor's size is the distance from its offset to the next tensor's in the same file
+(`tensorBytes()`), the last one ending at the end of the file. `relPath` is relative to the models folder when the file is inside it, otherwise
+the absolute path.
+
+**Errors**: `400` `Absolute path to a .gguf file expected` (a path that does not start with `/` or does not end with
+`.gguf`), `404` `File not found`, `422` with the reader's message when the file cannot be parsed (`unreadable GGUF: …`,
+`file not found: <path>` for a missing part).
+
+```bash title="Terminal"
+curl -G http://127.0.0.1:7860/api/models/info --data-urlencode 'path=/home/me/models/qwen3-32b-q4_k_m.gguf'
+```
+
+```json
+{
+  "path": "/home/me/models/qwen3-32b-q4_k_m.gguf",
+  "relPath": "qwen3-32b-q4_k_m.gguf",
+  "kind": "model",
+  "arch": "qwen3",
+  "quant": "Q4_K_M",
+  "tensorCount": 707,
+  "weights": {
+    "embedBytes": 637009920,
+    "outputBytes": 1043333120,
+    "layersBytes": 18070035520,
+    "expertsBytes": 0,
+    "otherBytes": 2621440,
+    "totalBytes": 19753000000
+  }
+}
+```
+
+The example is trimmed: the response has every `ModelSummary` field.

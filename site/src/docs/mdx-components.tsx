@@ -1,8 +1,11 @@
 import type { MDXComponents } from 'mdx/types';
 import { Link } from 'react-router';
+import { ArchitectureDiagram } from './ArchitectureDiagram';
 import { Callout } from './Callout';
 import { CodeBlock } from './CodeBlock';
 import { Tab, Tabs } from './DocTabs';
+import { Endpoint } from './Endpoint';
+import { FileTree } from './FileTree';
 import { Screenshot } from './Screenshot';
 import { Step, Steps } from './Steps';
 
@@ -49,7 +52,10 @@ export const mdxComponents: MDXComponents = {
   thead: (props) => <thead className="bg-muted/50" {...props} />,
   th: (props) => <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap" {...props} />,
   td: (props) => <td className="border-t border-border px-4 py-2.5 align-top" {...props} />,
+  ArchitectureDiagram,
   Callout,
+  Endpoint,
+  FileTree,
   Kbd,
   Screenshot,
   Step,

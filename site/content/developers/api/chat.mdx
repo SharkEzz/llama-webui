@@ -1,0 +1,314 @@
+---
+title: Chat
+description: Conversation routes, sending a message, regenerating and stopping a reply, and the SSE stream that carries a reply as it is written.
+---
+
+The chat routes store conversations and stream the replies of `llama-server`. They live in `server/routes/chat.ts`;
+the types and the patch schema are in `shared/src/chat.ts`, the SSE helpers (`formatSse()`, `SseParser`) in
+`shared/src/sse.ts`. Generations are run by `ChatRuns` (`server/chat/runs.ts`, see [Chat runs](/developers/server/chat/)).
+The user side is described on the [Chat](/docs/chat/) page.
+
+The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
+
+## How a reply runs
+
+A reply is a run held by `ChatRuns`, at most one per conversation. It does not belong to the HTTP request that
+started it:
+
+- The run posts the conversation to `llama-server`'s `/v1/chat/completions` with `stream: true` and goes on until
+  `llama-server` ends the reply, fails, or is stopped. A client that disconnects only unsubscribes.
+- The text written so far is saved to the database at most every second (`flushMs = 1000`), and in full when the run
+  ends. A `GET /api/chat/:id` during a generation returns `live: true` and the partial reply.
+- Any number of clients can follow the same run: the route that started it streams it, and
+  [`GET /api/chat/:id/stream`](#follow-a-reply-in-progress) attaches to it later.
+
+The target is the server the supervisor reports: a `ready` managed server, or an `external` one (its model is then
+unknown). Otherwise sending is refused with `409 llama-server is not ready`.
+
+What is sent to `llama-server` (`buildChatRequest()` in `server/chat/request.ts`): the system prompt if it is not blank,
+the finished history (messages `done` or `stopped` with content, reasoning left out, consecutive messages with the same
+role merged, since strict chat templates require alternating roles), the sampling keys that are set, and
+`chat_template_kwargs: { enable_thinking }` from the conversation's `thinking`.
+
+## Conversations
+
+`Conversation` (`shared/src/chat.ts`):
+
+| Field          | Type             | Description                                                                                  |
+| -------------- | ---------------- | -------------------------------------------------------------------------------------------- |
+| `id`           | number           | Conversation id.                                                                             |
+| `title`        | string           | `New conversation` until the first message gives it one (`autoTitle()`: 6 words, 48 characters at most). |
+| `profileId`    | number \| null    | Profile the conversation started with.                                                       |
+| `modelPath`    | string \| null    | Absolute path of its model. Set at creation, or by the first reply if it was null.           |
+| `systemPrompt` | string           | System prompt, empty by default.                                                             |
+| `sampling`     | `Sampling`       | Sampling overrides; a missing key keeps the server's value (the profile's).                  |
+| `thinking`     | boolean          | Reasoning enabled (`enable_thinking`), true by default.                                      |
+| `createdAt`    | number           | Epoch ms.                                                                                    |
+| `updatedAt`    | number           | Epoch ms, moved by every new or updated message and every `PATCH`.                           |
+
+`ConversationDetail` adds `messages: ChatMessage[]` (oldest first) and `live: boolean` (a reply is being written).
+`ChatMessage`:
+
+| Field            | Type                         | Description                                                            |
+| ---------------- | ---------------------------- | ---------------------------------------------------------------------- |
+| `id`             | number                       | Message id.                                                            |
+| `conversationId` | number                       | Its conversation.                                                      |
+| `role`           | `"user"` \| `"assistant"`     |                                                                        |
+| `content`        | string                       | Text of the message.                                                   |
+| `reasoning`      | string                       | Reasoning of the reply (`reasoning_content`), empty otherwise.         |
+| `status`         | string                       | `streaming`, `done`, `stopped` (stopped or interrupted) or `error`.    |
+| `error`          | string \| null                | Why the reply failed.                                                  |
+| `stats`          | `MessageStats` \| null        | Read from `llama-server`'s `timings`: `ttftMs`, `promptTokens`, `cachedTokens`, `genTokens`, `ppTps`, `tgTps`, `draftN`, `draftAccepted`, `durationMs`. |
+| `model`          | string \| null                | Model that wrote the reply (null for user messages and external servers). |
+| `createdAt`      | number                       | Epoch ms.                                                              |
+
+### List conversations
+
+<Endpoint method="GET" path="/api/chat" />
+
+**Response**: `200` with an array of `ConversationSummary`, most recently updated first: `id`, `title`, `updatedAt`,
+`messageCount`, `modelPath` and `live`.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/chat
+```
+
+### Create a conversation
+
+<Endpoint method="POST" path="/api/chat" />
+
+Creates an empty conversation with the default title, an empty system prompt, no sampling override and thinking on.
+
+**Body**: a JSON object (send `{}` for the defaults).
+
+| Field       | Type    | Required | Description                                                                                         |
+| ----------- | ------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `profileId` | integer | no       | Profile whose model the conversation records. Omitted: the profile of the running server, if any. |
+
+**Response**: `201` with the `ConversationDetail` (no messages).
+
+**Errors**: `400` `profileId: expected an integer`; `404` unknown profile.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/chat \
+  -H 'content-type: application/json' \
+  -d '{}'
+```
+
+### Get a conversation
+
+<Endpoint method="GET" path="/api/chat/:id" />
+
+**Response**: `200` with the `ConversationDetail`.
+
+**Errors**: `404` unknown conversation.
+
+```bash title="Terminal"
+curl http://127.0.0.1:7860/api/chat/7
+```
+
+### Update a conversation
+
+<Endpoint method="PATCH" path="/api/chat/:id" />
+
+Changes the title, the system prompt, the sampling or the thinking switch. Missing fields keep their value, but
+`sampling` replaces the whole object: send every override you want to keep.
+
+**Body**: `ConversationPatch` (`ConversationPatchSchema`, `shared/src/chat.ts`), strict.
+
+| Field          | Type       | Required | Description                                  |
+| -------------- | ---------- | -------- | -------------------------------------------- |
+| `title`        | string     | no       | Trimmed, 1 to 200 characters.                |
+| `systemPrompt` | string     | no       | 100,000 characters at most.                  |
+| `sampling`     | `Sampling` | no       | Replaces the sampling overrides (below).     |
+| `thinking`     | boolean    | no       | Reasoning on or off.                         |
+
+`Sampling` (`SamplingSchema`), strict, every key optional:
+
+| Key                | Type    | Range                  |
+| ------------------ | ------- | ---------------------- |
+| `temperature`      | number  | 0 to 5                 |
+| `top_p`            | number  | 0 to 1                 |
+| `top_k`            | integer | 0 to 1000              |
+| `min_p`            | number  | 0 to 1                 |
+| `presence_penalty` | number  | -2 to 2                |
+| `repeat_penalty`   | number  | 0 to 5                 |
+| `max_tokens`       | integer | 1 to 1,000,000         |
+| `seed`             | integer | any                    |
+
+**Response**: `200` with the `ConversationDetail`.
+
+**Errors**: `400` invalid body; `404` unknown conversation.
+
+```bash title="Terminal"
+curl -X PATCH http://127.0.0.1:7860/api/chat/7 \
+  -H 'content-type: application/json' \
+  -d '{"systemPrompt":"Answer in one paragraph.","sampling":{"temperature":0.7,"top_p":0.9}}'
+```
+
+### Delete a conversation
+
+<Endpoint method="DELETE" path="/api/chat/:id" />
+
+Deletes the conversation and its messages. A reply in progress is stopped first, and the route waits for its run to
+end.
+
+**Response**: `204`.
+
+**Errors**: `404` unknown conversation.
+
+```bash title="Terminal"
+curl -X DELETE http://127.0.0.1:7860/api/chat/7
+```
+
+## Replies
+
+### Send a message
+
+<Endpoint method="POST" path="/api/chat/:id/messages" />
+
+Saves the user message (trimmed), creates an empty assistant message with status `streaming`, starts the run and answers
+with its [SSE stream](#the-sse-stream). If the conversation still has its default title and this is its first user
+message, the title is taken from the message.
+
+**Body**:
+
+| Field     | Type   | Required | Description                     |
+| --------- | ------ | -------- | ------------------------------- |
+| `content` | string | yes      | The message; must not be blank. |
+
+**Response**: `200`, `content-type: text/event-stream`.
+
+**Errors** (JSON, before the stream starts): `400` `content: expected a string` or `Empty message`; `404` unknown
+conversation; `409` `A reply is already in progress in this conversation`; `409` `llama-server is not ready`.
+
+A failure of `llama-server` itself does not change the status code: the stream ends with a `done` event whose message
+has status `error` and an `error` text (for example a context overflow, worded by `llamaErrorMessage()`).
+
+```bash title="Terminal"
+curl -N -X POST http://127.0.0.1:7860/api/chat/7/messages \
+  -H 'content-type: application/json' \
+  -d '{"content":"Explain the KV cache in two sentences."}'
+```
+
+### Regenerate the last reply
+
+<Endpoint method="POST" path="/api/chat/:id/regenerate" />
+
+Deletes everything after the last user message (the last reply, failed or not) and writes a new reply to it. The
+stream is the same as for a message, except that the `start` event has `user: null`.
+
+**Body**: none.
+
+**Response**: `200`, `content-type: text/event-stream`.
+
+**Errors**: `404` unknown conversation; `409` `A reply is already in progress in this conversation`; `409`
+`llama-server is not ready`; `409` `Nothing to regenerate` (no user message).
+
+```bash title="Terminal"
+curl -N -X POST http://127.0.0.1:7860/api/chat/7/regenerate
+```
+
+### Stop a reply
+
+<Endpoint method="POST" path="/api/chat/:id/stop" />
+
+Aborts the request to `llama-server`. The reply keeps what was written, with status `stopped`, and every stream
+following it receives `done`.
+
+**Response**: `204`.
+
+**Errors**: `409` `No reply in progress`.
+
+```bash title="Terminal"
+curl -X POST http://127.0.0.1:7860/api/chat/7/stop
+```
+
+### Follow a reply in progress
+
+<Endpoint method="GET" path="/api/chat/:id/stream" />
+
+Attaches to the conversation's running reply: the stream replays what is already written, then follows live.
+
+**Response**: `200` with the [SSE stream](#the-sse-stream), or `204` with no body when no reply is in progress.
+
+**Errors**: `404` when `:id` is not a positive integer. An id with no conversation answers `204`.
+
+```bash title="Terminal"
+curl -N http://127.0.0.1:7860/api/chat/7/stream
+```
+
+## The SSE stream
+
+`POST /api/chat/:id/messages`, `POST /api/chat/:id/regenerate` and `GET /api/chat/:id/stream` answer with the same
+`text/event-stream` (`sse()` in `server/routes/chat.ts`). Each event is written by `formatSse()`: an `event:` line with
+the event type, then one `data:` line with the whole `ChatEvent` as single-line JSON, its `type` included.
+
+| Event   | Payload (`ChatEvent`)                                         | Description                                                                 |
+| ------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `start` | `{ type, user: ChatMessage \| null, assistant: ChatMessage }` | First event. `user` is the saved user message (null for a regeneration), `assistant` the reply being written. |
+| `delta` | `{ type, content?: string, reasoning?: string }`              | New text since the previous event; each key is present only when non-empty. |
+| `done`  | `{ type, message: ChatMessage }`                              | Last event: the reply as saved (`done`, `stopped` or `error`, with its `stats`). The server closes the stream right after. |
+
+Between events, the server writes a `: ping` comment every 15 seconds (`PING_MS = 15_000`): a long prompt can be
+processed for a while without any token. The route also lifts Bun's idle timeout for this request
+(`server.timeout(req, 0)`), which would otherwise drop a connection silent for 10 seconds.
+
+### Replay then follow
+
+A subscriber always receives the run's state first (`subscribe()` in `server/chat/runs.ts`):
+
+1. `start`, with the same user and assistant messages as the first subscriber received.
+2. One `delta` with all the content and reasoning written so far, if there is any.
+3. `done` if the run has already ended (the stream then closes), otherwise the live events that follow.
+
+So a client that attaches late gets the same text as one that followed from the start, in fewer `delta` events.
+Concatenate `content` and `reasoning` from every `delta` after the last `start`.
+
+### Re-attach after a disconnect
+
+Closing the stream never stops the reply. To get it back, the web app (`web/src/lib/chat.ts`) does this:
+
+1. `GET /api/chat/:id`. If `live` is false, the saved messages are final.
+2. If `live` is true, `GET /api/chat/:id/stream` and read it like the first stream. The replayed `start` and `delta`
+   rebuild the reply.
+3. If the stream answers `204` (the reply ended in between) or ends without a `done` event, read
+   `GET /api/chat/:id` again.
+
+A stream can end without `done` when Bun reloads or stops: `ChatRuns.dispose()` saves each running reply as `stopped`
+and sends `done` to its subscribers first, but a killed process sends nothing. On the next start, a reply left
+`streaming` is marked `stopped` (`stopOrphans()`).
+
+### Example
+
+The raw stream of a message sent to a reasoning model (messages trimmed):
+
+```text
+event: start
+data: {"type":"start","user":{"id":41,"conversationId":7,"role":"user","content":"Explain the KV cache in two sentences.","reasoning":"","status":"done","error":null,"stats":null,"model":null,"createdAt":1762700000000},"assistant":{"id":42,"conversationId":7,"role":"assistant","content":"","reasoning":"","status":"streaming","error":null,"stats":null,"model":"/home/demo/models/Qwen3-8B-Q4_K_M.gguf","createdAt":1762700000004}}
+
+event: delta
+data: {"type":"delta","reasoning":"The user wants a short definition."}
+
+: ping
+
+event: delta
+data: {"type":"delta","content":"The KV cache stores the keys and values"}
+
+event: delta
+data: {"type":"delta","content":" of tokens already processed, so they are not computed again."}
+
+event: done
+data: {"type":"done","message":{"id":42,"conversationId":7,"role":"assistant","content":"The KV cache stores the keys and values of tokens already processed, so they are not computed again.","reasoning":"The user wants a short definition.","status":"done","error":null,"stats":{"ttftMs":182,"promptTokens":24,"cachedTokens":0,"genTokens":21,"ppTps":1450.2,"tgTps":96.4,"draftN":null,"draftAccepted":null,"durationMs":431},"model":"/home/demo/models/Qwen3-8B-Q4_K_M.gguf","createdAt":1762700000004}}
+```
+
+To read it in TypeScript, `SseParser` from `@llama-webui/shared` accepts chunks split anywhere and skips comments:
+
+```ts title="web/src/lib/chat.ts"
+const parser = new SseParser();
+for (;;) {
+  const { value, done } = await reader.read();
+  if (done) return;
+  for (const ev of parser.push(decoder.decode(value, { stream: true }))) onEvent(JSON.parse(ev.data) as ChatEvent);
+}
+```

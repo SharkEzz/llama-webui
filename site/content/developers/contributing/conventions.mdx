@@ -1,0 +1,196 @@
+---
+title: Conventions
+description: Language, number formatting, Biome rules, React and Bun idioms, generated shadcn components and the hot-reload rules every change follows.
+---
+
+These rules apply to `server/`, `shared/`, `web/` and `site/`. They come from `CLAUDE.md` at the root of the repository
+(written in French); `biome.json`, the `tsconfig*.json` files and CI enforce the mechanical ones.
+
+## Language
+
+Everything is in English (en-US):
+
+- the UI and the website;
+- server messages: HTTP errors, zod validation messages, logs and `--help`;
+- code comments and test names;
+- commit messages and pull requests.
+
+Comments explain why rather than what: exported functions and non-obvious choices carry a `/** … */` comment. Most
+console messages from the server start with `[llama-webui]`.
+
+### Numbers, dates and units
+
+The web app formats every number, date and unit through `web/src/lib/format.ts`, which sets `LOCALE = 'en-US'` once.
+Do not hard-code a locale in a component: use a helper, or add one to that file.
+
+| Helper                                       | Output                                                          |
+| -------------------------------------------- | --------------------------------------------------------------- |
+| `num(max, min = max)`                        | Cached `Intl.NumberFormat` with that many fraction digits       |
+| `fmt(v, max = 1)`                            | Up to `max` decimals: `fmt(3.14159, 1)` gives “3.1”             |
+| `plural(n, one, other)`                      | `plural(1, 'line')` gives “line”, `plural(0, 'line')` “lines”   |
+| `formatBytes(n, digits = 1)`                 | Base 1024 with `B`, `KiB`, `MiB`, `GiB`, `TiB`: “12.3 GiB”      |
+| `formatBps`, `formatRate`                    | “1.2 GiB/s”, “42.7 tok/s”                                       |
+| `formatPct`, `formatInt`, `formatParams`     | “37%” (one decimal below 10), “32,768”, “27.3 B”                |
+| `formatTemp`, `formatStddev`                 | “54 °C”, “ ± 0.4”                                               |
+| `formatDuration`, `formatTime`, `formatShortDate` | “12 min 05 s”, “14:03:27”, “Nov 7, 14:03”                  |
+
+Missing values (`null`, `undefined`, not finite) render as “—” in the helpers that accept them. The website has its own
+`site/src/lib/format.ts` with the same `LOCALE`.
+
+### Never compare a server message
+
+The web app never branches on the text of a server message. When the UI must react to a specific refusal, the server
+gives it a machine-readable `code`:
+
+```ts title="server/db/profiles.ts"
+const conflict = (name: string) => new HttpError(409, `A profile named “${name}” already exists`, 'name-taken');
+```
+
+`HttpError(status, message, code)` (`server/http.ts`) becomes `{ "error": "…", "code": "name-taken" }`, and the web
+client's `ApiError` (`web/src/lib/api.ts`) exposes it as `code`:
+
+```ts title="web/src/lib/bench.ts"
+if (e instanceof ApiError && e.code === 'server-running') return 'confirm';
+```
+
+Text stored in the database that the UI has to recognize goes through a helper in `shared/`, which also knows the
+wording of earlier versions (the app used to be in French, and old rows keep their text):
+
+- `isOomError(error)` (`shared/src/bench.ts`): a run's error starts with `OOM_ERROR = 'Out of memory'` or the legacy
+  prefix.
+- `isDefaultTitle(title)` (`shared/src/chat.ts`): the conversation still has `DEFAULT_TITLE = 'New conversation'` or the
+  legacy default title.
+
+## Formatting and lint
+
+[Biome](https://biomejs.dev) formats, lints and sorts imports. It is a pinned devDependency (`@biomejs/biome` 2.6.6)
+configured in `biome.json`.
+
+| Setting       | Value                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| Indentation   | 2 spaces                                                                                  |
+| Line width    | 120 columns                                                                               |
+| Quotes        | Single quotes in TypeScript, double quotes in JSX attributes                              |
+| Semicolons    | Always                                                                                    |
+| Lint rules    | The `recommended` preset, with `style/noNonNullAssertion` turned off (`x!` is allowed)     |
+| Assists       | `organizeImports` (sorted imports) and `useSortedPackageJson` (sorted `package.json` keys) |
+| CSS           | Parsed with Tailwind directives                                                           |
+
+Biome checks TypeScript, JSON and CSS in every package. It skips files ignored by Git, `node_modules`, `testdata`,
+`dist`, the site's build output (`site/build`, `site/dist`, `site/.react-router`), the `.mdx` pages (not supported) and
+the generated shadcn components (see [Generated shadcn components](#generated-shadcn-components)).
+
+| Command            | Runs                       | Effect                                     |
+| ------------------ | -------------------------- | ------------------------------------------ |
+| `bun run lint`     | `biome check`              | Format, lint and imports, read-only        |
+| `bun run lint:fix` | `biome check --write`      | Applies the safe fixes                     |
+| `bun run format`   | `biome format --write`     | Formats only                               |
+
+Before a commit, a pull request or the end of a milestone, `bun run lint` must report zero errors and zero warnings
+(see [the quality gate](/developers/contributing/workflow/#the-quality-gate)).
+
+### Never disable a rule
+
+Do not turn a rule off or lower it to `warn` in `biome.json` to get the lint through. When a rule reports a false
+positive, silence that one line with a `biome-ignore` comment that names the rule and says why:
+
+```tsx title="web/src/features/chat/CodeBlock.tsx"
+// biome-ignore lint/security/noDangerouslySetInnerHtml: HTML produced by shiki from the text (escaped), not the reply's HTML
+```
+
+The same works in CSS:
+
+```css title="web/src/index.css"
+/* biome-ignore lint/complexity/noImportantStyles: overrides the border set by uPlot */
+```
+
+## React
+
+The web app uses React 19. Three rules cover most effect-related lint reports:
+
+- **Trigger dependencies.** `useExhaustiveDependencies` flags a dependency the effect does not read. When the value is a
+  deliberate trigger (the effect must run again when it changes), keep it and say so in a `biome-ignore`:
+
+  ```tsx title="web/src/features/chat/Thread.tsx"
+  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id is a trigger: re-pin to the bottom on every conversation change
+  useLayoutEffect(() => {
+    stick.current = true;
+  }, [current?.id]);
+  ```
+
+- **Read the latest value without re-running the effect.** Use `useEffectEvent` rather than leaving the value out of
+  the dependencies with an ignore:
+
+  ```tsx title="web/src/features/tuning/TuningPage.tsx"
+  // Only a change of ?sweep opens one; openId is read fresh without re-running the effect.
+  const openWanted = useEffectEvent((id: number) => {
+    if (id !== openId) void useTuning.getState().open(id);
+  });
+  useEffect(() => {
+    if (wanted !== null) openWanted(wanted);
+  }, [wanted]);
+  ```
+
+- **Reset state when the identity changes.** Put a `key` on the component instead of clearing its state in an effect:
+
+  ```tsx title="web/src/features/chat/SamplingPanel.tsx"
+  // key: switching conversations remounts the form (fields and errors start from scratch).
+  return <SamplingForm key={current.id} current={current} props={props} />;
+  ```
+
+## Bun first
+
+The app runs on Bun and uses its APIs rather than npm packages that do the same job:
+
+| Need                          | Used                                  | Where                                                      |
+| ----------------------------- | ------------------------------------- | ---------------------------------------------------------- |
+| HTTP routes, WebSocket, UI    | `Bun.serve`                           | `server/app.ts`                                            |
+| SQLite                        | `bun:sqlite`                          | `server/db/`                                               |
+| Reading files                 | `Bun.file`                            | Collectors and hardware readers (`/proc`, `/sys`), tests   |
+| Child processes               | `Bun.spawn`                           | Supervisor, benchmarks, `nvidia-smi`, `perf`               |
+| Production front end          | `Bun.build`                           | `server/routes/web.ts`                                     |
+| NVML                          | `bun:ffi` in a `Worker`               | `server/collectors/nvml/`                                  |
+| Checksums                     | `Bun.CryptoHasher`                    | `server/hf/downloader.ts`                                  |
+| Shell commands                | `Bun.$`                               | Tests (`server/collectors/nvidia.test.ts`)                 |
+| Tests                         | `bun:test`                            | Every `*.test.ts`                                          |
+
+`Bun.file` and `Bun.write` only handle files: directories and file handles go through `node:fs` or `node:fs/promises`
+(`readdir`, `stat`, `realpath`, `open`, `statfs`). There is no Express, `ws`, `better-sqlite3`, `execa` or `dotenv`
+(Bun loads `.env` itself), and no Vite, Jest or Vitest in the app. The website is the one exception: `site/` is built
+with Vite and React Router, and is still installed, run and tested with Bun.
+
+### Code idioms
+
+- **`shared/` stays portable.** The browser bundle imports it, so its modules import nothing but `zod` and each other:
+  no Bun or Node API. The server and the web import it as `@llama-webui/shared`; inside `web/` and `site/`, `@/` points
+  to their own `src/`.
+- **Cleanup with `using`.** `defer(fn)` (`shared/src/dispose.ts`) returns a `Disposable`, so
+  `using _busy = defer(() => (busy = false));` replaces a `try`/`finally`. Tests release temporary directories and
+  databases the same way.
+- **Dependencies as arguments.** Server classes and builders take their collaborators (`fetch`, `spawn`, repositories,
+  settings getters) as a deps object, which is what lets tests pass fakes (see [Testing](/developers/contributing/testing/)).
+
+## Generated shadcn components
+
+`web/src/components/ui/**` and `site/src/components/ui/**` hold stock [shadcn/ui](https://ui.shadcn.com) components
+(configured by `components.json` in each package). Biome ignores them entirely (no format, no lint, no import sorting) so
+they stay comparable with shadcn updates. Leave them untouched: put the project's changes in a wrapper outside `ui/`, as
+`web/src/components/Select.tsx` does for the select list.
+
+## Hot reload
+
+`bun run dev` runs the server under `bun --hot`, and some modules deliberately survive a reload:
+
+- The supervisor, the log ring, the monitor and the bench gate live on `globalThis` (`server/runtime.ts`) so that saving
+  a file does not kill the loaded model. A change to `server/supervisor/supervisor.ts`, `server/logs/buffer.ts`,
+  `server/bench/gate.ts`, `server/monitor/**` (except `placement.ts`), `server/collectors/**` or `server/runtime.ts` is
+  not picked up: stop Bun with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run `bun run dev` again.
+- For the same reason, recognize supervisor errors by `name` (`e.name === 'SupervisorError'`), never with `instanceof`:
+  the surviving supervisor throws the class from the old version of the module.
+- A file created under `web/src/` while `bun run dev` runs may not be found by the bundler ("Could not resolve", while
+  `bun run check` passes): restart `bun run dev`.
+- A Bun plugin added to `bunfig.toml` must also be passed to `Bun.build` in `server/routes/web.ts`, which builds the
+  production front end.
+
+[Architecture](/developers/architecture/) explains which modules are recreated on a reload and what happens to a
+generation, a benchmark or a sweep in progress.

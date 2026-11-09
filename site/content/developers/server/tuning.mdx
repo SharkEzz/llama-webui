@@ -1,0 +1,419 @@
+---
+title: Tuning
+description: How the estimator reads GGUF metadata and hardware, models the memory of each device, places tensors, picks flags per preset, and runs the system checks.
+---
+
+The tuning module recommends `llama-server` flags for a model on this machine without running anything. It reads the
+GGUF header, the devices `llama-bench` lists and the RAM, computes what each device would hold for a set of flags, and
+searches for the placement a preset prefers. It also reviews the system settings that affect llama.cpp. It lives in
+`server/tuning/`, with the presets and result types in `shared/src/tuning.ts`. For what users see, read
+[Tuning](/docs/tuning/).
+
+| File                         | Role                                                                                   |
+| ---------------------------- | -------------------------------------------------------------------------------------- |
+| `server/tuning/estimate.ts`  | `estimate()`: the search, the recommended flags, the "why" strings and the warnings   |
+| `server/tuning/placement.ts` | `measurePlacement()` and `fitOf()`: every tensor on a device or in RAM, then a verdict |
+| `server/tuning/memory.ts`    | KV cache per layer, recurrent state, compute buffers, margins                          |
+| `server/tuning/space.ts`     | `planSweep()`: a sweep's items with their verdict                                      |
+| `server/tuning/hardware.ts`  | `readTuningHardware()`: devices, CPU, RAM                                              |
+| `server/tuning/models.ts`    | `loadModel()` and `mmprojBytes()`: the parsed GGUF and the projector size              |
+| `server/tuning/checks.ts`    | `runChecks()` and `summarize()`: the system checks                                     |
+| `server/tuning/sysinfo.ts`   | `readSys()`: the `/proc`, `/sys` and log readings the checks need                      |
+| `server/tuning/disk.ts`      | `measureDiskSpeed()`: sequential read speed of the model's disk                        |
+| `server/tuning/fixtures.ts`  | `fakeModel()` and `hw3()`, for tests                                                   |
+| `server/models/gguf.ts`      | `readModel()`: GGUF header to `ModelInfo`                                              |
+| `server/models/sizes.ts`     | `tensorBytes()`, `EXPERTS`                                                             |
+| `shared/src/tuning.ts`       | `PRESETS`, `NOISE`, `deviceRole()`, `gpuDevices()`, `Estimate`, `Fit`, `Check`…        |
+
+The estimator, the placement, the memory model, `planSweep()` and the checks are pure functions: data in, result out,
+which is what the tests rely on. Only `readTuningHardware()`, `loadModel()`, `readSys()` and `measureDiskSpeed()` touch
+the system. The routes are in `server/routes/tuning.ts` (see [Tuning API](/developers/api/tuning/)).
+
+## Inputs
+
+An estimate takes an `EstimateInput`: the model (`ModelInfo`), the hardware (`TuningHardware`), a preset, the
+projector's size in bytes, and optionally values the user pinned (`pinned`, a partial `BenchParams`) and a pinned
+context (`ctx`).
+
+### GGUF metadata
+
+`loadModel(path)` (`server/tuning/models.ts`) refuses a path that is not absolute or does not end in `.gguf` (`400`),
+answers `404` for a missing file and `422` for an unreadable GGUF, and keeps the result while the file's size and
+modification time are unchanged. It calls `readModel()` (`server/models/gguf.ts`), which reads the header with
+`@huggingface/gguf` (every shard when the name is `…-00001-of-0000N.gguf`) and keeps up to `CACHE_MAX = 8` models,
+stamped with the size and modification time of every part.
+
+A tensor's size is not in the header: `tensorBytes()` takes the gap between consecutive offsets, and the last tensor
+ends at the end of the file. The estimator uses these `ModelInfo` fields:
+
+| Field                                  | From the GGUF                                                                          | Used for                     |
+| -------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------- |
+| `tensors` (name, bytes)                | Tensor infos of every shard                                                            | Placement                    |
+| `blockCount`                           | `<arch>.block_count`                                                                   | Layers                       |
+| `headCountKv`                          | `<arch>.attention.head_count_kv`, an array or a scalar (default: `head_count`)         | KV cache                     |
+| `keyLength`, `valueLength`             | `<arch>.attention.key_length`, `value_length` (default: `embedding_length / head_count`) | KV cache                   |
+| `slidingWindow`, `swaPattern`          | `<arch>.attention.sliding_window`, `sliding_window_pattern`                            | Sliding-window layers        |
+| `fullAttentionInterval`                | `<arch>.full_attention_interval`                                                       | Hybrid models                |
+| `nextnLayers`                          | `<arch>.nextn_predict_layers`                                                          | MTP layers (no KV cache)     |
+| `recurrent`, `ssmStateBytesPerSeq`     | `blk.N.ssm_*` or `*linear_attn*` tensors; `ssm.inner_size`, `state_size`, `conv_kernel` | Recurrent state             |
+| `embeddingLength`, `vocabSize`         | `<arch>.embedding_length`; `<arch>.vocab_size`, else the tokenizer's token count, else the output (or embedding) tensor's second dimension | Compute buffers |
+| `expertCount`, `expertUsedCount`       | `<arch>.expert_count`, `expert_used_count`                                             | MoE, disk reads per token    |
+| `contextLength`                        | `<arch>.context_length`                                                                | Largest context tried        |
+| `fileBytes`                            | Sum of the parts' sizes                                                                | Sweep duration, memlock check |
+
+`EXPERTS = /ffn_(gate|up|down)_(ch)?exps/` (`server/models/sizes.ts`) matches the tensors that `--n-cpu-moe` moves to
+the CPU, as in llama.cpp; shared experts (`_shexp`) stay. For the estimator, a model is a MoE when `expertCount > 0`
+and at least one tensor matches.
+
+### Hardware
+
+`readTuningHardware({ benchBinary, mem })` (`server/tuning/hardware.ts`) returns a `TuningHardware`:
+
+- `devices`: the cached `llama-bench --list-devices` output (see
+  [Hardware and the device list](/developers/server/bench/#hardware-and-the-device-list)).
+- `cpu`: `readCpuInfo()`, read once per module: model, physical cores (distinct physical id and core id pairs in
+  `/proc/cpuinfo`), logical threads, flags, and NUMA nodes (`/sys/devices/system/node/node*`, 1 when unreadable).
+- `ramTotalBytes`, `ramAvailableBytes`: from the Monitor's latest snapshot, otherwise `/proc/meminfo` (`MemAvailable`,
+  else `MemFree`).
+
+Each device gets a role from `deviceRole(d, all)` (`shared/src/tuning.ts`):
+
+| Role         | Rule                                                                   |
+| ------------ | ---------------------------------------------------------------------- |
+| `host`       | Backend `BLAS` or `CPU`, or no memory (`totalMib ≤ 0`)                 |
+| `gpu`        | Backend `CUDA`                                                         |
+| `integrated` | The name matches `processor` or `APU` (Vulkan names an iGPU after the CPU) |
+| `duplicate`  | A non-CUDA device whose name starts with a CUDA device's name: the Vulkan copy of an NVIDIA card |
+| `gpu`        | Anything else                                                          |
+
+`gpuDevices(all)` keeps the `gpu` devices in `--list-devices` order: it is what a missing `-dev` means, for the
+placement and for the estimator.
+
+### Presets
+
+`PRESETS` in `shared/src/tuning.ts`:
+
+| Id        | Label              | `ctxTarget`            | `ctxMin` | `kvPreferred` | `ub`  | `score`                 |
+| --------- | ------------------ | ---------------------- | -------- | ------------- | ----- | ----------------------- |
+| `chat`    | Responsive chat    | 32,768                 | 8,192    | `f16`         | 512   | `tgTps`                 |
+| `agent`   | Agent & RAG        | 65,536                 | 16,384   | `q8_0`        | 2,048 | `0.6 × ppTps + 0.4 × tgTps` |
+| `context` | Max context        | Infinity (the largest that fits) | 8,192 | `q8_0`   | 512   | `ctx × 1e6 + tgTps`     |
+| `fit`     | Make the model fit | 8,192                  | 8,192    | `q8_0`        | 512   | `tgTps`                 |
+| `big`     | 100 GB model       | 32,768                 | 8,192    | `q8_0`        | 512   | `tgTps`                 |
+
+The estimator uses the context, cache and `-ub` settings; `score` ranks sweep results
+([Ranking](/developers/server/bench/#ranking)). `NOISE = { pp: 0.1, tg: 0.02 }` is `llama-bench`'s relative
+measurement noise, below which two sweep results are a tie.
+
+## The memory model
+
+`server/tuning/memory.ts` holds the formulas. Every size is in bytes.
+
+- **KV cache element.** `KV_BYTES` gives the bytes per element of each cache type: `f32` 4, `f16` and `bf16` 2,
+  `q8_0` 1.0625, `q5_1` 0.75, `q5_0` 0.6875, `q4_1` 0.625, `q4_0` and `iq4_nl` 0.5625.
+- **Layers with a KV cache.** `holdsKv(m, i)` is false for the MTP layers (the last `nextnLayers`), for every layer of
+  a recurrent model without `fullAttentionInterval`, and, when `fullAttentionInterval` is set, for every layer that is
+  not the last of its interval.
+- **KV cache of a layer.** `kvLayerBytes(m, i, ctx, kv)` is the layer's KV heads × (`keyLength` × the K type's size +
+  `valueLength` × the V type's size) × tokens. A sliding-window layer only holds `min(ctx, slidingWindow)` tokens; one
+  layer in every `swaPattern` is a full-attention layer. The pattern comes from the GGUF, else from
+  `SWA_PATTERN_DEFAULT` (`gpt-oss`: 2), else 6.
+- **Recurrent state.** `recurrentBytes(m)` is `ssmStateBytesPerSeq`: per sequence, whatever the context. `readModel()`
+  computes it as the recurrent layers × (`inner_size` × `state_size` + `conv_kernel` × `inner_size`) × 4.
+- **Compute buffers and margin.**
+
+```ts title="server/tuning/memory.ts"
+/** Compute buffers of the main GPU for a micro-batch of `ub` tokens. */
+export const computeBytes = (m: ModelInfo, ub: number): number =>
+  ub * (m.embeddingLength * 4 + m.vocabSize * 4) + 256 * MiB;
+
+/** VRAM kept free on a card: CUDA/Vulkan context, fragmentation. */
+export const marginBytes = (totalBytes: number): number => 512 * MiB + 0.04 * totalBytes;
+```
+
+A device's usable budget is its total memory minus `marginBytes()`. It starts from `totalMib`, not `freeMib`: the
+estimate assumes the cards are empty.
+
+## Placement
+
+`measurePlacement(input)` (`server/tuning/placement.ts`) applies a set of flags the way llama.cpp would and returns
+the bytes on each device (`vram`), the bytes in RAM (`ram`), the device of each layer (`layerDevice`), the weights
+split by kind (`cpuWeights`, `cpuExpertsBytes`, `cpuOtherBytes`, `gpuWeights`) and `issues`.
+
+<Steps>
+  <Step title="Pick the devices">
+
+With `-dev`, each id is looked up in the device list. An id that is not listed, or that names a `host` device, is left
+out and adds the issue `unknown device: <id>`, except `none`, which means no device. Without `-dev`, the devices are
+`gpuDevices()`. The first device gets the compute buffers.
+
+  </Step>
+  <Step title="Count the GPU layers">
+
+A numeric `-ngl` is a layer count; a missing `-ngl`, `all` or `auto` means every layer plus the output. Without a
+device, it is 0. The GPU layers are the last ones (layers `L − ngl` to `L − 1`), and the output goes to a card only
+when `-ngl` exceeds the layer count.
+
+  </Step>
+  <Step title="Split the layers">
+
+The GPU layers are cut into contiguous slices, in `-dev` order, in proportion to `-ts` when it has one value per device
+and one of them is positive, otherwise to each device's free memory (`freeMib`, or `totalMib` when it is 0), as
+llama.cpp does. With `-sm none` or a single device, every GPU layer goes to the first device.
+
+  </Step>
+  <Step title="Place every tensor">
+
+In order, the first rule that applies wins:
+
+1. A matching `-ot` rule (the first matching pattern, as in llama.cpp). Its target is used when it is a listed device;
+   any other target, such as `CPU`, means RAM. An invalid pattern adds an issue.
+2. An expert tensor (`EXPERTS`) of a layer below `-ncmoe`: RAM.
+3. The token embeddings (`token_embd.*`): RAM.
+4. A layer tensor: the device of its layer.
+5. Anything else (output, output norm): the last device when the output is on a card, otherwise RAM.
+
+  </Step>
+  <Step title="Add the rest">
+
+Each layer's KV cache goes where the layer is. The compute buffers, the projector and the recurrent state go to the
+first device when at least one layer is on a GPU, otherwise to RAM.
+
+  </Step>
+</Steps>
+
+`fitOf(input, measured)` then gives the verdict (`Fit`), with each device's estimate, budget and total:
+
+| Verdict | When                                                                                     | `reason`                                                     |
+| ------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `no`    | An unknown device, or a device over its budget                                           | `unknown device: CUDA7`, `CUDA0: 17.1 GiB for 14.7 GiB usable` |
+| `tight` | RAM above what is available: `mmap` reads the rest from disk, slow but not a failure     | `RAM: … for … available, the rest is re-read from disk`      |
+| `tight` | A device above `MIN_FREE_RATIO = 0.95` of its budget                                     | `CUDA0: … for … usable, thin margin`                         |
+| `fits`  | Everything else                                                                          | `null`                                                       |
+
+## The estimator
+
+`estimate(input)` (`server/tuning/estimate.ts`) adapts llama-tui's rule-based estimator. It tries placement families
+in a fixed order and keeps the first configuration that passes `fitOf()`, then explains it.
+
+### Candidates
+
+- **Cards.** `gpuDevices()` with a usable budget of at least `TS_UNIT = 256 MiB`, CUDA cards first (in
+  `--list-devices` order), then the others.
+- **Device sets.** A pinned `-dev` is the only set. Otherwise: each CUDA card alone, all CUDA cards together (when
+  there are two or more), each card alone, then all of them, without duplicates. The widest set is the one with the
+  most cards.
+- **Families**, in order:
+  - every preset except `big`: `gpu` (the whole model) on each device set, then `moe-cpu` on the widest set (MoE only),
+    `partial` on the widest set, and `cpu`;
+  - `big`: `moe-cpu` (MoE only) and `partial` on the widest set, then `cpu`.
+- **KV cache types.** `f16` only when `-fa off` is pinned; `f16` when a pinned `-ctk` is `f16` and `q8_0` for any
+  other pinned type; otherwise `f16` then `q8_0` when the preset prefers `f16`, `q8_0` alone when it prefers `q8_0`.
+- **`-ub`.** The pinned value; otherwise the preset's, then 512 when it differs.
+- **Context.** From the preset's target (capped at the model's `contextLength`, rounded down to a multiple of 1,024)
+  down to `ctxMin` in steps of `CTX_STEP = 4096`, or the pinned context alone.
+
+A family turns into flags this way:
+
+| Family    | Flags tried                                                                                       |
+| --------- | ------------------------------------------------------------------------------------------------- |
+| `gpu`     | `-ngl all`, `-dev` the set, `-ts` for two cards or more                                           |
+| `moe-cpu` | The same, with `-ncmoe` from 1 up to the layer count: the smallest that fits (or the pinned value) |
+| `partial` | The same, with `-ngl` from `L − 1` down to 1: the largest that fits (or the pinned value)         |
+| `cpu`     | `-ngl 0 -dev none`                                                                               |
+
+Every candidate also gets `-fa on` (unless `-fa off` is pinned), `-ctk` and `-ctv` set to the cache type, `-t` (the
+physical cores), `-b` (`DEFAULT_BATCH = 2048`) and `-ub`. `-ts` gives each card its budget, minus the compute buffers
+and the projector on the first card, in units of 256 MiB (at least 1). Pinned values are applied on top of every
+candidate, so they always win. A candidate passes when its verdict is not `no` and the RAM it needs is available; the
+`big` preset accepts RAM overflow, read again from disk through `mmap`.
+
+### Search order
+
+For every preset except `context`, or when a context is pinned:
+
+1. Each `gpu` family at the target context and the first cache type: the first `fits` wins; failing that, the first
+   `tight` one. One card with headroom thus wins over a split, and a split with headroom over a tight single card.
+2. Otherwise every family in order and, for each one, every cache type, every context from the largest down and every
+   `-ub`: the first candidate that passes wins. The context goes down before the estimator moves to the next family.
+
+For `context`, `largest()` binary-searches a family for the largest context, in multiples of 1,024, between `ctxMin`
+and the model's maximum. The estimator compares the `gpu` families and the family right after them (`moe-cpu` for a
+MoE, `partial` otherwise) and keeps the largest context; a placement that moves experts or layers to RAM can therefore
+win when it frees room for a longer context. When none of these fits, it goes on through the remaining families until
+one does, and moves to the next cache type only when no family fits.
+
+### Flags and why
+
+The result (`Estimate`) has the flags (`params`), `ctx`, `kv`, `serverArgs` (the flags, then `-c`, `--fit off`, and
+`--mlock` and `--numa distribute` when they apply), the verdict, and one row per flag with a "why" string:
+
+| Flag                 | Why                                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `-ncmoe`             | `experts of the first N layers in RAM (…)`; with `big`: `…; attention, norms and remaining experts on <cards>`                                         |
+| `-ngl`               | `all`: `… of weights fit in … usable`, or `all layers on GPU, except the experts above` with `-ncmoe`; a number: `N of L layers fit, the rest in RAM`; `0`: `not a single layer fits: everything in RAM` |
+| `-dev`               | `single card: no PCIe hop`, or `N cards, <first> gets the compute buffers`                                                                             |
+| `-ts`                | `split by the usable VRAM of each card`                                                                                                                |
+| `-c`                 | `… estimated in total, <kv> KV cache included, margin kept`                                                                                            |
+| `-fa`                | `faster attention, smaller compute buffers` (`f16`), `required for the quantized KV cache` (`q8_0`)                                                     |
+| `-ctk / -ctv`        | `the budget allows it, no loss` (`f16`), `cache halved, negligible loss` (`q8_0`)                                                                      |
+| `-t`                 | `N physical cores`                                                                                                                                     |
+| `-b / -ub`           | `default` for 2048 / 512, otherwise `faster prompt processing, enough VRAM headroom`                                                                   |
+| `--fit`              | `what gets measured is exactly what gets written`                                                                                                      |
+| `--mlock`            | `whole model locked in memory, enough RAM`                                                                                                             |
+| `--numa distribute`  | `several NUMA nodes`                                                                                                                                   |
+
+`--mlock` is recommended when `-ngl` is not `all`, some weights are in RAM, `-ncmoe` is not used, RAM does not overflow
+and at least 2 GiB of RAM remain. `--numa distribute` is added when the CPU has several NUMA nodes.
+
+When RAM overflows, `ramOverflowBytes` is what exceeds the available RAM and `diskReadBytesPerToken` estimates what
+each generated token reads from disk: the weights in RAM that a token touches (the active share of the experts in RAM,
+`expertUsedCount / expertCount`, plus the other layer weights in RAM), times the share of the RAM weights that do not
+fit.
+
+### Warnings and failures
+
+`warnings` collects the placement issues and these messages: `slow generation: X of L layers in RAM`,
+`experts of the first N layers in RAM: slower generation`, `not enough VRAM: everything in RAM`,
+`overflows RAM by …: NVMe read ≈ … per generated token`, the `tight` reason when RAM does not overflow, and
+`dense model: -ncmoe has no effect` when `-ncmoe` is pinned on a dense model.
+
+When nothing passes, the estimate still shows the simplest configuration, without checking it: `-ngl all` on the
+widest set (or `-ngl 0` without a card), a `q8_0` cache (`f16` with `-fa off`), `-ub 512`, the pinned values and
+`ctxMin` (or the pinned context).
+`ok` is false, `rows` is empty, the verdict is `no`, and the reason is `fitOf()`'s, or
+`model too large: … of RAM needed, … available`.
+
+### Who calls it
+
+- `POST /api/tuning/estimate` computes an estimate and keeps the last one per model in memory, for the checks.
+- The launch pad (`GET /api/launchpad`, `server/setup.ts`) gives each profile a fit badge with the `fit` preset, the
+  profile's own flags pinned (`paramsFromServerArgs()`) and its `-c` (`ctxFromArgs()`). It shows no badge when
+  `llama-bench` lists no device while the Monitor sees GPUs: an estimate without them would be wrong.
+- Sweep planning calls `fitOf()` directly for each item (see [Sweeps](/developers/server/bench/#sweeps)).
+
+## System checks
+
+`runChecks(ctx)` (`server/tuning/checks.ts`) turns a `CheckContext` into a list of `Check`s. A check has a stable `id`,
+a `family` (`nvidia`, `amd`, `cpu`, `build`, `kernel`), a `label`, a `state` (`ok`, `warn`, `unknown`, `na`), a
+`detail`, the exact `command` to run when there is one, `persistence` (`session` until reboot, or `permanent`) and its
+`impact`. `summarize()` counts the states.
+
+### Readings
+
+`readSys(deps)` (`server/tuning/sysinfo.ts`) gathers the readings; each one is tolerant and returns `null` or an empty
+value when it cannot read, it never rejects.
+
+| Reading                   | Source                                                                                  |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `governors`               | `/sys/devices/system/cpu/cpuN/cpufreq/scaling_governor`                                 |
+| `thp`                     | The bracketed value of `/sys/kernel/mm/transparent_hugepage/enabled`                    |
+| `memlockLimitBytes`       | "Max locked memory" in `/proc/self/limits` (`Infinity` for `unlimited`)                 |
+| `swappiness`, `cmdline`, `modules` | `/proc/sys/vm/swappiness`, `/proc/cmdline`, `/proc/modules`                    |
+| `iommuActive`             | Whether `/sys/class/iommu` has entries                                                  |
+| `backendLibs`             | The `libggml-*.so` files next to the binary, after resolving symlinks                   |
+| `buildDate`               | `git log -1 --format=%ct` in the git checkout holding the binary (its folder or one of its three parents) |
+| `driver`, `cudaDriver`    | NVML, else `/sys/module/nvidia/version` for the driver                                  |
+| `bar1Bytes`               | The largest of the first six BARs in `/sys/bus/pci/devices/<busId>/resource`            |
+| `amdDpm`                  | `/sys/class/drm/cardN/device/power_dpm_force_performance_level`, by bus id              |
+| `systemInfo`, `cudaDriverError` | The last `system_info:` log line; a log line saying `driver version is insufficient` |
+| `modelDisk`               | `queue/rotational` of the model's disk, and the file system type from `/proc/mounts`    |
+
+### The checks
+
+| Id                           | `warn` when                                                                 | Command                                                                          | Persistence |
+| ---------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------- |
+| `nvidia.persistence.<busId>` | Persistence mode is off                                                     | `sudo nvidia-smi -i <uuid> -pm 1`                                                | session     |
+| `nvidia.powerlimit.<busId>`  | The limit is more than 1 W below the default                                | `sudo nvidia-smi -i <uuid> -pl <default W>`                                      | session     |
+| `nvidia.pcie.<busId>`, `amd.pcie.<busId>` | The current generation or width is below the maximum           |                                                                                  | permanent   |
+| `nvidia.rebar.<busId>`       | BAR1 is smaller than the VRAM                                               |                                                                                  | permanent   |
+| `nvidia.driver`              | The logs say the driver is too old for the build's CUDA                     |                                                                                  | permanent   |
+| `nvidia.uvm`                 | `nvidia_uvm` is not loaded                                                  | `sudo modprobe nvidia_uvm`                                                       | session     |
+| `amd.dpm.<busId>`            | The level is `auto`                                                         | `echo high \| sudo tee <file>`                                                   | session     |
+| `amd.hip`                    | No `libggml-hip*` next to the binary                                        |                                                                                  | permanent   |
+| `amd.rocm-gfx`               | Never: always `unknown`, `rocminfo` is not queried                         |                                                                                  |             |
+| `cpu.governor`               | A core is not on `performance`                                              | `echo performance \| sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor` | session |
+| `cpu.thp`                    | `never`                                                                     | `echo madvise \| sudo tee /sys/kernel/mm/transparent_hugepage/enabled`           | session     |
+| `cpu.memlock`                | `--mlock` is recommended and the limit is below the model's size            | `ulimit -l unlimited`                                                            | session     |
+| `cpu.swappiness`             | Above 10 while the model spills into RAM                                    | `sudo sysctl vm.swappiness=10`                                                   | session     |
+| `cpu.numa`                   | Several NUMA nodes without `--numa` in the recommendation                   |                                                                                  | permanent   |
+| `build.cuda`                 | An NVIDIA card, no CUDA device listed and no `libggml-cuda*`               |                                                                                  | permanent   |
+| `build.simd`                 | The CPU has AVX2 or AVX-512 and `system_info` does not show `AVX2 = 1` or `AVX512 = 1` |                                                       | permanent   |
+| `build.age`                  | The last commit is older than 60 days (`OLD_BUILD_MS`)                      | `git pull && cmake --build build`                                                | permanent   |
+| `kernel.iommu`               | Active without passthrough (`iommu=pt`, `amd_iommu=off`, `intel_iommu=off`) with two cards or more |                                           | permanent   |
+| `kernel.disk`                | A spinning disk or a network file system (`NETWORK_FS`)                     |                                                                                  | permanent   |
+| `kernel.disk-speed`          | Sequential read under `DISK_OK_BPS = 2 GiB/s`; `unknown` until measured     |                                                                                  |             |
+| `kernel.swap`                | Swap in use while the model spills into RAM                                 |                                                                                  |             |
+
+The NVIDIA commands name the card by its UUID (from the Monitor's key), because `nvidia-smi`'s own index need not match
+llama-webui's order. "The model spills into RAM" means the last estimate is `ok` and either `-ngl` is not `all` or it
+uses `-ncmoe`. Per-card checks are `na` (`not applicable (card ignored)`) for a card that is not in `retainedBusIds`.
+
+### Context of a check run
+
+`GET /api/tuning/checks?model=<path>` builds the context from the Monitor's latest snapshot (`allGpus`, every GPU's bus
+id as `retainedBusIds`), the hardware, the parsed model, the log ring, the last estimate computed for that model and
+its last disk measurement. Both are kept in memory in `server/routes/tuning.ts`, so a reload forgets them.
+
+The first-run checklist on the Home page only shows the checks for which `isSetupCheck(id)` is true: it drops those that
+need a model or a running server (`cpu.memlock`, `cpu.swappiness`, `kernel.disk`, `kernel.disk-speed`,
+`kernel.swap`, the PCIe checks and `build.simd`).
+
+## Disk speed
+
+`measureDiskSpeed(path)` (`server/tuning/disk.ts`) reads up to 1 GiB of the model file, never more than the file,
+starting at a random offset to avoid the part already in the page cache, and divides by the time it took. It answers
+`404` for a missing file and `400` for a file under 64 MiB (`MIN_BYTES`). The page cache can still inflate the result.
+`POST /api/tuning/disk-speed` refuses to measure while a benchmark runs, and keeps the result for the
+`kernel.disk-speed` check.
+
+## Fixtures and tests
+
+`server/tuning/fixtures.ts` builds the inputs of the pure functions:
+
+- `fakeModel(o)` returns a complete `ModelInfo` with synthetic tensors: 48 layers by default, `token_embd.weight` of
+  300 MiB, one `attn_q` tensor per layer (`otherBytesPerLayer`, 100 MiB), the experts of each layer split into
+  `ffn_gate_exps`, `ffn_up_exps` and `ffn_down_exps` when `experts` is above 0 (`expertBytesPerLayer`, 300 MiB),
+  `output_norm` and an `output.weight` of 300 MiB. It has 4 KV heads per layer, key and value lengths of 128, a context
+  of 131,072 and a vocabulary of 151,936.
+- `hw3(o)` is the maintainer's machine: two 16 GiB CUDA cards (`CUDA0`, `CUDA1`), the Ryzen iGPU (`Vulkan0`), the
+  Vulkan copies of the NVIDIA cards (`Vulkan1`, `Vulkan2`), an RX 9070 XT (`Vulkan3`), `BLAS`, a 6-core CPU on one NUMA
+  node, 61 GiB of RAM and 55 GiB available (`ramAvailableGiB`).
+
+The tests:
+
+- `server/tuning/placement.test.ts`: device roles, `-ncmoe`, `-ot` against `-ngl`, `-ts` slices, the default devices,
+  the `fits` / `tight` / `no` thresholds, and RAM overflow as `tight`.
+- `server/tuning/estimate.test.ts`: the `big` preset on a MoE over 100 GB, a dense model on one card, a MoE split over
+  the CUDA pair before its experts go to RAM, pinned values, and `planSweep()`.
+- `server/tuning/checks.test.ts`: checks on fixed `SysReadings`.
+- `shared/src/setup.test.ts` covers `isSetupCheck()`; `server/models/gguf.test.ts` writes real GGUF files with
+  `writeGguf()` from `server/models/gguf.fixture.ts` to test the reader.
+
+### Add a hardware fixture
+
+<Steps>
+  <Step title="Capture the device list">
+
+Run `llama-bench --list-devices` on the machine. Each line gives an id, a name, the total and the free memory in MiB:
+`CUDA0: NVIDIA GeForce RTX 5070 Ti (15933 MiB, 15643 MiB free)`.
+
+  </Step>
+  <Step title="Write the fixture">
+
+Next to `hw3()` in `server/tuning/fixtures.ts`, add a function that returns a `TuningHardware`. Build each device with
+the file's `dev(id, name, totalMib, freeMib?)` helper, in the listed order: the backend comes from the letters of the
+id, and the role from `deviceRole()`, so keep the names exactly as llama.cpp prints them. Fill in the CPU (physical
+cores, threads, flags, NUMA nodes) and the RAM.
+
+  </Step>
+  <Step title="Test against it">
+
+Call `estimate({ model: fakeModel({ … }), hw: yourFixture(), preset, mmprojBytes: 0 })` or `measurePlacement()`, and
+assert on `params`, `ctx` and `fit.verdict`. Size the fake model so that the case you care about sits on one side of a
+budget: the existing tests do that with `otherBytesPerLayer` and `expertBytesPerLayer`.
+
+  </Step>
+</Steps>
+
+See [Testing](/developers/contributing/testing/) for how to run the tests.

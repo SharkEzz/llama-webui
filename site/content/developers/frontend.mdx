@@ -1,0 +1,270 @@
+---
+title: Web app
+description: How the React app in web/src is organized, how its zustand stores are fed by REST and the WebSocket, and its conventions for errors, numbers and theming.
+---
+
+The web app is a React 19 single-page app in `web/`, served by the Bun process (see
+[Serving the UI](/developers/architecture/#serving-the-ui)). Its entry is `web/index.html`, which loads
+`web/src/main.tsx`. It imports types, schemas and pure functions from `@llama-webui/shared` and never talks to
+`llama-server` directly: everything goes through the llama-webui API.
+
+## Structure
+
+<FileTree>
+- `web/`
+  - `index.html` HTML entry; an inline script applies the theme before the first paint
+  - `components.json` shadcn configuration (`base-nova` style)
+  - `tsconfig.json` DOM types and the `@/*` → `src/*` alias
+  - `src/`
+    - `main.tsx` starts the store syncs and the WebSocket, renders the router
+    - `index.css` Tailwind, theme tokens for light and dark, Shiki colors
+    - `app/` the shell
+      - `router.tsx` routes, each page lazy-loaded
+      - `routes.ts` sidebar entries (path, label, icon)
+      - `AppLayout.tsx` layout: sidebar, status bar, page outlet, toasts
+      - `Sidebar.tsx`, `StatusBar.tsx`, `ThemeToggle.tsx`, `PageSkeleton.tsx`
+    - `features/` one folder per page
+      - `home/` Home: `launchpad/` and the first-run `setup/` checklist
+      - `dashboard/`, `server/`, `profiles/`, `logs/`, `system/`, `topology/`, `models/` (with `hf/` for downloads), `chat/`, `bench/`, `tuning/`, `settings/`
+      - `_placeholder/` the page shown for an unknown path
+    - `lib/` API client, WebSocket client, one zustand store per domain, formatting
+    - `components/` components shared by several pages
+      - `glass/` the glass look: `GLASS`, `GlassCard`, `StatTile`, `Gauge`, `AuroraBackground`, tones
+      - `charts/` `TimeSeriesChart` (uPlot) and its theme
+      - `ui/` shadcn components, generated: do not edit
+      - `CodeTextarea.tsx`, `ConfirmDialog.tsx`, `Select.tsx`
+</FileTree>
+
+A page's code lives in `features/<page>/`, named after its route. What several pages share goes to `lib/` (data and
+logic) or `components/` (UI). Pure logic that the server also needs goes to the
+[shared package](/developers/shared/).
+
+### Generated shadcn components
+
+`web/src/components/ui/` holds the shadcn components, built on Base UI (`@base-ui/react`), with `cmdk` for the command
+menu and `sonner` for toasts. They stay as shadcn generates them, so a later shadcn update can be compared file by
+file, and Biome ignores the folder (no format, no lint, no import sorting). To change a component's behavior, wrap it
+outside `ui/`: `components/Select.tsx` re-exports the shadcn select with the project's tweaks (it opens below its
+trigger, at least as wide as it), and `GlassCard` puts the glass look on the shadcn `Card`.
+
+## Startup
+
+`main.tsx` starts the syncs of the stores every page needs, opens the WebSocket, then renders the router:
+
+```tsx title="web/src/main.tsx"
+startThemeSync();
+startServerSync();
+startMonitorSync();
+startLogsSync();
+startTopologySync();
+startDownloadsSync();
+useWs.getState().connect();
+```
+
+The benchmark and tuning stores start their own sync the first time their page mounts (`startBenchSync()` in
+`BenchPage`, `startTuningSync()` in `TuningPage`).
+
+## Routing
+
+`app/router.tsx` creates a React Router data router (`createBrowserRouter`) with one layout route, `AppLayout`, and
+one child per page. Each child is loaded on its first visit:
+
+```tsx title="web/src/app/router.tsx"
+const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) => ({
+  lazy: { Component: async () => (await load())[name] },
+});
+
+{ path: 'dashboard', ...page(() => import('@/features/dashboard/DashboardPage'), 'DashboardPage') },
+```
+
+`load` must stay a literal `import()` so that `Bun.build` can split the page into its own chunk: the initial bundle
+only holds the shell, and the Topology page's three.js scene only loads with that page. On the first load of a deep
+URL, `hydrateFallbackElement` renders `<AppLayout loading />`, the shell with a `PageSkeleton`, until the page's code
+arrives. Unknown paths render the placeholder page with "Page not found".
+
+`AppLayout` draws the aurora background, the sidebar, the status bar and the page `<Outlet />`, with the sonner
+`Toaster` at the bottom right. It refreshes the health store (version, uptime) every time the WebSocket opens.
+
+## State: zustand stores
+
+Each domain has a module in `web/src/lib/` with a zustand store, its REST calls and, for live data, a `start…Sync()`
+function. A sync function runs once and does two things:
+
+- it subscribes to the WebSocket messages of its domain with `onWs(type, fn)`;
+- it subscribes to `useWs` and reads the current state over REST every time the status becomes `open`, which covers
+  the first connection and every reconnection.
+
+```ts title="web/src/lib/server.ts"
+export function startServerSync() {
+  if (started) return;
+  started = true;
+  onWs('server-state', (m) => useServer.setState({ view: m.payload }));
+  useWs.subscribe((s, prev) => {
+    if (s.status === 'open' && prev.status !== 'open') void refresh();
+  });
+}
+```
+
+The WebSocket only pushes changes; the REST read on (re)connection fills whatever was missed while disconnected.
+
+| Module | Store | Fed by |
+| --- | --- | --- |
+| `ws.ts` | `useWs` | The socket: connection status and last message. |
+| `server.ts` | `useServer` | `server-state`; `GET /api/state` on connection. Also the start, switch, restart and stop actions. |
+| `monitor.ts` | `useMonitor` | `snapshot`, appended to a client-side history; `GET /api/monitor/history` on connection and when the history shape changes. |
+| `logs.ts` | `useLogs` | `hello` and `log`; `GET /api/logs?since=<seq>` on connection. |
+| `topology.ts` | `useTopology` | `placement`; `GET /api/topology` on connection. |
+| `downloads.ts` | `useDownloads` | `download`, `download-progress`, `download-deleted`; the queue reloaded on connection. A finished download rescans the models. |
+| `bench.ts` | `useBench` | `bench-progress`, `bench-run`, `bench-deleted`; the history reloaded on connection. |
+| `tuning.ts` | `useTuning` | `sweep`, `sweep-progress`, `sweep-deleted`, and the `bench-*` messages of the open sweep; the sweeps reloaded on connection. |
+| `chat.ts` | `useChat` | REST and the SSE stream of the open conversation. |
+| `health.ts` | `useHealth` | `GET /api/health`, refreshed by `AppLayout` on every connection. |
+| `theme.ts` | `useTheme` | `localStorage` and the `theme` setting. |
+| `models.ts` | `useModels` | `GET /api/models`, on demand. |
+| `profiles.ts` | `useProfiles` | `GET /api/profiles`, on demand. |
+| `flags.ts` | `useFlags()` (hook over a private store) | `GET /api/flags`, read once: the flag catalogue of the configured `llama-server`. |
+| `settings.ts` | `useSettingsEditor()` (hook, no store) | `GET` and `PATCH /api/settings`, with per-field validation errors. |
+
+### Monitoring history
+
+`useMonitor` keeps a `ClientHistory`: timestamps in seconds (for uPlot) and one series per key, aligned point by point,
+`null` for a gap. The arrays are mutable and shared with the charts; the store's `version` counter changes on every
+update, and `useSeries(key)` re-renders on it. Each `snapshot` carries the values of its tick in `points`, and the
+history's `intervalMs` and `capacity`: when they no longer match the local copy (the polling interval or history
+length changed in Settings), the client reloads the whole history. Snapshots that arrive during a reload are queued and
+appended afterwards.
+
+### Chat streaming
+
+`useChat` sends a message with `POST /api/chat/:id/messages` and reads the SSE response with `readSse()`, which feeds
+the shared `SseParser`. `delta` events accumulate and are pushed to the store once per animation frame. Opening a
+conversation whose reply is still running (`live: true`) attaches to it with `GET /api/chat/:id/stream`. Switching to
+another conversation aborts the fetch, which only unsubscribes: the generation goes on on the server (see
+[Chat runs](/developers/server/chat/)).
+
+## WebSocket client
+
+`web/src/lib/ws.ts` holds the app's single WebSocket, opened by `connect()` (once) on `ws://` or `wss://` +
+`location.host` + `/ws`.
+
+- **Reconnection.** After a close, it retries after `BACKOFF_START_MS = 500` ms, doubling the delay after each failed
+  attempt up to `BACKOFF_MAX_MS = 10_000` ms. A successful connection resets the delay to 500 ms.
+- **Status.** `status` is `connecting`, `open` or `closed`. After the first drop it stays `closed` while retrying, so
+  the status dot does not flicker. `WS_STATUS_UI` gives the label and tone: Connected, Connecting…, Disconnected.
+- **Heartbeat.** The client answers every `ping` with a `pong`. The server sends one every 15 seconds and closes a
+  connection that missed two (see [WebSocket](/developers/api/websocket/)).
+- **Dispatch.** `onWs(type, fn)` registers a typed listener for one message type and returns its unsubscribe
+  function. Messages are dispatched by `type`; a message that is not valid JSON is ignored.
+- **Hot reload.** In development, `import.meta.hot.dispose` closes the socket and clears the retry timer, so HMR does
+  not leave ghost sockets behind.
+
+### Resynchronizing with bootId
+
+The server sends `hello` with its `bootId` first on every connection. The `bootId` is stable across `bun --hot`
+reloads and changes only when llama-webui restarts, so it tells a reconnection apart from a restart:
+
+- `useLogs` ties its lines to the boot (`LogView.bootId`). Log line numbers restart from 0 on every boot, so on a new
+  `bootId`, `onBoot()` drops the old lines and the "clear view" marker. The replay on connection asks for
+  `/logs?since=<seq>`; if the answer comes from another boot than the one asked, it starts over from `since=0`.
+- `useMonitor` drops its history and its last snapshot when the `bootId` changes: the `hello` of a new boot always
+  precedes its snapshots. The history is then read again on connection.
+
+## API client and errors
+
+`api<T>(path, init)` in `web/src/lib/api.ts` calls `fetch('/api' + path)`. When a body is given, it sets
+`content-type: application/json`, which the server's guard requires on writes. It parses the JSON response and
+throws an `ApiError` for any status outside 2xx:
+
+| Field | Content |
+| --- | --- |
+| `status` | The HTTP status, or `0` when the server is unreachable (message `llama-webui server unreachable`). |
+| `message` | The body's `error`, else `HTTP error <status>`. |
+| `issues` | The zod issues of a `400` (`path` and `message`), used to show errors next to their field. |
+| `code` | The body's machine-readable `code`, or `null`. |
+
+The `code` comes from the server's `HttpError(status, message, code)` (`server/http.ts`). The rule is that the web app
+never compares the text of a server message: it branches on `status`, `code` or a shared helper. For example, when a
+benchmark would stop the running server, the server answers `409` with `code: "server-running"` and the client asks for
+confirmation:
+
+```ts title="web/src/lib/bench.ts"
+if (e instanceof ApiError && e.code === 'server-running') return 'confirm';
+```
+
+Other codes the UI branches on include `name-taken` (a profile name already used) and `hf-gated` or `hf-not-found`
+(Hugging Face). For text stored in the database, shared helpers do the comparison in one place, including the wording
+of earlier versions still present in existing databases:
+
+- `isOomError(error)` (`shared/src/bench.ts`): a benchmark run failed for lack of memory (`OOM_ERROR = 'Out of memory'`
+  prefix).
+- `isDefaultTitle(title)` (`shared/src/chat.ts`): a conversation still has its default title
+  (`DEFAULT_TITLE = 'New conversation'`) and can be titled automatically.
+
+Validation errors come back field by field: the profile form and the settings editor map `issues[i].path[0]` to their
+fields, and other errors become toasts.
+
+## Formatting numbers and dates
+
+Every number, date and unit shown in the UI goes through `web/src/lib/format.ts`: no component formats with a locale of
+its own.
+
+| Export | Output |
+| --- | --- |
+| `LOCALE` | `'en-US'`, the locale of every number and date. |
+| `num(max, min = max)` | A cached `Intl.NumberFormat` with at most `max` and at least `min` fraction digits. |
+| `fmt(v, max = 1)` | A number with up to `max` decimals: `fmt(3.14159, 1)` → "3.1". |
+| `plural(n, one, other?)` | The English singular or plural, `other` defaulting to `one` + "s": `plural(0, 'line')` → "lines". |
+| `formatBytes(n, digits = 1)` | Base 1024 with B, KiB, MiB, GiB, TiB: "12.3 GiB". |
+| `formatBps(n)` | A byte rate: "1.2 GiB/s". |
+| `formatRate(tps)` | Tokens per second: "42.7 tok/s". |
+| `formatPct(n)` | A percentage, one decimal below 10: "37%". |
+| `formatInt(n)` | A grouped integer: "32,768". |
+| `formatParams(n)` | A parameter count: "27.3 B", "600 M". |
+| `formatTemp(c)` | "54 °C". |
+| `formatDuration(ms)` | "45 s", "12 min 05 s", "3 h 07 min", "2 d 4 h". |
+| `formatTime(t)`, `formatShortDate(t)` | "14:03:27", "Nov 7, 14:03". |
+| `formatStddev(sd)` | " ± 0.4", empty when zero. |
+
+The formatters return "—" for `null`, `undefined` or a non-finite number. The UI text itself is in English.
+
+## Theme
+
+The theme is `system`, `light` or `dark`, stored in two places:
+
+- In the browser, under the `localStorage` key `llama-webui:theme`. The inline script of `web/index.html` reads it
+  before React loads and sets the `dark` class and `color-scheme` on `<html>`, so the page never flashes the wrong
+  theme.
+- In the database, as the `theme` setting. `useTheme().setMode()` applies the mode, stores it locally and sends
+  `PATCH /api/settings`. At startup, `startThemeSync()` reads the settings and the database wins, so a choice made in
+  another browser applies here too. In `system` mode it follows `prefers-color-scheme` changes.
+
+The colors are CSS variables in `web/src/index.css`: `:root` for light, `.dark` for dark, exposed to Tailwind through
+`@theme inline`. Components only use these semantic classes, never raw colors. The four tones of the glass components
+and the charts are `blue`, `teal`, `amber` and `rose` (`components/glass/tones.ts`).
+
+## Charts
+
+Time series use uPlot through `components/charts/TimeSeriesChart.tsx`, on the Dashboard and the System page. A chart
+is created once per set of series and theme, then fed with `setData` on every monitor tick from the `useMonitor`
+history; `null` values are gaps. Its colors come from the theme's CSS variables (`--chart-1` to `--chart-4` for the
+four tones), read by `readChartTheme()` in `chartTheme.ts` and read again when the theme changes. `compact` draws a
+sparkline without axes or legend. The circular gauges are SVG (`components/glass/Gauge.tsx`), and the Topology page
+draws its scene with react-three-fiber (`features/topology/`).
+
+## Code highlighting
+
+Chat replies render as Markdown with react-markdown and remark-gfm (`features/chat/Markdown.tsx`); raw HTML in a reply
+is shown as text. Code blocks go through `highlight()` in `web/src/lib/highlight.ts`:
+
+- The Shiki highlighter is created on first use with `createHighlighterCore` and the JavaScript regex engine, with only
+  the grammars it needs (TypeScript, TSX, JavaScript, JSX, JSON, Bash, Python, Rust, Go, C, C++, HTML, CSS, SQL, YAML,
+  TOML, Markdown, diff) and the `github-light` and `github-dark` themes.
+- `ALIASES` maps a fence's language to a grammar (`ts`, `sh`, `zsh`, `console`, `yml`…). An unknown language returns
+  `null` and the block stays plain text.
+- The output carries both themes as CSS variables (`defaultColor: false`); `index.css` picks `--shiki-light` or
+  `--shiki-dark` from the `dark` class, so switching theme does not highlight again.
+
+`features/chat/CodeBlock.tsx` shows the plain text first and highlights it after 120 ms without changes, since a
+streamed block changes on every frame. The profile argument editor does not use Shiki: `features/profiles/highlight.tsx`
+colors the arguments itself, using the flag catalogue read from `llama-server --help` (known, reserved and unknown
+flags, quoted values), drawn under a transparent textarea by `components/CodeTextarea.tsx`.

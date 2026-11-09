@@ -99,9 +99,11 @@ fits:
 It first looks for a whole-model placement at the preset's target context and preferred KV cache; one with headroom
 wins over one that is tight. If none fits, it goes through the placements again and, for each one, lowers the context
 in steps of 4,096 tokens down to the preset's minimum (and tries `q8_0` for **Responsive chat**) before moving on to the
-next placement. **Max context** instead looks for the largest context, in multiples of 1,024, that each whole-model
-placement can hold and keeps the largest; it only falls back to the other placements when no whole-model placement
-fits.
+next placement. **Max context** instead looks for the largest context, in multiples of 1,024, that each placement can
+hold. It compares every whole-model placement with the first fallback (experts in RAM for a MoE model, otherwise
+fewer layers on the GPUs) and keeps the largest context: moving experts to RAM frees VRAM for the KV cache, so a
+`-ncmoe` placement can win even when the whole model fits on the cards. The later placements are only tried when none
+of these fit.
 
 ### What the estimate counts
 
