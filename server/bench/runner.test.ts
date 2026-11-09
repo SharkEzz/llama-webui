@@ -451,3 +451,35 @@ test('server validation runs get the sweep context when the profile sets no -c (
   expect(ctxFromArgs(sweep.spec.serverArgs)).toBeUndefined();
   expect(ctxFromArgs(validation.spec.serverArgs)).toBe(sweepCtx(sweep.spec));
 }, 20_000);
+
+test('resuming a sweep whose model was deleted is one 400, before anything stops (#37)', async () => {
+  const { runner, calls, repo, sweeps } = setup();
+  const sw = sweeps.create(
+    SweepSpecSchema.parse({ name: 's', modelPath: '/nulle/part.gguf', preset: 'chat', r: 1, space: { ncmoe: [1] } }),
+  );
+  repo.enqueue(sw.id, [
+    { spec: { ...spec, modelPath: '/nulle/part.gguf', r: 1 } as BenchSpec, label: 'x', fit: 'fits' },
+  ]);
+  sweeps.setStatus(sw.id, 'interrupted');
+  const routes = sweepRoutes({
+    sweeps,
+    benchRuns: repo,
+    benchRunner: runner,
+    settings: null!,
+    monitor: null!,
+    hub: { broadcast() {} } as never,
+  });
+  const req = Object.assign(
+    new Request(`http://127.0.0.1:7860/api/sweeps/${sw.id}/resume`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ stopServer: true }),
+    }),
+    { params: { id: String(sw.id) } },
+  );
+  const res = (await routes['/api/sweeps/:id/resume'].POST(req as never, null as never))!;
+  expect(res.status).toBe(400);
+  expect(((await res.json()) as { error: string }).error).toBe('Model not found: /nulle/part.gguf');
+  expect(calls).toEqual([]);
+  expect(sweeps.get(sw.id)!.status).toBe('interrupted');
+});

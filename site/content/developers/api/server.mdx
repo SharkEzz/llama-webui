@@ -186,7 +186,8 @@ response is `llama-server`'s own JSON, unchanged: its fields depend on the llama
 **Response**: `200` with the `/props` body.
 
 **Errors**: `409` `Server not ready` (any state but `ready` and `external`), `502`
-`llama-server is not responding on /props`, `502` `llama-server /props: HTTP <status>`.
+`llama-server is not responding on /props`, `502` `llama-server /props: HTTP <status>`, `502`
+`llama-server /props: the reply is not JSON`.
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/server/props

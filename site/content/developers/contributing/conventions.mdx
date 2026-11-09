@@ -20,8 +20,9 @@ console messages from the server start with `[llama-webui]`.
 
 ### Numbers, dates and units
 
-The web app formats every number, date and unit through `web/src/lib/format.ts`, which sets `LOCALE = 'en-US'` once.
-Do not hard-code a locale in a component: use a helper, or add one to that file.
+The web app formats every number, date and unit through `web/src/lib/format.ts`, with the `LOCALE = 'en-US'` of
+`shared/src/format.ts`. Do not hard-code a locale in a component: use a helper, or add one to that file. A server
+message that shows a number (an error, a log line) uses `fmtInt()` from `shared/src/format.ts` the same way.
 
 | Helper                                       | Output                                                          |
 | -------------------------------------------- | --------------------------------------------------------------- |

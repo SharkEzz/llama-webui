@@ -113,17 +113,10 @@ The root `package.json` defines every script. The `shared`, `server` and `web` w
 | `bun run lint` | `biome check` | Format, lint and import order, read-only. |
 | `bun run lint:fix` | `biome check --write` | Applies Biome's safe fixes. |
 | `bun run format` | `biome format --write` | Formats only. |
-| `bun run test` | `bun test server shared site` | Runs the test files whose path contains `server`, `shared` or `site`. |
+| `bun run test` | `bun test` | Runs every test file: `server/`, `shared/`, `web/` and `site/`. |
 | `bun run site:dev` | `bun run --cwd site dev` | Website dev server (Vite, HMR) on `0.0.0.0:5173`. |
 | `bun run site:build` | `bun run --cwd site build` | Prerenders the website into `site/dist/`. |
 | `bun run site:preview` | `bun run --cwd site preview` | Serves `site/dist/` the way GitHub Pages does, on port 4173. |
-
-<Callout type="note" title="bun test or bun run test">
-
-`bun test` without arguments runs every test file in the repository; it is what CI and the quality gate use.
-`bun run test` passes `server shared site` as path filters (substring matches), so it skips the tests under `web/`.
-
-</Callout>
 
 The website has more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typecheck`), run with
 `bun run --cwd site <script>`; [Docs, commits and PRs](/developers/contributing/workflow/) covers them.

@@ -126,7 +126,7 @@ export interface Estimate {
   ctx: number;
   /** K cache type of the configuration (pinned `ctk` included). */
   kv: CacheType;
-  /** serverArgs(params) (which has -t, -b, -ub), then -c, --fit off, --mlock and --numa when relevant. */
+  /** serverArgs(params) (-t, -b and -ub included), then -c, --fit off, and --mlock and --numa when relevant. */
   serverArgs: string[];
   rows: Recommendation[];
   fit: Fit;

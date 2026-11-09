@@ -65,8 +65,11 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
       ),
       POST: guarded(async (req) => {
         const body = await jsonObject(req);
-        const id = body.profileId === undefined ? activeProfileId() : Number(body.profileId);
-        if (id !== null && !Number.isInteger(id)) throw new HttpError(400, 'profileId: expected an integer');
+        // Omitted: the running server's profile; null: none. `Number(null)` would be 0, a profile that never exists.
+        const raw = body.profileId;
+        if (raw !== undefined && raw !== null && !Number.isInteger(raw))
+          throw new HttpError(400, 'profileId: expected an integer or null');
+        const id = raw === undefined ? activeProfileId() : (raw as number | null);
         const profile = id !== null ? profiles.get(id) : null;
         if (id !== null && !profile) throw notFound('Profile');
         const c = conversations.create({
@@ -114,6 +117,7 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
     '/api/chat/:id/stream': {
       GET: guarded((req, server) => {
         const id = idParam(req, 'Conversation');
+        if (!conversations.get(id)) throw notFound('Conversation');
         const run = chatRuns.live(id);
         return run ? sse(req, server, run) : new Response(null, { status: 204 });
       }),

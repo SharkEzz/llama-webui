@@ -9,7 +9,7 @@ import type { SettingsRepo } from './db/settings';
 import type { SweepsRepo } from './db/sweeps';
 import type { HfClient } from './hf/client';
 import type { DownloadQueue } from './hf/downloader';
-import { guarded, jsonObject } from './http';
+import { guarded, withMethodNotAllowed } from './http';
 import type { Monitor } from './monitor/monitor';
 import type { PlacementTracker } from './monitor/placement';
 import pkg from './package.json';
@@ -20,6 +20,7 @@ import { modelRoutes } from './routes/models';
 import { monitorRoutes } from './routes/monitor';
 import { profileRoutes } from './routes/profiles';
 import { serverRoutes } from './routes/server';
+import { settingsRoutes } from './routes/settings';
 import { setupRoutes } from './routes/setup';
 import { sweepRoutes } from './routes/sweeps';
 import { topologyRoutes } from './routes/topology';
@@ -62,18 +63,11 @@ export function createApp(deps: AppDeps) {
     port,
     hostname: deps.hostname,
     development: development ? { hmr: true, console: true } : false,
-    routes: {
+    routes: withMethodNotAllowed({
       '/api/health': {
         GET: guarded(() => Response.json({ ok: true, version: pkg.version, uptimeMs: Date.now() - startedAt })),
       },
-      '/api/settings': {
-        GET: guarded(() => Response.json(settings.get())),
-        PATCH: guarded(async (req) => {
-          const next = settings.patch(await jsonObject(req));
-          await monitor.configure(next);
-          return Response.json(next);
-        }),
-      },
+      ...settingsRoutes({ settings, monitor }),
       ...profileRoutes(deps),
       ...serverRoutes({ ...deps, benchBusy: () => deps.benchRunner.busy }),
       ...monitorRoutes({ monitor, bootId: deps.runtime.bootId }),
@@ -92,7 +86,7 @@ export function createApp(deps: AppDeps) {
       }),
       // Any other path serves the app (SPA fallback `/*`: reloading /chat works).
       ...deps.web,
-    },
+    }),
     websocket: {
       open: (ws) => hub.attach(ws),
       message: (ws, msg) => hub.receive(ws, msg),

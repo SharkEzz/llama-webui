@@ -65,6 +65,9 @@ const toRun = (r: Row): BenchRun => {
   };
 };
 
+/** Most runs one list returns: the default for a sweep (all its items), and the cap of an explicit `limit`. */
+export const MAX_RUNS = 10_000;
+
 export type BenchFinish = Partial<
   Pick<
     BenchRun,
@@ -78,7 +81,7 @@ export interface BenchFilter {
   status?: BenchStatus;
   /** "none" (default): outside sweeps; "all": all of them; an id: that sweep. */
   sweepId?: number | 'none' | 'all';
-  /** 200 by default. */
+  /** 200 by default, `MAX_RUNS` for a sweep id. */
   limit?: number;
 }
 
@@ -223,7 +226,7 @@ export class BenchRunsRepo {
     const sql = `SELECT * FROM bench_runs${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY ${order} LIMIT ?`;
     return this.db
       .query<Row, (string | number)[]>(sql)
-      .all(...args, f.limit ?? (typeof sweep === 'number' ? 10_000 : 200))
+      .all(...args, f.limit ?? (typeof sweep === 'number' ? MAX_RUNS : 200))
       .map(toRun);
   }
 

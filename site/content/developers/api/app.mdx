@@ -49,7 +49,7 @@ and are not part of this schema.
 | `host`                    | string                                        | `127.0.0.1`    | not empty              | `--host` given to `llama-server` for a profile without `host`.                                                                                                              |
 | `port`                    | integer                                       | `8080`         | 1 to 65535             | `--port` given to `llama-server` for a profile without `port`; also the port watched for an external server.                                                               |
 | `modelsDir`               | string                                        | `~/models`     | not empty              | The folder scanned for GGUF files; `~` is expanded by the server.                                                                                                           |
-| `pollIntervalMs`          | integer                                       | `1000`         | at least 250           | Interval of the monitor ticks, so of the `snapshot` messages, in milliseconds.                                                                                              |
+| `pollIntervalMs`          | integer                                       | `1000`         | 250 to 60,000          | Interval of the monitor ticks, so of the `snapshot` messages, in milliseconds.                                                                                              |
 | `historySeconds`          | integer                                       | `300`          | 30 to 1800             | How much monitor history the server keeps, in seconds.                                                                                                                       |
 | `hiddenGpus`              | string[]                                      | `[]`           |                        | PCI addresses (`0000:01:00.0`, the `busId` of `GpuSample`) of GPUs that are listed but not read.                                                                            |
 | `defaultProfileId`        | integer \| null                               | `null`         |                        | The last profile started, preselected on the Server page.                                                                                                                   |
@@ -104,8 +104,8 @@ present in the body, one row per key in the `settings` table (the value as JSON)
 **Body**: a JSON object with any subset of the [settings fields](#settings-fields).
 
 - Unknown keys are ignored, not refused.
-- The merge is shallow: an object such as `collectors` replaces the stored one, and its missing keys take their
-  default, not their current value. Send the three switches together.
+- An object such as `collectors` is merged field by field: `{"collectors":{"nvml":false}}` leaves `system` and
+  `disk` as they are.
 
 After the write, the route calls `Monitor.configure()` with the new settings:
 
@@ -119,10 +119,12 @@ No WebSocket message announces the change. Other clients see it on their next `G
 `pollIntervalMs` or `historySeconds` shows in the `history` field of the next
 [`snapshot`](/developers/api/websocket/#snapshot), which makes the web app reload its history.
 
-**Response**: `200` with the whole `Settings` after the change.
+**Response**: `200` with the whole `Settings` after the change. When `Monitor.configure()` fails, the change is
+saved all the same: the body then has a `warning` string as well (`Saved, but the monitor could not apply it: …`),
+which the web app shows as a warning toast, and the server logs it.
 
 **Errors**: `400` `JSON object expected` when the body is not an object, `400` with zod issues when a value is invalid
-(`Port between 1 and 65535`, `At least 250 ms`, `Between 30 and 1800 s`, `Required`…).
+(`Port between 1 and 65535`, `Between 250 and 60000 ms`, `Between 30 and 1800 s`, `Required`…).
 
 ```bash title="Terminal"
 curl -X PATCH http://127.0.0.1:7860/api/settings \

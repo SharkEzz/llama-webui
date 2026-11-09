@@ -1,5 +1,6 @@
-/** Locale of every number and date shown in the UI. */
-export const LOCALE = 'en-US';
+import { LOCALE } from '@llama-webui/shared';
+
+export { LOCALE };
 
 const numCache = new Map<string, Intl.NumberFormat>();
 /** Cached number formatter: `max` fraction digits at most, `min` at least (defaults to `max`). */

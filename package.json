@@ -17,7 +17,7 @@
     "site:dev": "bun run --cwd site dev",
     "site:preview": "bun run --cwd site preview",
     "start": "NODE_ENV=production bun server/index.ts",
-    "test": "bun test server shared site"
+    "test": "bun test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",

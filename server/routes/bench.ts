@@ -14,7 +14,7 @@ import {
 import { listDevices } from '../bench/hardware';
 import { benchBinary } from '../bench/parse';
 import type { BenchRunner } from '../bench/runner';
-import type { BenchRunsRepo } from '../db/benchRuns';
+import { type BenchRunsRepo, MAX_RUNS } from '../db/benchRuns';
 import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
 import type { SweepsRepo } from '../db/sweeps';
@@ -58,7 +58,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
           modelPath: q.get('model') || undefined,
           // By default: one-off runs only; “all” or a sweep id for the others.
           sweepId: sweep === 'all' ? 'all' : sweep && /^\d+$/.test(sweep) ? Number(sweep) : 'none',
-          limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, 5000) : undefined,
+          limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, MAX_RUNS) : undefined,
         });
         return Response.json({ runs, live: benchRunner.live });
       }),

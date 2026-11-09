@@ -228,7 +228,7 @@ directory, along with profiles, conversations, benchmark runs and sweeps.
 bun install
 bun run dev        # bun --hot: HMR for the UI, live reload for the server
 bun run check      # type check (server, shared and web)
-bun run test       # unit tests (bun test)
+bun run test       # every test (bun test)
 bun run lint       # Biome: format + lint + import order (read-only)
 bun run lint:fix   # apply Biome's safe fixes
 ```

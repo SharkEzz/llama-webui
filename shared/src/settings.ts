@@ -11,7 +11,12 @@ export const SettingsSchema = z.object({
     .max(65535, 'Port between 1 and 65535')
     .default(8080),
   modelsDir: z.string().min(1, 'Required').default('~/models'),
-  pollIntervalMs: z.number().int().min(250, 'At least 250 ms').default(1000),
+  pollIntervalMs: z
+    .number()
+    .int()
+    .min(250, 'Between 250 and 60000 ms')
+    .max(60_000, 'Between 250 and 60000 ms')
+    .default(1000),
   historySeconds: z.number().int().min(30, 'Between 30 and 1800 s').max(1800, 'Between 30 and 1800 s').default(300),
   hiddenGpus: z.array(z.string()).default([]),
   defaultProfileId: z.number().int().nullable().default(null),

@@ -85,7 +85,7 @@ class Run implements ChatRun {
   }
 
   /**
-   * Immediate stop before the DB closes: the reply is saved as “interrupted” right away and subscribers receive
+   * Immediate stop before the DB closes: the reply is saved as “stopped” right away and subscribers receive
    * `done` (their SSE streams close; otherwise they would stay open after a Bun reload).
    */
   detach(): void {
@@ -256,7 +256,7 @@ export class ChatRuns {
     return [...this.runs.keys()];
   }
 
-  /** Before the DB closes: everything stops, each running reply is saved as “interrupted”. */
+  /** Before the DB closes: everything stops, each running reply is saved as “stopped”. */
   dispose(): void {
     for (const run of this.runs.values()) run.detach();
     this.runs.clear();

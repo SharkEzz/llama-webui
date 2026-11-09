@@ -3,6 +3,9 @@ import { DEFAULT_SETTINGS, type Settings, SettingsSchema } from '@llama-webui/sh
 
 const KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
 
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
 export class SettingsRepo {
   constructor(private readonly db: Database) {}
 
@@ -26,9 +29,18 @@ export class SettingsRepo {
     return SettingsSchema.parse(merged);
   }
 
-  /** Validates the full merge before writing; throws a ZodError if invalid. */
-  patch(partial: Partial<Settings>): Settings {
-    const next = SettingsSchema.parse({ ...this.get(), ...partial });
+  /**
+   * Validates the full merge before writing; throws a ZodError if invalid. An object-valued setting (`collectors`) is
+   * merged field by field: `{ collectors: { nvml: false } }` leaves the other collectors as they are.
+   */
+  patch(partial: Record<string, unknown>): Settings {
+    const current: Record<string, unknown> = this.get();
+    const merged: Record<string, unknown> = { ...current };
+    for (const [key, value] of Object.entries(partial)) {
+      const was = current[key];
+      merged[key] = isPlainObject(was) && isPlainObject(value) ? { ...was, ...value } : value;
+    }
+    const next = SettingsSchema.parse(merged);
     const upsert = this.db.prepare('INSERT OR REPLACE INTO settings(key, value_json) VALUES (?, ?)');
     this.db.transaction(() => {
       for (const key of KEYS) {
