@@ -50,7 +50,13 @@ export default function DocsLayout() {
         </div>
 
         <main className="min-w-0 flex-1 py-10 lg:py-12">
-          <article data-pagefind-body className="mx-auto max-w-[46rem]">
+          <article
+            data-pagefind-body
+            // Pagefind takes the h1 as the result title; pages sharing a title get their group appended (no comma in
+            // those titles: Pagefind splits this attribute on commas).
+            data-pagefind-meta={doc && doc.metaTitle !== doc.title ? `title:${doc.metaTitle}` : undefined}
+            className="mx-auto max-w-[46rem]"
+          >
             {doc && (
               <header className="mb-10">
                 {place && <p className="mb-3 text-sm font-medium text-primary-ink">{place.current.group.title}</p>}
