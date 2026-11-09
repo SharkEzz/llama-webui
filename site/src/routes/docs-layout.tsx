@@ -43,11 +43,11 @@ export default function DocsLayout() {
       </div>
 
       <div className="mx-auto flex max-w-7xl gap-10 px-4 sm:px-6">
-        <aside className="hidden w-60 shrink-0 lg:block">
+        <div className="hidden w-60 shrink-0 lg:block">
           <div className="sticky top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto py-10 pr-2">
             <DocsNav pathname={pathname} />
           </div>
-        </aside>
+        </div>
 
         <main className="min-w-0 flex-1 py-10 lg:py-12">
           <article data-pagefind-body className="mx-auto max-w-[46rem]">
@@ -89,11 +89,11 @@ export default function DocsLayout() {
           </div>
         </main>
 
-        <aside className="hidden w-56 shrink-0 xl:block">
+        <div className="hidden w-56 shrink-0 xl:block">
           <div className="sticky top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto py-12">
             {doc && <Toc key={doc.path} items={doc.toc} />}
           </div>
-        </aside>
+        </div>
       </div>
       <SiteFooter />
     </MDXProvider>

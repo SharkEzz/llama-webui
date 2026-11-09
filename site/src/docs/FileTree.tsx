@@ -1,5 +1,6 @@
 import { File, Folder } from 'lucide-react';
 import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { HScroll } from './HScroll';
 
 type El = ReactElement<{ children?: ReactNode }>;
 const isEl = (n: ReactNode): n is El => isValidElement(n);
@@ -66,8 +67,8 @@ function Items({ list }: { list: El }) {
 export function FileTree({ children }: { children: ReactNode }) {
   const list = Children.toArray(children).find((c) => tag(c) === 'ul') as El | undefined;
   return (
-    <div className="not-prose my-6 overflow-x-auto rounded-xl bg-well px-4 py-3 font-mono text-[0.8125rem] leading-6 inset-shadow-well ring-1 ring-border">
+    <HScroll className="not-prose my-6 rounded-xl bg-well px-4 py-3 font-mono text-[0.8125rem] leading-6 inset-shadow-well ring-1 ring-border">
       {list ? <Items list={list} /> : children}
-    </div>
+    </HScroll>
   );
 }

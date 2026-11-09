@@ -6,6 +6,7 @@ import { CodeBlock } from './CodeBlock';
 import { Tab, Tabs } from './DocTabs';
 import { Endpoint } from './Endpoint';
 import { FileTree } from './FileTree';
+import { HScroll } from './HScroll';
 import { Screenshot } from './Screenshot';
 import { Step, Steps } from './Steps';
 
@@ -30,9 +31,9 @@ function Anchor({ href = '', children, ...props }: React.ComponentProps<'a'>) {
 
 function Table(props: React.ComponentProps<'table'>) {
   return (
-    <div className="my-6 overflow-x-auto rounded-xl ring-1 ring-border">
+    <HScroll className="my-6 rounded-xl ring-1 ring-border">
       <table className="w-full text-sm [&_td:first-child_code]:whitespace-nowrap" {...props} />
-    </div>
+    </HScroll>
   );
 }
 
