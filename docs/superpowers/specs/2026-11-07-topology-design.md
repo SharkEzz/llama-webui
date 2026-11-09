@@ -54,7 +54,8 @@ serveur (chargement, prompt, génération) et répartition du modèle entre les 
 - **Phase** : `phaseOf(state, snapshot)` (`shared/`) : arrêté → chargement → inactif → prompt → génération. Un slot
   occupé est en phase prompt tant qu'il n'a généré aucun token (`n_decoded = 0`) : `n_prompt_tokens` est tout le
   contexte du slot (il grossit des tokens générés) et `n_prompt_tokens_processed` exclut le cache.
-- **Scène** (`TopologyScene.tsx`) : dalles arrondies (émission = charge, corps teinté du ton du composant), tubes
+- **Scène** (`TopologyScene.tsx`, rendu revu par `2026-11-09-topology-visibility-design.md` : réservoirs, pastilles
+  de débit, traits lumineux, cartes repliables) : dalles arrondies (émission = charge, corps teinté du ton du composant), tubes
   (épaisseur = capacité PCIe), particules instanciées (nombre et vitesse en échelle log du débit, un sens de chaque côté
   du tube), pulsation du lien mémoire ∝ activité quand la DRAM n'est pas mesurée. Caméra ajustée au cadre par projection
   des coins de la scène (`fitCamera`, `layout.ts`) pour laisser les coins aux cartes HUD. Couleurs = tokens CSS résolus
