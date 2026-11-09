@@ -45,10 +45,10 @@ function Link({ labels }: { labels: string[] }) {
 
 function Tier({ title, children, accent }: { title: string; children: React.ReactNode; accent?: boolean }) {
   return (
-    <section className={cn('rounded-2xl p-3 ring-1 ring-border sm:p-4', accent && 'bg-primary/4 ring-primary-ink/30')}>
-      <h4 className="mb-3 px-1 text-xs font-medium text-muted-foreground">{title}</h4>
+    <div className={cn('rounded-2xl p-3 ring-1 ring-border sm:p-4', accent && 'bg-primary/4 ring-primary-ink/30')}>
+      <p className="mb-3 px-1 text-xs font-medium text-muted-foreground">{title}</p>
       {children}
-    </section>
+    </div>
   );
 }
 

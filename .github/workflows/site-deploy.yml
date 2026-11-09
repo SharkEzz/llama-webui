@@ -1,8 +1,13 @@
-# Publishes site/ to GitHub Pages (https://sharkezz.github.io/llama-webui/).
-# Manual only while the website is being written; the push trigger is added when it goes public.
+# Publishes site/ to GitHub Pages (https://sharkezz.github.io/llama-webui/) on every push to master that changes the
+# website, or when started by hand.
 name: Deploy website
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - "site/**"
+      - ".github/workflows/site-deploy.yml"
   workflow_dispatch:
 
 permissions:

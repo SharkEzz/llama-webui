@@ -37,7 +37,8 @@ to the Hub call: a client that goes away (a closed sheet, a new keystroke) cance
 
 Says which Hugging Face token llama-webui uses and whose account it is. The token is resolved on every call with the
 rules of the `hf` CLI (`server/hf/token.ts`): `HF_TOKEN` (or the legacy `HUGGING_FACE_HUB_TOKEN`), otherwise the file
-`hf auth login` writes (`HF_TOKEN_PATH`, else `$HF_HOME/token`, default `~/.cache/huggingface/token`). A login made
+`hf auth login` writes (`HF_TOKEN_PATH`, else `$HF_HOME/token`, else `$XDG_CACHE_HOME/huggingface/token`, default
+`~/.cache/huggingface/token`). A login made
 while llama-webui runs is picked up.
 
 The account name comes from the Hub's `/api/whoami-v2`, cached per token. A rejected token stays cached as invalid; a
@@ -176,7 +177,7 @@ Every change is pushed over the [WebSocket](/developers/api/websocket/):
 | Message             | Payload                     | When                                                                   |
 | ------------------- | --------------------------- | ---------------------------------------------------------------------- |
 | `download`          | `DownloadItem`              | An item is queued, starts, ends, is canceled or requeued.              |
-| `download-progress` | `DownloadLive` \| null       | Progress of the running item, at most every 250 ms; null when the queue goes idle. |
+| `download-progress` | `DownloadLive` \| null       | Progress of the running item: phase changes at once, byte progress at most every 250 ms; null when an item ends (the next one then sends its own). |
 | `download-deleted`  | `{ ids: number[] }`         | Items removed from the list.                                           |
 
 `DownloadItem`:

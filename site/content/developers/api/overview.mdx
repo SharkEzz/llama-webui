@@ -136,12 +136,14 @@ Every other error has no `code`.
 | `202`  | The operation started and goes on in the background (server start, switch and restart, benchmark run, sweep, download); follow it over the WebSocket. |
 | `204`  | Success without a body (deletions, cancellations, a chat stream with no reply in progress).                                                            |
 | `400`  | Invalid body, JSON or query parameter.                                                                                                                  |
+| `401`  | Hugging Face rejected the token (`hf-unauthorized`).                                                                                                    |
 | `403`  | Refused by the guard (`Host`, `Origin`), or a gated Hugging Face repository.                                                                           |
 | `404`  | Unknown route, unknown id, or missing file.                                                                                                             |
 | `409`  | The request conflicts with the current state: a name is taken, an operation is in progress, a benchmark holds the GPUs, a server is running…           |
 | `415`  | Refused by the guard: a write that is not `application/json`.                                                                                           |
 | `422`  | The file exists but cannot be read as a GGUF.                                                                                                           |
 | `426`  | `/ws` requested without a WebSocket upgrade (plain-text body `WebSocket upgrade expected`).                                                            |
+| `429`  | Hugging Face rate limit reached (`hf-rate-limited`).                                                                                                    |
 | `500`  | An unexpected exception (`Internal error`).                                                                                                             |
 | `502`  | An upstream service failed: `llama-server` (`/props`) or Hugging Face.                                                                                  |
 | `503`  | `llama-server --help` failed (`/api/flags`).                                                                                                            |

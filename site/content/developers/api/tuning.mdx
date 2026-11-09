@@ -217,7 +217,7 @@ Expands a sweep spec and runs the estimator on each combination, without saving 
 | `droppedTs`        | number       | `-ts` values discarded because the `-dev` of the combination has another length.   |
 | `estimatedSeconds` | number       | Rough duration: per item, one load at 1.5 GiB/s plus 10 seconds per repetition.     |
 
-**Errors**: `400` invalid spec; the [model errors](#model-errors).
+**Errors**: `400` `JSON object expected` or an invalid spec; the [model errors](#model-errors).
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/tuning/plan \

@@ -159,7 +159,8 @@ status `running` and starts it in the background.
 **Response**: `202` with the created `BenchRun`. The result arrives with the `bench-run` message at the end, or with
 `GET /api/bench/runs`.
 
-**Errors**: `400` invalid spec; `400` `Model not found: <path>` or `Projector not found: <path>`; the
+**Errors**: `400` `JSON object expected` or an invalid spec; `400` `Model not found: <path>` or
+`Projector not found: <path>`; the
 [gate errors](#gate-errors).
 
 ```bash title="Terminal"
