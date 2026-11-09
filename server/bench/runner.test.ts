@@ -5,12 +5,14 @@ import {
   type BenchRun,
   type BenchSpec,
   BenchSpecSchema,
+  ctxFromArgs,
   DEFAULT_SETTINGS,
   type GpuSample,
   type ServerState,
   type Sweep,
   type SweepLive,
   SweepSpecSchema,
+  sweepCtx,
 } from '@llama-webui/shared';
 import { BenchRunsRepo } from '../db/benchRuns';
 import { openDb } from '../db/open';
@@ -412,4 +414,32 @@ test('the VRAM sampler takes its last reading when the run ends, then stops', as
     await Bun.sleep(1200);
     expect(calls).toBe(after);
   }
+}, 20_000);
+
+test('server validation runs get the sweep context when the profile sets no -c (#24)', async () => {
+  const { runner, repo, sweeps, sweepLives } = setup();
+  const { sweep } = sweepOf(repo, sweeps, [1, 2]);
+  await runner.startSweep(sweep.id, { stopServer: true });
+  await sweepEnd(sweepLives);
+  const routes = sweepRoutes({
+    sweeps,
+    benchRuns: repo,
+    benchRunner: runner,
+    settings: null!,
+    monitor: null!,
+    hub: { broadcast() {} } as never,
+  });
+  const req = Object.assign(
+    new Request(`http://127.0.0.1:7860/api/sweeps/${sweep.id}/validate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ n: 1, stopServer: true }),
+    }),
+    { params: { id: String(sweep.id) } },
+  );
+  expect((await routes['/api/sweeps/:id/validate'].POST(req as never, null as never))!.status).toBe(202);
+  while (sweeps.get(sweep.id)!.status === 'running') await Bun.sleep(10);
+  const validation = repo.list({ sweepId: sweep.id }).find((r) => r.kind === 'server')!;
+  expect(ctxFromArgs(sweep.spec.serverArgs)).toBeUndefined();
+  expect(ctxFromArgs(validation.spec.serverArgs)).toBe(sweepCtx(sweep.spec));
 }, 20_000);

@@ -118,7 +118,7 @@ The sweep card keeps two rankings apart, never mixed: **Validation (server)**, o
 | **Estimated**     | The estimator's verdict when the sweep was planned.                       |
 | **Status**        | **Done**, **Failed**, **out of memory**…; hover for the error.            |
 | **Prompt**, **Generation** | Speeds in tok/s, with the standard deviation below.              |
-| **MTP**           | Validation only: draft acceptance with speculative decoding.              |
+| **Draft**         | Validation only: draft acceptance with speculative decoding.              |
 | **Peak VRAM**     | VRAM the run added, summed over the cards.                                |
 | **Duration**      | The whole run, model loading included.                                    |
 
@@ -144,12 +144,9 @@ with the sweep's `p`, `n` and `r` and your profile's other flags (`-c`, speculat
 **Validation (server)**, and in the Benchmark history with a label that starts with `validation ·`. Validation needs at
 least one successful exploration run, and asks to stop the running model again if there is one.
 
-<Callout type="tip" title="Start from a profile">
-
-The server validation uses the other flags of the profile you started from. Without a `-c` among them, `llama-server`
-uses the context stored in the model, which can be much larger than the one the estimator checked.
-
-</Callout>
+When the profile you started from sets no context, the sweep carries the recommendation's `-c`: the **Model** card
+shows it among the other flags, with **-c from the recommendation**. The validation runs and the profiles created from
+the sweep's runs use it, so `llama-server` does not allocate the model's full context.
 
 ## Keep the best as a profile
 

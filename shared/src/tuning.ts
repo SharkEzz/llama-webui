@@ -1,4 +1,4 @@
-import type { BenchDevice, BenchParams } from './bench';
+import type { BenchDevice, BenchParams, CacheType } from './bench';
 import type { CpuInfo } from './monitor';
 
 export type PresetId = 'chat' | 'agent' | 'context' | 'fit' | 'big';
@@ -124,8 +124,9 @@ export interface Estimate {
   preset: PresetId;
   params: BenchParams;
   ctx: number;
-  kv: 'f16' | 'q8_0';
-  /** serverArgs(params) then -c, -t, -b, -ub, --fit off, --mlock and --numa when relevant. */
+  /** K cache type of the configuration (pinned `ctk` included). */
+  kv: CacheType;
+  /** serverArgs(params) (which has -t, -b, -ub), then -c, --fit off, --mlock and --numa when relevant. */
   serverArgs: string[];
   rows: Recommendation[];
   fit: Fit;

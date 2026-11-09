@@ -315,7 +315,8 @@ Creates a profile from a run's spec:
   taken.
 - **Files**: the working directory is the models folder setting; the model and projector paths are relative to it when
   the files are inside, absolute otherwise (`profileModelPath()`).
-- **Arguments**: `serverArgs(spec.params)` followed by `spec.serverArgs`.
+- **Arguments**: `serverArgs(spec.params)` followed by `spec.serverArgs`. For a sweep's run, `-c <sweepCtx>` is
+  appended when they set no context (`withCtx()`), as for the validation.
 - **Environment**: copied from the source profile if it still exists, empty otherwise.
 
 Any run that is not running can be turned into a profile, sweep items included.

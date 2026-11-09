@@ -109,7 +109,7 @@ When a reply is complete, a line under it gives the numbers `llama-server` repor
 | **533 t/s prompt**         | Prompt processing speed. Only the tokens processed for this reply count: the part of the conversation already in the server's cache is skipped. |
 | **71.9 t/s**               | Generation speed of the reply.                                                                                                                 |
 | **10,608 tokens**          | Tokens generated, reasoning included.                                                                                                          |
-| **MTP 51%**                | Share of drafted tokens the model accepted. Only shown when the profile uses speculative decoding, with a draft model or MTP.                  |
+| **draft 51%**              | Share of drafted tokens the model accepted. Only shown when the profile uses speculative decoding: MTP, a draft model or n-gram drafts.       |
 
 These are the same measures the [Dashboard](/docs/dashboard/) shows live, for one reply. To compare profiles on a
 fixed workload, use the [Benchmark](/docs/benchmark/) page. See

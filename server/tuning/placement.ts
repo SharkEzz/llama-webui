@@ -47,21 +47,29 @@ function nglOf(p: BenchParams, layers: number): number {
   return typeof p.ngl === 'number' ? p.ngl : layers + 1;
 }
 
-/** The `-ot` rules in order: the first matching pattern wins, as in llama.cpp. */
-function overrides(p: BenchParams, issues: string[]): { re: RegExp; target: string }[] {
+const UNKNOWN_DEVICE = 'unknown device';
+/** Host buffer types an `-ot` rule may name: `CPU`, `CPU_REPACK`, `CUDA_Host`… (RAM). */
+const HOST_BUFFER = /^CPU(?:_|$)|_Host$/i;
+
+/**
+ * The `-ot` rules in order: the first matching pattern wins, as in llama.cpp. A target is a listed device or a host
+ * buffer (RAM); anything else is an unknown device (#36): reported, and counted in RAM as llama.cpp would fail anyway.
+ */
+function overrides(p: BenchParams, known: Set<string>, issues: string[]): { re: RegExp; target: string }[] {
   const out: { re: RegExp; target: string }[] = [];
   for (const rule of p.ot ?? []) {
     const eq = rule.lastIndexOf('=');
+    const target = rule.slice(eq + 1);
     try {
-      out.push({ re: new RegExp(rule.slice(0, eq)), target: rule.slice(eq + 1) });
+      out.push({ re: new RegExp(rule.slice(0, eq)), target: known.has(target) ? target : CPU });
     } catch {
       issues.push(`invalid -ot pattern: ${rule.slice(0, eq)}`);
+      continue;
     }
+    if (!known.has(target) && !HOST_BUFFER.test(target)) issues.push(`${UNKNOWN_DEVICE}: ${target} (-ot ${rule})`);
   }
   return out;
 }
-
-const UNKNOWN_DEVICE = 'unknown device';
 
 /** Assigns each GGUF tensor to a device or RAM according to the flags, then adds KV, buffers and projector. */
 export function measurePlacement(input: PlacementInput): PlacementMeasure {
@@ -103,7 +111,7 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
   };
   const layerDevice = Array.from({ length: L }, (_, i) => deviceAt(i));
   const lastDevice = used.at(-1)?.id ?? CPU;
-  const rules = overrides(params, issues);
+  const rules = overrides(params, new Set(byId.keys()), issues);
   const ncmoe = params.ncmoe ?? 0;
 
   const vram = new Map<string, number>(used.map((d) => [d.id, 0]));
@@ -125,7 +133,7 @@ export function measurePlacement(input: PlacementInput): PlacementMeasure {
     const layer = m ? Number(m[1]) : null;
     let target: string;
     const rule = rules.find((r) => r.re.test(t.name));
-    if (rule) target = byId.has(rule.target) ? rule.target : CPU;
+    if (rule) target = rule.target;
     else if (layer !== null && layer < ncmoe && EXPERTS.test(t.name)) target = CPU;
     else if (t.name.startsWith('token_embd.')) target = CPU;
     else if (layer !== null) target = layerDevice[layer] ?? (outputOnGpu ? lastDevice : CPU);

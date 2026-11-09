@@ -84,6 +84,16 @@ test('each tool gets its own separators', () => {
   expect(paramsFromServerArgs(serverArgs(p)).params).toEqual(p);
 });
 
+test('ignoredByBench flags every speculative flag, not only --spec-type (#30)', () => {
+  const args = ['--spec-draft-n-max', '16', '--spec-default', '-md', 'd.gguf', '--n-gpu-layers-draft', '99', '-t', '8'];
+  expect(ignoredByBench(args).map((i) => i.flag)).toEqual([
+    '--spec-draft-n-max',
+    '--spec-default',
+    '-md',
+    '--n-gpu-layers-draft',
+  ]);
+});
+
 test('ignoredByBench names context and speculative decoding', () => {
   expect(ignoredByBench(['-c', '40000', '--spec-type', 'draft-mtp', '--jinja']).map((i) => i.flag)).toEqual([
     '-c',

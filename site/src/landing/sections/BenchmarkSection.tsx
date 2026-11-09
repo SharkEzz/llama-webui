@@ -8,7 +8,7 @@ const RUN = {
   stats: [
     ['Prompt', '1,098.7 tok/s'],
     ['Generation', '75.0 tok/s'],
-    ['MTP accepted', '54.9%'],
+    ['Draft accepted', '54.9%'],
     ['Peak VRAM', '16.68 GiB'],
   ],
 } as const;

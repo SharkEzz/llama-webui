@@ -17,6 +17,7 @@ import {
   type SweepLive,
   type SweepSpace,
   type TuningHardware,
+  withCtx,
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
@@ -170,7 +171,8 @@ export const useTuning = create<TuningState>()((set, get) => {
       preset: s.preset,
       base: s.base,
       space: s.space,
-      serverArgs: s.serverArgs,
+      // The recommendation's context when the profile sets none: the validation would get the model's full one (#24).
+      serverArgs: withCtx(s.serverArgs, s.estimate?.ctx),
       p: s.run.p,
       n: s.run.n,
       r: s.run.r,

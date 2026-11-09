@@ -87,3 +87,39 @@ test('a CUDA pair with margin beats a single card at the limit, and the AMD card
     expect(e.ctx).toBe(32768);
   }
 });
+
+test('pinned -fa and -ctk show up in the rows and the kv field, not the searched values (#36)', () => {
+  const e = estimate({
+    model: fakeModel({ layers: 36, otherBytesPerLayer: 120 * MiB }),
+    hw: hw3(),
+    preset: 'chat',
+    mmprojBytes: 0,
+    pinned: { fa: 'auto', ctk: 'q4_0' },
+  });
+  const args = e.serverArgs.join(' ');
+  expect(args).toContain('-fa auto');
+  expect(args).toContain('-ctk q4_0');
+  const row = (flag: string) => e.rows.find((r) => r.flag === flag);
+  expect(row('-fa')?.value).toBe('auto');
+  const ctv = e.params.ctv;
+  expect(row('-ctk / -ctv')?.value).toBe(ctv === 'q4_0' ? 'q4_0' : `q4_0 / ${ctv}`);
+  expect(row('-c')?.why).toContain('q4_0');
+  expect(e.kv).toBe('q4_0');
+});
+
+test('an -ot rule to an unknown device is reported and does not fit (#36)', () => {
+  const model = fakeModel({ layers: 48, experts: 128, expertBytesPerLayer: 300 * MiB, otherBytesPerLayer: 30 * MiB });
+  const e = estimate({ model, hw: hw3(), preset: 'chat', mmprojBytes: 0, pinned: { ot: ['exps=CUDA7'] } });
+  expect(e.fit.verdict).toBe('no');
+  expect(e.warnings.some((w) => w.includes('CUDA7'))).toBe(true);
+});
+
+test('when nothing fits because of RAM, the reason names RAM, not the all-GPU fallback (#25)', () => {
+  // 72 GiB of experts: too much for the three cards, so experts must go to RAM, but only 10 GiB is available.
+  const model = fakeModel({ layers: 48, experts: 128, expertBytesPerLayer: 1.5 * GiB, otherBytesPerLayer: 50 * MiB });
+  const e = estimate({ model, hw: hw3({ ramAvailableGiB: 10 }), preset: 'fit', mmprojBytes: 0 });
+  expect(e.ok).toBe(false);
+  expect(e.reason).toMatch(/^not enough RAM: .* needed with weights in RAM, 10\.0 GiB available$/);
+  // The per-device detail of the fallback stays on the bars.
+  expect(e.fit.vram.length).toBeGreaterThan(0);
+});

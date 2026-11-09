@@ -6,6 +6,7 @@ import {
   type BenchRun,
   benchSpecBase,
   CACHE_TYPES,
+  ctxFromArgs,
   FIELD_ORDER,
   FLASH_ATTN,
   SPLIT_MODES,
@@ -121,15 +122,9 @@ export function itemLabel(params: BenchParams, space: SweepSpace): string {
   return parts.length ? parts.join(' · ') : 'base';
 }
 
-/** Context of a sweep: the -c from the other server flags, otherwise the preset's minimum. */
+/** Context of a sweep: the -c from the other server flags (as `ctxFromArgs` reads it), otherwise the preset's minimum. */
 export function sweepCtx(spec: Pick<SweepSpec, 'serverArgs' | 'preset'>): number {
-  const args = spec.serverArgs;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
-    const v = a === '-c' || a === '--ctx-size' ? args[i + 1] : a.startsWith('--ctx-size=') ? a.slice(11) : undefined;
-    if (v !== undefined && /^\d+$/.test(v) && Number(v) > 0) return Number(v);
-  }
-  return presetOf(spec.preset).ctxMin;
+  return ctxFromArgs(spec.serverArgs) ?? presetOf(spec.preset).ctxMin;
 }
 
 /** The preset's score for a successful run; null otherwise. */

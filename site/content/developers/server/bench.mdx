@@ -349,7 +349,8 @@ A `SweepSpec` (`SweepSpecSchema` in `shared/src/sweep.ts`) has the run fields of
    only on items whose `-dev` lists the same number of devices, and more than one; `droppedTs` counts the ones dropped.
    Duplicates are removed, and an empty space gives the base alone.
 2. Each item gets `fitOf()` from the [estimator](/developers/server/tuning/), at the sweep's context `sweepCtx(spec)`
-   (the `-c` among `serverArgs`, otherwise the preset's `ctxMin`), with the item's cache types (`f16` by default) and
+   (the last `-c` among `serverArgs`, read by `ctxFromArgs()`, otherwise the preset's `ctxMin`; the web app appends
+   the recommendation's `-c` when the source profile has none), with the item's cache types (`f16` by default) and
    `-ub` (512 by default).
 3. Items with a `no` verdict are left out unless `includeUnfit`; `excluded` counts them.
 4. Each item is labelled with `itemLabel()`: only the dimensions of the space, as `llama-server` flags

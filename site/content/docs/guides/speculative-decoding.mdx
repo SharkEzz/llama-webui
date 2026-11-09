@@ -111,10 +111,10 @@ llama-webui shows the acceptance rate in three places:
   The **Recent requests** table has an **Acceptance** column, one value per request. These figures come from
   `llama-server`'s metrics, which llama-webui turns on for the servers it starts; a server started outside llama-webui
   shows them only if it runs with `--metrics`. See [Dashboard](/docs/dashboard/).
-- **Chat**: the stats line under a reply ends with the acceptance of that reply, for example `MTP 51%`. The label reads
-  MTP whatever the speculative type. See [Chat](/docs/chat/).
-- **Benchmark**: server runs record the acceptance over their measured requests, in the **MTP** column of the history
-  and as **MTP accepted** on the live card and in comparisons. llama-bench runs show `—`.
+- **Chat**: the stats line under a reply ends with the acceptance of that reply, for example `draft 51%`, whatever the
+  speculative type. See [Chat](/docs/chat/).
+- **Benchmark**: server runs record the acceptance over their measured requests, in the **Draft** column of the history
+  and as **Draft accepted** on the live card and in comparisons. llama-bench runs show `—`.
 
 Compare the tokens accepted per draft with `--spec-draft-n-max`. When drafts are often kept in full, a longer draft may
 be worth trying; when only a token or so is kept, a shorter one wastes less work. Either way, measure the result.
@@ -136,7 +136,7 @@ To measure the gain:
 
 1. Run a **Server** benchmark from the profile, with the speculative flags in **Other server flags**.
 2. Run it again without them.
-3. Select both runs in the history and click **Compare**: generation tok/s shows the speedup, **MTP accepted** the
+3. Select both runs in the history and click **Compare**: generation tok/s shows the speedup, **Draft accepted** the
    acceptance.
 
 Do not compare a llama-bench run with a server run here: the comparison warns that llama-bench does not measure
@@ -150,7 +150,7 @@ speculative decoding (MTP, draft) or the profile's context.
 
 When you start Tuning from a profile, the **Model** card lists the profile's other flags, speculative ones included,
 under **Other profile flags (carried over to the created profile and the server validation)**, and adds
-`Ignored by llama-bench: --spec-type` (or the flag you used). **Create profile** keeps those flags in the new profile.
+`Ignored by llama-bench: --spec-type` (and every other `--spec-…`, `-md` or `-ngld` flag you used). **Create profile** keeps those flags in the new profile.
 
 A [sweep](/docs/sweeps/) explores its configurations with llama-bench, so its first ranking ignores speculative
 decoding. **Validate on the server** then reruns the best configurations with a real `llama-server` and the sweep's

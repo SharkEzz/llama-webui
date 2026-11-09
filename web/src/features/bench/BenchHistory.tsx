@@ -173,7 +173,12 @@ export function BenchHistory() {
                 {filters.sweeps === 'all' && <TableHead>Sweep</TableHead>}
                 <TableHead className="text-right">Prompt</TableHead>
                 <TableHead className="text-right">Generation</TableHead>
-                <TableHead className="text-right">MTP</TableHead>
+                <TableHead
+                  className="text-right"
+                  title="Speculative decoding: draft tokens accepted (MTP, draft model or n-gram)"
+                >
+                  Draft
+                </TableHead>
                 <TableHead className="text-right">Peak VRAM</TableHead>
                 <TableHead className="text-right">Duration</TableHead>
                 <TableHead>Status</TableHead>

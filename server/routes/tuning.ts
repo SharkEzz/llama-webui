@@ -17,6 +17,7 @@ import { runChecks, summarize } from '../tuning/checks';
 import { measureDiskSpeed } from '../tuning/disk';
 import { estimate } from '../tuning/estimate';
 import { readTuningHardware } from '../tuning/hardware';
+import { retainedBusIds } from '../tuning/match';
 import { loadModel, mmprojBytes } from '../tuning/models';
 import { planSweep } from '../tuning/space';
 import { readSys } from '../tuning/sysinfo';
@@ -92,14 +93,16 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
             busIds: gpus.map((g) => g.busId),
           }),
         ]);
+        const last = modelPath ? (lastEstimates.get(modelPath) ?? null) : null;
         const checks = runChecks({
           readings,
           gpus,
-          retainedBusIds: gpus.map((g) => g.busId),
+          // Only the cards the estimate runs on: the others are `na` (#36).
+          retainedBusIds: retainedBusIds(hw.devices, gpus, last?.params.dev),
           devices: hw.devices,
           cpu: hw.cpu,
           model,
-          estimate: modelPath ? (lastEstimates.get(modelPath) ?? null) : null,
+          estimate: last,
           mem: snap?.system?.mem ?? null,
           diskSpeed: modelPath ? (diskSpeeds.get(modelPath) ?? null) : null,
           now: Date.now(),

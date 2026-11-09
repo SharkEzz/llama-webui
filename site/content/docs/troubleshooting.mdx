@@ -224,7 +224,8 @@ usable memory: its total minus a margin of 512 MiB plus 4 %. The reason names th
 | Reason                                           | Meaning                                                                                      |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
 | `CUDA0: 18.2 GiB for 14.4 GiB usable`            | That device would hold more than it can.                                                     |
-| `unknown device: CUDA2`                          | The profile's `-dev` names a device that `llama-bench --list-devices` does not list.         |
+| `unknown device: CUDA2`                          | The profile's `-dev` (or an `-ot` rule) names a device that `llama-bench --list-devices` does not list. |
+| `not enough RAM: … needed with weights in RAM, … available` | The model is too large for the GPUs, and moving experts or layers to RAM needs more RAM than is available: free RAM, or pick **100 GB model**, which accepts reading the rest from disk. |
 | `model too large: … of RAM needed, … available` | Nothing fits on the GPUs and the RAM is too small as well.                                   |
 
 The launch pad estimates each profile with its own flags and context. **Tight in VRAM** means less than 5 % headroom

@@ -19,7 +19,7 @@ A run uses one of two tools, picked with the **Tool** tabs of the form.
 | What runs           | llama.cpp's own benchmark, `llama-bench`                               | A temporary `llama-server`, started for the measurement and stopped afterwards     |
 | What it measures    | Raw prompt and generation speed for the flags in the fields            | Real chat requests, with every flag of the run                                      |
 | Context (`-c`)      | Not allocated                                                          | Allocated, as in daily use                                                         |
-| Speculative decoding | Not measured                                                          | Measured, with the draft acceptance rate in the **MTP** column                     |
+| Speculative decoding | Not measured                                                          | Measured, with the draft acceptance rate in the **Draft** column                   |
 | Projector           | Ignored                                                                | Loaded                                                                             |
 | Needs               | `llama-bench` next to `llama-server`                                   | `llama-server` only                                                                |
 
@@ -41,7 +41,7 @@ A server run starts `llama-server` on `127.0.0.1`, on the port set in [Settings]
 4. Stops the server.
 
 **Prompt** and **Generation** are the mean of the speeds `llama-server` reports for these requests, with their standard
-deviation. The **MTP** value is the share of drafted tokens that were accepted, over all the requests; it stays empty
+deviation. The **Draft** value is the share of drafted tokens that were accepted, over all the requests; it stays empty
 without speculative decoding.
 
 ## Run a benchmark
@@ -86,7 +86,7 @@ flags** contains a flag that changes speed or memory but that llama-bench does n
 | Flag                                                         | Why it is listed                    |
 | ------------------------------------------------------------ | ----------------------------------- |
 | `-c`, `--ctx-size`                                           | context not allocated               |
-| `--spec-type`, `-md`, `--model-draft`, `--draft…`, `-ngld`, `-devd` | speculative decoding not measured |
+| `--spec-…` (`--spec-type`, `--spec-draft-n-max`, `--spec-default`…), `-md`, `--model-draft`, `--draft…`, `-ngld`, `-devd` | speculative decoding not measured |
 | `-cmoe`, `--cpu-moe`                                         | use `-ncmoe`                        |
 | `-np`, `--parallel`                                          | parallel slots                      |
 
@@ -103,7 +103,7 @@ prefixed with `[bench]`.
 Once the server restarts, the run is over and there is nothing left to cancel.
 
 When nothing runs, the card becomes **Last run**: **Prompt** and **Generation** with their deviation and token count,
-**MTP accepted**, **Peak VRAM**, and the error if the run failed.
+**Draft accepted**, **Peak VRAM**, and the error if the run failed.
 
 ## What happens to a running model
 
@@ -139,7 +139,7 @@ runs that belong to a [sweep](/docs/sweeps/); **With sweeps** shows them and add
 | **Sweep**      | With sweeps only: the sweep number and the configuration, linked to the sweep on Tuning.   |
 | **Prompt**     | Prompt processing speed in tok/s, with the standard deviation below.                       |
 | **Generation** | Generation speed in tok/s, with the standard deviation below.                              |
-| **MTP**        | Draft acceptance rate of a server run with speculative decoding.                           |
+| **Draft**      | Draft acceptance rate of a server run with speculative decoding (MTP, draft model or n-gram). |
 | **Peak VRAM**  | VRAM the run added, summed over the cards; hover for each card.                            |
 | **Duration**   | The whole run, model loading included.                                                     |
 | **Status**     | **Done**, **Failed**, **Cancelled**, **Interrupted**…; hover a failed run for its error.   |
@@ -161,7 +161,7 @@ checked, the other boxes are disabled.
 
 The **Comparing N runs** dialog has one column per run and one row per setting: **Tool**, **Model**, every flag from
 `-ngl` to `-ub`, **Other flags** (`ignored` for a llama-bench run), **-p / -n / -r**, then the results: **Prompt**,
-**Generation**, **MTP accepted**, the VRAM peak of each card, and the **Build** and **CPU** the run used. Settings that
+**Generation**, **Draft accepted**, the VRAM peak of each card, and the **Build** and **CPU** the run used. Settings that
 differ between runs are highlighted; measurements are not.
 
 Two notes appear when they apply: llama-bench and server runs are not directly comparable, and the runs used different

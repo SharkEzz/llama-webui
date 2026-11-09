@@ -86,7 +86,8 @@ base value. For the list fields (`ot`, `dev`, `ts`), each value is itself a list
   `-ncmoe 8 · -dev CUDA0,CUDA1 · -ub 2048`, `-<key> default` for an unset value, `base` for an empty space.
 
 The estimator (`planSweep()` in `server/tuning/space.ts`) checks each item at the sweep's context (`sweepCtx()`: the
-`-c`, `--ctx-size` or `--ctx-size=` of `serverArgs`, otherwise the preset's minimum context), with the item's `ctk` and
+last `-c`, `--ctx-size`, `-c=` or `--ctx-size=` of `serverArgs`, read by `ctxFromArgs()`, otherwise the preset's
+minimum context), with the item's `ctk` and
 `ctv` (default `f16`; `ctv` defaults to `ctk`) and `ub` (default 512). Its verdict is saved in each item's `fit`.
 
 ## The sweep record
@@ -247,7 +248,8 @@ curl -X POST http://127.0.0.1:7860/api/sweeps/4/resume \
 <Endpoint method="POST" path="/api/sweeps/:id/validate" />
 
 Takes the `n` best successful `bench` items of the sweep ([ranking](#ranking)) and queues each of them again as a
-`server` item: same params, the sweep's `serverArgs`, `p`, `n` and `r`, labeled `validation · <item label>`. The
+`server` item: same params, the sweep's `serverArgs` (with `-c <sweepCtx>` appended when they set no context, so
+llama-server does not allocate the model's full one), `p`, `n` and `r`, labeled `validation · <item label>`. The
 sweep's interrupted items are requeued with them. The sweep then runs again, in the `validate` stage.
 
 **Body**: a JSON object, required (`{}` for the defaults), strict.

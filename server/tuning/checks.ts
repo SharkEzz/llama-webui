@@ -33,6 +33,8 @@ export interface CheckContext {
 const DISK_OK_BPS = 2 * GiB;
 
 const NA = 'not applicable (card ignored)';
+/** Below this GPU use, a card counts as idle: its PCIe link may be trained down (power saving). */
+const IDLE_UTIL_PCT = 10;
 const OLD_BUILD_MS = 60 * 86400_000;
 const NETWORK_FS = /^(nfs|nfs4|cifs|smb3?|fuse|sshfs|9p|afs|ceph|glusterfs)/;
 
@@ -54,7 +56,6 @@ export function runChecks(ctx: CheckContext): Check[] {
     const impact = 'slower loading and CPU↔GPU offload';
     if (g.pcieGenMax == null || g.pcieWidthMax == null)
       return push({ id, family, label, state: 'unknown', detail: 'unknown PCIe link', impact });
-    // Idle links train down (ASPM): only a link seen under load says anything (null until then, see withObservedLinks).
     if (g.pcieGen == null || g.pcieWidth == null)
       return push({
         id,
@@ -66,6 +67,16 @@ export function runChecks(ctx: CheckContext): Check[] {
       });
     const below =
       (g.pcieGen as number) < (g.pcieGenMax as number) || (g.pcieWidth as number) < (g.pcieWidthMax as number);
+    // An idle link trains down to save power (ASPM): below its maximum, it only says something under load (#36).
+    if (below && (g.utilPct ?? 0) < IDLE_UTIL_PCT)
+      return push({
+        id,
+        family,
+        label,
+        state: 'unknown',
+        detail: `${pcieLabel(g.pcieGen, g.pcieWidth)} while idle (max ${pcieLabel(g.pcieGenMax, g.pcieWidthMax)}): measured under load`,
+        impact,
+      });
     push({
       id,
       family,

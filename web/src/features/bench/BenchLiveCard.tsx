@@ -36,7 +36,7 @@ export function BenchLiveCard() {
             <dl className="grid grid-cols-2 gap-4">
               <Stat label="Prompt" value={formatRate(run.pp?.tps)} sub={deviation(run.pp)} />
               <Stat label="Generation" value={formatRate(run.tg?.tps)} sub={deviation(run.tg)} />
-              <Stat label="MTP accepted" value={formatAccept(run.draftAcceptPct)} />
+              <Stat label="Draft accepted" value={formatAccept(run.draftAcceptPct)} />
               <Stat label="Peak VRAM" value={vramTotal(run)} />
             </dl>
             {run.error && <p className="text-sm text-destructive">{run.error}</p>}

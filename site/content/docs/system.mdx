@@ -47,7 +47,8 @@ A chart at the bottom plots **Utilization** and **VRAM** over the history.
 
 GPUs lower their link speed when idle to save power, so an idle card often shows less than its maximum. Compare the
 two values while a model generates. A link still below its maximum under load points to the slot, a riser or a BIOS
-setting; the **PCIe link** check in [Checks](#checks) flags it.
+setting; the **PCIe link** check in [Checks](#checks) flags it. An idle card's lower link is not flagged: the check
+stays unknown, **while idle … measured under load**, until the card works.
 
 </Callout>
 
@@ -161,7 +162,8 @@ button. A badge says whether the fix lasts **until reboot** or is **permanent**.
 | **Kernel and disk** | IOMMU, model disk, model disk bandwidth, swap                                             |
 
 Within each group, the checks that need attention come first; the passing ones are folded under a line such as
-**4 checks ok**. A check for a GPU that `llama-server` will not use is marked not applicable.
+**4 checks ok**. A check for a GPU that `llama-server` will not use is marked not applicable: the cards the last
+[Tuning](/docs/tuning/) estimate of the selected model runs on, or every dedicated card without one.
 
 Some checks depend on a model (the disk it sits on, whether it spills out of VRAM). Pick it in the selector at the top
 of the card: it starts on the running profile's model, or the first model of your folder, and **No model** skips

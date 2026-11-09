@@ -1,4 +1,4 @@
-import { type BenchSpec, rankRuns, SweepSpecSchema, sweepCtx } from '@llama-webui/shared';
+import { type BenchSpec, rankRuns, SweepSpecSchema, sweepCtx, withCtx } from '@llama-webui/shared';
 import { z } from 'zod';
 import { benchBinary } from '../bench/parse';
 import type { BenchRunner } from '../bench/runner';
@@ -144,7 +144,8 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
                   mmprojPath,
                   profileId,
                   params: run.spec.params,
-                  serverArgs,
+                  // The context the sweep was planned at, not the model's full one (#24).
+                  serverArgs: withCtx(serverArgs, sweepCtx(sweep.spec)),
                   p,
                   n: sweep.spec.n,
                   r,
