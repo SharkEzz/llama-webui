@@ -124,9 +124,11 @@ If you used llama-tui and have no profile yet, the step also lists the profiles 
 
 ## Network access
 
-This card only appears when llama-webui listens on an address other than the loopback, for example after
-`--host 0.0.0.0`. It is a reminder that llama-webui has no authentication: anyone who can reach it can start processes
-on the machine. Read [Security](/docs/security/) before using it this way.
+This card only appears when llama-webui or `llama-server` listens on an address other than the loopback: llama-webui
+after `--host 0.0.0.0`, `llama-server` when **Default host** in Settings is `0.0.0.0` or a LAN address. It is a reminder
+that neither has authentication: anyone who can reach llama-webui can start processes on the machine, and anyone who
+can reach `llama-server` can send prompts to the loaded model. Read [Security](/docs/security/) before using it this
+way.
 
 ## Finish
 

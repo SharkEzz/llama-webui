@@ -6,6 +6,7 @@ import {
   type BenchRun,
   ctxFromArgs,
   type Estimate,
+  isLoopback,
   type LaunchpadEntry,
   type ModelEntry,
   type Profile,
@@ -16,7 +17,7 @@ import type { ModelInfo } from './models/gguf';
 
 /** What the first-run report reads from the machine (injected: tested without the real binary, GPUs or perf). */
 export interface SetupDeps {
-  settings: { binary: string; modelsDir: string };
+  settings: { binary: string; modelsDir: string; host: string };
   /** `modelsDir` with `~` expanded. */
   modelsDir: string;
   resolveBinary(binary: string): Promise<string | null>;
@@ -69,6 +70,7 @@ export async function buildSetupReport(d: SetupDeps): Promise<SetupReport> {
     },
     telemetry: { nvidiaSource: d.nvidiaSource, perfParanoid },
     listen: d.listen,
+    llamaListen: { host: d.settings.host, exposed: !isLoopback(d.settings.host) },
     ready: path !== null && exists,
   };
 }

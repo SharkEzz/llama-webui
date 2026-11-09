@@ -137,7 +137,15 @@ class FakeSupervisor {
     for (const fn of this.fns) fn(s);
   }
 }
-const ready: ServerState = { kind: 'ready', profile: 'p', profileId: 1, pid: 1, port: 8080, since: 0 };
+const ready: ServerState = {
+  kind: 'ready',
+  profile: 'p',
+  profileId: 1,
+  pid: 1,
+  host: '127.0.0.1',
+  port: 8080,
+  since: 0,
+};
 
 test('PlacementTracker: replays the ring at construction, follows new lines and the server state', async () => {
   const logs = new LogBuffer(100);

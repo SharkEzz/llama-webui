@@ -43,6 +43,8 @@ It runs commands and reads the disk, so it is not free:
 | `telemetry.perfParanoid`  | number \| null             | `kernel.perf_event_paranoid` (`/proc/sys/kernel/perf_event_paranoid`), `null` when unreadable.                                      |
 | `listen.host`             | string                     | The address llama-webui itself listens on (`--host`).                                                                               |
 | `listen.exposed`          | boolean                    | That address is not a loopback one (`isLoopback()`: `127.*`, `::1`, `localhost`, `[::1]`), so the network can reach the API.       |
+| `llamaListen.host`        | string                     | The `host` setting: the default `--host` of `llama-server`.                                                                           |
+| `llamaListen.exposed`     | boolean                    | That address is not a loopback one, so the network can reach `llama-server`'s API.                                                    |
 | `ready`                   | boolean                    | The required steps pass: `binary.path` is not `null` and `models.exists` is `true`.                                                 |
 
 A `BenchDevice` (`shared/src/bench.ts`) is `{ id, name, totalMib, freeMib, backend }`: the device id (`CUDA0`,
@@ -66,6 +68,7 @@ curl http://127.0.0.1:7860/api/setup
   "models": { "setting": "~/models", "dir": "/home/me/models", "exists": true, "count": 3, "bytes": 52143285248 },
   "telemetry": { "nvidiaSource": "nvml", "perfParanoid": 2 },
   "listen": { "host": "127.0.0.1", "exposed": false },
+  "llamaListen": { "host": "127.0.0.1", "exposed": false },
   "ready": true
 }
 ```

@@ -1,4 +1,4 @@
-import type { Settings, ThemeMode } from '@llama-webui/shared';
+import { isLoopback, type Settings, type ThemeMode } from '@llama-webui/shared';
 import { ListChecks } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
@@ -89,6 +89,16 @@ function General({ settings, errors, save }: SectionProps & { errors: SettingsEr
         <TextField
           id="host"
           label="Default host"
+          hint={
+            isLoopback(settings.host) ? (
+              'llama-server only accepts connections from this machine. 0.0.0.0 opens it to your network.'
+            ) : (
+              <span className="text-warning">
+                llama-server is reachable from your network, with no authentication: anyone on it can send prompts to
+                the loaded model.
+              </span>
+            )
+          }
           value={settings.host}
           error={errors.host}
           onCommit={(v) => save({ host: v })}

@@ -7,7 +7,7 @@ import type {
   Snapshot,
   SpecStats,
 } from '@llama-webui/shared';
-import { defer, SERIES } from '@llama-webui/shared';
+import { defer, SERIES, stateHost } from '@llama-webui/shared';
 import { type AmdCard, hiddenAmdReading, suspendedAmdReading } from '../collectors/amdgpu';
 import type { DiskSample } from '../collectors/disk';
 import { type GpuReading, identityReading, selectUsedGpus } from '../collectors/gpu';
@@ -25,6 +25,7 @@ import {
 import { gpuNeeds, gpuSkipped } from '../collectors/needs';
 import { Collectors } from '../collectors/registry';
 import type { SystemSample } from '../collectors/system';
+import { probeUrl } from '../supervisor/health';
 import type { ServerState, Supervisor } from '../supervisor/supervisor';
 import { History, historyPoints } from './history';
 
@@ -219,7 +220,7 @@ export class Monitor {
 
     this.ticksForPid++;
     const port = state.port;
-    const url = `http://127.0.0.1:${port}`;
+    const url = probeUrl(stateHost(state), port);
     const [raw, allGpus, procRaw] = await Promise.all([
       fetchLlama(url).catch(() => null),
       this.collectGpus(pid).catch(() => [] as GpuSample[]),

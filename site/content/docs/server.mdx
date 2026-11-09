@@ -93,7 +93,8 @@ shows **Could not read /props** with the error.
 The **Effective command** card shows the full command line of the last launch: the binary from Settings, the model
 and projector, the profile's arguments and the flags llama-webui adds, quoted the way a shell would need them.
 **Copy** puts it on the clipboard, which is handy to run the same server by hand or to report a problem. Before the
-first launch, it says **No launch since llama-webui started.**
+first launch, it says **No launch since llama-webui started.** When the running server listens on an address other
+machines can reach (`--host 0.0.0.0`, a LAN address), a warning below the command says so: it has no authentication.
 
 ### Latest logs
 
@@ -104,11 +105,12 @@ The last 20 log lines, updated live: `llama-server`'s output and llama-webui's o
 
 llama-webui notices a `llama-server` it did not start, for example one you launched in a terminal:
 
-- When llama-webui starts, then every 2 seconds while the state is **Stopped**, it checks the port set in
-  [Settings](/docs/settings/) (`8080` by default).
+- When llama-webui starts, then every 2 seconds while the state is **Stopped** or **Crashed**, it checks the port set
+  in [Settings](/docs/settings/) (`8080` by default) and the port the last started profile used.
 - When you start a profile, it first checks that profile's port.
 
-If something answers HTTP on that port, the state becomes **External**. llama-webui looks for the process in `/proc`
+If a `llama-server` answers on that port (its `/health` replies the way `llama-server`'s does), the state becomes
+**External**. Any other service on a profile's port makes **Start** fail with `port … is in use by another service`. llama-webui looks for the process in `/proc`
 and shows its PID when it finds a `llama-server` started with that port; the PID can be unknown.
 
 An external server can be used but not controlled:

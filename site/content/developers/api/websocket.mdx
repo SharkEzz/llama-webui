@@ -137,7 +137,8 @@ A batch of `LogLine` (`shared/src/logs.ts`): every line pushed to the ring in th
 ### `server-state`
 
 The `ServerView` (`shared/src/server.ts`), the same body as `GET /api/server/state`: `state` (a `ServerState`, by
-`kind`: `idle`, `starting`, `ready`, `stopping`, `crashed`, `external`), `command` (the last launched command) and
+`kind`: `idle`, `starting`, `ready`, `stopping`, `crashed`, `external`; `starting`, `ready` and `stopping` carry the
+`host` the server listens on), `command` (the last launched command) and
 `profileId`. The fields are described on [Server, state and logs](/developers/api/server/#serverview).
 
 ### `bench-progress`

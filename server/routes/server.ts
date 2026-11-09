@@ -1,9 +1,11 @@
+import { stateHost } from '@llama-webui/shared';
 import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
 import { guarded, HttpError, jsonObject, notFound } from '../http';
 import { type Runtime, serverView } from '../runtime';
 import { buildCommand } from '../supervisor/args';
 import { getFlags } from '../supervisor/flags';
+import { probeUrl } from '../supervisor/health';
 
 export interface ServerRouteDeps {
   runtime: Runtime;
@@ -84,7 +86,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
         if (s.kind !== 'ready' && s.kind !== 'external') throw new HttpError(409, 'Server not ready');
         let r: Response;
         try {
-          r = await fetch(`http://127.0.0.1:${s.port}/props`, { signal: AbortSignal.timeout(2000) });
+          r = await fetch(`${probeUrl(stateHost(s), s.port)}/props`, { signal: AbortSignal.timeout(2000) });
         } catch {
           throw new HttpError(502, 'llama-server is not responding on /props');
         }

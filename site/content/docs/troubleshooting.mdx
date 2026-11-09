@@ -134,10 +134,13 @@ No restart is needed: after a failure, llama-webui tries `perf` again every minu
 a profile fails with `port in use by an external server (PID …)`. A benchmark refuses to start with
 `An external llama-server is running on port 8080: stop it first`.
 
-**Cause:** every 2 seconds, llama-webui checks whether something answers `/health` on `127.0.0.1` at the **Default
-port** of Settings (8080 by default). Any HTTP server there counts, not only `llama-server`; the PID reads `unknown`
-when llama-webui finds no `llama-server` process on that port. llama-webui can chat with such a server and monitor it,
-but cannot stop it.
+**Cause:** every 2 seconds while stopped or crashed, llama-webui checks whether a `llama-server` answers `/health` on
+`127.0.0.1`, at the **Default port** of Settings (8080 by default) and at the port the last profile used. Only an
+answer shaped like `llama-server`'s counts; the PID reads `unknown` when llama-webui finds no `llama-server` process on
+that port. llama-webui can chat with such a server and monitor it, but cannot stop it.
+
+Another kind of service on a profile's port (a web server, another API) is not taken for a `llama-server`: starting
+the profile then fails with `port 8080 is in use by another service`.
 
 **Fix:** stop that process (`kill <PID>`). The status goes back to **Stopped** by itself once that process has exited
 and the port is silent. To
@@ -188,13 +191,12 @@ default).
 
 **What you see:** the status stays on **Starting…**, and the timer on the Server page keeps counting.
 
-**Cause:** the status turns **Ready** once `llama-server` answers `/health` on `127.0.0.1` with success. Until the
-model is loaded, it answers that it is still loading: a large model read from a slow disk takes minutes. If the
-profile's **Host** is an address that does not include `127.0.0.1` (a single LAN address, for example), llama-webui
-cannot reach `/health` at all.
+**Cause:** the status turns **Ready** once `llama-server` answers `/health` with success, on the address it listens
+on (`127.0.0.1` for `0.0.0.0`). Until the model is loaded, it answers that it is still loading: a large model read from
+a slow disk takes minutes.
 
-**Fix:** follow the loading on the Logs page. If it has finished, set the profile's **Host** to `0.0.0.0` or
-`127.0.0.1`, or leave it empty to use the **Default host** of Settings (`0.0.0.0`).
+**Fix:** follow the loading on the Logs page. If it has finished and the status still does not change, check that the
+profile's **Host** is an address of this machine.
 
 ## Benchmarks and memory
 

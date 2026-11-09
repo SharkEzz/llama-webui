@@ -11,7 +11,7 @@ const entry = (path: string, kind: 'model' | 'mmproj', fileBytes: number): Model
 
 function deps(o: Partial<SetupDeps> & { root: string }): SetupDeps {
   return {
-    settings: { binary: 'llama-server', modelsDir: '~/models' },
+    settings: { binary: 'llama-server', modelsDir: '~/models', host: '127.0.0.1' },
     modelsDir: join(o.root, 'models'),
     resolveBinary: async () => null,
     buildOf: async () => 'b1 (abc)',
@@ -145,4 +145,14 @@ test('launchpad: a failing estimate drops the fit badge only', async () => {
   });
   expect(e).toMatchObject({ modelError: null, fit: null });
   expect(e!.model).not.toBeNull();
+});
+
+test('setup: llama-server exposed on the network only when its host is not loopback (#27)', async () => {
+  using dir = tempDir('lw-setup-');
+  const local = await buildSetupReport(deps({ root: dir.path }));
+  expect(local.llamaListen).toEqual({ host: '127.0.0.1', exposed: false });
+  const lan = await buildSetupReport(
+    deps({ root: dir.path, settings: { binary: 'llama-server', modelsDir: '~/models', host: '0.0.0.0' } }),
+  );
+  expect(lan.llamaListen).toEqual({ host: '0.0.0.0', exposed: true });
 });

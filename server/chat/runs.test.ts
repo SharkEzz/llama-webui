@@ -30,7 +30,7 @@ function setup() {
   }) as typeof fetch;
   const runs = new ChatRuns({
     repo,
-    target: () => ({ port: 8080, profileId: null, modelPath: '/m.gguf' }),
+    target: () => ({ host: null, port: 8080, profileId: null, modelPath: '/m.gguf' }),
     fetch: fetchFn,
     flushMs: 0,
   });

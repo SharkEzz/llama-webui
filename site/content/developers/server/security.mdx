@@ -65,6 +65,9 @@ What follows from these rules:
   `http://localhost:7860` calling `http://127.0.0.1:7860` is refused, even though both reach the same server.
 - A request without `Origin` passes the `Origin` rule: `curl` sends none, and browsers omit it on many same-origin
   requests.
+- Behind a reverse proxy that terminates TLS, `url.protocol` is `http:` while the browser's `Origin` is `https://…`:
+  every write and the WebSocket get `403`. The guard does not read `X-Forwarded-Proto`, which any client can set, so
+  this setup is not supported; trusting it would need an explicit setting naming the proxy.
 - `application/json; charset=utf-8` passes the content-type rule. A write without a body and without a
   `Content-Type` (for example `POST /api/server/stop`) passes too; with a body, it must be JSON. A cross-site
   `fetch()` that sends `application/json` triggers a CORS preflight, which gets no CORS headers back.
@@ -107,6 +110,7 @@ Every error an `/api` route returns is a JSON object with an `error` string, and
 | -------------------------------------- | --------------- | ---------------------------------------------------------------- |
 | `new HttpError(status, message)`       | `status`        | `{ "error": message }`                                           |
 | `new HttpError(status, message, code)` | `status`        | `{ "error": message, "code": code }`                             |
+| An `HttpError` of an older module (`bun --hot`) | `status` | the same: `isHttpError()` checks `name === 'HttpError'` and a numeric `status`, not `instanceof` |
 | A `ZodError`                           | `400`           | `{ "error": "Invalid data: <first issue> (<path>)", "issues": [...] }`, the path only when the issue has one |
 | A `SyntaxError` (body is not JSON)     | `400`           | `{ "error": "Invalid JSON" }`                                    |
 | Anything else                          | `500`           | `{ "error": "Internal error" }`, and the error is logged         |
@@ -127,10 +131,12 @@ authentication appears. With a non-loopback address, `GET /api/setup` reports `l
 ## llama-server's own exposure
 
 `llama-server` is a separate HTTP server with its own address. `buildCommand()` passes `--host` and `--port` from the
-profile, else from the `host` and `port` settings, whose defaults are `0.0.0.0` and `8080` (`shared/src/settings.ts`).
-So by default `llama-server` listens on every interface, even when llama-webui listens on `127.0.0.1`. This default
-is a known open issue. The benchmark's temporary `llama-server` always gets `host: '127.0.0.1'`
-(`server/bench/execute.ts`). llama-webui itself always talks to `llama-server` through `127.0.0.1`.
+profile, else from the `host` and `port` settings, whose defaults are `127.0.0.1` and `8080`
+(`shared/src/settings.ts`): `llama-server` stays local, like llama-webui, unless a user opens it. `GET /api/setup`
+reports `llamaListen: { host, exposed }` for the `host` setting, and the setup checklist, the Settings field and the
+Server page's command card warn when it is not loopback. The benchmark's temporary `llama-server` always gets
+`host: '127.0.0.1'` (`server/bench/execute.ts`). llama-webui talks to `llama-server` on the address it listens on
+(`probeUrl()`: loopback for a wildcard address).
 
 [How llama-server is exposed](/docs/security/#how-llama-server-is-exposed) gives users the settings to change.
 

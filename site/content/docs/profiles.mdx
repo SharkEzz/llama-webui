@@ -32,7 +32,7 @@ Other pages create profiles for you, already filled in: **Create profile** in a 
 | **Working directory**    | The folder `llama-server` runs in. Relative paths in the model and projector fields start from here.                                           |
 | **Model (GGUF)**         | Required. The model file; for a split model, its first part.                                                                                   |
 | **Multimodal projector** | Optional. The `mmproj` file that lets the model read images (and audio or video for some models).                                               |
-| **Host**                 | The address `llama-server` listens on. Empty: the value from [Settings](/docs/settings/) (`0.0.0.0` by default).                                |
+| **Host**                 | The address `llama-server` listens on. Empty: the value from [Settings](/docs/settings/) (`127.0.0.1` by default).                              |
 | **Port**                 | The port `llama-server` listens on, from 1 to 65535. Empty: the value from Settings (`8080` by default).                                        |
 
 In the working directory, model and projector fields, a leading `~` stands for your home folder. Without a working

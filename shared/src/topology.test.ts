@@ -17,12 +17,22 @@ const slot = (o: Partial<SlotView>): SlotView => ({
 
 const snap = (o: Partial<Snapshot>): Snapshot => ({ health: 'ok', slots: null, ...o }) as unknown as Snapshot;
 
-const ready: ServerState = { kind: 'ready', profile: 'p', profileId: 1, pid: 1, port: 8080, since: 0 };
+const ready: ServerState = {
+  kind: 'ready',
+  profile: 'p',
+  profileId: 1,
+  pid: 1,
+  host: '127.0.0.1',
+  port: 8080,
+  since: 0,
+};
 
 test('phaseOf: no server, stopping or crashed → stopped', () => {
   expect(phaseOf(undefined, null)).toBe('stopped');
   expect(phaseOf({ kind: 'idle' }, snap({}))).toBe('stopped');
-  expect(phaseOf({ kind: 'stopping', profile: 'p', profileId: 1, pid: 1, port: 1 }, snap({}))).toBe('stopped');
+  expect(phaseOf({ kind: 'stopping', profile: 'p', profileId: 1, pid: 1, host: '127.0.0.1', port: 1 }, snap({}))).toBe(
+    'stopped',
+  );
   expect(phaseOf({ kind: 'crashed', profile: 'p', profileId: 1, exitCode: 1, signal: null, at: 0 }, snap({}))).toBe(
     'stopped',
   );

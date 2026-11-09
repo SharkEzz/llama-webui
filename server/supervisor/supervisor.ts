@@ -4,7 +4,7 @@ import type { LogBuffer } from '../logs/buffer';
 import { LineSplitter } from '../logs/lines';
 import type { BuiltCommand } from './args';
 import { findLlamaServerPid } from './discovery';
-import { probeHealth } from './health';
+import { probeHealth, probeLlamaServer } from './health';
 
 export type { ServerState };
 
@@ -64,13 +64,15 @@ export class Supervisor {
     for (const fn of this.listeners) fn(s);
   }
 
-  private async portAnswers(port: number): Promise<boolean> {
-    return (await probeHealth(port, this.fetchImpl)) !== null;
+  private async portAnswers(port: number, host?: string): Promise<boolean> {
+    return (await probeHealth(port, this.fetchImpl, host)) !== null;
   }
 
+  /** An external llama-server on `port` (idle or after a crash): any other HTTP service on it is not one (#28). */
   async detectExternal(port: number): Promise<boolean> {
     if (this.proc) return false;
-    if (!(await this.portAnswers(port))) return false;
+    if (!(await probeLlamaServer(port, this.fetchImpl))) return false;
+    if (this.proc || (this._state.kind !== 'idle' && this._state.kind !== 'crashed')) return false;
     this.set({ kind: 'external', pid: await findLlamaServerPid(port), port });
     return true;
   }
@@ -116,7 +118,9 @@ export class Supervisor {
       this.set({ kind: 'idle' });
     }
     if (this.proc) throw new SupervisorError('a server is already running');
-    if (await this.portAnswers(cmd.port)) {
+    if (await this.portAnswers(cmd.port, cmd.host)) {
+      if (!(await probeLlamaServer(cmd.port, this.fetchImpl, cmd.host)))
+        throw new SupervisorError(`port ${cmd.port} is in use by another service`);
       this.set({ kind: 'external', pid: await findLlamaServerPid(cmd.port), port: cmd.port });
       throw await this.externalError(cmd.port);
     }
@@ -149,6 +153,7 @@ export class Supervisor {
       profile: cmd.profileName,
       profileId: cmd.profileId,
       pid: proc.pid,
+      host: cmd.host,
       port: cmd.port,
       since: this.now(),
     });
@@ -168,7 +173,8 @@ export class Supervisor {
 
   private async pollHealth(proc: Child, cmd: BuiltCommand) {
     if (this.proc !== proc || this._state.kind !== 'starting') return this.clearHealth();
-    const status = await probeHealth(cmd.port, this.fetchImpl);
+    // On the host it listens on: a LAN address refuses loopback, the server would never be seen ready (#28).
+    const status = await probeHealth(cmd.port, this.fetchImpl, cmd.host);
     if (status === 200 && this.proc === proc && this._state.kind === 'starting') {
       this.clearHealth();
       this.set({
@@ -176,6 +182,7 @@ export class Supervisor {
         profile: cmd.profileName,
         profileId: cmd.profileId,
         pid: proc.pid,
+        host: cmd.host,
         port: cmd.port,
         since: this.now(),
       });
@@ -225,7 +232,14 @@ export class Supervisor {
     }
     const s = this._state;
     if (s.kind === 'starting' || s.kind === 'ready')
-      this.set({ kind: 'stopping', profile: s.profile, profileId: s.profileId, pid: s.pid, port: s.port });
+      this.set({
+        kind: 'stopping',
+        profile: s.profile,
+        profileId: s.profileId,
+        pid: s.pid,
+        host: s.host,
+        port: s.port,
+      });
     this.clearHealth();
     try {
       proc.kill('SIGTERM');

@@ -38,6 +38,8 @@ export interface SetupReport {
     /** Listening on a non-loopback address. */
     exposed: boolean;
   };
+  /** The default `--host` of llama-server (Settings), exposed when it is not loopback. */
+  llamaListen: { host: string; exposed: boolean };
   /** The required steps pass: the binary is found and the models folder exists. */
   ready: boolean;
 }
