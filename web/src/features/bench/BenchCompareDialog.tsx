@@ -135,7 +135,7 @@ export function BenchCompareDialog({
               false,
             )}
             {row(
-              'MTP accepted',
+              'Draft accepted',
               runs.map((r) => formatAccept(r.draftAcceptPct)),
               false,
             )}

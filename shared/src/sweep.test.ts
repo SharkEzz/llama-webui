@@ -1,6 +1,8 @@
 import { expect, test } from 'bun:test';
 import type { BenchRun, Measure } from './bench';
-import { expandSpace, itemLabel, rankRuns, SweepSpecSchema } from './sweep';
+import { withCtx } from './bench';
+import { expandSpace, itemLabel, rankRuns, SweepSpecSchema, sweepCtx } from './sweep';
+import { presetOf } from './tuning';
 
 test('expandSpace crosses the dimensions in field order and applies -ts only where it fits', () => {
   const { items, droppedTs } = expandSpace(
@@ -53,4 +55,16 @@ test('rankRuns marks ties inside the noise band and leaves failures unranked', (
 test('SweepSpecSchema refuses an empty value list for a dimension', () => {
   const r = SweepSpecSchema.safeParse({ name: 's', modelPath: '/m.gguf', preset: 'chat', space: { ncmoe: [] } });
   expect(r.success).toBe(false);
+});
+
+test('sweepCtx reads -c= and the last -c, like ctxFromArgs (#24)', () => {
+  expect(sweepCtx({ serverArgs: ['-c=16384'], preset: 'chat' })).toBe(16384);
+  expect(sweepCtx({ serverArgs: ['-c', '4096', '--ctx-size', '8192'], preset: 'chat' })).toBe(8192);
+  expect(sweepCtx({ serverArgs: [], preset: 'chat' })).toBe(presetOf('chat').ctxMin);
+});
+
+test('withCtx adds -c only when the flags set no context (#24)', () => {
+  expect(withCtx(['--jinja'], 32768)).toEqual(['--jinja', '-c', '32768']);
+  expect(withCtx(['-c', '4096'], 32768)).toEqual(['-c', '4096']);
+  expect(withCtx(['--jinja'], undefined)).toEqual(['--jinja']);
 });

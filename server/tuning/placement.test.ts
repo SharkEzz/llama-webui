@@ -97,3 +97,12 @@ test('RAM overflow is tight, never no (mmap reads the rest from disk)', () => {
   expect(f.verdict).toBe('tight');
   expect(f.reason).toContain('RAM');
 });
+
+test('-ot to an unknown device is an issue, to a host buffer is RAM (#36)', () => {
+  const unknown = measurePlacement(input({ params: { dev: ['CUDA0'], ot: ['exps=CUDA7'] } }));
+  expect(unknown.issues).toEqual(['unknown device: CUDA7 (-ot exps=CUDA7)']);
+  expect(fitOf(input({ params: { dev: ['CUDA0'], ot: ['exps=CUDA7'] } })).verdict).toBe('no');
+  const host = measurePlacement(input({ params: { dev: ['CUDA0'], ot: ['exps=CPU', 'norm=CUDA_Host'] } }));
+  expect(host.issues).toEqual([]);
+  expect(host.cpuExpertsBytes).toBe(48 * 300 * MiB);
+});

@@ -89,7 +89,12 @@ Warnings below the table point out what costs speed: layers or experts left in R
 with a thin margin, or a device or `-ot` pattern the estimator does not recognize.
 
 When nothing fits, even on the CPU, a **Does not fit** alert gives the reason and the card shows the simplest command
-instead of the table, without any action.
+instead of the table, without any action. The reason names what blocks: the RAM when the model would need some of its
+weights in RAM and there is not enough of it (`not enough RAM: … needed with weights in RAM, … available`), otherwise
+the card that runs out of VRAM.
+
+Pinned values show as such in the table: a pinned `-fa auto` reads `auto`, a pinned `-ctk q4_0` reads `q4_0 / q8_0`
+when the V cache keeps the searched type.
 
 ### How the estimator places the model
 

@@ -187,7 +187,9 @@ llama.cpp does. With `-sm none` or a single device, every GPU layer goes to the 
 In order, the first rule that applies wins:
 
 1. A matching `-ot` rule (the first matching pattern, as in llama.cpp). Its target is used when it is a listed device;
-   any other target, such as `CPU`, means RAM. An invalid pattern adds an issue.
+   a host buffer (`CPU`, `CPU_REPACK`, `CUDA_Host`…) means RAM. Any other target adds the issue
+   `unknown device: <target> (-ot <rule>)`, which makes the verdict `no`, and is counted in RAM. An invalid pattern
+   adds an issue.
 2. An expert tensor (`EXPERTS`) of a layer below `-ncmoe`: RAM.
 3. The token embeddings (`token_embd.*`): RAM.
 4. A layer tensor: the device of its layer.
@@ -265,8 +267,10 @@ one does, and moves to the next cache type only when no family fits.
 
 ### Flags and why
 
-The result (`Estimate`) has the flags (`params`), `ctx`, `kv`, `serverArgs` (the flags, then `-c`, `--fit off`, and
-`--mlock` and `--numa distribute` when they apply), the verdict, and one row per flag with a "why" string:
+The result (`Estimate`) has the flags (`params`), `ctx`, `kv` (the final K cache type, a pinned `ctk` included),
+`serverArgs` (the flags, then `-c`, `--fit off`, and `--mlock` and `--numa distribute` when they apply), the verdict,
+and one row per flag with a "why" string. The rows are built from the final flags, after the pinned values: a pinned
+`-fa` or cache type shows as such.
 
 | Flag                 | Why                                                                                                                                                    |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -275,8 +279,8 @@ The result (`Estimate`) has the flags (`params`), `ctx`, `kv`, `serverArgs` (the
 | `-dev`               | `single card: no PCIe hop`, or `N cards, <first> gets the compute buffers`                                                                             |
 | `-ts`                | `split by the usable VRAM of each card`                                                                                                                |
 | `-c`                 | `… estimated in total, <kv> KV cache included, margin kept`                                                                                            |
-| `-fa`                | `faster attention, smaller compute buffers` (`f16`), `required for the quantized KV cache` (`q8_0`)                                                     |
-| `-ctk / -ctv`        | `the budget allows it, no loss` (`f16`), `cache halved, negligible loss` (`q8_0`)                                                                      |
+| `-fa`                | The final value. `on`: `faster attention, smaller compute buffers` (`f16`), `required for the quantized KV cache`; pinned `auto`: `pinned: llama.cpp decides`; pinned `off`: `pinned: attention without flash attention` |
+| `-ctk / -ctv`        | The final types (`q4_0 / q8_0` when they differ). `pinned`, or `the budget allows it, no loss` (`f16`), `cache halved, negligible loss` (quantized)        |
 | `-t`                 | `N physical cores`                                                                                                                                     |
 | `-b / -ub`           | `default` for 2048 / 512, otherwise `faster prompt processing, enough VRAM headroom`                                                                   |
 | `--fit`              | `what gets measured is exactly what gets written`                                                                                                      |
@@ -296,13 +300,17 @@ fit.
 `warnings` collects the placement issues and these messages: `slow generation: X of L layers in RAM`,
 `experts of the first N layers in RAM: slower generation`, `not enough VRAM: everything in RAM`,
 `overflows RAM by …: NVMe read ≈ … per generated token`, the `tight` reason when RAM does not overflow, and
-`dense model: -ncmoe has no effect` when `-ncmoe` is pinned on a dense model.
+`dense model: -ncmoe has no effect` when `-ncmoe` is pinned on a dense model, and
+`a quantized KV cache needs flash attention: -fa off may fail` when `-fa off` is pinned with a quantized cache.
 
 When nothing passes, the estimate still shows the simplest configuration, without checking it: `-ngl all` on the
 widest set (or `-ngl 0` without a card), a `q8_0` cache (`f16` with `-fa off`), `-ub 512`, the pinned values and
 `ctxMin` (or the pinned context).
-`ok` is false, `rows` is empty, the verdict is `no`, and the reason is `fitOf()`'s, or
-`model too large: … of RAM needed, … available`.
+`ok` is false, `rows` is empty and the verdict is `no`. The reason names the limit that ruled the candidates out: when
+some of them fitted in VRAM but needed more RAM than available (`tryParams()` keeps the smallest such need),
+`not enough RAM: … needed with weights in RAM, … available`; otherwise the fallback's `fitOf()` reason
+(`CUDA0: … for … usable`), or `model too large: … of RAM needed, … available`. The fallback's per-device detail stays in
+`fit.vram`, for the memory bars.
 
 ### Who calls it
 
@@ -368,11 +376,14 @@ value when it cannot read, it never rejects.
 The NVIDIA commands name the card by its UUID (from the Monitor's key), because `nvidia-smi`'s own index need not match
 llama-webui's order. "The model spills into RAM" means the last estimate is `ok` and either `-ngl` is not `all` or it
 uses `-ncmoe`. Per-card checks are `na` (`not applicable (card ignored)`) for a card that is not in `retainedBusIds`.
+A PCIe link below its maximum while the card is idle (under 10% use, `IDLE_UTIL_PCT`) is `unknown`, not `warn`: idle
+links train down to save power (ASPM), so only a link read under load says something about the slot.
 
 ### Context of a check run
 
-`GET /api/tuning/checks?model=<path>` builds the context from the Monitor's latest snapshot (`allGpus`, every GPU's bus
-id as `retainedBusIds`), the hardware, the parsed model, the log ring, the last estimate computed for that model and
+`GET /api/tuning/checks?model=<path>` builds the context from the Monitor's latest snapshot (`allGpus`), the cards the
+last estimate runs on as `retainedBusIds` (`retainedBusIds()` in `server/tuning/match.ts`: its `-dev`, or every
+dedicated card without one, matched to the monitored cards; every card when there is no device list), the hardware, the parsed model, the log ring, the last estimate computed for that model and
 its last disk measurement. Both are kept in memory in `server/routes/tuning.ts`, so a reload forgets them.
 
 The first-run checklist on the Home page only shows the checks for which `isSetupCheck(id)` is true: it drops those that

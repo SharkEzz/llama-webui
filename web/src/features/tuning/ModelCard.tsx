@@ -1,4 +1,4 @@
-import { ignoredByBench, type ModelDetail, shellQuote } from '@llama-webui/shared';
+import { ignoredByBench, type ModelDetail, shellQuote, withCtx } from '@llama-webui/shared';
 import { Box } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { GlassCard } from '@/components/glass/GlassCard';
@@ -19,7 +19,11 @@ export function ModelCard() {
   const modelPath = useTuning((s) => s.modelPath);
   const mmprojPath = useTuning((s) => s.mmprojPath);
   const profileId = useTuning((s) => s.profileId);
-  const serverArgs = useTuning((s) => s.serverArgs);
+  const profileArgs = useTuning((s) => s.serverArgs);
+  const estimateCtx = useTuning((s) => s.estimate?.ctx);
+  // What the sweep carries: the profile's flags, plus the recommendation's -c when they set no context (#24).
+  const serverArgs = withCtx(profileArgs, estimateCtx);
+  const addedCtx = serverArgs !== profileArgs;
   const profiles = useProfiles((s) => s.profiles);
   const [info, setInfo] = useState<ModelDetail | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
@@ -112,6 +116,12 @@ export function ModelCard() {
             <code className="rounded-md bg-well inset-shadow-well px-2.5 py-1.5 font-mono text-xs break-all">
               {shellQuote(serverArgs)}
             </code>
+            {addedCtx && (
+              <span className="text-xs text-muted-foreground">
+                -c from the recommendation: the profile sets no context, and llama-server would allocate the model's
+                full one.
+              </span>
+            )}
             {ignored.length > 0 && (
               <span className="text-xs text-muted-foreground">
                 Ignored by llama-bench: {ignored.map((i) => i.flag).join(', ')}

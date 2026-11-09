@@ -8,6 +8,8 @@ import {
   paramsFromServerArgs,
   profileModelPath,
   serverArgs,
+  sweepCtx,
+  withCtx,
 } from '@llama-webui/shared';
 import { listDevices } from '../bench/hardware';
 import { benchBinary } from '../bench/parse';
@@ -15,6 +17,7 @@ import type { BenchRunner } from '../bench/runner';
 import type { BenchRunsRepo } from '../db/benchRuns';
 import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
+import type { SweepsRepo } from '../db/sweeps';
 import { guarded, HttpError, idParam, jsonObject, notFound } from '../http';
 import { profilePaths } from '../supervisor/args';
 import type { WsHub } from '../ws/hub';
@@ -24,13 +27,14 @@ export interface BenchRouteDeps {
   benchRunner: BenchRunner;
   settings: SettingsRepo;
   profiles: ProfilesRepo;
+  sweeps: SweepsRepo;
   hub: WsHub;
 }
 
 const KINDS = new Set(['bench', 'server']);
 const STATUSES = new Set(['queued', 'running', 'ok', 'failed', 'cancelled', 'interrupted']);
 
-export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }: BenchRouteDeps) {
+export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps, hub }: BenchRouteDeps) {
   const home = homedir();
   /** Free name: “<base>”, then “<base> (2)”, “(3)”… */
   const freeName = (base: string) => {
@@ -115,12 +119,14 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, hub }:
           ? profileModelPath(spec.mmprojPath, { cwd: placed.cwd, modelsDir, home }).model
           : undefined;
         const origin = spec.profileId !== null ? profiles.get(spec.profileId) : null;
+        // A sweep run: the context it was planned at, not the model's full one (#24).
+        const sweep = run.sweepId !== null ? sweeps.get(run.sweepId) : null;
         const profile = profiles.create({
           name: freeName(`${basename(spec.modelPath).replace(/\.gguf$/, '')} — bench #${run.id}`),
           model: placed.model,
           ...(mmproj ? { mmproj } : {}),
           ...(placed.cwd ? { cwd: placed.cwd } : {}),
-          args: [...serverArgs(spec.params), ...spec.serverArgs],
+          args: [...serverArgs(spec.params), ...withCtx(spec.serverArgs, sweep ? sweepCtx(sweep.spec) : null)],
           env: origin?.env ?? {},
         });
         return Response.json(profile, { status: 201 });

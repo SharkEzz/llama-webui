@@ -81,7 +81,7 @@ export function RankingTable({ sweep, runs }: { sweep: Sweep; runs: BenchRun[] }
           <p className="text-xs text-muted-foreground">
             Best configurations of the exploration. Thin line: ± one standard deviation. Configurations whose gap to the
             first is below the noise (pp ±{NOISE.pp * 100}%, tg ±{NOISE.tg * 100}%) are tied (“1=”); llama-bench
-            measures neither MTP nor -c: the server validation settles it.
+            measures neither speculative decoding nor -c: the server validation settles it.
           </p>
         </div>
       )}
@@ -124,7 +124,11 @@ function Ranking({
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Prompt</TableHead>
               <TableHead className="text-right">Generation</TableHead>
-              {server && <TableHead className="text-right">MTP</TableHead>}
+              {server && (
+                <TableHead className="text-right" title="Speculative decoding: draft tokens accepted">
+                  Draft
+                </TableHead>
+              )}
               <TableHead className="text-right">Peak VRAM</TableHead>
               <TableHead className="text-right">Duration</TableHead>
               <TableHead className="w-8">

@@ -252,6 +252,11 @@ export function ctxFromArgs(args: string[]): number | undefined {
   return out;
 }
 
+/** `args` with `-c <ctx>` appended when they set no context: llama-server would otherwise allocate the model's full one. */
+export function withCtx(args: string[], ctx: number | null | undefined): string[] {
+  return ctx && ctxFromArgs(args) === undefined ? [...args, '-c', String(ctx)] : args;
+}
+
 function toArgs(p: BenchParams, tool: BenchKind): string[] {
   const out: string[] = [];
   const sep = tool === 'bench' ? '/' : ',';
@@ -278,13 +283,19 @@ export const benchArgs = (p: BenchParams): string[] => toArgs(p, 'bench');
 const IGNORED: { test: (flag: string) => boolean; why: string }[] = [
   { test: (f) => f === '-c' || f === '--ctx-size', why: 'context not allocated' },
   {
+    // Every speculative flag: --spec-type, --spec-draft-n-max, --spec-default…, the draft model and its placement (#30).
     test: (f) =>
-      f === '--spec-type' ||
+      f.startsWith('--spec-') ||
       f === '-md' ||
-      f === '--model-draft' ||
+      f.startsWith('--model-draft') ||
       f.startsWith('--draft') ||
       f === '-ngld' ||
-      f === '-devd',
+      f === '--gpu-layers-draft' ||
+      f === '--n-gpu-layers-draft' ||
+      f === '-devd' ||
+      f === '--device-draft' ||
+      f === '-cd' ||
+      f === '--ctx-size-draft',
     why: 'speculative decoding not measured',
   },
   { test: (f) => f === '-cmoe' || f === '--cpu-moe', why: 'use -ncmoe' },

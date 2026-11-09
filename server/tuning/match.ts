@@ -1,4 +1,4 @@
-import type { BenchDevice, GpuSample } from '@llama-webui/shared';
+import { type BenchDevice, type GpuSample, gpuDevices } from '@llama-webui/shared';
 
 const MiB = 1024 ** 2;
 /** Vulkan appends the driver to the name: “AMD Radeon RX 9070 XT (RADV GFX1201)”. */
@@ -40,6 +40,17 @@ export function matchGpus(devices: BenchDevice[], gpus: GpuSample[]): Map<string
     out.set(d.id, g);
   }
   return out;
+}
+
+/**
+ * Bus ids of the cards llama-server will run on: the estimate's `-dev` (all dedicated cards when it has none), matched
+ * to the monitored cards. Without a device list, every monitored card counts (nothing better to go on).
+ */
+export function retainedBusIds(devices: BenchDevice[], gpus: GpuSample[], dev: string[] | undefined): string[] {
+  if (devices.length === 0) return gpus.map((g) => g.busId);
+  const ids = dev?.filter((id) => id !== 'none') ?? gpuDevices(devices).map((d) => d.id);
+  const matched = matchGpus(devices, gpus);
+  return [...new Set(ids.flatMap((id) => matched.get(id)?.busId ?? []))];
 }
 
 /**
