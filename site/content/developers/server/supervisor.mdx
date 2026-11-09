@@ -152,8 +152,11 @@ profile's `env` over it: a profile variable overrides an inherited one with the 
 4. It records `cmd` as the last command, checks that `cmd.cwd` exists, and calls `Bun.spawn(cmd.argv, …)` with that
    `cwd` and `env`, `stdin` ignored, `stdout` and `stderr` piped. A missing directory or a spawn error logs
    `[llama-webui] launch failed: …` and sets `crashed` with that message.
-5. It pushes the launch line, `LAUNCH_LOG_PREFIX` (`[llama-webui] launch:`) followed by `display`, to the log ring. The
-   [placement tracker](/developers/server/monitor/) looks for that prefix to find the start of the current load.
+5. It pushes the lines of `launchLines()` (`server/supervisor/args.ts`) to the log ring: the launch line,
+   `LAUNCH_LOG_PREFIX` (`[llama-webui] launch:`) followed by `display`, then `P2P_LOG_LINE` when `GGML_CUDA_P2P` is in
+   `env`, whatever its value (llama.cpp only checks that it exists). The
+   [placement tracker](/developers/server/monitor/) looks for the prefix to find the start of the current load, and
+   for the second line to know that peer-to-peer was requested, which `llama-server` does not log.
 6. Both output streams are split into lines (`LineSplitter`, `server/logs/lines.ts`) and pushed to the `LogBuffer`
    (`server/logs/buffer.ts`, 10,000 lines kept in memory).
 7. The state becomes `starting`, and a timer probes readiness every `healthPollMs` (500 ms).

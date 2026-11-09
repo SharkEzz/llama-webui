@@ -126,8 +126,10 @@ suspended card can answer `0xFFFF` to a config read) is treated as unknown.
 `ModelPlacement` comes from `llama-server`'s startup logs, since `llama-server` does not expose these figures through
 its API (`parsePlacement()` in `server/monitor/placement.ts`). The tracker reads the log ring from the last
 `[llama-webui] launch:` line: the `using device … (<busId>)` lines, the `… model|KV|RS|compute buffer size = N MiB`
-lines and `offloaded N/M layers to GPU`. A second `offloaded` line opens the draft model and ends the parsing; the
-projector's buffers and the fitting probes of `-fit` are skipped. The sizes are only logged from `-lv 4` on, which
+lines and `offloaded N/M layers to GPU`. A second `offloaded` line opens the draft model and ends the reading of the
+buffers; the projector's buffers and the fitting probes of `-fit` are skipped. NCCL's lines, written with
+`NCCL_DEBUG=INFO`, are read over the whole launch: they give the PCI address of each CUDA device and say whether
+peer-to-peer is in use. The sizes are only logged from `-lv 4` on, which
 llama-webui adds to a profile that sets no verbosity.
 
 `placement` is null when no managed server is `starting`, `ready` or `stopping`, before the launch line appears in the
@@ -139,17 +141,26 @@ last placement read stays valid as long as the server has the same PID.
 | `launchSeq` | number                                       | Sequence number of the `[llama-webui] launch:` log line it comes from.  |
 | `layers`    | `{ offloaded, total }` \| null                | From `offloaded N/M layers to GPU`; null until that line has gone by.  |
 | `buffers`   | `PlacementBuffer[]`                          | One per device that has buffers.                                        |
+| `p2p`       | `'active'` \| `'unavailable'` \| `'requested'`, optional | Peer-to-peer between the GPUs of a backend, see below. Absent when neither requested nor reported. |
 
 `PlacementBuffer`:
 
 | Field          | Type           | Description                                                                              |
 | -------------- | -------------- | ---------------------------------------------------------------------------------------- |
 | `device`       | string         | ggml device name: `CUDA0`, `ROCm0`, `Vulkan1`, `CPU`, `CPU_Mapped`, `CUDA_Host`…         |
-| `busId`        | string \| null  | PCI address from the `using device` line; null for the host or when not logged.          |
+| `busId`        | string \| null  | PCI address from the `using device` line, or from NCCL's `cudaDev N … busId X` for a CUDA device it does not cover (`-sm tensor`); null for the host or when not logged. |
 | `modelBytes`   | number         | Weights on the device.                                                                   |
 | `kvBytes`      | number         | KV cache, plus the recurrent state (`RS`) of hybrid models.                              |
 | `computeBytes` | number         | Compute buffers, summed over the contexts (an MTP's adds to the model's); a context reserved again keeps only its last size. |
 | `estimated`    | `true`, optional | Spread from the `Meta()` buffers of `-sm tensor`, which only give the largest part: by `-ts`, equal parts without it. Absent otherwise. |
+
+`p2p` says what the logs tell about direct transfers between GPUs:
+
+| Value         | Read from                                                                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `active`      | An NCCL line `Channel … via P2P/…`: a channel goes from GPU to GPU. Does not need `GGML_CUDA_P2P` (NCCL enables peer access itself). |
+| `unavailable` | The launch set `GGML_CUDA_P2P` (llama-webui's own line, right after the launch line), and NCCL logs `P2P is disabled between connected GPUs` or a channel `via SHM/…`: the driver refuses it. |
+| `requested`   | The launch set `GGML_CUDA_P2P` and NCCL says nothing (not built in, or without `NCCL_DEBUG=INFO`): llama.cpp enables peer-to-peer where the driver allows, silently. |
 
 Every change is pushed as the `placement` message of the [WebSocket](/developers/api/websocket/), with the same
 `ModelPlacement | null` payload.

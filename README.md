@@ -83,9 +83,11 @@ one dashboard designed for a **single machine you own**:
 ### 🧭 3D hardware topology
 
 The **Topology** page draws your machine as an interactive 3D scene (react-three-fiber): CPU, memory,
-NVMe drives, GPUs and chipset, discovered automatically from sysfs. Particles flow along each link according to
-**measured** PCIe, NVMe and DRAM traffic (DRAM through `perf` on AMD Zen 4/5), and HUD cards show the current phase
-(loading, prompt, generation) and **how the model is split across devices**, parsed from `llama-server`'s startup logs.
+NVMe drives, GPUs and chipset, discovered automatically from sysfs. Streaks flow along each link according to
+**measured** PCIe, NVMe and DRAM traffic (DRAM through `perf` on AMD Zen 4/5), with the exact throughput next to it
+and an alert when a link nears its capacity. GPUs and memory are tanks filled to the memory in use, and cards show the
+current phase (loading, prompt, generation) and **how the model is split across devices**, parsed from
+`llama-server`'s startup logs.
 
 <p align="center">
   <img src="docs/assets/screenshots/topology.jpg" alt="3D hardware topology with live PCIe, NVMe and DRAM traffic and model placement per device" width="100%">

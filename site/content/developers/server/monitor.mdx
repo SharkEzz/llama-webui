@@ -274,6 +274,18 @@ With `-sm tensor`, the buffers are logged on one `Meta()` device, at the size of
 `llama_prepare_model_devices: - device N: <name>` lines: model and cache scaled by `ts[i] / max(ts)` (`-ts` from the
 launch line, equal parts without it), the whole compute buffer on each, and `estimated: true`.
 
+Two things come from lines that are not `llama-server`'s own, read over the whole launch (NCCL starts with the
+context, after the lines of a draft model):
+
+- **Peer-to-peer** (`parseP2p()`). llama.cpp enables CUDA peer-to-peer as soon as `GGML_CUDA_P2P` exists and logs
+  nothing, so the supervisor writes `P2P_LOG_LINE` after the launch line when the variable is in the server's
+  environment. NCCL, built in and run with `NCCL_DEBUG=INFO`, says what really happens, which depends on the same
+  driver capability: a `Channel … via P2P/…` line gives `active`; with the variable set, `P2P is disabled between
+  connected GPUs` or a channel `via SHM/…` gives `unavailable`, and no NCCL line gives `requested`.
+- **PCI addresses of CUDA devices** (`ncclBusIds()`). NCCL's `ncclCommInitAll … cudaDev N nvmlDev N busId X` lines
+  give the address of `CUDA<N>` as hex digits (`3000` is `0000:03:00.0`). An address from a `using device` line wins;
+  with `-sm tensor`, which only logs the `Meta()` device, this is the only one.
+
 Unlike the rest of `server/monitor/`, the tracker is recreated on every reload by `server/index.ts`: it replays the log
 ring, which survives, and keeps the last placement on `globalThis.__llamaWebuiPlacement`, so a reload after the
 launch lines left the ring still knows the placement of the same PID. It subscribes to new log lines (only those that

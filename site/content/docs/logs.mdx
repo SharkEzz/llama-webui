@@ -19,8 +19,8 @@ The buffer collects:
 - **Everything `llama-server` writes**, on standard output and standard error, for every server llama-webui launches.
   Color codes and empty lines are removed.
 - **llama-webui's own lines**, which start with `[llama-webui]` and stand out in the accent color: the command of each
-  launch (`[llama-webui] launch: …`), a launch that failed, the server's exit code, and a forced stop when the server
-  does not stop in time.
+  launch (`[llama-webui] launch: …`), a note when the profile requests peer-to-peer between GPUs (`GGML_CUDA_P2P`), a
+  launch that failed, the server's exit code, and a forced stop when the server does not stop in time.
 - **Benchmark lines**, which start with `[bench]`: the command of each run, the output of `llama-bench` or of the
   temporary server, and the managed server being stopped for the benchmark and restarted afterwards.
 

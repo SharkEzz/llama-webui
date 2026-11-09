@@ -252,6 +252,26 @@ four tones), read by `readChartTheme()` in `chartTheme.ts` and read again when t
 sparkline without axes or legend. The circular gauges are SVG (`components/glass/Gauge.tsx`), and the Topology page
 draws its scene with react-three-fiber (`features/topology/`).
 
+## The Topology scene
+
+`features/topology/` keeps what is drawn apart from how it is computed:
+
+| File                | Role                                                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `flows.ts`          | Pure: projects the snapshot and the placement onto the graph. `linkFlows()` (throughput, share of the capacity, alert level), `linkBadge()`, `nodeLive()` (tank layers, labels, tooltip), `peerLinks()`. |
+| `layout.ts`         | Pure: where each block sits, the curve of each link (`linkPath()`, `peerPath()`) and the camera fit.             |
+| `smooth.ts`         | `Smoother` (per-key easing between two ticks) and `flowVisual()`, the log scale of the streaks.                  |
+| `pacing.ts`         | `FramePacer`: a frame only when something moves.                                                                 |
+| `TopologyScene.tsx` | The three.js scene: tanks, CPU thread grid, tubes, streaks, peer-to-peer dots, and the `Projector` that anchors the DOM labels. |
+| `Labels.tsx`        | DOM labels, link badges and the tooltip, positioned by the scene.                                                |
+| `Hud.tsx`           | The Phase and Model cards and the legend popover; `hudPrefs.ts` keeps the folded cards in `localStorage` (`llama-webui:topology-hud`). |
+
+Thresholds are named constants in `flows.ts` (`LINK_WARN`, `LINK_CRIT`, `FILL_WARN_PCT`, `FILL_CRIT_PCT`,
+`REST_BADGE_FLOOR_BPS`), which the legend reads too. Two rules hold the scene together: a tank's level is always the
+measured memory (the sizes from the logs only split it), and an alert color always has its figure written next to it.
+Colors are mixed by Three in linear space, where a little of a bright tone goes a long way: `LAYER_TINT`
+(`themeColors.ts`) is shared with the legend, which mixes its swatches in `srgb-linear` for the same result.
+
 ## Code highlighting
 
 Chat replies render as Markdown with react-markdown and remark-gfm (`features/chat/Markdown.tsx`); raw HTML in a reply
