@@ -219,7 +219,8 @@ directory, along with profiles, conversations, benchmark runs and sweeps.
 ## For developers
 
 > [!NOTE]
-> This is the short version. Full documentation will live on a dedicated site.
+> This is the short version. The full developer documentation is on the website:
+> [sharkezz.github.io/llama-webui/developers](https://sharkezz.github.io/llama-webui/developers/).
 
 ### Getting started
 
