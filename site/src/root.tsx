@@ -1,4 +1,6 @@
 import './styles/app.css';
+import interLatin from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url';
+import monoLatin from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url';
 import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
@@ -6,6 +8,9 @@ import type { Route } from './+types/root';
 
 export const links: Route.LinksFunction = () => [
   { rel: 'icon', type: 'image/svg+xml', href: `${import.meta.env.BASE_URL}favicon.svg` },
+  // Both faces are on the first screen (headline, dashboard figures): fetch them alongside the stylesheet.
+  { rel: 'preload', as: 'font', type: 'font/woff2', href: interLatin, crossOrigin: 'anonymous' },
+  { rel: 'preload', as: 'font', type: 'font/woff2', href: monoLatin, crossOrigin: 'anonymous' },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
