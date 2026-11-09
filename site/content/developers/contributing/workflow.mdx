@@ -19,11 +19,16 @@ soon as a change forgets it.
 | `server/cli.ts`, `server/paths.ts`, environment variables                    | [Launch options](/docs/configuration/), [Architecture](/developers/architecture/)                                                |
 | `server/security.ts`, `server/http.ts`                                       | [Security](/docs/security/) (user), [Security](/developers/server/security/) (server), [API overview](/developers/api/overview/) |
 | `server/supervisor/**`                                                       | [Supervisor](/developers/server/supervisor/), [Server](/docs/server/)                                                            |
+| `server/logs/**`                                                             | [Supervisor](/developers/server/supervisor/), [Server, state and logs](/developers/api/server/), [Logs](/docs/logs/)             |
 | `server/monitor/**`, `server/collectors/**`                                  | [Monitor and collectors](/developers/server/monitor/), [Dashboard](/docs/dashboard/), [System](/docs/system/), [Topology](/docs/topology/) |
+| `server/hardware/**` (PCI, CPU)                                              | [Topology](/developers/api/topology/) and [Monitor and system](/developers/api/monitor/) (API), [Topology](/docs/topology/), [System](/docs/system/) |
 | `server/chat/**`                                                             | [Chat runs](/developers/server/chat/), [Chat](/docs/chat/)                                                                       |
 | `server/bench/**`                                                            | [Benchmarks and sweeps](/developers/server/bench/), [Benchmark](/docs/benchmark/), [Sweeps](/docs/sweeps/)                       |
 | `shared/src/tuning.ts`, `server/tuning/**`                                   | [Tuning](/developers/server/tuning/) (server), [Tuning](/docs/tuning/) (user), [Sweeps](/docs/sweeps/), the guides it affects    |
-| `server/hf/**`                                                               | [Hugging Face downloads](/developers/server/hugging-face/) (server), [Hugging Face downloads](/docs/hugging-face/) (user)         |
+| `server/hf/**`                                                               | [Hugging Face downloads](/developers/server/hugging-face/) (server), [Hugging Face downloads](/docs/hugging-face/) (user)        |
+| `server/models/**` (scan, GGUF)                                              | [Models](/developers/api/models/) (API), [Models](/docs/models/) (user)                                                          |
+| `server/setup.ts`                                                            | [Setup and launch pad](/developers/api/setup/), [First run](/docs/getting-started/first-run/)                                    |
+| `server/llamatui.ts`                                                         | [Profiles](/developers/api/profiles/) (API), [Profiles](/docs/profiles/) (user)                                                  |
 | `server/db/**` (migrations, tables)                                          | [Database](/developers/server/database/)                                                                                         |
 | `web/src/features/home/setup/**`                                             | [First run](/docs/getting-started/first-run/)                                                                                    |
 | `web/src/features/<page>/**`                                                 | `/docs/<page>/` and its screenshots (`bench` is [Benchmark](/docs/benchmark/), the Hugging Face part of `models` is [Hugging Face downloads](/docs/hugging-face/)) |
@@ -32,6 +37,7 @@ soon as a change forgets it.
 | `shared/src/settings.ts`, the Settings page                                  | [Settings](/docs/settings/), [Health and settings](/developers/api/app/)                                                         |
 | `server/index.ts`, `server/runtime.ts`, `server/routes/web.ts`, hot reload   | [Architecture](/developers/architecture/)                                                                                        |
 | `package.json` scripts, repository layout                                    | [Development setup](/developers/getting-started/)                                                                                |
+| `server/testing/**`, `testdata/**` (fakes, fixtures)                         | [Testing](/developers/contributing/testing/)                                                                                     |
 | Requirements, installation (README)                                          | [Requirements](/docs/getting-started/requirements/), [Installation](/docs/getting-started/installation/)                         |
 | Project conventions (Biome, language, tests, docs)                           | These Contributing pages                                                                                                         |
 
@@ -242,5 +248,6 @@ Node.js 24 (the React Router CLI that builds the site runs on Node, and Vite 8 n
 `--frozen-lockfile` fails when a lockfile is out of date: commit `bun.lock` (and `site/bun.lock`) with any dependency
 change.
 
-`.github/workflows/site-deploy.yml` publishes `site/dist/` to GitHub Pages. It only runs when started by hand
-(`workflow_dispatch`) while the website is not public.
+`.github/workflows/site-deploy.yml` publishes `site/dist/` to GitHub Pages: on every push to `master` that changes
+`site/` (or the workflow itself), and when started by hand from the Actions tab (`workflow_dispatch`). A pull request
+never deploys: the site changes it brings go live when it is merged.
