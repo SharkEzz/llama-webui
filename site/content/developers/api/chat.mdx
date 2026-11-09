@@ -87,7 +87,8 @@ Creates an empty conversation with the default title, an empty system prompt, no
 
 **Response**: `201` with the `ConversationDetail` (no messages).
 
-**Errors**: `400` `profileId: expected an integer`; `404` unknown profile.
+**Errors**: `400` `JSON object expected` (a body is required); `400` `profileId: expected an integer`; `404` unknown
+profile.
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/chat \
@@ -179,7 +180,8 @@ message, the title is taken from the message.
 
 **Response**: `200`, `content-type: text/event-stream`.
 
-**Errors** (JSON, before the stream starts): `400` `content: expected a string` or `Empty message`; `404` unknown
+**Errors** (JSON, before the stream starts): `400` `JSON object expected`, `content: expected a string` or
+`Empty message`; `404` unknown
 conversation; `409` `A reply is already in progress in this conversation`; `409` `llama-server is not ready`.
 
 A failure of `llama-server` itself does not change the status code: the stream ends with a `done` event whose message

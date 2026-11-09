@@ -141,7 +141,8 @@ it. The sweep and its items are written only once the gate is taken: a refused r
 **Response**: `202` with `{ sweep: Sweep, items: number, excluded: number }`: the sweep (status `running`), the number
 of queued items, and the number of combinations dropped by the estimator.
 
-**Errors**: `400` invalid spec; `404` `Model not found` or `Projector not found`; `422` unreadable GGUF; `409`
+**Errors**: `400` `JSON object expected` or an invalid spec; `404` `Model not found` or `Projector not found`; `422`
+unreadable GGUF; `409`
 `No configuration to run: <n> excluded by the estimator`; the [gate errors](/developers/api/bench/#gate-errors) (`409`, `code:
 "server-running"` when the server must be stopped).
 
@@ -157,7 +158,20 @@ curl -X POST http://127.0.0.1:7860/api/sweeps \
     "id": 4,
     "name": "Qwen3 30B offload",
     "status": "running",
-    "spec": { "name": "Qwen3 30B offload", "preset": "chat", "space": { "ncmoe": [0, 8, 16], "ub": [512, 2048] } },
+    "spec": {
+      "name": "Qwen3 30B offload",
+      "modelPath": "/home/demo/models/Qwen3-30B-A3B-Q4_K_M.gguf",
+      "mmprojPath": null,
+      "profileId": null,
+      "p": 512,
+      "n": 128,
+      "r": 3,
+      "preset": "chat",
+      "base": { "ngl": "all", "fa": "on" },
+      "space": { "ncmoe": [0, 8, 16], "ub": [512, 2048] },
+      "serverArgs": ["-c", "32768"],
+      "includeUnfit": false
+    },
     "bestRunId": null,
     "best": null,
     "counts": { "total": 5, "queued": 5, "running": 0, "ok": 0, "failed": 0, "cancelled": 0, "interrupted": 0 },
@@ -213,11 +227,13 @@ curl -X POST http://127.0.0.1:7860/api/sweeps/4/cancel
 Puts the `interrupted` items back in the queue, then runs the queued items: those an interruption left behind and the
 requeued ones. Cancelled items are not resumed.
 
-**Body**: a JSON object, `{}` or `{ "stopServer": true }`.
+**Body**: a JSON object, `{}` or `{ "stopServer": true }`. It is required: a request without a body gets `400`
+`Invalid JSON`.
 
 **Response**: `202` with the `Sweep` (status `running`).
 
-**Errors**: `404` unknown sweep; `409` `This sweep is still running: cancel it first`; `409`
+**Errors**: `400` `Invalid JSON` or `JSON object expected`; `404` unknown sweep; `409`
+`This sweep is still running: cancel it first`; `409`
 `Nothing to resume: no interrupted or queued item`; the [gate errors](/developers/api/bench/#gate-errors).
 
 ```bash title="Terminal"
@@ -234,7 +250,7 @@ Takes the `n` best successful `bench` items of the sweep ([ranking](#ranking)) a
 `server` item: same params, the sweep's `serverArgs`, `p`, `n` and `r`, labeled `validation · <item label>`. The
 sweep's interrupted items are requeued with them. The sweep then runs again, in the `validate` stage.
 
-**Body**: strict.
+**Body**: a JSON object, required (`{}` for the defaults), strict.
 
 | Field        | Type    | Required | Description                                          |
 | ------------ | ------- | -------- | ---------------------------------------------------- |
