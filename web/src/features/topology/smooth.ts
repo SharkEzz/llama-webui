@@ -35,17 +35,37 @@ export class Smoother {
   }
 }
 
-const FLOOR_BPS = 1e5;
+/** Throughput under which a link counts as idle: no streak. */
+export const FLOOR_BPS = 1e5;
 const CEIL_BPS = 20e9;
 const RANGE = Math.log10(CEIL_BPS / FLOOR_BPS);
-export const MAX_PARTICLES = 64;
+/** Most streaks on one lane of a link. */
+export const MAX_STREAKS = 24;
+
+export interface FlowVisual {
+  /** Number of streaks on the lane. */
+  count: number;
+  /** Fraction of the link covered per second. */
+  speed: number;
+  /** Length of a streak (scene units). */
+  length: number;
+  /** 0..1. */
+  glow: number;
+}
+
+const NONE: FlowVisual = { count: 0, speed: 0, length: 0, glow: 0 };
 
 /**
- * Maps a throughput to visual parameters, on a log scale: 50 MiB/s must stay visible next to 20 GiB/s.
- * `particles`: number of particles on the link; `speed`: fraction of the link covered per second; `glow`: 0..1.
+ * Maps a throughput to what a lane looks like, on a log scale: 50 MiB/s must stay visible next to 20 GiB/s. More
+ * traffic means more streaks, longer and faster; the exact figure is on the link's badge.
  */
-export function flowVisual(bps: number | null): { particles: number; speed: number; glow: number } {
-  if (bps === null || !(bps >= FLOOR_BPS)) return { particles: 0, speed: 0, glow: 0 };
+export function flowVisual(bps: number | null): FlowVisual {
+  if (bps === null || !(bps >= FLOOR_BPS)) return NONE;
   const x = Math.min(1, Math.log10(bps / FLOOR_BPS) / RANGE);
-  return { particles: Math.round(4 + (MAX_PARTICLES - 4) * x), speed: 0.15 + 0.6 * x, glow: 0.15 + 0.85 * x };
+  return {
+    count: Math.round(3 + (MAX_STREAKS - 3) * x),
+    speed: 0.12 + 0.5 * x,
+    length: 0.3 + 0.6 * x,
+    glow: 0.2 + 0.8 * x,
+  };
 }
