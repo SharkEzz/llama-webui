@@ -235,7 +235,9 @@ requeued ones. Cancelled items are not resumed.
 
 **Errors**: `400` `Invalid JSON` or `JSON object expected`; `404` unknown sweep; `409`
 `This sweep is still running: cancel it first`; `409`
-`Nothing to resume: no interrupted or queued item`; the [gate errors](/developers/api/bench/#gate-errors).
+`Nothing to resume: no interrupted or queued item`; `400` `Model not found: <path>` or `Projector not found: <path>`
+when the sweep's files were deleted, checked before the gate is taken; the
+[gate errors](/developers/api/bench/#gate-errors).
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/sweeps/4/resume \
@@ -262,7 +264,8 @@ sweep's interrupted items are requeued with them. The sweep then runs again, in 
 **Response**: `202` with the `Sweep` (status `running`).
 
 **Errors**: `400` invalid body; `404` unknown sweep; `409` `This sweep is still running: cancel it first`; `409`
-`No successful run to validate`; the [gate errors](/developers/api/bench/#gate-errors).
+`No successful run to validate`; `400` `Model not found: <path>` or `Projector not found: <path>`, checked before
+the gate is taken; the [gate errors](/developers/api/bench/#gate-errors).
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/sweeps/4/validate \

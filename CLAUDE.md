@@ -48,7 +48,7 @@ Biome (devDependency épinglée, config dans `biome.json`) gère le format, le l
 
 ## Langue
 
-L'UI, les messages du serveur (erreurs, validations zod, logs, `--help`), les commentaires, les noms de tests, les messages de commit et les PR sont **en anglais**. Nombres, dates et unités passent par `web/src/lib/format.ts` (`LOCALE = 'en-US'`, `num`, `fmt`, `plural`, `formatBytes` en KiB/MiB/GiB…) : pas de locale codée en dur. Le web ne compare jamais un texte de message du serveur : utiliser un `code` (`HttpError`) ou un helper partagé (`isOomError`, `isDefaultTitle`).
+L'UI, les messages du serveur (erreurs, validations zod, logs, `--help`), les commentaires, les noms de tests, les messages de commit et les PR sont **en anglais**. Nombres, dates et unités passent par `web/src/lib/format.ts` (`LOCALE = 'en-US'` de `shared/src/format.ts`, `num`, `fmt`, `plural`, `formatBytes` en KiB/MiB/GiB…), côté serveur par `fmtInt` (`shared/src/format.ts`) : pas de locale codée en dur. Le web ne compare jamais un texte de message du serveur : utiliser un `code` (`HttpError`) ou un helper partagé (`isOomError`, `isDefaultTitle`).
 
 ## Frontend
 

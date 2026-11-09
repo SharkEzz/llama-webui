@@ -98,11 +98,14 @@ export class Monitor {
     this.modelDisks.clear();
   }
 
-  /** Follows the settings: collectors, history size (recent points kept), interval. */
+  /**
+   * Follows the settings: collectors, history size (recent points kept), interval. The new settings only become
+   * current once the collectors accepted them: after a failure, a later call compares against the old ones.
+   */
   async configure(next: MonitorSettings): Promise<void> {
     const prev = this.settings;
-    this.settings = next;
     await this.collectors.configure(next);
+    this.settings = next;
     if (prev.historySeconds !== next.historySeconds || prev.pollIntervalMs !== next.pollIntervalMs) {
       this.history = this.history.resized(historyPoints(next.historySeconds, next.pollIntervalMs), next.pollIntervalMs);
     }

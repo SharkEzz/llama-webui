@@ -18,13 +18,7 @@ bun test
 Bun's runner looks for `*.test.ts` files (and the other test suffixes) in every folder except `node_modules` and hidden
 ones, so this runs the tests of `server/`, `shared/`, `web/` and `site/`. It is the command CI runs.
 
-<Callout type="note" title="bun test and bun run test">
-
-The root `test` script is `bun test server shared site`. Positional arguments are path filters (substring matches), so
-`bun run test` only runs the files whose path contains `server`, `shared` or `site`, and leaves out the tests under
-`web/src/`. Use `bun test` to run everything.
-
-</Callout>
+The root `test` script is `bun test` too: `bun run test` runs the same files.
 
 | Command                                     | Runs                                                 |
 | ------------------------------------------- | ---------------------------------------------------- |
@@ -128,7 +122,10 @@ it was given:
   is off), then Markdown, one chunk at a time; a prompt larger than the simulated context gets `llama-server`'s
   context-size error.
 - `/slots`, `/metrics` and `/props` serve `slots-busy.json`, `metrics-after.txt` and `props.json` from `testdata/fake/`.
-- `--version` prints a fake build line and exits.
+- `--version` prints a fake build line and exits; `--help` prints a one-flag catalogue and exits.
+
+The bench runner and the parser tests use it (`server/bench/runner.test.ts`), as the binary setting of a fake
+configuration.
 
 Environment variables shape its behavior:
 
@@ -158,7 +155,7 @@ Environment variables shape its behavior:
 | `FAKE_BENCH_OOM`                  | `1`: fails like an out-of-memory load (`oom-stderr.txt`, exit code 1)             |
 | `FAKE_BENCH_OOM_ARG`              | Same failure when the arguments contain that fragment                             |
 | `FAKE_PP`, `FAKE_TG`              | Overrides the prompt and generation speeds                                         |
-| `FAKE_TG_BY_ARG`                  | `-ncmoe 8=30;-dev CUDA0/CUDA1=55`: the generation speed of the first fragment found |
+| `FAKE_TG_BY_ARG`                  | `-ncmoe 8=30;-dev CUDA0,CUDA1=55`: the generation speed of the first fragment found (the fake receives `-dev` with commas) |
 
 ### Use them in a test
 

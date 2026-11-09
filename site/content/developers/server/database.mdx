@@ -60,11 +60,12 @@ migration. Tests open a migrated database in memory with `openDb(':memory:')`.
 
 ## Migrations
 
-`MIGRATIONS` is an array of SQL strings, one per schema version. The rule is written above it:
+`MIGRATIONS` has one entry per schema version: an SQL string, or a `Rebuild` (`{ rebuild: string[] }`) for a table
+rebuild. The rule is written above it:
 
 ```ts title="server/db/migrations.ts"
 /** One entry per schema version; never change a migration that has shipped, add a new one. */
-export const MIGRATIONS: string[] = [
+export const MIGRATIONS: Migration[] = [
   // 1 — key/value settings
   `CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL);`,
   // …
@@ -73,17 +74,24 @@ export const MIGRATIONS: string[] = [
 
 `runMigrations(db)` keeps the current version in a one-row `schema_version` table (created, with version `0`, on a new
 database). It applies each entry after the current version in order, each in its own transaction together with the
-version update, so a failed migration leaves the database at the previous version. There are 16 entries: a database
-created by the current code is at version 16.
+version update, so a failed migration leaves the database at the previous version. There are 17 entries: a database
+created by the current code is at version 17.
+
+A `Rebuild` runs its statements in one transaction with the foreign keys off (`runRebuild()`). With them on, the
+`DROP TABLE` of a parent table deletes its rows first, and every `ON DELETE SET NULL` link to it would be emptied.
+`PRAGMA foreign_keys` has no effect inside a transaction, so the runner turns it off before and back on after. Before
+committing, it runs `PRAGMA foreign_key_check` and aborts the migration if the rebuild broke a link that was not
+already broken. `runMigrations(db, upTo)` stops at version `upTo`: tests use it to fill an older schema, then migrate.
 
 ### Write a migration
 
-1. Append an entry at the end of `MIGRATIONS`, with a comment giving its number and purpose (`// 17 — …`), like the
-   existing ones. Each existing entry holds a single SQL statement.
+1. Append an entry at the end of `MIGRATIONS`, with a comment giving its number and purpose (`// 18 — …`), like the
+   existing ones. A string entry holds a single SQL statement.
 2. Never edit, reorder or remove an entry that has shipped: databases that already ran it would never see the change,
    and new ones would diverge from them.
-3. For a change `ALTER TABLE` cannot make, rebuild the table as entries 10 to 14 do for `bench_runs`: create the new
-   table, copy the rows, drop the old one, rename the new one, then recreate its indexes.
+3. For a change `ALTER TABLE` cannot make, rebuild the table: create the new table, copy the rows, drop the old one,
+   rename the new one, then recreate its indexes. Use a `Rebuild` entry, as entry 17 does for `profiles`, whenever
+   other tables reference the one rebuilt (entries 10 to 14, for `bench_runs`, predate it).
 4. Update the repository that owns the table, and its tests.
 
 The migration runs at the next start, or at the next `bun --hot` reload in development.
@@ -96,7 +104,7 @@ Columns are `snake_case`. Columns ending in `_json` hold JSON text that the repo
 | Table           | Repository          | Main columns                                                                                                                 |
 | --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `settings`      | `SettingsRepo`      | `key` (primary key), `value_json`                                                                                           |
-| `profiles`      | `ProfilesRepo`      | `id`, `name` (unique), `model_path`, `mmproj_path`, `cwd`, `host`, `port`, `args_json`, `env_json`, `source`, `created_at`, `updated_at` |
+| `profiles`      | `ProfilesRepo`      | `id` (`AUTOINCREMENT`), `name` (unique), `model_path`, `mmproj_path`, `cwd`, `host`, `port`, `args_json`, `env_json`, `source`, `created_at`, `updated_at` |
 | `model_cache`   | `ModelCacheRepo`    | `path` (primary key), `stamp`, `summary_json`, `read_at`                                                                    |
 | `conversations` | `ConversationsRepo` | `id`, `title`, `profile_id`, `model_path`, `sampling_json`, `system_prompt`, `thinking`, `created_at`, `updated_at`          |
 | `messages`      | `ConversationsRepo` | `id`, `conversation_id`, `role`, `content`, `reasoning`, `status`, `error`, `stats_json`, `model_path`, `created_at`         |
@@ -116,8 +124,9 @@ Foreign keys:
 | `sweeps.best_run_id`          | `bench_runs(id)`    | `SET NULL` |
 
 Deleting a profile keeps its conversations, runs and sweeps, which still record the model path. Deleting a sweep
-deletes its runs. `bench_runs` uses `AUTOINCREMENT` so that a deleted ID is never handed out again:
-`sweeps.best_run_id` relies on it.
+deletes its runs. `bench_runs` and `profiles` use `AUTOINCREMENT` so that a deleted ID is never handed out again:
+`sweeps.best_run_id` relies on it, and so does anything that kept a profile id (a run, a sweep, a conversation, the
+last started profile, a client).
 
 Indexes: `messages_by_conversation` on `messages(conversation_id, id)`, `bench_runs_by_date` on
 `bench_runs(created_at DESC)`, `bench_runs_by_sweep` on `bench_runs(sweep_id, id)`.

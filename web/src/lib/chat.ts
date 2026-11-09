@@ -9,7 +9,7 @@ import {
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { ApiError, api } from './api';
+import { ApiError, api, apiError } from './api';
 
 /** Reply being written in the open conversation. */
 export interface Streaming {
@@ -58,10 +58,7 @@ async function postStream(path: string, body?: unknown, signal?: AbortSignal): P
     signal,
   });
   if (res.status === 204) return null;
-  if (!res.ok) {
-    const j = (await res.json().catch(() => null)) as { error?: string } | null;
-    throw new ApiError(res.status, j?.error ?? `HTTP ${res.status}`);
-  }
+  if (!res.ok) throw apiError(res.status, await res.json().catch(() => null));
   return res;
 }
 

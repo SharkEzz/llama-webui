@@ -83,12 +83,12 @@ Creates an empty conversation with the default title, an empty system prompt, no
 
 | Field       | Type    | Required | Description                                                                                         |
 | ----------- | ------- | -------- | --------------------------------------------------------------------------------------------------- |
-| `profileId` | integer | no       | Profile whose model the conversation records. Omitted: the profile of the running server, if any. |
+| `profileId` | integer \| null | no | Profile whose model the conversation records. Omitted: the profile of the running server, if any; `null`: none. |
 
 **Response**: `201` with the `ConversationDetail` (no messages).
 
-**Errors**: `400` `JSON object expected` (a body is required); `400` `profileId: expected an integer`; `404` unknown
-profile.
+**Errors**: `400` `JSON object expected` (a body is required); `400` `profileId: expected an integer or null` (a
+string is refused too); `404` unknown profile.
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/chat \
@@ -234,7 +234,7 @@ Attaches to the conversation's running reply: the stream replays what is already
 
 **Response**: `200` with the [SSE stream](#the-sse-stream), or `204` with no body when no reply is in progress.
 
-**Errors**: `404` when `:id` is not a positive integer. An id with no conversation answers `204`.
+**Errors**: `404` `Conversation not found` when `:id` is not a positive integer or has no conversation.
 
 ```bash title="Terminal"
 curl -N http://127.0.0.1:7860/api/chat/7/stream

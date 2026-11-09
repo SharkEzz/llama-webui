@@ -28,6 +28,7 @@ Tests sit next to their module (`shared/src/<module>.test.ts`) and run with `bun
 | `chat.ts` | `SamplingSchema`, `ConversationPatchSchema`, the conversation and message types, `ChatEvent` (the SSE events `start`, `delta`, `done`), `statsFromTimings()`, `DEFAULT_TITLE`, `isDefaultTitle()`, `autoTitle()`. |
 | `dispose.ts` | `defer(fn)`: a `Disposable` for `using`, with the same `Symbol.dispose` fallback `Bun.build` emits, for browsers that lack it. |
 | `flags.ts` | The `llama-server` flag catalogue: `parseHelp()` reads `--help`, `catalogFrom()`, `flagOf()`, `complete()`, `flagSuggestions()`, `unknownFlags()`, `describeFlag()`. |
+| `format.ts` | `LOCALE = 'en-US'`, the locale of every number shown to the user, and `fmtInt()` for the server's messages; `web/src/lib/format.ts` imports `LOCALE` from here. |
 | `hf.ts` | Hugging Face: `HF_REPO_RE`, `parseHfInput()`, the status, search, repository and variant types, `DownloadItem`, `DownloadLive`, `DownloadRequestSchema`, `isDownloadActive()`, `vramFit()`. |
 | `logs.ts` | `LogLine`, `classifyLine()` (level and kind), `filterLogs()`, the client's `LogView` with `EMPTY_LOG_VIEW`, `onBoot()` and `mergeLogs()`, `LAUNCH_LOG_PREFIX`. |
 | `models.ts` | `ModelSummary` (a GGUF header summary), `ModelEntry`, `ModelList`, `ModelDetail`, `profileModelPath()`. |

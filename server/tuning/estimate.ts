@@ -44,11 +44,6 @@ interface Tried {
 /** A placement family over a set of cards: yields flags for (ctx, kv, ub), or null if nothing fits. */
 type Kind = { name: 'gpu' | 'moe-cpu' | 'partial' | 'cpu'; cards: BenchDevice[] };
 
-/**
- * Rule-based recommendation (adapted from llama-tui's estimator): CUDA cards then Vulkan (duplicates and iGPU excluded),
- * `-ncmoe` for MoEs that overflow, partial `-ngl` for dense models, then CPU only. The “100 GB model” preset puts the
- * experts in RAM right away across all cards and accepts a RAM overflow (mmap: re-reads from NVMe).
- */
 /** “experts of the first layer”, “experts of the first 8 layers”. */
 const firstLayers = (n: number) => (n === 1 ? 'experts of the first layer' : `experts of the first ${n} layers`);
 
@@ -58,6 +53,11 @@ const cacheOf = (p: BenchParams): { k: CacheType; v: CacheType } => ({
   v: (p.ctv ?? 'f16') as CacheType,
 });
 
+/**
+ * Rule-based recommendation (adapted from llama-tui's estimator): CUDA cards then Vulkan (duplicates and iGPU excluded),
+ * `-ncmoe` for MoEs that overflow, partial `-ngl` for dense models, then CPU only. The “100 GB model” preset puts the
+ * experts in RAM right away across all cards and accepts a RAM overflow (mmap: re-reads from NVMe).
+ */
 export function estimate(input: EstimateInput): Estimate {
   const { model, hw, mmprojBytes } = input;
   const pinned = input.pinned ?? {};

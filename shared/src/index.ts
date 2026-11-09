@@ -2,6 +2,7 @@ export * from './bench';
 export * from './chat';
 export * from './dispose';
 export * from './flags';
+export * from './format';
 export * from './hf';
 export * from './logs';
 export * from './models';

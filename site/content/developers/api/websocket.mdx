@@ -18,7 +18,8 @@ non-browser clients send none. A plain `GET /ws` without an upgrade gets `426` `
 
 Every frame is a JSON text message `{ "type": "…", "payload": … }` (`ping` and `pong` have no payload). There is no
 subscription: every connected client receives every broadcast message. The server reads only `ping` and `pong` from
-clients and ignores anything else, unparseable frames included.
+clients and ignores anything else: unparseable frames, and frames that parse to something other than an object
+(`null`, a number, an array).
 
 ```ts title="watch.ts"
 const ws = new WebSocket('ws://127.0.0.1:7860/ws');

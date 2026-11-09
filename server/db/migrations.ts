@@ -1,7 +1,18 @@
 import type { Database } from 'bun:sqlite';
 
+/**
+ * A table rebuild (`CREATE … _v2`, copy, `DROP`, `RENAME`): its statements run in one transaction with the foreign
+ * keys off. With them on, the `DROP TABLE` of a parent deletes its rows first, and `ON DELETE SET NULL` would empty
+ * every link to it. `PRAGMA foreign_keys` has no effect inside a transaction, so the runner sets it around.
+ */
+export interface Rebuild {
+  rebuild: string[];
+}
+
+export type Migration = string | Rebuild;
+
 /** One entry per schema version; never change a migration that has shipped, add a new one. */
-export const MIGRATIONS: string[] = [
+export const MIGRATIONS: Migration[] = [
   // 1 — key/value settings
   `CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL);`,
   // 2 — llama-server profiles
@@ -130,20 +141,72 @@ export const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL,
     finished_at INTEGER
   );`,
+  // 17 — profiles rebuilt with AUTOINCREMENT, ids kept: a deleted profile's id is never given to a new one, so a run,
+  // a sweep, a conversation or the last started profile never points to another profile.
+  {
+    rebuild: [
+      `CREATE TABLE profiles_v2(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        model_path TEXT NOT NULL,
+        mmproj_path TEXT,
+        cwd TEXT,
+        host TEXT,
+        port INTEGER,
+        args_json TEXT NOT NULL,
+        env_json TEXT NOT NULL,
+        source TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );`,
+      `INSERT INTO profiles_v2(id, name, model_path, mmproj_path, cwd, host, port, args_json, env_json, source, created_at, updated_at) SELECT id, name, model_path, mmproj_path, cwd, host, port, args_json, env_json, source, created_at, updated_at FROM profiles;`,
+      `DROP TABLE profiles;`,
+      `ALTER TABLE profiles_v2 RENAME TO profiles;`,
+    ],
+  },
 ];
 
-export function runMigrations(db: Database): void {
+type Violation = { table: string; rowid: number; parent: string; fkid: number };
+const violations = (db: Database) =>
+  new Set(
+    db
+      .query<Violation, []>('PRAGMA foreign_key_check')
+      .all()
+      .map((v) => `${v.table}:${v.rowid}:${v.fkid}`),
+  );
+
+function runRebuild(db: Database, m: Rebuild, version: number): void {
+  const fk = db.query<{ foreign_keys: number }, []>('PRAGMA foreign_keys').get()?.foreign_keys ?? 0;
+  db.run('PRAGMA foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      // A violation already there (an old database) is not the rebuild's: only new ones abort it.
+      const before = violations(db);
+      for (const sql of m.rebuild) db.run(sql);
+      const broken = [...violations(db)].filter((v) => !before.has(v));
+      if (broken.length > 0) throw new Error(`migration ${version}: broken foreign keys (${broken.join(', ')})`);
+      db.run('UPDATE schema_version SET version = ?', [version]);
+    })();
+  } finally {
+    if (fk) db.run('PRAGMA foreign_keys = ON');
+  }
+}
+
+/** Brings the schema to `upTo` (the last version by default; tests stop earlier to fill an old schema). */
+export function runMigrations(db: Database, upTo: number = MIGRATIONS.length): void {
   db.run('CREATE TABLE IF NOT EXISTS schema_version(version INTEGER NOT NULL)');
   const row = db.query<{ version: number }, []>('SELECT version FROM schema_version LIMIT 1').get();
   let current = row?.version ?? 0;
   if (!row) db.run('INSERT INTO schema_version(version) VALUES (0)');
-  while (current < MIGRATIONS.length) {
-    const sql = MIGRATIONS[current]!;
+  while (current < upTo) {
+    const m = MIGRATIONS[current]!;
     const next = current + 1;
-    db.transaction(() => {
-      db.run(sql);
-      db.run('UPDATE schema_version SET version = ?', [next]);
-    })();
+    if (typeof m === 'string')
+      db.transaction(() => {
+        db.run(m);
+        db.run('UPDATE schema_version SET version = ?', [next]);
+      })();
+    else runRebuild(db, m, next);
     current = next;
   }
 }

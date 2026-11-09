@@ -139,6 +139,7 @@ Every other error has no `code`.
 | `401`  | Hugging Face rejected the token (`hf-unauthorized`).                                                                                                    |
 | `403`  | Refused by the guard (`Host`, `Origin`), or a gated Hugging Face repository.                                                                           |
 | `404`  | Unknown route, unknown id, or missing file.                                                                                                             |
+| `405`  | A known path called with a method it does not define; the `Allow` header lists the ones it does.                                                       |
 | `409`  | The request conflicts with the current state: a name is taken, an operation is in progress, a benchmark holds the GPUs, a server is running…           |
 | `415`  | Refused by the guard: a write that is not `application/json`.                                                                                           |
 | `422`  | The file exists but cannot be read as a GGUF.                                                                                                           |
@@ -167,7 +168,8 @@ export function modelRoutes({ db, settings }: { db: Database; settings: Settings
     },
 ```
 
-`createApp()` defines the health and settings routes itself, spreads the domain tables, then adds the catch-alls:
+`createApp()` defines the health route itself, spreads the domain tables (the settings ones from
+`server/routes/settings.ts`), then adds the catch-alls, all wrapped in `withMethodNotAllowed()`:
 
 ```ts title="server/app.ts"
       ...setupRoutes(deps),
@@ -180,10 +182,12 @@ export function modelRoutes({ db, settings }: { db: Database; settings: Settings
       ...deps.web,
 ```
 
-- An unknown path under `/api/` gets `404` `{ "error": "Unknown route" }`. A known path called with a method it does
-  not define is a `404` too, never a `405`: Bun falls through to the next route that matches the path, usually
-  `/api/*`, sometimes a parameterized one (`GET /api/profiles/import` reaches `/api/profiles/:id`, which answers
-  `Profile not found`).
+- An unknown path under `/api/` gets `404` `{ "error": "Unknown route" }`.
+- A known path called with a method it does not define gets `405` `{ "error": "Method not allowed (POST)" }` with
+  `Allow: POST`. Without it, Bun would fall through to the next route that matches the path: `GET
+  /api/profiles/import` would reach `/api/profiles/:id` and answer `Profile not found`. `withMethodNotAllowed()`
+  (`server/http.ts`) fills in a guarded `405` handler for each missing `GET`, `POST`, `PUT`, `PATCH` and `DELETE` of
+  every `/api/…` route defined by methods.
 - Path parameters are read with `idParam(req, what)`: anything but a positive integer gives `404` `<what> not found`,
   the same answer as an id that does not exist.
 - A body that must be an object is read with `jsonObject(req)`: valid JSON that is not an object gives `400`

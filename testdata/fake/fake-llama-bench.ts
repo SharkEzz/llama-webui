@@ -1,6 +1,6 @@
 // Mimics llama-bench: progress on stderr (--progress), real JSON on stdout.
 // FAKE_BENCH_OOM=1 or FAKE_BENCH_OOM_ARG=<argv fragment> reproduce a load failure;
-// FAKE_PP / FAKE_TG override the throughputs; FAKE_TG_BY_ARG="-ncmoe 8=30;-dev CUDA0/CUDA1=55": first fragment found → that tg.
+// FAKE_PP / FAKE_TG override the throughputs; FAKE_TG_BY_ARG="-ncmoe 8=30;-dev CUDA0,CUDA1=55": first fragment found → that tg.
 const args = process.argv.slice(2);
 const joined = args.join(" ");
 const dir = `${import.meta.dir}/../llama-bench`;

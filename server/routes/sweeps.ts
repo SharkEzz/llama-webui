@@ -115,7 +115,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
               throw new HttpError(409, 'Nothing to resume: no interrupted or queued item');
             return sweep.id;
           },
-          { stopServer: body.stopServer === true },
+          { stopServer: body.stopServer === true, files: sweep.spec },
         );
         return Response.json(started, { status: 202 });
       }),
@@ -156,7 +156,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
             );
             return sweep.id;
           },
-          { stopServer: stopServer === true },
+          { stopServer: stopServer === true, files: sweep.spec },
         );
         return Response.json(started, { status: 202 });
       }),

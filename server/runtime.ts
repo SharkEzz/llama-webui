@@ -20,8 +20,8 @@ const g = globalThis as { __llamaWebuiRuntime?: Runtime };
 /**
  * Single supervisor and log ring for the whole process. They live on globalThis to survive `bun --hot`
  * (a code reload must neither kill nor orphan llama-server). Shutdown signal handlers are installed only once.
- * Consequence: changing supervisor.ts, logs/buffer.ts, bench/gate.ts, server/monitor/**, server/collectors/** or this file
- * requires a full Bun restart.
+ * Consequence: changing supervisor.ts, logs/buffer.ts, bench/gate.ts, server/monitor/** (except placement.ts, whose
+ * tracker server/index.ts recreates on every reload), server/collectors/** or this file requires a full Bun restart.
  */
 export function getRuntime(): Runtime {
   if (g.__llamaWebuiRuntime) return g.__llamaWebuiRuntime;

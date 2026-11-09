@@ -173,7 +173,8 @@ reloads and changes only when llama-webui restarts, so it tells a reconnection a
 
 `api<T>(path, init)` in `web/src/lib/api.ts` calls `fetch('/api' + path)`. When a body is given, it sets
 `content-type: application/json`, which the server's guard requires on writes. It parses the JSON response and
-throws an `ApiError` for any status outside 2xx:
+throws an `ApiError` for any status outside 2xx, built by `apiError(status, body)` (the chat's SSE requests,
+`postStream()` in `web/src/lib/chat.ts`, use it too):
 
 | Field | Content |
 | --- | --- |

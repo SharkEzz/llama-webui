@@ -1,5 +1,10 @@
-// Imitates llama-server for supervisor tests.
+// Imitates llama-server for the bench runner and parser tests.
 const args = process.argv.slice(2);
+if (args.includes("--help")) {
+  // A short catalogue, so a --help call (flag catalogue) exits at once instead of starting a server on 8080.
+  process.stdout.write("----- common params -----\n\n-c,    --ctx-size N                     size of the prompt context\n");
+  process.exit(0);
+}
 if (args.includes("--version")) {
   process.stderr.write("version: 0.0.0-fake (build 1, commit fake)\n");
   process.exit(0);

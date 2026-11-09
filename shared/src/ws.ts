@@ -21,6 +21,6 @@ export type WsMessage =
   | { type: 'sweep'; payload: Sweep } // on every sweep change (status, counters, best)
   | { type: 'sweep-deleted'; payload: { id: number } }
   | { type: 'placement'; payload: ModelPlacement | null } // placement of the loaded model, on every change
-  | { type: 'download-progress'; payload: DownloadLive | null } // throttled; null when the queue is idle
+  | { type: 'download-progress'; payload: DownloadLive | null } // throttled; null once each download ends
   | { type: 'download'; payload: DownloadItem } // on every status change
   | { type: 'download-deleted'; payload: { ids: number[] } };

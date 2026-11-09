@@ -33,6 +33,8 @@ export class WsHub {
     } catch {
       return;
     }
+    // `null`, a number or an array parse fine too: only an object can be a message.
+    if (typeof msg !== 'object' || msg === null || Array.isArray(msg)) return;
     const state = this.clients.get(ws);
     if (!state) return;
     if (msg.type === 'pong') state.missed = 0;

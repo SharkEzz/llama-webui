@@ -218,7 +218,7 @@ curl -X POST http://127.0.0.1:7860/api/bench/run \
 | `status`  | `queued`, `running`, `ok`, `failed`, `cancelled` or `interrupted`.                                  |
 | `model`   | Exact `modelPath`.                                                                                  |
 | `sweep`   | Omitted: one-off runs only. `all`: one-off runs and sweep items. A sweep id: that sweep's items.    |
-| `limit`   | Positive integer, capped at 5000. Default 200, or 10,000 with a sweep id.                           |
+| `limit`   | Positive integer, capped at 10,000 (`MAX_RUNS`). Default 200, or 10,000 with a sweep id.            |
 
 Runs come newest first (`created_at`, then `id`), except with a sweep id: in item order (`id`).
 

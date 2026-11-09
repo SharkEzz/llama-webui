@@ -91,7 +91,11 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
           throw new HttpError(502, 'llama-server is not responding on /props');
         }
         if (!r.ok) throw new HttpError(502, `llama-server /props: HTTP ${r.status}`);
-        return Response.json(await r.json());
+        // Its reply, not the client's request: a body that is not JSON is a 502, not a 400 "Invalid JSON".
+        const props: unknown = await r.json().catch(() => {
+          throw new HttpError(502, 'llama-server /props: the reply is not JSON');
+        });
+        return Response.json(props);
       }),
     },
     '/api/flags': {

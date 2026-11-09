@@ -37,20 +37,17 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       body = text;
     }
   }
-  if (!res.ok) {
-    const message =
-      typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string'
-        ? body.error
-        : `HTTP error ${res.status}`;
-    const issues =
-      typeof body === 'object' && body !== null && 'issues' in body && Array.isArray(body.issues)
-        ? (body.issues as ApiIssue[])
-        : [];
-    const code =
-      typeof body === 'object' && body !== null && 'code' in body && typeof body.code === 'string' ? body.code : null;
-    throw new ApiError(res.status, message, issues, code);
-  }
+  if (!res.ok) throw apiError(res.status, body);
   return body as T;
+}
+
+/** The `ApiError` of an error response: its `error` message, `issues` (validation) and `code`, when present. */
+export function apiError(status: number, body: unknown): ApiError {
+  const o = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
+  const message = typeof o.error === 'string' ? o.error : `HTTP error ${status}`;
+  const issues = Array.isArray(o.issues) ? (o.issues as ApiIssue[]) : [];
+  const code = typeof o.code === 'string' ? o.code : null;
+  return new ApiError(status, message, issues, code);
 }
 
 export interface Health {

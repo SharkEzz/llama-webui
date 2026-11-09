@@ -182,9 +182,14 @@ export class BenchRunner {
 
   /**
    * Starts a sweep: the gate is taken once, then its queued items run one after another. `target`: the id of an existing
-   * sweep, or the function that creates it (called only once the gate is taken: a 409 refusal writes nothing).
+   * sweep, or the function that creates or requeues it (called only once the gate is taken: a 409 refusal writes
+   * nothing). The model files are checked first, from the sweep for an id, from `o.files` otherwise (resume, validate):
+   * a deleted model is one 400, not every item failing with "Model not found".
    */
-  async startSweep(target: number | (() => number), o: { stopServer: boolean }): Promise<Sweep> {
+  async startSweep(
+    target: number | (() => number),
+    o: { stopServer: boolean; files?: Pick<BenchSpec, 'modelPath' | 'mmprojPath'> },
+  ): Promise<Sweep> {
     if (this.busy) throw new HttpError(409, 'A benchmark is running');
     this.claimed = true;
     using _claim = defer(() => (this.claimed = false));
@@ -192,7 +197,7 @@ export class BenchRunner {
       const sw = this.deps.sweeps.get(target);
       if (!sw) throw notFound('Sweep');
       await this.checkFiles(sw.spec);
-    }
+    } else if (o.files) await this.checkFiles(o.files);
     await this.deps.gate.acquire(o);
     let id: number;
     try {
