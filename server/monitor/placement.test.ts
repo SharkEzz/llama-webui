@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { LogLine, ServerState } from '@llama-webui/shared';
+import { type LogLine, P2P_LOG_LINE, type ServerState } from '@llama-webui/shared';
 import { LogBuffer } from '../logs/buffer';
 import { PlacementTracker, parsePlacement } from './placement';
 
@@ -248,4 +248,71 @@ test('parsePlacement: -sm tensor without -ts gives each device an equal part (#1
   const by = new Map(p.buffers.map((b) => [b.device, b]));
   expect(by.get('CUDA0')!.modelBytes).toBe(5931.79 * MiB);
   expect(by.get('CUDA1')!.modelBytes).toBe(5931.79 * MiB);
+});
+
+test('parsePlacement: peer-to-peer is requested by the line llama-webui adds to the launch, for that launch only', async () => {
+  const text = await fixture();
+  expect(parsePlacement(lines(text))!.p2p).toBeUndefined();
+  const [launch, ...rest] = text.split('\n');
+  const withP2p = lines([launch, P2P_LOG_LINE, ...rest].join('\n'));
+  const p = parsePlacement(withP2p)!;
+  expect(p.p2p).toBe('requested');
+  expect(p.buffers.map((b) => b.device)).toEqual(['CPU_Mapped', 'CUDA0', 'CUDA1', 'ROCm0', 'CUDA_Host']);
+  // A later launch without it: the previous server's request does not carry over.
+  const next = lines('[llama-webui] launch: llama-server -m other.gguf', withP2p.length);
+  expect(parsePlacement([...withP2p, ...next])).toEqual({ launchSeq: withP2p.length, layers: null, buffers: [] });
+});
+
+test('parsePlacement: NCCL (NCCL_DEBUG=INFO) says whether peer-to-peer is really in use', async () => {
+  const [launch, ...rest] = (await fixture()).split('\n');
+  const nccl = (...extra: string[]) => parsePlacement(lines([launch, ...rest, ...extra].join('\n')))!.p2p;
+  // The driver refuses it (consumer cards): NCCL says so and falls back to host memory.
+  const refused = [
+    'host:1205899:1205973 [1] NCCL INFO P2P is disabled between connected GPUs 1 and 0. You can repress this message with NCCL_IGNORE_DISABLED_P2P=1.',
+    'host:1205899:1205984 [0] NCCL INFO Channel 00 : 0[0] -> 1[1] via SHM/direct',
+    'host:1205899:1205983 [1] NCCL INFO Channel 00 : 1[1] -> 0[0] via SHM/direct',
+  ];
+  expect(nccl(P2P_LOG_LINE, ...refused)).toBe('unavailable');
+  expect(nccl(P2P_LOG_LINE, refused[1]!)).toBe('unavailable');
+  // Not requested and not available: nothing to report.
+  expect(nccl(...refused)).toBeUndefined();
+  // Channels going from GPU to GPU: active, with or without GGML_CUDA_P2P (NCCL enables peer access itself).
+  const direct = [
+    'host:7:8 [0] NCCL INFO Channel 00 : 0[0] -> 1[1] via P2P/CUMEM',
+    'host:7:9 [1] NCCL INFO Channel 00 : 1[1] -> 0[0] via P2P/CUMEM',
+  ];
+  expect(nccl(P2P_LOG_LINE, ...direct)).toBe('active');
+  expect(nccl(...direct)).toBe('active');
+  // NCCL comes up with the context, after the lines of a draft model (a second “offloaded” line ends the buffers).
+  expect(nccl('load_tensors: offloaded 5/5 layers to GPU', ...direct)).toBe('active');
+});
+
+test('parsePlacement: with -sm tensor, NCCL (NCCL_DEBUG=INFO) gives the PCI address of each CUDA device', async () => {
+  const text = (await Bun.file(`${import.meta.dir}/../../testdata/llama-server-load-tensor.txt`).text()).trimEnd();
+  const bare = parsePlacement(lines(text))!;
+  expect(
+    bare.buffers.filter((b) => b.device.startsWith('CUDA') && !b.device.endsWith('Host')).map((b) => b.busId),
+  ).toEqual([null, null]);
+  const nccl = [
+    'host:1:3 [1] NCCL INFO [Rank 1] ncclCommInitAll comm 0x5604f471ece0 rank 1 nranks 2 cudaDev 1 nvmlDev 1 busId 3000 commId 0x6a6789d3de0d6f12 - Init START',
+    'host:1:2 [0] NCCL INFO [Rank 0] ncclCommInitAll comm 0x5604f3500b90 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 1000 commId 0x6a6789d3de0d6f12 - Init START',
+    // Domain, bus, device and function: 0001:0a:1f.3.
+    'host:1:4 [2] NCCL INFO ncclCommInitAll comm 0x1 rank 2 nranks 3 cudaDev 2 nvmlDev 2 busId 10a1f3 commId 0x2 - Init COMPLETE',
+  ];
+  const p = parsePlacement(lines([text, ...nccl].join('\n')))!;
+  const by = new Map(p.buffers.map((b) => [b.device, b.busId]));
+  expect(by.get('CUDA0')).toBe('0000:01:00.0');
+  expect(by.get('CUDA1')).toBe('0000:03:00.0');
+  // The sizes are the same: only the addresses are added.
+  expect(p.buffers.map((b) => ({ ...b, busId: null }))).toEqual(bare.buffers.map((b) => ({ ...b, busId: null })));
+});
+
+test('parsePlacement: the address llama-server logs itself wins over NCCL', async () => {
+  const text = await fixture();
+  const p = parsePlacement(
+    lines(
+      `${text}\nhost:1:2 [0] NCCL INFO ncclCommInitAll comm 0x1 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 9000 commId 0x2 - Init COMPLETE`,
+    ),
+  )!;
+  expect(p.buffers.find((b) => b.device === 'CUDA0')!.busId).toBe('0000:01:00.0');
 });

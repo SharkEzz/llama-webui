@@ -2,6 +2,8 @@ import {
   LAUNCH_LOG_PREFIX,
   type LogLine,
   type ModelPlacement,
+  P2P_LOG_LINE,
+  type P2pStatus,
   type PlacementBuffer,
   type ServerState,
 } from '@llama-webui/shared';
@@ -42,7 +44,8 @@ const META = /^Meta\(/;
 const TENSOR_SPLIT = /(?:^|\s)(?:-ts|--tensor-split)(?:=|\s+)(\S+)/;
 
 /** A line that can change the placement: avoids rereading the whole ring on every batch of request logs. */
-export const RELEVANT = /\[llama-webui\] launch:|using device|buffer size =|offloaded \d+\/\d+ layers|- device \d+:/;
+export const RELEVANT =
+  /\[llama-webui\] launch:|GGML_CUDA_P2P|using device|buffer size =|offloaded \d+\/\d+ layers|- device \d+:|NCCL INFO (?:Channel|P2P is disabled|.*ncclCommInitAll)/;
 
 /**
  * Placement of the main model from the last launch found in `lines`; null without a launch line (ring cleared or
@@ -60,7 +63,7 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
     }
   }
   if (start < 0) return null;
-  const busIds = new Map<string, string>();
+  const busIds = ncclBusIds(lines, start);
   const buffers = new Map<string, PlacementBuffer>();
   let layers: ModelPlacement['layers'] = null;
   // Compute per context then per device; an implicit first context for logs without “constructing”.
@@ -117,7 +120,56 @@ export function parsePlacement(lines: readonly LogLine[]): ModelPlacement | null
   for (const ctx of contexts) for (const [device, bytes] of ctx) buffers.get(device)!.computeBytes += bytes;
   for (const b of buffers.values()) b.busId = busIds.get(b.device) ?? null;
   const out = spreadMeta([...buffers.values()], metaMembers, lines[start]!.text, busIds);
-  return { launchSeq: lines[start]!.seq, layers, buffers: out };
+  const p2p = parseP2p(lines, start);
+  return { launchSeq: lines[start]!.seq, layers, buffers: out, ...(p2p && { p2p }) };
+}
+
+/** NCCL (with `NCCL_DEBUG=INFO`): a rank's CUDA device and its PCI address, as hex digits without separators. */
+const NCCL_RANK = /NCCL INFO .*ncclCommInitAll .* cudaDev (\d+) nvmlDev \d+ busId ([0-9a-f]+) /;
+
+/**
+ * PCI address of the CUDA devices NCCL names. With -sm tensor, llama-server's own lines only know the `Meta()` device,
+ * without an address: this is what ties `CUDA0` to a card. An address llama-server logs itself replaces it.
+ */
+function ncclBusIds(lines: readonly LogLine[], start: number): Map<string, string> {
+  const out = new Map<string, string>();
+  for (let i = start + 1; i < lines.length; i++) {
+    const m = NCCL_RANK.exec(lines[i]!.text);
+    if (!m) continue;
+    // “3000” is 0000:03:00.0: domain (4 digits), bus (2), device (2), function (1).
+    const id = m[2]!.padStart(9, '0');
+    out.set(`CUDA${m[1]}`, `${id.slice(0, 4)}:${id.slice(4, 6)}:${id.slice(6, 8)}.${id.slice(8)}`);
+  }
+  return out;
+}
+
+/** NCCL (with `NCCL_DEBUG=INFO`): transport of a channel between two GPUs, “P2P/CUMEM”, “SHM/direct”… */
+const NCCL_CHANNEL = /NCCL INFO Channel \d+ : \d+\[\d+\] -> \d+\[\d+\] via (\S+)/;
+const NCCL_NO_P2P = /NCCL INFO P2P is disabled between connected GPUs/;
+
+/**
+ * Peer-to-peer of the launch at `start`. llama.cpp enables it where the driver allows as soon as `GGML_CUDA_P2P` is
+ * set (llama-webui's own line says so) and logs nothing; NCCL, when it is built in and `NCCL_DEBUG=INFO`, says how its
+ * channels reach the other GPU, which depends on the same driver capability. Read over the whole launch: NCCL starts
+ * with the context, after the lines of a draft model.
+ */
+function parseP2p(lines: readonly LogLine[], start: number): P2pStatus | null {
+  let requested = false;
+  let direct = false;
+  let refused = false;
+  for (let i = start + 1; i < lines.length; i++) {
+    const text = lines[i]!.text;
+    if (text === P2P_LOG_LINE) requested = true;
+    else if (NCCL_NO_P2P.test(text)) refused = true;
+    else {
+      const via = NCCL_CHANNEL.exec(text)?.[1];
+      if (via?.startsWith('P2P')) direct = true;
+      else if (via?.startsWith('SHM')) refused = true;
+    }
+  }
+  if (direct) return 'active';
+  if (!requested) return null;
+  return refused ? 'unavailable' : 'requested';
 }
 
 /**

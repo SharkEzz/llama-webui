@@ -11,6 +11,12 @@ export interface LogLine {
 /** Log line written by llama-webui before each llama-server launch; the model placement is read from the next lines. */
 export const LAUNCH_LOG_PREFIX = '[llama-webui] launch:';
 
+/**
+ * Log line written by llama-webui after the launch line when the server's environment sets `GGML_CUDA_P2P`: llama.cpp
+ * then enables direct transfers between the GPUs whose driver allows it, and logs nothing about it.
+ */
+export const P2P_LOG_LINE = '[llama-webui] GGML_CUDA_P2P is set: direct transfers between GPUs requested';
+
 export const LEVEL_ORDER: LogLevel[] = ['debug', 'info', 'warn', 'error'];
 
 // llama.cpp format: "<m.ss.mmm.uuu> <L> <tag> <func>: message"
