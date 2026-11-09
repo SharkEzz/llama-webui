@@ -67,10 +67,14 @@ and at least one tensor matches.
 
 ### Hardware
 
-`readTuningHardware({ benchBinary, mem })` (`server/tuning/hardware.ts`) returns a `TuningHardware`:
+`readTuningHardware({ benchBinary, mem, gpus })` (`server/tuning/hardware.ts`) returns a `TuningHardware`:
 
 - `devices`: the cached `llama-bench --list-devices` output (see
-  [Hardware and the device list](/developers/server/bench/#hardware-and-the-device-list)).
+  [Hardware and the device list](/developers/server/bench/#hardware-and-the-device-list)), with its live memory:
+  `withLiveMemory(devices, gpus)` (`server/tuning/match.ts`) sets `freeMib` and `otherUsedMib` from the Monitor's
+  `allGpus` (see below).
+- `devicesError`: why the list is not trusted (`llama-bench --list-devices` crashed, a GPU listed without memory),
+  `null` otherwise; the devices are then the last good list.
 - `cpu`: `readCpuInfo()`, read once per module: model, physical cores (distinct physical id and core id pairs in
   `/proc/cpuinfo`), logical threads, flags, and NUMA nodes (`/sys/devices/system/node/node*`, 1 when unreadable).
 - `ramTotalBytes`, `ramAvailableBytes`: from the Monitor's latest snapshot, otherwise `/proc/meminfo` (`MemAvailable`,
@@ -80,14 +84,30 @@ Each device gets a role from `deviceRole(d, all)` (`shared/src/tuning.ts`):
 
 | Role         | Rule                                                                   |
 | ------------ | ---------------------------------------------------------------------- |
-| `host`       | Backend `BLAS` or `CPU`, or no memory (`totalMib ≤ 0`)                 |
-| `gpu`        | Backend `CUDA`                                                         |
-| `integrated` | The name matches `processor` or `APU` (Vulkan names an iGPU after the CPU) |
-| `duplicate`  | A non-CUDA device whose name starts with a CUDA device's name: the Vulkan copy of an NVIDIA card |
+| `host`       | Backend `BLAS` or `CPU`, or no memory (`totalMib ≤ 0`: ZenDNN, BLAS)   |
+| `integrated` | The name matches `processor` or `APU` (Vulkan names an iGPU after the CPU), or is `AMD Radeon Graphics` with no model number (ROCm's name for the desktop Ryzen iGPU) |
+| `duplicate`  | The same card already listed through a better ranked backend (CUDA, then ROCm, then Vulkan), names compared without the Vulkan driver suffix (`(RADV GFX1201)`): the Vulkan copy of an NVIDIA or ROCm card |
 | `gpu`        | Anything else                                                          |
+
+The large APUs (`Radeon 8060S Graphics`, `Radeon 780M Graphics`) carry a model number: they stay `gpu`, since they
+are the only usable GPU of such a machine. `DEVICE_ROLE_BADGE` gives the badge the Hardware card and the Benchmark
+device picker show for the other roles (`duplicate`, `iGPU`, `host`).
 
 `gpuDevices(all)` keeps the `gpu` devices in `--list-devices` order: it is what a missing `-dev` means, for the
 placement and for the estimator.
+
+#### Live memory
+
+`--list-devices` has no PCI address, and its free memory is a snapshot of its first read. `matchGpus(devices, gpus)`
+pairs each device with a card of the Monitor: NVIDIA cards by name (CUDA and NVML use the same one), AMD cards by VRAM
+total within 2% (the pci.ids name differs from the driver's), identical cards in bus order, the Vulkan copy with the
+same card as its native device. Hidden cards are left out. For a matched card, `withLiveMemory()` sets:
+
+- `freeMib`: the card's free VRAM now (total − used, from NVML or sysfs);
+- `otherUsedMib`: what other processes than the managed llama-server hold, `totalMib − free − procVramBytes`. The
+  managed server's own VRAM (`procVramBytes`) is given back: a restart with the new flags would free it.
+
+An unmatched device (iGPU, unknown vendor, no Monitor sample) keeps the list's values and no `otherUsedMib`.
 
 ### Presets
 
@@ -131,8 +151,8 @@ export const computeBytes = (m: ModelInfo, ub: number): number =>
 export const marginBytes = (totalBytes: number): number => 512 * MiB + 0.04 * totalBytes;
 ```
 
-A device's usable budget is its total memory minus `marginBytes()`. It starts from `totalMib`, not `freeMib`: the
-estimate assumes the cards are empty.
+A device's usable budget, `budgetBytes(d)`, is its total memory minus `marginBytes()` minus `otherUsedMib`: the VRAM
+held by a desktop session or another model is not available, the managed llama-server's own is.
 
 ## Placement
 

@@ -42,7 +42,11 @@ const lastEstimates = new Map<string, Estimate>();
 
 export function tuningRoutes({ settings, monitor, benchRunner, runtime }: TuningRouteDeps) {
   const hardware = () =>
-    readTuningHardware({ benchBinary: benchBinary(settings.get().binary), mem: monitor.latest()?.system?.mem ?? null });
+    readTuningHardware({
+      benchBinary: benchBinary(settings.get().binary),
+      mem: monitor.latest()?.system?.mem ?? null,
+      gpus: monitor.latest()?.allGpus,
+    });
 
   return {
     '/api/tuning/hardware': {

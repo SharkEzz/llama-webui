@@ -310,10 +310,16 @@ saved as `diskReadPeakBps`.
   `parseDeviceList()` into `BenchDevice`s: `id` (`CUDA0`), `name`, `totalMib`, `freeMib`, and `backend` (the letters of
   the id: `CUDA`, `Vulkan`, `BLAS`…).
 
-The device list is cached per binary path. An empty result (tool missing, or it failed before printing a device) is
-dropped from the cache, so the next call tries again. A non-empty list is never read again while the module is loaded
-(in production, until llama-webui restarts): the free memory it reports is that of the first call, and the output is
-used whatever the tool's exit status, so a listing cut short by a crash of `llama-bench` stays too.
+`listDevicesResult(benchBinary)` returns `{ devices, error }`; `listDevices()` is its `devices`. The list is cached
+per binary path and modification time, so a rebuild is read again. A listing is not trusted, and not cached, when:
+
+- the tool is missing, exits with a non-zero code or is killed by a signal (`output()` rejects: recent builds crash
+  in `--list-devices` while llama-server holds the GPUs, after printing part of the list);
+- a GPU backend's device (CUDA, ROCm, Vulkan…) is listed with 0 MiB.
+
+`error` then says why, and `devices` is the last good list of that binary (`[]` if there was none). The free memory in
+the cached list is that of its first read: the estimator takes the live one from the Monitor (see
+[Live memory](/developers/server/tuning/#live-memory)).
 
 The list feeds `GET /api/bench/devices` (the device picker of the form), and through `readTuningHardware()` the
 [Tuning](/developers/server/tuning/) estimator, sweep planning, and the launch pad's fit badges.

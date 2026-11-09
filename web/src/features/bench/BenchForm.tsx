@@ -1,4 +1,11 @@
-import { CACHE_TYPES, FLASH_ATTN, ignoredByBench, SPLIT_MODES } from '@llama-webui/shared';
+import {
+  CACHE_TYPES,
+  DEVICE_ROLE_BADGE,
+  deviceRole,
+  FLASH_ATTN,
+  ignoredByBench,
+  SPLIT_MODES,
+} from '@llama-webui/shared';
 import { Play, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { GlassCard } from '@/components/glass/GlassCard';
@@ -14,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -57,8 +65,12 @@ export function BenchForm() {
   // A form -dev (from a profile or a rerun) missing from --list-devices stays listed, checked, so it can be removed.
   const missing = form.dev.filter((id) => !gpuDevices.some((d) => d.id === id));
   const shownDevices = [
-    ...gpuDevices.map((d) => ({ id: d.id, label: `${d.name} · ${fmt(d.totalMib / 1024, 1)} GiB` })),
-    ...missing.map((id) => ({ id, label: 'missing from --list-devices' })),
+    ...gpuDevices.map((d) => ({
+      id: d.id,
+      label: `${d.name} · ${fmt(d.totalMib / 1024, 1)} GiB`,
+      badge: DEVICE_ROLE_BADGE[deviceRole(d, devices ?? [])],
+    })),
+    ...missing.map((id) => ({ id, label: 'missing from --list-devices', badge: null })),
   ];
 
   const launch = async (stopServer = false) => {
@@ -202,6 +214,7 @@ export function BenchForm() {
                     />
                     <Label htmlFor={`dev-${d.id}`} className="min-w-0 flex-1 font-normal">
                       <span className="font-mono text-xs">{d.id}</span>
+                      {d.badge && <Badge variant="outline">{d.badge}</Badge>}
                       <span className="truncate text-muted-foreground" title={d.label}>
                         {d.label}
                       </span>

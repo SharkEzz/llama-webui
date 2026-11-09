@@ -336,8 +336,9 @@ curl -X POST http://127.0.0.1:7860/api/bench/57/to-profile
 
 <Endpoint method="GET" path="/api/bench/devices" />
 
-Runs `llama-bench --list-devices` (15-second timeout) and parses its output. The result is cached per binary; an empty
-list (tool missing or failing) is not cached, so the next call tries again.
+Runs `llama-bench --list-devices` (15-second timeout) and parses its output. The result is cached per binary and
+modification time. A failed listing (tool missing, non-zero exit, crash, a GPU listed with 0 MiB) is not cached: the
+response is then the last good list, or `[]`.
 
 **Response**: `200` with an array of `BenchDevice`.
 
@@ -348,6 +349,7 @@ list (tool missing or failing) is not cached, so the next call tries again.
 | `totalMib` | number | Memory of the device, MiB.                               |
 | `freeMib`  | number | Free memory when the list was read, MiB.                 |
 | `backend`  | string | Letters of the id: `CUDA`, `Vulkan`, `BLAS`…             |
+| `otherUsedMib` | number, optional | Only in [`GET /api/tuning/hardware`](/developers/api/tuning/#get-the-hardware): VRAM held by other processes than the managed llama-server, MiB. |
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/bench/devices

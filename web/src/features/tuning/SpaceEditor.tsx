@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useTuning } from '@/lib/tuning';
+import { otSuggestions, useTuning } from '@/lib/tuning';
 import { cn } from '@/lib/utils';
 import { PlanTable } from './PlanTable';
 
@@ -21,14 +21,6 @@ const list = (t: string) => {
     .map(Number);
   return xs.length >= 2 && xs.every((x) => Number.isFinite(x) && x >= 0) ? xs : null;
 };
-
-/** Suggested -ot patterns: they target MoE experts (llama.cpp applies the first matching rule). */
-const OT_SUGGESTIONS = [
-  'exps=CPU',
-  'blk\\.(\\d|1\\d)\\.ffn_.*_exps=CPU',
-  'blk\\.[0-9]\\.ffn_.*_exps=CPU',
-  'ffn_.*_exps=Vulkan3',
-];
 
 /** The search space: one row per flag, each added value multiplies the configurations. */
 export function SpaceEditor() {
@@ -112,7 +104,7 @@ export function SpaceEditor() {
               values={space.ot ?? []}
               onChange={(ot) => setSpace({ ot })}
               parse={(t) => (/^[^=,;]+=[^=,;]+$/.test(t.trim()) ? [t.trim()] : 'pattern=buffer (e.g. exps=CPU)')}
-              suggestions={OT_SUGGESTIONS.map((o) => [o])}
+              suggestions={otSuggestions(hw?.devices ?? []).map((o) => [o])}
               mono
               wide
             />

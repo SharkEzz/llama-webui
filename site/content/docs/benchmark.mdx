@@ -68,7 +68,9 @@ Fill in the **New benchmark** form, then click **Run**.
 | **Other server flags**    | Any other `llama-server` flag, passed as is to a server run. llama-bench ignores them, but they are kept for a server run or a profile. | Empty |
 
 An empty field leaves the flag out, so the tool uses its own default. The device list comes from
-`llama-bench --list-devices`; when it cannot be read, the form says so and the choice stays automatic.
+`llama-bench --list-devices`; when it cannot be read, the form says so and the choice stays automatic. As on the
+[Tuning](/docs/tuning/#hardware) page, a **duplicate** badge marks a card listed a second time through Vulkan, and an
+**iGPU** badge the integrated GPU: you can still check them, but they rarely help.
 
 **Other server flags** cannot contain the flags llama-webui manages itself (`--host`, `--port`, `-m`, `--mmproj`,
 `--metrics`, `--slots`, `--props`), nor a flag that has its own field: the form asks you to use the field instead.

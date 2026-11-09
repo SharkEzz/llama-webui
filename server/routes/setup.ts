@@ -55,6 +55,7 @@ export function setupRoutes({ db, settings, profiles, benchRuns, monitor, hostna
         const hw = readTuningHardware({
           benchBinary: benchBinary(s.binary),
           mem: monitor.latest()?.system?.mem ?? null,
+          gpus: monitor.latest()?.allGpus,
         });
         const entries = await buildLaunchpad(profiles.list(), {
           paths: (p) => profilePaths(p),

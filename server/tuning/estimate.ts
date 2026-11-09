@@ -13,7 +13,7 @@ import {
 } from '@llama-webui/shared';
 import type { ModelInfo } from '../models/gguf';
 import { EXPERTS } from '../models/sizes';
-import { computeBytes, fmtBytes, GiB, MiB, marginBytes } from './memory';
+import { budgetBytes, computeBytes, fmtBytes, GiB, MiB } from './memory';
 import { fitOf, measurePlacement, type PlacementInput, type PlacementMeasure } from './placement';
 
 export interface EstimateInput {
@@ -64,7 +64,7 @@ export function estimate(input: EstimateInput): Estimate {
   const noFa = pinned.fa === 'off';
   const byId = new Map(hw.devices.map((d) => [d.id, d]));
 
-  const budget = (d: BenchDevice) => Math.max(0, d.totalMib * MiB - marginBytes(d.totalMib * MiB));
+  const budget = budgetBytes;
   const gpus = gpuDevices(hw.devices).filter((d) => budget(d) >= TS_UNIT);
   // CUDA first (in --list-devices order: CUDA0 is the fastest card here), then the others.
   const ordered = [...gpus.filter((d) => d.backend === 'CUDA'), ...gpus.filter((d) => d.backend !== 'CUDA')];

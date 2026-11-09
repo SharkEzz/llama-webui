@@ -43,14 +43,15 @@ What the estimator plans for (`readTuningHardware()` in `server/tuning/hardware.
 
 | Field               | Type            | Description                                                                                  |
 | ------------------- | --------------- | -------------------------------------------------------------------------------------------- |
-| `devices`           | `BenchDevice[]` | `llama-bench --list-devices`, cached per binary; empty when the tool is missing (see [List devices](/developers/api/bench/#list-devices)). |
+| `devices`           | `BenchDevice[]` | `llama-bench --list-devices`, cached per binary; empty when the tool is missing (see [List devices](/developers/api/bench/#list-devices)). `freeMib` is the live free VRAM and `otherUsedMib` the VRAM held by other processes, for the devices matched to a monitored card. |
+| `devicesError`      | string \| null  | Why the list is not trusted (`llama-bench --list-devices killed by SIGSEGV`, `CUDA0 listed without memory`); `devices` is then the last good list, or empty. |
 | `cpu`               | `CpuInfo`       | Model, physical cores, threads, flags, NUMA nodes (see [Get the system info](/developers/api/monitor/#get-the-system-info)). |
 | `ramTotalBytes`     | number          | From the latest snapshot's `system.mem`, otherwise `/proc/meminfo`; 0 when unknown.          |
 | `ramAvailableBytes` | number          | Same source: `MemAvailable`.                                                                 |
 
 `deviceRole()` and `gpuDevices()` (`shared/src/tuning.ts`) sort the devices: dedicated cards, Vulkan copies of a card
-already seen through CUDA, integrated GPUs (Vulkan named after the processor) and host devices (BLAS, CPU). The
-estimator only places layers on the dedicated cards.
+already seen through CUDA or ROCm, integrated GPUs (Vulkan named after the processor, ROCm's `AMD Radeon Graphics`) and
+host devices (BLAS, CPU). The estimator only places layers on the dedicated cards.
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/tuning/hardware
@@ -162,8 +163,9 @@ measured is exactly what gets written.
 | ------------ | ------ | --------------------------------------------------------------------------------- |
 | `device`     | string | Device id (`CUDA0`).                                                              |
 | `bytes`      | number | Estimated bytes on the device: weights and KV cache, plus the compute buffers, the projector and the recurrent state on the first card. |
-| `budget`     | number | Usable bytes: the total minus a margin of 512 MiB plus 4% (`marginBytes()`), for the driver context and fragmentation. |
+| `budget`     | number | Usable bytes: the total minus a margin of 512 MiB plus 4% (`marginBytes()`), for the driver context and fragmentation, minus `otherBytes`. |
 | `totalBytes` | number | Memory of the device.                                                             |
+| `otherBytes` | number, optional | VRAM held by other processes than the managed llama-server; 0 when unknown. |
 
 The verdict is `no` when a device needs more than its budget or a flag names an unknown device; `tight` when the RAM
 needed exceeds the available RAM, or a device uses more than 95% of its budget; `fits` otherwise.

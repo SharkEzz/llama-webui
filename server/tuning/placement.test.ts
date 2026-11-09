@@ -31,6 +31,27 @@ test('deviceRole skips the Vulkan copies of the CUDA cards and the iGPU', () => 
   ]);
 });
 
+test('deviceRole treats the ROCm iGPU as integrated and the Vulkan copy of a ROCm card as a duplicate (#22)', () => {
+  const dev = (id: string, name: string, totalMib: number) => ({
+    id,
+    name,
+    totalMib,
+    freeMib: totalMib,
+    backend: id.replace(/\d+$/, ''),
+  });
+  // llama.cpp b12211 built with CUDA, HIP and Vulkan on the user's machine.
+  const all = [
+    dev('ZenDNN', 'ZenDNN: AMD optimized primitives backend for GGML (optimized for AMD CPUs)', 0),
+    dev('CUDA0', 'NVIDIA GeForce RTX 5070 Ti', 15901),
+    dev('CUDA1', 'NVIDIA GeForce RTX 5060 Ti', 15909),
+    dev('ROCm0', 'AMD Radeon RX 9070 XT', 16304),
+    dev('ROCm1', 'AMD Radeon Graphics', 31335),
+    dev('Vulkan0', 'AMD Radeon RX 9070 XT (RADV GFX1201)', 16304),
+    dev('Vulkan1', 'Radeon 8060S Graphics (RADV GFX1151)', 98304),
+  ];
+  expect(all.map((d) => deviceRole(d, all))).toEqual(['host', 'gpu', 'gpu', 'gpu', 'integrated', 'duplicate', 'gpu']);
+});
+
 test('-ncmoe moves the experts of the first N layers to RAM', () => {
   const m = measurePlacement(input({ params: { dev: ['CUDA0'], ngl: 'all', ncmoe: 8 } }));
   expect(m.cpuExpertsBytes).toBe(8 * 300 * MiB);
