@@ -56,12 +56,24 @@ export interface PlacementBuffer {
   estimated?: boolean;
 }
 
+/**
+ * Peer-to-peer between GPUs, as far as the logs tell:
+ * - `active`: NCCL reports a channel going from GPU to GPU (needs `NCCL_DEBUG=INFO`);
+ * - `unavailable`: the launch set `GGML_CUDA_P2P`, and NCCL reports that the driver does not allow it (its channels go
+ *   through host memory);
+ * - `requested`: the launch set `GGML_CUDA_P2P` and nothing says whether the driver allows it (llama.cpp enables it
+ *   where it can, silently).
+ */
+export type P2pStatus = 'active' | 'unavailable' | 'requested';
+
 export interface ModelPlacement {
   /** Number of the “[llama-webui] launch:” line it comes from. */
   launchSeq: number;
   /** “offloaded N/M layers to GPU”; null until that line has gone by. */
   layers: { offloaded: number; total: number } | null;
   buffers: PlacementBuffer[];
+  /** Direct transfers between the GPUs of a backend (peer-to-peer); absent when neither requested nor reported. */
+  p2p?: P2pStatus;
 }
 
 /** Host-side (RAM) buffers: `CPU`, `CPU_Mapped` (mmap from disk), `CPU_REPACK`, `CUDA_Host` (pinned)… */

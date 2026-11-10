@@ -8,7 +8,7 @@ import { useMonitor } from '@/lib/monitor';
 import { useServer } from '@/lib/server';
 import { refreshTopology, useTopology } from '@/lib/topology';
 import { cn } from '@/lib/utils';
-import { gpuTones, linkFlows, nodeLive } from './flows';
+import { gpuTones, linkFlows, nodeLive, peerLinks } from './flows';
 import { Hud } from './Hud';
 import { Labels } from './Labels';
 import { layoutGraph } from './layout';
@@ -16,7 +16,7 @@ import { type SceneView, TopologyScene } from './TopologyScene';
 import { useSceneColors } from './themeColors';
 import { useReducedMotion } from './useReducedMotion';
 
-/** Full-frame 3D scene (same height as chat and logs: p-4 + status bar + gap) with HUD cards on top. */
+/** Full-frame 3D scene (same height as chat and logs: p-4 + status bar + gap) with the HUD cards on top. */
 export function TopologyPage() {
   const graph = useTopology((s) => s.graph);
   const placement = useTopology((s) => s.placement);
@@ -42,7 +42,9 @@ export function TopologyPage() {
     [graph, snapshot, placement, flows],
   );
   const tones = useMemo(() => (graph ? gpuTones(graph) : new Map()), [graph]);
+  const peers = useMemo(() => (graph ? peerLinks(graph, placement) : []), [graph, placement]);
   const phase = phaseOf(state, snapshot);
+  const busy = phase === 'loading' || phase === 'prompt' || phase === 'generating';
 
   return (
     <div className={cn(GLASS, 'relative h-[calc(100dvh-5.5rem)] overflow-hidden')}>
@@ -52,10 +54,12 @@ export function TopologyPage() {
             graph={graph}
             layout={layout}
             flows={flows}
+            peers={peers}
             live={live}
             tones={tones}
             colors={colors}
             reducedMotion={reducedMotion}
+            busy={busy}
             hovered={hovered}
             onHover={setHovered}
             labelLayer={labelLayer}
@@ -66,13 +70,23 @@ export function TopologyPage() {
       ) : (
         <Skeleton className="absolute inset-4 rounded-md" />
       )}
-      {graph && live && <Labels graph={graph} live={live} hovered={hovered} layerRef={labelLayer} />}
+      {graph && live && flows && (
+        <Labels
+          graph={graph}
+          live={live}
+          flows={flows}
+          peers={peers}
+          tones={tones}
+          busy={busy}
+          hovered={hovered}
+          layerRef={labelLayer}
+        />
+      )}
       <Hud
         phase={phase}
         snapshot={snapshot}
         graph={graph}
         placement={placement}
-        flows={flows}
         tones={tones}
         reducedMotion={reducedMotion}
         error={error}

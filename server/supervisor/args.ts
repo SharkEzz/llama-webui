@@ -1,6 +1,13 @@
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { type Profile, type ProfileInput, type Settings, shellQuote } from '@llama-webui/shared';
+import {
+  LAUNCH_LOG_PREFIX,
+  P2P_LOG_LINE,
+  type Profile,
+  type ProfileInput,
+  type Settings,
+  shellQuote,
+} from '@llama-webui/shared';
 
 export interface BuiltCommand {
   argv: string[];
@@ -93,4 +100,13 @@ export function buildCommand(
     profileName: profile.name,
     profileId: profile.id,
   };
+}
+
+/**
+ * Lines llama-webui writes to the log ring when it launches llama-server: the command, then what the Topology page
+ * cannot read from llama-server's own output. llama.cpp enables CUDA peer-to-peer as soon as `GGML_CUDA_P2P` exists,
+ * whatever its value, and logs nothing about it.
+ */
+export function launchLines(cmd: Pick<BuiltCommand, 'display' | 'env'>): string[] {
+  return [`${LAUNCH_LOG_PREFIX} ${cmd.display}`, ...('GGML_CUDA_P2P' in cmd.env ? [P2P_LOG_LINE] : [])];
 }

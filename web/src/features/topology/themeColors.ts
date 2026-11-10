@@ -12,7 +12,17 @@ export interface SceneColors {
   /** Body of the blocks and tubes. */
   slab: Color;
   tube: Color;
+  /** A link or a tank near its limit, then at it (see Level). */
+  warning: Color;
+  critical: Color;
 }
+
+/**
+ * Share of white mixed into a GPU's tone for each of its tank layers: the model keeps the full tone, its KV cache and
+ * compute buffers are lighter shades of it (mixed in linear space, where a little white goes a long way). Shared with
+ * the legend's swatches.
+ */
+export const LAYER_TINT = { model: 0, kv: 0.18, compute: 0.42 } as const;
 
 /** Any CSS color (including `oklch()`, which Three cannot read) → `#rrggbb`, via the browser's 2D canvas. */
 export function cssToHex(value: string): string | null {
@@ -55,6 +65,8 @@ export function useSceneColors(): SceneColors {
       neutral: cssVarColor('--foreground', dark ? '#f2f3f5' : '#2a2d33'),
       slab: new Color(dark ? '#23262d' : '#dfe3ea'),
       tube: new Color(dark ? '#3a3f4a' : '#b8bfca'),
+      warning: cssVarColor('--warning', '#e0a53a'),
+      critical: cssVarColor('--destructive', '#e5484d'),
     };
   }, [resolved]);
 }

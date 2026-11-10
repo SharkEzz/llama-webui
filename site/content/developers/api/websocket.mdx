@@ -202,6 +202,7 @@ running or its placement is not known (an external server writes nothing to the 
 | `launchSeq` | number                            | `seq` of the `[llama-webui] launch:` log line it was read after.            |
 | `layers`    | `{ offloaded, total } \| null`    | From "offloaded N/M layers to GPU"; `null` until that line has gone by.     |
 | `buffers`   | `PlacementBuffer[]`               | One entry per device: `device`, `busId`, `modelBytes`, `kvBytes`, `computeBytes`. |
+| `p2p`       | string, optional                  | `active`, `unavailable` or `requested`: peer-to-peer between GPUs, absent when neither requested nor reported. |
 
 See [Topology](/developers/api/topology/).
 

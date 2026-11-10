@@ -1,4 +1,4 @@
-/** Frame rate while something animates (particles, pulse, transitions, camera being handled). */
+/** Frame rate while something animates (streaks, pulse, transitions, camera being handled). */
 export const ACTIVE_FPS = 60;
 /** Frame rate when only the camera drift moves (under 0.1 unit/s: 20 fps is enough). */
 export const DRIFT_FPS = 20;

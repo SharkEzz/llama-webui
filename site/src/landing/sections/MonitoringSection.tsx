@@ -2,11 +2,12 @@ import { Activity, Cpu, Network, ScrollText } from 'lucide-react';
 import { Shot } from '@/components/Shot';
 import { BentoCard, FeatureSection, SHOT_FRAME } from '../Bento';
 
-/** What the Topology HUD shows (web/src/features/topology/Hud.tsx). */
+/** What the Topology page shows (web/src/features/topology/). */
 const HUD = [
   ['Phase', 'loading, prompt or generation, with the current speeds'],
   ['Model split', 'memory per device and offloaded layers, from the startup logs'],
-  ['Throughput', 'host to GPU and back, NVMe reads, DRAM reads and writes'],
+  ['Tanks', 'each GPU filled to its VRAM: model, KV cache, compute buffers'],
+  ['Links', 'exact throughput per direction, and an alert near the PCIe capacity'],
 ] as const;
 
 /** Where each reading comes from (server/collectors/). */
@@ -49,15 +50,15 @@ export function MonitoringSection() {
         visual={
           <Shot
             name="topology"
-            alt="Topology page: the CPU, memory, GPUs and NVMe drive as 3D blocks, with the model split per device"
+            alt="Topology page: the CPU, memory, GPUs and NVMe drive as 3D blocks, the GPUs filled to the memory they hold, with the model split per device"
             crop={{ x: 0.155, y: 0.055, w: 0.84, h: 0.935 }}
             width="min(42rem, 90vw)"
             className={SHOT_FRAME}
           />
         }
       >
-        CPU, memory, NVMe drives and GPUs are discovered from sysfs. Particles follow the measured PCIe, NVMe and DRAM
-        traffic, and the HUD shows how the model is split across devices.
+        CPU, memory, NVMe drives and GPUs are discovered from sysfs. Streaks follow the measured PCIe, NVMe and DRAM
+        traffic, and each GPU fills up with what the model takes in it.
       </BentoCard>
 
       <BentoCard

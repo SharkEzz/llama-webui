@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
-import { LAUNCH_LOG_PREFIX, type ServerState } from '@llama-webui/shared';
+import type { ServerState } from '@llama-webui/shared';
 import type { LogBuffer } from '../logs/buffer';
 import { isIdleNoise, LineSplitter } from '../logs/lines';
-import type { BuiltCommand } from './args';
+import { type BuiltCommand, launchLines } from './args';
 import { findLlamaServerPid } from './discovery';
 import { probeHealth, probeLlamaServer } from './health';
 
@@ -145,7 +145,7 @@ export class Supervisor {
       return fail((e as Error).message);
     }
     this.proc = proc;
-    this.logs.push(`${LAUNCH_LOG_PREFIX} ${cmd.display}`);
+    for (const line of launchLines(cmd)) this.logs.push(line);
     this.pipe(proc.stdout as ReadableStream<Uint8Array>);
     this.pipe(proc.stderr as ReadableStream<Uint8Array>);
     this.set({

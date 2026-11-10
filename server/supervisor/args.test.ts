@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { type Profile, type ProfileInput, shellQuote, shellSplit } from '@llama-webui/shared';
-import { binaryPath, buildCommand, profilePaths } from './args';
+import { P2P_LOG_LINE, type Profile, type ProfileInput, shellQuote, shellSplit } from '@llama-webui/shared';
+import { binaryPath, buildCommand, launchLines, profilePaths } from './args';
 
 const settings = { binary: 'llama-server', host: '0.0.0.0', port: 8080 };
 const p = (input: ProfileInput): Profile => ({ ...input, id: 1, source: 'ui', createdAt: 0, updatedAt: 0 });
@@ -144,4 +144,16 @@ test('the binary setting is run with ~ expanded (#32)', () => {
     '/home/x',
   );
   expect(cmd.argv[4]).toBe('/home/x/b/llama-server');
+});
+
+test('launchLines: the launch line, plus the peer-to-peer one when GGML_CUDA_P2P is set, whatever its value', () => {
+  const plain = buildCommand(p({ name: 'q', model: 'm.gguf', args: [], env: {} }), settings);
+  // The variable may come from llama-webui's own environment: the test must not depend on it.
+  delete plain.env.GGML_CUDA_P2P;
+  expect(launchLines(plain)).toEqual([`[llama-webui] launch: ${plain.display}`]);
+  // llama.cpp only checks that the variable exists: an empty value enables it too.
+  for (const value of ['1', '0', '']) {
+    const cmd = buildCommand(p({ name: 'q', model: 'm.gguf', args: [], env: { GGML_CUDA_P2P: value } }), settings);
+    expect(launchLines(cmd)).toEqual([`[llama-webui] launch: ${cmd.display}`, P2P_LOG_LINE]);
+  }
 });

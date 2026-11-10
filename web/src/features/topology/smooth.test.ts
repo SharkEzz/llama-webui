@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { flowVisual, MAX_DT, Smoother } from './smooth';
+import { flowVisual, MAX_DT, MAX_STREAKS, Smoother } from './smooth';
 
 test('Smoother: exponential approach, first value snaps, unknown resets to zero', () => {
   const s = new Smoother(0.5);
@@ -21,15 +21,20 @@ test('Smoother: a frame after a long pause eases in (dt capped), it does not jum
 });
 
 test('flowVisual: log scale, nothing under 100 kB/s, bounded at 20 GB/s', () => {
-  expect(flowVisual(null)).toEqual({ particles: 0, speed: 0, glow: 0 });
-  expect(flowVisual(50e3)).toEqual({ particles: 0, speed: 0, glow: 0 });
-  const slow = flowVisual(10e6);
-  const fast = flowVisual(2e9);
+  const none = { count: 0, speed: 0, length: 0, glow: 0 };
+  expect(flowVisual(null)).toEqual(none);
+  expect(flowVisual(50e3)).toEqual(none);
   const max = flowVisual(50e9);
-  expect(slow.particles).toBeGreaterThan(0);
-  expect(fast.particles).toBeGreaterThan(slow.particles);
-  expect(fast.speed).toBeGreaterThan(slow.speed);
-  expect(max.particles).toBeLessThanOrEqual(64);
-  expect(max.glow).toBeLessThanOrEqual(1);
+  expect(max.count).toBe(MAX_STREAKS);
+  expect(max.glow).toBe(1);
   expect(flowVisual(20e9)).toEqual(max);
+});
+
+test('flowVisual: more traffic means more streaks, longer and faster, at every decade', () => {
+  const steps = [1e5, 1e6, 1e7, 1e8, 1e9, 1e10].map(flowVisual);
+  expect(steps[0]!.count).toBeGreaterThan(0); // visible from the floor up
+  for (let i = 1; i < steps.length; i++) {
+    for (const k of ['count', 'speed', 'length', 'glow'] as const)
+      expect(steps[i]![k]).toBeGreaterThan(steps[i - 1]![k]);
+  }
 });

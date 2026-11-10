@@ -30,7 +30,7 @@ Tests sit next to their module (`shared/src/<module>.test.ts`) and run with `bun
 | `flags.ts` | The `llama-server` flag catalogue: `parseHelp()` reads `--help`, `catalogFrom()`, `flagOf()`, `complete()`, `flagSuggestions()`, `unknownFlags()`, `describeFlag()`. |
 | `format.ts` | `LOCALE = 'en-US'`, the locale of every number shown to the user, and `fmtInt()` for the server's messages; `web/src/lib/format.ts` imports `LOCALE` from here. |
 | `hf.ts` | Hugging Face: `HF_REPO_RE`, `parseHfInput()`, the status, search, repository and variant types, `DownloadItem`, `DownloadLive`, `DownloadRequestSchema`, `isDownloadActive()`, `vramFit()`. |
-| `logs.ts` | `LogLine`, `classifyLine()` (level and kind), `filterLogs()`, the client's `LogView` with `EMPTY_LOG_VIEW`, `onBoot()` and `mergeLogs()`, `LAUNCH_LOG_PREFIX`. |
+| `logs.ts` | `LogLine`, `classifyLine()` (level and kind), `filterLogs()`, the client's `LogView` with `EMPTY_LOG_VIEW`, `onBoot()` and `mergeLogs()`, `LAUNCH_LOG_PREFIX` and `P2P_LOG_LINE`. |
 | `models.ts` | `ModelSummary` (a GGUF header summary), `ModelEntry`, `ModelList`, `ModelDetail`, `profileModelPath()`. |
 | `monitor.ts` | `Snapshot` (the state pushed on every tick), `HistoryDump`, the GPU, system, disk, slot and request types, `SERIES` (history keys), `slotContextTokens()`. |
 | `profile.ts` | `ProfileInputSchema`, `Profile`, `RESERVED_FLAGS` with `reservedFlag()` and `reservedFlagMessage()`, `parseProfileImport()` (llama-tui configs, arrays or single profiles). |
@@ -40,7 +40,7 @@ Tests sit next to their module (`shared/src/<module>.test.ts`) and run with `bun
 | `shell.ts` | `shellQuote()` and `shellSplit()`: POSIX-shell-style quoting and splitting, without expansion. |
 | `sse.ts` | `SseParser`, an incremental `text/event-stream` reader, and `formatSse()`. |
 | `sweep.ts` | `SweepSpaceSchema`, `SweepSpecSchema`, `Sweep`, `SweepLive`, `expandSpace()`, `itemLabel()`, `sweepCtx()`, `scoreOf()`, `rankRuns()`, `estimatedSweepSeconds()`. |
-| `topology.ts` | The hardware graph and `ModelPlacement` types, `placementTotals()`, `hostDevice()`, `Phase` with `PHASE_LABEL` and `phaseOf()`, `pcieBps()`. |
+| `topology.ts` | The hardware graph and `ModelPlacement` types (with `P2pStatus`), `placementTotals()`, `hostDevice()`, `Phase` with `PHASE_LABEL` and `phaseOf()`, `pcieBps()`. |
 | `tuning.ts` | `PRESETS`, `PresetId`, `presetOf()`, `NOISE`, the estimate, fit, plan and system check types, `isSetupCheck()`, `deviceRole()`, `gpuDevices()`. |
 | `ws.ts` | `WsMessage`, the union of the 16 messages of `/ws` ([WebSocket](/developers/api/websocket/)). |
 
