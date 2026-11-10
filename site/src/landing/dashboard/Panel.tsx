@@ -10,11 +10,14 @@ export const PANEL = 'rounded-lg bg-card shadow-surface inset-shadow-highlight r
 export function Panel({
   title,
   icon: Icon,
+  actions,
   className,
   children,
 }: {
   title?: string;
   icon?: LucideIcon;
+  /** Right end of the title row (the app's CardAction). */
+  actions?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -24,6 +27,7 @@ export function Panel({
         <div className="flex items-center gap-2.5 text-[0.9375rem] font-semibold tracking-tight">
           {Icon && <Icon className="size-4 shrink-0 text-muted-foreground" />}
           {title}
+          {actions && <span className="ml-auto">{actions}</span>}
         </div>
       )}
       {children}

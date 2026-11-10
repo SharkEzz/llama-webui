@@ -24,6 +24,8 @@ export interface HistoryPoint {
   at: number;
   gen: number;
   pp: number;
+  /** CPU load in percent, for the System card's history. */
+  cpu: number;
 }
 
 export interface RequestRow {
@@ -215,7 +217,8 @@ export function createSimulation(seed = 7, warmup = WARMUP_SECONDS): Simulation 
     }
 
     at += 1;
-    history.push({ at, gen: round1(gen), pp: round1(pp) });
+    const cpuPct = Math.round(3 + busy * 11 + rand() * 2);
+    history.push({ at, gen: round1(gen), pp: round1(pp), cpu: cpuPct });
     if (history.length > HISTORY_SECONDS) history.shift();
 
     const phase: Phase = !job ? 'idle' : job.promptLeft > 0 ? 'prompt' : 'generating';
@@ -228,7 +231,7 @@ export function createSimulation(seed = 7, warmup = WARMUP_SECONDS): Simulation 
       tokensPerDraft: round1(lastAccept * 2.9),
       ctxUsed: Math.min(RUN.ctxTotal, ctxUsed + (job ? job.prompt - job.promptLeft + job.generated - job.genLeft : 0)),
       ctxTotal: RUN.ctxTotal,
-      cpuPct: Math.round(3 + busy * 11 + rand() * 2),
+      cpuPct,
       ramUsedGiB: RUN.ramUsedGiB,
       ramTotalGiB: RUN.ramTotalGiB,
       gpus: RUN.gpus.map((g) => ({

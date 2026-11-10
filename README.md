@@ -29,7 +29,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/screenshots/dashboard.jpg" alt="Dashboard: live generation speed, speculative acceptance, context usage, CPU/RAM/VRAM gauges and throughput chart" width="100%">
+  <img src="docs/assets/screenshots/dashboard.jpg" alt="Dashboard: live generation speed, speculative acceptance, context usage, generation and prompt throughput charts, CPU/RAM/VRAM gauges" width="100%">
 </p>
 
 ## Why llama-webui?
@@ -71,7 +71,8 @@ one dashboard designed for a **single machine you own**:
 ### 📈 Live monitoring
 
 - **Dashboard**: generation and prompt tokens/s, speculative-decoding acceptance (draft model or MTP), context usage
-  per slot, CPU/RAM/VRAM gauges, model disk reads and a rolling throughput chart.
+  per slot, CPU/RAM/VRAM gauges, model disk reads, and rolling generation and prompt throughput charts, each on its
+  own scale.
 - **System**: one card per GPU with utilization, VRAM, PCIe link and traffic, power, clocks, temperature and
   fans, plus CPU, memory and disk. NVIDIA through NVML (falls back to `nvidia-smi`), AMD through sysfs.
 - **Logs**: 10,000-line live ring buffer with level filter, search and auto-follow.

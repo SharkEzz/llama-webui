@@ -7,6 +7,7 @@ import {
   type LucideIcon,
   MessageSquare,
   Network,
+  PanelLeftClose,
   ScrollText,
   Server,
   Settings,
@@ -33,12 +34,20 @@ const NAV: [string, LucideIcon][] = [
   ['Tuning', Wand2],
 ];
 
-function NavItem({ label, icon: Icon, active }: { label: string; icon: LucideIcon; active?: boolean }) {
+interface NavItemProps {
+  label: string;
+  icon: LucideIcon;
+  active?: boolean;
+  className?: string;
+}
+
+function NavItem({ label, icon: Icon, active, className }: NavItemProps) {
   return (
     <div
       className={cn(
         'relative flex h-9 items-center gap-3 rounded-md px-3 text-sm text-sidebar-foreground/70',
         active && 'bg-sidebar-primary/12 text-sidebar-accent-foreground',
+        className,
       )}
     >
       {active && <span className="absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-sidebar-primary" />}
@@ -71,7 +80,9 @@ export function AppWindow({ children }: { children: React.ReactNode }) {
               <NavItem key={label} label={label} icon={icon} active={label === 'Dashboard'} />
             ))}
           </div>
-          <div className="mt-6 border-t border-sidebar-border pt-3">
+          <div className="mt-6 flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
+            {/* The app's collapse button; like the app on a narrow window, the icon-only sidebar has none. */}
+            <NavItem label="Collapse" icon={PanelLeftClose} className="hidden @5xl:flex" />
             <NavItem label="Settings" icon={Settings} />
           </div>
         </aside>

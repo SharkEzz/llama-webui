@@ -104,7 +104,7 @@ export const SHOTS: Shot[] = [
   // Captured on the empty demo instance, before `demo-seed.ts setup`.
   { name: 'setup', path: '/setup', readyText: 'Welcome to llama-webui', goneText: 'Checking…', manual: true },
   { name: 'launchpad', path: '/', readyText: 'Launch pad', goneText: 'Loading' },
-  { name: 'dashboard', path: '/dashboard', readyText: 'Throughput', live: true, delayMs: 4000 },
+  { name: 'dashboard', path: '/dashboard', readyText: 'Generation (tok/s)', live: true, delayMs: 4000 },
   { name: 'system', path: '/system', readyText: 'NVIDIA GeForce RTX 5070 Ti', live: true, delayMs: 4000 },
   { name: 'topology', path: '/topology', readyText: 'Generating', live: true, delayMs: 6000 },
   { name: 'server', path: '/server', readyText: 'Effective command' },

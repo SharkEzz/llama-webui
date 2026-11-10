@@ -8,7 +8,7 @@ requests it served, and how hard the machine works. Keep it open while you chat 
 
 <Screenshot
   name="dashboard"
-  alt="Dashboard during a generation: tiles for generation speed, prompt speed, speculative acceptance and context used, a strip of CPU, RAM and VRAM gauges with the model disk's read rate, a throughput chart, the slots card and a table of recent requests."
+  alt="Dashboard during a generation: tiles for generation speed, prompt speed, speculative acceptance and context used, a generation chart and a prompt chart stacked on the left, and on the right the System card with a gauge for CPU, RAM and the VRAM of each GPU, and the model disk's read rate."
 />
 
 ## Where the numbers come from
@@ -22,7 +22,7 @@ Each sample reads:
   throughput from the kernel's disk counters. The [System](/docs/system/) page shows the full readings.
 
 Every sample also feeds a history kept in memory for the last 5 minutes by default. Because sampling never stops, the
-chart already holds the last few minutes when you open the page. The history is not saved: restarting llama-webui
+charts already hold the last few minutes when you open the page. The history is not saved: restarting llama-webui
 clears it. You can change the interval and the history length in [Settings](/docs/settings/) (see
 [Change the sampling](#change-the-sampling)).
 
@@ -51,28 +51,37 @@ to 0 between requests. For the average speed of each request, read the [Recent r
 
 </Callout>
 
-## System strip
+## Throughput charts
 
-Below the tiles, a strip of gauges shows the load of the machine. It is measured even when no server runs. Click a
-gauge to open the [System](/docs/system/) page.
+Two charts plot the rates over the whole history: **Generation (tok/s)** and **Prompt (tok/s)**. Each has its own
+vertical scale, which follows the highest value in view: prompt processing usually runs many times faster than
+generation, and on a shared scale the generation curve would be flattened against the axis.
 
-| Gauge                | What it shows                                                                                                                                                         |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CPU**              | CPU load of the whole machine.                                                                                                                                        |
-| **RAM**              | Memory in use, total minus available, with the amounts in the label (`RAM 7 GiB / 61 GiB`). Page cache that the kernel can free does not count as used.             |
-| **VRAM** _card name_ | VRAM in use on each GPU the server runs on, all processes included. Without a running server, every GPU is shown, except hidden and sleeping ones.                    |
-| **Model disk**       | Read throughput of the disk that holds the running profile's model, with the disk's name (`Model disk (nvme0n1)`). When that disk is unknown, **Disk** shows the reads of all disks. |
+Hover over either chart to read the values at a given time: the cursor moves on both, and each card shows the time
+and its value in its top right corner.
+
+On a wide window, the tiles, the two charts and the **System** card fill the height of the window, and the charts
+grow with it. **Slots and context** and **Recent requests** come below: scroll to reach them.
+
+## System
+
+Beside the charts, the **System** card shows the load of the machine, one meter per resource: a gauge with the share
+in use, and the details next to it. When the window is tall enough, each meter also draws that share over the
+history, under its readings. The card is measured even when no server runs. **All readings** opens the
+[System](/docs/system/) page.
+
+| Meter                | What it shows                                                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **CPU**              | CPU load of the whole machine, with its temperature and the 1-minute load average when the machine reports them.                                                                           |
+| **RAM**              | Memory in use, total minus available, with the amounts (`7 GiB / 61 GiB`) and the page cache (`27 GiB cached`). Page cache that the kernel can free does not count as used.             |
+| **VRAM** _card name_ | VRAM in use on each GPU the server runs on, all processes included, with the amounts, the card's compute load and its temperature. Without a running server, every GPU is shown, except hidden and sleeping ones. |
+| **Model disk**       | Read throughput of the disk that holds the running profile's model, with the disk's name (`nvme0n1`) and a curve of the reads over the history. When that disk is unknown, **Disks** shows the reads of all disks. |
 
 A GPU counts as used by the server once `llama-server` holds more than 64 MiB on it. The model disk is unknown for an
 external server and for a model on btrfs, tmpfs or a network filesystem.
 
 If you turn off the **CPU and memory** collector in Settings, the CPU and RAM gauges stay at 0. With the **Disks**
 collector off, the disk reading shows `—`.
-
-## Throughput chart
-
-**Throughput (tok/s)** plots the **Generation** and **Prompt** rates over the whole history. Hover over the chart to
-read the values at a given time in the legend below it. The vertical scale follows the highest value in view.
 
 ## Slots and context
 
@@ -122,8 +131,8 @@ acceptance** tile, the queue figures and this table need `/metrics`: a server yo
 ## When no server runs
 
 Without a running server, the Dashboard shows **llama-server is stopped** with a **Start** button that opens the
-[Server](/docs/server/) page. The tiles, the chart, the slots and the requests disappear; the system strip keeps
-measuring CPU, RAM, every visible GPU and the disks. Start a profile from [Home](/docs/home/) or the Server page and
+[Server](/docs/server/) page. The tiles, the charts, the slots and the requests disappear; the **System** card takes
+the full width and keeps measuring CPU, RAM, every visible GPU and the disks. Start a profile from [Home](/docs/home/) or the Server page and
 the rest comes back on the next sample.
 
 ## Change the sampling
