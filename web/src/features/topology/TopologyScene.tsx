@@ -12,7 +12,7 @@ import {
   Vector3,
 } from 'three';
 import type { Tone } from '@/components/glass/tones';
-import type { LayerKind, LinkFlow, NodeLive, PeerLink } from './flows';
+import { type LayerKind, type LinkFlow, linkShown, type NodeLive, type PeerLink } from './flows';
 import {
   type Bounds,
   FOV_DEG,
@@ -46,6 +46,8 @@ export interface TopologySceneProps {
   tones: Map<string, Tone>;
   colors: SceneColors;
   reducedMotion: boolean;
+  /** llama-server is loading, processing a prompt or generating: links show their traffic from 100 kB/s. */
+  busy: boolean;
   hovered: string | null;
   onHover: (id: string | null) => void;
   /** DOM label layer (`data-node` elements), moved on every frame. */
@@ -136,6 +138,7 @@ export function TopologyScene(p: TopologySceneProps) {
             color={nodeColor(toNode)}
             colors={p.colors}
             reducedMotion={p.reducedMotion}
+            busy={p.busy}
             smoother={smoother}
             pacer={pacer}
           />
@@ -397,14 +400,7 @@ function NodeBlock({ node, placed, live, color, colors, hovered, onHover, smooth
         <TankFill id={node.id} size={placed.size} live={live} color={color} colors={colors} smoother={smoother} />
       )}
       {node.kind === 'cpu' && live.cores.length > 0 && (
-        <CoreGrid
-          key={live.cores.length}
-          id={node.id}
-          size={placed.size}
-          cores={live.cores}
-          colors={colors}
-          smoother={smoother}
-        />
+        <CoreGrid key={live.cores.length} size={placed.size} cores={live.cores} colors={colors} />
       )}
     </group>
   );
@@ -507,25 +503,23 @@ function TankFill({ id, size, live, color, colors, smoother }: TankFillProps) {
 }
 
 interface CoreGridProps {
-  id: string;
   size: Vec3;
   cores: number[];
   colors: SceneColors;
-  smoother: Smoother;
 }
 
 const tile = new Object3D();
 const tileColor = new Color();
 
-/** One tile per CPU thread on the top face, lit with the thread's load. Remounted when the thread count changes. */
-function CoreGrid({ id, size, cores, colors, smoother }: CoreGridProps) {
+/**
+ * One tile per CPU thread on the top face, lit with the thread's load. Remounted when the thread count changes. Tiles
+ * change color once per measurement, without easing: per-thread loads move a little on every tick, and easing them
+ * would keep the scene redrawing at rest.
+ */
+function CoreGrid({ size, cores, colors }: CoreGridProps) {
   const [w, h, d] = size;
   const n = cores.length;
   const mesh = useRef<InstancedMesh>(null);
-  const coresRef = useRef(cores);
-  useEffect(() => {
-    coresRef.current = cores;
-  }, [cores]);
   const off = useMemo(() => colors.slab.clone().lerp(colors.primary, colors.dark ? 0.16 : 0.1), [colors]);
   useLayoutEffect(() => {
     const m = mesh.current;
@@ -539,21 +533,18 @@ function CoreGrid({ id, size, cores, colors, smoother }: CoreGridProps) {
       tile.scale.set(cell * 0.82, 1, cell * 0.82);
       tile.updateMatrix();
       m.setMatrixAt(i, tile.matrix);
-      // Colors exist before the first frame: the material is compiled with them.
-      m.setColorAt(i, off);
     }
     m.instanceMatrix.needsUpdate = true;
-    if (m.instanceColor) m.instanceColor.needsUpdate = true;
-  }, [n, w, d, off]);
-  useFrame((_, dt) => {
+  }, [n, w, d]);
+  // Before the frame the new snapshot asks for; colors exist before the first one, the material is compiled with them.
+  useLayoutEffect(() => {
     const m = mesh.current;
     if (!m) return;
     for (let i = 0; i < n; i++) {
-      const k = smoother.step(`${id}:core:${i}`, Math.min(1, (coresRef.current[i] ?? 0) / 100), dt);
-      m.setColorAt(i, tileColor.copy(off).lerp(colors.primary, k));
+      m.setColorAt(i, tileColor.copy(off).lerp(colors.primary, Math.min(1, (cores[i] ?? 0) / 100)));
     }
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
-  });
+  }, [n, cores, off, colors]);
   return (
     <instancedMesh
       ref={mesh}
@@ -575,6 +566,7 @@ interface LinkProps {
   color: Color;
   colors: SceneColors;
   reducedMotion: boolean;
+  busy: boolean;
   smoother: Smoother;
   pacer: FramePacer;
 }
@@ -582,7 +574,9 @@ interface LinkProps {
 const LEVEL_STEP = { ok: 0, warn: 1, crit: 2 } as const;
 const tint = new Color();
 
-function Link({ link, path, flow, color, colors, reducedMotion, smoother, pacer }: LinkProps) {
+function Link({ link, path, flow, color, colors, reducedMotion, busy, smoother, pacer }: LinkProps) {
+  // Under the floor (background traffic at rest), the link stays still: no streaks, no glow.
+  const shown = linkShown(flow, busy);
   const neutral = color === colors.neutral;
   const curve = useMemo(
     () => new QuadraticBezierCurve3(new Vector3(...path.start), new Vector3(...path.ctrl), new Vector3(...path.end)),
@@ -596,14 +590,14 @@ function Link({ link, path, flow, color, colors, reducedMotion, smoother, pacer 
         : 0.07 + 0.15 * Math.sqrt(Math.min(1, (flow.maxBps ?? 0) / REF_BPS));
 
   const mat = useRef<MeshStandardMaterial>(null);
-  const flowRef = useRef(flow);
+  const flowRef = useRef({ flow, shown });
   useEffect(() => {
-    flowRef.current = flow;
-  }, [flow]);
+    flowRef.current = { flow, shown };
+  }, [flow, shown]);
   useFrame(({ clock }, dt) => {
     const m = mat.current;
     if (!m) return;
-    const f = flowRef.current;
+    const { flow: f, shown: on } = flowRef.current;
     // Near its capacity the link leaves its own color for the alert ones (0 = ok, 1 = warning, 2 = critical).
     const level = smoother.step(`${link.id}:level`, LEVEL_STEP[f.level], dt);
     tint.copy(color);
@@ -619,7 +613,7 @@ function Link({ link, path, flow, color, colors, reducedMotion, smoother, pacer 
         ? 0.08 + 0.6 * a
         : 0.08 + a * (0.35 + 0.35 * Math.abs(Math.sin(clock.elapsedTime * (1 + 4 * a))));
     } else {
-      const total = (f.fwdBps ?? 0) + (f.backBps ?? 0);
+      const total = on ? (f.fwdBps ?? 0) + (f.backBps ?? 0) : 0;
       target = 0.08 + (neutral ? 0.35 : 0.8) * flowVisual(total > 0 ? total : null).glow + 0.25 * Math.min(1, level);
     }
     m.emissiveIntensity = smoother.step(`${link.id}:glow`, target, dt);
@@ -648,7 +642,7 @@ function Link({ link, path, flow, color, colors, reducedMotion, smoother, pacer 
           <Streaks
             id={`${link.id}:fwd`}
             curve={curve}
-            bps={flow.fwdBps}
+            bps={shown ? flow.fwdBps : null}
             color={color}
             reverse={false}
             side={lane}
@@ -659,7 +653,7 @@ function Link({ link, path, flow, color, colors, reducedMotion, smoother, pacer 
           <Streaks
             id={`${link.id}:back`}
             curve={curve}
-            bps={flow.backBps}
+            bps={shown ? flow.backBps : null}
             color={color}
             reverse
             side={-lane}

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { GpuSample, ModelPlacement, Snapshot, TopologyGraph } from '@llama-webui/shared';
-import { levelOf, linkBadge, linkFlows, nodeLive, peerLinks, placementSeries } from './flows';
+import { levelOf, linkBadge, linkFlows, linkShown, nodeLive, peerLinks, placementSeries } from './flows';
 
 const graph: TopologyGraph = {
   at: 0,
@@ -531,4 +531,13 @@ test('nodeLive: a GPU says what is known of its peer-to-peer, and with which car
   expect(p2p(undefined)).toBeUndefined();
   // The AMD card is alone on its backend.
   expect(p2p('active', 'pci:0000:08:00.0')).toBeUndefined();
+});
+
+test('linkShown: at rest only from 8 MiB/s in the busier direction, from 100 kB/s while llama-server works', () => {
+  const mib = 1024 ** 2;
+  expect(linkShown({ fwdBps: 4 * mib, backBps: 1 * mib }, false)).toBe(false);
+  expect(linkShown({ fwdBps: 0, backBps: 8 * mib }, false)).toBe(true);
+  expect(linkShown({ fwdBps: 4 * mib, backBps: null }, true)).toBe(true);
+  expect(linkShown({ fwdBps: 50e3, backBps: 50e3 }, true)).toBe(false);
+  expect(linkShown({ fwdBps: null, backBps: null }, true)).toBe(false);
 });

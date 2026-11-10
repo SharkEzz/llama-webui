@@ -44,6 +44,7 @@ export function TopologyPage() {
   const tones = useMemo(() => (graph ? gpuTones(graph) : new Map()), [graph]);
   const peers = useMemo(() => (graph ? peerLinks(graph, placement) : []), [graph, placement]);
   const phase = phaseOf(state, snapshot);
+  const busy = phase === 'loading' || phase === 'prompt' || phase === 'generating';
 
   return (
     <div className={cn(GLASS, 'relative h-[calc(100dvh-5.5rem)] overflow-hidden')}>
@@ -58,6 +59,7 @@ export function TopologyPage() {
             tones={tones}
             colors={colors}
             reducedMotion={reducedMotion}
+            busy={busy}
             hovered={hovered}
             onHover={setHovered}
             labelLayer={labelLayer}
@@ -75,7 +77,7 @@ export function TopologyPage() {
           flows={flows}
           peers={peers}
           tones={tones}
-          busy={phase === 'loading' || phase === 'prompt' || phase === 'generating'}
+          busy={busy}
           hovered={hovered}
           layerRef={labelLayer}
         />

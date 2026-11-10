@@ -31,11 +31,19 @@ export const FILL_CRIT_PCT = 95;
 /** Share of the capacity from which a badge spells it out: below, the figure is noise. */
 const BADGE_PCT_MIN = 0.25;
 /**
- * Throughput from which a link gets its badge while llama-server is at rest (8 MiB/s): background traffic (an idle GPU
- * exchanges a few MiB/s, a journal write) shows as a few streaks, without a badge. While the server loads or generates,
- * every link that carries streaks has its badge. The tooltips keep every figure.
+ * Throughput from which a link shows its traffic (streaks and badge) while llama-server is at rest (8 MiB/s): an idle
+ * GPU exchanges a few MiB/s with the host, which would otherwise keep streaks running and badges on screen, and the
+ * scene redrawing. While the server loads or generates, everything from 100 kB/s shows. The tooltips keep every figure.
  */
-export const REST_BADGE_FLOOR_BPS = 8 * 1024 ** 2;
+export const REST_FLOOR_BPS = 8 * 1024 ** 2;
+
+/**
+ * The link's traffic is worth showing (streaks, glow, badge): its busier direction reaches the floor. `busy`:
+ * llama-server is loading, processing a prompt or generating.
+ */
+export function linkShown(flow: Pick<LinkFlow, 'fwdBps' | 'backBps'>, busy: boolean): boolean {
+  return Math.max(flow.fwdBps ?? 0, flow.backBps ?? 0) >= (busy ? FLOOR_BPS : REST_FLOOR_BPS);
+}
 
 export function levelOf(value: number | null, warn: number, crit: number): Level {
   if (value === null) return 'ok';
@@ -195,13 +203,12 @@ export interface LinkBadge {
 
 /**
  * What a link's badge says: the exact throughput in each direction, in the words of the device at its end. Null when
- * there is nothing to say: an idle link, one whose traffic is not measured, an internal connection. `busy`: llama-server
- * is loading, processing a prompt or generating.
+ * there is nothing to say: an idle link (see linkShown), one whose traffic is not measured, an internal connection.
  */
 export function linkBadge(link: TopologyLink, to: TopologyNode, flow: LinkFlow, busy: boolean): LinkBadge | null {
   if (link.kind === 'internal') return null;
+  if (!linkShown(flow, busy)) return null;
   const { fwdBps, backBps } = flow;
-  if (Math.max(fwdBps ?? 0, backBps ?? 0) < (busy ? FLOOR_BPS : REST_BADGE_FLOOR_BPS)) return null;
   const line = (label: string, bps: number | null): Fact[] => (bps === null ? [] : [{ label, value: formatBps(bps) }]);
   // Words rather than arrows: memory sits behind the CPU and the devices in front, “up” would mean both.
   const lines =

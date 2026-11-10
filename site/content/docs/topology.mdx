@@ -101,7 +101,8 @@ Tubes join the blocks:
 Streaks travel along a tube when traffic is measured on that link, toward the device on one lane and back on the
 other. More traffic means more streaks, longer and faster, on a logarithmic scale, so 50 MiB/s stays visible next to
 20 GiB/s. The tube also glows brighter with more traffic. Streaks show that something flows and roughly how much; the
-exact figure is on the badge.
+exact figure is on the badge. At rest, the same 8 MiB/s floor as for badges applies (see below): the background traffic
+of an idle GPU leaves its link still.
 
 ### Badges
 
@@ -116,8 +117,8 @@ each direction:
 | CPU ↔ chipset    | **→ devices**, **→ host** |
 
 While `llama-server` loads a model, processes a prompt or generates, every link with measured traffic shows its
-badge. At rest, a badge only appears from 8 MiB/s: an idle GPU exchanges a few MiB/s with the host, which would
-otherwise leave badges on screen all the time. The details on hover always give the figures.
+badge. At rest, a link shows its traffic, streaks and badge, only from 8 MiB/s: an idle GPU exchanges a few MiB/s with
+the host, which would otherwise leave streaks running and badges on screen all the time. The details on hover always give the figures.
 
 ### A link near its limit
 

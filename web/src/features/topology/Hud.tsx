@@ -213,7 +213,7 @@ export function Hud({ phase, snapshot, graph, placement, tones, reducedMotion, e
             <li>Link thickness: PCIe capacity.</li>
             <li>
               Streaks: measured throughput (log scale), one direction per lane. The badge above a block gives its link's
-              exact figures, while llama-server works or from 8 MiB/s at rest.
+              exact figures. At rest, a link shows its traffic only from 8 MiB/s.
             </li>
             <li>
               Percentage on a badge: share of the link's current capacity, amber from {fmt(LINK_WARN * 100, 0)}%, red

@@ -38,16 +38,19 @@ Aucun changement serveur, API ou WebSocket : tout vient du `Snapshot` et du `Mod
 
 **Sobriété**
 
-- Pastille sur tout lien dont le débit mesuré dépasse 100 kB/s pendant que llama-server charge ou génère ; au repos,
-  seulement à partir de 8 MiB/s (le trafic de fond d'un GPU inactif, quelques MiB/s, ne fait pas apparaître de
-  pastille). Pourcentage de capacité seulement à partir de 25 %. Les infobulles gardent tous les chiffres.
+- Pastille et traits sur tout lien dont le débit mesuré dépasse 100 kB/s pendant que llama-server charge ou génère ;
+  au repos, seulement à partir de 8 MiB/s (le trafic de fond d'un GPU inactif, quelques MiB/s, ne fait apparaître ni
+  pastille ni traits, et la scène peut s'arrêter de dessiner). Pourcentage de capacité seulement à partir de 25 %. Les
+  infobulles gardent tous les chiffres.
 - La pastille d'un lien est empilée sur l'étiquette du composant où il arrive : posée au milieu du lien, elle
   recouvrait ses voisines dès que plusieurs liens partent du CPU, ou que la caméra tourne.
 - Mots plutôt que flèches : `→ GPU` / `→ host`, `read` / `write` (NVMe, mémoire), `→ devices` / `→ host` (chipset).
 - Étiquettes : GPU = charge + barre + VRAM ; CPU = charge + barre ; mémoire = RAM utilisée ; NVMe = nom seul ;
   chipset = lien courant.
 - NVMe et chipset restent des dalles pleines.
-- Pas de nouvelle dépendance ni de post-traitement ; rendu à la demande conservé (`FramePacer`).
+- Pas de nouvelle dépendance ni de post-traitement ; rendu à la demande conservé (`FramePacer`). Les tuiles des
+  threads changent de couleur à chaque mesure, sans fondu : la charge d'un thread bouge un peu à chaque seconde, et
+  lissée, elle faisait redessiner la scène au repos (≈ 44 i/s mesurées en mouvement réduit, ≈ 14 sans le lissage).
 - Mouvement réduit : pas de traits ni de dérive ; pastilles, réservoirs et jauges restent.
 - L'état replié des cartes est gardé par le navigateur ; la caméra ne se recadre pas quand on replie.
 
