@@ -9,11 +9,13 @@ interface GlassCardProps {
   icon?: LucideIcon;
   actions?: ReactNode;
   className?: string;
+  /** Classes of the content area, e.g. `flex min-h-0 flex-1 flex-col` for a content that fills a stretched card. */
+  contentClassName?: string;
   children?: ReactNode;
 }
 
 /** Glass shadcn Card: translucent --card background + blur; visible beyond its edges (suggestion menus). */
-export function GlassCard({ title, icon: Icon, actions, className, children }: GlassCardProps) {
+export function GlassCard({ title, icon: Icon, actions, className, contentClassName, children }: GlassCardProps) {
   const hasHeader = Boolean(title || actions);
   return (
     <Card className={cn(GLASS, '[--card-spacing:--spacing(5)]', className)}>
@@ -26,7 +28,7 @@ export function GlassCard({ title, icon: Icon, actions, className, children }: G
           {actions && <CardAction className="row-span-1 flex items-center gap-2">{actions}</CardAction>}
         </CardHeader>
       )}
-      <CardContent>{children}</CardContent>
+      <CardContent className={contentClassName}>{children}</CardContent>
     </Card>
   );
 }

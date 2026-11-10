@@ -7,12 +7,14 @@ interface GaugeProps {
   unit?: string;
   size?: number;
   tone?: Tone;
+  /** Label under the gauge. Set to false when the label is written beside it (it stays the accessible name). */
+  caption?: boolean;
 }
 
 const SWEEP = 0.75; // 270° arc
 
 /** 270° circular gauge, open at the bottom, value in the center. */
-export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = 'blue' }: GaugeProps) {
+export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = 'blue', caption = true }: GaugeProps) {
   const stroke = Math.max(6, Math.round(size / 14));
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;
@@ -21,7 +23,7 @@ export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = '
   const display = Number.isInteger(value) ? value : value.toFixed(1);
 
   return (
-    <figure className="inline-flex flex-col items-center gap-1.5" style={{ width: size }}>
+    <figure className="inline-flex shrink-0 flex-col items-center gap-1.5" style={{ width: size }}>
       <div className="relative" style={{ width: size, height: size }}>
         {/* biome-ignore lint/a11y/useSemanticElements: SVG gauge: <meter> cannot apply to an <svg> */}
         <svg
@@ -70,7 +72,7 @@ export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = '
           </span>
         </div>
       </div>
-      <figcaption className="text-xs text-muted-foreground">{label}</figcaption>
+      {caption && <figcaption className="text-xs text-muted-foreground">{label}</figcaption>}
     </figure>
   );
 }

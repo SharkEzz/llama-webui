@@ -23,6 +23,7 @@ The web app is a React 19 single-page app in `web/`, served by the Bun process (
       - `routes.ts` sidebar entries (path, label, icon)
       - `AppLayout.tsx` layout: sidebar, status bar, page outlet, toasts
       - `Sidebar.tsx`, `StatusBar.tsx`, `ThemeToggle.tsx`, `PageSkeleton.tsx`
+      - `sidebarPrefs.ts` collapsed sidebar, kept by the browser
     - `features/` one folder per page
       - `home/` Home: `launchpad/` and the first-run `setup/` checklist
       - `dashboard/`, `server/`, `profiles/`, `logs/`, `system/`, `topology/`, `models/` (with `hf/` for downloads), `chat/`, `bench/`, `tuning/`, `settings/`
@@ -84,6 +85,14 @@ arrives. Unknown paths render the placeholder page with "Page not found".
 
 `AppLayout` draws the aurora background, the sidebar, the status bar and the page `<Outlet />`, with the sonner
 `Toaster` at the bottom right. It refreshes the health store (version, uptime) every time the WebSocket opens.
+
+The sidebar collapses to its icons. `web/src/app/sidebarPrefs.ts` holds the choice in a zustand store, saved in the
+browser's `localStorage` under `llama-webui:sidebar` (`collapsed` or `expanded`), and `useSidebarLayout()` gives what
+the layout shows: below Tailwind's `md` width the sidebar is collapsed whatever the choice, and its **Collapse**
+button is not rendered. `AppLayout` only changes the width of the sidebar's grid column, with a transition. The rows
+keep their labels in the DOM: collapsed, the sidebar is exactly as wide as a row's padding and icon, so the label is
+clipped, the icons do not move, and the label stays the link's accessible name. A tooltip on the right gives the name
+of a row while the sidebar is collapsed.
 
 ## State: zustand stores
 
@@ -249,7 +258,10 @@ Time series use uPlot through `components/charts/TimeSeriesChart.tsx`, on the Da
 is created once per set of series and theme, then fed with `setData` on every monitor tick from the `useMonitor`
 history; `null` values are gaps. Its colors come from the theme's CSS variables (`--chart-1` to `--chart-4` for the
 four tones), read by `readChartTheme()` in `chartTheme.ts` and read again when the theme changes. `compact` draws a
-sparkline without axes or legend. The circular gauges are SVG (`components/glass/Gauge.tsx`), and the Topology page
+sparkline without axes or legend. Three props serve the Dashboard's throughput charts: `fill` sizes the plot from
+its parent (a flex column) instead of `height`, so a chart can take what is left of the viewport; `syncKey` shares
+the cursor between the charts that pass the same key; `legendTarget` mounts the legend in another element (one with
+the `ts-legend` class, here the card header). The circular gauges are SVG (`components/glass/Gauge.tsx`), and the Topology page
 draws its scene with react-three-fiber (`features/topology/`).
 
 ## The Topology scene

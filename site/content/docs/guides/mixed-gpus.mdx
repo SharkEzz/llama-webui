@@ -186,7 +186,7 @@ Once the profile runs, several pages show where the model landed:
 - **Logs**: `llama-server` writes one `using device` line per device it loads onto, with its PCI address, then
   `offloaded N/M layers to GPU` and a `model buffer size` line per device. Search the [Logs](/docs/logs/) page for
   `using device`.
-- **Dashboard**: the system strip shows a VRAM gauge for each card on which `llama-server` holds more than 64 MiB,
+- **Dashboard**: the **System** card shows a VRAM gauge for each card on which `llama-server` holds more than 64 MiB,
   that is, the cards in the split. See [Dashboard](/docs/dashboard/).
 - **System**: one card per physical GPU, with its VRAM in use by every process. A card that two backends can reach
   still appears once here, by its PCI address.

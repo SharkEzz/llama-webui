@@ -7,12 +7,14 @@ interface GaugeProps {
   label: string;
   size?: number;
   tone?: Tone;
+  /** Label under the gauge; false when it is written beside it. */
+  caption?: boolean;
 }
 
 const SWEEP = 0.75; // 270° arc
 
 /** 270° circular gauge, open at the bottom, percentage in the center. */
-export function Gauge({ value, label, size = 84, tone = 'blue' }: GaugeProps) {
+export function Gauge({ value, label, size = 84, tone = 'blue', caption = true }: GaugeProps) {
   const stroke = Math.max(6, Math.round(size / 14));
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;
@@ -20,7 +22,7 @@ export function Gauge({ value, label, size = 84, tone = 'blue' }: GaugeProps) {
   const ratio = Math.min(1, Math.max(0, value / 100));
 
   return (
-    <figure className="inline-flex flex-col items-center gap-1.5" style={{ width: size }}>
+    <figure className="inline-flex shrink-0 flex-col items-center gap-1.5" style={{ width: size }}>
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="rotate-135" aria-hidden="true">
           <circle
@@ -56,7 +58,7 @@ export function Gauge({ value, label, size = 84, tone = 'blue' }: GaugeProps) {
           </span>
         </div>
       </div>
-      <figcaption className="text-center text-xs leading-tight text-muted-foreground">{label}</figcaption>
+      {caption && <figcaption className="text-center text-xs leading-tight text-muted-foreground">{label}</figcaption>}
     </figure>
   );
 }
