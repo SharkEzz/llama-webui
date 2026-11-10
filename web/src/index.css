@@ -314,18 +314,21 @@
   }
 }
 
-/* ---- uPlot: live legend in text colors (never the series color) ---- */
-.ts-chart .u-legend {
+/* ---- uPlot: live legend in text colors (never the series color); .ts-legend = legend mounted out of the chart ---- */
+:is(.ts-chart, .ts-legend) .u-legend {
   @apply mt-1 font-sans text-xs text-muted-foreground;
 }
-.ts-chart .u-legend th {
+.ts-legend .u-legend {
+  @apply mt-0 text-right;
+}
+:is(.ts-chart, .ts-legend) .u-legend th {
   @apply font-normal;
 }
-.ts-chart .u-legend .u-value {
+:is(.ts-chart, .ts-legend) .u-legend .u-value {
   @apply num text-foreground;
 }
 /* line marker (like the brand mark): the top border keeps the series color set by uPlot */
-.ts-chart .u-legend .u-marker {
+:is(.ts-chart, .ts-legend) .u-legend .u-marker {
   height: 0;
   width: 0.875rem;
   /* biome-ignore lint/complexity/noImportantStyles: overrides the border set by uPlot */
@@ -334,7 +337,7 @@
   /* biome-ignore lint/complexity/noImportantStyles: overrides the background set by uPlot */
   background: transparent !important;
 }
-.ts-chart .u-legend .u-series:first-child .u-marker {
+:is(.ts-chart, .ts-legend) .u-legend .u-series:first-child .u-marker {
   display: none;
 }
 .ts-chart .u-cursor-x {
@@ -342,6 +345,12 @@
 }
 .ts-chart .u-cursor-y {
   display: none;
+}
+/* `fill` charts: the plot is sized from its host, so it must not take part in the host's own height. */
+.ts-chart-fill > .uplot {
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 /* Code highlighted by shiki: both themes' colors as variables, background left to the container (bg-well). */
