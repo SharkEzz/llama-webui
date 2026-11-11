@@ -2,7 +2,7 @@ import type { BenchPhase, Measure } from '@llama-webui/shared';
 import { LineSplitter } from '../logs/lines';
 import type { BuiltCommand } from '../supervisor/args';
 import { probeHealth } from '../supervisor/health';
-import { benchFailure } from './parse';
+import { benchFailure, ERROR_LINE } from './parse';
 import { promptOf } from './prompt';
 
 type Child = ReturnType<typeof Bun.spawn>;
@@ -43,7 +43,11 @@ interface Timings {
 export class TrialCancelled extends Error {}
 
 const EXIT_GRACE_MS = 2000;
-const WARMUP_PROMPT = 'Hello.';
+/**
+ * A sentence, not a word: llama.cpp segfaults on a 2-token prompt with -sm tensor and an MTP draft (`Hello.` did,
+ * every time), and a real request is never that short anyway.
+ */
+export const WARMUP_PROMPT = 'Write one short sentence about the sea.';
 /** Instruction after the filler text: a fresh generation, not a copy. */
 const STORY =
   'Starting from this text, write a new and original story, with different characters and a different setting.';
@@ -75,10 +79,16 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
   if (o.signal.aborted) throw new TrialCancelled();
 
   const tail: string[] = [];
+  // The error lines, kept apart: a crash can bury them under more lines than the tail keeps (gdb backtrace).
+  const errors: string[] = [];
   const push = (line: string) => {
     o.onLine(line);
     tail.push(line);
     if (tail.length > 50) tail.shift();
+    if (ERROR_LINE.test(line)) {
+      errors.push(line);
+      if (errors.length > 10) errors.shift();
+    }
   };
   const proc = Bun.spawn(cmd.argv, { cwd: cmd.cwd, env: cmd.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
   // Stopped when the trial exits, no matter what: SIGTERM, then SIGKILL after killTimeoutMs.
@@ -94,7 +104,8 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
   });
   const exitError = async () => {
     await Promise.race([piped, Bun.sleep(200)]);
-    return new Error(benchFailure(tail, proc.exitCode ?? proc.signalCode ?? '-', 'llama-server').message);
+    const exit = proc.exitCode ?? proc.signalCode ?? '-';
+    return new Error(benchFailure([...errors, ...tail], exit, 'llama-server').message);
   };
 
   /** A measured, non-streaming request; returns llama-server's timings. */
