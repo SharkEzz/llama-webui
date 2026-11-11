@@ -157,3 +157,13 @@ test('launchLines: the launch line, plus the peer-to-peer one when GGML_CUDA_P2P
     expect(launchLines(cmd)).toEqual([`[llama-webui] launch: ${cmd.display}`, P2P_LOG_LINE]);
   }
 });
+
+test('the settings variables are in the environment, under the profile ones, and can set the verbosity', () => {
+  const cmd = buildCommand(
+    p({ name: 'q', model: 'm.gguf', args: [], env: { GGML_CUDA_P2P: '0', B: 'profile' } }),
+    { ...settings, env: { GGML_CUDA_P2P: '1', A: 'global', LLAMA_ARG_LOG_VERBOSITY: '3' } },
+    '/home/x',
+  );
+  expect(cmd.env).toMatchObject({ A: 'global', B: 'profile', GGML_CUDA_P2P: '0', LLAMA_ARG_LOG_VERBOSITY: '3' });
+  expect(cmd.argv).not.toContain('-lv');
+});

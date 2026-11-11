@@ -97,8 +97,9 @@ The **Environment variables** box takes one `KEY=value` per line, for example `C
 are ignored. A line without `=` or with an invalid name is underlined, and the profile cannot be saved until you fix
 it.
 
-`llama-server` inherits the environment llama-webui was started with; the profile's variables are added to it and win
-over variables of the same name.
+`llama-server` inherits the environment llama-webui was started with, then the global variables of
+[Settings](/docs/settings/#environment-variables); the profile's variables are added last and win over variables of
+the same name.
 
 ## Flags llama-webui sets itself
 

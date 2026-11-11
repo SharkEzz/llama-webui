@@ -57,6 +57,7 @@ and are not part of this schema.
 | `onboardingDone`          | boolean                                       | `false`        |                        | The first-run setup checklist was completed: Home shows the launch pad.                                                                                                     |
 | `collectors`              | `{ nvml: boolean, system: boolean, disk: boolean }` | all `true` |                   | Monitor collectors: NVML for NVIDIA GPUs (otherwise `nvidia-smi`), CPU and memory (with the DRAM bandwidth), disks.                                                        |
 | `theme`                   | `'system' \| 'light' \| 'dark'`               | `system`       |                        | The web app's theme.                                                                                                                                                        |
+| `env`                     | `Record<string, string>`                      | `{}`           | names `[A-Za-z_][A-Za-z0-9_]*` | Environment variables of every `llama-server` launch and benchmark (`llama-bench` too), under the profile's own variables.                                                  |
 
 The server writes `defaultProfileId` on its own: [starting or switching](/developers/api/server/) to a profile stores
 its id, deleting that profile resets it to `null`, and the llama-tui import sets it from llama-tui's default profile
@@ -89,7 +90,8 @@ curl http://127.0.0.1:7860/api/settings
   "llamaTuiImportDismissed": false,
   "onboardingDone": true,
   "collectors": { "nvml": true, "system": true, "disk": true },
-  "theme": "system"
+  "theme": "system",
+  "env": {}
 }
 ```
 
@@ -105,14 +107,14 @@ present in the body, one row per key in the `settings` table (the value as JSON)
 
 - Unknown keys are ignored, not refused.
 - An object such as `collectors` is merged field by field: `{"collectors":{"nvml":false}}` leaves `system` and
-  `disk` as they are.
+  `disk` as they are. `env` is the exception: it is replaced as a whole, so a variable left out is removed.
 
 After the write, the route calls `Monitor.configure()` with the new settings:
 
 - `collectors.system`, `collectors.disk`, `hiddenGpus`, `pollIntervalMs` and `historySeconds` apply at once (the
   history is resized, the tick timer restarted).
 - `collectors.nvml` is only read when llama-webui starts: the NVIDIA collector is chosen once.
-- `binary`, `host`, `port` and `modelsDir` are read when they are used: the next start, scan or setup report. A
+- `binary`, `host`, `port`, `modelsDir` and `env` are read when they are used: the next start, scan or setup report. A
   running `llama-server` keeps its binary, host and port until it restarts.
 
 No WebSocket message announces the change. Other clients see it on their next `GET /api/settings`, and a change of

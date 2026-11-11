@@ -137,7 +137,9 @@ the home directory and leaves every other path unchanged.
 ### Environment
 
 `env` starts from a copy of llama-webui's own `process.env` (variables with a value), then `Object.assign`s the
-profile's `env` over it: a profile variable overrides an inherited one with the same name. Nothing else is added.
+`env` setting (the global variables of Settings) and the profile's `env` over it, in that order: a profile variable
+overrides a global one, which overrides an inherited one. Nothing else is added. A `LLAMA_ARG_LOG_VERBOSITY` in the
+setting or the profile also stops `-lv 4` from being added.
 
 ## Starting and readiness
 

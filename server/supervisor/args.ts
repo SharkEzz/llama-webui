@@ -36,14 +36,14 @@ const VERBOSITY_FLAGS = new Set(['-lv', '--verbosity', '--log-verbosity', '-v', 
 
 /**
  * Verbosity llama-webui runs llama-server at: 4 is the first level that logs the buffer sizes (model, KV, compute) the
- * Topology page reads. A profile that sets its own (a flag above, or `LLAMA_ARG_LOG_VERBOSITY` in its environment)
- * keeps it.
+ * Topology page reads. A profile that sets its own (a flag above, or `LLAMA_ARG_LOG_VERBOSITY` in its environment or
+ * the global one of the settings) keeps it.
  */
 export const DEFAULT_VERBOSITY = '4';
 
-function setsVerbosity(profile: Pick<Profile, 'args' | 'env'>): boolean {
+function setsVerbosity(profile: Pick<Profile, 'args' | 'env'>, globalEnv: Record<string, string>): boolean {
   if (profile.args.some((a) => VERBOSITY_FLAGS.has(a.split('=')[0]!))) return true;
-  return 'LLAMA_ARG_LOG_VERBOSITY' in profile.env;
+  return 'LLAMA_ARG_LOG_VERBOSITY' in profile.env || 'LLAMA_ARG_LOG_VERBOSITY' in globalEnv;
 }
 
 export interface ProfilePaths {
@@ -66,9 +66,10 @@ export function profilePaths(profile: ProfileInput, home: string = homedir()): P
 
 export function buildCommand(
   profile: Profile,
-  settings: Pick<Settings, 'binary' | 'host' | 'port'>,
+  settings: Pick<Settings, 'binary' | 'host' | 'port'> & { env?: Settings['env'] },
   home: string = homedir(),
 ): BuiltCommand {
+  const globalEnv = settings.env ?? {};
   const host = profile.host ?? settings.host;
   const port = profile.port ?? settings.port;
   // llama-server runs without a shell: `~` is expanded here, relative paths stay relative to its cwd.
@@ -78,7 +79,7 @@ export function buildCommand(
     expandHome(profile.model, home),
     ...(profile.mmproj ? ['-mm', expandHome(profile.mmproj, home)] : []),
     ...profile.args,
-    ...(setsVerbosity(profile) ? [] : ['-lv', DEFAULT_VERBOSITY]),
+    ...(setsVerbosity(profile, globalEnv) ? [] : ['-lv', DEFAULT_VERBOSITY]),
     '--host',
     host,
     '--port',
@@ -89,7 +90,8 @@ export function buildCommand(
   ];
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
-  Object.assign(env, profile.env);
+  // The settings' variables, then the profile's: a profile variable with the same name wins.
+  Object.assign(env, globalEnv, profile.env);
   return {
     argv: ['setpriv', '--pdeathsig', 'KILL', '--', ...server],
     display: shellQuote(server),

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** A shell environment variable name. */
+export const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 export const SettingsSchema = z.object({
   binary: z.string().min(1, 'Required').default('llama-server'),
   /** llama-server's `--host`: loopback by default, like llama-webui; `0.0.0.0` opens it to the network (#27). */
@@ -27,6 +30,13 @@ export const SettingsSchema = z.object({
     .object({ nvml: z.boolean().default(true), system: z.boolean().default(true), disk: z.boolean().default(true) })
     .default({ nvml: true, system: true, disk: true }),
   theme: z.enum(['system', 'light', 'dark']).default('system'),
+  /**
+   * Environment variables of every llama-server launch and benchmark (`llama-bench` too), under the profile's own: a
+   * profile variable with the same name wins. Replaced as a whole by PATCH, not merged.
+   */
+  env: z
+    .record(z.string().regex(ENV_NAME, { error: (i) => `invalid variable name “${String(i.input)}”` }), z.string())
+    .default({}),
 });
 
 export type ThemeMode = Settings['theme'];

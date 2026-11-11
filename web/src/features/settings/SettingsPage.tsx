@@ -16,7 +16,7 @@ import { formatDuration } from '@/lib/format';
 import { type SettingsErrors, useSettingsEditor } from '@/lib/settings';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
-import { GpuSwitches, SwitchRow, TextField } from './fields';
+import { EnvField, GpuSwitches, SwitchRow, TextField } from './fields';
 
 const INTERVALS = [250, 500, 1000, 2000].map((ms) => ({ value: String(ms), label: `${ms} ms` }));
 const THEMES: { value: ThemeMode; label: string }[] = [
@@ -67,6 +67,23 @@ interface SectionProps {
 }
 
 function General({ settings, errors, save }: SectionProps & { errors: SettingsErrors }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <Server settings={settings} errors={errors} save={save} />
+      <GlassCard title="Environment variables">
+        <EnvField
+          id="env"
+          hint="One variable per line, KEY=value. Applied to every profile started, and to benchmarks and Tuning sweeps; a profile variable with the same name wins. Takes effect at the next start."
+          value={settings.env}
+          error={errors.env}
+          onCommit={(env) => save({ env })}
+        />
+      </GlassCard>
+    </div>
+  );
+}
+
+function Server({ settings, errors, save }: SectionProps & { errors: SettingsErrors }) {
   return (
     <GlassCard title="llama-server">
       <div className="grid gap-5 md:grid-cols-2">

@@ -180,7 +180,9 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
         {'error' in env ? (
           <p className="text-sm text-destructive">{String(env.error)}</p>
         ) : (
-          <p className="text-xs text-muted-foreground">One variable per line, KEY=value.</p>
+          <p className="text-xs text-muted-foreground">
+            One variable per line, KEY=value. Added to the variables of Settings, which they override.
+          </p>
         )}
       </div>
 

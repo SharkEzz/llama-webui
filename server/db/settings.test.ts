@@ -29,3 +29,13 @@ test('settings: llama-server listens on loopback by default, like llama-webui (#
   using db = openDb(':memory:');
   expect(new SettingsRepo(db).get().host).toBe('127.0.0.1');
 });
+
+test('settings: env is replaced as a whole (a variable left out is removed) and its names are checked', () => {
+  using dir = tempDir('lw-');
+  using db = openDb(join(dir.path, 't.sqlite'));
+  const repo = new SettingsRepo(db);
+  repo.patch({ env: { A: '1', B: '2' } });
+  expect(repo.patch({ env: { B: '3' } }).env).toEqual({ B: '3' });
+  expect(new SettingsRepo(db).get().env).toEqual({ B: '3' });
+  expect(() => repo.patch({ env: { '1BAD': 'x' } })).toThrow('invalid variable name “1BAD”');
+});
