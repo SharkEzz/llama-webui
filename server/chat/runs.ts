@@ -1,16 +1,9 @@
-import {
-  autoTitle,
-  type ChatEvent,
-  type ChatMessage,
-  isDefaultTitle,
-  type LlamaTimings,
-  SseParser,
-  statsFromTimings,
-} from '@llama-webui/shared';
+import { autoTitle, type ChatEvent, type ChatMessage, isDefaultTitle, statsFromTimings } from '@llama-webui/shared';
+import { type LlamaTimings, probeUrl, streamChatCompletion } from 'llamacpp-js/client';
+import { LlamaHttpError, LlamaStreamCutError, LlamaStreamError } from 'llamacpp-js/errors';
 import type { ConversationsRepo } from '../db/conversations';
 import { HttpError, notFound } from '../http';
-import { probeUrl } from '../supervisor/health';
-import { buildChatRequest, type LlamaError, llamaErrorMessage } from './request';
+import { buildChatRequest, llamaErrorMessage } from './request';
 
 export interface ChatTarget {
   /** `--host` of the server, null for loopback (external server). */
@@ -36,10 +29,16 @@ export interface ChatRun {
   done: Promise<void>;
 }
 
-/** Error already worded (llama-server response). */
-class LlamaFailure extends Error {}
-
 const CUT = 'llama-server cut the reply short (stopped or crashed)';
+
+/** Why a generation failed, worded for the conversation. */
+function failureMessage(e: unknown): string {
+  if (e instanceof LlamaHttpError)
+    return e.error ? llamaErrorMessage(e.error) : `llama-server: HTTP ${e.status}${e.body ? ` — ${e.body}` : ''}`;
+  if (e instanceof LlamaStreamError) return llamaErrorMessage(e.error);
+  if (e instanceof LlamaStreamCutError) return CUT;
+  return `llama-server unreachable: ${e instanceof Error ? e.message : String(e)}`;
+}
 
 class Run implements ChatRun {
   private listeners = new Set<(e: ChatEvent) => void>();
@@ -56,7 +55,7 @@ class Run implements ChatRun {
     private readonly deps: Required<Omit<ChatRunsDeps, 'target'>>,
     private readonly user: ChatMessage | null,
     private readonly assistant: ChatMessage,
-    private readonly url: string,
+    private readonly baseUrl: string,
     private readonly body: Record<string, unknown>,
     onEnd: () => void,
   ) {
@@ -119,76 +118,32 @@ class Run implements ChatRun {
     let lastFlush = started;
     let status: ChatMessage['status'] = 'done';
     let error: string | null = null;
-    /** The HTTP response has started: a later cut comes from llama-server, not from a failed connection. */
-    let receiving = false;
-    let finished = false;
     try {
-      const res = await this.deps.fetch(this.url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(this.body),
+      const stream = streamChatCompletion(this.baseUrl, this.body, {
+        fetch: this.deps.fetch,
         signal: this.abort.signal,
       });
-      if (!res.ok || !res.body) {
-        const text = await res.text().catch(() => '');
-        let err: LlamaError | undefined;
-        try {
-          err = JSON.parse(text)?.error;
-        } catch {}
-        throw new LlamaFailure(
-          err ? llamaErrorMessage(err) : `llama-server: HTTP ${res.status}${text ? ` — ${text}` : ''}`,
-        );
-      }
-      receiving = true;
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      const parser = new SseParser();
-      read: for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        for (const ev of parser.push(decoder.decode(value, { stream: true }))) {
-          if (ev.data === '[DONE]') {
-            finished = true;
-            break read;
+      for await (const j of stream) {
+        const delta = j.choices?.[0]?.delta;
+        const content = delta?.content ?? '';
+        const reasoning = delta?.reasoning_content ?? '';
+        if (content || reasoning) {
+          ttft ??= now() - started;
+          this.content += content;
+          this.reasoning += reasoning;
+          this.emit({ type: 'delta', ...(content ? { content } : {}), ...(reasoning ? { reasoning } : {}) });
+          if (now() - lastFlush >= flushMs && !this.detached) {
+            repo.updateMessage(this.assistant.id, { content: this.content, reasoning: this.reasoning });
+            lastFlush = now();
           }
-          let j: {
-            choices?: { delta?: { content?: string | null; reasoning_content?: string | null } }[];
-            timings?: LlamaTimings;
-            error?: LlamaError;
-          };
-          try {
-            j = JSON.parse(ev.data);
-          } catch {
-            continue;
-          }
-          if (j.error) throw new LlamaFailure(llamaErrorMessage(j.error));
-          const delta = j.choices?.[0]?.delta;
-          const content = delta?.content ?? '';
-          const reasoning = delta?.reasoning_content ?? '';
-          if (content || reasoning) {
-            ttft ??= now() - started;
-            this.content += content;
-            this.reasoning += reasoning;
-            this.emit({ type: 'delta', ...(content ? { content } : {}), ...(reasoning ? { reasoning } : {}) });
-            if (now() - lastFlush >= flushMs && !this.detached) {
-              repo.updateMessage(this.assistant.id, { content: this.content, reasoning: this.reasoning });
-              lastFlush = now();
-            }
-          }
-          if (j.timings) timings = j.timings;
         }
+        if (j.timings) timings = j.timings;
       }
-      if (!finished) throw new LlamaFailure(CUT);
     } catch (e) {
       if (this.stopped) status = 'stopped';
       else {
         status = 'error';
-        error =
-          e instanceof LlamaFailure
-            ? e.message
-            : receiving
-              ? CUT
-              : `llama-server unreachable: ${e instanceof Error ? e.message : String(e)}`;
+        error = failureMessage(e);
       }
     }
     if (this.detached) return;
@@ -288,7 +243,7 @@ export class ChatRuns {
       this.deps,
       user,
       assistant,
-      `${probeUrl(target.host, target.port)}/v1/chat/completions`,
+      probeUrl(target.host, target.port),
       buildChatRequest(conv, history),
       () => {
         if (this.runs.get(conversationId) === run) this.runs.delete(conversationId);

@@ -1,0 +1,26 @@
+{
+  // Options every project shares. Each project (see the references of tsconfig.json) adds its own types and files.
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleDetection": "force",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "types": [],
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    // A referenced project may not set noEmit. `bun check` writes nothing; a `tsc -b` would write .tsbuild/ (ignored).
+    "emitDeclarationOnly": true,
+    "outDir": "${configDir}/.tsbuild",
+    "composite": true,
+
+    "strict": true,
+    "skipLibCheck": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true
+  }
+}

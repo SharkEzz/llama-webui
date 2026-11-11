@@ -1,0 +1,26 @@
+{
+  "name": "llamacpp-js",
+  "version": "0.2.1",
+  "private": true,
+  "description": "Talk to llama.cpp: llama-server's HTTP API, its metrics, the --help of its binaries and llama-bench's output.",
+  "license": "MIT",
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./bench": "./src/bench.ts",
+    "./client": "./src/client.ts",
+    "./errors": "./src/errors.ts",
+    "./flags": "./src/flags.ts",
+    "./metrics": "./src/metrics.ts",
+    "./node": "./src/node.ts",
+    "./sse": "./src/sse.ts",
+    "./package.json": "./package.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

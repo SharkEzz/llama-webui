@@ -13,6 +13,7 @@ export const PACKAGE_FILES = [
   'package.json',
   'server/package.json',
   'packages/webui-shared/package.json',
+  'packages/llamacpp-js/package.json',
   'web/package.json',
   'site/package.json',
 ];

@@ -14,7 +14,9 @@ runs sweeps: lists of `llama-bench` runs planned by the estimator, optionally va
 | `server/bench/gate.ts`     | `BenchGate`: one holder at a time, stops the managed server once and restarts it once           |
 | `server/bench/runner.ts`   | `BenchRunner`: one-off runs and sweeps, saves results, emits the live state, hands over on reload |
 | `server/bench/execute.ts`  | `RunExecutor`: builds the command, runs the tool, samples VRAM and disk, returns the result     |
-| `server/bench/parse.ts`    | `llama-bench` JSON, `--progress` lines, `--list-devices`, failure lines, binary path            |
+| `server/bench/parse.ts`    | `benchFailure()`: why a run failed, from the tool's last lines                                  |
+| `llamacpp-js/bench`        | `llama-bench` JSON, `--progress` lines, `--list-devices`, failure lines ([llamacpp-js](/developers/llamacpp-js/)) |
+| `llamacpp-js/node`         | `benchBinary()`: `llama-bench` next to `llama-server`                                           |
 | `server/bench/server.ts`   | `runServerTrial()`: a temporary `llama-server` measured through chat requests                  |
 | `server/bench/prompt.ts`   | `promptOf()`: the fixed filler text of a server run                                             |
 | `server/bench/vram.ts`     | `VramProbe`: VRAM sampled every 100 ms                                                          |
@@ -506,8 +508,9 @@ A client that connects late reads the current state over HTTP: `GET /api/bench/r
   `FAKE_BENCH_OOM`, `FAKE_BENCH_OOM_ARG` (out of memory when the argv contains a fragment), `FAKE_TG_BY_ARG`,
   `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`, `FAKE_LOAD_MS`, `FAKE_BENCH_STEP_MS`. The reload tests share one gate between two
   runners.
-- `server/bench/parse.test.ts` parses outputs captured from real runs in `testdata/llama-bench/` (`ok.json`,
-  `oom-stdout.json`, `oom-stderr.txt`, `list-devices.txt`).
+- `packages/llamacpp-js/src/bench.test.ts` parses outputs captured from real runs in `testdata/llama-bench/`
+  (`ok.json`, `oom-stdout.json`, `oom-stderr.txt`, `list-devices.txt`); `server/bench/parse.test.ts` words an
+  out-of-memory failure from them.
 - `server/bench/vram.test.ts`, `server/bench/hardware.test.ts`, `packages/webui-shared/src/sweep.test.ts`,
   `server/db/sweeps.test.ts` and `server/db/benchRuns.test.ts` cover the rest.
 

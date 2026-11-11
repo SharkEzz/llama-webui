@@ -11,12 +11,14 @@ single instance lives in the runtime (`server/runtime.ts`).
 | --------------------------------- | ----------------------------------------------------------------------------------------- |
 | `server/supervisor/supervisor.ts` | `Supervisor`: the state machine, spawn, output piping, health polling, stop.              |
 | `server/supervisor/args.ts`       | `buildCommand()`, `profilePaths()`, `expandHome()`: from a profile to a `BuiltCommand`.    |
-| `server/supervisor/health.ts`     | `probeHealth()`: one `GET /health` with a short timeout.                                   |
 | `server/supervisor/external.ts`   | `externalWatcher()`: detects a `llama-server` llama-webui did not start.                   |
-| `server/supervisor/discovery.ts`  | `findLlamaServerPid()`: finds that process in `/proc`.                                     |
-| `server/supervisor/flags.ts`      | `loadFlags()`, `getFlags()`: the flag catalog read from `llama-server --help`.            |
+| `server/supervisor/flags.ts`      | `getFlags()`: the flag catalog of a binary, cached per path.                              |
 | `server/runtime.ts`               | `getRuntime()`: the supervisor, the log ring and the bench gate on `globalThis`; shutdown. |
 | `packages/webui-shared/src/server.ts`            | `ServerState` and `ServerView`, shared with the web app.                                   |
+
+What talks to `llama-server` itself comes from [llamacpp-js](/developers/llamacpp-js/): `probeHealth()`,
+`probeLlamaServer()` and `probeUrl()` (`llamacpp-js/client`), `findLlamaServerPid()` and `loadFlags()`
+(`llamacpp-js/node`).
 
 The HTTP routes that drive it (`/api/server/start`, `/switch`, `/restart`, `/stop`) are in `server/routes/server.ts`
 and documented in [Server, state and logs](/developers/api/server/). The user-facing behavior is on the
@@ -212,7 +214,7 @@ turns them into `409` responses by checking `e.name`, not `instanceof`, for the 
 ## External servers
 
 An external server is a `llama-server` that answers on a port llama-webui would use, while llama-webui has no process
-of its own. `probeLlamaServer(port)` (`health.ts`) tells it apart from any other HTTP service: its `/health` answers
+of its own. `probeLlamaServer(port)` (`llamacpp-js/client`) tells it apart from any other HTTP service: its `/health` answers
 JSON, `{"status":"ok"}` once loaded or `{"error":{"type":"unavailable_error",…}}` while loading.
 
 `externalWatcher()` (`external.ts`) returns a check function. `server/index.ts` runs it once at startup, then every
@@ -227,7 +229,7 @@ JSON, `{"status":"ok"}` once loaded or `{"error":{"type":"unavailable_error",…
 - In any other state it does nothing. Overlapping checks are skipped, and the check is paused while a benchmark holds
   the [bench gate](#benchmarks-and-the-gate).
 
-`findLlamaServerPid(port)` (`discovery.ts`) reads `/proc/<pid>/cmdline` for every process and returns the first whose
+`findLlamaServerPid(port)` (`llamacpp-js/node`) reads `/proc/<pid>/cmdline` for every process and returns the first whose
 `argv[0]` has the basename `llama-server` and whose `--port` (or `--port=`, `8080` when absent) equals `port`. The
 PID is `null` when nothing matches, for example a server started under another name or in a container.
 
@@ -237,8 +239,8 @@ An external server can be read (chat, monitoring, `/props`) but never stopped: `
 
 `flags.ts` reads what the installed `llama-server` accepts, for the profile editor's completion and warnings:
 
-- `loadFlags(binary, timeoutMs = 5000)` runs `<binary> --help` with that timeout, and parses its standard output with
-  `parseHelp()` (`packages/webui-shared/src/flags.ts`). It returns `null` when the binary cannot run, exits with a non-zero code, or
+- `loadFlags(binary, timeoutMs = 5000)` (`llamacpp-js/node`) runs `<binary> --help` with that timeout, and parses its standard output with
+  `parseHelp()` (`llamacpp-js/flags`). It returns `null` when the binary cannot run, exits with a non-zero code, or
   lists no flag.
 - `getFlags(binary)` keeps one promise per binary path, so `--help` runs once per path. A failure is removed from the
   cache, so the next call tries again.
@@ -293,8 +295,9 @@ it as is. Consequences:
   the previous evaluation, which unsubscribes the old listeners, clears its timers and closes its database handle.
 
 The other files of `server/supervisor/` hold plain functions. `args.ts`, `external.ts` and `flags.ts` are called from
-the routes and `server/index.ts`, so a reload picks up their changes. `health.ts` and `discovery.ts` are also imported
-by `supervisor.ts`: the surviving instance keeps calling the versions it was loaded with.
+the routes and `server/index.ts`, so a reload picks up their changes. `supervisor.ts` also imports `llamacpp-js/client`
+and `llamacpp-js/node` (`packages/llamacpp-js/src/`): the surviving instance keeps calling the versions it was loaded
+with.
 [Architecture](/developers/architecture/) describes the reload model of the whole process.
 
 ## Benchmarks and the gate

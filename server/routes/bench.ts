@@ -11,8 +11,8 @@ import {
   sweepCtx,
   withCtx,
 } from '@llama-webui/shared';
+import { benchBinary } from 'llamacpp-js/node';
 import { listDevices } from '../bench/hardware';
-import { benchBinary } from '../bench/parse';
 import type { BenchRunner } from '../bench/runner';
 import { type BenchRunsRepo, MAX_RUNS } from '../db/benchRuns';
 import type { ProfilesRepo } from '../db/profiles';

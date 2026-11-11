@@ -1,27 +1,12 @@
 {
-  "compilerOptions": {
-    "lib": ["ESNext"],
-    "target": "ESNext",
-    "module": "Preserve",
-    "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
-    "types": ["bun"],
-
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "noEmit": true,
-
-    "strict": true,
-    "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-
-    "paths": {
-      "@llama-webui/shared": ["./packages/webui-shared/src/index.ts"]
-    }
-  },
-  "include": ["server", "packages", "scripts"]
+  // Solution file: `bun check -b` checks every project below, each with its own options.
+  "files": [],
+  "references": [
+    { "path": "packages/llamacpp-js" },
+    { "path": "packages/llamacpp-js/tsconfig.test.json" },
+    { "path": "packages/webui-shared" },
+    { "path": "server" },
+    { "path": "scripts" },
+    { "path": "web" }
+  ]
 }

@@ -1,3 +1,4 @@
+import type { LlamaTimings } from 'llamacpp-js/client';
 import { z } from 'zod';
 
 const num = (min: number, max: number, label: string) =>
@@ -95,16 +96,6 @@ export type ChatEvent =
   | { type: 'done'; message: ChatMessage };
 
 /** `timings` of the last chunk of a llama-server stream. */
-export interface LlamaTimings {
-  prompt_n: number;
-  prompt_per_second: number;
-  predicted_n: number;
-  predicted_per_second: number;
-  cache_n?: number;
-  draft_n?: number;
-  draft_n_accepted?: number;
-}
-
 export function statsFromTimings(t: LlamaTimings, ttftMs: number | null, durationMs: number): MessageStats {
   return {
     ttftMs,

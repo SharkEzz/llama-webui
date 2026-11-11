@@ -1,3 +1,4 @@
+import type { BenchMeasure, BenchDevice as LlamaBenchDevice } from 'llamacpp-js/bench';
 import { z } from 'zod';
 import { reservedFlag, reservedFlagMessage } from './profile';
 import type { FitVerdict } from './tuning';
@@ -101,11 +102,8 @@ export const BenchSpecSchema = z.strictObject({
 export type BenchSpec = z.infer<typeof BenchSpecSchema>;
 export type BenchSpecInput = z.input<typeof BenchSpecSchema>;
 
-export interface Measure {
-  tps: number;
-  stddev: number;
-  tokens: number;
-}
+/** A pp or tg measure of a run. */
+export type Measure = BenchMeasure;
 
 export interface BenchHardware {
   cpu: string;
@@ -156,13 +154,8 @@ export interface BenchLive {
   lines: string[];
 }
 
-export interface BenchDevice {
-  id: string;
-  name: string;
-  totalMib: number;
-  freeMib: number;
-  /** Letters of the id: "CUDA", "Vulkan", "BLAS"… */
-  backend: string;
+/** A device of `llama-bench --list-devices`, with what the monitor knows of it. */
+export interface BenchDevice extends LlamaBenchDevice {
   /**
    * VRAM used by other processes than the managed llama-server (desktop, another model), from the monitor; the
    * estimator deducts it from the budget. Missing: unknown (card not matched to the monitor, or not read).

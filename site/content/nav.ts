@@ -101,10 +101,11 @@ export const NAV: NavSection[] = [
         ],
       },
       {
-        title: 'Web app and shared code',
+        title: 'Web app and packages',
         pages: [
           { path: 'developers/frontend', title: 'Web app' },
           { path: 'developers/shared', title: 'Shared package' },
+          { path: 'developers/llamacpp-js', title: 'llamacpp-js' },
         ],
       },
       {

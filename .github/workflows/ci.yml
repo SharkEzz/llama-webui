@@ -16,7 +16,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
-      # The React Router CLI (site build) runs on Node; Vite 8 needs a recent one.
+      # The React Router CLI (site build) and the llamacpp-js smoke test run on Node.
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -26,6 +26,8 @@ jobs:
       - run: bun run lint
       - run: bun run check
       - run: bun test
+      # llamacpp-js targets Node >= 24 too: Node loads its TypeScript sources and runs the runtime parts.
+      - run: node packages/llamacpp-js/scripts/node-smoke.ts
       # Standalone executable: builds, starts, serves the production UI.
       - run: bun run compile
       - run: bun scripts/smoke-binary.ts dist/llama-webui

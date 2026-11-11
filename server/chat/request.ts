@@ -1,4 +1,5 @@
 import { type ChatMessage, type Conversation, fmtInt } from '@llama-webui/shared';
+import { contextOverflow, type LlamaError } from 'llamacpp-js/errors';
 
 /**
  * Body of /v1/chat/completions: system prompt, finished history (without reasoning or failed replies, consecutive
@@ -20,20 +21,11 @@ export function buildChatRequest(conv: Conversation, history: ChatMessage[]): Re
   return { messages, stream: true, ...sampling, chat_template_kwargs: { enable_thinking: conv.thinking } };
 }
 
-export interface LlamaError {
-  code?: number;
-  message?: string;
-  type?: string;
-  n_prompt_tokens?: number;
-  n_ctx?: number;
-}
-
 /** llama-server error (HTTP response or stream event) as a readable message; a context overflow is explained. */
 export function llamaErrorMessage(e: LlamaError): string {
-  if (e.type === 'exceed_context_size_error') {
-    const m = /\((\d+) tokens\).*\((\d+)\s*tokens\)/.exec(e.message ?? '');
-    const prompt = e.n_prompt_tokens ?? (m ? Number(m[1]) : null);
-    const ctx = e.n_ctx ?? (m ? Number(m[2]) : null);
+  const overflow = contextOverflow(e);
+  if (overflow) {
+    const { promptTokens: prompt, contextTokens: ctx } = overflow;
     const sizes = prompt !== null && ctx !== null ? ` (${fmtInt(prompt)} / ${fmtInt(ctx)} tokens)` : '';
     return `Conversation too long for the model's context${sizes}: start a new conversation or use a profile with a larger context.`;
   }

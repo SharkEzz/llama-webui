@@ -15,6 +15,7 @@ import {
   SweepSpecSchema,
   sweepCtx,
 } from '@llama-webui/shared';
+import { probeHealth } from 'llamacpp-js/client';
 import { BenchRunsRepo } from '../db/benchRuns';
 import { openDb } from '../db/open';
 import { SweepsRepo } from '../db/sweeps';
@@ -22,7 +23,6 @@ import { HttpError } from '../http';
 import { LogBuffer } from '../logs/buffer';
 import { sweepRoutes } from '../routes/sweeps';
 import type { BuiltCommand } from '../supervisor/args';
-import { probeHealth } from '../supervisor/health';
 import { tempDir } from '../testing/tempDir';
 import { type ExecutorDeps, RunExecutor } from './execute';
 import { BenchGate, type ServerControl } from './gate';

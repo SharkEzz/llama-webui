@@ -1,6 +1,6 @@
 import { type BenchSpec, rankRuns, SweepSpecSchema, sweepCtx, withCtx } from '@llama-webui/shared';
+import { benchBinary } from 'llamacpp-js/node';
 import { z } from 'zod';
-import { benchBinary } from '../bench/parse';
 import type { BenchRunner } from '../bench/runner';
 import type { BenchRunsRepo } from '../db/benchRuns';
 import type { SettingsRepo } from '../db/settings';

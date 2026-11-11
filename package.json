@@ -9,7 +9,7 @@
     "web"
   ],
   "scripts": {
-    "check": "bun check --no-script && bun check -p web && bun run --cwd site typecheck",
+    "check": "bun check --no-script -b && bun run --cwd site typecheck",
     "compile": "bun scripts/compile.ts",
     "dev": "bun --hot server/index.ts",
     "format": "biome format --write",

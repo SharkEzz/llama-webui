@@ -1,11 +1,12 @@
 import { stateHost } from '@llama-webui/shared';
+import { fetchProps, probeUrl } from 'llamacpp-js/client';
+import { LlamaHttpError, LlamaReplyError } from 'llamacpp-js/errors';
 import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
 import { guarded, HttpError, jsonObject, notFound } from '../http';
 import { type Runtime, serverView } from '../runtime';
 import { binaryPath, buildCommand } from '../supervisor/args';
 import { getFlags } from '../supervisor/flags';
-import { probeUrl } from '../supervisor/health';
 
 export interface ServerRouteDeps {
   runtime: Runtime;
@@ -84,17 +85,15 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
       GET: guarded(async () => {
         const s = supervisor.state;
         if (s.kind !== 'ready' && s.kind !== 'external') throw new HttpError(409, 'Server not ready');
-        let r: Response;
+        let props: unknown;
         try {
-          r = await fetch(`${probeUrl(stateHost(s), s.port)}/props`, { signal: AbortSignal.timeout(2000) });
-        } catch {
+          props = await fetchProps(probeUrl(stateHost(s), s.port));
+        } catch (e) {
+          if (e instanceof LlamaHttpError) throw new HttpError(502, `llama-server /props: HTTP ${e.status}`);
+          // Its reply, not the client's request: a body that is not JSON is a 502, not a 400 "Invalid JSON".
+          if (e instanceof LlamaReplyError) throw new HttpError(502, 'llama-server /props: the reply is not JSON');
           throw new HttpError(502, 'llama-server is not responding on /props');
         }
-        if (!r.ok) throw new HttpError(502, `llama-server /props: HTTP ${r.status}`);
-        // Its reply, not the client's request: a body that is not JSON is a 502, not a 400 "Invalid JSON".
-        const props: unknown = await r.json().catch(() => {
-          throw new HttpError(502, 'llama-server /props: the reply is not JSON');
-        });
         return Response.json(props);
       }),
     },

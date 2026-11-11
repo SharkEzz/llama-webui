@@ -1,6 +1,6 @@
 import type { BenchDevice, BenchHardware, GpuSample } from '@llama-webui/shared';
+import { parseDeviceList } from 'llamacpp-js/bench';
 import { readCpuInfo } from '../hardware/cpu';
-import { parseDeviceList } from './parse';
 
 const VERSION = /build (\d+), commit (\w+)/;
 const builds = new Map<string, Promise<string | null>>();

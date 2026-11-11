@@ -1,8 +1,21 @@
 import { describe, expect, test } from 'bun:test';
-import { fetchLlama, type LlamaRaw, lastRequestStats, liveRates, parseSlots, type SlotView, specStats } from './llama';
-import { parsePrometheus } from './prometheus';
+import { fetchLlama } from './client.ts';
+import {
+  foldRecent,
+  kvUsage,
+  type LlamaRaw,
+  lastRequestStats,
+  liveRates,
+  mergeRequestStats,
+  parsePrometheus,
+  parseSlots,
+  type RequestRecord,
+  requestDelta,
+  type SlotView,
+  specStats,
+} from './metrics.ts';
 
-const fx = (n: string) => Bun.file(`${import.meta.dir}/../../testdata/${n}`);
+const fx = (n: string) => Bun.file(`${import.meta.dir}/../../../testdata/${n}`);
 const after = parsePrometheus(await fx('metrics-after.txt').text());
 const idle = parsePrometheus(await fx('metrics-idle.txt').text());
 
@@ -144,8 +157,6 @@ describe('fetchLlama', () => {
   });
 });
 
-import { mergeRequestStats } from './llama';
-
 describe('mergeRequestStats (prompt and generation counters land on different ticks)', () => {
   test('generation delta keeps the prompt rate of the same request', () => {
     const afterPrompt = mergeRequestStats(null, { genTps: null, ppTps: 124.6, specAccept: null });
@@ -169,8 +180,6 @@ describe('mergeRequestStats (prompt and generation counters land on different ti
     expect(mergeRequestStats(prev, null)).toBe(prev);
   });
 });
-
-import { foldRecent, kvUsage, type RequestRecord, requestDelta } from './llama';
 
 describe('context usage and recent requests', () => {
   const slot = (p: number, d: number, ctx: number): SlotView => ({

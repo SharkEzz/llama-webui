@@ -1,0 +1,108 @@
+---
+title: llamacpp-js
+description: The llama.cpp client library of the monorepo, its entry points, its errors, and the rules that keep it publishable, Node-compatible and tree-shakeable.
+---
+
+`llamacpp-js` (`packages/llamacpp-js/`) holds everything llama-webui knows about llama.cpp itself: the HTTP API of
+`llama-server` (health, `/slots`, `/metrics`, `/props`, streamed chat completions), the figures derived from its
+metrics, the `--help` of its binaries, the output of `llama-bench`, and finding a running server in `/proc`. It depends
+on nothing in the monorepo, so it can be published to npm on its own; until then it is `private` and the other
+workspaces use it as `workspace:*`.
+
+What is llama-webui's own choice stays in the app: the [supervisor](/developers/server/supervisor/) (process states,
+logs, profiles), `buildCommand()`, the benchmark runner and gate, tuning, and the wording of errors shown to the user
+(`llamaErrorMessage()`, `benchFailure()`).
+
+## Entry points
+
+Each module has its own subpath export, and the root re-exports every module that runs anywhere:
+
+| Import | Module | What it exports |
+| --- | --- | --- |
+| `llamacpp-js/client` | `client.ts` | `probeUrl()`, `probeHealth()`, `probeLlamaServer()`, `fetchLlama()`, `fetchProps()`, `streamChatCompletion()`, the `LlamaTimings` and `ChatCompletionChunk` types. |
+| `llamacpp-js/metrics` | `metrics.ts` | `parsePrometheus()`, `parseSlots()`, `liveRates()`, `lastRequestStats()`, `kvUsage()`, `requestDelta()`, `foldRecent()`, `mergeRequestStats()`, `specStats()`, `slotContextTokens()`, the `SlotView`, `Health`, `LlamaRaw`, `RequestStats`, `SpecStats` and `RequestRecord` types. |
+| `llamacpp-js/flags` | `flags.ts` | The flag catalogue of a `--help`: `parseHelp()`, `catalogFrom()`, `flagOf()`, `complete()`, `flagSuggestions()`, `unknownFlags()`, `describeFlag()`. |
+| `llamacpp-js/bench` | `bench.ts` | `parseBenchJson()`, `parseBenchProgress()`, `parseDeviceList()`, `ERROR_LINE` and `OOM_LINE`, the `BenchMeasure` and `BenchDevice` types. |
+| `llamacpp-js/sse` | `sse.ts` | `SseParser`, an incremental `text/event-stream` reader. |
+| `llamacpp-js/errors` | `errors.ts` | `LlamaError`, `contextOverflow()`, `parseLlamaError()` and the error classes below. |
+| `llamacpp-js/node` | `node.ts` | `loadFlags()` (runs `<binary> --help`), `findLlamaServerPid()`, `parseCmdline()`, `portFromArgv()`, `benchBinary()`. |
+| `llamacpp-js` | `index.ts` | Everything above except `llamacpp-js/node`. |
+
+Only `llamacpp-js/node` uses Node APIs (`node:child_process`, `node:fs/promises`, `node:path`); every other module
+needs nothing but `fetch`, streams and `TextDecoder`, and runs in a browser too. The web app reaches the browser-safe
+part through `@llama-webui/shared`, which re-exports the flag catalogue, `SseParser` and the monitoring types
+([Shared package](/developers/shared/#re-exported-from-llamacpp-js)).
+
+## Using it
+
+Every function that talks to a server takes the server's base URL (`probeUrl(host, port)` builds it: loopback for a
+wildcard address) and accepts a `fetch`, for tests or another transport:
+
+```ts title="Monitoring read"
+import { fetchLlama, kvUsage, probeUrl } from 'llamacpp-js';
+
+const raw = await fetchLlama(probeUrl('0.0.0.0', 8080));
+if (raw.health === 'ok') console.log(kvUsage(raw.slots));
+```
+
+`streamChatCompletion(baseUrl, body, { fetch, signal })` posts `body` to `/v1/chat/completions` with `stream: true` and
+yields each chunk until `data: [DONE]`. Aborting `signal` stops the request; leaving the loop before `[DONE]` cancels
+the stream.
+
+```ts title="Streamed chat"
+import { streamChatCompletion } from 'llamacpp-js/client';
+
+let text = '';
+for await (const chunk of streamChatCompletion(baseUrl, { messages: [{ role: 'user', content: 'Hi' }] })) {
+  text += chunk.choices?.[0]?.delta?.content ?? '';
+}
+```
+
+```ts title="Flags of the installed binary"
+import { loadFlags } from 'llamacpp-js/node';
+
+const catalog = await loadFlags('llama-server'); // null when it cannot run
+console.log(catalog?.byName.get('-c')?.help);
+```
+
+## Errors
+
+The errors are classes with a fixed `name`, so a caller can test them with `instanceof` or by name:
+
+| Class | When | Carries |
+| --- | --- | --- |
+| `LlamaHttpError` | The server answered an HTTP error (or a stream response without a body). | `status`, `body`, and `error`: the `LlamaError` of a JSON body, else `null`. |
+| `LlamaReplyError` | A 2xx reply that is not what the endpoint returns (`/props` that is not JSON). | The message. |
+| `LlamaStreamError` | A streamed completion sent an `error` event. | `error`, the `LlamaError`. |
+| `LlamaStreamCutError` | The stream ended or broke before `[DONE]`. | The read error as `cause`, when there is one. |
+
+A `fetch` that fails before any response (nothing listens, a timeout) throws its own error unchanged. The probes and
+`fetchLlama()` never throw: a server that does not answer is `null`, `false` or `health: 'down'`.
+`contextOverflow(error)` reads the prompt and context sizes of an `exceed_context_size_error`, from its fields or, on
+builds that only put them in the message, from its text.
+
+## Rules of the package
+
+`packages/llamacpp-js/src/package.test.ts` and the type check enforce them:
+
+- **No dependency.** No `dependencies` in its `package.json`, and no import of `@llama-webui/*`.
+- **Node 24 or later, and Bun.** `engines.node` is `>=24`. The sources use web and `node:*` APIs only, never `Bun.*`:
+  its project (`packages/llamacpp-js/tsconfig.json`) is checked with the Node types alone, so a Bun API does not type
+  check. Its tests run on `bun test` and have their own project with the Bun types (`tsconfig.test.json`).
+- **TypeScript that Node runs as is.** Node 24 strips types itself, so the sources are executed without a build:
+  relative imports name their `.ts` file (`./metrics.ts`), types use `import type`, and the syntax is erasable only
+  (`erasableSyntaxOnly`: no `enum`, `namespace` or constructor parameter properties).
+  `node packages/llamacpp-js/scripts/node-smoke.ts` loads the sources in Node and runs the parsers, the HTTP client
+  against a local server, `loadFlags()` on a fake binary and `findLlamaServerPid()`; CI runs it after `bun test`.
+- **Tree-shakeable.** The package is ESM only with `"sideEffects": false`; modules hold no state and run nothing when
+  imported (a cache such as the per-binary flags of `getFlags()` lives in the app). An import of one function bundles
+  that function and what it calls, nothing else: `package.test.ts` bundles `parseHelp` alone with `Bun.build` and
+  checks that the client, the SSE parser and the metrics are not in the output, and that the browser-safe modules
+  bundle for the browser without any Node built-in.
+- **One export per module.** Every source file has its subpath in `exports`.
+
+## Publishing
+
+The package is not published yet. Node refuses to strip types under `node_modules`, so the published package will
+need a build that emits JavaScript and `.d.ts` files, with `exports` pointing at them; the sources and the rules above
+stay the same.

@@ -1,4 +1,8 @@
 {
-  "extends": "../../tsconfig.json",
-  "include": ["src"]
+  // Runs in Bun and in the browser bundle. Bun types for its tests and for the globals both have (URL…); no DOM, so a
+  // browser-only API fails here.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "types": ["bun"] },
+  "include": ["src"],
+  "references": [{ "path": "../llamacpp-js" }]
 }
