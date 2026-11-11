@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'bun:test';
-import { fetchLlama } from './client.ts';
+import assert from 'node:assert/strict';
+import { describe, test } from 'node:test';
+import { fetchLlama } from '../src/client.ts';
 import {
   foldRecent,
   kvUsage,
@@ -13,30 +14,33 @@ import {
   requestDelta,
   type SlotView,
   specStats,
-} from './metrics.ts';
+} from '../src/metrics.ts';
+import { closeTo, fixture, matchObject } from './helpers.ts';
 
-const fx = (n: string) => Bun.file(`${import.meta.dir}/../../../testdata/${n}`);
-const after = parsePrometheus(await fx('metrics-after.txt').text());
-const idle = parsePrometheus(await fx('metrics-idle.txt').text());
+const after = parsePrometheus(await fixture('metrics-after.txt'));
+const idle = parsePrometheus(await fixture('metrics-idle.txt'));
 
 describe('parsePrometheus', () => {
   test('reads plain and labelled series', () => {
-    expect(after.get('llamacpp:tokens_predicted_total')).toBe(300);
-    expect(after.get('llamacpp:spec_decode_num_accepted_tokens_per_pos_total{position="0"}')).toBe(87);
-    expect(after.has('# HELP')).toBe(false);
+    assert.equal(after.get('llamacpp:tokens_predicted_total'), 300);
+    assert.equal(after.get('llamacpp:spec_decode_num_accepted_tokens_per_pos_total{position="0"}'), 87);
+    assert.equal(after.has('# HELP'), false);
   });
   test('skips garbage', () => {
     const m = parsePrometheus('a 1\nb notanumber\n\n# c\nd 2.5');
-    expect([...m.entries()]).toEqual([
-      ['a', 1],
-      ['d', 2.5],
-    ]);
+    assert.deepEqual(
+      [...m.entries()],
+      [
+        ['a', 1],
+        ['d', 2.5],
+      ],
+    );
   });
 });
 
 describe('parseSlots', () => {
   test('busy slot', async () => {
-    expect(parseSlots(await fx('slots-busy.json').json())[0]).toEqual({
+    assert.deepEqual(parseSlots(JSON.parse(await fixture('slots-busy.json')))[0], {
       id: 0,
       nCtx: 40192,
       processing: true,
@@ -48,17 +52,17 @@ describe('parseSlots', () => {
     });
   });
   test('idle slot', async () => {
-    const s = parseSlots(await fx('slots-idle.json').json())[0]!;
-    expect(s.processing).toBe(false);
-    expect(s.nDecoded).toBe(0);
-    expect(s.idTask).toBeNull();
+    const s = parseSlots(JSON.parse(await fixture('slots-idle.json')))[0]!;
+    assert.equal(s.processing, false);
+    assert.equal(s.nDecoded, 0);
+    assert.equal(s.idTask, null);
   });
   test('garbage', () => {
-    expect(parseSlots({})).toEqual([]);
-    expect(parseSlots([null, 3])).toEqual([]);
+    assert.deepEqual(parseSlots({}), []);
+    assert.deepEqual(parseSlots([null, 3]), []);
   });
   test('next_token as object', () => {
-    expect(parseSlots([{ id: 1, is_processing: true, next_token: { n_decoded: 4 } }])[0]!.nDecoded).toBe(4);
+    assert.equal(parseSlots([{ id: 1, is_processing: true, next_token: { n_decoded: 4 } }])[0]!.nDecoded, 4);
   });
 });
 
@@ -77,18 +81,18 @@ const raw = (at: number, slots: SlotView[]): LlamaRaw => ({ at, health: 'ok', sl
 
 describe('liveRates', () => {
   test('same task delta', () => {
-    expect(liveRates(raw(0, [slot({ nDecoded: 21 })]), raw(1000, [slot({ nDecoded: 26 })])).genTps).toBe(5);
+    assert.equal(liveRates(raw(0, [slot({ nDecoded: 21 })]), raw(1000, [slot({ nDecoded: 26 })])).genTps, 5);
   });
   test('task changed → current value', () => {
-    expect(liveRates(raw(0, [slot({ nDecoded: 21 })]), raw(1000, [slot({ idTask: 3, nDecoded: 4 })])).genTps).toBe(4);
+    assert.equal(liveRates(raw(0, [slot({ nDecoded: 21 })]), raw(1000, [slot({ idTask: 3, nDecoded: 4 })])).genTps, 4);
   });
   test('prompt processing rate', () => {
     const r = liveRates(raw(0, [slot({ nPromptProcessed: 10 })]), raw(500, [slot({ nPromptProcessed: 30 })]));
-    expect(r.ppTps).toBe(40);
+    assert.equal(r.ppTps, 40);
   });
   test('no prev or idle → 0', () => {
-    expect(liveRates(null, raw(1000, [slot({ nDecoded: 5 })]))).toEqual({ genTps: 0, ppTps: 0 });
-    expect(liveRates(raw(0, [slot({})]), raw(1000, [slot({ processing: false, nDecoded: 9 })]))).toEqual({
+    assert.deepEqual(liveRates(null, raw(1000, [slot({ nDecoded: 5 })])), { genTps: 0, ppTps: 0 });
+    assert.deepEqual(liveRates(raw(0, [slot({})]), raw(1000, [slot({ processing: false, nDecoded: 9 })])), {
       genTps: 0,
       ppTps: 0,
     });
@@ -98,46 +102,46 @@ describe('liveRates', () => {
 describe('lastRequestStats', () => {
   test('computes per-request rates from counter deltas', () => {
     const s = lastRequestStats(idle, after)!;
-    expect(s.genTps!).toBeCloseTo(300 / 56.0309, 2);
-    expect(s.ppTps!).toBeCloseTo(68 / 2.44401, 2);
-    expect(s.specAccept!).toBeCloseTo(174 / 374, 4);
+    closeTo(s.genTps!, 300 / 56.0309, 2);
+    closeTo(s.ppTps!, 68 / 2.44401, 2);
+    closeTo(s.specAccept!, 174 / 374, 4);
   });
-  test('unchanged → null', () => expect(lastRequestStats(after, after)).toBeNull());
+  test('unchanged → null', () => assert.equal(lastRequestStats(after, after), null));
 });
 
 test('specStats', () => {
   const s = specStats(after);
-  expect(s.acceptCum!).toBeCloseTo(0.4652, 3);
-  expect(s.drafts).toBe(125);
-  expect(s.draftTokens).toBe(374);
-  expect(s.accepted).toBe(174);
-  expect(s.meanAcceptedPerDraft!).toBeCloseTo(1.392, 3);
-  expect(s.perPos.length).toBe(3);
-  expect(s.perPos[0]!).toBeCloseTo(0.696, 3);
-  expect(s.perPos[1]!).toBeCloseTo(0.44, 3);
-  expect(s.perPos[2]!).toBeCloseTo(0.256, 3);
-  expect(specStats(idle).acceptCum).toBeNull();
+  closeTo(s.acceptCum!, 0.4652, 3);
+  assert.equal(s.drafts, 125);
+  assert.equal(s.draftTokens, 374);
+  assert.equal(s.accepted, 174);
+  closeTo(s.meanAcceptedPerDraft!, 1.392, 3);
+  assert.equal(s.perPos.length, 3);
+  closeTo(s.perPos[0]!, 0.696, 3);
+  closeTo(s.perPos[1]!, 0.44, 3);
+  closeTo(s.perPos[2]!, 0.256, 3);
+  assert.equal(specStats(idle).acceptCum, null);
 });
 
 describe('fetchLlama', () => {
   test('503 → loading, no slots', async () => {
     const f = (async () => new Response('', { status: 503 })) as unknown as typeof fetch;
     const r = await fetchLlama('http://x', f);
-    expect(r.health).toBe('loading');
-    expect(r.slots).toBeNull();
+    assert.equal(r.health, 'loading');
+    assert.equal(r.slots, null);
   });
   test('ok → slots and metrics', async () => {
     const body = {
       '/health': '{"status":"ok"}',
-      '/slots': await fx('slots-busy.json').text(),
-      '/metrics': await fx('metrics-after.txt').text(),
+      '/slots': await fixture('slots-busy.json'),
+      '/metrics': await fixture('metrics-after.txt'),
     };
     const f = (async (u: string) =>
       new Response(body[new URL(u).pathname as keyof typeof body])) as unknown as typeof fetch;
     const r = await fetchLlama('http://x', f);
-    expect(r.health).toBe('ok');
-    expect(r.slots?.[0]?.nDecoded).toBe(21);
-    expect(r.metrics?.get('llamacpp:tokens_predicted_total')).toBe(300);
+    assert.equal(r.health, 'ok');
+    assert.equal(r.slots?.[0]?.nDecoded, 21);
+    assert.equal(r.metrics?.get('llamacpp:tokens_predicted_total'), 300);
   });
   test('hung server → down within timeout', async () => {
     const f = ((_u: string, init?: RequestInit) =>
@@ -146,14 +150,14 @@ describe('fetchLlama', () => {
       )) as unknown as typeof fetch;
     const t0 = Date.now();
     const r = await fetchLlama('http://x', f, 50);
-    expect(r.health).toBe('down');
-    expect(Date.now() - t0).toBeLessThan(200);
+    assert.equal(r.health, 'down');
+    assert.ok(Date.now() - t0 < 200);
   });
   test('network error → down', async () => {
     const f = (async () => {
       throw new Error('ECONNREFUSED');
     }) as unknown as typeof fetch;
-    expect((await fetchLlama('http://x', f)).health).toBe('down');
+    assert.equal((await fetchLlama('http://x', f)).health, 'down');
   });
 });
 
@@ -161,11 +165,11 @@ describe('mergeRequestStats (prompt and generation counters land on different ti
   test('generation delta keeps the prompt rate of the same request', () => {
     const afterPrompt = mergeRequestStats(null, { genTps: null, ppTps: 124.6, specAccept: null });
     const afterGen = mergeRequestStats(afterPrompt, { genTps: 44.7, ppTps: null, specAccept: 0.415 });
-    expect(afterGen).toEqual({ genTps: 44.7, ppTps: 124.6, specAccept: 0.415 });
+    assert.deepEqual(afterGen, { genTps: 44.7, ppTps: 124.6, specAccept: 0.415 });
   });
   test('a new prompt starts a new request', () => {
     const prev = { genTps: 44.7, ppTps: 124.6, specAccept: 0.415 };
-    expect(mergeRequestStats(prev, { genTps: null, ppTps: 90, specAccept: null })).toEqual({
+    assert.deepEqual(mergeRequestStats(prev, { genTps: null, ppTps: 90, specAccept: null }), {
       genTps: null,
       ppTps: 90,
       specAccept: null,
@@ -173,11 +177,11 @@ describe('mergeRequestStats (prompt and generation counters land on different ti
   });
   test('both in one delta', () => {
     const d = { genTps: 5, ppTps: 27.8, specAccept: 0.8 };
-    expect(mergeRequestStats({ genTps: 1, ppTps: 1, specAccept: 1 }, d)).toEqual(d);
+    assert.deepEqual(mergeRequestStats({ genTps: 1, ppTps: 1, specAccept: 1 }, d), d);
   });
   test('null delta keeps previous', () => {
     const prev = { genTps: 1, ppTps: 2, specAccept: 0.5 };
-    expect(mergeRequestStats(prev, null)).toBe(prev);
+    assert.equal(mergeRequestStats(prev, null), prev);
   });
 });
 
@@ -195,10 +199,10 @@ describe('context usage and recent requests', () => {
 
   test('kvUsage sums slots; generated tokens are already in n_prompt_tokens', () => {
     // Real slot mid-generation: a 29-token prompt, 1110 generated, n_prompt_tokens 1142.
-    expect(kvUsage([slot(1142, 1110, 64512), slot(0, 0, 64512)])).toEqual({ usedTokens: 1142, totalTokens: 129024 });
-    expect(kvUsage([])).toBeNull();
-    expect(kvUsage(null)).toBeNull();
-    expect(kvUsage([slot(0, 0, 0)])).toBeNull();
+    assert.deepEqual(kvUsage([slot(1142, 1110, 64512), slot(0, 0, 64512)]), { usedTokens: 1142, totalTokens: 129024 });
+    assert.equal(kvUsage([]), null);
+    assert.equal(kvUsage(null), null);
+    assert.equal(kvUsage([slot(0, 0, 0)]), null);
   });
 
   const metricsMap = (o: Record<string, number>) => new Map(Object.entries(o).map(([k, v]) => [`llamacpp:${k}`, v]));
@@ -218,7 +222,7 @@ describe('context usage and recent requests', () => {
       tokens_predicted_total: 0,
       tokens_predicted_seconds_total: 0,
     });
-    expect(requestDelta(prev, cur, 5)).toEqual({
+    assert.deepEqual(requestDelta(prev, cur, 5), {
       at: 5,
       promptTokens: 68,
       cachedTokens: 20,
@@ -229,7 +233,7 @@ describe('context usage and recent requests', () => {
       genTps: null,
       specAccept: null,
     });
-    expect(requestDelta(cur, cur, 6)).toBeNull();
+    assert.equal(requestDelta(cur, cur, 6), null);
     const gen = metricsMap({
       prompt_tokens_total: 68,
       prompt_seconds_total: 2,
@@ -238,7 +242,7 @@ describe('context usage and recent requests', () => {
       spec_decode_num_draft_tokens_total: 10,
       spec_decode_num_accepted_tokens_total: 5,
     });
-    expect(requestDelta(cur, gen, 7)).toMatchObject({
+    matchObject(requestDelta(cur, gen, 7), {
       promptTokens: 0,
       genTokens: 300,
       genSec: 60,
@@ -272,22 +276,25 @@ describe('context usage and recent requests', () => {
     };
     const l1 = foldRecent([], p);
     const l2 = foldRecent(l1, g);
-    expect(l2).toEqual([{ ...p, genTokens: 300, genSec: 60, genTps: 5, specAccept: 0.5 }]);
-    expect(foldRecent(l2, { ...g, genTokens: 100, genSec: 20, specAccept: null })[0]).toMatchObject({
+    assert.deepEqual(l2, [{ ...p, genTokens: 300, genSec: 60, genTps: 5, specAccept: 0.5 }]);
+    matchObject(foldRecent(l2, { ...g, genTokens: 100, genSec: 20, specAccept: null })[0], {
       genTokens: 400,
       genSec: 80,
       genTps: 5,
       specAccept: 0.5,
     });
-    expect(foldRecent(l2, { ...p, at: 3 }).map((r) => r.at)).toEqual([3, 1]);
-    expect(foldRecent([], g)).toEqual([g]);
-    expect(foldRecent(l2, null)).toBe(l2);
+    assert.deepEqual(
+      foldRecent(l2, { ...p, at: 3 }).map((r) => r.at),
+      [3, 1],
+    );
+    assert.deepEqual(foldRecent([], g), [g]);
+    assert.equal(foldRecent(l2, null), l2);
     // Kept for wide dashboards, where Recent requests grows to fill its column.
     const many = Array.from({ length: 45 }, (_, i) => ({ ...p, at: i })).reduce<RequestRecord[]>(
       (l, r) => foldRecent(l, r),
       [],
     );
-    expect(many.length).toBe(40);
-    expect(many[0]!.at).toBe(44);
+    assert.equal(many.length, 40);
+    assert.equal(many[0]!.at, 44);
   });
 });

@@ -1,6 +1,6 @@
 {
   // The library alone, as a Node user sees it: Node types only (no Bun, no DOM), syntax Node can strip.
-  // Tests run on `bun test`: tsconfig.test.json checks them with the Bun types.
+  // The tests (tests/, node:test) have their own project with the same options: tsconfig.test.json.
   "compilerOptions": {
     "lib": ["ESNext"],
     "target": "ESNext",
@@ -22,6 +22,5 @@
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src", "scripts"],
-  "exclude": ["src/**/*.test.ts"]
+  "include": ["src"]
 }

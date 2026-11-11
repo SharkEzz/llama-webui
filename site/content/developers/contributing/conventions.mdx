@@ -153,14 +153,15 @@ The app runs on Bun and uses its APIs rather than npm packages that do the same 
 | NVML                          | `bun:ffi` in a `Worker`               | `server/collectors/nvml/`                                  |
 | Checksums                     | `Bun.CryptoHasher`                    | `server/hf/downloader.ts`                                  |
 | Shell commands                | `Bun.$`                               | Tests (`server/collectors/nvidia.test.ts`)                 |
-| Tests                         | `bun:test`                            | Every `*.test.ts`                                          |
+| Tests                         | `bun:test`                            | Every `*.test.ts` but those of `packages/llamacpp-js/`     |
 
 `Bun.file` and `Bun.write` only handle files: directories and file handles go through `node:fs` or `node:fs/promises`
 (`readdir`, `stat`, `realpath`, `open`, `statfs`). There is no Express, `ws`, `better-sqlite3`, `execa` or `dotenv`
 (Bun loads `.env` itself), and no Vite, Jest or Vitest in the app. Two exceptions: `site/` is built with Vite and
 React Router, and is still installed, run and tested with Bun; `packages/llamacpp-js/` targets Node 24 or later as
 well as Bun, so its sources use only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), never
-`Bun.*`. Its tests still run on `bun test` ([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
+`Bun.*`, and its tests use `node:test` so that they run on Node as well as under `bun test`
+([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
 
 ### Code idioms
 

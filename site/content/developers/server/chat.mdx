@@ -212,4 +212,4 @@ that the SSE streams close, and blocks any later write from that run.
 saved after its listener leaves, a stop that keeps the partial answer, a late subscriber that receives what was
 already written, a stream that breaks, and `dispose()` closing the streams. `server/chat/request.test.ts` covers
 `buildChatRequest()` and `llamaErrorMessage()`; the stream reader itself is tested in
-`packages/llamacpp-js/src/client.test.ts`.
+`packages/llamacpp-js/tests/client.test.ts`.

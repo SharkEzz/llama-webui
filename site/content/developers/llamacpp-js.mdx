@@ -83,20 +83,23 @@ builds that only put them in the message, from its text.
 
 ## Rules of the package
 
-`packages/llamacpp-js/src/package.test.ts` and the type check enforce them:
+`packages/llamacpp-js/tests/package.test.ts` and the type check enforce them:
 
 - **No dependency.** No `dependencies` in its `package.json`, and no import of `@llama-webui/*`.
 - **Node 24 or later, and Bun.** `engines.node` is `>=24`. The sources use web and `node:*` APIs only, never `Bun.*`:
   its project (`packages/llamacpp-js/tsconfig.json`) is checked with the Node types alone, so a Bun API does not type
-  check. Its tests run on `bun test` and have their own project with the Bun types (`tsconfig.test.json`).
+  check. Its tests, in `tests/` (out of `src/`, which holds only what the package ships), are written with
+  `node:test` and `node:assert` and run on both Node and Bun; their project (`tsconfig.test.json`) has the Node types
+  only too ([Tests of llamacpp-js](/developers/contributing/testing/#tests-of-llamacpp-js)).
 - **TypeScript that Node runs as is.** Node 24 strips types itself, so the sources are executed without a build:
   relative imports name their `.ts` file (`./metrics.ts`), types use `import type`, and the syntax is erasable only
   (`erasableSyntaxOnly`: no `enum`, `namespace` or constructor parameter properties).
-  `node packages/llamacpp-js/scripts/node-smoke.ts` loads the sources in Node and runs the parsers, the HTTP client
-  against a local server, `loadFlags()` on a fake binary and `findLlamaServerPid()`; CI runs it after `bun test`.
+  CI runs the tests under Node (`bun run --cwd packages/llamacpp-js test:node`) after `bun test`: the parsers, the
+  HTTP client against a local `node:http` server, `loadFlags()` on a stand-in binary and `findLlamaServerPid()` on a
+  temporary `/proc` tree.
 - **Tree-shakeable.** The package is ESM only with `"sideEffects": false`; modules hold no state and run nothing when
   imported (a cache such as the per-binary flags of `getFlags()` lives in the app). An import of one function bundles
-  that function and what it calls, nothing else: `package.test.ts` bundles `parseHelp` alone with `Bun.build` and
+  that function and what it calls, nothing else: `tests/package.test.ts` bundles `parseHelp` alone with `Bun.build` and
   checks that the client, the SSE parser and the metrics are not in the output, and that the browser-safe modules
   bundle for the browser without any Node built-in.
 - **One export per module.** Every source file has its subpath in `exports`.

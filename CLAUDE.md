@@ -54,9 +54,9 @@ L'UI, les messages du serveur (erreurs, validations zod, logs, `--help`), les co
 
 ## Packages (`packages/`)
 
-`packages/webui-shared/` (`@llama-webui/shared`) : types, schémas zod et logique pure partagés par le serveur et le web. `packages/llamacpp-js/` : tout ce qui parle à llama.cpp (API HTTP de `llama-server`, métriques, `--help`, sortie de `llama-bench`, `/proc`), destiné à être publié sur npm. Règles de `llamacpp-js` (vérifiées par `src/package.test.ts`, son projet TS et `node packages/llamacpp-js/scripts/node-smoke.ts` en CI) :
+`packages/webui-shared/` (`@llama-webui/shared`) : types, schémas zod et logique pure partagés par le serveur et le web. `packages/llamacpp-js/` : tout ce qui parle à llama.cpp (API HTTP de `llama-server`, métriques, `--help`, sortie de `llama-bench`, `/proc`), destiné à être publié sur npm. Règles de `llamacpp-js` (vérifiées par `tests/package.test.ts`, son projet TS et ses tests rejoués sous Node en CI) :
 
-- **Exception à « préférer Bun » :** cible Node ≥ 24 **et** Bun, donc uniquement des API web et `node:*` dans `src/` (`fetch`, `node:child_process`, `node:fs/promises`), jamais `Bun.*` ; les tests restent en `bun:test`.
+- **Exception à « préférer Bun » :** cible Node ≥ 24 **et** Bun, donc uniquement des API web et `node:*` dans `src/` (`fetch`, `node:child_process`, `node:fs/promises`), jamais `Bun.*`. Ses tests sont dans `tests/` (hors de `src/`) et utilisent `node:test` + `node:assert/strict` : ils tournent sous `bun test` et sous Node (`bun run --cwd packages/llamacpp-js test:node`, en CI). Bun n'implémente qu'une partie de `node:test` (ni snapshots, ni `mock.module()`, `test.only` ne filtre pas) : s'en tenir à ce que les deux supportent ; ce qui demande `Bun.build` passe `{ skip }` sans `Bun`.
 - Aucune dépendance ni import de `@llama-webui/*` ; ce qui est un choix de llama-webui (superviseur, `buildCommand`, formulation des erreurs pour l'utilisateur, caches) reste dans l'app.
 - TS exécutable tel quel par Node : imports relatifs avec extension `.ts`, `import type`, syntaxe effaçable (`erasableSyntaxOnly` : pas d'`enum`, de `namespace` ni de propriétés de paramètre).
 - Tree-shakeable : ESM, `"sideEffects": false`, aucun état ni effet au chargement d'un module, un export par module dans `package.json` ; seul `llamacpp-js/node` utilise des API Node, le reste tourne aussi dans le navigateur.

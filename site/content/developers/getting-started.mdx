@@ -182,7 +182,7 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
     - `src/` one module per domain, re-exported by `index.ts`
   - `llamacpp-js/` the llama.cpp client: HTTP API, metrics, `--help`, `llama-bench` output (workspace `llamacpp-js`)
     - `src/` one module per subpath export, `node.ts` for the process and filesystem helpers
-    - `scripts/node-smoke.ts` runs the library under Node
+    - `tests/` its tests (`node:test`), run by `bun test` and by Node (`test:node`)
 - `site/` this website (standalone package)
   - `content/` the `.mdx` pages and `nav.ts`
   - `src/` routes, layout, docs components, landing page

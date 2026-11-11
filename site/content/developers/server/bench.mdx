@@ -508,7 +508,7 @@ A client that connects late reads the current state over HTTP: `GET /api/bench/r
   `FAKE_BENCH_OOM`, `FAKE_BENCH_OOM_ARG` (out of memory when the argv contains a fragment), `FAKE_TG_BY_ARG`,
   `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`, `FAKE_LOAD_MS`, `FAKE_BENCH_STEP_MS`. The reload tests share one gate between two
   runners.
-- `packages/llamacpp-js/src/bench.test.ts` parses outputs captured from real runs in `testdata/llama-bench/`
+- `packages/llamacpp-js/tests/bench.test.ts` parses outputs captured from real runs in `testdata/llama-bench/`
   (`ok.json`, `oom-stdout.json`, `oom-stderr.txt`, `list-devices.txt`); `server/bench/parse.test.ts` words an
   out-of-memory failure from them.
 - `server/bench/vram.test.ts`, `server/bench/hardware.test.ts`, `packages/webui-shared/src/sweep.test.ts`,
