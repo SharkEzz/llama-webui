@@ -1,8 +1,9 @@
-import { ignoredByBench, type ModelDetail, shellQuote, withCtx } from '@llama-webui/shared';
-import { Box } from 'lucide-react';
+import { serverArgs as argsOf, ignoredByBench, type ModelDetail, shellQuote, withCtx } from '@llama-webui/shared';
+import { Box, Lock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
+import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,7 +11,7 @@ import { ModelPicker } from '@/features/models/ModelPicker';
 import { api } from '@/lib/api';
 import { formatBytes, formatInt, formatParams } from '@/lib/format';
 import { useProfiles } from '@/lib/profiles';
-import { useTuning } from '@/lib/tuning';
+import { replacedProfileParams, useTuning } from '@/lib/tuning';
 
 const NO_PROFILE = '__none';
 
@@ -24,6 +25,10 @@ export function ModelCard() {
   // What the sweep carries: the profile's flags, plus the recommendation's -c when they set no context (#24).
   const serverArgs = withCtx(profileArgs, estimateCtx);
   const addedCtx = serverArgs !== profileArgs;
+  const profileParams = useTuning((s) => s.profileParams);
+  const pinned = useTuning((s) => s.pinned);
+  const replaced = replacedProfileParams(profileParams, pinned);
+  const replacedArgs = argsOf(replaced);
   const profiles = useProfiles((s) => s.profiles);
   const [info, setInfo] = useState<ModelDetail | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
@@ -127,6 +132,22 @@ export function ModelCard() {
                 Ignored by llama-bench: {ignored.map((i) => i.flag).join(', ')}
               </span>
             )}
+          </div>
+        )}
+
+        {replacedArgs.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">
+                Profile flags replaced by the recommendation (pin them to keep them)
+              </span>
+              <Button variant="outline" size="xs" onClick={() => useTuning.getState().pin(replaced)}>
+                <Lock /> Pin
+              </Button>
+            </div>
+            <code className="rounded-md bg-well inset-shadow-well px-2.5 py-1.5 font-mono text-xs break-all">
+              {shellQuote(replacedArgs)}
+            </code>
           </div>
         )}
       </div>

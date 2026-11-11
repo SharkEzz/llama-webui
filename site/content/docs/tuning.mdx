@@ -44,6 +44,11 @@ Starting from a profile fills in the model and the projector and keeps the profi
 does not set itself (`-c`, `--spec-type`…). They appear under **Other profile flags (carried over to the created
 profile and the server validation)**, with the ones llama-bench ignores listed below.
 
+The flags the estimator sets itself (`-ngl`, `-dev`, `-ts`, `-fa`, `-ctk`, `-ctv`, `-t`, `-b`, `-ub`…) are replaced by
+the recommendation. They appear under **Profile flags replaced by the recommendation (pin them to keep them)**: **Pin**
+pins them all, so the estimate starts from your profile's values (unpin any of them in the recommendation card). A flag
+pinned to the profile's value leaves the list.
+
 Once a model is set, the card shows what the estimator reads from its header: **Architecture** (with the quantization
 and parameter count), **Size**, **Layers**, **Experts** (for example `8 active of 128`, or `dense`) and **Max context**.
 
