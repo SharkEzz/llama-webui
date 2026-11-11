@@ -3,7 +3,7 @@ import interLatin from '@fontsource-variable/inter/files/inter-latin-wght-normal
 import monoLatin from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url';
 import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { THEME_INIT_SCRIPT } from '@/lib/theme';
+import { THEME_INIT_SCRIPT, useResolvedTheme } from '@/lib/theme';
 import type { Route } from './+types/root';
 
 export const links: Route.LinksFunction = () => [
@@ -14,9 +14,10 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  // Prerendered as "dark"; the inline script rewrites the class before paint and the hydration render reads it back.
+  const theme = useResolvedTheme();
   return (
-    // class="dark" is the prerendered default; the inline script fixes it before paint (hence the warning opt-out).
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className={theme}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
