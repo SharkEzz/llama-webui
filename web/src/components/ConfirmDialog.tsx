@@ -17,8 +17,11 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   destructive?: boolean;
   onConfirm(): unknown;
-  /** Trigger element (a button). */
-  trigger: ReactElement;
+  /** Trigger element (a button); without one, the dialog is controlled through `open` / `onOpenChange`. */
+  trigger?: ReactElement;
+  cancelLabel?: string;
+  open?: boolean;
+  onOpenChange?(open: boolean): void;
 }
 
 export function ConfirmDialog({
@@ -28,18 +31,25 @@ export function ConfirmDialog({
   destructive,
   onConfirm,
   trigger,
+  cancelLabel = 'Cancel',
+  ...controlled
 }: ConfirmDialogProps) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = controlled.open ?? ownOpen;
+  const setOpen = (o: boolean) => {
+    setOwnOpen(o);
+    controlled.onOpenChange?.(o);
+  };
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={trigger} />
+      {trigger && <AlertDialogTrigger render={trigger} />}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction
             variant={destructive ? 'destructive' : 'default'}
             onClick={() => {

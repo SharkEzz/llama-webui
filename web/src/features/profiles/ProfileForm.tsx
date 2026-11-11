@@ -20,35 +20,11 @@ import { ModelPicker } from '@/features/models/ModelPicker';
 import { ApiError } from '@/lib/api';
 import { useModels } from '@/lib/models';
 import { createProfile, deleteProfile, duplicateProfile, updateProfile } from '@/lib/profiles';
-import { isRunning, startProfile, useServer } from '@/lib/server';
+import { isRunning, restartServer, startProfile, useServer } from '@/lib/server';
 import { ArgsEditor } from './ArgsEditor';
-import { formatArgs, formatEnv, parseArgs, parseEnv } from './argsText';
+import { parseArgs, parseEnv } from './argsText';
+import { commandChanged, type Draft, draftOf } from './draft';
 import { highlightEnv } from './highlight';
-
-export interface Draft {
-  name: string;
-  model: string;
-  mmproj: string;
-  cwd: string;
-  host: string;
-  port: string;
-  args: string;
-  env: string;
-}
-
-function draftOf(p: Profile | null, initial?: Partial<Draft>): Draft {
-  return {
-    name: p?.name ?? '',
-    model: p?.model ?? '',
-    mmproj: p?.mmproj ?? '',
-    cwd: p?.cwd ?? '',
-    host: p?.host ?? '',
-    port: p?.port !== undefined ? String(p.port) : '',
-    args: formatArgs(p?.args ?? []),
-    env: formatEnv(p?.env ?? {}),
-    ...initial,
-  };
-}
 
 interface ProfileFormProps {
   profile: Profile | null;
@@ -64,6 +40,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
   const models = useModels((s) => s.list);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [restartAsk, setRestartAsk] = useState(false);
   const view = useServer((s) => s.view);
   const isActive = profile !== null && view?.profileId === profile.id && isRunning(view);
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(draftOf(profile)), [draft, profile]);
@@ -94,6 +71,8 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
       const saved = profile ? await updateProfile(profile.id, input) : await createProfile(input);
       setErrors({});
       toast.success(profile ? 'Profile saved' : 'Profile created');
+      // The running server still uses the previous version: offer to restart it.
+      if (profile && isActive && commandChanged(profile, saved)) setRestartAsk(true);
       onSaved(saved);
     } catch (e) {
       if (e instanceof ApiError && e.issues.length > 0) {
@@ -204,6 +183,16 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
           <p className="text-xs text-muted-foreground">One variable per line, KEY=value.</p>
         )}
       </div>
+
+      <ConfirmDialog
+        open={restartAsk}
+        onOpenChange={setRestartAsk}
+        title="Restart llama-server?"
+        description={`“${draft.name.trim()}” is running with its previous settings. Restart it to apply the changes? Running requests will be interrupted.`}
+        cancelLabel="Later"
+        confirmLabel="Restart"
+        onConfirm={restartServer}
+      />
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-5">
         <Button type="submit" disabled={saving || !dirty || blocked}>

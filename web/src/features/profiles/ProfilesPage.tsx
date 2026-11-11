@@ -14,8 +14,9 @@ import { matchingProjector, stem, useModels } from '@/lib/models';
 import { importProfiles, importSummary, useProfiles } from '@/lib/profiles';
 import { isRunning, useServer } from '@/lib/server';
 import { cn } from '@/lib/utils';
+import type { Draft } from './draft';
 import { ImportBanner } from './ImportBanner';
-import { type Draft, ProfileForm } from './ProfileForm';
+import { ProfileForm } from './ProfileForm';
 
 const basename = (p: string) => p.split('/').pop() ?? p;
 
@@ -54,6 +55,17 @@ export function ProfilesPage() {
   const requested = Number(params.get('id'));
   const selected = creating ? null : (profiles.find((p) => p.id === requested) ?? profiles[0] ?? null);
   const select = (id: number | 'new') => setParams(id === 'new' ? { new: '1' } : { id: String(id) }, { replace: true });
+
+  // Opened without a selection: the running profile, written once into the URL (a later start or stop must not
+  // change the selection, which would remount the form and lose its edits).
+  const preselected = useRef(false);
+  const runningId = isRunning(view) ? (view?.profileId ?? null) : null;
+  useEffect(() => {
+    if (preselected.current || !loaded || view === null) return;
+    preselected.current = true;
+    if (params.has('id') || params.has('new') || runningId === null) return;
+    if (profiles.some((p) => p.id === runningId)) setParams({ id: String(runningId) }, { replace: true });
+  }, [loaded, view, params, runningId, profiles, setParams]);
 
   const onFile = async (file: File) => {
     let raw: unknown;

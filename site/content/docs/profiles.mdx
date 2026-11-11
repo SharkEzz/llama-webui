@@ -12,7 +12,8 @@ A profile is a named way to launch `llama-server`: the model to load, an optiona
 ## The Profiles page
 
 The list on the left shows every profile in alphabetical order, with its model file below the name. A green dot marks
-the profile `llama-server` is running. Click a profile to open it in the editor on the right.
+the profile `llama-server` is running. Click a profile to open it in the editor on the right. The page opens on the
+running profile, otherwise on the first one.
 
 Above the list:
 
@@ -133,8 +134,10 @@ The buttons under the editor:
 - **Delete** asks for confirmation, then deletes the profile. It is disabled while `llama-server` runs this profile:
   stop it first.
 
-Editing a profile does not change a server that is already running. Click **Restart** on the
-[Server](/docs/server/) page to relaunch it with the saved changes.
+Editing a profile does not change a server that is already running. When you save the profile `llama-server` is
+running, and the change is more than a new name, a dialog offers to restart it now: **Restart** relaunches it with the
+saved changes (running requests are interrupted), **Later** keeps it as it is. You can restart it any time with
+**Restart** on the [Server](/docs/server/) page.
 
 ## Import and export
 
