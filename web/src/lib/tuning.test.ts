@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { BenchDevice } from '@llama-webui/shared';
-import { otSuggestions } from './tuning';
+import { otSuggestions, replacedProfileParams } from './tuning';
 
 const dev = (id: string, name: string, totalMib: number): BenchDevice => ({
   id,
@@ -22,4 +22,14 @@ test('-ot suggestions name the dedicated cards of this machine, not a hard-coded
   expect(s.some((x) => x.includes('Vulkan3'))).toBe(false);
   // Neither the iGPU nor the Vulkan copy of the CUDA card.
   expect(s.filter((x) => !x.endsWith('=CPU'))).toEqual(['ffn_.*_exps=CUDA0']);
+});
+
+test('the profile flags replaced by the recommendation leave out those pinned to the same value', () => {
+  const profile = { ngl: 'all' as const, dev: ['CUDA0', 'CUDA1'], ctk: 'f8_e4m3' as const, ctv: 'f8_e4m3' as const };
+  expect(replacedProfileParams(profile, {})).toEqual(profile);
+  expect(replacedProfileParams(profile, { ctk: 'f8_e4m3', ctv: 'f8_e4m3', dev: ['CUDA0'] })).toEqual({
+    ngl: 'all',
+    dev: ['CUDA0', 'CUDA1'],
+  });
+  expect(replacedProfileParams(profile, profile)).toEqual({});
 });

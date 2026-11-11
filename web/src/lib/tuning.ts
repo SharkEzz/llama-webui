@@ -34,6 +34,8 @@ interface TuningState {
   profileId: number | null;
   /** Profile server flags outside the measurable fields (-c, --spec-type…): carried over to the sweep and the created profile. */
   serverArgs: string[];
+  /** Profile flags the estimator sets itself (-ngl, -ctk…): replaced by the recommendation unless pinned. */
+  profileParams: BenchParams;
   preset: PresetId;
   pinned: Partial<BenchParams>;
   estimate: Estimate | null;
@@ -104,6 +106,14 @@ async function guarded(fn: () => Promise<unknown>): Promise<'ok' | 'confirm' | '
     fail(e);
     return 'error';
   }
+}
+
+/** The profile's flags that the recommendation replaces: those not pinned to the same value. */
+export function replacedProfileParams(profile: BenchParams, pinned: Partial<BenchParams>): BenchParams {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(profile))
+    if (JSON.stringify(pinned[k as keyof BenchParams]) !== JSON.stringify(v)) out[k] = v;
+  return out as BenchParams;
 }
 
 /** Static -ot patterns: they send MoE experts to RAM (llama.cpp applies the first matching rule). */
@@ -211,6 +221,7 @@ export const useTuning = create<TuningState>()((set, get) => {
     mmprojPath: null,
     profileId: null,
     serverArgs: [],
+    profileParams: {},
     preset: 'chat',
     pinned: {},
     estimate: null,
@@ -249,7 +260,7 @@ export const useTuning = create<TuningState>()((set, get) => {
     },
 
     async fromProfile(id) {
-      if (id === null) return set({ profileId: null, serverArgs: [] });
+      if (id === null) return set({ profileId: null, serverArgs: [], profileParams: {} });
       try {
         const d = await api<Draft>(`/bench/from-profile/${id}`);
         set({
@@ -257,6 +268,7 @@ export const useTuning = create<TuningState>()((set, get) => {
           modelPath: d.modelPath,
           mmprojPath: d.mmprojPath,
           serverArgs: d.serverArgs,
+          profileParams: d.params,
           estimate: null,
           plan: null,
         });
