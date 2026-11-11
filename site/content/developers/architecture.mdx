@@ -106,7 +106,7 @@ There is one hub (`server/ws/hub.ts`) and one connection per tab. The hub sends 
 server time when a client connects, then broadcasts every message to every client: there are no subscriptions, the
 client dispatches by `type`. Every `PING_INTERVAL_MS = 15_000` ms the hub sends `ping`; a client that leaves
 `MAX_MISSED_PINGS = 2` pings unanswered is closed with code `4000`. The messages are the `WsMessage` union of
-`shared/src/ws.ts`, listed on the [WebSocket](/developers/api/websocket/) page.
+`packages/webui-shared/src/ws.ts`, listed on the [WebSocket](/developers/api/websocket/) page.
 
 The WebSocket only carries changes. After every (re)connection, the web app reads the current state again over REST,
 and the `bootId` tells it whether the process restarted in between ([Web app](/developers/frontend/) describes the
@@ -115,7 +115,7 @@ client).
 ### SSE for chat
 
 A chat generation belongs to the server, not to the HTTP request (see [Chat runs](/developers/server/chat/)). The SSE
-response only subscribes to the run: events `start`, `delta` and `done` (`ChatEvent` in `shared/src/chat.ts`,
+response only subscribes to the run: events `start`, `delta` and `done` (`ChatEvent` in `packages/webui-shared/src/chat.ts`,
 formatted by `formatSse()`), plus a `: ping` comment every `PING_MS = 15_000` ms. Bun closes a connection that stays
 silent for 10 seconds, so the route also disables the idle timeout for this request (`server.timeout(req, 0)`): a long
 prompt can be processed without sending anything. A client that leaves only unsubscribes; the generation goes on, and

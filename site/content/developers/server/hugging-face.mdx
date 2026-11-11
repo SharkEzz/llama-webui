@@ -5,7 +5,7 @@ description: The Hub client, how repository files become variants, and the persi
 
 The Hugging Face module searches the Hub, lists a repository's GGUF files as downloadable variants, and downloads them
 into the models folder through a persistent queue that survives restarts and reloads. It lives in `server/hf/`, with
-its routes in `server/routes/hf.ts`, its table in `server/db/downloads.ts` and its types in `shared/src/hf.ts`. For
+its routes in `server/routes/hf.ts`, its table in `server/db/downloads.ts` and its types in `packages/webui-shared/src/hf.ts`. For
 what users see, read [Hugging Face downloads](/docs/hugging-face/).
 
 | File                        | Role                                                                                     |
@@ -18,11 +18,11 @@ what users see, read [Hugging Face downloads](/docs/hugging-face/).
 | `server/hf/token.ts`        | `resolveHfToken()`, `hfTokenPath()`, `hfEndpoint()`                                      |
 | `server/db/downloads.ts`    | `DownloadsRepo`: the `downloads` table                                                   |
 | `server/routes/hf.ts`       | The HTTP routes (see [Hugging Face API](/developers/api/hf/))                            |
-| `shared/src/hf.ts`          | Types, `HF_REPO_RE`, `parseHfInput()`, `DownloadRequestSchema`, `vramFit()`              |
+| `packages/webui-shared/src/hf.ts`          | Types, `HF_REPO_RE`, `parseHfInput()`, `DownloadRequestSchema`, `vramFit()`              |
 
 ## From a search to a file
 
-1. The web app reads what the user typed with `parseHfInput()` (`shared/src/hf.ts`): a repository id (`org/name`), the
+1. The web app reads what the user typed with `parseHfInput()` (`packages/webui-shared/src/hf.ts`): a repository id (`org/name`), the
    llama.cpp `-hf` syntax (`org/name:Q4_K_M`), a `huggingface.co` or `hf.co` URL (a `blob` or `resolve` URL also gives
    the file), or free text.
 2. Free text goes to `GET /api/hf/search`, which calls `HfClient.search()`.
@@ -284,4 +284,4 @@ late reads `GET /api/downloads`, which returns the items and `live`.
   CDN with range support and scripted failures: shards, resume with `Range`, a server that ignores it, connections cut
   mid-file, retries, gated repositories, checksum mismatches, cancel and retry, duplicates, disk space, and resuming
   after a restart from a database file.
-- `shared/src/hf.test.ts`: `parseHfInput()`, `vramFit()` and `DownloadRequestSchema`.
+- `packages/webui-shared/src/hf.test.ts`: `parseHfInput()`, `vramFit()` and `DownloadRequestSchema`.

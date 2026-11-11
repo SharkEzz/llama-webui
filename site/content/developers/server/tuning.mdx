@@ -6,7 +6,7 @@ description: How the estimator reads GGUF metadata and hardware, models the memo
 The tuning module recommends `llama-server` flags for a model on this machine without running anything. It reads the
 GGUF header, the devices `llama-bench` lists and the RAM, computes what each device would hold for a set of flags, and
 searches for the placement a preset prefers. It also reviews the system settings that affect llama.cpp. It lives in
-`server/tuning/`, with the presets and result types in `shared/src/tuning.ts`. For what users see, read
+`server/tuning/`, with the presets and result types in `packages/webui-shared/src/tuning.ts`. For what users see, read
 [Tuning](/docs/tuning/).
 
 | File                         | Role                                                                                   |
@@ -23,7 +23,7 @@ searches for the placement a preset prefers. It also reviews the system settings
 | `server/tuning/fixtures.ts`  | `fakeModel()` and `hw3()`, for tests                                                   |
 | `server/models/gguf.ts`      | `readModel()`: GGUF header to `ModelInfo`                                              |
 | `server/models/sizes.ts`     | `tensorBytes()`, `EXPERTS`                                                             |
-| `shared/src/tuning.ts`       | `PRESETS`, `NOISE`, `deviceRole()`, `gpuDevices()`, `Estimate`, `Fit`, `Check`…        |
+| `packages/webui-shared/src/tuning.ts`       | `PRESETS`, `NOISE`, `deviceRole()`, `gpuDevices()`, `Estimate`, `Fit`, `Check`…        |
 
 The estimator, the placement, the memory model, `planSweep()` and the checks are pure functions: data in, result out,
 which is what the tests rely on. Only `readTuningHardware()`, `loadModel()`, `readSys()` and `measureDiskSpeed()` touch
@@ -80,7 +80,7 @@ and at least one tensor matches.
 - `ramTotalBytes`, `ramAvailableBytes`: from the Monitor's latest snapshot, otherwise `/proc/meminfo` (`MemAvailable`,
   else `MemFree`).
 
-Each device gets a role from `deviceRole(d, all)` (`shared/src/tuning.ts`):
+Each device gets a role from `deviceRole(d, all)` (`packages/webui-shared/src/tuning.ts`):
 
 | Role         | Rule                                                                   |
 | ------------ | ---------------------------------------------------------------------- |
@@ -111,7 +111,7 @@ An unmatched device (iGPU, unknown vendor, no Monitor sample) keeps the list's v
 
 ### Presets
 
-`PRESETS` in `shared/src/tuning.ts`:
+`PRESETS` in `packages/webui-shared/src/tuning.ts`:
 
 | Id        | Label              | `ctxTarget`            | `ctxMin` | `kvPreferred` | `ub`  | `score`                 |
 | --------- | ------------------ | ---------------------- | -------- | ------------- | ----- | ----------------------- |
@@ -424,7 +424,7 @@ The tests:
 - `server/tuning/estimate.test.ts`: the `big` preset on a MoE over 100 GB, a dense model on one card, a MoE split over
   the CUDA pair before its experts go to RAM, pinned values, and `planSweep()`.
 - `server/tuning/checks.test.ts`: checks on fixed `SysReadings`.
-- `shared/src/setup.test.ts` covers `isSetupCheck()`; `server/models/gguf.test.ts` writes real GGUF files with
+- `packages/webui-shared/src/setup.test.ts` covers `isSetupCheck()`; `server/models/gguf.test.ts` writes real GGUF files with
   `writeGguf()` from `server/models/gguf.fixture.ts` to test the reader.
 
 ### Add a hardware fixture

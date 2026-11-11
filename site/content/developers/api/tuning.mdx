@@ -5,7 +5,7 @@ description: Routes that read the hardware, estimate the best llama-server flags
 
 The tuning routes give the [Tuning](/docs/tuning/) page its recommendation: the hardware the estimator works with, the
 estimate itself, the dry run of a sweep plan, the system checks and the model disk's read speed. They live in
-`server/routes/tuning.ts`; the types and the presets are in `shared/src/tuning.ts`, the estimator and the checks in
+`server/routes/tuning.ts`; the types and the presets are in `packages/webui-shared/src/tuning.ts`, the estimator and the checks in
 `server/tuning/` (see [Tuning](/developers/server/tuning/)).
 
 The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
@@ -21,7 +21,7 @@ and modification time do not change. It answers:
 
 ## Presets
 
-A preset (`PRESETS` in `shared/src/tuning.ts`) sets what the estimator aims for and how sweep results are ranked.
+A preset (`PRESETS` in `packages/webui-shared/src/tuning.ts`) sets what the estimator aims for and how sweep results are ranked.
 
 | `id`      | Label              | Target context    | Minimum context | Preferred KV | `-ub` | Score                       |
 | --------- | ------------------ | ----------------- | --------------- | ------------ | ----- | --------------------------- |
@@ -49,7 +49,7 @@ What the estimator plans for (`readTuningHardware()` in `server/tuning/hardware.
 | `ramTotalBytes`     | number          | From the latest snapshot's `system.mem`, otherwise `/proc/meminfo`; 0 when unknown.          |
 | `ramAvailableBytes` | number          | Same source: `MemAvailable`.                                                                 |
 
-`deviceRole()` and `gpuDevices()` (`shared/src/tuning.ts`) sort the devices: dedicated cards, Vulkan copies of a card
+`deviceRole()` and `gpuDevices()` (`packages/webui-shared/src/tuning.ts`) sort the devices: dedicated cards, Vulkan copies of a card
 already seen through CUDA or ROCm, integrated GPUs (Vulkan named after the processor, ROCm's `AMD Radeon Graphics`) and
 host devices (BLAS, CPU). The estimator only places layers on the dedicated cards.
 

@@ -128,11 +128,11 @@ The root `package.json` defines every script. The `shared`, `server` and `web` w
 | `bun run start` | `NODE_ENV=production bun server/index.ts` | Production server, UI built in memory at startup. |
 | `bun run compile` | `bun scripts/compile.ts` | Standalone executable in `dist/llama-webui` (`--target`, `--outfile`, `--version`). |
 | `bun run release` | `bun scripts/release.ts` | Sets the version of every `package.json` before a release tag ([Releases](/developers/contributing/workflow/#releases)). |
-| `bun run check` | `bun check --no-script && bun check -p web && bun run --cwd site typecheck` | Type checks `server/` and `shared/` (root `tsconfig.json`), then `web/` (its own `tsconfig.json`, with the DOM types and the `@/` alias), then the website. |
+| `bun run check` | `bun check --no-script && bun check -p web && bun run --cwd site typecheck` | Type checks `server/` and `packages/webui-shared/` (root `tsconfig.json`), then `web/` (its own `tsconfig.json`, with the DOM types and the `@/` alias), then the website. |
 | `bun run lint` | `biome check` | Format, lint and import order, read-only. |
 | `bun run lint:fix` | `biome check --write` | Applies Biome's safe fixes. |
 | `bun run format` | `biome format --write` | Formats only. |
-| `bun run test` | `bun test` | Runs every test file: `server/`, `shared/`, `web/` and `site/`. |
+| `bun run test` | `bun test` | Runs every test file: `server/`, `packages/webui-shared/`, `web/` and `site/`. |
 | `bun run site:dev` | `bun run --cwd site dev` | Website dev server (Vite, HMR) on `0.0.0.0:5173`. |
 | `bun run site:build` | `bun run --cwd site build` | Prerenders the website into `site/dist/`. |
 | `bun run site:preview` | `bun run --cwd site preview` | Serves `site/dist/` the way GitHub Pages does, on port 4173. |
@@ -176,8 +176,9 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
     - `lib/` API client, WebSocket client, zustand stores, formatting
     - `components/` shared components: `glass/`, `charts/`, and `ui/` (generated shadcn)
     - `index.css` Tailwind, theme tokens
-- `shared/` types, zod schemas and pure functions (workspace `@llama-webui/shared`)
-  - `src/` one module per domain, re-exported by `index.ts`
+- `packages/` the monorepo's libraries, one folder per package
+  - `webui-shared/` types, zod schemas and pure functions (workspace `@llama-webui/shared`)
+    - `src/` one module per domain, re-exported by `index.ts`
 - `site/` this website (standalone package)
   - `content/` the `.mdx` pages and `nav.ts`
   - `src/` routes, layout, docs components, landing page
@@ -189,13 +190,13 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
 - `scripts/` `compile.ts` (standalone executable), `smoke-binary.ts` (its smoke test) and `release.ts` (versions)
 - `docs/` README assets and design plans
 - `package.json` workspaces and scripts
-- `tsconfig.json` type check of `server/`, `shared/` and `scripts/`
+- `tsconfig.json` type check of `server/`, `packages/webui-shared/` and `scripts/`
 - `biome.json` format and lint rules
 - `bunfig.toml` the Tailwind plugin for the HTML import
 </FileTree>
 
 The [Web app](/developers/frontend/) and [Shared package](/developers/shared/) pages describe `web/src/` and
-`shared/src/` module by module; the server pages describe each server folder.
+`packages/webui-shared/src/` module by module; the server pages describe each server folder.
 
 ## Without GPUs
 

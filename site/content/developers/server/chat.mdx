@@ -13,8 +13,8 @@ HTTP clients follow it over Server-Sent Events (SSE).
 | `server/chat/request.ts`   | `buildChatRequest()`, the body sent to `llama-server`, and `llamaErrorMessage()`.               |
 | `server/routes/chat.ts`    | The `/api/chat` routes and the `sse()` helper that turns a run into a `text/event-stream`.     |
 | `server/db/conversations.ts` | `ConversationsRepo`: the `conversations` and `messages` tables.                              |
-| `shared/src/chat.ts`       | `Conversation`, `ChatMessage`, `ChatEvent`, `MessageStats`, `statsFromTimings()`, the zod schemas. |
-| `shared/src/sse.ts`        | `SseParser` (incremental reader, used on both sides) and `formatSse()`.                         |
+| `packages/webui-shared/src/chat.ts`       | `Conversation`, `ChatMessage`, `ChatEvent`, `MessageStats`, `statsFromTimings()`, the zod schemas. |
+| `packages/webui-shared/src/sse.ts`        | `SseParser` (incremental reader, used on both sides) and `formatSse()`.                         |
 
 The routes are documented in [Chat](/developers/api/chat/), the user-facing behavior in [Chat](/docs/chat/).
 
@@ -108,9 +108,9 @@ follows live:
 3. `done` with the final message if the run has already ended; otherwise the listener is added and receives the next
    events.
 
-The events are a `ChatEvent` (`shared/src/chat.ts`):
+The events are a `ChatEvent` (`packages/webui-shared/src/chat.ts`):
 
-```ts title="shared/src/chat.ts"
+```ts title="packages/webui-shared/src/chat.ts"
 export type ChatEvent =
   | { type: 'start'; user: ChatMessage | null; assistant: ChatMessage }
   | { type: 'delta'; content?: string; reasoning?: string }

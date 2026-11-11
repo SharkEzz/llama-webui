@@ -126,13 +126,13 @@ clients.
 `server/index.ts` passes `--host` (or `LLAMA_WEBUI_HOST`, default `DEFAULT_HOST = '127.0.0.1'`) as Bun's `hostname`.
 That decides who can connect, and nothing else: the guard applies the same rules on every address, and no
 authentication appears. With a non-loopback address, `GET /api/setup` reports `listen.exposed: true` (from
-`isLoopback()`, `shared/src/setup.ts`), and the setup checklist shows a network access reminder.
+`isLoopback()`, `packages/webui-shared/src/setup.ts`), and the setup checklist shows a network access reminder.
 
 ## llama-server's own exposure
 
 `llama-server` is a separate HTTP server with its own address. `buildCommand()` passes `--host` and `--port` from the
 profile, else from the `host` and `port` settings, whose defaults are `127.0.0.1` and `8080`
-(`shared/src/settings.ts`): `llama-server` stays local, like llama-webui, unless a user opens it. `GET /api/setup`
+(`packages/webui-shared/src/settings.ts`): `llama-server` stays local, like llama-webui, unless a user opens it. `GET /api/setup`
 reports `llamaListen: { host, exposed }` for the `host` setting, and the setup checklist, the Settings field and the
 Server page's command card warn when it is not loopback. The benchmark's temporary `llama-server` always gets
 `host: '127.0.0.1'` (`server/bench/execute.ts`). llama-webui talks to `llama-server` on the address it listens on
@@ -181,4 +181,4 @@ The API reads files where the user points it, by design: there is no allowlist o
   `application/json; charset=utf-8` passes, and so does a `POST` without a body.
 
 `server/hf/hf.test.ts` checks that `repoDir()` and `fileDest()` refuse `..`, absolute and empty paths, and
-`shared/src/profile.test.ts` that an import with a reserved flag is rejected.
+`packages/webui-shared/src/profile.test.ts` that an import with a reserved flag is rejected.

@@ -4,7 +4,7 @@ description: The /ws channel, from connection and guard to the hello message, bo
 ---
 
 llama-webui pushes its live events over one WebSocket, `/ws`. The server side is `WsHub` (`server/ws/hub.ts`), the
-message types are the `WsMessage` union (`shared/src/ws.ts`), and the web app's client is `useWs` and `onWs()`
+message types are the `WsMessage` union (`packages/webui-shared/src/ws.ts`), and the web app's client is `useWs` and `onWs()`
 (`web/src/lib/ws.ts`). The events themselves are wired in `server/index.ts`.
 
 ## Connect
@@ -65,7 +65,7 @@ and reason `shutdown`, and the clients reconnect to the new one (same `bootId`).
 
 ## Messages
 
-| `type`                                      | Direction        | Payload (`shared/src/`)                        | Sent                                                                                       |
+| `type`                                      | Direction        | Payload (`packages/webui-shared/src/`)                        | Sent                                                                                       |
 | ------------------------------------------- | ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | [`hello`](#hello)                           | server to client | `{ serverTime, bootId }`                       | Once, when the client connects.                                                            |
 | [`ping`](#ping-and-pong)                    | both             | none                                           | Every 15 seconds by the server; by a client when it wants.                                 |
@@ -125,7 +125,7 @@ The nested types are described on [Monitor and system](/developers/api/monitor/)
 
 ### `log`
 
-A batch of `LogLine` (`shared/src/logs.ts`): every line pushed to the ring in the same microtask
+A batch of `LogLine` (`packages/webui-shared/src/logs.ts`): every line pushed to the ring in the same microtask
 (`LogBuffer.push()`, `server/logs/buffer.ts`).
 
 | Field   | Type                                       | Description                                                                            |
@@ -137,14 +137,14 @@ A batch of `LogLine` (`shared/src/logs.ts`): every line pushed to the ring in th
 
 ### `server-state`
 
-The `ServerView` (`shared/src/server.ts`), the same body as `GET /api/server/state`: `state` (a `ServerState`, by
+The `ServerView` (`packages/webui-shared/src/server.ts`), the same body as `GET /api/server/state`: `state` (a `ServerState`, by
 `kind`: `idle`, `starting`, `ready`, `stopping`, `crashed`, `external`; `starting`, `ready` and `stopping` carry the
 `host` the server listens on), `command` (the last launched command) and
 `profileId`. The fields are described on [Server, state and logs](/developers/api/server/#serverview).
 
 ### `bench-progress`
 
-The `BenchLive` of the running benchmark run (`shared/src/bench.ts`), `null` when a run ends (between the items of a
+The `BenchLive` of the running benchmark run (`packages/webui-shared/src/bench.ts`), `null` when a run ends (between the items of a
 sweep too).
 
 | Field       | Type                              | Description                                                                                                  |
@@ -158,7 +158,7 @@ sweep too).
 
 ### `bench-run`
 
-A whole `BenchRun` (`shared/src/bench.ts`): sent when the run starts (a one-off run when it is created, a sweep item
+A whole `BenchRun` (`packages/webui-shared/src/bench.ts`): sent when the run starts (a one-off run when it is created, a sweep item
 when its turn comes), when it ends, and again if the server restart that follows it fails (the error is appended to
 the run's). Its fields: `id`, `kind`, `status`, `spec`, `command`, `hardware`, `pp`, `tg`, `draftAcceptPct`,
 `vramPeak`, `error`, `logExcerpt`, `durationMs`, `diskReadPeakBps`, `sweepId`, `sweepLabel`, `fit` and `createdAt`.
@@ -171,7 +171,7 @@ deleted some) or `DELETE /api/sweeps/:id` (the sweep's runs, sent before `sweep-
 
 ### `sweep-progress`
 
-The `SweepLive` of the running sweep (`shared/src/sweep.ts`), `null` when none is running.
+The `SweepLive` of the running sweep (`packages/webui-shared/src/sweep.ts`), `null` when none is running.
 
 | Field     | Type                       | Description                                         |
 | --------- | -------------------------- | --------------------------------------------------- |
@@ -183,7 +183,7 @@ The `SweepLive` of the running sweep (`shared/src/sweep.ts`), `null` when none i
 
 ### `sweep`
 
-A whole `Sweep` (`shared/src/sweep.ts`), on every change: `id`, `name`, `status` (`running`, `done`, `cancelled`,
+A whole `Sweep` (`packages/webui-shared/src/sweep.ts`), on every change: `id`, `name`, `status` (`running`, `done`, `cancelled`,
 `interrupted`), `spec`, `bestRunId`, `best` (a summary of the best run), `counts` (runs per status), `createdAt` and
 `finishedAt`. See [Sweeps](/developers/api/sweeps/).
 
@@ -208,7 +208,7 @@ See [Topology](/developers/api/topology/).
 
 ### `download-progress`
 
-The `DownloadLive` of the running download (`shared/src/hf.ts`). While bytes arrive it is emitted at most once every
+The `DownloadLive` of the running download (`packages/webui-shared/src/hf.ts`). While bytes arrive it is emitted at most once every
 `liveEveryMs` (250 ms by default, `DownloadQueue` in `server/hf/downloader.ts`); it is `null` when a download ends
 (the next one in the queue then sends its own).
 
@@ -224,7 +224,7 @@ The `DownloadLive` of the running download (`shared/src/hf.ts`). While bytes arr
 
 ### `download`
 
-A whole `DownloadItem` (`shared/src/hf.ts`) on every status change (`queued`, `downloading`, `done`, `error`,
+A whole `DownloadItem` (`packages/webui-shared/src/hf.ts`) on every status change (`queued`, `downloading`, `done`, `error`,
 `canceled`): `id`, `repo`, `revision`, `key`, `name`, `quant`, `kind`, `dir`, `files`, `status`, `bytesDone`,
 `totalBytes`, `error`, `code`, `createdAt` and `finishedAt`. See [Hugging Face](/developers/api/hf/).
 
@@ -254,7 +254,7 @@ a progress bar comes back without waiting for the next `*-progress` message.
 Then the `bootId` decides what the client keeps:
 
 - **Same `bootId`** (a network drop, a `bun --hot` reload): the numbering goes on. The logs store asks for the lines
-  from its next expected `seq` and merges them by number (`mergeLogs()`, `shared/src/logs.ts`).
+  from its next expected `seq` and merges them by number (`mergeLogs()`, `packages/webui-shared/src/logs.ts`).
 - **Different `bootId`** (llama-webui restarted): the log numbering restarted at 0 and the history is empty. The
   clients drop what they hold: the logs store starts over (`onBoot()`) and reads `GET /api/logs?since=0`, the monitor
   store empties its history and snapshot, and reloads the history.

@@ -5,7 +5,7 @@ description: How the server gate, the runner and the executor measure with llama
 
 The benchmark module measures one configuration at a time with `llama-bench` or with a temporary `llama-server`, and
 runs sweeps: lists of `llama-bench` runs planned by the estimator, optionally validated on the server. It lives in
-`server/bench/`, with its types in `shared/src/bench.ts` and `shared/src/sweep.ts` and its tables in
+`server/bench/`, with its types in `packages/webui-shared/src/bench.ts` and `packages/webui-shared/src/sweep.ts` and its tables in
 `server/db/benchRuns.ts` and `server/db/sweeps.ts`. For what users see, read [Benchmark](/docs/benchmark/) and
 [Sweeps](/docs/sweeps/).
 
@@ -20,8 +20,8 @@ runs sweeps: lists of `llama-bench` runs planned by the estimator, optionally va
 | `server/bench/vram.ts`     | `VramProbe`: VRAM sampled every 100 ms                                                          |
 | `server/bench/hardware.ts` | Build number, the hardware frozen with each run, the `--list-devices` cache                     |
 | `server/tuning/space.ts`   | `planSweep()`: a sweep's items, each with the estimator's verdict                               |
-| `shared/src/bench.ts`      | `BenchSpec`, `BenchParams`, `BenchRun`, `BenchLive`, flag translation for both tools            |
-| `shared/src/sweep.ts`      | `SweepSpec`, `Sweep`, `SweepLive`, `expandSpace()`, `rankRuns()`, `sweepCtx()`                  |
+| `packages/webui-shared/src/bench.ts`      | `BenchSpec`, `BenchParams`, `BenchRun`, `BenchLive`, flag translation for both tools            |
+| `packages/webui-shared/src/sweep.ts`      | `SweepSpec`, `Sweep`, `SweepLive`, `expandSpace()`, `rankRuns()`, `sweepCtx()`                  |
 | `server/db/benchRuns.ts`   | `BenchRunsRepo`: the `bench_runs` table (one-off runs and sweep items)                          |
 | `server/db/sweeps.ts`      | `SweepsRepo`: the `sweeps` table                                                                |
 
@@ -54,7 +54,7 @@ Like the supervisor, the gate is not reloaded by `bun --hot`: after editing `ser
 
 ## Specs and parameters
 
-A run is described by a `BenchSpec` (`BenchSpecSchema` in `shared/src/bench.ts`):
+A run is described by a `BenchSpec` (`BenchSpecSchema` in `packages/webui-shared/src/bench.ts`):
 
 | Field        | Type                      | Default | Notes                                                                       |
 | ------------ | ------------------------- | ------- | --------------------------------------------------------------------------- |
@@ -336,7 +336,7 @@ for the whole sweep.
 
 ### The spec and the plan
 
-A `SweepSpec` (`SweepSpecSchema` in `shared/src/sweep.ts`) has the run fields of a `BenchSpec` (`modelPath`,
+A `SweepSpec` (`SweepSpecSchema` in `packages/webui-shared/src/sweep.ts`) has the run fields of a `BenchSpec` (`modelPath`,
 `mmprojPath`, `profileId`, `p`, `n`, `r`, `serverArgs`) plus:
 
 | Field          | Type                 | Default | Notes                                                    |
@@ -386,7 +386,7 @@ the server is restarted once, and a failed restart is appended to the error of t
 ### Ranking
 
 `rankRuns(runs, preset, ctx)` sorts the successful runs by the preset's score (`scoreOf()`, which uses the preset's
-`score` function from `shared/src/tuning.ts`) and gives them a rank; the other runs follow, unranked, in their original
+`score` function from `packages/webui-shared/src/tuning.ts`) and gives them a rank; the other runs follow, unranked, in their original
 order. A run is a `tie` with the best when its score is within the noise band: the difference between the best score
 and the score the best run would get with its prompt speed lowered by `NOISE.pp = 0.1` and its generation speed by
 `NOISE.tg = 0.02`. The best run is marked as a tie too when another run ties with it.
@@ -477,7 +477,7 @@ When Bun was killed without that chance, rows stay `running`. At the next start 
 ## WebSocket messages
 
 The runner's callbacks become broadcasts in `server/index.ts`; the routes emit the deletions. The payload types are in
-`shared/src/ws.ts`; see [WebSocket](/developers/api/websocket/).
+`packages/webui-shared/src/ws.ts`; see [WebSocket](/developers/api/websocket/).
 
 | Message          | Payload             | When                                                                                                    |
 | ---------------- | ------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -501,7 +501,7 @@ A client that connects late reads the current state over HTTP: `GET /api/bench/r
   runners.
 - `server/bench/parse.test.ts` parses outputs captured from real runs in `testdata/llama-bench/` (`ok.json`,
   `oom-stdout.json`, `oom-stderr.txt`, `list-devices.txt`).
-- `server/bench/vram.test.ts`, `server/bench/hardware.test.ts`, `shared/src/sweep.test.ts`,
+- `server/bench/vram.test.ts`, `server/bench/hardware.test.ts`, `packages/webui-shared/src/sweep.test.ts`,
   `server/db/sweeps.test.ts` and `server/db/benchRuns.test.ts` cover the rest.
 
 See [Testing](/developers/contributing/testing/) for how to run them.

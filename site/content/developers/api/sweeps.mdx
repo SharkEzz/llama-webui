@@ -5,7 +5,7 @@ description: Routes that create, list, cancel, resume, validate and delete sweep
 
 A sweep runs a series of benchmarks over a space of flag values, keeps the items that the estimator says fit, and ranks
 the results with a tuning preset. The routes live in `server/routes/sweeps.ts`; the spec schema, the space expansion
-and the ranking are in `shared/src/sweep.ts`, the planning in `server/tuning/space.ts`, the execution in
+and the ranking are in `packages/webui-shared/src/sweep.ts`, the planning in `server/tuning/space.ts`, the execution in
 `server/bench/runner.ts` (see [Benchmarks and sweeps](/developers/server/bench/)). The user side is described on the
 [Sweeps](/docs/sweeps/) page.
 
@@ -44,7 +44,7 @@ of each item:
 
 ## The sweep spec
 
-`SweepSpec` (`SweepSpecSchema`, `shared/src/sweep.ts`), strict. `modelPath`, `mmprojPath`, `profileId`, `p`, `n`, `r`
+`SweepSpec` (`SweepSpecSchema`, `packages/webui-shared/src/sweep.ts`), strict. `modelPath`, `mmprojPath`, `profileId`, `p`, `n`, `r`
 and `serverArgs` have the same rules as in a [run spec](/developers/api/bench/#the-run-spec).
 
 | Field          | Type            | Required | Description                                                                                  |

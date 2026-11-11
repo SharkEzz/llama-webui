@@ -11,7 +11,7 @@ Checked against commit `bbc6a5b`.
 
 llama-webui has one HTTP API. Its own web app uses it, and so can your scripts and integrations. The route table is
 in `server/app.ts`, the routes themselves in `server/routes/` (one file per domain), the handler wrapper and errors in
-`server/http.ts`, and the request guard in `server/security.ts`. Types and zod schemas come from `shared/src/`
+`server/http.ts`, and the request guard in `server/security.ts`. Types and zod schemas come from `packages/webui-shared/src/`
 (`@llama-webui/shared`).
 
 ## Base URL

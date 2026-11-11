@@ -209,9 +209,9 @@ Other codes the UI branches on include `name-taken` (a profile name already used
 (Hugging Face). For text stored in the database, shared helpers do the comparison in one place, including the wording
 of earlier versions still present in existing databases:
 
-- `isOomError(error)` (`shared/src/bench.ts`): a benchmark run failed for lack of memory (`OOM_ERROR = 'Out of memory'`
+- `isOomError(error)` (`packages/webui-shared/src/bench.ts`): a benchmark run failed for lack of memory (`OOM_ERROR = 'Out of memory'`
   prefix).
-- `isDefaultTitle(title)` (`shared/src/chat.ts`): a conversation still has its default title
+- `isDefaultTitle(title)` (`packages/webui-shared/src/chat.ts`): a conversation still has its default title
   (`DEFAULT_TITLE = 'New conversation'`) and can be titled automatically.
 
 Validation errors come back field by field: the profile form and the settings editor map `issues[i].path[0]` to their
