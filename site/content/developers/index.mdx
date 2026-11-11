@@ -14,7 +14,7 @@ If you only want to install and use llama-webui, start with the [user documentat
 llama-webui is a Bun monorepo with three workspaces and a separate website. `server/` is the Bun process: it serves the
 REST API, the `/ws` WebSocket and the web UI on one port (7860 by default), supervises one `llama-server`, samples the
 hardware, runs benchmarks and sweeps, relays chat generations and stores everything in a SQLite file. `web/` is the
-React app it serves. `shared/` (the `@llama-webui/shared` package) holds the types, zod schemas and pure functions
+React app it serves. `packages/webui-shared/` (the `@llama-webui/shared` package) holds the types, zod schemas and pure functions
 both sides use. `site/` is this website, a standalone package outside the workspaces.
 [Development setup](/developers/getting-started/#repository-layout) shows the layout in detail.
 
@@ -24,7 +24,7 @@ both sides use. `site/` is this website, a standalone package outside the worksp
 | --- | --- | --- |
 | Runtime | [Bun](https://bun.com) 1.4.4 or later: HTTP and WebSocket server (`Bun.serve`), bundler (`Bun.build`, HTML imports), test runner, `bun:sqlite`, `bun:ffi` | the whole repository |
 | Database | `bun:sqlite`, one file in the data directory, WAL journal | `server/db/` |
-| Validation | [zod](https://zod.dev) 4: request bodies and settings are parsed on the server, TypeScript types are inferred for both sides | `shared/src/`, `server/` |
+| Validation | [zod](https://zod.dev) 4: request bodies and settings are parsed on the server, TypeScript types are inferred for both sides | `packages/webui-shared/src/`, `server/` |
 | GGUF headers | `@huggingface/gguf` | `server/models/`, `server/hf/` |
 | UI | [React](https://react.dev) 19, [React Router](https://reactrouter.com) 8 (data router, lazy routes) | `web/` |
 | Styling | [Tailwind CSS](https://tailwindcss.com) 4 through `bun-plugin-tailwind` | `web/src/index.css` |

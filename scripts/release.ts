@@ -12,7 +12,7 @@ const ROOT = resolve(import.meta.dir, '..');
 export const PACKAGE_FILES = [
   'package.json',
   'server/package.json',
-  'shared/package.json',
+  'packages/webui-shared/package.json',
   'web/package.json',
   'site/package.json',
 ];

@@ -25,7 +25,7 @@ lives in `server/monitor/`, the readers of each data source in `server/collector
 | `server/collectors/system.ts`      | `SystemSampler`: machine CPU, memory, load, frequency, temperature.                          |
 | `server/collectors/disk.ts`        | `DiskSampler` and `resolveModelDisk()`.                                                       |
 | `server/collectors/membw.ts`       | `MemBandwidthSampler`: DRAM bandwidth through `perf stat`.                                    |
-| `shared/src/monitor.ts`            | `Snapshot`, `HistoryDump`, `GpuSample`, `SERIES` and the other monitoring types.              |
+| `packages/webui-shared/src/monitor.ts`            | `Snapshot`, `HistoryDump`, `GpuSample`, `SERIES` and the other monitoring types.              |
 
 The user-facing pages are the [Dashboard](/docs/dashboard/), [System](/docs/system/) and
 [Topology](/docs/topology/); the routes are in [Monitor and system](/developers/api/monitor/).
@@ -62,7 +62,7 @@ interval changes.
 
 ## The Snapshot
 
-`Snapshot` (`shared/src/monitor.ts`) is the whole state of one tick, serializable as is.
+`Snapshot` (`packages/webui-shared/src/monitor.ts`) is the whole state of one tick, serializable as is.
 
 | Group                | Fields                                                                                | Source                                                    |
 | -------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -108,7 +108,7 @@ With the defaults (`historySeconds = 300`, `pollIntervalMs = 1000`) a series hol
 bounds `historySeconds` to 30 to 1,800 and `pollIntervalMs` to at least 250, so a series holds at most 7,200 points.
 The history is only in memory: it survives `bun --hot` with the monitor, and is lost when Bun stops.
 
-The keys are built by `SERIES` (`shared/src/monitor.ts`):
+The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`):
 
 | Keys                                                                                     | Measure                                     |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------- |
@@ -297,10 +297,10 @@ An external server has no placement: it writes nothing to the ring.
 1. Write the reader in `server/collectors/<name>.ts`: pure parse functions for the raw text, and a sampler whose
    roots (`procRoot`, `sysRoot`) and side effects (`spawn`, `now`) can be injected, so tests run on fixtures. It
    returns `null` on any failure.
-2. Add its type to `shared/src/monitor.ts` as an optional or nullable field of `Snapshot` (or of `SystemSample`), and
+2. Add its type to `packages/webui-shared/src/monitor.ts` as an optional or nullable field of `Snapshot` (or of `SystemSample`), and
    its series keys to `SERIES`.
 3. Create it in `Collectors` (`registry.ts`): in `start()` if it is always on, in `configure()` if a switch in
-   `collectors` (`shared/src/settings.ts`) controls it.
+   `collectors` (`packages/webui-shared/src/settings.ts`) controls it.
 4. Call it from `Monitor.doTick()` or `sampleMachine()`, push its series with `push()` or `known()`, and put its value
    in the snapshot.
 5. Stop Bun and run `bun run dev` again: the monitor does not reload.

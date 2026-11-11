@@ -20,8 +20,8 @@
     "noImplicitOverride": true,
 
     "paths": {
-      "@llama-webui/shared": ["./shared/src/index.ts"]
+      "@llama-webui/shared": ["./packages/webui-shared/src/index.ts"]
     }
   },
-  "include": ["server", "shared", "scripts"]
+  "include": ["server", "packages", "scripts"]
 }

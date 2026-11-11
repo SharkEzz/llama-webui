@@ -5,7 +5,7 @@ description: Routes that start, list, cancel and delete benchmark runs with llam
 
 The benchmark routes run one measurement at a time with `llama-bench` or with a `llama-server` started for the
 purpose, and keep every run in the `bench_runs` table. They live in `server/routes/bench.ts`; the spec schema, the
-types and the flag translation are in `shared/src/bench.ts`, the runner, the executor and the server gate in
+types and the flag translation are in `packages/webui-shared/src/bench.ts`, the runner, the executor and the server gate in
 `server/bench/` (see [Benchmarks and sweeps](/developers/server/bench/)). The user side is described on the
 [Benchmark](/docs/benchmark/) page. Sweep items are runs too: their routes are on the [Sweeps](/developers/api/sweeps/)
 page.
@@ -46,7 +46,7 @@ A run is created with status `running` and executes in the background. Its progr
 
 ## The run spec
 
-`BenchSpec` (`BenchSpecSchema`, `shared/src/bench.ts`), strict:
+`BenchSpec` (`BenchSpecSchema`, `packages/webui-shared/src/bench.ts`), strict:
 
 | Field        | Type            | Required | Description                                                                                    |
 | ------------ | --------------- | -------- | ---------------------------------------------------------------------------------------------- |
@@ -103,7 +103,7 @@ file name, in the same folder (`benchBinary()`).
 
 ## The run record
 
-`BenchRun` (`shared/src/bench.ts`):
+`BenchRun` (`packages/webui-shared/src/bench.ts`):
 
 | Field            | Type                  | Description                                                                         |
 | ---------------- | --------------------- | ----------------------------------------------------------------------------------- |

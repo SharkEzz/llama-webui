@@ -28,7 +28,7 @@ const BARS = [
   { device: 'RAM', used: 31.84, budget: 55, total: 61 },
 ] as const;
 
-/** shared/src/tuning.ts */
+/** packages/webui-shared/src/tuning.ts */
 const PRESETS = [
   ['Responsive chat', 'generation throughput first, 32k context'],
   ['Agent & RAG', 'long prompts: prompt processing and generation'],

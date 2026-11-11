@@ -65,11 +65,11 @@ and the [Web app](/developers/frontend/) page for the router and sidebar.
   <Step title="Define the shapes">
 
 A request body or a response the web app also builds or reads gets a zod schema and its type in
-`shared/src/<domain>.ts` (a new module is re-exported from `shared/src/index.ts`). Validation messages are in English.
+`packages/webui-shared/src/<domain>.ts` (a new module is re-exported from `packages/webui-shared/src/index.ts`). Validation messages are in English.
 A shape only the route reads can stay in the route file, like `EstimateRequest` in `server/routes/tuning.ts`.
 `z.strictObject` rejects unknown fields.
 
-```ts title="shared/src/hf.ts"
+```ts title="packages/webui-shared/src/hf.ts"
 export const DownloadRequestSchema = z.strictObject({
   repo: z.string().regex(HF_REPO_RE, 'Repository id expected (org/name)'),
   revision: z.string().regex(/^[0-9a-f]{40}$/, 'Commit sha expected'),
@@ -145,9 +145,9 @@ shape) live on the [API overview](/developers/api/overview/).
 <Steps>
   <Step title="Declare it">
 
-Add a variant to the `WsMessage` union in `shared/src/ws.ts`, with a payload type from `shared/`:
+Add a variant to the `WsMessage` union in `packages/webui-shared/src/ws.ts`, with a payload type from `packages/webui-shared/`:
 
-```ts title="shared/src/ws.ts"
+```ts title="packages/webui-shared/src/ws.ts"
 | { type: 'download-progress'; payload: DownloadLive | null } // throttled; null when the queue is idle
 ```
 
@@ -218,7 +218,7 @@ takes several (versions 10 to 14 rebuild `bench_runs` and copy its rows).
   <Step title="Update the repository">
 
 Each table has a repository in `server/db/` (`settings.ts`, `profiles.ts`, `benchRuns.ts`, `downloads.ts`…) that maps
-rows to the types of `shared/`. Change its queries and row mapping, and the shared type if the API exposes the column.
+rows to the types of `packages/webui-shared/`. Change its queries and row mapping, and the shared type if the API exposes the column.
 
   </Step>
   <Step title="Test it">
@@ -244,7 +244,7 @@ source is unavailable. Keep parsing in pure functions tested against captured ou
   </Step>
   <Step title="Type the sample">
 
-Declare the sample type in `shared/src/monitor.ts`, as `SystemSample` and `DiskSample` are, and add a nullable field to
+Declare the sample type in `packages/webui-shared/src/monitor.ts`, as `SystemSample` and `DiskSample` are, and add a nullable field to
 `Snapshot`. Add its history keys to `SERIES` if it is charted.
 
   </Step>
@@ -287,10 +287,10 @@ page for the new `Snapshot` field, and the user pages that show it ([Dashboard](
 <Steps>
   <Step title="Add it to the schema">
 
-Add a field with its limits and a `.default()` to `SettingsSchema` (`shared/src/settings.ts`). `DEFAULT_SETTINGS` and the
+Add a field with its limits and a `.default()` to `SettingsSchema` (`packages/webui-shared/src/settings.ts`). `DEFAULT_SETTINGS` and the
 `Settings` type follow from it.
 
-```ts title="shared/src/settings.ts"
+```ts title="packages/webui-shared/src/settings.ts"
 historySeconds: z.number().int().min(30, 'Between 30 and 1800 s').max(1800, 'Between 30 and 1800 s').default(300),
 ```
 

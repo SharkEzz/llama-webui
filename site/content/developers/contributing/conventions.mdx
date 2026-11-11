@@ -3,7 +3,7 @@ title: Conventions
 description: Language, number formatting, Biome rules, React and Bun idioms, generated shadcn components and the hot-reload rules every change follows.
 ---
 
-These rules apply to `server/`, `shared/`, `web/` and `site/`. They come from `CLAUDE.md` at the root of the repository
+These rules apply to `server/`, `packages/webui-shared/`, `web/` and `site/`. They come from `CLAUDE.md` at the root of the repository
 (written in French); `biome.json`, the `tsconfig*.json` files and CI enforce the mechanical ones.
 
 ## Language
@@ -21,8 +21,8 @@ console messages from the server start with `[llama-webui]`.
 ### Numbers, dates and units
 
 The web app formats every number, date and unit through `web/src/lib/format.ts`, with the `LOCALE = 'en-US'` of
-`shared/src/format.ts`. Do not hard-code a locale in a component: use a helper, or add one to that file. A server
-message that shows a number (an error, a log line) uses `fmtInt()` from `shared/src/format.ts` the same way.
+`packages/webui-shared/src/format.ts`. Do not hard-code a locale in a component: use a helper, or add one to that file. A server
+message that shows a number (an error, a log line) uses `fmtInt()` from `packages/webui-shared/src/format.ts` the same way.
 
 | Helper                                       | Output                                                          |
 | -------------------------------------------- | --------------------------------------------------------------- |
@@ -54,12 +54,12 @@ client's `ApiError` (`web/src/lib/api.ts`) exposes it as `code`:
 if (e instanceof ApiError && e.code === 'server-running') return 'confirm';
 ```
 
-Text stored in the database that the UI has to recognize goes through a helper in `shared/`, which also knows the
+Text stored in the database that the UI has to recognize goes through a helper in `packages/webui-shared/`, which also knows the
 wording of earlier versions (the app used to be in French, and old rows keep their text):
 
-- `isOomError(error)` (`shared/src/bench.ts`): a run's error starts with `OOM_ERROR = 'Out of memory'` or the legacy
+- `isOomError(error)` (`packages/webui-shared/src/bench.ts`): a run's error starts with `OOM_ERROR = 'Out of memory'` or the legacy
   prefix.
-- `isDefaultTitle(title)` (`shared/src/chat.ts`): the conversation still has `DEFAULT_TITLE = 'New conversation'` or the
+- `isDefaultTitle(title)` (`packages/webui-shared/src/chat.ts`): the conversation still has `DEFAULT_TITLE = 'New conversation'` or the
   legacy default title.
 
 ## Formatting and lint
@@ -162,10 +162,10 @@ with Vite and React Router, and is still installed, run and tested with Bun.
 
 ### Code idioms
 
-- **`shared/` stays portable.** The browser bundle imports it, so its modules import nothing but `zod` and each other:
+- **`packages/webui-shared/` stays portable.** The browser bundle imports it, so its modules import nothing but `zod` and each other:
   no Bun or Node API. The server and the web import it as `@llama-webui/shared`; inside `web/` and `site/`, `@/` points
   to their own `src/`.
-- **Cleanup with `using`.** `defer(fn)` (`shared/src/dispose.ts`) returns a `Disposable`, so
+- **Cleanup with `using`.** `defer(fn)` (`packages/webui-shared/src/dispose.ts`) returns a `Disposable`, so
   `using _busy = defer(() => (busy = false));` replaces a `try`/`finally`. Tests release temporary directories and
   databases the same way.
 - **Dependencies as arguments.** Server classes and builders take their collaborators (`fetch`, `spawn`, repositories,

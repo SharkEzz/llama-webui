@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { catalogFrom, complete, describeFlag, flagOf, flagSuggestions, parseHelp, unknownFlags } from './flags';
 
-const HELP = await Bun.file(join(import.meta.dir, '../../testdata/llama-server-help.txt')).text();
+const HELP = await Bun.file(join(import.meta.dir, '../../../testdata/llama-server-help.txt')).text();
 const catalog = parseHelp(HELP);
 
 describe('parseHelp', () => {
