@@ -77,7 +77,7 @@ offending index.
 | `ts`    | number[], each at least 0         | `-ts`    | Tensor split proportions.                                         |
 | `sm`    | `none`, `layer`, `row`, `tensor`  | `-sm`    | Split mode.                                                       |
 | `fa`    | `on`, `off`, `auto`               | `-fa`    | Flash attention.                                                  |
-| `ctk`   | cache type                        | `-ctk`   | K cache type: `f32`, `f16`, `bf16`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`. |
+| `ctk`   | cache type                        | `-ctk`   | K cache type: `f32`, `f16`, `bf16`, `f8_e4m3`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`. |
 | `ctv`   | cache type                        | `-ctv`   | V cache type, same values.                                        |
 | `t`     | integer 1 to 1024                 | `-t`     | Threads.                                                          |
 | `b`     | integer 1 to 1,000,000            | `-b`     | Batch size.                                                       |

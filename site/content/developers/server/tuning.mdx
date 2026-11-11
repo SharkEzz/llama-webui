@@ -130,7 +130,7 @@ measurement noise, below which two sweep results are a tie.
 `server/tuning/memory.ts` holds the formulas. Every size is in bytes.
 
 - **KV cache element.** `KV_BYTES` gives the bytes per element of each cache type: `f32` 4, `f16` and `bf16` 2,
-  `q8_0` 1.0625, `q5_1` 0.75, `q5_0` 0.6875, `q4_1` 0.625, `q4_0` and `iq4_nl` 0.5625.
+  `q8_0` 1.0625, `f8_e4m3` 1, `q5_1` 0.75, `q5_0` 0.6875, `q4_1` 0.625, `q4_0` and `iq4_nl` 0.5625.
 - **Layers with a KV cache.** `holdsKv(m, i)` is false for the MTP layers (the last `nextnLayers`), for every layer of
   a recurrent model without `fullAttentionInterval`, and, when `fullAttentionInterval` is set, for every layer that is
   not the last of its interval.
@@ -229,8 +229,11 @@ in a fixed order and keeps the first configuration that passes `fitOf()`, then e
   - every preset except `big`: `gpu` (the whole model) on each device set, then `moe-cpu` on the widest set (MoE only),
     `partial` on the widest set, and `cpu`;
   - `big`: `moe-cpu` (MoE only) and `partial` on the widest set, then `cpu`.
-- **KV cache types.** `f16` only when `-fa off` is pinned; `f16` when a pinned `-ctk` is `f16` and `q8_0` for any
-  other pinned type; otherwise `f16` then `q8_0` when the preset prefers `f16`, `q8_0` alone when it prefers `q8_0`.
+- **KV cache types.** When `-fa off` is pinned: `f16`, then `f8_e4m3` as the fallback (half the size, and unlike
+  `q8_0` it needs no flash attention), `f16` alone when both `-ctk` and `-ctv` are pinned. `f8_e4m3` is only tried on
+  a family whose cards are all CUDA (or on the CPU family): Vulkan has no FP8 KV cache. Otherwise `f16` when a pinned
+  `-ctk` is `f16` and `q8_0` for any other pinned type; `f16` then `q8_0` when the preset prefers `f16`, `q8_0` alone
+  when it prefers `q8_0`.
 - **`-ub`.** The pinned value; otherwise the preset's, then 512 when it differs.
 - **Context.** From the preset's target (capped at the model's `contextLength`, rounded down to a multiple of 1,024)
   down to `ctxMin` in steps of `CTX_STEP = 4096`, or the pinned context alone.
@@ -263,7 +266,8 @@ For `context`, `largest()` binary-searches a family for the largest context, in 
 and the model's maximum. The estimator compares the `gpu` families and the family right after them (`moe-cpu` for a
 MoE, `partial` otherwise) and keeps the largest context; a placement that moves experts or layers to RAM can therefore
 win when it frees room for a longer context. When none of these fits, it goes on through the remaining families until
-one does, and moves to the next cache type only when no family fits.
+one does. With several cache types (`-fa off` pinned), each one goes through this search and the next type only wins
+with a strictly larger context: `f8_e4m3` is chosen only when `f16` cannot reach the model's context.
 
 ### Flags and why
 
@@ -279,8 +283,8 @@ and one row per flag with a "why" string. The rows are built from the final flag
 | `-dev`               | `single card: no PCIe hop`, or `N cards, <first> gets the compute buffers`                                                                             |
 | `-ts`                | `split by the usable VRAM of each card`                                                                                                                |
 | `-c`                 | `… estimated in total, <kv> KV cache included, margin kept`                                                                                            |
-| `-fa`                | The final value. `on`: `faster attention, smaller compute buffers` (`f16`), `required for the quantized KV cache`; pinned `auto`: `pinned: llama.cpp decides`; pinned `off`: `pinned: attention without flash attention` |
-| `-ctk / -ctv`        | The final types (`q4_0 / q8_0` when they differ). `pinned`, or `the budget allows it, no loss` (`f16`), `cache halved, negligible loss` (quantized)        |
+| `-fa`                | The final value. `on`: `faster attention, smaller compute buffers` (`f32`, `f16`, `bf16`, `f8_e4m3`), `required for the quantized KV cache` (any other type); pinned `auto`: `pinned: llama.cpp decides`; pinned `off`: `pinned: attention without flash attention` |
+| `-ctk / -ctv`        | The final types (`q4_0 / q8_0` when they differ). `pinned`, or `the budget allows it, no loss` (`f16`), `cache halved, negligible loss` (quantized), `cache halved, works without flash attention` (`f8_e4m3`) |
 | `-t`                 | `N physical cores`                                                                                                                                     |
 | `-b / -ub`           | `default` for 2048 / 512, otherwise `faster prompt processing, enough VRAM headroom`                                                                   |
 | `--fit`              | `what gets measured is exactly what gets written`                                                                                                      |
@@ -301,7 +305,9 @@ fit.
 `experts of the first N layers in RAM: slower generation`, `not enough VRAM: everything in RAM`,
 `overflows RAM by …: NVMe read ≈ … per generated token`, the `tight` reason when RAM does not overflow, and
 `dense model: -ncmoe has no effect` when `-ncmoe` is pinned on a dense model, and
-`a quantized KV cache needs flash attention: -fa off may fail` when `-fa off` is pinned with a quantized cache.
+`a quantized KV cache needs flash attention: -fa off may fail` when `-fa off` is pinned with a quantized cache
+(`f8_e4m3` is not one), and `only CUDA and the CPU support an f8_e4m3 KV cache: … may fail` when an `f8_e4m3` cache
+(pinned) runs on a non-CUDA card.
 
 When nothing passes, the estimate still shows the simplest configuration, without checking it: `-ngl all` on the
 widest set (or `-ngl 0` without a card), a `q8_0` cache (`f16` with `-fa off`), `-ub 512`, the pinned values and

@@ -124,3 +124,11 @@ test('isOomError recognizes the current and the legacy out-of-memory errors', ()
   expect(isOomError('llama-bench exited (code 2)')).toBe(false);
   expect(isOomError(null)).toBe(false);
 });
+
+test('the f8_e4m3 KV cache type is accepted by the schema and read from the server flags', () => {
+  expect(paramsFromServerArgs(['-ctk', 'f8_e4m3', '--cache-type-v', 'f8_e4m3']).params).toEqual({
+    ctk: 'f8_e4m3',
+    ctv: 'f8_e4m3',
+  });
+  expect(benchArgs({ ctk: 'f8_e4m3', ctv: 'f8_e4m3' })).toEqual(['-ctk', 'f8_e4m3', '-ctv', 'f8_e4m3']);
+});
