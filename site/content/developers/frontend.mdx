@@ -20,7 +20,7 @@ The web app is a React 19 single-page app in `web/`, served by the Bun process (
     - `index.css` Tailwind, theme tokens for light and dark, Shiki colors
     - `app/` the shell
       - `router.tsx` routes, each page lazy-loaded
-      - `routes.ts` sidebar entries (path, label, icon)
+      - `routes.ts` sidebar entries (path, label, icon, group)
       - `AppLayout.tsx` layout: sidebar, status bar, page outlet, toasts
       - `Sidebar.tsx`, `StatusBar.tsx`, `ThemeToggle.tsx`, `PageSkeleton.tsx`
       - `sidebarPrefs.ts` collapsed sidebar, kept by the browser
@@ -85,6 +85,10 @@ arrives. Unknown paths render the placeholder page with "Page not found".
 
 `AppLayout` draws the aurora background, the sidebar, the status bar and the page `<Outlet />`, with the sonner
 `Toaster` at the bottom right. It refreshes the health store (version, uptime) every time the WebSocket opens.
+
+The sidebar lists `ROUTES` in order and draws a thin line between two groups of entries (`navGroups()` in
+`routes.ts`: `overview`, `run`, `monitor`, `tune`); **Settings** (group `settings`) is pinned at the bottom with the
+**Collapse** button. The line is centered under the icons, so it looks the same collapsed and expanded.
 
 The sidebar collapses to its icons. `web/src/app/sidebarPrefs.ts` holds the choice in a zustand store, saved in the
 browser's `localStorage` under `llama-webui:sidebar` (`collapsed` or `expanded`), and `useSidebarLayout()` gives what

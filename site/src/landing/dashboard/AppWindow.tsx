@@ -14,24 +14,33 @@ import {
   SlidersHorizontal,
   Wand2,
 } from 'lucide-react';
+import { Fragment } from 'react';
 import { LogoMark } from '@/components/Logo';
 import { cn } from '@/lib/utils';
 import { RUN } from '../telemetry';
 import { StateBadge } from './DashboardReplica';
 
-/** Same entries and icons as the app's sidebar (web/src/app/routes.ts). */
-const NAV: [string, LucideIcon][] = [
-  ['Home', Home],
-  ['Dashboard', Activity],
-  ['Server', Server],
-  ['Profiles', SlidersHorizontal],
-  ['Logs', ScrollText],
-  ['System', Cpu],
-  ['Topology', Network],
-  ['Models', Boxes],
-  ['Chat', MessageSquare],
-  ['Benchmark', Gauge],
-  ['Tuning', Wand2],
+/** Same entries, icons and groups as the app's sidebar (web/src/app/routes.ts); a line separates two groups. */
+const NAV: [string, LucideIcon][][] = [
+  [
+    ['Home', Home],
+    ['Dashboard', Activity],
+  ],
+  [
+    ['Models', Boxes],
+    ['Profiles', SlidersHorizontal],
+    ['Server', Server],
+    ['Chat', MessageSquare],
+  ],
+  [
+    ['System', Cpu],
+    ['Topology', Network],
+    ['Logs', ScrollText],
+  ],
+  [
+    ['Benchmark', Gauge],
+    ['Tuning', Wand2],
+  ],
 ];
 
 interface NavItemProps {
@@ -76,8 +85,13 @@ export function AppWindow({ children }: { children: React.ReactNode }) {
             <span className="hidden text-[0.9375rem] font-semibold tracking-tight @5xl:inline">llama-webui</span>
           </div>
           <div className="mt-4 flex flex-1 flex-col gap-0.5">
-            {NAV.map(([label, icon]) => (
-              <NavItem key={label} label={label} icon={icon} active={label === 'Dashboard'} />
+            {NAV.map((group, i) => (
+              <Fragment key={group[0]![0]}>
+                {i > 0 && <div className="mx-2 my-2 h-px shrink-0 bg-sidebar-border" />}
+                {group.map(([label, icon]) => (
+                  <NavItem key={label} label={label} icon={icon} active={label === 'Dashboard'} />
+                ))}
+              </Fragment>
             ))}
           </div>
           <div className="mt-6 flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
