@@ -7,6 +7,7 @@ export const KV_BYTES: Record<CacheType, number> = {
   f16: 2,
   bf16: 2,
   q8_0: 1.0625,
+  f8_e4m3: 1,
   q5_1: 0.75,
   q5_0: 0.6875,
   q4_1: 0.625,

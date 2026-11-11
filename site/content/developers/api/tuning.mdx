@@ -116,7 +116,7 @@ the preset's `-ub` (`agent` also tries 512).
 | `dev`          | Only this set of cards is tried.                                           |
 | `ncmoe`        | The MoE family uses this value instead of searching it.                    |
 | `ngl`          | The partial family uses this value instead of searching it.                |
-| `fa: "off"`    | `-fa off` instead of `-fa on`; the KV cache stays `f16`.                   |
+| `fa: "off"`    | `-fa off` instead of `-fa on`; the KV cache is `f16`, or `f8_e4m3` on CUDA cards when `f16` does not fit. |
 | `ctk`          | The KV cache searched is `f16` if `ctk` is `f16`, `q8_0` otherwise.        |
 | `ub`           | Only this micro-batch.                                                     |
 | `t`, `b`       | Replace the defaults (physical cores, 2048).                               |
@@ -135,7 +135,7 @@ warning `dense model: -ncmoe has no effect`.
 | `preset`                | string             | The preset id.                                                                      |
 | `params`                | `BenchParams`      | The recommended flags, pins included. When nothing fits: the simplest configuration (all layers on the widest set of cards, or `-ngl 0`), not validated. |
 | `ctx`                   | number             | Context size.                                                                       |
-| `kv`                    | `"f16"` \| `"q8_0"` | KV cache type the search used.                                                     |
+| `kv`                    | cache type         | The final K cache type: `f16`, `q8_0`, `f8_e4m3` (with `fa: "off"`) or the pinned `ctk`. |
 | `serverArgs`            | string[]           | `serverArgs(params)`, then `-c <ctx>`, `--fit off`, and `--mlock` and `--numa distribute` when they apply: ready for a profile. |
 | `rows`                  | `Recommendation[]` | One row per flag: `flag`, `value` and `why`, the reason shown in the UI. Empty when `ok` is false. |
 | `fit`                   | `Fit`              | Per-device memory and verdict (below).                                              |

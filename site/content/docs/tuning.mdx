@@ -78,7 +78,7 @@ has three columns: **Flag**, **Value** and **Why**.
 | `-ts`                 | Several cards                                       | The split, in proportion to each card's usable VRAM.                                  |
 | `-c`                  | Always                                              | The context. **Why** gives the total memory estimated for the whole configuration.    |
 | `-fa`                 | Always                                              | `on`: faster attention, and required for a quantized KV cache.                        |
-| `-ctk / -ctv`         | Always                                              | The KV cache type: `f16`, or `q8_0` (half the size, negligible loss).                 |
+| `-ctk / -ctv`         | Always                                              | The KV cache type: `f16`, or `q8_0` (half the size, negligible loss). With `-fa off` pinned, `f8_e4m3` when `f16` does not fit (half the size, no flash attention needed; CUDA cards only). |
 | `-t`                  | Always                                              | The number of physical CPU cores.                                                     |
 | `-b / -ub`            | Always                                              | Batch 2048, micro-batch from the preset.                                              |
 | `--fit`               | Always                                              | `off`: what gets measured is exactly what gets written.                               |

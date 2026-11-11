@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { deviceRole } from '@llama-webui/shared';
 import { fakeModel, hw3 } from './fixtures';
+import { kvLayerBytes } from './memory';
 import { fitOf, measurePlacement, type PlacementInput } from './placement';
 
 const MiB = 1024 ** 2;
@@ -105,4 +106,11 @@ test('-ot to an unknown device is an issue, to a host buffer is RAM (#36)', () =
   const host = measurePlacement(input({ params: { dev: ['CUDA0'], ot: ['exps=CPU', 'norm=CUDA_Host'] } }));
   expect(host.issues).toEqual([]);
   expect(host.cpuExpertsBytes).toBe(48 * 300 * MiB);
+});
+
+test('an f8_e4m3 KV cache takes half the bytes of an f16 one', () => {
+  const dense = fakeModel({ layers: 36 });
+  const f16 = kvLayerBytes(dense, 0, 65536, { k: 'f16', v: 'f16' });
+  expect(f16).toBeGreaterThan(0);
+  expect(kvLayerBytes(dense, 0, 65536, { k: 'f8_e4m3', v: 'f8_e4m3' }) * 2).toBe(f16);
 });

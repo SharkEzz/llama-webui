@@ -59,7 +59,7 @@ Fill in the **New benchmark** form, then click **Run**.
 | `-t`, `-b`, `-ub`         | Threads, batch size, micro-batch size.                                                                                 | Tool default           |
 | `-sm`                     | Split mode: `none`, `layer`, `row` or `tensor`.                                                                        | Tool default           |
 | `-fa`                     | Flash attention: `on`, `off` or `auto`.                                                                                | Tool default           |
-| `-ctk`, `-ctv`            | KV cache types: `f32`, `f16`, `bf16`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`.                               | Tool default           |
+| `-ctk`, `-ctv`            | KV cache types: `f32`, `f16`, `bf16`, `f8_e4m3`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`. `f8_e4m3` needs a recent llama.cpp build and runs on CUDA and the CPU only. | Tool default           |
 | **-dev and -ts**          | One checkbox per device, then a proportion box next to each checked device. With nothing checked, one `-ts` field (for example `3,1`) applies in the tool's device order. | Automatic |
 | `-ot`                     | Tensor overrides, one `pattern=buffer` rule per line, for example `exps=CPU`.                                          | None                   |
 | `-p`                      | Prompt tokens, 1 to 32,768.                                                                                            | 512                    |

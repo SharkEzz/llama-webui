@@ -27,7 +27,7 @@ export interface EstimateInput {
   ctx?: number;
 }
 
-type Kv = 'f16' | 'q8_0';
+type Kv = 'f16' | 'q8_0' | 'f8_e4m3';
 const CTX_STEP = 4096;
 const TS_UNIT = 256 * MiB;
 const DEFAULT_BATCH = 2048;
@@ -46,6 +46,12 @@ type Kind = { name: 'gpu' | 'moe-cpu' | 'partial' | 'cpu'; cards: BenchDevice[] 
 
 /** “experts of the first layer”, “experts of the first 8 layers”. */
 const firstLayers = (n: number) => (n === 1 ? 'experts of the first layer' : `experts of the first ${n} layers`);
+
+/** Cache types llama.cpp does not count as quantized: a V cache of these types works without flash attention. */
+const FLOAT_KV: ReadonlySet<CacheType> = new Set<CacheType>(['f32', 'f16', 'bf16', 'f8_e4m3']);
+
+/** The backends that implement an f8_e4m3 KV cache (CUDA and the CPU; Vulkan does not). */
+const fp8Backend = (d: BenchDevice) => d.backend === 'CUDA';
 
 /** The K and V cache types the flags give llama.cpp (-ctv defaults to f16, not to -ctk). */
 const cacheOf = (p: BenchParams): { k: CacheType; v: CacheType } => ({
@@ -101,8 +107,11 @@ export function estimate(input: EstimateInput): Estimate {
   }
   kinds.push({ name: 'cpu', cards: [] });
 
+  // Without flash attention, f8_e4m3 (no FA needed, half of f16) is the fallback when f16 does not fit.
   const kvs: Kv[] = noFa
-    ? ['f16']
+    ? pinned.ctk && pinned.ctv
+      ? ['f16']
+      : ['f16', 'f8_e4m3']
     : pinned.ctk
       ? [pinned.ctk === 'f16' ? 'f16' : 'q8_0']
       : preset.kvPreferred === 'f16'
@@ -150,6 +159,7 @@ export function estimate(input: EstimateInput): Estimate {
   });
 
   const fitKind = (k: Kind, ctx: number, kv: Kv, ub: number): Tried | null => {
+    if (kv === 'f8_e4m3' && !k.cards.every(fp8Backend)) return null;
     const dev = k.cards.map((d) => d.id);
     const ts = tsOf(k.cards, ub);
     const placed = (extra: BenchParams): BenchParams => ({
@@ -211,6 +221,8 @@ export function estimate(input: EstimateInput): Estimate {
 
   const search = (): Tried | null => {
     if (preset.ctxTarget === Number.POSITIVE_INFINITY && !input.ctx) {
+      // A fallback cache type only wins with a larger context: when the preferred one cannot reach the model's.
+      let found: Tried | null = null;
       for (const kv of kvs) {
         let best: Tried | null = null;
         for (const k of kinds) {
@@ -218,9 +230,9 @@ export function estimate(input: EstimateInput): Estimate {
           if (r && (!best || r.ctx > best.ctx)) best = r;
           if (best && k.name !== 'gpu') break;
         }
-        if (best) return best;
+        if (best && (!found || best.ctx > found.ctx)) found = best;
       }
-      return null;
+      return found;
     }
     // One card when everything fits on it, at the target context and with the preferred cache; only then scale down.
     // A configuration with headroom wins over a simpler “tight” one.
@@ -296,7 +308,8 @@ export function estimate(input: EstimateInput): Estimate {
   const cache = cacheOf(params);
   const kv = cache.k;
   const kvLabel = cache.k === cache.v ? cache.k : `${cache.k} / ${cache.v}`;
-  const quantized = cache.k !== 'f16' || cache.v !== 'f16';
+  const quantized = !FLOAT_KV.has(cache.k) || !FLOAT_KV.has(cache.v);
+  const fp8 = cache.k === 'f8_e4m3' || cache.v === 'f8_e4m3';
   const used = m.used;
   const ramOverflowBytes = Math.max(0, m.ram - hw.ramAvailableBytes);
   const activeCpu =
@@ -360,7 +373,13 @@ export function estimate(input: EstimateInput): Estimate {
   row(
     '-ctk / -ctv',
     kvLabel,
-    pinned.ctk || pinned.ctv ? 'pinned' : quantized ? 'cache halved, negligible loss' : 'the budget allows it, no loss',
+    pinned.ctk || pinned.ctv
+      ? 'pinned'
+      : quantized
+        ? 'cache halved, negligible loss'
+        : fp8
+          ? 'cache halved, works without flash attention'
+          : 'the budget allows it, no loss',
   );
   row('-t', String(threads), `${threads} physical ${threads === 1 ? 'core' : 'cores'}`);
   row(
@@ -382,6 +401,12 @@ export function estimate(input: EstimateInput): Estimate {
     );
   if (fit.verdict === 'tight' && fit.reason && ramOverflowBytes === 0) warnings.push(fit.reason);
   if (params.fa === 'off' && quantized) warnings.push('a quantized KV cache needs flash attention: -fa off may fail');
+  const noFp8 = (params.dev ?? []).filter((id) => {
+    const d = byId.get(id);
+    return d !== undefined && !fp8Backend(d);
+  });
+  if (fp8 && noFp8.length > 0)
+    warnings.push(`only CUDA and the CPU support an f8_e4m3 KV cache: ${noFp8.join(', ')} may fail`);
   warnings.push(...m.issues);
 
   return {

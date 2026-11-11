@@ -123,3 +123,69 @@ test('when nothing fits because of RAM, the reason names RAM, not the all-GPU fa
   // The per-device detail of the fallback stays on the bars.
   expect(e.fit.vram.length).toBeGreaterThan(0);
 });
+
+test('with -fa off, an f8_e4m3 cache keeps the model on a CUDA card where f16 does not fit', () => {
+  const model = fakeModel({ layers: 36, otherBytesPerLayer: 200 * MiB });
+  const e = estimate({
+    model,
+    hw: hw3(),
+    preset: 'chat',
+    mmprojBytes: 0,
+    ctx: 131072,
+    pinned: { fa: 'off', dev: ['CUDA0'] },
+  });
+  expect(e.params).toMatchObject({ ngl: 'all', dev: ['CUDA0'], fa: 'off', ctk: 'f8_e4m3', ctv: 'f8_e4m3' });
+  expect(e.kv).toBe('f8_e4m3');
+  expect(e.rows.find((r) => r.flag === '-ctk / -ctv')?.why).toBe('cache halved, works without flash attention');
+  expect(e.warnings.some((w) => w.includes('flash attention'))).toBe(false);
+});
+
+test('with -fa off, the estimator never picks f8_e4m3 on a Vulkan card', () => {
+  const model = fakeModel({ layers: 36, otherBytesPerLayer: 200 * MiB });
+  const e = estimate({
+    model,
+    hw: hw3(),
+    preset: 'chat',
+    mmprojBytes: 0,
+    ctx: 131072,
+    pinned: { fa: 'off', dev: ['Vulkan3'] },
+  });
+  expect(e.params.ctk).toBe('f16');
+  expect(e.params.ctv).toBe('f16');
+});
+
+test('with -fa off and the largest context, f8_e4m3 only wins when f16 cannot reach the model context', () => {
+  const pinned = { fa: 'off' as const, dev: ['CUDA0'] };
+  const small = estimate({ model: fakeModel({ layers: 36 }), hw: hw3(), preset: 'context', mmprojBytes: 0, pinned });
+  expect(small.params).toMatchObject({ ngl: 'all', ctk: 'f16', ctv: 'f16' });
+  expect(small.ctx).toBe(131072);
+  // 32 KV heads: f16 cannot hold the 131072 tokens of the model, f8_e4m3 goes further.
+  const model = { ...fakeModel({ layers: 36, otherBytesPerLayer: 200 * MiB }), headCountKv: Array(36).fill(32) };
+  const f16 = estimate({
+    model,
+    hw: hw3(),
+    preset: 'context',
+    mmprojBytes: 0,
+    pinned: { ...pinned, ctk: 'f16', ctv: 'f16' },
+  });
+  const big = estimate({ model, hw: hw3(), preset: 'context', mmprojBytes: 0, pinned });
+  expect(big.params).toMatchObject({ ctk: 'f8_e4m3', ctv: 'f8_e4m3' });
+  expect(big.ctx).toBeGreaterThan(f16.ctx);
+});
+
+test('a pinned f8_e4m3 cache is not called quantized and warns on a Vulkan card', () => {
+  const model = fakeModel({ layers: 36, otherBytesPerLayer: 120 * MiB });
+  const pinned = { fa: 'on' as const, ctk: 'f8_e4m3' as const, ctv: 'f8_e4m3' as const };
+  const cuda = estimate({ model, hw: hw3(), preset: 'chat', mmprojBytes: 0, pinned: { ...pinned, dev: ['CUDA0'] } });
+  expect(cuda.rows.find((r) => r.flag === '-fa')?.why).toBe('faster attention, smaller compute buffers');
+  expect(cuda.warnings.some((w) => w.includes('f8_e4m3'))).toBe(false);
+  const vulkan = estimate({
+    model,
+    hw: hw3(),
+    preset: 'chat',
+    mmprojBytes: 0,
+    pinned: { ...pinned, dev: ['Vulkan3'] },
+  });
+  expect(vulkan.params.ctk).toBe('f8_e4m3');
+  expect(vulkan.warnings).toContain('only CUDA and the CPU support an f8_e4m3 KV cache: Vulkan3 may fail');
+});
