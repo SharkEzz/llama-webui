@@ -1,5 +1,5 @@
 import type { ModelDetail } from '@llama-webui/shared';
-import { Copy, Plus, Trash2 } from 'lucide-react';
+import { Copy, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -18,7 +18,7 @@ import { Facts } from '@/features/system/Facts';
 import { api } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatBytes, formatInt, formatParams } from '@/lib/format';
-import { DeleteModelDialog } from './DeleteModelDialog';
+import { DeleteModelPopover } from './DeleteModelPopover';
 
 const yesNo = (b: boolean) => (b ? 'yes' : 'no');
 
@@ -26,7 +26,6 @@ const yesNo = (b: boolean) => (b ? 'yes' : 'no');
 export function ModelDetailDialog({ path, onClose }: { path: string | null; onClose(): void }) {
   const [detail, setDetail] = useState<ModelDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -104,11 +103,7 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
           </div>
         )}
         <DialogFooter>
-          {path && (
-            <Button variant="destructive" className="sm:mr-auto" onClick={() => setDeleting(true)}>
-              <Trash2 /> Delete
-            </Button>
-          )}
+          {path && <DeleteModelPopover path={path} onDeleted={onClose} />}
           <Button
             variant="ghost"
             disabled={!path}
@@ -122,7 +117,6 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
             </Button>
           )}
         </DialogFooter>
-        {path && <DeleteModelDialog path={path} open={deleting} onOpenChange={setDeleting} onDeleted={onClose} />}
       </DialogContent>
     </Dialog>
   );

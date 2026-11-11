@@ -19,8 +19,6 @@ interface ArgsEditorProps {
   onChange(text: string): void;
 }
 
-const MAX_SUGGESTIONS = 8;
-
 /** Arguments in shell syntax, with flag autocompletion, help for the flag under the cursor, and warnings. */
 export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   const { catalog, error: catalogError } = useFlags();
@@ -36,7 +34,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
 
   const parsed = useMemo(() => parseArgs(value), [value]);
   const at = wordAt(value, cursor);
-  const suggestions = catalog && !dismissed ? flagSuggestions(catalog, at.word, MAX_SUGGESTIONS) : [];
+  const suggestions = catalog && !dismissed ? flagSuggestions(catalog, at.word) : [];
   const helpFlag = catalog
     ? (flagOf(catalog, at.word) ?? (!at.word.startsWith('-') ? flagOf(catalog, at.previous) : undefined))
     : undefined;
@@ -68,6 +66,12 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
       : undefined;
     if (list !== aria.list || active !== aria.active) setAria({ list, active });
   });
+
+  // Every matching flag is listed: keep the highlighted one in view while the arrows move through the list.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `active` is the trigger (cmdk marks the item from it)
+  useLayoutEffect(() => {
+    if (open) listRef.current?.querySelector('[cmdk-item][data-selected=true]')?.scrollIntoView({ block: 'nearest' });
+  }, [open, active]);
 
   const track = () => setCursor(ref.current?.selectionStart ?? 0);
 

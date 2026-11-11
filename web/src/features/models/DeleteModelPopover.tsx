@@ -1,54 +1,39 @@
 import type { ModelUsage } from '@llama-webui/shared';
-import { useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatBytes, plural } from '@/lib/format';
 import { deleteModel, modelUsage, stem, useModels } from '@/lib/models';
 import { useProfiles } from '@/lib/profiles';
 
 /**
- * Confirms deleting a model's files from the disk. When profiles use it, the user chooses whether they go too
- * (a kept profile cannot start until it gets another model).
+ * Delete button of a model, confirmed in a popover that lists the files and the profiles using it: the user chooses
+ * whether those profiles go too (a kept profile cannot start until it gets another model).
  */
-export function DeleteModelDialog({
-  path,
-  open,
-  onOpenChange,
-  onDeleted,
-}: {
-  path: string;
-  open: boolean;
-  onOpenChange(o: boolean): void;
-  onDeleted(): void;
-}) {
+export function DeleteModelPopover({ path, onDeleted }: { path: string; onDeleted(): void }) {
+  const [open, setOpen] = useState(false);
   const [usage, setUsage] = useState<ModelUsage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
+  const onOpenChange = (o: boolean) => {
+    setOpen(o);
+    if (!o) return;
     setUsage(null);
     setError(null);
-    if (!open) return;
-    let live = true;
-    modelUsage(path).then(
-      (u) => live && setUsage(u),
-      (e: Error) => live && setError(e.message),
-    );
-    return () => {
-      live = false;
-    };
-  }, [open, path]);
+    modelUsage(path).then(setUsage, (e: Error) => setError(e.message));
+  };
 
   const run = async (deleteProfiles: boolean) => {
     setBusy(true);
@@ -56,7 +41,7 @@ export function DeleteModelDialog({
       const r = await deleteModel(path, deleteProfiles);
       const n = r.deletedProfiles.length;
       toast.success(n > 0 ? `Model and ${n} ${plural(n, 'profile')} deleted` : 'Model deleted');
-      onOpenChange(false);
+      setOpen(false);
       onDeleted();
       void useModels.getState().refresh();
       void useProfiles.getState().reload();
@@ -70,31 +55,36 @@ export function DeleteModelDialog({
   const profiles = usage?.profiles ?? [];
   const disabled = busy || !usage || usage.blocked !== null;
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="sm:max-w-lg">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="break-all">Delete “{stem(path)}”?</AlertDialogTitle>
-          <AlertDialogDescription>
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger render={<Button variant="destructive" className="sm:mr-auto" />}>
+        <Trash2 /> Delete
+      </PopoverTrigger>
+      <PopoverContent side="top" align="start" className="w-[26rem] max-w-[calc(100vw-2rem)]">
+        <PopoverHeader>
+          <PopoverTitle className="break-all">Delete “{stem(path)}”?</PopoverTitle>
+          <PopoverDescription>
             {usage
               ? `${usage.files.length > 1 ? `Its ${usage.files.length} files` : 'The file'} (${formatBytes(usage.fileBytes)}) will be permanently deleted from the disk.`
               : 'The model files will be permanently deleted from the disk.'}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </PopoverDescription>
+        </PopoverHeader>
         {error ? (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : !usage ? (
-          <Skeleton className="h-16" />
+          <Skeleton className="h-12" />
         ) : (
-          <div className="flex min-w-0 flex-col gap-3 text-sm">
-            <div className="flex max-h-32 flex-col gap-0.5 overflow-y-auto">
-              {usage.files.map((f) => (
-                <p key={f} className="break-all font-mono text-xs text-muted-foreground">
-                  {f}
-                </p>
-              ))}
-            </div>
+          <>
+            {usage.files.length > 1 && (
+              <div className="flex max-h-24 flex-col gap-0.5 overflow-y-auto">
+                {usage.files.map((f) => (
+                  <p key={f} className="break-all font-mono text-xs text-muted-foreground">
+                    {f.split('/').pop()}
+                  </p>
+                ))}
+              </div>
+            )}
             {usage.blocked && (
               <Alert variant="destructive">
                 <AlertDescription>{usage.blocked}</AlertDescription>
@@ -117,26 +107,28 @@ export function DeleteModelDialog({
                 </ul>
               </div>
             )}
-          </div>
+          </>
         )}
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
           {profiles.length > 0 ? (
             <>
-              <AlertDialogAction variant="outline" disabled={disabled} onClick={() => void run(false)}>
+              <Button variant="outline" size="sm" disabled={disabled} onClick={() => void run(false)}>
                 Delete model only
-              </AlertDialogAction>
-              <AlertDialogAction variant="destructive" disabled={disabled} onClick={() => void run(true)}>
+              </Button>
+              <Button variant="destructive" size="sm" disabled={disabled} onClick={() => void run(true)}>
                 Delete model and {profiles.length} {plural(profiles.length, 'profile')}
-              </AlertDialogAction>
+              </Button>
             </>
           ) : (
-            <AlertDialogAction variant="destructive" disabled={disabled} onClick={() => void run(false)}>
+            <Button variant="destructive" size="sm" disabled={disabled} onClick={() => void run(false)}>
               Delete
-            </AlertDialogAction>
+            </Button>
           )}
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
