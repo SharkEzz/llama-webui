@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export type ModelKind = 'model' | 'mmproj';
 
 /** Summary of a GGUF (header only), cached in the database. */
@@ -51,6 +53,35 @@ export interface ModelDetail extends ModelSummary {
     otherBytes: number;
     totalBytes: number;
   };
+}
+
+/** A profile that opens a model file, as its model or as its projector. */
+export interface ModelProfileUse {
+  id: number;
+  name: string;
+  role: ModelKind;
+}
+
+/** What deleting a model would remove, and why it is refused (`blocked`), from `GET /api/models/usage`. */
+export interface ModelUsage {
+  path: string;
+  /** Every file deleted (all the parts of a split model). */
+  files: string[];
+  fileBytes: number;
+  profiles: ModelProfileUse[];
+  /** Why the model cannot be deleted now (the running server, a benchmark or a download uses it); null if it can. */
+  blocked: string | null;
+}
+
+export const ModelDeleteSchema = z.strictObject({
+  path: z.string().min(1, 'path required'),
+  /** Also delete the profiles that use the model. */
+  deleteProfiles: z.boolean().default(false),
+});
+
+export interface ModelDeleted {
+  deletedFiles: string[];
+  deletedProfiles: number[];
 }
 
 const expand = (p: string, home: string) => (p === '~' ? home : p.startsWith('~/') ? `${home}/${p.slice(2)}` : p);

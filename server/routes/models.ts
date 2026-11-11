@@ -1,20 +1,57 @@
 import type { Database } from 'bun:sqlite';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import type { ModelDetail, ModelList } from '@llama-webui/shared';
+import { type ModelDeleted, ModelDeleteSchema, type ModelDetail, type ModelList } from '@llama-webui/shared';
+import type { BenchRunner } from '../bench/runner';
+import type { BenchRunsRepo } from '../db/benchRuns';
+import type { DownloadsRepo } from '../db/downloads';
 import { ModelCacheRepo } from '../db/modelCache';
+import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
-import { guarded, HttpError, notFound } from '../http';
+import type { SweepsRepo } from '../db/sweeps';
+import { guarded, HttpError, jsonObject, notFound } from '../http';
+import { deleteModelFiles, findEntry, type ModelUsers, modelUsage } from '../models/delete';
 import { readModel } from '../models/gguf';
 import { scanModels, toSummary } from '../models/scan';
 import { weightSizes } from '../models/sizes';
 import { expandHome } from '../supervisor/args';
+import { removeProfile } from './profiles';
 
-export function modelRoutes({ db, settings }: { db: Database; settings: SettingsRepo }) {
+export interface ModelRouteDeps {
+  db: Database;
+  settings: SettingsRepo;
+  profiles: ProfilesRepo;
+  activeProfileId: () => number | null;
+  benchRunner: Pick<BenchRunner, 'live'>;
+  benchRuns: Pick<BenchRunsRepo, 'get'>;
+  sweeps: Pick<SweepsRepo, 'running'>;
+  downloadsRepo: Pick<DownloadsRepo, 'active'>;
+}
+
+export function modelRoutes(deps: ModelRouteDeps) {
+  const { db, settings } = deps;
   const cache = new ModelCacheRepo(db);
   const modelsDir = () => {
     const setting = settings.get().modelsDir;
     return { setting, dir: expandHome(setting) };
+  };
+  const users: ModelUsers = {
+    profiles: deps.profiles,
+    activeProfileId: deps.activeProfileId,
+    benchFiles: () => {
+      const live = deps.benchRunner.live;
+      const run = live ? deps.benchRuns.get(live.runId) : null;
+      const sweep = deps.sweeps.running();
+      return [run?.spec.modelPath, run?.spec.mmprojPath, sweep?.spec.modelPath, sweep?.spec.mmprojPath].map(
+        (p) => p ?? null,
+      );
+    },
+    downloads: () => deps.downloadsRepo.active(),
+  };
+  /** The model at `path`, from a fresh scan of the models folder (never a path taken as is from the client). */
+  const entryOf = async (path: string) => {
+    const { dir } = modelsDir();
+    return { dir, entry: findEntry(await scanModels(dir, { cache }), dir, path) };
   };
 
   return {
@@ -29,6 +66,24 @@ export function modelRoutes({ db, settings }: { db: Database; settings: Settings
           models: await scanModels(dir, { cache }),
         };
         return Response.json(list);
+      }),
+      DELETE: guarded(async (req) => {
+        const body = ModelDeleteSchema.parse(await jsonObject(req));
+        const { dir, entry } = await entryOf(body.path);
+        const usage = await modelUsage(entry, users);
+        if (usage.blocked) throw new HttpError(409, usage.blocked, 'model-in-use');
+        await deleteModelFiles(entry, dir);
+        const deletedProfiles = body.deleteProfiles ? usage.profiles.map((p) => p.id) : [];
+        for (const id of deletedProfiles) removeProfile(deps, id);
+        const result: ModelDeleted = { deletedFiles: entry.files, deletedProfiles };
+        return Response.json(result);
+      }),
+    },
+    '/api/models/usage': {
+      GET: guarded(async (req) => {
+        const path = new URL(req.url).searchParams.get('path');
+        if (!path) throw new HttpError(400, 'path required');
+        return Response.json(await modelUsage((await entryOf(path)).entry, users));
       }),
     },
     '/api/models/info': {

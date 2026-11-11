@@ -12,6 +12,13 @@ export interface ProfileRouteDeps {
   activeProfileId: () => number | null;
 }
 
+/** Deletes a profile: refused for the running server's, and no longer the default one. */
+export function removeProfile({ profiles, settings, activeProfileId }: ProfileRouteDeps, id: number): void {
+  if (activeProfileId() === id) throw new HttpError(409, 'This profile belongs to the running server: stop it first');
+  profiles.remove(id);
+  if (settings.get().defaultProfileId === id) settings.patch({ defaultProfileId: null });
+}
+
 function attachment(filename: string, body: unknown): Response {
   return new Response(`${JSON.stringify(body, null, 2)}\n`, {
     headers: {
@@ -21,7 +28,8 @@ function attachment(filename: string, body: unknown): Response {
   });
 }
 
-export function profileRoutes({ profiles, settings, activeProfileId }: ProfileRouteDeps) {
+export function profileRoutes(deps: ProfileRouteDeps) {
+  const { profiles, settings } = deps;
   const mustGet = (id: number) =>
     profiles.get(id) ??
     (() => {
@@ -71,11 +79,7 @@ export function profileRoutes({ profiles, settings, activeProfileId }: ProfileRo
       GET: guarded((req) => Response.json(mustGet(idParam(req, 'Profile')))),
       PUT: guarded(async (req) => Response.json(profiles.update(idParam(req, 'Profile'), await req.json()))),
       DELETE: guarded((req) => {
-        const id = idParam(req, 'Profile');
-        if (activeProfileId() === id)
-          throw new HttpError(409, 'This profile belongs to the running server: stop it first');
-        profiles.remove(id);
-        if (settings.get().defaultProfileId === id) settings.patch({ defaultProfileId: null });
+        removeProfile(deps, idParam(req, 'Profile'));
         return new Response(null, { status: 204 });
       }),
     },
