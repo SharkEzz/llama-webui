@@ -33,8 +33,11 @@ an API route with the app (`/*`), so a reload on the new URL works without a ser
   </Step>
   <Step title="Add it to the sidebar">
 
-Add `{ path, label, icon }` to `ROUTES` in `web/src/app/routes.ts`, with a [Lucide](https://lucide.dev) icon. The
-sidebar (`web/src/app/Sidebar.tsx`) lists `ROUTES` in order, with **Settings** pinned at the bottom.
+Add `{ path, label, icon, group }` to `ROUTES` in `web/src/app/routes.ts`, with a [Lucide](https://lucide.dev) icon,
+next to the other entries of its group (`overview`, `run`, `monitor` or `tune`). The sidebar
+(`web/src/app/Sidebar.tsx`) lists `ROUTES` in order, draws a line between two groups (`navGroups()`), and pins
+**Settings** (group `settings`) at the bottom. `web/src/app/routes.test.ts` fails if a group's entries are not
+contiguous.
 
   </Step>
   <Step title="Load its data">

@@ -1,13 +1,13 @@
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import { type ComponentProps, Fragment } from 'react';
 import { NavLink } from 'react-router';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { type AppRoute, ROUTES } from './routes';
+import { type AppRoute, navGroups, ROUTES } from './routes';
 import { useSidebar, useSidebarLayout } from './sidebarPrefs';
 
-const main = ROUTES.filter((r) => r.path !== '/settings');
-const settings = ROUTES.find((r) => r.path === '/settings')!;
+const main = navGroups(ROUTES.filter((r) => r.group !== 'settings'));
+const settings = ROUTES.find((r) => r.group === 'settings')!;
 
 /**
  * One row. Collapsed, the sidebar is exactly as wide as a row's padding and icon (2.5rem inside its own padding):
@@ -80,8 +80,14 @@ export function Sidebar() {
         <span className={cn(LABEL, 'text-[0.9375rem] font-semibold tracking-tight')}>llama-webui</span>
       </div>
       <nav id="main-navigation" aria-label="Main navigation" className="mt-4 flex flex-1 flex-col gap-0.5">
-        {main.map((r) => (
-          <Item key={r.path} route={r} collapsed={collapsed} />
+        {main.map((group, i) => (
+          <Fragment key={group[0]!.group}>
+            {/* Centered under the icons, so it reads the same collapsed and expanded. */}
+            {i > 0 && <div aria-hidden="true" className="mx-2 my-2 h-px shrink-0 bg-sidebar-border" />}
+            {group.map((r) => (
+              <Item key={r.path} route={r} collapsed={collapsed} />
+            ))}
+          </Fragment>
         ))}
       </nav>
       <div className="flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
