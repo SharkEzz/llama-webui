@@ -1,6 +1,6 @@
 ---
 title: Models
-description: The Models page lists the GGUF files of your models folder with their header metadata, and creates a profile from any of them.
+description: The Models page lists the GGUF files of your models folder with their header metadata, creates a profile from any of them, and deletes the ones you no longer need.
 ---
 
 The Models page shows every GGUF file in your models folder, read from the file headers: architecture, quantization,
@@ -92,7 +92,8 @@ already filled in:
   `mmproj-Qwen3.8-27B-BF16.gguf` next to `Qwen3.8-27B-IQ3_S.gguf`.
 
 Add the `llama-server` arguments, then click **Create profile** to save it. Projectors have no **Create profile**
-button. **Copy path** copies the absolute path of the file.
+button. **Copy path** copies the absolute path of the file, and **Delete** removes the model from the disk (see
+[Delete a model](#delete-a-model)).
 
 To have flags chosen for your hardware instead of writing them yourself, pick the model in [Tuning](/docs/tuning/).
 
@@ -101,5 +102,19 @@ To have flags chosen for your hardware instead of writing them yourself, pick th
 - To add a model, click **Download** to get one from Hugging Face (see [Hugging Face downloads](/docs/hugging-face/)),
   or copy GGUF files into the models folder and click **Rescan**. While downloads are running, the **Download** button
   shows the progress of the whole queue.
-- The Models page never deletes files. To remove a model, delete its files from the folder, then click **Rescan**.
-  Profiles that used it show the error on their [launch pad](/docs/home/) card.
+- To remove a model, click **Delete** in its details (see [Delete a model](#delete-a-model)). A model you delete
+  from the folder yourself disappears from the list at the next **Rescan**; the profiles that used it show the error
+  on their [launch pad](/docs/home/) card.
+
+## Delete a model
+
+**Delete**, in the details of a model or a projector, opens a confirmation that lists what goes:
+
+- every file of the model (all the parts of a split model), with their total size. They are deleted from the disk,
+  not moved to a trash: this cannot be undone. Folders left empty, such as a Hugging Face download's `org/name`
+  folder, are removed too; the models folder itself stays.
+- the profiles that use the file, as their model or as their projector. You choose: **Delete model and N profiles**
+  deletes them too, **Delete model only** keeps them. A kept profile cannot start until you pick another file in it.
+
+Deleting is refused while the file is in use: by the running server (stop it first), by a benchmark or sweep in
+progress, or by a Hugging Face download still writing it. Benchmark runs, sweeps and conversations keep their history.

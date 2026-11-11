@@ -75,8 +75,10 @@ An empty field leaves the flag out, so the tool uses its own default. The device
 **Other server flags** cannot contain the flags llama-webui manages itself (`--host`, `--port`, `-m`, `--mmproj`,
 `--metrics`, `--slots`, `--props`), nor a flag that has its own field: the form asks you to use the field instead.
 
-When you start from a profile, a server run uses the profile's working directory, and both tools get its environment
-variables (for example `CUDA_VISIBLE_DEVICES`), so the run sees the same cards as the profile.
+Both tools get the environment variables of [Settings](/docs/settings/#environment-variables). When you start from
+a profile, a server run uses the profile's working directory, and both tools also get the profile's environment
+variables (for example `CUDA_VISIBLE_DEVICES`), which win over the global ones, so the run sees the same cards as the
+profile.
 
 ### What llama-bench leaves out
 
@@ -181,7 +183,7 @@ named after the model and the run (`<model> — bench #12`, with a number added 
 
 - the model and the projector;
 - the run's flags in `llama-server` syntax, followed by its other server flags;
-- the environment variables of the profile the run started from, if any.
+- the environment variables of Settings, then those of the profile the run started from, if any.
 
 The menu item is disabled while the run is in progress.
 

@@ -38,7 +38,8 @@ export class SettingsRepo {
     const merged: Record<string, unknown> = { ...current };
     for (const [key, value] of Object.entries(partial)) {
       const was = current[key];
-      merged[key] = isPlainObject(was) && isPlainObject(value) ? { ...was, ...value } : value;
+      // Objects are merged field by field (collectors), except `env`: a variable left out is removed.
+      merged[key] = key !== 'env' && isPlainObject(was) && isPlainObject(value) ? { ...was, ...value } : value;
     }
     const next = SettingsSchema.parse(merged);
     const upsert = this.db.prepare('INSERT OR REPLACE INTO settings(key, value_json) VALUES (?, ?)');

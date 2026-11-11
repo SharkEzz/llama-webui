@@ -12,7 +12,8 @@ A profile is a named way to launch `llama-server`: the model to load, an optiona
 ## The Profiles page
 
 The list on the left shows every profile in alphabetical order, with its model file below the name. A green dot marks
-the profile `llama-server` is running. Click a profile to open it in the editor on the right.
+the profile `llama-server` is running. Click a profile to open it in the editor on the right. The page opens on the
+running profile, otherwise on the first one.
 
 Above the list:
 
@@ -72,7 +73,7 @@ its values, with quotes only where they are needed.
 The editor knows every flag of your `llama-server`: llama-webui runs the configured binary with `--help` and reads its
 output, so the list matches your build of llama.cpp.
 
-- Type `-` to see the flags that start with what you typed, with their value and description (8 suggestions at most).
+- Type `-` to see every flag that starts with what you typed, with its value and description, in a list that scrolls.
 - <Kbd>Tab</Kbd> completes the highlighted suggestion. <Kbd>↑</Kbd> and <Kbd>↓</Kbd> move through the list, then
   <Kbd>Enter</Kbd> picks one. Otherwise <Kbd>Enter</Kbd> starts a new line. <Kbd>Esc</Kbd> closes the list.
 - Below the box, a help line describes the flag under the cursor, or the flag whose value you are typing: its names,
@@ -96,8 +97,9 @@ The **Environment variables** box takes one `KEY=value` per line, for example `C
 are ignored. A line without `=` or with an invalid name is underlined, and the profile cannot be saved until you fix
 it.
 
-`llama-server` inherits the environment llama-webui was started with; the profile's variables are added to it and win
-over variables of the same name.
+`llama-server` inherits the environment llama-webui was started with, then the global variables of
+[Settings](/docs/settings/#environment-variables); the profile's variables are added last and win over variables of
+the same name.
 
 ## Flags llama-webui sets itself
 
@@ -133,8 +135,10 @@ The buttons under the editor:
 - **Delete** asks for confirmation, then deletes the profile. It is disabled while `llama-server` runs this profile:
   stop it first.
 
-Editing a profile does not change a server that is already running. Click **Restart** on the
-[Server](/docs/server/) page to relaunch it with the saved changes.
+Editing a profile does not change a server that is already running. When you save the profile `llama-server` is
+running, and the change is more than a new name, a dialog offers to restart it now: **Restart** relaunches it with the
+saved changes (running requests are interrupted), **Later** keeps it as it is. You can restart it any time with
+**Restart** on the [Server](/docs/server/) page.
 
 ## Import and export
 

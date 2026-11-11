@@ -163,8 +163,8 @@ A run's status (`BenchStatus`) is one of `queued` (a sweep item waiting its turn
 
 `llama-bench` is looked for next to the `llama-server` binary from the settings (`benchBinary()`: the same directory,
 with `llama-server` replaced by `llama-bench` in the file name; a bare name stays bare and is looked up in the
-`PATH`). The child runs under `setpriv --pdeathsig KILL`, so it dies with Bun, and gets the environment of the source
-profile on top of Bun's (the same `CUDA_VISIBLE_DEVICES`, for example).
+`PATH`). The child runs under `setpriv --pdeathsig KILL`, so it dies with Bun, and gets Bun's environment, then the
+`env` setting, then the source profile's environment (the same `CUDA_VISIBLE_DEVICES`, for example).
 
 ```ts title="server/bench/execute.ts"
 const argv = [
@@ -184,6 +184,7 @@ A server run builds a throwaway profile named `bench` and passes it to the super
 projector, `serverArgs(params)` followed by `serverArgs`, host `127.0.0.1` and the port from the settings, plus the
 flags the supervisor always adds (`--metrics`, `--slots`, `--props`). The working directory and environment variables
 come from the source profile, because its flags may use relative paths; without one, the directory is the model's.
+`buildCommand()` adds the `env` setting under the profile's variables, as for any launch.
 
   </Tab>
 </Tabs>

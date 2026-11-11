@@ -1,9 +1,48 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
+import { CodeTextarea } from '@/components/CodeTextarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { formatEnv, parseEnv } from '@/features/profiles/argsText';
+import { highlightEnv } from '@/features/profiles/highlight';
 import { formatBytes } from '@/lib/format';
+
+/** Environment variables, `KEY=value` per line, committed on blur when they parse and changed. */
+export function EnvField(props: {
+  id: string;
+  hint: ReactNode;
+  value: Record<string, string>;
+  error?: string;
+  onCommit(env: Record<string, string>): void;
+}) {
+  const saved = formatEnv(props.value);
+  const [draft, setDraft] = useState(saved);
+  useEffect(() => setDraft(saved), [saved]);
+  const parsed = parseEnv(draft);
+  const error = 'error' in parsed ? String(parsed.error) : props.error;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <CodeTextarea
+        id={props.id}
+        aria-label="Environment variables"
+        value={draft}
+        onChange={setDraft}
+        onBlur={() => {
+          if (!('error' in parsed) && formatEnv(parsed) !== saved) props.onCommit(parsed);
+        }}
+        highlight={highlightEnv}
+        placeholder={'CUDA_VISIBLE_DEVICES=0,1\nGGML_CUDA_P2P=1'}
+        aria-invalid={!!error}
+      />
+      {error ? (
+        <p className="text-xs text-destructive">{error}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">{props.hint}</p>
+      )}
+    </div>
+  );
+}
 
 /** Text setting committed on blur or Enter (only when it changed). */
 export function TextField(props: {

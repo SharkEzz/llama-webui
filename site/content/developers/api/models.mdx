@@ -1,12 +1,12 @@
 ---
 title: Models
-description: Scan the models folder for GGUF files, and read the header and weight breakdown of one GGUF, with every field of ModelSummary and ModelDetail.
+description: Scan the models folder for GGUF files, read the header and weight breakdown of one GGUF, with every field of ModelSummary and ModelDetail, and delete a model.
 ---
 
-Two read-only routes list the GGUF files of the models folder and describe one of them (`server/routes/models.ts`).
+These routes list the GGUF files of the models folder, describe one of them, and delete one (`server/routes/models.ts`).
 The scan is `scanModels()` (`server/models/scan.ts`), the GGUF reader `readModel()` (`server/models/gguf.ts`), the
 weight breakdown `weightSizes()` (`server/models/sizes.ts`), and the types `ModelList`, `ModelEntry`, `ModelSummary`
-and `ModelDetail` (`shared/src/models.ts`). The common rules are on the [API overview](/developers/api/overview/); the
+and `ModelDetail` (`shared/src/models.ts`); deletion is in `server/models/delete.ts`. The common rules are on the [API overview](/developers/api/overview/); the
 Models page is described on [Models](/docs/models/).
 
 ## Scan the models folder
@@ -189,3 +189,71 @@ curl -G http://127.0.0.1:7860/api/models/info --data-urlencode 'path=/home/me/mo
 ```
 
 The example is trimmed: the response has every `ModelSummary` field.
+
+## Delete a model
+
+The model is always looked up in a fresh scan of the models folder: the path sent must be the `path` of an entry
+(the first part of a split model), and only that entry's `files`, all inside the models folder, are deleted. A path
+the scan does not list, a later part included, is a `404`. Unreadable entries (`ok: false`) can be deleted too.
+
+A profile uses the model when its model or projector, resolved as `llama-server` will open it (`~` expanded, relative
+paths taken from its working directory), is one of the files, directly or through a symbolic link. Deleting is
+refused while the files are in use:
+
+- by the managed server: the model or projector of the profile it runs (state `starting`, `ready` or `stopping`);
+- by the benchmark run or sweep in progress (its `modelPath` or `mmprojPath`);
+- by a queued or running Hugging Face download that writes one of the files.
+
+### Read what a deletion removes
+
+<Endpoint method="GET" path="/api/models/usage" />
+
+**Query**
+
+| Parameter | Description                                  |
+| --------- | -------------------------------------------- |
+| `path`    | The `path` of a `ModelEntry` (absolute).     |
+
+**Response**: `200` with a `ModelUsage`.
+
+| Field       | Type                  | Description                                                                         |
+| ----------- | --------------------- | ----------------------------------------------------------------------------------- |
+| `path`      | string                | The entry's path.                                                                   |
+| `files`     | string[]              | Every file that would be deleted.                                                   |
+| `fileBytes` | number                | Their total size.                                                                   |
+| `profiles`  | `ModelProfileUse[]`   | The profiles using it: `{ id, name, role }`, `role` being `model` or `mmproj`.      |
+| `blocked`   | string \| null        | Why the deletion is refused right now (the reason of the `409` below), else `null`. |
+
+**Errors**: `400` `path required`, `404` `Model not found`.
+
+```bash title="Terminal"
+curl -G http://127.0.0.1:7860/api/models/usage --data-urlencode 'path=/home/me/models/qwen3-32b-q4_k_m.gguf'
+```
+
+### Delete the files
+
+<Endpoint method="DELETE" path="/api/models" />
+
+Deletes the entry's files (a symbolic link: the link, not its target), then the folders left empty between them and
+the models folder. With `deleteProfiles`, the profiles using the model are deleted too, as
+[Delete a profile](/developers/api/profiles/#delete-a-profile) does (`defaultProfileId` goes back to `null` if it was
+one of them). Benchmark runs, sweeps and conversations keep their `model_path` as text.
+
+**Body**
+
+| Field            | Type    | Description                                                   |
+| ---------------- | ------- | ------------------------------------------------------------- |
+| `path`           | string  | The `path` of a `ModelEntry`.                                 |
+| `deleteProfiles` | boolean | Also delete the profiles that use the model. Default `false`. |
+
+**Response**: `200` with `{ deletedFiles: string[], deletedProfiles: number[] }`.
+
+**Errors**: `400` with `issues` for an invalid body, `404` `Model not found`, `409` with code `model-in-use` and the
+reason (`The running server uses it (profile “…”): stop it first`, `A benchmark in progress uses it`,
+`A download in progress writes it`). Nothing is deleted on an error.
+
+```bash title="Terminal"
+curl -X DELETE http://127.0.0.1:7860/api/models \
+  -H 'content-type: application/json' \
+  -d '{"path":"/home/me/models/qwen3-32b-q4_k_m.gguf","deleteProfiles":true}'
+```

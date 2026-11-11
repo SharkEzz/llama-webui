@@ -254,9 +254,9 @@ export class RunExecutor {
     await using _sampling = this.sampler(ex);
     let proc: Child;
     try {
-      // Environment of the source profile (CUDA_VISIBLE_DEVICES…: same cards as the server).
+      // Environment of the settings then of the source profile (CUDA_VISIBLE_DEVICES…: same cards as the server).
       proc = Bun.spawn(argv, {
-        env: { ...process.env, ...this.source(ex.spec)?.env },
+        env: { ...process.env, ...this.deps.settings().env, ...this.source(ex.spec)?.env },
         stdin: 'ignore',
         stdout: 'pipe',
         stderr: 'pipe',

@@ -100,11 +100,11 @@ export function complete(catalog: FlagCatalog, prefix: string): { insert: string
 }
 
 /**
- * Suggestions for the word under the cursor: the flags it starts, at most `max`. None when the word is not a flag
+ * Suggestions for the word under the cursor: the flags it starts (at most `max`, all by default). None when the word is not a flag
  * being typed (a value, `--x=…`) or is already a complete known flag — Enter then keeps it instead of swapping it
  * for a longer name (`--verbose` → `--verbose-prompt`).
  */
-export function flagSuggestions(catalog: FlagCatalog, word: string, max: number): string[] {
+export function flagSuggestions(catalog: FlagCatalog, word: string, max = Number.POSITIVE_INFINITY): string[] {
   if (!word.startsWith('-') || word.includes('=') || catalog.byName.has(word)) return [];
   return complete(catalog, word).candidates.slice(0, max);
 }

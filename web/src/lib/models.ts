@@ -1,4 +1,11 @@
-import { defer, type ModelEntry, type ModelList, type ModelSummary } from '@llama-webui/shared';
+import {
+  defer,
+  type ModelDeleted,
+  type ModelEntry,
+  type ModelList,
+  type ModelSummary,
+  type ModelUsage,
+} from '@llama-webui/shared';
 import { create } from 'zustand';
 import { api } from './api';
 
@@ -56,3 +63,10 @@ export function matchingProjector(modelPath: string, models: ModelEntry[]): stri
     });
   return found.length === 1 ? found[0]!.path : null;
 }
+
+/** What deleting the model at `path` removes (files, profiles using it) and why it is refused, if it is. */
+export const modelUsage = (path: string) => api<ModelUsage>(`/models/usage?path=${encodeURIComponent(path)}`);
+
+/** Deletes the model's files, and the profiles using it when `deleteProfiles` is set. */
+export const deleteModel = (path: string, deleteProfiles: boolean) =>
+  api<ModelDeleted>('/models', { method: 'DELETE', body: JSON.stringify({ path, deleteProfiles }) });

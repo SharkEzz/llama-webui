@@ -20,6 +20,7 @@ Each option is saved on its own, as soon as you change it; there is no Save butt
 - **Text fields** are saved when you press <Kbd>Enter</Kbd> or leave the field, if the value changed. Leading and
   trailing spaces are removed.
 - **Switches, menus and the slider** are saved when you change them (the slider when you release it).
+- **Environment variables** are saved when you leave the box, if they changed and every line is valid.
 
 A **Setting saved** notification confirms each change. An invalid value is not saved: its error appears under the
 field, for example "Port between 1 and 65535". Settings are stored in llama-webui's database, so they are the same in
@@ -49,6 +50,17 @@ send prompts to the model. Earlier versions defaulted to `0.0.0.0`: if you relie
 See [Security](/docs/security/#how-llama-server-is-exposed).
 
 </Callout>
+
+### Environment variables
+
+The **Environment variables** card, under the llama-server card, takes one `KEY=value` per line, for example `CUDA_VISIBLE_DEVICES=0,1` or
+`GGML_CUDA_P2P=1`. Empty lines are ignored; a line without `=` or with an invalid name shows an error and nothing is
+saved until you fix it. Removing a line removes the variable.
+
+These variables are given to every profile you start, and to benchmark runs and [Tuning](/docs/tuning/) sweeps
+(`llama-server` and `llama-bench` alike), on top of the environment llama-webui was started with. A
+[profile](/docs/profiles/#environment-variables) variable with the same name wins. A running `llama-server` keeps its
+environment until you restart it.
 
 ## Monitoring
 

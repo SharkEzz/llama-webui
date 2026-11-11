@@ -18,10 +18,11 @@ import { Facts } from '@/features/system/Facts';
 import { api } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatBytes, formatInt, formatParams } from '@/lib/format';
+import { DeleteModelPopover } from './DeleteModelPopover';
 
 const yesNo = (b: boolean) => (b ? 'yes' : 'no');
 
-/** GGUF details: header, weight breakdown, files; creates a prefilled profile. */
+/** GGUF details: header, weight breakdown, files; creates a prefilled profile, deletes the model. */
 export function ModelDetailDialog({ path, onClose }: { path: string | null; onClose(): void }) {
   const [detail, setDetail] = useState<ModelDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
           </div>
         )}
         <DialogFooter>
+          {path && <DeleteModelPopover path={path} onDeleted={onClose} />}
           <Button
             variant="ghost"
             disabled={!path}
