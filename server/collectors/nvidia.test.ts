@@ -1,7 +1,7 @@
-import { expect, test } from 'bun:test';
 import { chmod, readFile, rm } from 'node:fs/promises';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { defer } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import type { Spawn } from '../proc';
 import { writeFileDeep } from '../testing/write';
 import { type GpuSample, normalizeBusId, selectUsedGpus } from './gpu';

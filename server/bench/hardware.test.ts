@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test';
 import { chmodSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
+import { expect, test } from 'vitest';
 import { tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';
 import { buildOf, listDevices, listDevicesResult } from './hardware';

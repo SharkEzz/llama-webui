@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import type { GpuSample, ModelPlacement, Snapshot, TopologyGraph } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { levelOf, linkBadge, linkFlows, linkShown, nodeLive, peerLinks, placementSeries } from './flows';
 
 const graph: TopologyGraph = {

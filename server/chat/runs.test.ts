@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { ChatEvent } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { ConversationsRepo } from '../db/conversations';
 import { openDb } from '../db/open';
 import { ChatRuns } from './runs';

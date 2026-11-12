@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { MIGRATIONS, runMigrations } from './migrations';
 import { openDb } from './open';
 import { ProfilesRepo } from './profiles';

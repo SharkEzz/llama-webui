@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { flowVisual, MAX_DT, MAX_STREAKS, Smoother } from './smooth';
 
 test('Smoother: exponential approach, first value snaps, unknown resets to zero', () => {

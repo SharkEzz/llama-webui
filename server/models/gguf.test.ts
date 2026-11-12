@@ -1,8 +1,8 @@
-import { afterAll, describe, expect, test } from 'bun:test';
 import { chmodSync, mkdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { defer } from '@llama-webui/shared';
+import { afterAll, describe, expect, test } from 'vitest';
 import { tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';
 import { ModelReadError, type ParsedShard, parseModel, readModel, type TensorInfo } from './gguf';
@@ -163,17 +163,17 @@ describe('readModel', () => {
   test('a missing shard is a ModelReadError', async () => {
     const p1 = join(dir, 'lone-00001-of-00002.gguf');
     await writeGguf(p1, DENSE_KV, DENSE_TENSORS);
-    expect(readModel(p1)).rejects.toBeInstanceOf(ModelReadError);
+    await expect(readModel(p1)).rejects.toBeInstanceOf(ModelReadError);
   });
 
-  test('an absent file is a ModelReadError', () => {
-    expect(readModel(join(dir, 'nope.gguf'))).rejects.toBeInstanceOf(ModelReadError);
+  test('an absent file is a ModelReadError', async () => {
+    await expect(readModel(join(dir, 'nope.gguf'))).rejects.toBeInstanceOf(ModelReadError);
   });
 
   test('a file that is not a GGUF is a ModelReadError', async () => {
     const path = join(dir, 'junk.gguf');
     await writeFileDeep(path, 'hello');
-    expect(readModel(path)).rejects.toBeInstanceOf(ModelReadError);
+    await expect(readModel(path)).rejects.toBeInstanceOf(ModelReadError);
   });
 
   test('the cache returns the same object until the file changes', async () => {
@@ -219,7 +219,7 @@ describe('readModel', () => {
     await writeGguf(path, DENSE_KV, DENSE_TENSORS);
     chmodSync(locked, 0o000);
     using _unlock = defer(() => chmodSync(locked, 0o755));
-    expect(readModel(path)).rejects.toThrow(/permission denied/);
+    await expect(readModel(path)).rejects.toThrow(/permission denied/);
   });
 });
 

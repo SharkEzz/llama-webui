@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { ctxFromArgs } from './bench';
 import { isLoopback } from './setup';
 import { isSetupCheck } from './tuning';

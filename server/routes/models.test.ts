@@ -1,7 +1,7 @@
-import { expect, test } from 'bun:test';
 import { existsSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelDeleted, ModelUsage } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { openDb } from '../db/open';
 import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';

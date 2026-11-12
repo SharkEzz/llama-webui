@@ -1,4 +1,3 @@
-import { afterAll, afterEach, expect, test } from 'bun:test';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import {
@@ -17,6 +16,7 @@ import {
   sweepCtx,
 } from '@llama-webui/shared';
 import { probeHealth } from 'llamacpp-js/client';
+import { afterAll, afterEach, expect, test } from 'vitest';
 import { BenchRunsRepo } from '../db/benchRuns';
 import { openDb } from '../db/open';
 import { SweepsRepo } from '../db/sweeps';

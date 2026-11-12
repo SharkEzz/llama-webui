@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { DEFAULT_SETTINGS } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { tempDir } from '../testing/tempDir';
 import { openDb } from './open';
 import { SettingsRepo } from './settings';

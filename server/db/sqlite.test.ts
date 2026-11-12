@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { join } from 'node:path';
+import { expect, test } from 'vitest';
 import { tempDir } from '../testing/tempDir';
 import { Database } from './sqlite';
 

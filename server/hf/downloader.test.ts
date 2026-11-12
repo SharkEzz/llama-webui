@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, mock, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { existsSync, statSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { DownloadItem, DownloadLive } from '@llama-webui/shared';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { DownloadInput } from '../db/downloads';
 import { DownloadsRepo } from '../db/downloads';
 import { openDb } from '../db/open';
@@ -120,9 +120,9 @@ function setup(files: Record<string, Uint8Array>, o: { free?: number; dbPath?: s
   const hub = fakeHub(files);
   const make = (dbPath = o.dbPath ?? ':memory:') => {
     const repo = new DownloadsRepo(openDb(dbPath));
-    const onItem = mock((_: DownloadItem) => {});
-    const onLive = mock((_: DownloadLive | null) => {});
-    const onDeleted = mock((_: number[]) => {});
+    const onItem = vi.fn((_: DownloadItem) => {});
+    const onLive = vi.fn((_: DownloadLive | null) => {});
+    const onDeleted = vi.fn((_: number[]) => {});
     const queue = new DownloadQueue({
       repo,
       hf: new HfClient({ env: { HF_ENDPOINT: ENDPOINT, HF_TOKEN: 'hf_secret' }, fetch: hub.fetch }),

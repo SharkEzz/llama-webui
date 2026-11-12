@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import { DEFAULT_THEME, type ResolvedTheme, resolveTheme, THEME_INIT_SCRIPT, type ThemeMode } from './theme';
 
 const STORAGE_KEY = 'llama-webui-site-theme';
@@ -32,7 +32,7 @@ describe('resolveTheme', () => {
     ['system', false, 'light'],
     ['system', true, 'dark'],
   ];
-  test.each(cases)('%s with system dark = %p resolves to %s', (mode, prefersDark, expected) => {
+  test.each(cases)('%s with system dark = %o resolves to %s', (mode, prefersDark, expected) => {
     expect(resolveTheme(mode, prefersDark)).toBe(expected);
   });
 });
@@ -49,21 +49,21 @@ describe('THEME_INIT_SCRIPT', () => {
   }
 
   test.each([false, true])(
-    'falls back to the default mode when nothing is stored (system dark = %p)',
+    'falls back to the default mode when nothing is stored (system dark = %o)',
     (prefersDark) => {
       expect(runInitScript({ stored: null, prefersDark })).toBe(resolveTheme(DEFAULT_THEME, prefersDark));
     },
   );
 
   test.each([false, true])(
-    'falls back to the default mode on an unknown stored value (system dark = %p)',
+    'falls back to the default mode on an unknown stored value (system dark = %o)',
     (prefersDark) => {
       expect(runInitScript({ stored: 'bogus', prefersDark })).toBe(resolveTheme(DEFAULT_THEME, prefersDark));
     },
   );
 
   test.each([false, true])(
-    'falls back to the default mode when localStorage throws (system dark = %p)',
+    'falls back to the default mode when localStorage throws (system dark = %o)',
     (prefersDark) => {
       expect(runInitScript({ storageThrows: true, prefersDark })).toBe(resolveTheme(DEFAULT_THEME, prefersDark));
     },

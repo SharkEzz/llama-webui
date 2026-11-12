@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { P2P_LOG_LINE, type Profile, type ProfileInput, shellQuote, shellSplit } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { binaryPath, buildCommand, launchLines, profilePaths } from './args';
 
 const settings = { binary: 'llama-server', host: '0.0.0.0', port: 8080 };

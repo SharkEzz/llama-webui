@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { formFromSpec, specFromForm } from './bench';
 
 test('a -ts without -dev survives the form', () => {

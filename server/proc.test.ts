@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test';
 import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { expect, test } from 'vitest';
 import { fileExists, fileRange, readText, spawnProc, which } from './proc';
 import { tempDir } from './testing/tempDir';
 

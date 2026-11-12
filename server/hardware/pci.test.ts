@@ -1,6 +1,6 @@
-import { afterAll, expect, test } from 'bun:test';
 import { mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
+import { afterAll, expect, test } from 'vitest';
 import { tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';
 import { chipsetLabel, cpuLabel, findPciIdsEntry, minKnown, parseLinkSpeed, readPciTopology } from './pci';

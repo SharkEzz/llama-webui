@@ -1,7 +1,7 @@
-import { afterAll, expect, test } from 'bun:test';
 import { mkdirSync, symlinkSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { afterAll, expect, test } from 'vitest';
 import { parseLinkSpeed } from '../hardware/pci';
 import { tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';

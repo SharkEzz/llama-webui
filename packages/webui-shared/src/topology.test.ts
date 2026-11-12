@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import type { SlotView, Snapshot } from './monitor';
 import type { ServerState } from './server';
 import { hostDevice, pcieBps, phaseOf, placementTotals } from './topology';

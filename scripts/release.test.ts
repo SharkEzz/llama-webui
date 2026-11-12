@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { parseVersion, readVersions, withVersion } from './release';
 
 test('every package.json has the same version (bun run release <version>)', async () => {

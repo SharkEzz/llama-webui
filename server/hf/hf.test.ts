@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
+import { describe, expect, test } from 'vitest';
 import { HttpError } from '../http';
 import { tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';

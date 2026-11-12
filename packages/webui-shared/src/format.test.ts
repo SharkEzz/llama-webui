@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { fmtInt } from './format';
 
 test('fmtInt formats with the shared locale, not a hard-coded one (#40)', () => {

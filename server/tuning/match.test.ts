@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import type { GpuSample } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { estimate } from './estimate';
 import { fakeModel, hw3 } from './fixtures';
 import { matchGpus, withLiveMemory } from './match';

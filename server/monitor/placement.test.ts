@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { type LogLine, P2P_LOG_LINE, type ServerState } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { LogBuffer } from '../logs/buffer';
 import { PlacementTracker, parsePlacement } from './placement';
 

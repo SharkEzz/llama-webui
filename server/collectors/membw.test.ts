@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { expect, test } from 'vitest';
 import type { Spawn } from '../proc';
 import { MemBandwidthSampler, parsePerfLine } from './membw';
 

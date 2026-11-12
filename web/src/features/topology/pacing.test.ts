@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { FramePacer } from './pacing';
 
 /** Rendered frames per second over `secs` of rAF ticks at `hz`, `during` setting the flags of each frame. */

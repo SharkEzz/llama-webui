@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
+import { expect, test } from 'vitest';
 import { benchFailure } from './parse';
 
 const fixture = (name: string) => readFile(`${import.meta.dirname}/../../testdata/llama-bench/${name}`, 'utf8');

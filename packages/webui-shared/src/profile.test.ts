@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { expect, test } from 'vitest';
 import { parseProfileImport } from './profile';
 
 test('llama-tui import: whole config', async () => {

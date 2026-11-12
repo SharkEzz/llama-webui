@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { APP_VERSION } from './version';
 
 test('APP_VERSION: dev when running from source', () => {

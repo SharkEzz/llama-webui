@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { DEFAULT_HOST, DEFAULT_PORT, helpText, parseCli } from './cli';
 
 test('parseCli: defaults without flag or env', () => {

@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { errorResponse, HttpError } from './http';
 
 test('an HttpError from an older module (bun --hot) keeps its status and code (#34)', async () => {

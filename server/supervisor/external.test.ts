@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { externalWatcher } from './external';
 
 test('no external server is detected while a benchmark owns the port', async () => {

@@ -1,8 +1,8 @@
-import { expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type BenchSpec, BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { tempDir } from '../testing/tempDir';
 import { BenchRunsRepo } from './benchRuns';
 import { MIGRATIONS } from './migrations';

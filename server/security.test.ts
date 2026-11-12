@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { guard } from './security';
 
 const req = (url: string, init: RequestInit & { headers?: Record<string, string> } = {}) => new Request(url, init);

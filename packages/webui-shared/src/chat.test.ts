@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { autoTitle, contextUsed, DEFAULT_TITLE, isDefaultTitle, statsFromTimings } from './chat';
 
 test('statsFromTimings maps llama-server timings', () => {

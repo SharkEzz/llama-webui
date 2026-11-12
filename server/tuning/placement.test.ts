@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { deviceRole } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { fakeModel, hw3 } from './fixtures';
 import { kvLayerBytes } from './memory';
 import { fitOf, measurePlacement, type PlacementInput } from './placement';

@@ -1,7 +1,7 @@
-import { expect, test } from 'bun:test';
 import { chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BenchRun, Estimate, ModelEntry, Profile } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { buildLaunchpad, buildSetupReport, readPerfParanoid, type SetupDeps } from './setup';
 import { tempDir } from './testing/tempDir';
 import { writeFileDeep } from './testing/write';

@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { expect, test } from 'vitest';
 import { defer } from './dispose';
 
 test('defer runs at the end of the block, after a return or a throw, in reverse order', () => {

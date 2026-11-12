@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { parseSmiLine } from './vram';
 
 test('parseSmiLine reads nvidia-smi loop lines as monitor keys', () => {
