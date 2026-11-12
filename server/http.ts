@@ -91,7 +91,7 @@ export const id = (what: string) =>
 /**
  * Declares a route's query keys, for the web's typed client (`query: { path }`). Refuses nothing: a missing key is the
  * handler's call. `c.req.valid('query')` holds the first value of each key present, decoded by Hono; the handlers
- * read `new URL(c.req.url).searchParams` instead, which decodes as before the port.
+ * read `new URL(c.req.url).searchParams` instead, whose decoding the contract suite records.
  */
 export const query = <K extends string>(...keys: K[]) =>
   validator('query', (q: Record<string, string | string[]>) => {
