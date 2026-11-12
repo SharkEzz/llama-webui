@@ -7,11 +7,16 @@
     "./api": "./rpc.ts"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.7",
     "@hono/zod-validator": "^0.9.1",
     "@huggingface/gguf": "^0.4.6",
     "@llama-webui/shared": "workspace:*",
     "hono": "catalog:",
     "llamacpp-js": "workspace:*",
+    "ws": "^8.22.2",
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
   }
 }

@@ -2,8 +2,12 @@ import { isIP } from 'node:net';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+// The type is spelled out: the `/ws` route answers without the API's charset middleware.
 function forbidden(message: string, status = 403): Response {
-  return Response.json({ error: message }, { status });
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { 'Content-Type': 'application/json;charset=utf-8' },
+  });
 }
 
 /** Safe hostname: localhost or a literal IP address. A domain name can be rebound to 127.0.0.1. */
@@ -19,7 +23,7 @@ function trustedHostname(hostname: string): boolean {
  * - “simple request” CSRF: a write with a body must be application/json.
  * Returns an error response, or undefined if the request passes.
  */
-export function guard(req: Request): Response | undefined {
+export function guard(req: Pick<Request, 'url' | 'method' | 'headers'>): Response | undefined {
   // Bun builds `req.url` from the Host header: a Host that is not an authority (`a b`) makes it unparsable too.
   let url: URL;
   let host: string;
