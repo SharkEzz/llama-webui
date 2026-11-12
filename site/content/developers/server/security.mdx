@@ -93,7 +93,11 @@ Whatever a validator or a handler throws afterwards reaches the API's `onError`,
   `.use()` ahead of every domain file, so a new route is guarded without doing anything.
 - The WebSocket endpoint is guarded too: `mount()` (`server/host.ts`) runs `guard()` on a `/ws` upgrade request
   before handing it to the `ws` library, so another site cannot open the socket (browsers always send `Origin` on a WebSocket
-  handshake). A request to `/ws` that is not an upgrade gets `426` `WebSocket upgrade expected`.
+  handshake). A request to `/ws` that is not an upgrade gets `426` `WebSocket upgrade expected`. The refusal of an
+  upgrade is written to the raw socket (`writeRaw()`), which first gets an `error` listener: Node removes its own
+  before it emits `upgrade`, and a client that resets the connection would otherwise end the process with an
+  uncaught `ECONNRESET`. The socket is destroyed once the answer is flushed, and an accepted client can send
+  messages of 4,096 bytes at most.
 - The web interface itself (the HTML page, its bundles and the SPA fallback, `server/routes/web.ts`) is not guarded:
   it is static and holds no data. That is why a page opened through a host name loads, then has all its API calls
   refused with `Host not allowed`.

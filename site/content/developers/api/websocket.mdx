@@ -15,7 +15,8 @@ upgrade with the `ws` library and hands each socket to the hub (`attachSocket()`
 The upgrade request goes through the same [request guard](/developers/api/overview/#the-request-guard) as the REST
 routes: its `Host` must be `localhost` or an IP address, and an `Origin`, when present, must be llama-webui's own. A
 browser always sends `Origin` on a WebSocket handshake, so only pages served by llama-webui can connect; most
-non-browser clients send none. A plain `GET /ws` without an upgrade gets `426` `WebSocket upgrade expected`.
+non-browser clients send none. A refused upgrade gets the guard's `403` and the connection is closed. A plain
+`GET /ws` without an upgrade gets `426` `WebSocket upgrade expected`.
 
 Every frame is a JSON text message `{ "type": "…", "payload": … }` (`ping` and `pong` have no payload). There is no
 subscription: every connected client receives every broadcast message. The server reads only `ping` and `pong` from
@@ -60,6 +61,8 @@ The heartbeat is made of application messages, not WebSocket protocol pings:
   `heartbeat`, and forgets it. A client that stops answering is dropped between 30 and 45 seconds after its last
   `pong`.
 - A client can send `ping` too: the hub answers `pong` right away.
+- A client message larger than 4,096 bytes closes the socket with code `1009` (`maxPayload` in `server/host.ts`):
+  `ping` and `pong` are all a client sends.
 
 On a development reload, `server/index.ts` disposes of the old hub: it closes every client with code `1001`
 and reason `shutdown`, and the clients reconnect to the new one (same `bootId`).

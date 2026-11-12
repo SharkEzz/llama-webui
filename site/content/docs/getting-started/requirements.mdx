@@ -169,7 +169,8 @@ once a minute, so a permission change is picked up without restarting llama-webu
 
 ## Hugging Face access
 
-Downloading models from the Models page needs access to `huggingface.co`, or to a mirror set with `HF_ENDPOINT`. A
+Downloading models from the Models page needs access to `huggingface.co`, or to a mirror set with `HF_ENDPOINT`,
+directly or through the proxy set with `HTTPS_PROXY`. A
 token is only needed for gated or private repositories, and gives higher rate limits. llama-webui uses the same token
 as the `hf` command-line tool: see [Launch options](/docs/configuration/#hugging-face).
 

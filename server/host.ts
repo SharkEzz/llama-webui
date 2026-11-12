@@ -56,14 +56,27 @@ function head(req: IncomingMessage): Pick<Request, 'url' | 'method' | 'headers'>
 
 const pathOf = (req: IncomingMessage) => (req.url ?? '/').split('?', 1)[0] ?? '/';
 
-/** A `Response` written as is to a socket that asked for an upgrade, which is then closed. */
+/**
+ * A `Response` written as is to a socket that asked for an upgrade, which is then closed: destroyed once the answer
+ * is flushed (`end()` alone only closes this side, and a client that never closes its own would keep the socket).
+ */
 async function writeRaw(socket: Duplex, res: Response): Promise<void> {
+  // Before anything is awaited: Node drops its own 'error' listener when it emits 'upgrade', and without one a
+  // client that resets the connection while it is refused (ECONNRESET) is an uncaught exception: the process ends.
+  socket.on('error', () => {});
   const body = Buffer.from(await res.arrayBuffer());
   const lines = [`HTTP/1.1 ${res.status} ${STATUS_CODES[res.status] ?? ''}`];
   for (const [k, v] of res.headers) lines.push(`${k}: ${v}`);
   lines.push(`content-length: ${body.length}`, 'connection: close', '', '');
+  socket.once('finish', () => socket.destroy());
   socket.end(Buffer.concat([Buffer.from(lines.join('\r\n')), body]));
 }
+
+/**
+ * The largest message a client may send: the protocol only has `ping` and `pong` (`ws` allows 100 MiB by default,
+ * buffered whole before the hub parses it). A larger one closes the socket (1009).
+ */
+const MAX_CLIENT_MESSAGE_BYTES = 4096;
 
 /** `/ws` without an upgrade: the same guard as the API, then 426. */
 function wsExpected(req: Request): Response {
@@ -92,7 +105,7 @@ const listenerOptions = {
 export function mount(o: MountOptions): Promise<number> {
   const api = getRequestListener(o.fetch, listenerOptions);
   const ws = getRequestListener(wsExpected, listenerOptions);
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_CLIENT_MESSAGE_BYTES });
 
   const request: Listeners['request'] = (req, res) => {
     const path = pathOf(req);

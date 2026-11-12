@@ -23,7 +23,8 @@ const EXTERNAL_CHECK_MS = 2000;
 
 // In development (`server/dev.ts`) this module is re-evaluated on every server-side save, on the same HTTP server.
 // The new instance is built and mounted first, then the previous one is released (timers, db, subscriptions): a
-// reload that fails to build leaves the old one serving. The supervisor and the logs (runtime) survive the reload.
+// reload that fails to build leaves the old one serving, and one that fails after the mount has already registered
+// what the next reload releases. The supervisor and the logs (runtime) survive the reload.
 const g = globalThis as { __llamaWebuiDispose?: () => void; __llamaWebuiDevHost?: DevHost };
 const devHost = g.__llamaWebuiDevHost;
 
@@ -58,6 +59,23 @@ g.__llamaWebuiDispose?.();
 
 const { hub, settings, conversations, chatRuns, benchRuns, sweeps, benchRunner, profiles, downloads, monitor } = deps;
 const { placement } = deps;
+// Registered before the effects below start: if one of them throws (a reload of a broken file), this instance is
+// mounted all the same, and the next reload must find it to release it. `undo` grows with each effect.
+const undo: (() => void)[] = [];
+g.__llamaWebuiDispose = () => {
+  for (const fn of undo) fn();
+  placement.dispose();
+  monitor.setModelPathResolver(() => null);
+  hub.dispose();
+  chatRuns.dispose();
+  // Reload: a one-off run is interrupted, the sweep item is queued again; the gate (runtime) is handed to the
+  // new module, or restarts the server if nobody takes it over.
+  benchRunner.dispose({ restart: true });
+  // The running download stops; its `.part` and its row stay for the new module.
+  downloads.dispose();
+  db.close();
+};
+
 // A reply left “streaming” after the process was killed is marked interrupted.
 conversations.stopOrphans();
 const benchGate = runtime.benchGate;
@@ -75,10 +93,10 @@ monitor.setModelPathResolver((id) => {
 // Hugging Face downloads: recreated on every reload, the new queue resumes the `.part` the old one let go of.
 downloads.resume();
 
-const unsubState = supervisor.subscribe(() => hub.broadcast({ type: 'server-state', payload: serverView(supervisor) }));
-const unsubLogs = logs.onLines((lines) => hub.broadcast({ type: 'log', payload: lines }));
-const unsubSnapshot = monitor.onSnapshot((s) => hub.broadcast({ type: 'snapshot', payload: s }));
-const unsubPlacement = placement.onChange((p) => hub.broadcast({ type: 'placement', payload: p }));
+undo.push(supervisor.subscribe(() => hub.broadcast({ type: 'server-state', payload: serverView(supervisor) })));
+undo.push(logs.onLines((lines) => hub.broadcast({ type: 'log', payload: lines })));
+undo.push(monitor.onSnapshot((s) => hub.broadcast({ type: 'snapshot', payload: s })));
+undo.push(placement.onChange((p) => hub.broadcast({ type: 'placement', payload: p })));
 
 // Shutdown: running replies are saved as “interrupted” before the runtime stops llama-server
 // (otherwise they would see the disconnect and end as “error”). First in line, ahead of the runtime's handler.
@@ -89,6 +107,10 @@ const stopChats = () => {
 };
 process.prependListener('SIGINT', stopChats);
 process.prependListener('SIGTERM', stopChats);
+undo.push(() => {
+  process.off('SIGINT', stopChats);
+  process.off('SIGTERM', stopChats);
+});
 
 // External server: detected at startup then watched (leaves the “external” state when it stops).
 const checkExternal = externalWatcher({
@@ -98,25 +120,6 @@ const checkExternal = externalWatcher({
 });
 void checkExternal();
 const externalTimer = setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS);
-
-g.__llamaWebuiDispose = () => {
-  clearInterval(externalTimer);
-  unsubState();
-  unsubLogs();
-  unsubSnapshot();
-  unsubPlacement();
-  placement.dispose();
-  monitor.setModelPathResolver(() => null);
-  hub.dispose();
-  process.off('SIGINT', stopChats);
-  process.off('SIGTERM', stopChats);
-  chatRuns.dispose();
-  // Reload: a one-off run is interrupted, the sweep item is queued again; the gate (runtime) is handed to the
-  // new module, or restarts the server if nobody takes it over.
-  benchRunner.dispose({ restart: true });
-  // The running download stops; its `.part` and its row stay for the new module.
-  downloads.dispose();
-  db.close();
-};
+undo.push(() => clearInterval(externalTimer));
 
 console.log(`llama-webui on http://${HOSTNAME}:${port}${devHost ? ' (dev, HMR)' : ` (${APP_VERSION})`}`);

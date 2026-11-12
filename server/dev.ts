@@ -11,7 +11,7 @@ import {
   isRunnableDevEnvironment,
   type ViteDevServer,
 } from 'vite';
-import { loadDotEnv, overrideFlag } from './env.ts';
+import { loadDotEnv, overrideFlag, useEnvProxy } from './env.ts';
 
 export interface DevOptions {
   /** The server entry, evaluated by the module runner. */
@@ -140,6 +140,7 @@ function replayDroppedChanges(vite: ViteDevServer): void {
 
 if (import.meta.main) {
   loadDotEnv('.env', { override: overrideFlag() });
+  useEnvProxy();
   const root = resolve(import.meta.dirname, '..');
   await startDev({
     entry: resolve(root, 'server/index.ts'),

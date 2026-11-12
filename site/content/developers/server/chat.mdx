@@ -84,7 +84,10 @@ return { messages, stream: true, ...sampling, chat_template_kwargs: { enable_thi
 
 ## Reading the stream
 
-`Run.run()` iterates `streamChatCompletion(baseUrl, body, { fetch, signal })` with an `AbortController`. The generator
+`Run.run()` iterates `streamChatCompletion(baseUrl, body, { fetch, signal })` with an `AbortController`. The `fetch`
+it passes is `llamaFetch()` (`server/llamaFetch.ts`), a `node:http` request with the same signature and errors: Node's
+own `fetch` gives up after 300 s without response headers, and after 300 s between two chunks, which a long prompt
+can exceed before its first token. The generator
 posts the body, reads the response with `SseParser` and yields each chunk; its errors say what went wrong, and
 `failureMessage()` words them for the conversation:
 

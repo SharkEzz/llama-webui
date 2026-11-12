@@ -1,9 +1,10 @@
-import { ProfileInputSchema, parseProfileImport } from '@llama-webui/shared';
+import { type ProfileInputSchema, parseProfileImport } from '@llama-webui/shared';
 import { Hono } from 'hono';
+import type { z } from 'zod';
 import type { ProfilesRepo } from '../db/profiles';
 import { toInput } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
-import { body, type Env, HttpError, id, json, notFound, passthrough } from '../http';
+import { accepts, type Env, HttpError, id, json, notFound, passthrough } from '../http';
 import { readLlamaTuiProfiles } from '../llamatui';
 
 export interface ProfileRouteDeps {
@@ -41,8 +42,10 @@ export function profileRoutes(deps: ProfileRouteDeps) {
   return (
     new Hono<Env>()
       .get('/api/profiles', (c) => c.json(profiles.list()))
-      // Parsed here for the types, then again by the repo (same schema).
-      .post('/api/profiles', body(ProfileInputSchema), (c) => c.json(profiles.create(c.req.valid('json')), 201))
+      // The repo validates (one parse of the schema, as for an import): the body is only declared here.
+      .post('/api/profiles', accepts<z.input<typeof ProfileInputSchema>>(), async (c) =>
+        c.json(profiles.create(await c.req.json()), 201),
+      )
       .get('/api/profiles/export', () =>
         attachment('llama-webui-profiles.json', { profiles: profiles.list().map(toInput) }),
       )

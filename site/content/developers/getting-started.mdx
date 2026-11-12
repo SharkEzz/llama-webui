@@ -134,10 +134,11 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
   - `api.ts` `createApi()`: the Hono app of every `/api` route (health included)
   - `rpc.ts` `AppType`, the API's route types for the web's typed client (`@llama-webui/server/api`, types only)
   - `runtime.ts` state that survives a development reload (supervisor, log ring, monitor, bench gate)
-  - `cli.ts` launch options and `--help`; `env.ts` the `.env` file
+  - `cli.ts` launch options and `--help`; `env.ts` the `.env` file and the proxy variables
   - `paths.ts` data directory and database path; `version.ts` the version the build sets
   - `http.ts` `HttpError`, JSON error responses, the API's middlewares (guard, `405` table) and validators
   - `proc.ts` child processes and file reads on `node:*` (`spawnProc`, `readText`, `fileExists`, `fileRange`, `which`)
+  - `llamaFetch.ts` `fetch` over `node:http` for the requests to llama-server that outlast `fetch`'s 300 s limits
   - `security.ts` the request guard (Host, Origin, JSON-only writes)
   - `setup.ts` first-run report and launch pad
   - `llamatui.ts` llama-tui config import

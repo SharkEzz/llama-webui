@@ -3,6 +3,7 @@ import { type LlamaTimings, probeUrl, streamChatCompletion } from 'llamacpp-js/c
 import { LlamaHttpError, LlamaStreamCutError, LlamaStreamError } from 'llamacpp-js/errors';
 import type { ConversationsRepo } from '../db/conversations';
 import { HttpError, notFound } from '../http';
+import { llamaFetch } from '../llamaFetch';
 import { buildChatRequest, llamaErrorMessage } from './request';
 
 export interface ChatTarget {
@@ -17,6 +18,7 @@ export interface ChatRunsDeps {
   repo: ConversationsRepo;
   /** llama-server ready to answer, otherwise null. */
   target(): ChatTarget | null;
+  /** `llamaFetch` by default: a reply can take longer to start than `fetch` waits (300 s). */
   fetch?: typeof fetch;
   now?: () => number;
   /** Writes the text so far to the DB at most every `flushMs`. */
@@ -170,7 +172,7 @@ export class ChatRuns {
   private readonly deps: Required<Omit<ChatRunsDeps, 'target'>>;
 
   constructor(private readonly o: ChatRunsDeps) {
-    this.deps = { repo: o.repo, fetch: o.fetch ?? fetch, now: o.now ?? Date.now, flushMs: o.flushMs ?? 1000 };
+    this.deps = { repo: o.repo, fetch: o.fetch ?? llamaFetch, now: o.now ?? Date.now, flushMs: o.flushMs ?? 1000 };
   }
 
   send(conversationId: number, content: string): ChatRun {
