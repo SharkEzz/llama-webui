@@ -64,29 +64,6 @@ export async function call<R extends ClientResponse<unknown, number, string>>(re
   return body as Ok<R>;
 }
 
-/** JSON call to /api; throws ApiError if the response is not 2xx. */
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers);
-  if (init?.body !== undefined && !headers.has('content-type')) headers.set('content-type', 'application/json');
-  let res: Response;
-  try {
-    res = await fetch(`/api${path}`, { ...init, headers });
-  } catch {
-    throw new ApiError(0, 'llama-webui server unreachable');
-  }
-  const text = await res.text();
-  let body: unknown;
-  if (text) {
-    try {
-      body = JSON.parse(text);
-    } catch {
-      body = text;
-    }
-  }
-  if (!res.ok) throw apiError(res.status, body);
-  return body as T;
-}
-
 /** The `ApiError` of an error response: its `error` message, `issues` (validation) and `code`, when present. */
 export function apiError(status: number, body: unknown): ApiError {
   const o = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};

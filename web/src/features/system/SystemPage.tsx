@@ -1,7 +1,7 @@
 import type { CpuInfo } from '@llama-webui/shared';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/lib/api';
+import { call, client } from '@/lib/api';
 import { useMonitor } from '@/lib/monitor';
 import { ChecksCard } from './ChecksCard';
 import { CpuCard } from './CpuCard';
@@ -19,7 +19,7 @@ export function SystemPage() {
   const snapshot = useMonitor((s) => s.snapshot);
   const [info, setInfo] = useState<SystemInfo | null>(null);
   useEffect(() => {
-    void api<SystemInfo>('/system/info').then(setInfo, () => {});
+    void call(client.system.info.$get()).then(setInfo, () => {});
   }, []);
 
   return (

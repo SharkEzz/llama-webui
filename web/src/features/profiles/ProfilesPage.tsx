@@ -9,7 +9,7 @@ import { GLASS } from '@/components/glass/glass';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/lib/api';
+import { call, client } from '@/lib/api';
 import { matchingProjector, stem, useModels } from '@/lib/models';
 import { importProfiles, importSummary, useProfiles } from '@/lib/profiles';
 import { isRunning, useServer } from '@/lib/server';
@@ -29,7 +29,7 @@ export function ProfilesPage() {
 
   useEffect(() => {
     void reload().catch((e: Error) => toast.error(e.message));
-    api<Settings>('/settings').then(setSettings, () => {});
+    call(client.settings.$get()).then(setSettings, () => {});
   }, [reload]);
 
   const creating = params.get('new') === '1';
