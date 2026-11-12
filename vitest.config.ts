@@ -7,7 +7,11 @@ import { configDefaults, defineConfig } from 'vitest/config';
 const dir = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 /** Files that need the Bun runtime (Bun.serve, Bun.build): only `pnpm test:bun` runs them. */
-export const BUN_ONLY = ['server/routes/routes.test.ts', 'server/routes/web.test.ts'];
+export const BUN_ONLY = [
+  'server/routes/routes.test.ts',
+  'server/routes/web.test.ts',
+  'server/contract/contract.test.ts',
+];
 
 export default defineConfig({
   // Keep `using` native: the default transform downlevels it (N0(f)).

@@ -57,36 +57,42 @@ export interface AppDeps {
 
 const startedAt = Date.now();
 
+/** Every route of the app (API, `/ws`, then the UI), with the 405s of `withMethodNotAllowed`. */
+export function appRoutes(deps: AppDeps) {
+  const { settings, monitor } = deps;
+  return withMethodNotAllowed({
+    '/api/health': {
+      GET: guarded(() => Response.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt })),
+    },
+    ...settingsRoutes({ settings, monitor }),
+    ...profileRoutes(deps),
+    ...serverRoutes({ ...deps, benchBusy: () => deps.benchRunner.busy }),
+    ...monitorRoutes({ monitor, bootId: deps.runtime.bootId }),
+    ...modelRoutes(deps),
+    ...hfRoutes(deps),
+    ...chatRoutes(deps),
+    ...benchRoutes(deps),
+    ...sweepRoutes(deps),
+    ...tuningRoutes(deps),
+    ...topologyRoutes(deps),
+    ...setupRoutes(deps),
+    '/api/*': guarded(() => Response.json({ error: 'Unknown route' }, { status: 404 })),
+    '/ws': guarded((req, server) => {
+      if (server.upgrade(req)) return undefined;
+      return new Response('WebSocket upgrade expected', { status: 426 });
+    }),
+    // Any other path serves the app (SPA fallback `/*`: reloading /chat works).
+    ...deps.web,
+  });
+}
+
 export function createApp(deps: AppDeps) {
-  const { hub, settings, monitor, port, development } = deps;
+  const { hub, port, development } = deps;
   return Bun.serve({
     port,
     hostname: deps.hostname,
     development: development ? { hmr: true, console: true } : false,
-    routes: withMethodNotAllowed({
-      '/api/health': {
-        GET: guarded(() => Response.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt })),
-      },
-      ...settingsRoutes({ settings, monitor }),
-      ...profileRoutes(deps),
-      ...serverRoutes({ ...deps, benchBusy: () => deps.benchRunner.busy }),
-      ...monitorRoutes({ monitor, bootId: deps.runtime.bootId }),
-      ...modelRoutes(deps),
-      ...hfRoutes(deps),
-      ...chatRoutes(deps),
-      ...benchRoutes(deps),
-      ...sweepRoutes(deps),
-      ...tuningRoutes(deps),
-      ...topologyRoutes(deps),
-      ...setupRoutes(deps),
-      '/api/*': guarded(() => Response.json({ error: 'Unknown route' }, { status: 404 })),
-      '/ws': guarded((req, server) => {
-        if (server.upgrade(req)) return undefined;
-        return new Response('WebSocket upgrade expected', { status: 426 });
-      }),
-      // Any other path serves the app (SPA fallback `/*`: reloading /chat works).
-      ...deps.web,
-    }),
+    routes: appRoutes(deps),
     websocket: {
       open: (ws) => hub.attach(ws),
       message: (ws, msg) => hub.receive(ws, msg),

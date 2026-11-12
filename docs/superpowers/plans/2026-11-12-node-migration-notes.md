@@ -33,6 +33,15 @@ changes in the plan.
   `unstubAllGlobals`, so a test that must run on both stubs a global by hand. Bun-only (Bun.serve/Bun.build):
   `server/routes/routes.test.ts`, `server/routes/web.test.ts`. `tsc -b` on the real tree: clean, no TS2742/TS4023.
   N8: shrink `test:bun` to nothing (drop the script) once Bun no longer runs the app.
+- (N5) Pre-existing bug, kept (no behaviour change in N5): a `Host` that is not a valid authority (`Host: a b`) makes
+  Bun hand the handler a relative `req.url`, so `new URL(req.url)` in `guard()` (`server/security.ts`) throws outside
+  the `try` of `guarded()` and Bun answers its own 500 instead of 403 `Invalid host`. Not in the golden (runtime
+  specific). Fix in N6, where the guard becomes a Hono middleware: build the URL from the path and the `Host` inside
+  the `try`, answer 403 `Invalid host`, add the case to the contract. Bun's `os.homedir()` ignores a `HOME` changed at
+  run time (Node follows it): the contract normalises the home directory to `<home>`. The contract records only the
+  top-level field names of machine-dependent successes (`/api/system/info`, topology, tuning hardware and checks,
+  setup, launchpad, bench devices, flags) and has no Hugging Face success (no network): after N6 and N8, check those
+  screens (System, Topology, Tuning, first run, Hugging Face search) in the running app.
 
 ## Refactoring and optimisation backlog (for the R milestones, after the merge)
 
