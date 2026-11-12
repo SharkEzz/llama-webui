@@ -1,10 +1,11 @@
 // The production build (`vite.config.ts`): one `vite build` (client and server) into a temp dir, then what it wrote.
+import { fork } from 'node:child_process';
+import { once } from 'node:events';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { isBuiltin } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { join, resolve } from 'node:path';
-import { Worker } from 'node:worker_threads';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { request } from './contract/wire';
@@ -91,16 +92,16 @@ test('the server bundle: main.js, only node:* and the network-facing dependencie
   expect(readFileSync(join(server_, 'main.js'), 'utf8').startsWith('#!/usr/bin/env node')).toBe(true);
 });
 
-test('the NVML worker ships next to main.js and starts from the bundle', async () => {
+test('the NVML sampler ships next to main.js and starts from the bundle', async () => {
   expect(readdirSync(server_).filter((f) => f.endsWith('.js'))).toEqual(['main.js', 'nvml-worker.js']);
   const file = join(server_, 'nvml-worker.js');
   expect(specifiers(readFileSync(file, 'utf8')).filter((s) => !isBuiltin(s))).toEqual([]);
-  const w = new Worker(file, { execArgv: ['--disable-warning=ExperimentalWarning'] });
+  const child = fork(file, [], { execArgv: ['--disable-warning=ExperimentalWarning'], serialization: 'advanced' });
   try {
-    const answer = new Promise((resolve) => w.once('message', resolve));
-    w.postMessage({ type: 'start', intervalMs: 1000, lib: '/nonexistent/libnvidia-ml.so.1' });
-    expect(await answer).toMatchObject({ type: 'error' });
+    const answer = once(child, 'message');
+    child.send({ type: 'start', intervalMs: 1000, lib: '/nonexistent/libnvidia-ml.so.1' });
+    expect((await answer)[0]).toMatchObject({ type: 'error', message: expect.stringContaining('/nonexistent/') });
   } finally {
-    await w.terminate();
+    child.kill('SIGKILL');
   }
 });

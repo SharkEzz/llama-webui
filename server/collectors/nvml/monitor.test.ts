@@ -1,6 +1,10 @@
-import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { existsSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { expect, test, vi } from 'vitest';
+import { tempDir } from '../../testing/tempDir';
 import type { GpuReading } from '../gpu';
 import { NvmlMonitor, type WorkerLike, workerUrl } from './monitor';
 
@@ -87,3 +91,34 @@ test.skipIf(!nvmlHere())('a real worker reads NVML when the library is here', as
     mon!.stop();
   }
 });
+
+test('a sampler stuck in a native call does not hold the process when it exits', async () => {
+  using dir = tempDir('lw-nvml-');
+  // A sampler that announces itself, then blocks in libc's sleep(), as one stuck in an NVML call on a driver fault.
+  const stuck = join(dir.path, 'stuck.mjs');
+  writeFileSync(
+    stuck,
+    `import { dlopen } from 'node:ffi';
+const { functions } = dlopen('libc.so.6', { sleep: { arguments: ['uint32'], return: 'uint32' } });
+process.send('in');
+functions.sleep(10);
+`,
+  );
+  // The process under test: starts the sampler, waits until it is stuck, stops it and exits (as `shutdown()` does).
+  // Its own timer stands for the server: the sampler is `unref()`'d and would not keep it up.
+  const main = join(dir.path, 'main.mjs');
+  writeFileSync(
+    main,
+    `import { sampler } from ${JSON.stringify(new URL('./sampler.ts', import.meta.url).href)};
+const s = sampler(new URL(${JSON.stringify(pathToFileURL(stuck).href)}));
+s.onerror = () => process.exit(2); // the fixture must start: a broken one fails the test
+setTimeout(() => process.exit(3), 5000); // nor may it never answer; and this keeps the process up, as the server does
+s.onmessage = () => setTimeout(() => { s.terminate(); process.exit(0); }, 100);
+`,
+  );
+  const t0 = performance.now();
+  const child = spawn(process.execPath, [main], { stdio: ['ignore', 'ignore', 'inherit'] });
+  const [code] = (await once(child, 'exit')) as [number | null];
+  expect(code).toBe(0);
+  expect(performance.now() - t0).toBeLessThan(3000); // the sampler sleeps 10 s
+}, 15_000);

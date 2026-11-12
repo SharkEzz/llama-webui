@@ -153,7 +153,7 @@ processes, timers, hashes and SQLite go through `node:*`. The few packages it ad
 | Reading files                 | `readText`, `fileExists`, `fileRange` | `server/proc.ts` (`node:fs`): collectors, hardware readers |
 | Child processes               | `spawnProc`, `which`                  | `server/proc.ts` (`node:child_process`): supervisor, bench |
 | Front end, server bundle      | Vite (`vite build`, dev middlewares)  | `vite.config.ts`, `server/dev.ts`, `server/routes/web.ts`  |
-| NVML                          | `node:ffi` in a `node:worker_threads` worker | `server/collectors/nvml/`  |
+| NVML                          | `node:ffi` in a child process (`fork`)  | `server/collectors/nvml/`  |
 | Checksums                     | `createHash` (`node:crypto`)          | `server/hf/downloader.ts`                                  |
 | Pauses                        | `setTimeout` (`node:timers/promises`) | Supervisor, benchmarks, tests                              |
 | Tests                         | Vitest                                | Every `*.test.ts` but those of `packages/llamacpp-js/`     |

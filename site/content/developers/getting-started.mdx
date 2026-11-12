@@ -162,7 +162,7 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
   - `routes/` one module per API domain, plus `web.ts` for the production UI build and its shared bundler options
   - `supervisor/` the managed `llama-server`: command line, health, external server detection, `--help` flags
   - `monitor/` the sampling tick, history ring, model placement
-  - `collectors/` NVML (in `nvml/`, through `node:ffi` in a worker thread), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
+  - `collectors/` NVML (in `nvml/`, through `node:ffi` in a child process), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
   - `chat/` server-owned chat generations
   - `bench/` the bench gate, runner, executor and output parsers
   - `tuning/` memory estimator, sweep space, system checks

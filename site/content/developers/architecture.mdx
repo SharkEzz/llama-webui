@@ -159,8 +159,8 @@ Vite's `ssr` environment (see [The development reload pitfall](#the-development-
 - the server, `server/main.ts` → `dist/server/main.js`, one file with its dependencies bundled, except `hono`,
   `@hono/node-server` and `ws`, the network-facing ones, which stay `dependencies` installed with the app. The
   licenses of the bundled code are written next to it, in `THIRD-PARTY-LICENSES.md`;
-- the NVML worker, `server/collectors/nvml/worker.ts` → `dist/server/nvml-worker.js`, next to `main.js`, which starts
-  it. It has its own environment (`nvml`, build only): Rolldown takes a single input when code splitting is off, and
+- the NVML sampler, `server/collectors/nvml/worker.ts` → `dist/server/nvml-worker.js`, next to `main.js`, which starts
+  it as a child process. It has its own environment (`nvml`, build only): Rolldown takes a single input when code splitting is off, and
   development runs the worker's sources as is.
 
 The build also replaces `LLAMA_WEBUI_VERSION` (a `define`) with `git describe --tags --always --dirty`, or the version
@@ -240,7 +240,7 @@ export interface Runtime {
 - `supervisor`: the managed `llama-server`, its state and its child process.
 - `logs`: the `LogBuffer` ring of 10,000 lines.
 - `bootId`: `crypto.randomUUID()`, generated once per process. The client compares it to detect a real restart.
-- `monitor`: the `Monitor`, with its collectors and the NVML worker thread, started once by `startMonitor()`.
+- `monitor`: the `Monitor`, with its collectors and the NVML sampler process, started once by `startMonitor()`.
 - `benchGate` (`server/bench/gate.ts`): the gate that stops the managed server for a benchmark and restarts it
   afterwards. It is held across a reload so that a sweep continues in the new module without restarting the server in
   between.

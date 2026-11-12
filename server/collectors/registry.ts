@@ -36,8 +36,8 @@ const nvidiaSmiBin = () => process.env.LLAMA_WEBUI_NVIDIA_SMI || 'nvidia-smi';
 const nvmlLib = () => process.env.LLAMA_WEBUI_NVML_LIB || undefined;
 
 /**
- * Hardware collectors (copied from llama-tui): NVIDIA through NVML in a Worker (nvidia-smi fallback), AMD through sysfs,
- * the server process, and CPU/memory and disks depending on their switch. configure() follows the settings,
+ * Hardware collectors (copied from llama-tui): NVIDIA through NVML in a child process (nvidia-smi fallback), AMD
+ * through sysfs, the server process, and CPU/memory and disks depending on their switch. configure() follows the settings,
  * except the NVML / nvidia-smi choice, made once at startup.
  */
 export class Collectors {

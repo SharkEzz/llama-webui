@@ -1,14 +1,9 @@
-import { Worker } from 'node:worker_threads';
 import type { GpuReading } from '../gpu';
 import type { GpuNeeds } from '../needs';
 import type { NvmlProc, NvmlSnapshot, NvmlSystem } from './read';
+import { sampler, type WorkerLike } from './sampler';
 
-export interface WorkerLike {
-  postMessage(m: unknown): void;
-  terminate(): void;
-  onmessage: ((e: { data: unknown }) => void) | null;
-  onerror: ((e: unknown) => void) | null;
-}
+export type { WorkerLike };
 
 type WorkerMsg = { type: 'ready' } | { type: 'error'; message: string } | { type: 'sample'; snapshot: NvmlSnapshot };
 
@@ -19,23 +14,9 @@ type WorkerMsg = { type: 'ready' } | { type: 'error'; message: string } | { type
 export const workerUrl = (moduleUrl = import.meta.url): string =>
   new URL(moduleUrl.endsWith('.ts') ? './worker.ts' : './nvml-worker.js', moduleUrl).href;
 
-/** A `node:worker_threads` worker behind the `WorkerLike` surface (Bun's web-style `Worker`). */
-const defaultWorker = (): WorkerLike => {
-  // `node:ffi` is experimental: its warning would print on every start.
-  const w = new Worker(new URL(workerUrl()), { execArgv: ['--disable-warning=ExperimentalWarning'] });
-  w.unref(); // never keep the process alive
-  const like: WorkerLike = {
-    postMessage: (m) => w.postMessage(m),
-    terminate: () => void w.terminate(),
-    onmessage: null,
-    onerror: null,
-  };
-  w.on('message', (data: unknown) => like.onmessage?.({ data }));
-  w.on('error', (err) => like.onerror?.(err));
-  return like;
-};
+const defaultWorker = (): WorkerLike => sampler(new URL(workerUrl()));
 
-/** NVIDIA readings from NVML in a worker thread; same surface as NvidiaMonitor (gpus/procVram/refreshApps/stop). */
+/** NVIDIA readings from NVML in a child process (`sampler.ts`); same surface as NvidiaMonitor (gpus/procVram/refreshApps/stop). */
 export class NvmlMonitor {
   private current: GpuReading[] = [];
   private procs: NvmlProc[] = [];

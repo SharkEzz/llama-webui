@@ -88,14 +88,18 @@ changes in the plan.
   `Worker` is not global on Node, so NVIDIA monitoring falls back to nvidia-smi until N9.
 - (N9) Rolldown refuses a second input when `output.codeSplitting` is `false` (`INVALID_OPTION … multiple inputs are
   not supported`): the NVML worker gets its own Vite environment (`nvml`, build only, after `ssr`, `emptyOutDir:
-  false`) → `dist/server/nvml-worker.js` (9.6 kB, `node:ffi` and `node:worker_threads` only). Vite leaves
+  false`) → `dist/server/nvml-worker.js` (9.6 kB, Node built-ins only). Vite leaves
   `new URL('./worker.ts', import.meta.url)` untouched in the ssr bundle: `workerUrl()` picks the file by the module's
   extension. The typed `dlopen()` of `@types/node` 26.6 types `functions` from the definitions, so `openNvml()`
   returns them as `NvmlSymbols` without a cast. Measured on this machine (2 NVIDIA + 2 AMD): `nvidiaSource: nvml`
   with PCIe rx/tx in dev and prod, `LLAMA_WEBUI_NVML_LIB=/nonexistent` → `nvidia-smi`, SIGINT exit in 50 ms, no
   ExperimentalWarning. A `dlopen` in the test process itself prints the warning: the real-NVML test checks
   `/proc/driver/nvidia/version` instead. `requirements.mdx` still describes Bun: its experimental-FFI note waits for
-  its Node rewrite (N12).
+  its Node rewrite (N12). The final review found that a worker thread stuck in a native call holds the process's
+  exit (Node waits for every thread; `unref()` and `terminate()` do not help): measured with libc `sleep(4)` through
+  `node:ffi`, `process.exit()` at 210 ms, process gone at 4 027 ms; Bun exits at 230 ms. A driver fault would make
+  Ctrl-C hang with port 7860 bound. The sampler therefore runs in a child process (`fork`, IPC, `SIGKILL` on stop,
+  exit on `disconnect`): 116 MiB RSS of its own instead of ~67 MiB inside the server's.
 
 ## Refactoring and optimisation backlog (for the R milestones, after the merge)
 
