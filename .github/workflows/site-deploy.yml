@@ -8,6 +8,8 @@ on:
     paths:
       - "site/**"
       - ".github/workflows/site-deploy.yml"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
   workflow_dispatch:
 
 permissions:
@@ -24,14 +26,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.13
+          cache: pnpm
+      # Same version as the `bun` peer in pnpm-lock.yaml.
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-      - run: bun install --frozen-lockfile
-        working-directory: site
+      - run: pnpm install --frozen-lockfile
       - run: bun run build
         working-directory: site
       - uses: actions/upload-pages-artifact@v4
