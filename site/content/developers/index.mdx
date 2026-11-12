@@ -25,6 +25,7 @@ website, a standalone package outside the workspaces.
 | Layer | Technology | Where |
 | --- | --- | --- |
 | Runtime | [Bun](https://bun.com) 1.4.4 or later: HTTP and WebSocket server (`Bun.serve`), bundler (`Bun.build`, HTML imports), test runner, `bun:ffi` | the whole repository |
+| HTTP API | [Hono](https://hono.dev) 4 with `@hono/zod-validator`: one chained app for every `/api` route, served by `Bun.serve` | `server/api.ts`, `server/routes/` |
 | Database | `node:sqlite` behind a wrapper (`server/db/sqlite.ts`), one file in the data directory, WAL journal | `server/db/` |
 | Validation | [zod](https://zod.dev) 4: request bodies and settings are parsed on the server, TypeScript types are inferred for both sides | `packages/webui-shared/src/`, `server/` |
 | GGUF headers | `@huggingface/gguf` | `server/models/`, `server/hf/` |

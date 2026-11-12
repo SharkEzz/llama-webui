@@ -147,11 +147,12 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
 - `server/` the Bun process (workspace `@llama-webui/server`)
   - `index.ts` entry point: opens the database, builds the services, wires their events to the WebSocket
   - `deps.ts` `createDeps()`: constructs the services and wires them together, without starting any work
-  - `app.ts` `appRoutes()` (every route, `/ws`, health) and `createApp()` (`Bun.serve`)
+  - `api.ts` `createApi()`: the Hono app of every `/api` route (health included)
+  - `app.ts` `createApp()`: `Bun.serve` with `/api/*` (the Hono app), `/ws` and the UI
   - `runtime.ts` state that survives `bun --hot` (supervisor, log ring, monitor, bench gate)
   - `cli.ts` launch options and `--help`
   - `paths.ts` data directory and database path
-  - `http.ts` `HttpError`, `guarded()`, JSON error responses
+  - `http.ts` `HttpError`, JSON error responses, the API's middlewares (guard, `405` table) and validators
   - `proc.ts` child processes and file reads on `node:*` (`spawnProc`, `readText`, `fileExists`, `fileRange`, `which`)
   - `standalone.ts` whether the code runs inside the standalone executable
   - `security.ts` the request guard (Host, Origin, JSON-only writes)

@@ -77,8 +77,8 @@ export const DEFAULT_SETTINGS: Settings = SettingsSchema.parse({});
 - **The server validates.** Routes and repositories call `parse()`: `BenchSpecSchema` in `server/routes/bench.ts`,
   `SweepSpecSchema` in `server/routes/sweeps.ts` and `server/routes/tuning.ts`, `DownloadRequestSchema` in
   `server/routes/hf.ts`, `SettingsSchema` in `server/db/settings.ts`, `ProfileInputSchema` in `server/db/profiles.ts`,
-  `ConversationPatchSchema` in `server/db/conversations.ts`. A failure throws a `ZodError`, which `guarded()` turns
-  into a `400` with the zod `issues`.
+  `ConversationPatchSchema` in `server/db/conversations.ts`. A failure throws a `ZodError`, which the API's `onError`
+  turns into a `400` with the zod `issues`.
 - **Both sides share the types.** The web app imports `Settings`, `BenchParams`, `Profile` and the others as types
   and does not parse with zod itself. It shows the server's `issues` next to the matching field.
 - **Defaults and messages live in one place.** The defaults come from the schema (`DEFAULT_SETTINGS` is

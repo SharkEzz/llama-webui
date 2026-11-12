@@ -82,43 +82,48 @@ export type DownloadRequest = z.infer<typeof DownloadRequestSchema>;
   </Step>
   <Step title="Write the handlers">
 
-Each domain has a file in `server/routes/` that exports a function taking its dependencies and returning `Bun.serve`
-routes. Wrap every handler in `guarded()` (`server/http.ts`): it applies the request guard of `server/security.ts`,
-then turns exceptions into JSON responses.
+Each domain has a file in `server/routes/` that exports a function taking its dependencies and returning a chained
+`Hono` app (`new Hono<Env>()`, `Env` from `server/http.ts`). Keep the chain unbroken and the handlers inline: the
+typed client of the web app infers each route from it. The guard, the `405` table and the error responses are
+applied by `createApi()` for every route: there is nothing to wrap.
 
 ```ts title="server/routes/topology.ts"
-export function topologyRoutes({ placement }: TopologyRouteDeps) {
-  return {
-    '/api/topology': {
-      GET: guarded(async () => Response.json({ graph: await readPciTopology(), placement: placement.current })),
-    },
-  };
-}
+export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
+  new Hono<Env>().get('/api/topology', async (c) =>
+    c.json({ graph: await readPciTopology(), placement: placement.current }),
+  );
 ```
+
+Register a static path before a `:param` path of the same method that would match it (`/api/downloads/clear`
+before `/api/downloads/:id`): Hono takes the first match, and the contract suite fails on the wrong order.
 
 The helpers of `server/http.ts` cover the usual cases:
 
 | Helper                                      | Use                                                                        |
 | ------------------------------------------- | -------------------------------------------------------------------------- |
-| `jsonObject(req)`                           | Reads the body; `400` when it is not a JSON object                         |
-| `Schema.parse(…)`                           | A `ZodError` becomes `400` with the first issue and the full `issues` list |
-| `idParam(req, 'Download')`                  | A positive integer `:id`, otherwise `404 Download not found`              |
+| `body(Schema, { object: true })`            | Validates the JSON body with a zod schema (`@hono/zod-validator`): `400 Invalid JSON`, `400 JSON object expected`, then the `ZodError` (first issue + `issues`); read it with `c.req.valid('json')` |
+| `json(check)`                               | A JSON body passed through your own check (`json(object)`: any object), for custom messages |
+| `id('Download')`                            | A positive integer `:id`, otherwise `404 Download not found`; put it before the body validator; `c.req.valid('param').id` |
 | `notFound('Profile')`                       | `404 Profile not found`                                                    |
 | `new HttpError(409, message, code)`         | Any refusal; add a `code` when the web app must react to it                |
 
 ```ts title="server/routes/hf.ts"
-POST: guarded(async (req) => {
-  const body = DownloadRequestSchema.parse(await jsonObject(req));
-  const items = await downloads.enqueue(await downloadInputs(hf, body, modelsDir()));
-  return Response.json({ items }, { status: 202 });
-}),
+.post('/api/downloads', body(DownloadRequestSchema, { object: true }), async (c) => {
+  const items = await downloads.enqueue(await downloadInputs(hf, c.req.valid('json'), modelsDir()));
+  return c.json({ items }, 202);
+})
 ```
+
+When the handler must look something up (and answer `404` or `409`) before the body is checked, do not validate the
+body ahead of it: read it in the handler (`object(await c.req.json())`) or pass it as sent (`json(passthrough)`).
 
   </Step>
   <Step title="Register the routes">
 
-Spread the new function into `routes` in `createApp()` (`server/app.ts`), next to the others and before the `/api/*`
-fallback that answers `404 Unknown route`. A new dependency goes into `AppDeps` and is built in `server/index.ts`.
+Mount the new app in `createApi()` (`server/api.ts`) with `.route('/', xRoutes(deps))`, chained after the others.
+A new dependency goes into `AppDeps` (`server/app.ts`) and is built in `createDeps()` (`server/deps.ts`). Add the
+route to `ROUTES` in `server/contract/cases.ts` (the contract suite fails otherwise), then regenerate the golden
+(see [Testing](/developers/contributing/testing/)).
 
   </Step>
   <Step title="Call it from the web app">

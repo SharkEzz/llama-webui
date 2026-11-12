@@ -84,14 +84,14 @@ Every `/api/*` error is a JSON object with an `error` message, and a `code` when
 { "error": "A profile named “Qwen3 32B” already exists", "code": "name-taken" }
 ```
 
-`guarded()` catches whatever a handler throws and turns it into a response with `errorResponse()`
-(`server/http.ts`):
+The API's `onError` (`server/api.ts`) turns whatever a handler or a validator throws into a response with
+`errorResponse()` (`server/http.ts`):
 
 | Thrown                                           | Status         | Body                                                     |
 | ------------------------------------------------ | -------------- | -------------------------------------------------------- |
 | `HttpError(status, message, code?)`              | `status`       | `{ error: message }`, plus `code` when there is one       |
 | `ZodError` (a schema refused the input)          | `400`          | `{ error: "Invalid data: <first issue> (<path>)", issues }` |
-| `SyntaxError` (the body is not valid JSON)       | `400`          | `{ error: "Invalid JSON" }`                              |
+| `SyntaxError`, or Hono's `Malformed JSON in request body` (the body is not valid JSON) | `400` | `{ error: "Invalid JSON" }` |
 | Anything else                                    | `500`          | `{ error: "Internal error" }`, and the error is logged on the server console |
 
 Match on the status and the `code`, never on the `error` text: messages are written for people and can change. The
@@ -152,46 +152,52 @@ Every other error has no `code`.
 
 ## How routes are registered
 
-`createApp()` in `server/app.ts` starts a single `Bun.serve()` with a `routes` table. Each domain module in
-`server/routes/` exports a function that takes its dependencies and returns its part of the table,
-`{ path: { METHOD: handler } }`, and every handler is wrapped in `guarded()`:
+The API is one [Hono](https://hono.dev) app, built by `createApi()` in `server/api.ts`. Each domain module in
+`server/routes/` exports a function that takes its dependencies and returns a chained `Hono` app; `createApi()`
+mounts them in turn with `.route('/', …)` (the health route is defined there directly):
 
-```ts title="server/routes/models.ts"
-export function modelRoutes({ db, settings }: { db: Database; settings: SettingsRepo }) {
-  // …
-  return {
-    '/api/models': {
-      GET: guarded(async () => {
-        // …
-        return Response.json(list);
-      }),
-    },
+```ts title="server/routes/topology.ts"
+export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
+  new Hono<Env>().get('/api/topology', async (c) =>
+    c.json({ graph: await readPciTopology(), placement: placement.current }),
+  );
 ```
 
-`createApp()` defines the health route itself, spreads the domain tables (the settings ones from
-`server/routes/settings.ts`), then adds the catch-alls, all wrapped in `withMethodNotAllowed()`:
-
-```ts title="server/app.ts"
-      ...setupRoutes(deps),
-      '/api/*': guarded(() => Response.json({ error: 'Unknown route' }, { status: 404 })),
-      '/ws': guarded((req, server) => {
-        if (server.upgrade(req)) return undefined;
-        return new Response('WebSocket upgrade expected', { status: 426 });
-      }),
-      // Any other path serves the app (SPA fallback `/*`: reloading /chat works).
-      ...deps.web,
+```ts title="server/api.ts"
+  const api = new Hono<Env>()
+    .use(jsonCharset, guardMw, allow.mw)
+    .get('/api/health', (c) => c.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt }))
+    .route('/', settingsRoutes({ settings, monitor }))
+    // … one .route() per domain file
+  allow.load(apiRoutes(api));
+  api.notFound((c) => c.json({ error: 'Unknown route' }, 404));
+  api.onError((err) => errorResponse(err));
 ```
+
+`createApp()` in `server/app.ts` starts `Bun.serve()` and sends every `/api/*` request to that app
+(`api.fetch(req, { server })`); `/ws` and the web routes stay `Bun.serve` routes. Every API request goes through
+three middlewares first, in this order:
+
+- `jsonCharset` gives a JSON reply the `application/json;charset=utf-8` type the API has always used (`c.json()`
+  alone says `application/json`). A route that sets its own type keeps it.
+- `guardMw` applies the request guard of `server/security.ts` (see [Security](/developers/server/security/)).
+- `allow.mw` (`allowTable()`, `server/http.ts`) answers `405` `{ "error": "Method not allowed (POST)" }` with
+  `Allow: POST` when the path is known but the method is not one of its routes (`HEAD` counts as `GET`). It takes
+  the most specific matching pattern (a static segment beats a `:param`), so `GET /api/profiles/import` (a `POST`
+  route) is a `405` rather than `/api/profiles/:id` answering `Profile not found`.
+
+Then:
 
 - An unknown path under `/api/` gets `404` `{ "error": "Unknown route" }`.
-- A known path called with a method it does not define gets `405` `{ "error": "Method not allowed (POST)" }` with
-  `Allow: POST`. Without it, Bun would fall through to the next route that matches the path: `GET
-  /api/profiles/import` would reach `/api/profiles/:id` and answer `Profile not found`. `withMethodNotAllowed()`
-  (`server/http.ts`) fills in a guarded `405` handler for each missing `GET`, `POST`, `PUT`, `PATCH` and `DELETE` of
-  every `/api/…` route defined by methods.
-- Path parameters are read with `idParam(req, what)`: anything but a positive integer gives `404` `<what> not found`,
-  the same answer as an id that does not exist.
-- A body that must be an object is read with `jsonObject(req)`: valid JSON that is not an object gives `400`
-  `JSON object expected`.
+- Hono matches routes in registration order: within a domain file, a static path is registered before the `:param`
+  pattern that would also match it (`/api/profiles/export` before `/api/profiles/:id`). The contract suite checks it
+  with `shadowed()`.
+- Path parameters go through the `id(what)` validator: anything but a positive integer gives `404` `<what> not
+  found`, the same answer as an id that does not exist, and before any body check.
+- A body validated by a zod schema goes through `body(Schema)` (`@hono/zod-validator`): no JSON body is `400`
+  `Invalid JSON`, then, with `{ object: true }`, a JSON value that is not an object is `400` `JSON object expected`,
+  then the schema's `ZodError`. A body with an imperative check goes through `json(check)`, with the same first two
+  messages (`object(body)` throws the second).
 - `notFound(what)` is the shared `404` `<what> not found`.
 
 To add a route, see [How-to guides](/developers/contributing/how-to/).

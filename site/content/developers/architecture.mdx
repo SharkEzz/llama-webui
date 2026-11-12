@@ -62,34 +62,32 @@ The external server watcher (`externalWatcher()` in `server/supervisor/external.
 
 `createApp()` in `server/app.ts` passes a single `routes` object to `Bun.serve`:
 
-- `/api/health` and `/api/settings`, defined in `app.ts` itself;
-- the routes of each domain, spread from `server/routes/<domain>.ts`: `profileRoutes`, `serverRoutes`,
-  `monitorRoutes`, `modelRoutes`, `hfRoutes`, `chatRoutes`, `benchRoutes`, `sweepRoutes`, `tuningRoutes`,
-  `topologyRoutes` and `setupRoutes`;
-- `/api/*`, a catch-all that answers `404` with `{ "error": "Unknown route" }`, so an unknown API path never receives
-  the app's HTML;
-- `/ws`, which upgrades the request to a WebSocket or answers `426`;
+- `/api/*`, handed to the [Hono](https://hono.dev) app built by `createApi()` (`server/api.ts`):
+  `api.fetch(req, { server })`;
+- `/ws`, which runs `guard()`, then upgrades the request to a WebSocket or answers `426`;
 - the web routes, last: the UI files and the SPA fallback `/*`, so reloading `/chat/12` serves the app.
 
-Each route module exports a function that takes only the dependencies it needs and returns paths mapped to handlers
-by method. Every handler, `/ws` included, is wrapped in `guarded()`:
+`createApi()` mounts the request guard, the `405` table and the JSON charset middleware, defines `/api/health`, then
+mounts the routes of each domain from `server/routes/<domain>.ts` with `.route('/', …)`: `settingsRoutes`,
+`profileRoutes`, `serverRoutes`, `monitorRoutes`, `topologyRoutes`, `setupRoutes`, `modelRoutes`, `hfRoutes`,
+`tuningRoutes`, `chatRoutes`, `benchRoutes` and `sweepRoutes`. An unknown API path gets `404` with
+`{ "error": "Unknown route" }` (Hono's `notFound`), so it never receives the app's HTML, and whatever a route throws
+goes through `onError`.
+
+Each route module exports a function that takes only the dependencies it needs and returns a chained `Hono` app:
 
 ```ts title="server/routes/topology.ts"
-export function topologyRoutes({ placement }: TopologyRouteDeps) {
-  return {
-    '/api/topology': {
-      GET: guarded(async () => Response.json({ graph: await readPciTopology(), placement: placement.current })),
-    },
-  };
-}
+export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
+  new Hono<Env>().get('/api/topology', async (c) =>
+    c.json({ graph: await readPciTopology(), placement: placement.current }),
+  );
 ```
 
-`guarded()` (`server/http.ts`) runs `guard()` from `server/security.ts` first (Host header, Origin, JSON-only writes),
-then the handler, and turns any exception into a JSON response: an `HttpError` keeps its status and returns
-`{ error, code? }`, a `ZodError` becomes a `400` with the zod `issues`, a JSON `SyntaxError` a `400`, and anything else
-a `500` with `Internal error`. `idParam()`, `jsonObject()` and `notFound()` are the helpers routes use for path ids
-and bodies. The [API overview](/developers/api/overview/) documents the error shape and the
-[Security](/developers/server/security/) page the guard.
+`errorResponse()` (`server/http.ts`) turns an exception into a JSON response: an `HttpError` keeps its status and
+returns `{ error, code? }`, a `ZodError` becomes a `400` with the zod `issues`, invalid JSON a `400`, and anything
+else a `500` with `Internal error`. The `id()`, `body()` and `json()` validators and `notFound()` are the helpers
+routes use for path ids and bodies. The [API overview](/developers/api/overview/) documents the error shape and the
+order of the middlewares, the [Security](/developers/server/security/) page the guard.
 
 ## Channels to the browser
 

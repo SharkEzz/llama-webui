@@ -87,7 +87,8 @@ export function ArchitectureDiagram() {
         <div className={cn(BOX, 'mb-2')}>
           <p className="font-medium">Bun.serve</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            UI (HTML import in dev, Bun.build at startup in production), API routes wrapped in guarded(), WebSocket hub.
+            UI (HTML import in dev, Bun.build at startup in production), API routes in one Hono app (guard, 405 table),
+            WebSocket hub.
           </p>
         </div>
         <Boxes nodes={MODULES} className="grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-4" />

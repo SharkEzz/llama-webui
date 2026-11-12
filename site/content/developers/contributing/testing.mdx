@@ -108,10 +108,11 @@ Until the app runs on Node, `pnpm test:bun` replays the tests of `server/`, `scr
 (Bun's `node:sqlite` refuses booleans, which `server/db/sqlite.ts` converts), and only this replay sees a difference
 that breaks the app under Bun.
 
-Three files need the Bun runtime and run only there, excluded from Vitest by `BUN_ONLY` in `vitest.config.ts`:
-`server/routes/routes.test.ts` (starts `Bun.serve`), `server/routes/web.test.ts` (builds the front end with
-`Bun.build`) and `server/contract/contract.test.ts` (the [HTTP contract suite](#http-contract-suite), which boots the
-app). They import from `bun:test`.
+Two files need the Bun runtime and run only there, excluded from Vitest by `BUN_ONLY` in `vitest.config.ts`:
+`server/routes/web.test.ts` (builds the front end with `Bun.build`) and `server/contract/contract.test.ts` (the
+[HTTP contract suite](#http-contract-suite), which boots the app). They import from `bun:test`. Route tests call the
+Hono app of a domain (or `createApi()`) with `app.request()`, without a server, and run under Vitest; set
+`app.onError((err) => errorResponse(err))` on a domain app to get the API's error replies.
 
 A test that reads a Bun global on a code path the app takes only under Bun stubs it where it is missing, as the
 compiled-executable branch of `workerUrl` does in `server/collectors/nvml/monitor.test.ts`.

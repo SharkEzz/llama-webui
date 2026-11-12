@@ -147,7 +147,8 @@ provides still uses Bun:
 
 | Need                          | Used                                  | Where                                                      |
 | ----------------------------- | ------------------------------------- | ---------------------------------------------------------- |
-| HTTP routes, WebSocket, UI    | `Bun.serve`                           | `server/app.ts`                                            |
+| HTTP routes                   | Hono, served by `Bun.serve`           | `server/api.ts`, `server/routes/*.ts`                      |
+| WebSocket, UI                 | `Bun.serve`                           | `server/app.ts`                                            |
 | SQLite                        | `Database` (`node:sqlite`)            | `server/db/sqlite.ts`: every repository                    |
 | Reading files                 | `readText`, `fileExists`, `fileRange` | `server/proc.ts` (`node:fs`): collectors, hardware readers |
 | Child processes               | `spawnProc`, `which`                  | `server/proc.ts` (`node:child_process`): supervisor, bench |
