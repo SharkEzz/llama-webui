@@ -15,22 +15,16 @@ const ALLOW: { path: string; line?: RegExp; reason: string }[] = [
     line: /homedir|HOME/,
     reason: 'the golden was recorded under Bun, whose homedir() ignored a HOME set at run time',
   },
-];
-
-/** Files not swept yet (the N12 tasks empty this list). */
-const PENDING: string[] = [
-  'CLAUDE.md',
-  'README.md',
-  'scripts/package.test.ts',
-  'site/content/developers/api/overview.mdx',
-  'site/content/developers/contributing/conventions.mdx',
-  'site/content/developers/contributing/testing.mdx',
-  'site/content/developers/contributing/workflow.mdx',
-  'site/content/developers/frontend.mdx',
-  'site/content/developers/getting-started.mdx',
-  'site/content/developers/index.mdx',
-  'site/content/developers/server/database.mdx',
-  'site/content/developers/shared.mdx',
+  {
+    path: 'site/content/developers/architecture.mdx',
+    line: /^Up to v0\.2\.1, llama-webui ran on Bun/,
+    reason: 'the one history sentence: where the contract golden comes from',
+  },
+  {
+    path: 'CLAUDE.md',
+    line: /aucune API ni commande Bun|Don't use `bun:sqlite`|jamais `Bun\.file`/,
+    reason: 'the rules name the APIs an agent must not reach for',
+  },
 ];
 
 /** Every text line not ignored by git (tracked or new) that names Bun, as `path:line:text`. */
@@ -54,12 +48,11 @@ const covers = (a: (typeof ALLOW)[number], m: { path: string; text: string }) =>
   (a.path.endsWith('/') ? m.path.startsWith(a.path) : m.path === a.path) && (!a.line || a.line.test(m.text));
 
 test('nothing in the repository mentions Bun outside the allowlist', () => {
-  const uncovered = mentions().filter((m) => !PENDING.includes(m.path) && !ALLOW.some((a) => covers(a, m)));
+  const uncovered = mentions().filter((m) => !ALLOW.some((a) => covers(a, m)));
   expect(uncovered.map((m) => `${m.path}: ${m.text.trim().slice(0, 100)}`)).toEqual([]);
 });
 
 test('every allowlist entry still matches a line', () => {
   const all = mentions();
   expect(ALLOW.filter((a) => !all.some((m) => covers(a, m))).map((a) => a.path)).toEqual([]);
-  expect(PENDING.filter((p) => !all.some((m) => m.path === p))).toEqual([]);
 });

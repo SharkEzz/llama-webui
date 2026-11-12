@@ -198,6 +198,10 @@ builds: `pnpm pack` runs `scripts/prepack.ts` first, which refuses without `dist
 `pnpm build` before it. CI runs it on every
 pull request, and `release.yml` runs it on the tarball it publishes.
 
+Up to v0.2.1, llama-webui ran on Bun and shipped as a standalone executable. The port to Node.js kept every API answer
+the same: the contract suite replays each route against a golden record taken before the port
+([Testing](/developers/contributing/testing/)).
+
 ## Launch options
 
 `server/cli.ts` reads three options, each from a flag, else its environment variable, else a default. An empty

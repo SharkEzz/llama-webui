@@ -125,4 +125,4 @@ Inputs that depend on the environment are passed in instead of read: `profileMod
 an argument and expands `~` itself, without `node:os` or `node:path`.
 
 Its project (`packages/webui-shared/tsconfig.json`, checked by `tsc -b`) compiles it with `lib: ["ESNext"]`, the
-Bun types and no DOM types, so a DOM API in a shared module fails there.
+Node types (for its tests) and no DOM types, so a DOM API in a shared module fails there.

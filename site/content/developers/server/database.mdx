@@ -61,8 +61,8 @@ migration. Tests open a migrated database in memory with `openDb(':memory:')`.
 
 ## The `Database` wrapper
 
-`Database` (`server/db/sqlite.ts`) wraps `DatabaseSync` from `node:sqlite` and keeps the `bun:sqlite` surface the
-repositories were written against, where the two drivers differ:
+`Database` (`server/db/sqlite.ts`) wraps `DatabaseSync` from `node:sqlite` with the surface the repositories were
+written against, where it differs from `DatabaseSync`:
 
 | Call                             | Behaviour                                                                                                      |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------- |

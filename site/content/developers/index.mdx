@@ -39,7 +39,7 @@ website, which imports no code of the app.
 | Quality | TypeScript 7 (`tsc -b`), [Biome](https://biomejs.dev) 2 (format, lint, imports), [Vitest](https://vitest.dev) and `node:test` | `biome.json`, `tsconfig.json`, `vitest.config.ts` |
 
 The website uses its own stack (Vite, React Router in framework mode with prerendering, MDX), and its scripts run
-with Bun.
+on Node.js like the app's.
 
 ## Map of the developer docs
 
@@ -80,7 +80,7 @@ with Bun.
 ### Contributing
 
 - [Conventions](/developers/contributing/conventions/): language, formatting, Biome rules and React patterns.
-- [Testing](/developers/contributing/testing/): `bun test`, captured outputs in `testdata/`, the fakes.
+- [Testing](/developers/contributing/testing/): Vitest and `node:test`, the contract suite, captured outputs in `testdata/`, the fakes.
 - [How-to guides](/developers/contributing/how-to/): adding a page, a collector, a migration, a WebSocket message or
   an API route.
 - [Docs, commits and PRs](/developers/contributing/workflow/): keeping these pages in sync with the code, and the

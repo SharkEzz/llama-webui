@@ -8,7 +8,7 @@ const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.jso
 
 test('the root package is the one npm installs', () => {
   expect(pkg.bin).toEqual({ 'llama-webui': 'dist/server/main.js' });
-  // Not all of dist/: an old executable (the Bun builds’ `dist/llama-webui`) would ship too.
+  // Not all of dist/: whatever else lies there (an old `dist/llama-webui` executable) would ship too.
   expect(pkg.files).toEqual(['dist/server', 'dist/web']);
   expect(pkg.os).toEqual(['linux']);
   expect(pkg.engines.node).toMatch(/^>=26\./);

@@ -15,7 +15,7 @@ The web app is a React 19 single-page app in `web/`, served by the Node.js proce
 - `web/`
   - `index.html` HTML entry; an inline script applies the theme before the first paint
   - `components.json` shadcn configuration (`base-nova` style)
-  - `tsconfig.json` the app: DOM types only (no Bun, no Node), the `@/*` → `src/*` alias, references `../server` for the API's types
+  - `tsconfig.json` the app: DOM types only (no Node), the `@/*` → `src/*` alias, references `../server` for the API's types
   - `tsconfig.test.json` the tests (`*.test.ts`), with Node's types
   - `src/`
     - `main.tsx` starts the store syncs and the WebSocket, renders the router

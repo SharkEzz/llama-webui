@@ -162,14 +162,14 @@ Directories and file handles go through `node:fs` or `node:fs/promises` (`readdi
 `statfs`); tests write files with `writeFileDeep()` (`server/testing/write.ts`), which creates the parent directories.
 There is no Express, `better-sqlite3`, `execa` or `dotenv` (`server/env.ts` parses `.env` with Node's
 `parseEnv()` from `node:util`), and no Jest. Two exceptions: `site/` is built with Vite and React Router (its scripts, run by
-Node, follow the same rules); `packages/llamacpp-js/` targets Node 24 or later as well as Bun, so its sources use
-only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), never `Bun.*`, and its tests use
+Node, follow the same rules); `packages/llamacpp-js/` targets Node 24 or later, so its sources use
+only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), and its tests use
 `node:test` with no dependency ([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
 
 ### Code idioms
 
 - **`packages/webui-shared/` stays portable.** The browser bundle imports it, so its modules import nothing but `zod`,
-  the browser-safe modules of `llamacpp-js` and each other: no Bun or Node API. The server and the web import it as `@llama-webui/shared`; inside `web/` and `site/`, `@/` points
+  the browser-safe modules of `llamacpp-js` and each other: no Node API. The server and the web import it as `@llama-webui/shared`; inside `web/` and `site/`, `@/` points
   to their own `src/`.
 - **Cleanup with `using`.** `defer(fn)` (`packages/webui-shared/src/dispose.ts`) returns a `Disposable`, so
   `using _busy = defer(() => (busy = false));` replaces a `try`/`finally`. Tests release temporary directories and

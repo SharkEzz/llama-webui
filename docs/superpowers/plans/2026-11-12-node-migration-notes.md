@@ -112,6 +112,14 @@ changes in the plan.
   the three runtime dependencies are pinned exactly (none has dependencies of its own; `ws`'s peers are optional),
   and the tarball smoke fails if npm installs anything else. `release.yml` was already broken since N8 (`bun run
   compile` gone): it now publishes the tarball and its `SHA256SUMS`.
+- N12: `git grep` skips untracked files unless given `--untracked`, so the Bun guard (`scripts/no-bun.test.ts`) uses
+  it: a new file is checked before its first commit. Node 26 ships without corepack, so the pages install pnpm with
+  `npm install -g pnpm`. `dist/server/main.js` starts with `#!/usr/bin/env node`, and a version manager (fnm, nvm)
+  puts Node on the login shell's `PATH` only: the systemd unit of `installation.mdx` names Node by its absolute path
+  (`realpath "$(command -v node)"`), checked with `systemd-run --user` under `env -i`. The sweep also found
+  references the port had left behind: `server/app.ts` (gone since N6, health is in `server/api.ts`) in CLAUDE.md's
+  mapping table and `workflow.mdx`, and the README's list of files that need a restart (no `proc.ts`, no
+  `llamacpp-js`).
 
 ## Refactoring and optimisation backlog (for the R milestones, after the merge)
 

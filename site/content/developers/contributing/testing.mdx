@@ -48,7 +48,7 @@ A test file sits next to its module: `server/bench/parse.test.ts` tests `server/
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/`  | Parsers (`nvidia-smi`, AMD sysfs and fdinfo, `perf`, startup logs, PCI topology), GGUF reading and the model scan, `llama-server` command lines, external-server detection, tuning, repositories, the bench runner and gate, chat runs, Hugging Face downloads, the security guard, CLI flags, the setup report, the production front-end build |
 | `packages/webui-shared/`  | Pure logic used on both sides: benchmark parameters, profile import, sweeps, chat stats and titles, logs, topology, models, setup checks, Hugging Face inputs, `defer` |
-| `packages/llamacpp-js/`  | The llama.cpp client: flags from `--help`, the SSE parser, `/metrics` and `/slots`, `llama-bench` output, the health probes, `/props` and the streamed chat completion, `/proc` discovery, and the package's own contract (`tests/package.test.ts`: no app import, no Bun API, `.ts` import paths, one export per module, tree-shaking) |
+| `packages/llamacpp-js/`  | The llama.cpp client: flags from `--help`, the SSE parser, `/metrics` and `/slots`, `llama-bench` output, the health probes, `/props` and the streamed chat completion, `/proc` discovery, and the package's own contract (`tests/package.test.ts`: no app import, `.ts` import paths, one export per module, tree-shaking) |
 | `web/src/` | Pure UI logic: the Topology page's flows, layout, pacing and smoothing (`web/src/features/topology/`), the benchmark form mapping (`web/src/lib/bench.ts`)                                 |
 | `site/`    | The link checker helpers, the sidebar and content routes, the landing page's telemetry simulation                                                                                         |
 
@@ -123,7 +123,7 @@ around the API, under Vitest like the others:
 
 ### Tests of llamacpp-js
 
-[llamacpp-js](/developers/llamacpp-js/) targets Node 24 or later as well as Bun, so its tests are written with Node's
+[llamacpp-js](/developers/llamacpp-js/) targets Node 24 or later, so its tests are written with Node's
 own runner, `node:test` and `node:assert/strict`, with no dependency: `pnpm --filter llamacpp-js test`
 (`node --test 'tests/*.test.ts'`) runs them on the TypeScript sources as they are. CI runs them on Node 26 in the main
 job and on Node 24, the lowest supported version, in a job without any install.
@@ -144,9 +144,9 @@ describe('parseSlots', () => {
 });
 ```
 
-- They use web and `node:*` APIs only: a local server comes from `serve(handler)` (`node:http`) rather than
-  `Bun.serve`, a file from `fixture()` rather than `Bun.file`, the directory from `import.meta.dirname`. Their project
-  (`tsconfig.test.json`) has the Node types only, so a Bun API does not type check.
+- They use web and `node:*` APIs only: a local server comes from `serve(handler)` (`node:http`), a file from
+  `fixture()`, the directory from `import.meta.dirname`. Their project (`tsconfig.test.json`) has the Node types only,
+  so any other runtime's API does not type check.
 - `tests/helpers.ts` adds the two assertions `node:assert` lacks: `closeTo(actual, expected, digits)` and
   `matchObject(actual, expected)` (the properties of `expected`, deeply equal).
 - The bundling checks of `tests/package.test.ts` bundle an import of the package with Rolldown (a devDependency of
@@ -359,12 +359,12 @@ shared options are in `tsconfig.base.json`, which the projects extend.
 
 | Project                                  | Covers                                     | Types                                       |
 | ---------------------------------------- | ------------------------------------------ | ------------------------------------------- |
-| `packages/llamacpp-js/tsconfig.json`      | The library's sources, as a Node user compiles them: `erasableSyntaxOnly`, NodeNext resolution | Node only (no Bun, no DOM): a `Bun.*` call fails here |
+| `packages/llamacpp-js/tsconfig.json`      | The library's sources, as a Node user compiles them: `erasableSyntaxOnly`, NodeNext resolution | Node only (no DOM): a browser-only API fails here |
 | `packages/llamacpp-js/tsconfig.test.json` | The library's tests (`tests/`), with the same options | Node only, like the sources      |
-| `packages/webui-shared/tsconfig.json`     | `@llama-webui/shared` and its tests        | Bun, no DOM: a browser-only API fails here  |
-| `server/tsconfig.json`                    | `server/`, tests included                  | Bun                                         |
-| `scripts/tsconfig.json`                   | `scripts/`                                 | Bun                                         |
-| `web/tsconfig.json`                       | `web/src/`, tests left out; references `server/` for the API's types | DOM only (`types: []`): a Node or Bun API fails here |
+| `packages/webui-shared/tsconfig.json`     | `@llama-webui/shared` and its tests        | Node, no DOM: a browser-only API fails here |
+| `server/tsconfig.json`                    | `server/`, tests included                  | Node                                        |
+| `scripts/tsconfig.json`                   | `scripts/`                                 | Node                                        |
+| `web/tsconfig.json`                       | `web/src/`, tests left out; references `server/` for the API's types | DOM only (`types: []`): a Node API fails here |
 | `web/tsconfig.test.json`                  | `web/src/` with its tests                  | DOM and Node (the tests run under Vitest on Node) |
 | `site/tsconfig.json` (separate step)      | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types | DOM |
 

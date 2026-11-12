@@ -211,7 +211,7 @@ The web app calls the API through Hono's client (`hc` from `hono/client`), typed
 `server/rpc.ts` is the package entry `@llama-webui/server/api`: it exports `AppType`, the inferred type of
 `createApi()`, and nothing at runtime. Its declaration holds the whole route schema (paths, methods, `param`, `query`,
 `json` inputs, `c.json()` outputs and statuses) and imports only `hono`, `@llama-webui/shared` and
-`llamacpp-js/metrics`, so the browser project never sees Bun's or Node's types. For the same reason `Env` types the
+`llamacpp-js/metrics`, so the browser project never sees Node's types. For the same reason `Env` types the
 bindings as a plain `object`: the Node adapter passes its `incoming` and `outgoing` objects there, and no route reads
 them.
 

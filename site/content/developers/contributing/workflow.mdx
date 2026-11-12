@@ -14,7 +14,7 @@ soon as a change forgets it.
 
 | Code you change                                                              | Pages to update                                                                                                                  |
 | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `server/routes/<domain>.ts`, `server/app.ts`, zod schemas in `packages/webui-shared/src/`   | `/developers/api/<domain>/` (`server/app.ts` is [Health and settings](/developers/api/app/)) and the user page of the feature    |
+| `server/routes/<domain>.ts`, `server/api.ts`, zod schemas in `packages/webui-shared/src/`   | `/developers/api/<domain>/` (`server/api.ts` is [Health and settings](/developers/api/app/)) and the user page of the feature    |
 | `packages/webui-shared/src/ws.ts`, `server/ws/`                                             | [WebSocket](/developers/api/websocket/)                                                                                          |
 | `server/cli.ts`, `server/paths.ts`, environment variables                    | [Launch options](/docs/configuration/), [Architecture](/developers/architecture/)                                                |
 | `server/security.ts`, `server/http.ts`                                       | [Security](/docs/security/) (user), [Security](/developers/server/security/) (server), [API overview](/developers/api/overview/) |
@@ -217,15 +217,19 @@ feat: First-run setup checklist and profile launch pad on Home (#10)
 Before a commit, a pull request or the end of a milestone, these must pass from the root of the repository:
 
 ```bash title="Terminal"
-bun run lint
-bun run check
-bun test
+pnpm lint
+pnpm check
+pnpm test
 ```
 
-- `bun run lint`: Biome with zero errors and zero warnings (format, lint, sorted imports).
-- `bun run check`: the type checks of every project (`bun check -b`: `packages/*`, `server/`, `scripts/`, `web/`), then
+- `pnpm lint`: Biome with zero errors and zero warnings (format, lint, sorted imports).
+- `pnpm check`: the type checks of every project (`tsc -b`: `packages/*`, `server/`, `scripts/`, `web/`), then
   `site/`.
-- `bun test`: every test file, `web/src/` included ([Run the tests](/developers/contributing/testing/#run-the-tests)).
+- `pnpm test`: every Vitest project, `web/src/` and `site/` included, then the `llamacpp-js` tests on `node --test`
+  ([Run the tests](/developers/contributing/testing/#run-the-tests)).
+
+When the change touches the server, the build or the package, also run `pnpm build`, then `node scripts/smoke.ts`
+and `node scripts/smoke.ts --tarball`, as CI does.
 
 When the change touches `site/`, including its pages, also run `pnpm site:build`, then
 `pnpm --dir site check-links`.
@@ -257,12 +261,12 @@ never deploys: the site changes it brings go live when it is merged.
 
 ## Releases
 
-Every `package.json` (root, `server`, `shared`, `web`, `site`) carries the version of the last release, and the tag
+Every `package.json` (root, `server`, `shared`, `llamacpp-js`, `web`, `site`) carries the version of the last release, and the tag
 must match it. A release takes two steps:
 
 ```bash title="Terminal"
 # 1. Set the version everywhere, then commit it through a pull request
-bun run release 0.2.0
+pnpm release 0.2.0
 # 2. Once it is merged, tag master
 git fetch origin
 git tag v0.2.0 origin/master
@@ -270,12 +274,14 @@ git push origin v0.2.0
 ```
 
 `scripts/release.test.ts` fails when the `package.json` versions differ, and `.github/workflows/release.yml`, which
-runs when a `v*` tag is pushed, first checks that they match the tag (`bun scripts/release.ts --check v0.2.0`). The
-executables report the tag as their version (`git describe`, shown in the status bar).
+runs when a `v*` tag is pushed, first checks that they match the tag (`node scripts/release.ts --check v0.2.0`). The
+build reports the tag as its version (`git describe`, shown in the status bar and by `/api/health`).
 
-An executable built from an untagged commit reports its short hash instead (`fa823b5`), and `-dirty` when built with
-uncommitted changes.
+A build from an untagged commit reports the last tag, the number of commits since and the short hash instead
+(`v0.2.0-3-gfa823b5`), and `-dirty` when built with uncommitted changes.
 
-The workflow compiles `llama-webui-linux-x64` and `llama-webui-linux-arm64` (`bun run compile --target …`),
-smoke-tests the x64 executable, writes `SHA256SUMS`, and creates the GitHub Release with generated notes. The
-[Installation](/docs/getting-started/installation/) page downloads from the latest release.
+The workflow then builds, packs the root package (`pnpm pack --pack-destination release`), installs the tarball with
+npm into an empty prefix and smoke-tests the installed command (`node scripts/smoke.ts --tarball`), writes
+`SHA256SUMS`, and creates the GitHub Release with generated notes and those two files
+([Distribution](/developers/architecture/#distribution)). The [Installation](/docs/getting-started/installation/) page
+installs from a release.
