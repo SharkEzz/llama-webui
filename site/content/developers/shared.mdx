@@ -19,7 +19,8 @@ file path:
 import { EMPTY_LOG_VIEW, type LogLine, type LogView, mergeLogs, onBoot } from '@llama-webui/shared';
 ```
 
-Tests sit next to their module (`packages/webui-shared/src/<module>.test.ts`) and run with `bun test`.
+Tests sit next to their module (`packages/webui-shared/src/<module>.test.ts`) and run with Vitest on Node, then
+again under Bun while the app runs on it ([Tests under Bun](/developers/contributing/testing/#tests-under-bun)).
 
 ## Modules
 
@@ -118,10 +119,10 @@ the text itself.
 
 The package imports nothing from `server/` or `web/`: its modules import zod, the browser-safe modules of
 `llamacpp-js` (never `llamacpp-js/node`) and each other, and only the tests use
-`bun:test` and `node:path`. Keep it that way. The same module runs in Bun and in the browser bundle, so a module that
+`vitest` and `node:path`. Keep it that way. The same module runs in Bun and in the browser bundle, so a module that
 reached into the server would drag server code into the UI, and one that needed the DOM would break on the server.
 Inputs that depend on the environment are passed in instead of read: `profileModelPath()` takes the home directory as
 an argument and expands `~` itself, without `node:os` or `node:path`.
 
-Its project (`packages/webui-shared/tsconfig.json`, checked by `bun check -b`) compiles it with `lib: ["ESNext"]`, the
+Its project (`packages/webui-shared/tsconfig.json`, checked by `tsc -b`) compiles it with `lib: ["ESNext"]`, the
 Bun types and no DOM types, so a DOM API in a shared module fails there.
