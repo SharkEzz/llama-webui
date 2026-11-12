@@ -13,7 +13,7 @@ import {
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { ApiError, api } from './api';
+import { ApiError, byId, call, client } from './api';
 import { plural } from './format';
 import { onWs, useWs } from './ws';
 
@@ -230,8 +230,8 @@ export const useBench = create<BenchState>()((set, get) => ({
 
   async load() {
     try {
-      const { runs, live } = await api<{ runs: BenchRun[]; live: BenchLive | null }>(
-        `/bench/runs?sweep=${get().filters.sweeps}&limit=${HISTORY_LIMIT}`,
+      const { runs, live } = await call(
+        client.bench.runs.$get({ query: { sweep: get().filters.sweeps, limit: String(HISTORY_LIMIT) } }),
       );
       set({ runs, live, loaded: true, selected: get().selected.filter((id) => runs.some((r) => r.id === id)) });
     } catch (e) {
@@ -241,7 +241,7 @@ export const useBench = create<BenchState>()((set, get) => ({
 
   async loadDevices() {
     try {
-      set({ devices: await api<BenchDevice[]>('/bench/devices') });
+      set({ devices: await call(client.bench.devices.$get()) });
     } catch {
       set({ devices: [] });
     }
@@ -266,9 +266,7 @@ export const useBench = create<BenchState>()((set, get) => ({
       return;
     }
     try {
-      const draft = await api<Pick<BenchSpec, 'modelPath' | 'mmprojPath' | 'profileId' | 'params' | 'serverArgs'>>(
-        `/bench/from-profile/${id}`,
-      );
+      const draft = await call(client.bench['from-profile'][':id'].$get(byId(id)));
       set({
         form: formFromSpec(draft, { ...EMPTY_FORM, kind: form.kind, p: form.p, n: form.n, r: form.r }),
         errors: {},
@@ -291,7 +289,7 @@ export const useBench = create<BenchState>()((set, get) => ({
     set({ launching: true });
     using _launching = defer(() => set({ launching: false }));
     try {
-      await api<BenchRun>('/bench/run', { method: 'POST', body: JSON.stringify({ spec: built.spec, stopServer }) });
+      await call(client.bench.run.$post({ json: { spec: built.spec, stopServer } }));
       set({ errors: {} });
       return 'ok';
     } catch (e) {
@@ -309,7 +307,7 @@ export const useBench = create<BenchState>()((set, get) => ({
     const live = get().live;
     if (!live) return;
     try {
-      await api(`/bench/${live.runId}/cancel`, { method: 'POST' });
+      await call(client.bench[':id'].cancel.$post(byId(live.runId)));
     } catch (e) {
       fail(e);
     }
@@ -317,7 +315,7 @@ export const useBench = create<BenchState>()((set, get) => ({
 
   async remove(id) {
     try {
-      await api(`/bench/${id}`, { method: 'DELETE' });
+      await call(client.bench[':id'].$delete(byId(id)));
       set({ runs: get().runs.filter((r) => r.id !== id), selected: get().selected.filter((s) => s !== id) });
     } catch (e) {
       fail(e);
@@ -326,7 +324,7 @@ export const useBench = create<BenchState>()((set, get) => ({
 
   async removeFailed() {
     try {
-      const { deleted } = await api<{ deleted: number }>('/bench/runs?failed=1', { method: 'DELETE' });
+      const { deleted } = await call(client.bench.runs.$delete({ query: { failed: '1' } }));
       toast.success(deleted === 0 ? 'No failed runs' : `${deleted} ${plural(deleted, 'run')} deleted`);
       await get().load();
     } catch (e) {
@@ -336,7 +334,7 @@ export const useBench = create<BenchState>()((set, get) => ({
 
   async toProfile(id) {
     try {
-      const p = await api<Profile>(`/bench/${id}/to-profile`, { method: 'POST', body: '{}' });
+      const p = await call(client.bench[':id']['to-profile'].$post(byId(id)));
       toast.success(`Profile “${p.name}” created`);
       return p;
     } catch (e) {

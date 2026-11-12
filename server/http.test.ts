@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { expect, test } from 'vitest';
 import { z } from 'zod';
 import {
+  accepts,
   allowTable,
   apiRoutes,
   body,
@@ -174,4 +175,21 @@ test('query() declares the keys and refuses nothing; the handler still reads sea
   const none = await app.request('/api/q');
   expect(none.status).toBe(200);
   expect(await none.json()).toEqual({ path: null, valid: {} });
+});
+
+test('accepts() types the body for the client and reads nothing: the handler still decides (409 before 400)', async () => {
+  const app = new Hono<Env>().post('/api/a', accepts<{ n: number }>(), async (c) => {
+    if (c.req.header('x-busy')) throw new HttpError(409, 'busy');
+    return c.json(object(await c.req.json()));
+  });
+  app.onError((err) => errorResponse(err));
+  const post = (body: string, busy = false) =>
+    app.request('/api/a', {
+      method: 'POST',
+      body,
+      headers: { 'content-type': 'application/json', ...(busy ? { 'x-busy': '1' } : {}) },
+    });
+  expect((await post('{nope', true)).status).toBe(409);
+  expect(await (await post('{nope')).json()).toEqual({ error: 'Invalid JSON' });
+  expect(await (await post('{"n":2}')).json()).toEqual({ n: 2 });
 });

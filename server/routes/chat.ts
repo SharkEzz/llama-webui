@@ -65,7 +65,7 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
     )
     .post(
       '/api/chat',
-      json((body) => {
+      json((body): { profileId?: number | null } => {
         // Omitted: the running server's profile; null: none. `Number(null)` would be 0, a profile that never exists.
         const raw = object(body).profileId;
         if (raw !== undefined && raw !== null && !Number.isInteger(raw))

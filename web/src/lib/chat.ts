@@ -7,9 +7,10 @@ import {
   defer,
   SseParser,
 } from '@llama-webui/shared';
+import type { ClientResponse } from 'hono/client';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { ApiError, api, apiError } from './api';
+import { ApiError, apiError, byId, call, client } from './api';
 
 /** Reply being written in the open conversation. */
 export interface Streaming {
@@ -36,7 +37,10 @@ interface ChatState {
 }
 
 /** Reads an SSE stream of ChatEvent to the end (or until aborted). */
-export async function readSse(res: Response, onEvent: (e: ChatEvent) => void): Promise<void> {
+export async function readSse(
+  res: { readonly body: ReadableStream | null },
+  onEvent: (e: ChatEvent) => void,
+): Promise<void> {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   const parser = new SseParser();
@@ -50,13 +54,11 @@ export async function readSse(res: Response, onEvent: (e: ChatEvent) => void): P
 /** Stream followed for the open conversation; aborting it does not stop generation on the server. */
 let follow: AbortController | null = null;
 
-async function postStream(path: string, body?: unknown, signal?: AbortSignal): Promise<Response | null> {
-  const res = await fetch(`/api${path}`, {
-    method: body === undefined ? 'GET' : 'POST',
-    headers: body === undefined ? undefined : { 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal,
-  });
+type StreamReply = ClientResponse<unknown, number, string>;
+
+/** A stream request's reply: null for 204 (nothing running), otherwise read with `readSse`. */
+async function openStream(req: Promise<StreamReply>): Promise<StreamReply | null> {
+  const res = await req;
   if (res.status === 204) return null;
   if (!res.ok) throw apiError(res.status, await res.json().catch(() => null));
   return res;
@@ -66,7 +68,7 @@ const replace = (messages: ChatMessage[], m: ChatMessage) => messages.map((x) =>
 
 export const useChat = create<ChatState>((set, get) => {
   /** Follows a stream: text accumulates and is pushed to the store only once per frame. */
-  const consume = async (conversationId: number, request: (signal: AbortSignal) => Promise<Response | null>) => {
+  const consume = async (conversationId: number, request: (signal: AbortSignal) => Promise<StreamReply | null>) => {
     follow?.abort();
     const ctl = new AbortController();
     follow = ctl;
@@ -147,7 +149,7 @@ export const useChat = create<ChatState>((set, get) => {
 
     loadList: async () => {
       try {
-        set({ list: await api<ConversationSummary[]>('/chat') });
+        set({ list: await call(client.chat.$get()) });
       } catch (e) {
         toast.error((e as Error).message);
       }
@@ -163,9 +165,10 @@ export const useChat = create<ChatState>((set, get) => {
       follow?.abort();
       set({ streaming: null });
       try {
-        const c = await api<ConversationDetail>(`/chat/${id}`);
+        const c = await call(client.chat[':id'].$get(byId(id)));
         set({ current: c });
-        if (c.live) void consume(id, (signal) => postStream(`/chat/${id}/stream`, undefined, signal));
+        if (c.live)
+          void consume(id, (signal) => openStream(client.chat[':id'].stream.$get(byId(id), { init: { signal } })));
       } catch (e) {
         set({ current: null });
         toast.error((e as Error).message);
@@ -173,7 +176,7 @@ export const useChat = create<ChatState>((set, get) => {
     },
 
     create: async () => {
-      const c = await api<ConversationDetail>('/chat', { method: 'POST', body: '{}' });
+      const c = await call(client.chat.$post({ json: {} }));
       follow?.abort();
       set({ current: c, streaming: null });
       void get().loadList();
@@ -183,14 +186,14 @@ export const useChat = create<ChatState>((set, get) => {
     patch: async (p) => {
       const cur = get().current;
       if (!cur) return;
-      const c = await api<ConversationDetail>(`/chat/${cur.id}`, { method: 'PATCH', body: JSON.stringify(p) });
+      const c = await call(client.chat[':id'].$patch({ ...byId(cur.id), json: p }));
       if (get().current?.id === c.id) set({ current: { ...get().current!, ...c, messages: get().current!.messages } });
       if (p.title) void get().loadList();
     },
 
     rename: async (id, title) => {
       try {
-        const c = await api<ConversationDetail>(`/chat/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
+        const c = await call(client.chat[':id'].$patch({ ...byId(id), json: { title } }));
         const cur = get().current;
         if (cur?.id === id) set({ current: { ...cur, title: c.title } });
         await get().loadList();
@@ -200,7 +203,7 @@ export const useChat = create<ChatState>((set, get) => {
     },
 
     remove: async (id) => {
-      await api(`/chat/${id}`, { method: 'DELETE' });
+      await call(client.chat[':id'].$delete(byId(id)));
       if (get().current?.id === id) {
         follow?.abort();
         set({ current: null, streaming: null });
@@ -211,19 +214,25 @@ export const useChat = create<ChatState>((set, get) => {
     send: async (text) => {
       const cur = get().current;
       if (!cur) return;
-      await consume(cur.id, (signal) => postStream(`/chat/${cur.id}/messages`, { content: text }, signal));
+      await consume(cur.id, (signal) =>
+        openStream(
+          client.chat[':id'].messages.$post({ ...byId(cur.id), json: { content: text } }, { init: { signal } }),
+        ),
+      );
     },
 
     regenerate: async () => {
       const cur = get().current;
       if (!cur) return;
-      await consume(cur.id, (signal) => postStream(`/chat/${cur.id}/regenerate`, {}, signal));
+      await consume(cur.id, (signal) =>
+        openStream(client.chat[':id'].regenerate.$post(byId(cur.id), { init: { signal } })),
+      );
     },
 
     stop: async () => {
       const cur = get().current;
       if (!cur) return;
-      await api(`/chat/${cur.id}/stop`, { method: 'POST', body: '{}' }).catch((e: Error) => toast.error(e.message));
+      await call(client.chat[':id'].stop.$post(byId(cur.id))).catch((e: Error) => toast.error(e.message));
     },
   };
 });

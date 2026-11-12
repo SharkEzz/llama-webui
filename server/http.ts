@@ -128,6 +128,15 @@ export const body = <S extends z.ZodType>(schema: S, o: { object?: boolean } = {
     throw r.error;
   });
 
+/**
+ * Declares the JSON body a route takes, for the web's typed client, and reads nothing: for a handler that answers 404
+ * or 409 before reading its body itself (`object(await c.req.json())`). A json validator would parse it first.
+ */
+export const accepts =
+  <T>(): MiddlewareHandler<Env, string, { in: { json: T }; out: { json: T } }> =>
+  (_c, next) =>
+    next();
+
 /** For `json()`: the body as sent, when the handler (or its repo) validates it after a lookup or a 409. */
 export const passthrough = (body: unknown): unknown => body;
 

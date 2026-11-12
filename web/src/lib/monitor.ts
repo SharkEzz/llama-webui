@@ -1,6 +1,6 @@
 import { defer, type HistoryDump, type Snapshot } from '@llama-webui/shared';
 import { create } from 'zustand';
-import { api } from './api';
+import { call, client } from './api';
 import { onWs, useWs } from './ws';
 
 /**
@@ -70,7 +70,7 @@ export async function reloadHistory() {
     pending = [];
   });
   try {
-    const d = await api<HistoryDump & { bootId: string }>('/monitor/history');
+    const d = await call(client.monitor.history.$get());
     const h = fromDump(d);
     for (const s of pending) append(h, s);
     useMonitor.setState((st) => ({ history: h, version: st.version + 1 }));

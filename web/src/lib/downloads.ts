@@ -1,22 +1,15 @@
-import {
-  type DownloadItem,
-  type DownloadLive,
-  type HfRepo,
-  type HfSearchHit,
-  type HfStatus,
-  isDownloadActive,
-} from '@llama-webui/shared';
+import { type DownloadItem, type DownloadLive, isDownloadActive } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { api } from './api';
+import { byId, call, client } from './api';
 import { useModels } from './models';
 import { onWs, useWs } from './ws';
 
-export const getHfStatus = () => api<HfStatus>('/hf/status');
+export const getHfStatus = () => call(client.hf.status.$get());
 export const searchHf = (q: string, signal?: AbortSignal) =>
-  api<HfSearchHit[]>(`/hf/search?q=${encodeURIComponent(q)}`, { signal });
+  call(client.hf.search.$get({ query: { q } }, { init: { signal } }));
 export const getHfRepo = (id: string, signal?: AbortSignal) =>
-  api<HfRepo>(`/hf/repo?id=${encodeURIComponent(id)}`, { signal });
+  call(client.hf.repo.$get({ query: { id } }, { init: { signal } }));
 
 /**
  * Absolute path of a downloaded item's model (its first shard): what the models list and the detail dialog use.
@@ -44,7 +37,7 @@ export const useDownloads = create<DownloadsState>((set) => ({
 
   async load() {
     try {
-      const { items, live } = await api<{ items: DownloadItem[]; live: DownloadLive | null }>('/downloads');
+      const { items, live } = await call(client.downloads.$get());
       set({ items, live });
     } catch {
       // Offline: the WS reconnection reloads.
@@ -53,10 +46,7 @@ export const useDownloads = create<DownloadsState>((set) => ({
 
   async enqueue(repo, revision, keys) {
     try {
-      const { items } = await api<{ items: DownloadItem[] }>('/downloads', {
-        method: 'POST',
-        body: JSON.stringify({ repo, revision, keys }),
-      });
+      const { items } = await call(client.downloads.$post({ json: { repo, revision, keys } }));
       if (items.length === 0) toast.info('Already downloaded');
       return true;
     } catch (e) {
@@ -66,19 +56,19 @@ export const useDownloads = create<DownloadsState>((set) => ({
   },
 
   async cancel(id) {
-    await api(`/downloads/${id}`, { method: 'DELETE' }).catch(fail);
+    await call(client.downloads[':id'].$delete(byId(id))).catch(fail);
   },
 
   async retry(id) {
-    await api(`/downloads/${id}/retry`, { method: 'POST', body: '{}' }).catch(fail);
+    await call(client.downloads[':id'].retry.$post(byId(id))).catch(fail);
   },
 
   async remove(id) {
-    await api(`/downloads/${id}`, { method: 'DELETE' }).catch(fail);
+    await call(client.downloads[':id'].$delete(byId(id))).catch(fail);
   },
 
   async clearFinished() {
-    await api('/downloads/clear', { method: 'POST', body: '{}' }).catch(fail);
+    await call(client.downloads.clear.$post()).catch(fail);
   },
 }));
 

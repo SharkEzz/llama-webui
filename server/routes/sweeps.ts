@@ -6,7 +6,7 @@ import type { BenchRunner } from '../bench/runner';
 import type { BenchRunsRepo } from '../db/benchRuns';
 import type { SettingsRepo } from '../db/settings';
 import type { SweepsRepo } from '../db/sweeps';
-import { type Env, HttpError, id, json, notFound, object } from '../http';
+import { accepts, type Env, HttpError, id, json, notFound, object } from '../http';
 import type { Monitor } from '../monitor/monitor';
 import { readTuningHardware } from '../tuning/hardware';
 import { loadModel, mmprojBytes } from '../tuning/models';
@@ -102,7 +102,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
         return c.body(null, 204);
       })
       // resume and validate look the sweep up (404, 409) before reading the body: no body validator, read here.
-      .post('/api/sweeps/:id/resume', id('Sweep'), async (c) => {
+      .post('/api/sweeps/:id/resume', id('Sweep'), accepts<{ stopServer?: boolean }>(), async (c) => {
         const sweep = getSweep(c.req.valid('param').id);
         notRunning(sweep.status);
         const body = object(await c.req.json());
@@ -117,7 +117,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
         );
         return c.json(started, 202);
       })
-      .post('/api/sweeps/:id/validate', id('Sweep'), async (c) => {
+      .post('/api/sweeps/:id/validate', id('Sweep'), accepts<z.input<typeof ValidateRequest>>(), async (c) => {
         const sweep = getSweep(c.req.valid('param').id);
         notRunning(sweep.status);
         const { n, stopServer } = ValidateRequest.parse(object(await c.req.json()));

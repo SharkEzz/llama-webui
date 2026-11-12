@@ -1,6 +1,6 @@
-import { EMPTY_LOG_VIEW, type LogLine, type LogView, mergeLogs, onBoot } from '@llama-webui/shared';
+import { EMPTY_LOG_VIEW, type LogView, mergeLogs, onBoot } from '@llama-webui/shared';
 import { create } from 'zustand';
-import { api } from './api';
+import { call, client } from './api';
 import { onWs, useWs } from './ws';
 
 const MAX_LINES = 10_000;
@@ -11,21 +11,15 @@ export const useLogs = create<LogView>()(() => EMPTY_LOG_VIEW);
 /** “Clear view”: hides the lines received so far (the server ring is left untouched). */
 export const hideCurrentLogs = () => useLogs.setState((s) => ({ hiddenBefore: s.seq }));
 
-interface LogsResponse {
-  lines: LogLine[];
-  seq: number;
-  bootId: string;
-}
-
 async function replay() {
   const asked = useLogs.getState();
   try {
-    const r = await api<LogsResponse>(`/logs?since=${asked.seq}`);
+    const r = await call(client.logs.$get({ query: { since: String(asked.seq) } }));
     const now = useLogs.getState();
     if (r.bootId !== asked.bootId && asked.bootId !== null) {
       // Different boot than the one of the requested lines: start over and reread everything.
       useLogs.setState(onBoot(now, r.bootId));
-      const all = await api<LogsResponse>('/logs?since=0');
+      const all = await call(client.logs.$get({ query: { since: '0' } }));
       useLogs.setState((s) => mergeLogs(onBoot(s, all.bootId), all.lines, MAX_LINES));
     } else useLogs.setState(mergeLogs(onBoot(now, r.bootId), r.lines, MAX_LINES));
   } catch {

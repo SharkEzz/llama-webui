@@ -26,6 +26,9 @@ export class ApiError extends Error {
 export const makeClient = (f?: typeof fetch) => hc<AppType>('/', f ? { fetch: f } : {}).api;
 export const client = makeClient();
 
+/** The `:id` of a route, as the client takes it. */
+export const byId = (id: number) => ({ param: { id: String(id) } });
+
 /** What a 2xx reply of `R` holds: its JSON output, `undefined` for a 204. */
 export type Ok<R> =
   R extends ClientResponse<infer T, infer S, infer _F>

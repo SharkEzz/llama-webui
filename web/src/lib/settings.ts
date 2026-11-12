@@ -1,7 +1,7 @@
 import type { Settings } from '@llama-webui/shared';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ApiError, api } from './api';
+import { ApiError, call, client } from './api';
 
 export type SettingsErrors = Partial<Record<keyof Settings, string>>;
 
@@ -14,16 +14,13 @@ export function useSettingsEditor() {
   const [errors, setErrors] = useState<SettingsErrors>({});
 
   useEffect(() => {
-    void api<Settings>('/settings').then(setSettings, (e: Error) => toast.error(e.message));
+    void call(client.settings.$get()).then(setSettings, (e: Error) => toast.error(e.message));
   }, []);
 
   const save = async (patch: Partial<Settings>, o: { quiet?: boolean } = {}): Promise<boolean> => {
     const keys = Object.keys(patch) as (keyof Settings)[];
     try {
-      const { warning, ...next } = await api<Settings & { warning?: string }>('/settings', {
-        method: 'PATCH',
-        body: JSON.stringify(patch),
-      });
+      const { warning, ...next } = await call(client.settings.$patch({ json: patch }));
       setSettings(next);
       if (warning) toast.warning(warning);
       setErrors((e) => {
