@@ -52,7 +52,7 @@ const INTERRUPTED = 'interrupted (llama-webui reloaded or stopped)';
 
 /**
  * The benchmarks: one-off runs and sweeps, one at a time. The gate stops the managed server once and restarts it
- * once; the executor runs each run. Recreated on every `bun --hot` reload: dispose() hands over and the
+ * once; the executor runs each run. Recreated on every development reload: dispose() hands over and the
  * new runner resumes a running sweep (resume).
  */
 export class BenchRunner {
@@ -330,7 +330,7 @@ export class BenchRunner {
   }
 
   /**
-   * Reload (`restart: true`) or Bun shutdown. The child is killed. A one-off run is “interrupted”; a sweep item goes
+   * Reload (`restart: true`) or shutdown. The child is killed. A one-off run is “interrupted”; a sweep item goes
    * back to the queue on reload (the new runner replays it) and the sweep stays “running”. The gate is handed back
    * later: the new module takes it over, otherwise it restarts the server.
    */

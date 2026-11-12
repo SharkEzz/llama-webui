@@ -26,8 +26,8 @@ const POLL_MS = 100;
 /**
  * The server gate during benchmarks: a single holder (one-off run or sweep), the managed server stopped once on
  * acquire and restarted once on release, the external server detector paused while it is held.
- * Lives in the runtime (survives `bun --hot`): the runner is recreated on every reload, the gate is not, so a
- * sweep resumes in the new module without restarting the server in between. Changing this file requires restarting Bun.
+ * Lives in the runtime (survives a development reload): the runner is recreated on every reload, the gate is not, so a
+ * sweep resumes in the new module without restarting the server in between. Changing this file requires restarting `pnpm dev`.
  */
 export class BenchGate {
   private holding = false;

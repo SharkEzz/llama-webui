@@ -21,7 +21,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
   const { supervisor, logs } = runtime;
   /**
    * Supervisor refusals (port in use, operation in progress…) become 409s. Compared by name rather than with
-   * instanceof: the supervisor survives `bun --hot` and throws the class from the old version of the module.
+   * instanceof: the supervisor survives a development reload and throws the class from the old version of the module.
    */
   const lifecycle = async (fn: () => Promise<void>) => {
     try {

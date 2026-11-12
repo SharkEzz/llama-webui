@@ -7,9 +7,9 @@ import { Supervisor } from './supervisor/supervisor';
 export interface Runtime {
   supervisor: Supervisor;
   logs: LogBuffer;
-  /** ID of this llama-webui boot (stable across bun --hot): the client ties log numbering to it. */
+  /** ID of this llama-webui boot (stable across development reloads): the client ties log numbering to it. */
   bootId: string;
-  /** Always-on monitoring, started once by startMonitor() (also survives bun --hot). */
+  /** Always-on monitoring, started once by startMonitor() (also survives development reloads). */
   monitor: Promise<Monitor> | null;
   /** Server gate during benchmarks: held across a reload, so a sweep resumes without a restart. */
   benchGate: BenchGate;
@@ -18,10 +18,11 @@ export interface Runtime {
 const g = globalThis as { __llamaWebuiRuntime?: Runtime };
 
 /**
- * Single supervisor and log ring for the whole process. They live on globalThis to survive `bun --hot`
- * (a code reload must neither kill nor orphan llama-server). Shutdown signal handlers are installed only once.
- * Consequence: changing supervisor.ts, logs/buffer.ts, bench/gate.ts, server/monitor/** (except placement.ts, whose
- * tracker server/index.ts recreates on every reload), server/collectors/** or this file requires a full Bun restart.
+ * Single supervisor and log ring for the whole process. They live on globalThis to survive a development reload
+ * (`server/dev.ts`: a code reload must neither kill nor orphan llama-server). Shutdown signal handlers are installed
+ * only once. Consequence: changing supervisor.ts, logs/buffer.ts, bench/gate.ts, server/monitor/** (except
+ * placement.ts, whose tracker server/index.ts recreates on every reload), server/collectors/** or this file requires
+ * restarting `pnpm dev`.
  */
 export function getRuntime(): Runtime {
   if (g.__llamaWebuiRuntime) return g.__llamaWebuiRuntime;

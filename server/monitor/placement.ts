@@ -216,7 +216,7 @@ export interface PlacementMemory {
 }
 
 const g = globalThis as { __llamaWebuiPlacement?: PlacementMemory };
-/** Survives `bun --hot`, like the ring: a reload after the launch was evicted keeps the known placement. */
+/** Survives a development reload, like the ring: a reload after the launch was evicted keeps the known placement. */
 g.__llamaWebuiPlacement ??= { last: null };
 const sharedMemory = g.__llamaWebuiPlacement;
 
@@ -227,7 +227,7 @@ export interface PlacementTrackerDeps {
 }
 
 /**
- * Tracks the managed server's placement. Recreated on every Bun reload: it replays the ring (which does survive). The
+ * Tracks the managed server's placement. Recreated on every development reload: it replays the ring (which does survive). The
  * ring only keeps the latest lines: once the launch is evicted (request logs, -lv 4), the last placement read stays
  * valid as long as the tracked server has the same PID. An external server writes nothing to the ring: its
  * placement is unknown even if the ring still holds an old launch.

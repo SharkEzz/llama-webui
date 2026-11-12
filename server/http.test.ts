@@ -18,7 +18,7 @@ import {
   shadowed,
 } from './http';
 
-test('an HttpError from an older module (bun --hot) keeps its status and code (#34)', async () => {
+test('an HttpError from an older module (development reload) keeps its status and code (#34)', async () => {
   // What the bench gate throws after a reload: same name and fields, another class.
   class StaleHttpError extends Error {
     override name = 'HttpError';

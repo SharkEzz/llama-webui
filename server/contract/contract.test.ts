@@ -77,7 +77,7 @@ async function boot() {
   const savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
   for (const k of ENV_KEYS) delete process.env[k];
   process.env.HOME = join(tmp, 'home');
-  // Outside HOME: Bun's homedir() ignores this HOME (`<home>` in the golden), Node's follows it.
+  // Outside HOME: Node's homedir() follows this HOME (Bun's did not: `<home>` in the golden).
   process.env.XDG_CONFIG_HOME = join(tmp, 'xdg-config');
   process.env.XDG_CACHE_HOME = join(tmp, 'xdg-cache');
   // The fake llama-server inherits the environment: no pause between chat chunks, so the stream ends at once.

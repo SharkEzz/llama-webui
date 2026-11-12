@@ -207,7 +207,7 @@ test('PlacementTracker: the launch evicted from the ring keeps the placement of 
   expect(tracker.current?.layers).toEqual({ offloaded: 49, total: 49 });
   tracker.dispose();
 
-  // bun --hot: a new tracker, the ring without the launch, the same server.
+  // Development reload: a new tracker, the ring without the launch, the same server.
   const reloaded = new PlacementTracker({ logs, supervisor: sup, memory });
   expect(reloaded.current?.buffers).toHaveLength(5);
   // Another server (new PID) whose launch is not in the ring: unknown, not the old placement.

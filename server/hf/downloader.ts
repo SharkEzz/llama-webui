@@ -16,12 +16,12 @@ import { type HfClient, hfHttpError } from './client';
 import { fileDest, partPath, sizeOf } from './paths';
 
 export interface Handover {
-  /** Settles once the writer of the previous module instance has let go of its `.part` (bun --hot). */
+  /** Settles once the writer of the previous module instance has let go of its `.part` (development reload). */
   idle: Promise<void>;
 }
 
 const g = globalThis as { __llamaWebuiDownloadHandover?: Handover };
-/** Survives `bun --hot`: the new queue waits for the old one to close its file before resuming it. */
+/** Survives a development reload: the new queue waits for the old one to close its file before resuming it. */
 export const globalHandover = (): Handover => (g.__llamaWebuiDownloadHandover ??= { idle: Promise.resolve() });
 
 export interface DownloadQueueDeps {
@@ -101,7 +101,7 @@ export async function freeBytesOf(dir: string): Promise<number | null> {
 /**
  * The Hugging Face download queue, one item at a time. Each file goes to `<file>.part` (resumed with a Range
  * request after an error, a restart or a reload), is checked against its sha256 then renamed into place.
- * Recreated on every `bun --hot` reload: dispose() stops the transfer without touching the `.part` or the database
+ * Recreated on every development reload: dispose() stops the transfer without touching the `.part` or the database
  * row, and the new queue resumes it.
  */
 export class DownloadQueue {
@@ -411,7 +411,7 @@ export class DownloadQueue {
   private async fetchFile(cur: Current, item: DownloadItem, file: DownloadFile, base: number): Promise<void> {
     const dest = fileDest(item.dir, file.path);
     const part = partPath(dest);
-    // The previous module instance may still be writing this `.part` (bun --hot): wait for every holder before us.
+    // The previous module instance may still be writing this `.part` (development reload): wait for every holder before us.
     // Chained, so that two waiters never get in together.
     const prev = this.handover.idle;
     let release!: () => void;
