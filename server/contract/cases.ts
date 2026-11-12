@@ -18,8 +18,8 @@ export interface Route {
   query?: string;
 }
 
-/** The app's routes as `server/app.ts` registers them. `contract.test.ts` checks this list against the app. */
-export const ROUTES: Route[] = [
+/** The app's routes as `createApi()` registers them. `contract.test.ts` checks this list against the app. */
+export const ROUTES: Readonly<Route[]> = [
   { path: '/api/health', methods: ['GET'] },
   {
     path: '/api/settings',
