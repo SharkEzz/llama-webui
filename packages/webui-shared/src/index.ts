@@ -14,7 +14,6 @@ export * from './server';
 export * from './settings';
 export * from './setup';
 export * from './shell';
-export * from './sse';
 export * from './sweep';
 export * from './topology';
 export * from './tuning';

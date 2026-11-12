@@ -1,9 +1,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse, setGlobalProxyFromEnv } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { streamChatCompletion } from 'llamacpp-js/client';
 import { afterEach, expect, test, vi } from 'vitest';
 import { llamaFetch } from './llamaFetch';
+import { listen } from './testing/listen';
 
 const open: Server[] = [];
 afterEach(async () => {
@@ -16,8 +16,7 @@ afterEach(async () => {
 async function serve(handler: (req: IncomingMessage, res: ServerResponse) => void): Promise<string> {
   const server = createServer(handler);
   open.push(server);
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
-  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  return listen(server);
 }
 
 const bodyOf = async (req: IncomingMessage) => Buffer.concat(await req.toArray()).toString();

@@ -1,4 +1,4 @@
-import { type Spawn, spawnProc } from '../proc';
+import { type Spawn, type Spawned, spawnProc } from '../proc';
 import { type GpuReading, normalizeBusId } from './gpu';
 
 const MiB = 1024 ** 2;
@@ -54,11 +54,8 @@ export function parseComputeApps(csv: string): Array<{ pid: number; uuid: string
   return out;
 }
 
-type Spawned = {
-  stdout: ReadableStream<Uint8Array>;
-  exited: Promise<number>;
-  kill(signal?: NodeJS.Signals | number): void;
-};
+/** nvidia-smi: its output read, its errors ignored. */
+type Smi = Spawned<'pipe', 'ignore'>;
 
 /** `reached` resolves to null after `ms`; the timer is cleared when leaving the scope (`using`). */
 function timeoutAfter(ms: number): { reached: Promise<null> } & Disposable {
@@ -74,7 +71,7 @@ export class NvidiaMonitor {
   private bin: string;
   private intervalMs: number;
   private spawn: Spawn;
-  private proc: Spawned | null = null;
+  private proc: Smi | null = null;
   private current: GpuReading[] = [];
   private pending: GpuReading[] = [];
   private apps: Array<{ pid: number; uuid: string; usedBytes: number | null }> = [];
@@ -94,12 +91,8 @@ export class NvidiaMonitor {
     try {
       this.proc = this.spawn(
         [this.bin, `--query-gpu=${QUERY}`, '--format=csv,noheader,nounits', '-lms', String(this.intervalMs)],
-        {
-          stdout: 'pipe',
-          stderr: 'ignore',
-          stdin: 'ignore',
-        },
-      ) as unknown as Spawned;
+        { stderr: 'ignore' },
+      );
     } catch {
       this.disabled = true;
       return;
@@ -107,7 +100,7 @@ export class NvidiaMonitor {
     void this.read(this.proc);
   }
 
-  private async read(proc: Spawned) {
+  private async read(proc: Smi) {
     const decoder = new TextDecoder();
     let buf = '';
     try {
@@ -174,13 +167,11 @@ export class NvidiaMonitor {
   }
 
   private async queryApps(): Promise<void> {
-    let p: Spawned;
+    let p: Smi;
     try {
       p = this.spawn([this.bin, '--query-compute-apps=pid,gpu_uuid,used_memory', '--format=csv,noheader,nounits'], {
-        stdout: 'pipe',
         stderr: 'ignore',
-        stdin: 'ignore',
-      }) as unknown as Spawned;
+      });
     } catch {
       this.disabled = true;
       return;

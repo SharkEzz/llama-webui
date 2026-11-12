@@ -14,7 +14,6 @@ HTTP clients follow it over Server-Sent Events (SSE).
 | `server/routes/chat.ts`    | The `/api/chat` routes and the `sse()` helper that turns a run into a `text/event-stream`.     |
 | `server/db/conversations.ts` | `ConversationsRepo`: the `conversations` and `messages` tables.                              |
 | `packages/webui-shared/src/chat.ts`       | `Conversation`, `ChatMessage`, `ChatEvent`, `MessageStats`, `statsFromTimings()`, the zod schemas. |
-| `packages/webui-shared/src/sse.ts`        | `formatSse()`, one event of llama-webui's own stream.                                          |
 | `llamacpp-js/client`       | `streamChatCompletion()`, the streamed `/v1/chat/completions` ([llamacpp-js](/developers/llamacpp-js/)). |
 | `llamacpp-js/sse`          | `SseParser`, the incremental `text/event-stream` reader used on both sides.                    |
 
@@ -126,8 +125,8 @@ export type ChatEvent =
   | { type: 'done'; message: ChatMessage };
 ```
 
-`sse()` in `server/routes/chat.ts` serves a run as `text/event-stream`. Each event is written by `formatSse()` as a
-named event whose data is the whole `ChatEvent` as one line of JSON:
+`sse()` in `server/routes/chat.ts` serves a run as `text/event-stream` (`streamSSE()` of `hono/streaming`). Each event
+is written by `writeSSE()` as a named event whose data is the whole `ChatEvent` as one line of JSON:
 
 ```text
 event: start

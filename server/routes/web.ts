@@ -1,5 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, join, relative } from 'node:path';
+import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response';
 import type { WebHandler } from '../host';
 
 /*
@@ -7,16 +9,19 @@ import type { WebHandler } from '../host';
  * `dist/web`, split per page (each page loads its own chunks: the Topology page's three.js stays out of the others).
  */
 
-/** Types of the files `vite build` writes to `dist/web`, with the types the UI has always been served with. */
+const HTML = 'text/html;charset=utf-8';
+const IMMUTABLE = 'public, max-age=31536000, immutable';
+
+/** Types of the files `vite build` writes to `dist/web`. */
 const TYPES: Record<string, string> = {
-  '.html': 'text/html;charset=utf-8',
+  '.html': HTML,
   '.js': 'text/javascript;charset=utf-8',
   '.css': 'text/css;charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
-  '.json': 'application/json;charset=utf-8',
+  '.json': 'application/json',
   '.wasm': 'application/wasm',
 };
 
@@ -26,33 +31,28 @@ const TYPES: Record<string, string> = {
  * reloading /chat/12 works). Rejects when the directory has no `index.html`.
  */
 export async function staticWeb(dir: string): Promise<WebHandler> {
-  const index = await readFile(join(dir, 'index.html'));
-  const files = new Map<string, { body: Buffer; type: string }>();
-  for (const e of await readdir(dir, { recursive: true, withFileTypes: true })) {
-    if (!e.isFile()) continue;
-    const path = join(e.parentPath, e.name);
-    const type = TYPES[extname(e.name)] ?? 'application/octet-stream';
-    files.set(`/${relative(dir, path)}`, { body: await readFile(path), type });
-  }
+  const index = { body: await readFile(join(dir, 'index.html')), type: HTML, cache: 'no-cache' };
+  const entries = await readdir(dir, { recursive: true, withFileTypes: true });
+  const files = new Map<string, typeof index>(
+    await Promise.all(
+      entries
+        .filter((e) => e.isFile())
+        .map(async (e) => {
+          const path = join(e.parentPath, e.name);
+          const type = TYPES[extname(e.name)] ?? 'application/octet-stream';
+          return [`/${relative(dir, path)}`, { body: await readFile(path), type, cache: IMMUTABLE }] as const;
+        }),
+    ),
+  );
   files.delete('/index.html');
-  return (req, res) => {
-    const file = files.get((req.url ?? '/').split('?', 1)[0] ?? '/');
-    // An explicit length: headers written before the body would otherwise be sent chunked, and HEAD with no length.
-    if (file) {
-      res.writeHead(200, {
-        'Content-Type': file.type,
-        'Content-Length': file.body.length,
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      });
-      res.end(file.body);
-    } else {
-      res.writeHead(200, {
-        'Content-Type': 'text/html;charset=utf-8',
-        'Content-Length': index.length,
-        'Cache-Control': 'no-cache',
-      });
-      res.end(index);
-    }
+  return (c) => {
+    const file = files.get(c.req.path) ?? index;
+    // An explicit length: HEAD answers without the body, and must still say how long it is.
+    return c.body(file.body, 200, {
+      'Content-Type': file.type,
+      'Content-Length': String(file.body.length),
+      'Cache-Control': file.cache,
+    });
   };
 }
 
@@ -62,7 +62,16 @@ export async function staticWeb(dir: string): Promise<WebHandler> {
  */
 export function unavailableWeb(err: unknown): WebHandler {
   const text = `llama-webui: web UI unavailable.\n\n${err instanceof Error ? err.message : String(err)}\n`;
-  return (_req, res) => {
-    res.writeHead(503, { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-store' }).end(text);
+  return (c) => c.body(text, 503, { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-store' });
+}
+
+/**
+ * Development: Vite's middlewares, which answer on Node's own response. The adapter then leaves it alone
+ * (`RESPONSE_ALREADY_SENT`).
+ */
+export function nodeWeb(handle: (req: IncomingMessage, res: ServerResponse) => void): WebHandler {
+  return (c) => {
+    handle(c.env.incoming, c.env.outgoing);
+    return RESPONSE_ALREADY_SENT;
   };
 }

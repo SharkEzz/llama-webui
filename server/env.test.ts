@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { afterEach, expect, test } from 'vitest';
 import { loadDotEnv, useEnvProxy } from './env';
+import { listen } from './testing/listen';
 import { tempDir } from './testing/tempDir';
 import { writeFileDeep } from './testing/write';
 
@@ -47,8 +47,7 @@ test('loadDotEnv: no file, nothing happens', () => {
 
 async function serve(reply: (req: IncomingMessage) => string): Promise<{ url: string; server: Server }> {
   const server = createServer((req, res) => res.end(reply(req)));
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
-  return { url: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, server };
+  return { url: await listen(server), server };
 }
 
 test('useEnvProxy: no proxy variable, nothing changes', () => {

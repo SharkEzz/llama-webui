@@ -1,8 +1,9 @@
-import { chmod, readFile, rm } from 'node:fs/promises';
+import { chmod, readFile } from 'node:fs/promises';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { defer } from '@llama-webui/shared';
 import { expect, test } from 'vitest';
 import type { Spawn } from '../proc';
+import { tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';
 import { type GpuSample, normalizeBusId, selectUsedGpus } from './gpu';
 import { NvidiaMonitor, parseComputeApps, parseNvidiaGpuLine } from './nvidia';
@@ -146,19 +147,18 @@ test('selectUsedGpus', () => {
 });
 
 test("hung nvidia-smi compute-apps query times out, is killed, and calls don't pile up", async () => {
-  const dir = `${process.env.TMPDIR ?? '/tmp'}/llt-nv-${process.pid}`;
-  const bin = `${dir}/hung-nvidia-smi`;
+  using dir = tempDir('lw-nv-');
+  const bin = `${dir.path}/hung-nvidia-smi`;
   await writeFileDeep(bin, '#!/bin/sh\necho $$ >> "$(dirname "$0")/pids"\nexec sleep 30\n');
   await chmod(bin, 0o755);
   const mon = new NvidiaMonitor({ bin, appsTimeoutMs: 300 });
   const t0 = Date.now();
   await Promise.all([mon.refreshApps(), mon.refreshApps()]);
   expect(Date.now() - t0).toBeLessThan(2000);
-  const pids = (await readFile(`${dir}/pids`, 'utf8')).trim().split('\n').map(Number);
+  const pids = (await readFile(`${dir.path}/pids`, 'utf8')).trim().split('\n').map(Number);
   expect(pids.length).toBe(1);
   await sleep(50);
   expect(() => process.kill(pids[0]!, 0)).toThrow();
-  await rm(dir, { recursive: true, force: true });
 });
 
 test('configure restarts a running nvidia-smi stream at the new pace, and only then', async () => {

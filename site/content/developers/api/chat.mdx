@@ -4,7 +4,7 @@ description: Conversation routes, sending a message, regenerating and stopping a
 ---
 
 The chat routes store conversations and stream the replies of `llama-server`. They live in `server/routes/chat.ts`;
-the types and the patch schema are in `packages/webui-shared/src/chat.ts`, `formatSse()` in `packages/webui-shared/src/sse.ts`, and `SseParser` in
+the types and the patch schema are in `packages/webui-shared/src/chat.ts`, and `SseParser` in
 `llamacpp-js/sse` ([llamacpp-js](/developers/llamacpp-js/)). Generations are run by `ChatRuns` (`server/chat/runs.ts`, see [Chat runs](/developers/server/chat/)).
 The user side is described on the [Chat](/docs/chat/) page.
 
@@ -243,7 +243,7 @@ curl -N http://127.0.0.1:7860/api/chat/7/stream
 ## The SSE stream
 
 `POST /api/chat/:id/messages`, `POST /api/chat/:id/regenerate` and `GET /api/chat/:id/stream` answer with the same
-`text/event-stream` (`sse()` in `server/routes/chat.ts`). Each event is written by `formatSse()`: an `event:` line with
+`text/event-stream` (`sse()` in `server/routes/chat.ts`, `streamSSE()` of Hono). Each event is an `event:` line with
 the event type, then one `data:` line with the whole `ChatEvent` as single-line JSON, its `type` included.
 
 | Event   | Payload (`ChatEvent`)                                         | Description                                                                 |

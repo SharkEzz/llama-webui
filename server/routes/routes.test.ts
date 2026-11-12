@@ -1,7 +1,6 @@
 import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
-import { DEFAULT_SETTINGS, type ServerState } from '@llama-webui/shared';
+import { type ChatEvent, type ChatMessage, DEFAULT_SETTINGS, type ServerState, SseParser } from '@llama-webui/shared';
 import { expect, test } from 'vitest';
 import { MAX_RUNS } from '../db/benchRuns';
 import { ConversationsRepo } from '../db/conversations';
@@ -9,6 +8,7 @@ import { openDb } from '../db/open';
 import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
 import { errorResponse } from '../http';
+import { listen } from '../testing/listen';
 import { tempDir } from '../testing/tempDir';
 import { WsHub, type WsLike } from '../ws/hub';
 import { benchRoutes } from './bench';
@@ -16,7 +16,7 @@ import { chatRoutes } from './chat';
 import { serverRoutes } from './server';
 import { settingsRoutes } from './settings';
 
-function chat() {
+function chat(chatRuns: unknown = { live: () => undefined }) {
   const dir = tempDir('lw-');
   const db = openDb(join(dir.path, 't.sqlite'));
   const conversations = new ConversationsRepo(db);
@@ -26,7 +26,7 @@ function chat() {
     conversations,
     profiles,
     activeProfileId: () => p.id,
-    chatRuns: { live: () => null, isLive: () => false } as never,
+    chatRuns: chatRuns as never,
   });
   app.onError((err) => errorResponse(err));
   return {
@@ -64,10 +64,56 @@ test('GET /api/chat/:id/stream is a 404 for a conversation that does not exist, 
   expect((await c.app.request(`/api/chat/${created.id}/stream`)).status).toBe(204);
 });
 
+/** A reply in progress that the test drives: its subscribers and how many have left. */
+function liveRun() {
+  const listeners = new Set<(e: ChatEvent) => void>();
+  const run = {
+    left: 0,
+    emit: (e: ChatEvent) => {
+      for (const l of listeners) l(e);
+    },
+    subscribe(listener: (e: ChatEvent) => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+        run.left++;
+      };
+    },
+    done: Promise.resolve(),
+  };
+  return run;
+}
+
+const message = { id: 1, role: 'assistant', content: 'hi' } as unknown as ChatMessage;
+
+test('GET /api/chat/:id/stream sends the run as SSE events and ends after done', async () => {
+  const run = liveRun();
+  using c = chat({ live: () => run });
+  const created = (await (await c.app.request('/api/chat', post({}))).json()) as { id: number };
+  const res = await c.app.request(`/api/chat/${created.id}/stream`);
+  expect(res.headers.get('content-type')).toBe('text/event-stream');
+  expect(res.headers.get('cache-control')).toBe('no-cache');
+  run.emit({ type: 'delta', content: 'h' });
+  run.emit({ type: 'done', message });
+  expect(new SseParser().push(await res.text())).toEqual([
+    { event: 'delta', data: JSON.stringify({ type: 'delta', content: 'h' }) },
+    { event: 'done', data: JSON.stringify({ type: 'done', message }) },
+  ]);
+  expect(run.left).toBe(1);
+});
+
+test('GET /api/chat/:id/stream: a client that leaves only unsubscribes', async () => {
+  const run = liveRun();
+  using c = chat({ live: () => run });
+  const created = (await (await c.app.request('/api/chat', post({}))).json()) as { id: number };
+  const res = await c.app.request(`/api/chat/${created.id}/stream`);
+  await res.body?.cancel();
+  await expect.poll(() => run.left).toBe(1);
+});
+
 test('/api/server/props: a reply from llama-server that is not JSON is a 502 (#37)', async () => {
   const llama = createServer((_req, res) => res.end('<html>not json</html>'));
-  await new Promise<void>((r) => llama.listen(0, '127.0.0.1', r));
-  const state: ServerState = { kind: 'external', pid: null, port: (llama.address() as AddressInfo).port };
+  const state: ServerState = { kind: 'external', pid: null, port: Number(new URL(await listen(llama)).port) };
   const app = serverRoutes({
     runtime: { supervisor: { state, lastCommand: null }, logs: null } as never,
     profiles: null!,

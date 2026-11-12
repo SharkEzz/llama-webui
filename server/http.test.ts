@@ -12,7 +12,6 @@ import {
   HttpError,
   id,
   json,
-  jsonCharset,
   object,
   query,
   shadowed,
@@ -41,7 +40,7 @@ test('an HttpError from an older module (development reload) keeps its status an
 function things() {
   const allow = allowTable();
   const app = new Hono<Env>()
-    .use(jsonCharset, guardMw, allow.mw)
+    .use(guardMw, allow.mw)
     .post('/api/things/import', (c) => c.text('ok'))
     .get('/api/things/:id', id('Thing'), (c) => c.json({ id: c.req.valid('param').id }))
     .post('/api/things', json(object), (c) => c.json(c.req.valid('json'), 201))
@@ -60,7 +59,7 @@ test('a method a pattern lacks is a 405 with Allow, not the next matching patter
   const r = await app.request('/api/things/import');
   expect(r.status).toBe(405);
   expect(r.headers.get('allow')).toBe('POST');
-  expect(r.headers.get('content-type')).toBe('application/json;charset=utf-8');
+  expect(r.headers.get('content-type')).toBe('application/json');
   expect(await r.json()).toEqual({ error: 'Method not allowed (POST)' });
   expect((await app.request('/api/things/import', { method: 'HEAD' })).status).toBe(405);
   expect((await app.request('/api/things/import', { method: 'POST' })).status).toBe(200);
@@ -90,7 +89,7 @@ test('id() is a 404 for anything but a positive integer', async () => {
   expect(await (await app.request('/api/things/12')).json()).toEqual({ id: 12 });
 });
 
-test('json(object) keeps the messages of req.json() and jsonObject()', async () => {
+test('json(object): Invalid JSON, then JSON object expected', async () => {
   const app = things();
   const error = async (init: RequestInit) => {
     const r = await app.request('/api/things', init);
@@ -100,14 +99,14 @@ test('json(object) keeps the messages of req.json() and jsonObject()', async () 
   expect(await error(post('', 'application/json'))).toEqual([400, 'Invalid JSON']);
   expect(await error(post('{', 'application/json'))).toEqual([400, 'Invalid JSON']);
   expect(await error(post('[1]', 'application/json'))).toEqual([400, 'JSON object expected']);
-  // A JSON media type outside Hono's own list: parsed all the same, as req.json() does.
+  // A JSON media type outside Hono's own list: parsed all the same.
   const seq = await app.request('/api/things', post('{"a":1}', 'application/json-seq'));
   expect([seq.status, await seq.json()]).toEqual([201, { a: 1 }]);
 });
 
-test('jsonCharset only rewrites a bare application/json', async () => {
+test('a reply keeps the content type its handler gave it', async () => {
   const app = things();
-  expect((await app.request('/api/things/1')).headers.get('content-type')).toBe('application/json;charset=utf-8');
+  expect((await app.request('/api/things/1')).headers.get('content-type')).toBe('application/json');
   expect((await app.request('/api/stream')).headers.get('content-type')).toBe('text/event-stream');
   const empty = await app.request('/api/empty');
   expect([empty.status, empty.headers.get('content-type')]).toEqual([204, null]);
@@ -134,11 +133,9 @@ test('a static path registered after a parameter that shadows it is reported (#3
   ).toEqual([]);
 });
 
-test('body() validates with zod and keeps the messages of Schema.parse(await jsonObject(req))', async () => {
+test('body() validates a JSON object with zod: Invalid JSON, JSON object expected, then the schema', async () => {
   const Thing = z.strictObject({ name: z.string().min(1) });
-  const app = new Hono<Env>()
-    .post('/api/loose', body(Thing), (c) => c.json(c.req.valid('json'), 201))
-    .post('/api/object', body(Thing, { object: true }), (c) => c.json(c.req.valid('json'), 201));
+  const app = new Hono<Env>().post('/api/object', body(Thing), (c) => c.json(c.req.valid('json'), 201));
   app.onError((err) => errorResponse(err));
   const reply = async (path: string, init: RequestInit) => {
     const r = await app.request(path, init);
@@ -147,11 +144,6 @@ test('body() validates with zod and keeps the messages of Schema.parse(await jso
   expect(await reply('/api/object', post())).toEqual([400, { error: 'Invalid JSON' }]);
   expect(await reply('/api/object', post('{', 'application/json'))).toEqual([400, { error: 'Invalid JSON' }]);
   expect(await reply('/api/object', post('[1]', 'application/json'))).toEqual([400, { error: 'JSON object expected' }]);
-  const [status, loose] = await reply('/api/loose', post('[1]', 'application/json'));
-  expect([status, (loose as { error: string }).error]).toEqual([
-    400,
-    'Invalid data: Invalid input: expected object, received array',
-  ]);
   const [, bad] = await reply('/api/object', post('{"name":""}', 'application/json; charset=utf-8'));
   expect((bad as { error: string; issues: unknown[] }).error).toBe(
     'Invalid data: Too small: expected string to have >=1 characters (name)',
@@ -165,16 +157,14 @@ test('body() validates with zod and keeps the messages of Schema.parse(await jso
   ]);
 });
 
-test('query() declares the keys and refuses nothing; the handler still reads searchParams', async () => {
-  const app = new Hono<Env>().get('/api/q', query('path', 'n'), (c) =>
-    c.json({ path: new URL(c.req.url).searchParams.get('path'), valid: c.req.valid('query') }),
-  );
-  const r = await app.request('/api/q?path=a+b%2Bc%23%C3%A9&n=1&n=2');
+test('query() gives the handler the declared keys, decoded as searchParams, and refuses nothing', async () => {
+  const app = new Hono<Env>().get('/api/q', query('path', 'n'), (c) => c.json(c.req.valid('query')));
+  const r = await app.request('/api/q?path=a+b%2Bc%23%C3%A9&n=1&n=2&other=x');
   expect(r.status).toBe(200);
-  expect(await r.json()).toEqual({ path: 'a b+c#é', valid: { path: 'a b+c#é', n: '1' } });
+  expect(await r.json()).toEqual({ path: 'a b+c#é', n: '1' });
   const none = await app.request('/api/q');
   expect(none.status).toBe(200);
-  expect(await none.json()).toEqual({ path: null, valid: {} });
+  expect(await none.json()).toEqual({});
 });
 
 test('accepts() types the body for the client and reads nothing: the handler still decides (409 before 400)', async () => {

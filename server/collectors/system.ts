@@ -58,13 +58,7 @@ export function parseLoadavg(text: string): [number, number, number] | null {
 
 const CPU_SENSORS = ['k10temp', 'coretemp'];
 
-const readText = async (p: string): Promise<string | null> => {
-  try {
-    return await readFile(p, 'utf8');
-  } catch {
-    return null;
-  }
-};
+const readText = (p: string): Promise<string | null> => readFile(p, 'utf8').catch(() => null);
 
 /** Machine-wide CPU, memory, load, frequency and CPU temperature. Every read failure degrades to null. */
 export class SystemSampler {

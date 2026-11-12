@@ -1,10 +1,11 @@
 // The dev loop (`server/dev.ts`) when the entry fails on its first evaluation: `pnpm dev` started while a file is
 // broken waits for the fix, except for a listen error (port taken), which ends it.
-import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { startDev } from './dev';
 import { tempDir } from './testing/tempDir';
+import { writeFileAtomic } from './testing/write';
 
 const g = globalThis as { __devStarted?: string; __llamaWebuiDevHost?: unknown };
 const cleanup: (() => Promise<void> | void)[] = [];
@@ -19,10 +20,7 @@ function project(entry: string) {
   cleanup.push(() => dir[Symbol.dispose]());
   const src = join(dir.path, 'src');
   mkdirSync(src);
-  const write = (name: string, text: string) => {
-    writeFileSync(join(src, `${name}.tmp`), text);
-    renameSync(join(src, `${name}.tmp`), join(src, name));
-  };
+  const write = (name: string, text: string) => writeFileAtomic(join(src, name), text);
   write('entry.ts', entry);
   const start = () =>
     startDev({

@@ -6,10 +6,15 @@ import { readFile, stat } from 'node:fs/promises';
 import { delimiter, join } from 'node:path';
 import { Readable } from 'node:stream';
 
-export interface Spawned {
+type Stdio = 'pipe' | 'ignore';
+/** The stream of an output: null when it is ignored. */
+type Output<S extends Stdio> = S extends 'ignore' ? null : ReadableStream<Uint8Array>;
+
+/** A started process. `Spawned` alone has outputs that may be null; `spawnProc` types them from its options. */
+export interface Spawned<O extends Stdio = Stdio, E extends Stdio = Stdio> {
   pid: number;
-  stdout: ReadableStream<Uint8Array> | null;
-  stderr: ReadableStream<Uint8Array> | null;
+  stdout: Output<O>;
+  stderr: Output<E>;
   /** Resolves once the process has exited (`exitCode`/`signalCode` are set), with its exit code. */
   exited: Promise<number | null>;
   readonly exitCode: number | null;
@@ -17,21 +22,24 @@ export interface Spawned {
   kill(signal?: NodeJS.Signals): void;
 }
 
-export interface SpawnOptions {
+/** Standard input is never given to the child (`ignore`). */
+export interface SpawnOptions<O extends Stdio = Stdio, E extends Stdio = Stdio> {
   cwd?: string;
   env?: Record<string, string | undefined>;
-  stdin?: 'ignore';
-  stdout?: 'pipe' | 'ignore';
-  stderr?: 'pipe' | 'ignore';
+  /** `pipe` by default. */
+  stdout?: O;
+  stderr?: E;
   /** Killed with `killSignal` (default SIGTERM) after this many milliseconds. */
   timeout?: number;
   killSignal?: NodeJS.Signals;
 }
 
-export type Spawn = (argv: string[], o?: SpawnOptions) => Spawned;
+export type Spawn = <O extends Stdio = 'pipe', E extends Stdio = 'pipe'>(
+  argv: string[],
+  o?: SpawnOptions<O, E>,
+) => Spawned<O, E>;
 
-const toWeb = (s: ChildProcess['stdout']): ReadableStream<Uint8Array> | null =>
-  s ? (Readable.toWeb(s) as ReadableStream<Uint8Array>) : null;
+const toWeb = <S extends Stdio>(s: ChildProcess['stdout']) => (s ? Readable.toWeb(s) : null) as Output<S>;
 
 /**
  * Why a spawn failed, as Node would report it: the `'error'` event only comes after `spawn()` has returned. A bare
@@ -54,13 +62,13 @@ function spawnErrorCode(bin: string, cwd: string | undefined, path: string): str
  * Starts `argv`. Throws at once when the process cannot start (missing binary or `cwd`, not executable):
  * callers handle a failed launch in a `try`/`catch` around this call.
  */
-export const spawnProc: Spawn = (argv, o = {}) => {
+export const spawnProc: Spawn = <O extends Stdio, E extends Stdio>(argv: string[], o: SpawnOptions<O, E> = {}) => {
   const [bin, ...args] = argv;
   if (bin === undefined) throw new Error('spawn: empty command');
   const child = spawn(bin, args, {
     cwd: o.cwd,
     env: o.env,
-    stdio: [o.stdin ?? 'ignore', o.stdout ?? 'pipe', o.stderr ?? 'pipe'],
+    stdio: ['ignore', o.stdout ?? 'pipe', o.stderr ?? 'pipe'],
     timeout: o.timeout,
     killSignal: o.killSignal,
   });
@@ -72,11 +80,11 @@ export const spawnProc: Spawn = (argv, o = {}) => {
   // Callers already ignore kill failures.
   child.on('error', () => {});
   const exited = new Promise<number | null>((resolve) => child.once('exit', (code) => resolve(code)));
-  const proc: Spawned & { child: ChildProcess } = {
+  const proc: Spawned<O, E> & { child: ChildProcess } = {
     child, // the tests emit on it
     pid: child.pid,
-    stdout: toWeb(child.stdout),
-    stderr: toWeb(child.stderr),
+    stdout: toWeb<O>(child.stdout),
+    stderr: toWeb<E>(child.stderr),
     exited,
     get exitCode() {
       return child.exitCode;

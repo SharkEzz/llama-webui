@@ -2,7 +2,7 @@
   "POST /api/health": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -12,7 +12,7 @@
   "PUT /api/health": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -22,7 +22,7 @@
   "PATCH /api/health": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -32,7 +32,7 @@
   "DELETE /api/health": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -42,13 +42,13 @@
   "HEAD /api/health": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/health": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "ok": true,
@@ -59,7 +59,7 @@
   "POST /api/settings": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, PATCH"
     },
     "body": {
@@ -69,7 +69,7 @@
   "PUT /api/settings": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, PATCH"
     },
     "body": {
@@ -79,7 +79,7 @@
   "DELETE /api/settings": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, PATCH"
     },
     "body": {
@@ -89,13 +89,13 @@
   "HEAD /api/settings": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/settings": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "binary": "<repo>/testdata/fake/fake-llama-server",
@@ -120,7 +120,7 @@
   "PUT /api/profiles": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -130,7 +130,7 @@
   "PATCH /api/profiles": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -140,7 +140,7 @@
   "DELETE /api/profiles": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -150,13 +150,13 @@
   "HEAD /api/profiles": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/profiles": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": [
       {
@@ -184,7 +184,7 @@
   "POST /api/profiles/export": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -194,7 +194,7 @@
   "PUT /api/profiles/export": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -204,7 +204,7 @@
   "PATCH /api/profiles/export": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -214,7 +214,7 @@
   "DELETE /api/profiles/export": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -224,14 +224,14 @@
   "HEAD /api/profiles/export": {
     "status": 200,
     "headers": {
-      "content-type": "application/json; charset=utf-8",
+      "content-type": "application/json",
       "content-disposition": "attachment; filename*=UTF-8''llama-webui-profiles.json"
     }
   },
   "GET /api/profiles/export": {
     "status": 200,
     "headers": {
-      "content-type": "application/json; charset=utf-8",
+      "content-type": "application/json",
       "content-disposition": "attachment; filename*=UTF-8''llama-webui-profiles.json"
     },
     "body": {
@@ -254,7 +254,7 @@
   "GET /api/profiles/import": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -264,7 +264,7 @@
   "PUT /api/profiles/import": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -274,7 +274,7 @@
   "PATCH /api/profiles/import": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -284,7 +284,7 @@
   "DELETE /api/profiles/import": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -294,14 +294,14 @@
   "HEAD /api/profiles/import": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "PUT /api/profiles/import/llama-tui": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -311,7 +311,7 @@
   "PATCH /api/profiles/import/llama-tui": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -321,7 +321,7 @@
   "DELETE /api/profiles/import/llama-tui": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -331,13 +331,13 @@
   "HEAD /api/profiles/import/llama-tui": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/profiles/import/llama-tui": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "path": "<tmp>/xdg-config/llama-tui/config.json",
@@ -350,7 +350,7 @@
   "POST /api/profiles/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, PUT, DELETE"
     },
     "body": {
@@ -360,7 +360,7 @@
   "PATCH /api/profiles/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, PUT, DELETE"
     },
     "body": {
@@ -370,13 +370,13 @@
   "HEAD /api/profiles/:id": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/profiles/:id": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "id": 1,
@@ -392,7 +392,7 @@
   "GET /api/profiles/:id/duplicate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -402,7 +402,7 @@
   "PUT /api/profiles/:id/duplicate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -412,7 +412,7 @@
   "PATCH /api/profiles/:id/duplicate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -422,7 +422,7 @@
   "DELETE /api/profiles/:id/duplicate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -432,14 +432,14 @@
   "HEAD /api/profiles/:id/duplicate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "POST /api/profiles/:id/export": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -449,7 +449,7 @@
   "PUT /api/profiles/:id/export": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -459,7 +459,7 @@
   "PATCH /api/profiles/:id/export": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -469,7 +469,7 @@
   "DELETE /api/profiles/:id/export": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -479,14 +479,14 @@
   "HEAD /api/profiles/:id/export": {
     "status": 200,
     "headers": {
-      "content-type": "application/json; charset=utf-8",
+      "content-type": "application/json",
       "content-disposition": "attachment; filename*=UTF-8''A.json"
     }
   },
   "GET /api/profiles/:id/export": {
     "status": 200,
     "headers": {
-      "content-type": "application/json; charset=utf-8",
+      "content-type": "application/json",
       "content-disposition": "attachment; filename*=UTF-8''A.json"
     },
     "body": {
@@ -499,7 +499,7 @@
   "POST /api/state": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -509,7 +509,7 @@
   "PUT /api/state": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -519,7 +519,7 @@
   "PATCH /api/state": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -529,7 +529,7 @@
   "DELETE /api/state": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -539,13 +539,13 @@
   "HEAD /api/state": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/state": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "server": {
@@ -562,7 +562,7 @@
   "POST /api/server/state": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -572,7 +572,7 @@
   "PUT /api/server/state": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -582,7 +582,7 @@
   "PATCH /api/server/state": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -592,7 +592,7 @@
   "DELETE /api/server/state": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -602,13 +602,13 @@
   "HEAD /api/server/state": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/server/state": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "state": {
@@ -621,7 +621,7 @@
   "GET /api/server/start": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -631,7 +631,7 @@
   "PUT /api/server/start": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -641,7 +641,7 @@
   "PATCH /api/server/start": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -651,7 +651,7 @@
   "DELETE /api/server/start": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -661,14 +661,14 @@
   "HEAD /api/server/start": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/server/switch": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -678,7 +678,7 @@
   "PUT /api/server/switch": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -688,7 +688,7 @@
   "PATCH /api/server/switch": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -698,7 +698,7 @@
   "DELETE /api/server/switch": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -708,14 +708,14 @@
   "HEAD /api/server/switch": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/server/restart": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -725,7 +725,7 @@
   "PUT /api/server/restart": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -735,7 +735,7 @@
   "PATCH /api/server/restart": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -745,7 +745,7 @@
   "DELETE /api/server/restart": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -755,14 +755,14 @@
   "HEAD /api/server/restart": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/server/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -772,7 +772,7 @@
   "PUT /api/server/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -782,7 +782,7 @@
   "PATCH /api/server/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -792,7 +792,7 @@
   "DELETE /api/server/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -802,14 +802,14 @@
   "HEAD /api/server/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "POST /api/server/props": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -819,7 +819,7 @@
   "PUT /api/server/props": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -829,7 +829,7 @@
   "PATCH /api/server/props": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -839,7 +839,7 @@
   "DELETE /api/server/props": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -849,13 +849,13 @@
   "HEAD /api/server/props": {
     "status": 409,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/server/props": {
     "status": 409,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Server not ready"
@@ -864,7 +864,7 @@
   "POST /api/flags": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -874,7 +874,7 @@
   "PUT /api/flags": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -884,7 +884,7 @@
   "PATCH /api/flags": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -894,7 +894,7 @@
   "DELETE /api/flags": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -904,13 +904,13 @@
   "HEAD /api/flags": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/flags": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "fields": [
       "flags"
@@ -919,7 +919,7 @@
   "POST /api/logs": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -929,7 +929,7 @@
   "PUT /api/logs": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -939,7 +939,7 @@
   "PATCH /api/logs": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -949,7 +949,7 @@
   "DELETE /api/logs": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -959,13 +959,13 @@
   "HEAD /api/logs": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/logs": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "lines": [],
@@ -976,7 +976,7 @@
   "POST /api/monitor/snapshot": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -986,7 +986,7 @@
   "PUT /api/monitor/snapshot": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -996,7 +996,7 @@
   "PATCH /api/monitor/snapshot": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1006,7 +1006,7 @@
   "DELETE /api/monitor/snapshot": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1016,20 +1016,20 @@
   "HEAD /api/monitor/snapshot": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/monitor/snapshot": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": null
   },
   "POST /api/monitor/history": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1039,7 +1039,7 @@
   "PUT /api/monitor/history": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1049,7 +1049,7 @@
   "PATCH /api/monitor/history": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1059,7 +1059,7 @@
   "DELETE /api/monitor/history": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1069,13 +1069,13 @@
   "HEAD /api/monitor/history": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/monitor/history": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "intervalMs": 1000,
@@ -1089,7 +1089,7 @@
   "POST /api/system/info": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1099,7 +1099,7 @@
   "PUT /api/system/info": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1109,7 +1109,7 @@
   "PATCH /api/system/info": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1119,7 +1119,7 @@
   "DELETE /api/system/info": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1129,13 +1129,13 @@
   "HEAD /api/system/info": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/system/info": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "fields": [
       "cpu",
@@ -1146,7 +1146,7 @@
   "POST /api/models": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, DELETE"
     },
     "body": {
@@ -1156,7 +1156,7 @@
   "PUT /api/models": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, DELETE"
     },
     "body": {
@@ -1166,7 +1166,7 @@
   "PATCH /api/models": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, DELETE"
     },
     "body": {
@@ -1176,13 +1176,13 @@
   "HEAD /api/models": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/models": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "dir": "<tmp>/models",
@@ -1221,7 +1221,7 @@
   "POST /api/models/usage": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1231,7 +1231,7 @@
   "PUT /api/models/usage": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1241,7 +1241,7 @@
   "PATCH /api/models/usage": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1251,7 +1251,7 @@
   "DELETE /api/models/usage": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1261,13 +1261,13 @@
   "HEAD /api/models/usage": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/models/usage": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "path": "<tmp>/models/m.gguf",
@@ -1293,7 +1293,7 @@
   "POST /api/models/info": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1303,7 +1303,7 @@
   "PUT /api/models/info": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1313,7 +1313,7 @@
   "PATCH /api/models/info": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1323,7 +1323,7 @@
   "DELETE /api/models/info": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1333,13 +1333,13 @@
   "HEAD /api/models/info": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/models/info": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "path": "<tmp>/models/m.gguf",
@@ -1378,7 +1378,7 @@
   "POST /api/hf/status": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1388,7 +1388,7 @@
   "PUT /api/hf/status": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1398,7 +1398,7 @@
   "PATCH /api/hf/status": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1408,7 +1408,7 @@
   "DELETE /api/hf/status": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1418,13 +1418,13 @@
   "HEAD /api/hf/status": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/hf/status": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "token": null,
@@ -1436,7 +1436,7 @@
   "POST /api/hf/search": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1446,7 +1446,7 @@
   "PUT /api/hf/search": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1456,7 +1456,7 @@
   "PATCH /api/hf/search": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1466,7 +1466,7 @@
   "DELETE /api/hf/search": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1476,13 +1476,13 @@
   "HEAD /api/hf/search": {
     "status": 502,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/hf/search": {
     "status": 502,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Hugging Face unreachable: fetch failed",
@@ -1492,7 +1492,7 @@
   "POST /api/hf/repo": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1502,7 +1502,7 @@
   "PUT /api/hf/repo": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1512,7 +1512,7 @@
   "PATCH /api/hf/repo": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1522,7 +1522,7 @@
   "DELETE /api/hf/repo": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1532,13 +1532,13 @@
   "HEAD /api/hf/repo": {
     "status": 502,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/hf/repo": {
     "status": 502,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Hugging Face unreachable: fetch failed",
@@ -1548,7 +1548,7 @@
   "PUT /api/downloads": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -1558,7 +1558,7 @@
   "PATCH /api/downloads": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -1568,7 +1568,7 @@
   "DELETE /api/downloads": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -1578,13 +1578,13 @@
   "HEAD /api/downloads": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/downloads": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "items": [],
@@ -1594,7 +1594,7 @@
   "GET /api/downloads/clear": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1604,7 +1604,7 @@
   "PUT /api/downloads/clear": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1614,7 +1614,7 @@
   "PATCH /api/downloads/clear": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1624,7 +1624,7 @@
   "DELETE /api/downloads/clear": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1634,14 +1634,14 @@
   "HEAD /api/downloads/clear": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/downloads/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     },
     "body": {
@@ -1651,7 +1651,7 @@
   "POST /api/downloads/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     },
     "body": {
@@ -1661,7 +1661,7 @@
   "PUT /api/downloads/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     },
     "body": {
@@ -1671,7 +1671,7 @@
   "PATCH /api/downloads/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     },
     "body": {
@@ -1681,14 +1681,14 @@
   "HEAD /api/downloads/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     }
   },
   "GET /api/downloads/:id/retry": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1698,7 +1698,7 @@
   "PUT /api/downloads/:id/retry": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1708,7 +1708,7 @@
   "PATCH /api/downloads/:id/retry": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1718,7 +1718,7 @@
   "DELETE /api/downloads/:id/retry": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1728,14 +1728,14 @@
   "HEAD /api/downloads/:id/retry": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "PUT /api/chat": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -1745,7 +1745,7 @@
   "PATCH /api/chat": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -1755,7 +1755,7 @@
   "DELETE /api/chat": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -1765,13 +1765,13 @@
   "HEAD /api/chat": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/chat": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": [
       {
@@ -1795,7 +1795,7 @@
   "POST /api/chat/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, PATCH, DELETE"
     },
     "body": {
@@ -1805,7 +1805,7 @@
   "PUT /api/chat/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, PATCH, DELETE"
     },
     "body": {
@@ -1815,13 +1815,13 @@
   "HEAD /api/chat/:id": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/chat/:id": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "id": 1,
@@ -1840,7 +1840,7 @@
   "GET /api/chat/:id/messages": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1850,7 +1850,7 @@
   "PUT /api/chat/:id/messages": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1860,7 +1860,7 @@
   "PATCH /api/chat/:id/messages": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1870,7 +1870,7 @@
   "DELETE /api/chat/:id/messages": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1880,14 +1880,14 @@
   "HEAD /api/chat/:id/messages": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/chat/:id/regenerate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1897,7 +1897,7 @@
   "PUT /api/chat/:id/regenerate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1907,7 +1907,7 @@
   "PATCH /api/chat/:id/regenerate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1917,7 +1917,7 @@
   "DELETE /api/chat/:id/regenerate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1927,14 +1927,14 @@
   "HEAD /api/chat/:id/regenerate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/chat/:id/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1944,7 +1944,7 @@
   "PUT /api/chat/:id/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1954,7 +1954,7 @@
   "PATCH /api/chat/:id/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1964,7 +1964,7 @@
   "DELETE /api/chat/:id/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -1974,14 +1974,14 @@
   "HEAD /api/chat/:id/stop": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "POST /api/chat/:id/stream": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -1991,7 +1991,7 @@
   "PUT /api/chat/:id/stream": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2001,7 +2001,7 @@
   "PATCH /api/chat/:id/stream": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2011,7 +2011,7 @@
   "DELETE /api/chat/:id/stream": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2029,7 +2029,7 @@
   "POST /api/bench/runs": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, DELETE"
     },
     "body": {
@@ -2039,7 +2039,7 @@
   "PUT /api/bench/runs": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, DELETE"
     },
     "body": {
@@ -2049,7 +2049,7 @@
   "PATCH /api/bench/runs": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, DELETE"
     },
     "body": {
@@ -2059,13 +2059,13 @@
   "HEAD /api/bench/runs": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/bench/runs": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "runs": [
@@ -2152,7 +2152,7 @@
   "GET /api/bench/run": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2162,7 +2162,7 @@
   "PUT /api/bench/run": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2172,7 +2172,7 @@
   "PATCH /api/bench/run": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2182,7 +2182,7 @@
   "DELETE /api/bench/run": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2192,14 +2192,14 @@
   "HEAD /api/bench/run": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "POST /api/bench/devices": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2209,7 +2209,7 @@
   "PUT /api/bench/devices": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2219,7 +2219,7 @@
   "PATCH /api/bench/devices": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2229,7 +2229,7 @@
   "DELETE /api/bench/devices": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2239,20 +2239,20 @@
   "HEAD /api/bench/devices": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/bench/devices": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "fields": []
   },
   "GET /api/bench/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     },
     "body": {
@@ -2262,7 +2262,7 @@
   "POST /api/bench/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     },
     "body": {
@@ -2272,7 +2272,7 @@
   "PUT /api/bench/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     },
     "body": {
@@ -2282,7 +2282,7 @@
   "PATCH /api/bench/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     },
     "body": {
@@ -2292,14 +2292,14 @@
   "HEAD /api/bench/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "DELETE"
     }
   },
   "POST /api/bench/from-profile/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2309,7 +2309,7 @@
   "PUT /api/bench/from-profile/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2319,7 +2319,7 @@
   "PATCH /api/bench/from-profile/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2329,7 +2329,7 @@
   "DELETE /api/bench/from-profile/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2339,13 +2339,13 @@
   "HEAD /api/bench/from-profile/:id": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/bench/from-profile/:id": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "modelPath": "<tmp>/models/m.gguf",
@@ -2358,7 +2358,7 @@
   "GET /api/bench/:id/to-profile": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2368,7 +2368,7 @@
   "PUT /api/bench/:id/to-profile": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2378,7 +2378,7 @@
   "PATCH /api/bench/:id/to-profile": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2388,7 +2388,7 @@
   "DELETE /api/bench/:id/to-profile": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2398,14 +2398,14 @@
   "HEAD /api/bench/:id/to-profile": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/bench/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2415,7 +2415,7 @@
   "PUT /api/bench/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2425,7 +2425,7 @@
   "PATCH /api/bench/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2435,7 +2435,7 @@
   "DELETE /api/bench/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2445,14 +2445,14 @@
   "HEAD /api/bench/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "PUT /api/sweeps": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -2462,7 +2462,7 @@
   "PATCH /api/sweeps": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -2472,7 +2472,7 @@
   "DELETE /api/sweeps": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, POST"
     },
     "body": {
@@ -2482,13 +2482,13 @@
   "HEAD /api/sweeps": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/sweeps": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "sweeps": [
@@ -2573,7 +2573,7 @@
   "POST /api/sweeps/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, DELETE"
     },
     "body": {
@@ -2583,7 +2583,7 @@
   "PUT /api/sweeps/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, DELETE"
     },
     "body": {
@@ -2593,7 +2593,7 @@
   "PATCH /api/sweeps/:id": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET, DELETE"
     },
     "body": {
@@ -2603,13 +2603,13 @@
   "HEAD /api/sweeps/:id": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/sweeps/:id": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "sweep": {
@@ -2655,7 +2655,7 @@
   "GET /api/sweeps/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2665,7 +2665,7 @@
   "PUT /api/sweeps/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2675,7 +2675,7 @@
   "PATCH /api/sweeps/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2685,7 +2685,7 @@
   "DELETE /api/sweeps/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2695,14 +2695,14 @@
   "HEAD /api/sweeps/:id/cancel": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/sweeps/:id/resume": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2712,7 +2712,7 @@
   "PUT /api/sweeps/:id/resume": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2722,7 +2722,7 @@
   "PATCH /api/sweeps/:id/resume": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2732,7 +2732,7 @@
   "DELETE /api/sweeps/:id/resume": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2742,14 +2742,14 @@
   "HEAD /api/sweeps/:id/resume": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/sweeps/:id/validate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2759,7 +2759,7 @@
   "PUT /api/sweeps/:id/validate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2769,7 +2769,7 @@
   "PATCH /api/sweeps/:id/validate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2779,7 +2779,7 @@
   "DELETE /api/sweeps/:id/validate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2789,14 +2789,14 @@
   "HEAD /api/sweeps/:id/validate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "POST /api/tuning/hardware": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2806,7 +2806,7 @@
   "PUT /api/tuning/hardware": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2816,7 +2816,7 @@
   "PATCH /api/tuning/hardware": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2826,7 +2826,7 @@
   "DELETE /api/tuning/hardware": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2836,13 +2836,13 @@
   "HEAD /api/tuning/hardware": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/tuning/hardware": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "fields": [
       "cpu",
@@ -2855,7 +2855,7 @@
   "GET /api/tuning/estimate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2865,7 +2865,7 @@
   "PUT /api/tuning/estimate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2875,7 +2875,7 @@
   "PATCH /api/tuning/estimate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2885,7 +2885,7 @@
   "DELETE /api/tuning/estimate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2895,14 +2895,14 @@
   "HEAD /api/tuning/estimate": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "GET /api/tuning/plan": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2912,7 +2912,7 @@
   "PUT /api/tuning/plan": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2922,7 +2922,7 @@
   "PATCH /api/tuning/plan": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2932,7 +2932,7 @@
   "DELETE /api/tuning/plan": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -2942,14 +2942,14 @@
   "HEAD /api/tuning/plan": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "POST /api/tuning/checks": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2959,7 +2959,7 @@
   "PUT /api/tuning/checks": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2969,7 +2969,7 @@
   "PATCH /api/tuning/checks": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2979,7 +2979,7 @@
   "DELETE /api/tuning/checks": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -2989,13 +2989,13 @@
   "HEAD /api/tuning/checks": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/tuning/checks": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "fields": [
       "at",
@@ -3006,7 +3006,7 @@
   "GET /api/tuning/disk-speed": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -3016,7 +3016,7 @@
   "PUT /api/tuning/disk-speed": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -3026,7 +3026,7 @@
   "PATCH /api/tuning/disk-speed": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -3036,7 +3036,7 @@
   "DELETE /api/tuning/disk-speed": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     },
     "body": {
@@ -3046,14 +3046,14 @@
   "HEAD /api/tuning/disk-speed": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "POST"
     }
   },
   "POST /api/topology": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3063,7 +3063,7 @@
   "PUT /api/topology": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3073,7 +3073,7 @@
   "PATCH /api/topology": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3083,7 +3083,7 @@
   "DELETE /api/topology": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3093,13 +3093,13 @@
   "HEAD /api/topology": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/topology": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "fields": [
       "graph",
@@ -3109,7 +3109,7 @@
   "POST /api/setup": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3119,7 +3119,7 @@
   "PUT /api/setup": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3129,7 +3129,7 @@
   "PATCH /api/setup": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3139,7 +3139,7 @@
   "DELETE /api/setup": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3149,13 +3149,13 @@
   "HEAD /api/setup": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/setup": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "fields": [
       "bench",
@@ -3170,7 +3170,7 @@
   "POST /api/launchpad": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3180,7 +3180,7 @@
   "PUT /api/launchpad": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3190,7 +3190,7 @@
   "PATCH /api/launchpad": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3200,7 +3200,7 @@
   "DELETE /api/launchpad": {
     "status": 405,
     "headers": {
-      "content-type": "application/json;charset=utf-8",
+      "content-type": "application/json",
       "allow": "GET"
     },
     "body": {
@@ -3210,20 +3210,20 @@
   "HEAD /api/launchpad": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     }
   },
   "GET /api/launchpad": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "fields": []
   },
   "GET /api/profiles/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3232,7 +3232,7 @@
   "PUT /api/profiles/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3241,7 +3241,7 @@
   "DELETE /api/profiles/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3250,7 +3250,7 @@
   "GET /api/profiles/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3259,7 +3259,7 @@
   "PUT /api/profiles/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3268,7 +3268,7 @@
   "DELETE /api/profiles/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3277,7 +3277,7 @@
   "POST /api/profiles/:id/duplicate (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3286,7 +3286,7 @@
   "POST /api/profiles/:id/duplicate (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3295,7 +3295,7 @@
   "GET /api/profiles/:id/export (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3304,7 +3304,7 @@
   "GET /api/profiles/:id/export (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3313,7 +3313,7 @@
   "DELETE /api/downloads/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Download not found"
@@ -3322,7 +3322,7 @@
   "DELETE /api/downloads/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Download not found"
@@ -3331,7 +3331,7 @@
   "POST /api/downloads/:id/retry (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Download not found"
@@ -3340,7 +3340,7 @@
   "POST /api/downloads/:id/retry (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Download not found"
@@ -3349,7 +3349,7 @@
   "GET /api/chat/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3358,7 +3358,7 @@
   "PATCH /api/chat/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3367,7 +3367,7 @@
   "DELETE /api/chat/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3376,7 +3376,7 @@
   "GET /api/chat/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3385,7 +3385,7 @@
   "PATCH /api/chat/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3394,7 +3394,7 @@
   "DELETE /api/chat/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3403,7 +3403,7 @@
   "POST /api/chat/:id/messages (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3412,7 +3412,7 @@
   "POST /api/chat/:id/messages (unknown id)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "content: expected a string"
@@ -3421,7 +3421,7 @@
   "POST /api/chat/:id/regenerate (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3430,7 +3430,7 @@
   "POST /api/chat/:id/regenerate (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3439,7 +3439,7 @@
   "POST /api/chat/:id/stop (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3448,7 +3448,7 @@
   "POST /api/chat/:id/stop (unknown id)": {
     "status": 409,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "No reply in progress"
@@ -3457,7 +3457,7 @@
   "GET /api/chat/:id/stream (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3466,7 +3466,7 @@
   "GET /api/chat/:id/stream (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Conversation not found"
@@ -3475,7 +3475,7 @@
   "DELETE /api/bench/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Run not found"
@@ -3484,7 +3484,7 @@
   "DELETE /api/bench/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Run not found"
@@ -3493,7 +3493,7 @@
   "GET /api/bench/from-profile/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3502,7 +3502,7 @@
   "GET /api/bench/from-profile/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3511,7 +3511,7 @@
   "POST /api/bench/:id/to-profile (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Run not found"
@@ -3520,7 +3520,7 @@
   "POST /api/bench/:id/to-profile (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Run not found"
@@ -3529,7 +3529,7 @@
   "POST /api/bench/:id/cancel (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Run not found"
@@ -3538,7 +3538,7 @@
   "POST /api/bench/:id/cancel (unknown id)": {
     "status": 409,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "This run is not running"
@@ -3547,7 +3547,7 @@
   "GET /api/sweeps/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3556,7 +3556,7 @@
   "DELETE /api/sweeps/:id (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3565,7 +3565,7 @@
   "GET /api/sweeps/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3574,7 +3574,7 @@
   "DELETE /api/sweeps/:id (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3583,7 +3583,7 @@
   "POST /api/sweeps/:id/cancel (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3592,7 +3592,7 @@
   "POST /api/sweeps/:id/cancel (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3601,7 +3601,7 @@
   "POST /api/sweeps/:id/resume (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3610,7 +3610,7 @@
   "POST /api/sweeps/:id/resume (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3619,7 +3619,7 @@
   "POST /api/sweeps/:id/validate (bad id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3628,7 +3628,7 @@
   "POST /api/sweeps/:id/validate (unknown id)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Sweep not found"
@@ -3637,7 +3637,7 @@
   "PATCH /api/settings (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3646,7 +3646,7 @@
   "PATCH /api/settings (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -3655,7 +3655,7 @@
   "PATCH /api/settings (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3664,7 +3664,7 @@
   "PATCH /api/settings (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3673,7 +3673,7 @@
   "PATCH /api/settings (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -3682,7 +3682,7 @@
   "PATCH /api/settings (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: Between 250 and 60000 ms (pollIntervalMs)",
@@ -3703,7 +3703,7 @@
   "POST /api/profiles (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3712,7 +3712,7 @@
   "POST /api/profiles (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: Invalid input: expected object, received array",
@@ -3729,7 +3729,7 @@
   "POST /api/profiles (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3738,7 +3738,7 @@
   "POST /api/profiles (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3747,7 +3747,7 @@
   "POST /api/profiles (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -3756,7 +3756,7 @@
   "POST /api/profiles (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: cannot be empty (name)",
@@ -3785,7 +3785,7 @@
   "POST /api/profiles/import (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3794,7 +3794,7 @@
   "POST /api/profiles/import (non-object JSON)": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "imported": [],
@@ -3809,7 +3809,7 @@
   "POST /api/profiles/import (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3818,7 +3818,7 @@
   "POST /api/profiles/import (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3827,7 +3827,7 @@
   "POST /api/profiles/import (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -3836,7 +3836,7 @@
   "POST /api/profiles/import (schema violation)": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "imported": [],
@@ -3851,7 +3851,7 @@
   "PUT /api/profiles/:id (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3860,7 +3860,7 @@
   "PUT /api/profiles/:id (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: Invalid input: expected object, received array",
@@ -3877,7 +3877,7 @@
   "PUT /api/profiles/:id (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3886,7 +3886,7 @@
   "PUT /api/profiles/:id (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3895,7 +3895,7 @@
   "PUT /api/profiles/:id (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -3904,7 +3904,7 @@
   "PUT /api/profiles/:id (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: cannot be empty (name)",
@@ -3933,7 +3933,7 @@
   "POST /api/server/start (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3942,7 +3942,7 @@
   "POST /api/server/start (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -3951,7 +3951,7 @@
   "POST /api/server/start (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3960,7 +3960,7 @@
   "POST /api/server/start (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3969,7 +3969,7 @@
   "POST /api/server/start (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -3978,7 +3978,7 @@
   "POST /api/server/start (schema violation)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -3987,7 +3987,7 @@
   "POST /api/server/switch (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -3996,7 +3996,7 @@
   "POST /api/server/switch (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4005,7 +4005,7 @@
   "POST /api/server/switch (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4014,7 +4014,7 @@
   "POST /api/server/switch (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4023,7 +4023,7 @@
   "POST /api/server/switch (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4032,7 +4032,7 @@
   "POST /api/server/switch (schema violation)": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Profile not found"
@@ -4041,7 +4041,7 @@
   "DELETE /api/models (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4050,7 +4050,7 @@
   "DELETE /api/models (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4059,7 +4059,7 @@
   "DELETE /api/models (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4068,7 +4068,7 @@
   "DELETE /api/models (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4077,7 +4077,7 @@
   "DELETE /api/models (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4086,7 +4086,7 @@
   "DELETE /api/models (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: path required (path)",
@@ -4107,7 +4107,7 @@
   "POST /api/downloads (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4116,7 +4116,7 @@
   "POST /api/downloads (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4125,7 +4125,7 @@
   "POST /api/downloads (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4134,7 +4134,7 @@
   "POST /api/downloads (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4143,7 +4143,7 @@
   "POST /api/downloads (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4152,7 +4152,7 @@
   "POST /api/downloads (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: Repository id expected (org/name) (repo)",
@@ -4189,7 +4189,7 @@
   "POST /api/chat (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4198,7 +4198,7 @@
   "POST /api/chat (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4207,7 +4207,7 @@
   "POST /api/chat (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4216,7 +4216,7 @@
   "POST /api/chat (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4225,7 +4225,7 @@
   "POST /api/chat (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4234,7 +4234,7 @@
   "POST /api/chat (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "profileId: expected an integer or null"
@@ -4243,7 +4243,7 @@
   "PATCH /api/chat/:id (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4252,7 +4252,7 @@
   "PATCH /api/chat/:id (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4261,7 +4261,7 @@
   "PATCH /api/chat/:id (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4270,7 +4270,7 @@
   "PATCH /api/chat/:id (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4279,7 +4279,7 @@
   "PATCH /api/chat/:id (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4288,7 +4288,7 @@
   "PATCH /api/chat/:id (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: Invalid input: expected string, received number (title)",
@@ -4307,7 +4307,7 @@
   "POST /api/chat/:id/messages (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4316,7 +4316,7 @@
   "POST /api/chat/:id/messages (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4325,7 +4325,7 @@
   "POST /api/chat/:id/messages (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4334,7 +4334,7 @@
   "POST /api/chat/:id/messages (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4343,7 +4343,7 @@
   "POST /api/chat/:id/messages (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4352,7 +4352,7 @@
   "POST /api/chat/:id/messages (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "content: expected a string"
@@ -4361,7 +4361,7 @@
   "POST /api/bench/run (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4370,7 +4370,7 @@
   "POST /api/bench/run (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4379,7 +4379,7 @@
   "POST /api/bench/run (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4388,7 +4388,7 @@
   "POST /api/bench/run (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4397,7 +4397,7 @@
   "POST /api/bench/run (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4406,7 +4406,7 @@
   "POST /api/bench/run (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: “bench” or “server” (kind)",
@@ -4436,7 +4436,7 @@
   "POST /api/sweeps (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4445,7 +4445,7 @@
   "POST /api/sweeps (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4454,7 +4454,7 @@
   "POST /api/sweeps (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4463,7 +4463,7 @@
   "POST /api/sweeps (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4472,7 +4472,7 @@
   "POST /api/sweeps (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4481,7 +4481,7 @@
   "POST /api/sweeps (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: required (name)",
@@ -4522,7 +4522,7 @@
   "POST /api/sweeps/:id/resume (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4531,7 +4531,7 @@
   "POST /api/sweeps/:id/resume (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4540,7 +4540,7 @@
   "POST /api/sweeps/:id/resume (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4549,7 +4549,7 @@
   "POST /api/sweeps/:id/resume (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4558,7 +4558,7 @@
   "POST /api/sweeps/:id/resume (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4567,7 +4567,7 @@
   "POST /api/sweeps/:id/resume (schema violation)": {
     "status": 409,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Nothing to resume: no interrupted or queued item"
@@ -4576,7 +4576,7 @@
   "POST /api/sweeps/:id/validate (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4585,7 +4585,7 @@
   "POST /api/sweeps/:id/validate (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4594,7 +4594,7 @@
   "POST /api/sweeps/:id/validate (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4603,7 +4603,7 @@
   "POST /api/sweeps/:id/validate (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4612,7 +4612,7 @@
   "POST /api/sweeps/:id/validate (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4621,7 +4621,7 @@
   "POST /api/sweeps/:id/validate (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: Too small: expected number to be >=1 (n)",
@@ -4642,7 +4642,7 @@
   "POST /api/tuning/estimate (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4651,7 +4651,7 @@
   "POST /api/tuning/estimate (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4660,7 +4660,7 @@
   "POST /api/tuning/estimate (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4669,7 +4669,7 @@
   "POST /api/tuning/estimate (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4678,7 +4678,7 @@
   "POST /api/tuning/estimate (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4687,7 +4687,7 @@
   "POST /api/tuning/estimate (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: Invalid input: expected string, received undefined (modelPath)",
@@ -4720,7 +4720,7 @@
   "POST /api/tuning/plan (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4729,7 +4729,7 @@
   "POST /api/tuning/plan (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4738,7 +4738,7 @@
   "POST /api/tuning/plan (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4747,7 +4747,7 @@
   "POST /api/tuning/plan (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4756,7 +4756,7 @@
   "POST /api/tuning/plan (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4765,7 +4765,7 @@
   "POST /api/tuning/plan (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: required (name)",
@@ -4806,7 +4806,7 @@
   "POST /api/tuning/disk-speed (malformed JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4815,7 +4815,7 @@
   "POST /api/tuning/disk-speed (non-object JSON)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON object expected"
@@ -4824,7 +4824,7 @@
   "POST /api/tuning/disk-speed (no body, no content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4833,7 +4833,7 @@
   "POST /api/tuning/disk-speed (no body, JSON content-type)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid JSON"
@@ -4842,7 +4842,7 @@
   "POST /api/tuning/disk-speed (text/plain)": {
     "status": 415,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "JSON body expected (content-type: application/json)"
@@ -4851,7 +4851,7 @@
   "POST /api/tuning/disk-speed (schema violation)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Invalid data: Too small: expected string to have >=1 characters (modelPath)",
@@ -4872,7 +4872,7 @@
   "GET /api/health (foreign Origin)": {
     "status": 403,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Origin not allowed"
@@ -4881,7 +4881,7 @@
   "GET /api/health (same Origin)": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "ok": true,
@@ -4892,25 +4892,20 @@
   "GET /api/health (Host evil.example)": {
     "status": 403,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Host not allowed"
     }
   },
   "GET /api/health (Host a b)": {
-    "status": 403,
-    "headers": {
-      "content-type": "application/json;charset=utf-8"
-    },
-    "body": {
-      "error": "Invalid host"
-    }
+    "status": 400,
+    "headers": {}
   },
   "GET /api/health (Host localhost)": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "ok": true,
@@ -4921,7 +4916,7 @@
   "POST /api/profiles (foreign Origin)": {
     "status": 403,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Origin not allowed"
@@ -4938,7 +4933,7 @@
   "GET /api/nope": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Unknown route"
@@ -4947,7 +4942,7 @@
   "POST /api/nope": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Unknown route"
@@ -4986,7 +4981,7 @@
   "DELETE /api/bench/runs?failed=1": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "deleted": 0
@@ -4995,7 +4990,7 @@
   "DELETE /api/bench/runs (no failed=1)": {
     "status": 400,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "?failed=1 expected"
@@ -5004,7 +4999,7 @@
   "POST /api/bench/1/cancel": {
     "status": 409,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "This run is not running"
@@ -5013,7 +5008,7 @@
   "POST /api/sweeps/1/cancel": {
     "status": 409,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "This sweep is not running"
@@ -5022,7 +5017,7 @@
   "POST /api/chat/1/stop": {
     "status": 409,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "No reply in progress"
@@ -5031,7 +5026,7 @@
   "POST /api/downloads/clear": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "deleted": 0
@@ -5040,7 +5035,7 @@
   "POST /api/downloads/999999/retry": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Download not found"
@@ -5049,7 +5044,7 @@
   "DELETE /api/downloads/999999": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "Download not found"
@@ -5058,7 +5053,7 @@
   "POST /api/server/restart": {
     "status": 409,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "No profile to restart"
@@ -5067,7 +5062,7 @@
   "POST /api/server/stop": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "state": {
@@ -5080,7 +5075,7 @@
   "POST /api/profiles/import/llama-tui": {
     "status": 404,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "error": "llama-tui config not found (<tmp>/xdg-config/llama-tui/config.json)"
@@ -5105,7 +5100,7 @@
   "POST /api/profiles/1/duplicate": {
     "status": 201,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "id": 3,
@@ -5121,7 +5116,7 @@
   "POST /api/bench/1/to-profile": {
     "status": 201,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "id": 4,
@@ -5138,7 +5133,7 @@
   "GET /api/profiles (after the changes)": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": [
       {
@@ -5195,7 +5190,7 @@
   "POST /api/server/start (fake server)": {
     "status": 202,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "state": {
@@ -5214,7 +5209,7 @@
   "GET /api/server/state (fake server ready)": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "state": {
@@ -5273,7 +5268,7 @@
   "POST /api/server/stop (running)": {
     "status": 200,
     "headers": {
-      "content-type": "application/json;charset=utf-8"
+      "content-type": "application/json"
     },
     "body": {
       "state": {

@@ -1,16 +1,15 @@
-import { createServer, type Server } from 'node:http';
+import type { Server } from 'node:http';
 import { connect } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { Hono } from 'hono';
 import { afterEach, expect, test, vi } from 'vitest';
 import { request } from './contract/wire';
 import { mount, type WebHandler } from './host';
+import { createHostServer } from './hostServer';
 import { guardMw } from './http';
 import { WsHub } from './ws/hub';
 
-const web: WebHandler = (req, res) => {
-  res.writeHead(200, { 'content-type': 'text/html;charset=utf-8' }).end(`web ${req.url}`);
-};
+const web: WebHandler = (c) => c.body(`web ${c.req.path}`, 200, { 'content-type': 'text/html;charset=utf-8' });
 const app = (tag: string) =>
   new Hono()
     .use(guardMw)
@@ -26,8 +25,8 @@ afterEach(async () => {
   }
 });
 
-async function boot(o: { dev?: boolean; tag?: string } = {}) {
-  const server = createServer();
+async function boot(o: { tag?: string } = {}) {
+  const server = createHostServer();
   const hub = new WsHub('boot-1');
   open.push({ server, hub });
   const port = await mount({
@@ -37,7 +36,6 @@ async function boot(o: { dev?: boolean; tag?: string } = {}) {
     web,
     hostname: '127.0.0.1',
     port: 0,
-    dev: o.dev ?? false,
   });
   return { server, hub, port, base: `http://127.0.0.1:${port}` };
 }
@@ -77,14 +75,12 @@ test('a body-less POST passes the guard over HTTP; a text body is a 415', async 
   expect(text.status).toBe(415);
 });
 
-test('a Host that is not an authority is a 403 Invalid host, as from the guard', async () => {
+test('a Host that is not an authority is a 400, the answer of the HTTP adapter', async () => {
   const { base } = await boot();
-  const res = await request(base, { method: 'GET', path: '/api/x', headers: { Host: 'a b' } });
-  expect([res.status, res.headers['content-type'], JSON.parse(res.body)]).toEqual([
-    403,
-    'application/json;charset=utf-8',
-    { error: 'Invalid host' },
-  ]);
+  for (const path of ['/api/x', '/ws']) {
+    const res = await request(base, { method: 'GET', path, headers: { Host: 'a b' } });
+    expect([res.status, res.body]).toEqual([400, '']);
+  }
 });
 
 test('/ws without an upgrade: guarded, then 426', async () => {
@@ -121,7 +117,7 @@ test('a WebSocket on /ws gets the hub hello and its pong; a foreign Origin is re
   });
   expect([refused.status, refused.headers['content-type'], JSON.parse(refused.body)]).toEqual([
     403,
-    'application/json;charset=utf-8',
+    'application/json',
     { error: 'Origin not allowed' },
   ]);
   // The first client left (its close detached it), the refused one never came in.
@@ -196,25 +192,35 @@ test('a frame larger than the protocol needs closes the socket (1009)', async ()
   await vi.waitFor(() => expect(hub.size()).toBe(0));
 });
 
-test('an upgrade on another path is destroyed in production, left to the other listeners in dev', async () => {
-  const prod = await boot();
-  expect((await socket(prod.base)).frames.length).toBe(1); // /ws itself works
-  const other = (base: string) =>
+test('an upgrade on another path is refused, unless another upgrade listener is there (Vite in development)', async () => {
+  const { base, server } = await boot();
+  expect((await socket(base)).frames.length).toBe(1); // /ws itself works
+  const other = () =>
     new Promise<string>((resolve) => {
       const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/other`);
       ws.onopen = () => resolve('open');
       ws.onerror = () => resolve('error');
     });
-  expect(await other(prod.base)).toBe('error');
-  const dev = await boot({ dev: true });
+  expect(await other()).toBe('error');
+  const raw = await request(base, {
+    method: 'GET',
+    path: '/other',
+    headers: {
+      Upgrade: 'websocket',
+      Connection: 'Upgrade',
+      'Sec-WebSocket-Version': '13',
+      'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==',
+    },
+  });
+  expect([raw.status, raw.body]).toEqual([404, '']);
   let seen = false;
-  dev.server.on('upgrade', (req, sock) => {
+  server.on('upgrade', (req, sock) => {
     if (req.url === '/other') {
       seen = true;
       sock.destroy();
     }
   });
-  expect(await other(dev.base)).toBe('error');
+  expect(await other()).toBe('error');
   expect(seen).toBe(true);
 });
 
@@ -229,7 +235,6 @@ test('a second mount on the same server swaps the listeners and does not listen 
     web,
     hostname: '127.0.0.1',
     port: 0,
-    dev: false,
   });
   expect(port).toBe(first.port);
   expect(first.server.listenerCount('request')).toBe(1);
@@ -253,7 +258,6 @@ test('a mount from a re-evaluated host module (a development reload) still repla
     web,
     hostname: '127.0.0.1',
     port: 0,
-    dev: true,
   });
   expect([first.server.listenerCount('request'), first.server.listenerCount('upgrade')]).toEqual([1, 1]);
   const { frames } = await socket(first.base);
@@ -261,8 +265,8 @@ test('a mount from a re-evaluated host module (a development reload) still repla
 });
 
 test('a request with a non-WebSocket Upgrade header (h2c) is answered as a plain request', async () => {
-  for (const dev of [false, true]) {
-    const { base } = await boot({ dev });
+  {
+    const { base } = await boot();
     const h2c = { connection: 'Upgrade, HTTP2-Settings', upgrade: 'h2c', 'http2-settings': 'AAMAAABkAAQCAAAAAAIAAAAA' };
     const api = await request(base, { method: 'GET', path: '/api/x', headers: h2c });
     expect([api.status, JSON.parse(api.body)]).toEqual([200, { tag: 'one' }]);

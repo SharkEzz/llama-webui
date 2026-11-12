@@ -9,7 +9,7 @@ import type { BuiltCommand } from '../supervisor/args';
 import { benchFailure } from './parse';
 import { promptOf } from './prompt';
 
-type Child = Spawned;
+type Child = Spawned<'pipe', 'pipe'>;
 
 export interface ServerTrialOptions {
   cmd: BuiltCommand;
@@ -95,14 +95,11 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
       if (errors.length > 10) errors.shift();
     }
   };
-  const proc = spawnProc(cmd.argv, { cwd: cmd.cwd, env: cmd.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  const proc = spawnProc(cmd.argv, { cwd: cmd.cwd, env: cmd.env });
   // Stopped when the trial exits, no matter what: SIGTERM, then SIGKILL after killTimeoutMs.
   await using _server = { [Symbol.asyncDispose]: () => stop(proc, killTimeoutMs, o.onLine) };
   o.onSpawn(proc);
-  const piped = Promise.all([
-    pipe(proc.stdout as ReadableStream<Uint8Array>, push),
-    pipe(proc.stderr as ReadableStream<Uint8Array>, push),
-  ]);
+  const piped = Promise.all([pipe(proc.stdout, push), pipe(proc.stderr, push)]);
   let exited = false;
   void proc.exited.then(() => {
     exited = true;

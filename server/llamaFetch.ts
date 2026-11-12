@@ -1,8 +1,16 @@
-import { type IncomingMessage, request } from 'node:http';
+import { type IncomingHttpHeaders, type IncomingMessage, request } from 'node:http';
 import { Readable } from 'node:stream';
 
 /** Statuses whose response has no body (`new Response()` refuses one). */
 const NULL_BODY = new Set([204, 205, 304]);
+
+/** Node's headers as web `Headers`: a repeated one keeps each of its values. */
+export function webHeaders(from: IncomingHttpHeaders): Headers {
+  const headers = new Headers();
+  for (const [name, value] of Object.entries(from))
+    for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) headers.append(name, v);
+  return headers;
+}
 
 /**
  * `fetch` for the requests to llama-server that can stay silent for minutes (a long prompt being processed, a
@@ -47,9 +55,6 @@ export const llamaFetch: typeof fetch = (input, init = {}) =>
       response = res;
       // A connection cut during the body breaks its stream (`Readable.toWeb`); this keeps it from being uncaught too.
       res.on('error', () => {});
-      const headers = new Headers();
-      for (const [name, value] of Object.entries(res.headers))
-        for (const v of Array.isArray(value) ? value : value === undefined ? [] : [value]) headers.append(name, v);
       const status = res.statusCode ?? 0;
       const empty = NULL_BODY.has(status) || method === 'HEAD';
       if (empty) res.resume();
@@ -57,7 +62,7 @@ export const llamaFetch: typeof fetch = (input, init = {}) =>
         new Response(empty ? null : (Readable.toWeb(res) as ReadableStream<Uint8Array>), {
           status,
           statusText: res.statusMessage ?? '',
-          headers,
+          headers: webHeaders(res.headers),
         }),
       );
     });

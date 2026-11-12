@@ -1,5 +1,5 @@
 import type { MemBandwidth } from '@llama-webui/shared';
-import { type Spawn, spawnProc } from '../proc';
+import { type Spawn, type Spawned, spawnProc } from '../proc';
 
 /*
  * DRAM bandwidth through `perf stat`, without root when perf_event_paranoid ≤ 0 (or CAP_PERFMON on perf):
@@ -10,11 +10,8 @@ import { type Spawn, spawnProc } from '../proc';
  * Any failure (perf missing, event unknown on this CPU, insufficient permissions) degrades to “unknown”.
  */
 
-type Spawned = {
-  stdout: ReadableStream<Uint8Array>;
-  exited: Promise<number>;
-  kill(signal?: NodeJS.Signals | number): void;
-};
+/** `perf stat`: its output read, its errors ignored. */
+type Perf = Spawned<'pipe', 'ignore'>;
 
 export const SYSTEM_EVENTS = { read: 'umc_cas_cmd.rd', write: 'umc_cas_cmd.wr' } as const;
 export const PROC_EVENT = 'ls_any_fills_from_sys.dram_io_all';
@@ -52,7 +49,7 @@ interface StreamOptions {
 
 /** A running `perf stat`: rate (events/s) per event, from each interval's count. */
 class PerfStream {
-  private proc: Spawned | null = null;
+  private proc: Perf | null = null;
   private prevTime = new Map<string, number>();
   private rates = new Map<string, number>();
   private lastAt = 0;
@@ -68,10 +65,8 @@ class PerfStream {
     if (this.proc) return;
     try {
       this.proc = this.o.spawn([this.o.bin, 'stat', ...this.o.args, '-x', ',', '--log-fd', '1'], {
-        stdout: 'pipe',
         stderr: 'ignore',
-        stdin: 'ignore',
-      }) as unknown as Spawned;
+      });
     } catch {
       this.die();
       return;
@@ -79,7 +74,7 @@ class PerfStream {
     void this.read(this.proc);
   }
 
-  private async read(proc: Spawned) {
+  private async read(proc: Perf) {
     const decoder = new TextDecoder();
     let buf = '';
     try {

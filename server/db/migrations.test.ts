@@ -16,7 +16,7 @@ test("a deleted profile's id is never given to a new profile (#38)", () => {
 
 test('rebuilding profiles keeps their ids and every link to them (#38)', () => {
   const db = new Database(':memory:');
-  db.run('PRAGMA foreign_keys = ON');
+  db.exec('PRAGMA foreign_keys = ON');
   runMigrations(db, 16);
   const now = 1;
   db.run(

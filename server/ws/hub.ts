@@ -1,6 +1,6 @@
 import type { WsMessage } from '@llama-webui/shared';
 
-/** What the hub needs of a client socket: a `ws` socket (`server/ws/attach.ts`). */
+/** What the hub needs of a client socket: the adapter's WebSocket context (`server/ws/attach.ts`). */
 export interface WsLike {
   send(data: string): void;
   close(code?: number, reason?: string): void;
@@ -31,10 +31,10 @@ export class WsHub {
   }
 
   /** Call for every text message received from a client. */
-  receive(ws: WsLike, raw: string | Buffer): void {
+  receive(ws: WsLike, raw: string): void {
     let msg: WsMessage;
     try {
-      msg = JSON.parse(String(raw));
+      msg = JSON.parse(raw);
     } catch {
       return;
     }

@@ -3,7 +3,6 @@
 // the golden (review its diff).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -20,6 +19,7 @@ import { SettingsRepo } from '../db/settings';
 import { SweepsRepo } from '../db/sweeps';
 import { createDeps } from '../deps';
 import { mount, type WebHandler } from '../host';
+import { createHostServer } from '../hostServer';
 import { apiRoutes, shadowed } from '../http';
 import { LogBuffer } from '../logs/buffer';
 import { writeGguf } from '../models/gguf.fixture';
@@ -66,10 +66,11 @@ const stubMonitor = {
 } as unknown as Monitor;
 
 /** The UI as the production one answers a page (`staticWeb`'s SPA fallback): no built files needed. */
-const stubWeb: WebHandler = (_req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'no-cache' });
-  res.end('<!doctype html><title>llama-webui</title>');
-};
+const stubWeb: WebHandler = (c) =>
+  c.body('<!doctype html><title>llama-webui</title>', 200, {
+    'Content-Type': 'text/html;charset=utf-8',
+    'Cache-Control': 'no-cache',
+  });
 
 async function boot() {
   const dir = tempDir('lw-contract-');
@@ -133,7 +134,7 @@ async function boot() {
       throw new TypeError('fetch failed');
     }) as unknown as typeof fetch,
   });
-  const server = createHttpServer();
+  const server = createHostServer();
   const port = await mount({
     server,
     fetch: createApi(deps).fetch,
@@ -141,7 +142,6 @@ async function boot() {
     web: stubWeb,
     hostname: '127.0.0.1',
     port: 0,
-    dev: false,
   });
   return {
     base: `http://127.0.0.1:${port}`,

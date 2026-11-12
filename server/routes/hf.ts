@@ -23,21 +23,21 @@ export function hfRoutes({ hf, downloads, downloadsRepo, settings }: HfRouteDeps
     new Hono<Env>()
       .get('/api/hf/status', async (c) => c.json(await hf.status()))
       .get('/api/hf/search', query('q'), async (c) => {
-        const q = (new URL(c.req.url).searchParams.get('q') ?? '').trim();
+        const q = (c.req.valid('query').q ?? '').trim();
         if (!q || q.length > 200) throw new HttpError(400, 'Search text expected (200 characters at most)');
         return c.json(await hf.search(q, { signal: c.req.raw.signal }));
       })
       .get('/api/hf/repo', query('id', 'revision'), async (c) => {
-        const q = new URL(c.req.url).searchParams;
-        const repo = await describeRepo(hf, q.get('id') ?? '', {
+        const q = c.req.valid('query');
+        const repo = await describeRepo(hf, q.id ?? '', {
           modelsDir: modelsDir(),
-          revision: q.get('revision') || undefined,
+          revision: q.revision || undefined,
           signal: c.req.raw.signal,
         });
         return c.json(repo);
       })
       .get('/api/downloads', (c) => c.json({ items: downloadsRepo.list(), live: downloads.live }))
-      .post('/api/downloads', body(DownloadRequestSchema, { object: true }), async (c) => {
+      .post('/api/downloads', body(DownloadRequestSchema), async (c) => {
         const items = await downloads.enqueue(await downloadInputs(hf, c.req.valid('json'), modelsDir()));
         return c.json({ items }, 202);
       })

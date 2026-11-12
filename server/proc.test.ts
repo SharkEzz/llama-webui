@@ -1,5 +1,6 @@
 import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { expect, test } from 'vitest';
 import { fileExists, fileRange, readText, spawnProc, which } from './proc';
 import { tempDir } from './testing/tempDir';
@@ -52,7 +53,7 @@ test('a spawn failure throws at once, naming the binary and the cause', async ()
   expect(() => spawnProc([plain])).toThrow(`spawn ${plain} EACCES`);
   expect(() => spawnProc(['sh'], { cwd: join(dir.path, 'missing') })).toThrow('spawn sh ENOENT');
   // The child's late 'error' event is swallowed: nothing escapes as an unhandled error.
-  await new Promise((r) => setTimeout(r, 20));
+  await sleep(20);
 });
 
 test('a spawn failure is diagnosed with the PATH of the child environment, a directory is not executable', async () => {
@@ -70,7 +71,7 @@ test('a spawn failure is diagnosed with the PATH of the child environment, a dir
     process.env.PATH = parentPath;
   }
   expect(() => spawnProc([dir.path])).toThrow(`spawn ${dir.path} EACCES`);
-  await new Promise((r) => setTimeout(r, 20));
+  await sleep(20);
 });
 
 test('an error event after the start (a failed kill) does not crash the process', async () => {

@@ -1,7 +1,8 @@
 import { readdir, realpath, stat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { resolveModelDisk } from '../collectors/disk';
-import { readText, spawnProc, which } from '../proc';
+import { readText as text } from '../hardware/pci';
+import { spawnProc, which } from '../proc';
 
 export interface SysReadings {
   /** scaling_governor of every core; empty when unreadable. */
@@ -45,14 +46,6 @@ export interface SysDeps {
   resolveDisk?: (path: string) => Promise<string | null>;
 }
 
-async function text(path: string): Promise<string | null> {
-  try {
-    return (await readText(path)).trim();
-  } catch {
-    return null;
-  }
-}
-
 async function listDir(path: string): Promise<string[] | null> {
   try {
     return await readdir(path);
@@ -88,11 +81,7 @@ async function gitRoot(dir: string): Promise<string | null> {
 
 async function lastCommitMs(repo: string): Promise<number | null> {
   try {
-    const proc = spawnProc(['git', '-C', repo, 'log', '-1', '--format=%ct'], {
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'ignore',
-    });
+    const proc = spawnProc(['git', '-C', repo, 'log', '-1', '--format=%ct'], { stderr: 'ignore' });
     const out = (await new Response(proc.stdout).text()).trim();
     await proc.exited;
     const n = Number(out);

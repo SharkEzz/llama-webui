@@ -15,7 +15,7 @@ export interface WorkerLike {
  * Node's exit waits for every thread, and one stuck in an NVML call (a driver fault) would hold the process forever,
  * even on Ctrl-C. A child process is killed (SIGKILL) whatever it is doing.
  */
-export function sampler(url: URL): WorkerLike {
+export function sampler(url: string | URL): WorkerLike {
   const child = fork(fileURLToPath(url), [], {
     // `node:ffi` is experimental: its warning would print on every start.
     execArgv: ['--disable-warning=ExperimentalWarning'],

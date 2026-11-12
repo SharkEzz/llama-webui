@@ -1,4 +1,3 @@
-import { createServer, type Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createApi } from './api';
 import { cliOptionsOrExit } from './cli';
@@ -7,8 +6,9 @@ import { SettingsRepo } from './db/settings';
 import { createDeps } from './deps';
 import type { DevHost } from './dev';
 import { mount, type WebHandler } from './host';
+import { createHostServer } from './hostServer';
 import { dbPath } from './paths';
-import { staticWeb, unavailableWeb } from './routes/web';
+import { nodeWeb, staticWeb, unavailableWeb } from './routes/web';
 import { getRuntime, serverView, startMonitor } from './runtime';
 import { profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
@@ -34,7 +34,7 @@ const { supervisor, logs } = runtime;
 // Development: Vite's middlewares (HMR). Production: the files of `pnpm build`, next to this bundle
 // (`dist/server/main.js` → `dist/web`); without them the API and llama-server control still work.
 const web: WebHandler = devHost
-  ? devHost.web
+  ? nodeWeb(devHost.web)
   : await staticWeb(fileURLToPath(new URL('../web/', import.meta.url))).catch((err: unknown) => {
       console.error('[llama-webui] web UI unavailable (run `pnpm build`):', err);
       return unavailableWeb(err);
@@ -45,7 +45,7 @@ const deps = createDeps({
   monitor: await startMonitor(runtime, new SettingsRepo(db).get()),
   hostname: HOSTNAME,
 });
-const server: Server = devHost?.http ?? createServer();
+const server = devHost?.http ?? createHostServer();
 const port = await mount({
   server,
   fetch: createApi(deps).fetch,
@@ -53,7 +53,6 @@ const port = await mount({
   web,
   hostname: HOSTNAME,
   port: PORT,
-  dev: devHost !== undefined,
 });
 g.__llamaWebuiDispose?.();
 

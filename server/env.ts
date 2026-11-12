@@ -3,7 +3,7 @@ import { setGlobalProxyFromEnv } from 'node:http';
 import { parseEnv } from 'node:util';
 
 /** Lets `.env` override the environment: `1` or `true`, set in the environment or in the file itself. */
-export const ENV_OVERRIDE = 'LLAMA_WEBUI_ENV_OVERRIDE';
+const ENV_OVERRIDE = 'LLAMA_WEBUI_ENV_OVERRIDE';
 
 /** The `--env-override` flag, read from the arguments before they are parsed (the `.env` comes first). */
 export const overrideFlag = (argv = process.argv.slice(2)) => argv.includes('--env-override');

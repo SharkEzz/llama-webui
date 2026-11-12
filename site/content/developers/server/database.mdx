@@ -42,9 +42,9 @@ in [Configuration](/docs/configuration/#data-directory).
 ```ts title="server/db/open.ts"
 export function openDb(path: string): Database {
   mkdirSync(dirname(path), { recursive: true });
-  const db = new Database(path, { create: true });
-  db.run('PRAGMA journal_mode = WAL');
-  db.run('PRAGMA foreign_keys = ON');
+  const db = new Database(path);
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA foreign_keys = ON');
   runMigrations(db);
   return db;
 }
@@ -61,14 +61,14 @@ migration. Tests open a migrated database in memory with `openDb(':memory:')`.
 
 ## The `Database` wrapper
 
-`Database` (`server/db/sqlite.ts`) wraps `DatabaseSync` from `node:sqlite` with the surface the repositories were
-written against, where it differs from `DatabaseSync`:
+`Database` (`server/db/sqlite.ts`) wraps `DatabaseSync` from `node:sqlite` with the surface the repositories use,
+where it differs from `DatabaseSync`:
 
 | Call                             | Behaviour                                                                                                      |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `query<Row, Params>(sql)`        | A statement cached by its SQL text, with `get()`, `all()` and `run()`. `get()` returns `null` when no row matches. |
-| `prepare<Row, Params>(sql)`      | The same, without the cache (a statement reused in a loop).                                                     |
-| `run(sql, params?)`              | `{ changes, lastInsertRowid }`. Without parameters, `sql` may hold several statements.                         |
+| `query<Row, Params>(sql)`        | A statement cached by its SQL text, with `get()`, `all()` and `run()`. `get()` returns `null` when no row matches. `sql` holds one statement: several throw. |
+| `run(sql, params?)`              | `query(sql).run(...params)`: `{ changes, lastInsertRowid }` of one statement.                                  |
+| `exec(sql)`                      | Runs every statement of `sql`, without parameters nor result: migrations, pragmas.                             |
 | `transaction(fn)`                | Returns a function that runs `fn` in a transaction and returns its value; nested, it uses a savepoint.         |
 | `close()`, `using`               | Closes the handle; a second `close()` does nothing.                                                            |
 

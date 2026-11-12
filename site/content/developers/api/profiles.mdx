@@ -158,7 +158,7 @@ curl -X POST http://127.0.0.1:7860/api/profiles/3/duplicate
 
 ## Export and import
 
-The export routes answer with a JSON file to download: `content-type: application/json; charset=utf-8`, a
+The export routes answer with a JSON file to download: `content-type: application/json`, a
 `content-disposition: attachment; filename*=UTF-8''<name>` header, the JSON indented by two spaces and a final newline.
 The profiles are exported as `ProfileInput`, without `id`, `source` or dates.
 

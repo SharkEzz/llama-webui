@@ -2,13 +2,7 @@ import { isIP } from 'node:net';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-// The type is spelled out: the `/ws` route answers without the API's charset middleware.
-function forbidden(message: string, status = 403): Response {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { 'Content-Type': 'application/json;charset=utf-8' },
-  });
-}
+const forbidden = (message: string, status = 403): Response => Response.json({ error: message }, { status });
 
 /** Safe hostname: localhost or a literal IP address. A domain name can be rebound to 127.0.0.1. */
 function trustedHostname(hostname: string): boolean {
@@ -33,7 +27,9 @@ export function guard(req: Pick<Request, 'url' | 'method' | 'headers'>): Respons
     host = req.headers.get('host') ?? url.host;
     hostname = new URL(`http://${host}`).hostname;
   } catch {
-    return forbidden('Invalid host');
+    // Not a refusal of ours: an invalid Host is a malformed request (RFC 9112 §3.2), which the host's HTTP adapter
+    // answers 400 itself before the API is reached.
+    return forbidden('Invalid host', 400);
   }
   if (!trustedHostname(hostname)) return forbidden('Host not allowed');
 

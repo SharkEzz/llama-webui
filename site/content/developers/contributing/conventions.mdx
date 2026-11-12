@@ -146,9 +146,9 @@ processes, timers, hashes and SQLite go through `node:*`. The few packages it ad
 
 | Need                          | Used                                  | Where                                                      |
 | ----------------------------- | ------------------------------------- | ---------------------------------------------------------- |
-| HTTP server                   | `node:http`, routed by `mount()`      | `server/host.ts`                                           |
+| HTTP server                   | `@hono/node-server`, app of `mount()` | `server/hostServer.ts`, `server/host.ts`                   |
 | HTTP routes                   | Hono, through `@hono/node-server`     | `server/api.ts`, `server/routes/*.ts`                      |
-| WebSocket                     | `ws` (`noServer`)                     | `server/host.ts`, `server/ws/attach.ts`                    |
+| WebSocket                     | `upgradeWebSocket` on `ws`            | `server/host.ts`, `server/ws/attach.ts`                    |
 | Long requests to llama-server | `llamaFetch` (`node:http`)            | `server/llamaFetch.ts`: chat stream, benchmark requests    |
 | SQLite                        | `Database` (`node:sqlite`)            | `server/db/sqlite.ts`: every repository                    |
 | Reading files                 | `readText`, `fileExists`, `fileRange` | `server/proc.ts` (`node:fs`): collectors, hardware readers |
@@ -177,6 +177,10 @@ only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), 
   databases the same way.
 - **Dependencies as arguments.** Server classes and builders take their collaborators (`fetch`, `spawn`, repositories,
   settings getters) as a deps object, which is what lets tests pass fakes (see [Testing](/developers/contributing/testing/)).
+- **Hono's helpers for HTTP.** A handler answers with `c.json()` or `c.body()` rather than `new Response()`, streams
+  SSE with `streamSSE()` (`hono/streaming`), and the WebSocket goes through `upgradeWebSocket()` of `@hono/node-server`
+  (2.x has it built in: no `@hono/node-ws`). `Response.json()` stays where there is no context (`errorResponse()`,
+  the guard) or where `c.json()` cannot type the body (`/api/server/props`, llama-server's own JSON).
 
 ## Generated shadcn components
 
