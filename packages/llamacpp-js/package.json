@@ -21,7 +21,7 @@
     "test:node": "node --test 'tests/*.test.ts'"
   },
   "devDependencies": {
-    "@types/node": "^26.6.6"
+    "@types/node": "catalog:"
   },
   "engines": {
     "node": ">=24"

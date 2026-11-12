@@ -58,6 +58,14 @@
   },
   "overrides": [
     {
+      "includes": ["web/**", "site/**"],
+      "linter": {
+        "domains": {
+          "react": "recommended"
+        }
+      }
+    },
+    {
       "includes": ["web/src/components/ui/**", "site/src/components/ui/**"],
       "linter": {
         "enabled": false

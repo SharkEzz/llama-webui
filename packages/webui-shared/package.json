@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "llamacpp-js": "workspace:*",
-    "zod": "^4.6.7"
+    "zod": "catalog:"
   }
 }
