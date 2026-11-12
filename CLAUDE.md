@@ -14,7 +14,7 @@ Default to using Bun instead of Node.js.
 Migration vers Node en cours (branche `node`, plan `docs/superpowers/plans/2026-11-12-node-migration.md`) : pnpm installe, Bun exécute encore tout (scripts, tests, build) jusqu'à N8.
 
 - `pnpm install` à la racine installe tout le dépôt, `site/` compris : un seul `pnpm-lock.yaml` (à commiter avec tout changement de dépendance ; la CI fait `pnpm install --frozen-lockfile`). Workspaces, catalogue et réglages pnpm dans `pnpm-workspace.yaml` (pas de champ `workspaces` dans `package.json`, pas de réglage dans `.npmrc`).
-- Une version partagée par deux projets ou plus vient du `catalog:` de `pnpm-workspace.yaml` (`"react": "catalog:"`) ; la changer là, pas dans les `package.json`.
+- Le `catalog:` de `pnpm-workspace.yaml` fixe les versions qui doivent bouger ensemble (`"react": "catalog:"`) : pour une de ses entrées, changer la version là, pas dans les `package.json`. D'autres dépendances partagées (`@types/react`, `lucide-react`, `shadcn`…) ont encore leur version dans chaque `package.json` : ne pas les migrer pendant le port (candidat de refactoring dans les notes).
 - `allowBuilds` liste les scripts d'installation autorisés ; un paquet non listé qui en a un fait échouer l'installation : décider `true` (une fonctionnalité en a besoin) ou `false`. `bun: true` est le pair de `bun-plugin-tailwind` : ce `node_modules/.bin/bun` passe avant le Bun du système dans les scripts, d'où `bun-version` de la CI égale à la version de `bun` dans `pnpm-lock.yaml`. Garder les entrées `minimumReleaseAgeExclude` que pnpm ajoute.
 - Biome ne détecte pas React depuis une version `catalog:` : le domaine `react` est activé explicitement pour `web/**` et `site/**` dans `biome.json`.
 

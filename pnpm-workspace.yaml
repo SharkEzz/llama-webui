@@ -1,5 +1,6 @@
 packages: [packages/*, server, web, site]
-# Versions shared by two or more projects (`catalog:` in their package.json).
+# Versions that must move together across projects (`catalog:` in their package.json). Not every shared
+# dependency is listed yet: extending the catalog is a refactoring candidate (notes file).
 catalog:
   typescript: ~7.0.2
   react: ^19.3.1
