@@ -27,6 +27,8 @@ jobs:
       # Production build: starts from an empty data directory, serves the production UI and the WebSocket.
       - run: pnpm build
       - run: node scripts/smoke.ts
+      # The package as a user installs it: pnpm pack, npm install into an empty prefix, the same checks through its bin.
+      - run: node scripts/smoke.ts --tarball
       - run: pnpm site:build
       - run: pnpm --dir site check-links
 
