@@ -1,6 +1,18 @@
 import { Hono } from 'hono';
-import type { AppDeps } from './app';
+import type { BenchRunner } from './bench/runner';
+import type { ChatRuns } from './chat/runs';
+import type { BenchRunsRepo } from './db/benchRuns';
+import type { ConversationsRepo } from './db/conversations';
+import type { DownloadsRepo } from './db/downloads';
+import type { ProfilesRepo } from './db/profiles';
+import type { SettingsRepo } from './db/settings';
+import type { Database } from './db/sqlite';
+import type { SweepsRepo } from './db/sweeps';
+import type { HfClient } from './hf/client';
+import type { DownloadQueue } from './hf/downloader';
 import { allowTable, apiRoutes, type Env, errorResponse, guardMw, jsonCharset } from './http';
+import type { Monitor } from './monitor/monitor';
+import type { PlacementTracker } from './monitor/placement';
 import { benchRoutes } from './routes/bench';
 import { chatRoutes } from './routes/chat';
 import { hfRoutes } from './routes/hf';
@@ -13,7 +25,33 @@ import { setupRoutes } from './routes/setup';
 import { sweepRoutes } from './routes/sweeps';
 import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
+import type { Runtime } from './runtime';
 import { APP_VERSION } from './version';
+import type { WsHub } from './ws/hub';
+
+/** The objects the API is made of (`createDeps()`, `server/deps.ts`). */
+export interface AppDeps {
+  db: Database;
+  hub: WsHub;
+  settings: SettingsRepo;
+  profiles: ProfilesRepo;
+  conversations: ConversationsRepo;
+  chatRuns: ChatRuns;
+  benchRuns: BenchRunsRepo;
+  benchRunner: BenchRunner;
+  sweeps: SweepsRepo;
+  /** Hugging Face Hub client and download queue (Models page). */
+  hf: HfClient;
+  downloads: DownloadQueue;
+  downloadsRepo: DownloadsRepo;
+  activeProfileId: () => number | null;
+  runtime: Runtime;
+  monitor: Monitor;
+  /** Placement of the loaded model (from llama-server logs), for the Topology page. */
+  placement: PlacementTracker;
+  /** The listen address (`--host`): the first-run checks say whether the UI is open to the network. */
+  hostname: string;
+}
 
 const startedAt = Date.now();
 

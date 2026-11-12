@@ -6,10 +6,10 @@ import { ZodError, type z } from 'zod';
 import { guard } from './security';
 
 /**
- * What every API route sees: `c.env.server` is Bun's server (`api.fetch(req, { server })`), absent in tests. Typed by
- * the one method the routes call, so the API's declarations (and the web's typed client) never import Bun's types.
+ * What every API route sees. The Node adapter passes its `incoming`/`outgoing` as bindings: no route reads them, and
+ * typing them would bring Node's types into the API's declarations (and the web's typed client).
  */
-export type Env = { Bindings: { server?: { timeout(req: Request, seconds: number): void } } };
+export type Env = { Bindings: object };
 
 /** The methods an API route can define, in the order of `Allow`. */
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;

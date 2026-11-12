@@ -1,6 +1,7 @@
-// The production build (`vite.config.ts`): one `vite build` into a temp dir, then what it wrote.
+// The production build (`vite.config.ts`): one `vite build` (client and server) into a temp dir, then what it wrote.
 import { readdirSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
+import { isBuiltin } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { join, resolve } from 'node:path';
 import { createBuilder } from 'vite';
@@ -12,16 +13,18 @@ import { tempDir } from './testing/tempDir';
 const ROOT = resolve(import.meta.dirname, '..');
 const dir = tempDir('lw-build-');
 const web = join(dir.path, 'web');
+const server_ = join(dir.path, 'server');
 
 beforeAll(async () => {
   const builder = await createBuilder({
     configFile: join(ROOT, 'vite.config.ts'),
     logLevel: 'warn',
-    environments: { client: { build: { outDir: web } }, ssr: { build: { outDir: join(dir.path, 'server') } } },
+    environments: { client: { build: { outDir: web } }, ssr: { build: { outDir: server_ } } },
   });
-  const { client } = builder.environments;
-  if (!client) throw new Error('no client environment in vite.config.ts');
+  const { client, ssr } = builder.environments;
+  if (!client || !ssr) throw new Error('no client or ssr environment in vite.config.ts');
   await builder.build(client);
+  await builder.build(ssr);
 }, 120_000);
 afterAll(() => dir[Symbol.dispose]());
 
@@ -54,4 +57,30 @@ test('served by staticWeb, a deep URL finds every file its page references, from
     const res = await request(base, { method: 'GET', path: ref });
     expect([ref, res.status, res.headers['cache-control']]).toEqual([ref, 200, 'public, max-age=31536000, immutable']);
   }
+});
+
+/** What a built server module imports: static `import`/`export … from` statements and `import('…')`. */
+const specifiers = (code: string) =>
+  [
+    ...code.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*["']([^"']+)["']/gm),
+    ...code.matchAll(/^\s*import\s*["']([^"']+)["']/gm),
+    ...code.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g),
+  ]
+    .map((m) => m[1] as string)
+    // `import("${lib}")` inside a template literal: code shown to the user (Hugging Face snippets), not an import.
+    .filter((spec) => !spec.includes('${'));
+
+test('the server bundle: main.js, only node:* and the network-facing dependencies left out, licenses shipped', () => {
+  const files = readdirSync(server_, { recursive: true }).map(String);
+  expect(files).toContain('main.js');
+  expect(files).toContain('THIRD-PARTY-LICENSES.md');
+  // Node's built-in modules, with or without `node:` (a bundled dependency may write `fs`).
+  const allowed = (spec: string) =>
+    isBuiltin(spec) || /^(?:hono(?:\/|$)|@hono\/node-server(?:\/|$)|ws(?:\/|$)|\.{1,2}\/)/.test(spec);
+  const external = files
+    .filter((f) => f.endsWith('.js'))
+    .flatMap((f) => specifiers(readFileSync(join(server_, f), 'utf8')).map((s) => `${f}: ${s}`))
+    .filter((line) => !allowed(line.slice(line.indexOf(': ') + 2)));
+  expect(external).toEqual([]);
+  expect(readFileSync(join(server_, 'main.js'), 'utf8').startsWith('#!/usr/bin/env node')).toBe(true);
 });

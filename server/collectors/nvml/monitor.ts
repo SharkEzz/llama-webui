@@ -1,4 +1,3 @@
-import { isStandalone } from '../../standalone';
 import type { GpuReading } from '../gpu';
 import type { GpuNeeds } from '../needs';
 import type { NvmlProc, NvmlSnapshot, NvmlSystem } from './read';
@@ -13,17 +12,8 @@ export interface WorkerLike {
 
 type WorkerMsg = { type: 'ready' } | { type: 'error'; message: string } | { type: 'sample'; snapshot: NvmlSnapshot };
 
-/** The worker, relative to `server/`: also a compile entrypoint (`scripts/compile.ts`). */
-export const NVML_WORKER = 'collectors/nvml/worker.ts';
-
-/**
- * From source, the worker sits next to this module. In the compiled executable, this module is bundled into the
- * entrypoint (`Bun.main`) and the worker is embedded under its path relative to `server/`, the entrypoints' root.
- */
-export const workerUrl = (standalone = isStandalone): string =>
-  standalone
-    ? new URL(`./${NVML_WORKER}`, Bun.pathToFileURL(Bun.main)).href
-    : new URL('./worker.ts', import.meta.url).href;
+/** The worker, next to this module. */
+export const workerUrl = (): string => new URL('./worker.ts', import.meta.url).href;
 
 const defaultWorker = (): WorkerLike => {
   const w = new Worker(workerUrl()) as unknown as WorkerLike;

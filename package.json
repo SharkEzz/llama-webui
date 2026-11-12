@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "vite build",
     "check": "tsc -b && pnpm --filter llama-webui-site typecheck",
-    "compile": "bun scripts/compile.ts",
-    "dev": "bun --hot server/index.ts",
+    "dev": "node server/dev.ts",
     "format": "biome format --write",
     "lint": "biome check",
     "lint:fix": "biome check --write",
@@ -14,17 +14,20 @@
     "site:build": "bun run --cwd site build",
     "site:dev": "bun run --cwd site dev",
     "site:preview": "bun run --cwd site preview",
-    "start": "NODE_ENV=production bun server/index.ts",
-    "test": "pnpm test:unit && pnpm --filter llamacpp-js test && pnpm test:bun",
-    "test:bun": "bun test ./server ./scripts ./packages/webui-shared ./packages/llamacpp-js",
+    "start": "pnpm build && node dist/server/main.js",
+    "test": "pnpm test:unit && pnpm --filter llamacpp-js test",
     "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "catalog:",
+    "hono": "catalog:",
+    "ws": "catalog:"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
     "@tailwindcss/vite": "catalog:",
     "@types/bun": "^1.4.4",
     "@vitejs/plugin-react": "^6.3.0",
-    "bun-plugin-tailwind": "^0.1.2",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "5.1.0"

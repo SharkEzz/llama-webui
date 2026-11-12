@@ -1,16 +1,16 @@
-// HTTP contract of the app: every case of ./cases.ts over real HTTP against the real createApp, compared with
-// golden.json. `UPDATE_GOLDEN=1 bun test ./server/contract/contract.test.ts` rewrites the golden (review its diff).
-// On bun:test until N8: it boots Bun.serve (BUN_ONLY in vitest.config.ts).
-import { afterAll, beforeAll, expect, test } from 'bun:test';
+// HTTP contract of the app: every case of ./cases.ts over real HTTP against the real host (`mount()` with the real
+// API), compared with golden.json. `UPDATE_GOLDEN=1 pnpm exec vitest run server/contract/contract.test.ts` rewrites
+// the golden (review its diff).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
+import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
+import { afterAll, beforeAll, expect, test } from 'vitest';
 import { createApi } from '../api';
-import { createApp } from '../app';
 import { BenchGate } from '../bench/gate';
 import { BenchRunsRepo } from '../db/benchRuns';
 import { ConversationsRepo } from '../db/conversations';
@@ -19,6 +19,7 @@ import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
 import { SweepsRepo } from '../db/sweeps';
 import { createDeps } from '../deps';
+import { mount, type WebHandler } from '../host';
 import { apiRoutes, shadowed } from '../http';
 import { LogBuffer } from '../logs/buffer';
 import { writeGguf } from '../models/gguf.fixture';
@@ -63,6 +64,12 @@ const stubMonitor = {
   onSnapshot: () => () => {},
   setModelPathResolver: () => {},
 } as unknown as Monitor;
+
+/** The UI as the production one answers a page (`staticWeb`'s SPA fallback): no built files needed. */
+const stubWeb: WebHandler = (_req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'no-cache' });
+  res.end('<!doctype html><title>llama-webui</title>');
+};
 
 async function boot() {
   const dir = tempDir('lw-contract-');
@@ -120,27 +127,29 @@ async function boot() {
     db,
     runtime,
     monitor: stubMonitor,
-    web: {
-      '/*': new Response('<!doctype html><title>llama-webui</title>', {
-        headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'no-cache' },
-      }),
-    },
     hostname: '127.0.0.1',
-    port: 0,
-    development: false,
     // No network: Hugging Face Hub and CDN requests fail as offline.
     fetch: (async () => {
       throw new TypeError('fetch failed');
     }) as unknown as typeof fetch,
   });
-  const server = createApp(deps);
-  const port = server.port as number;
+  const server = createHttpServer();
+  const port = await mount({
+    server,
+    fetch: createApi(deps).fetch,
+    hub: deps.hub,
+    web: stubWeb,
+    hostname: '127.0.0.1',
+    port: 0,
+    dev: false,
+  });
   return {
     base: `http://127.0.0.1:${port}`,
     ctx: { tmp, repo: REPO, home: homedir(), ports: [port, llamaPort], port },
     deps,
     async dispose() {
-      await server.stop(true);
+      server.closeAllConnections();
+      await new Promise((r) => server.close(r));
       deps.chatRuns.dispose();
       deps.benchRunner.dispose({ restart: false });
       deps.downloads.dispose();

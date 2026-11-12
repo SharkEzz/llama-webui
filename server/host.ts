@@ -28,8 +28,12 @@ type Listeners = {
   upgrade: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
 };
 
-/** The listeners each server got from its last `mount()`. */
-const mounted = new WeakMap<Server, Listeners>();
+/**
+ * The listeners a server got from its last `mount()`, kept on the server itself under a registry symbol: a
+ * development reload evaluates this module again, and the new instance must find what the old one mounted.
+ */
+const MOUNTED = Symbol.for('llama-webui.host.mounted');
+type Mounted = Server & { [MOUNTED]?: Listeners };
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
@@ -105,14 +109,15 @@ export function mount(o: MountOptions): Promise<number> {
     wss.handleUpgrade(req, socket, head_, (client) => attachSocket(o.hub, client));
   };
 
-  const previous = mounted.get(o.server);
+  const server: Mounted = o.server;
+  const previous = server[MOUNTED];
   if (previous) {
-    o.server.off('request', previous.request);
-    o.server.off('upgrade', previous.upgrade);
+    server.off('request', previous.request);
+    server.off('upgrade', previous.upgrade);
   }
-  o.server.on('request', request);
-  o.server.on('upgrade', upgrade);
-  mounted.set(o.server, { request, upgrade });
+  server.on('request', request);
+  server.on('upgrade', upgrade);
+  server[MOUNTED] = { request, upgrade };
 
   const bound = () => (o.server.address() as AddressInfo).port;
   if (o.server.listening) return Promise.resolve(bound());

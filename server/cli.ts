@@ -1,5 +1,4 @@
 import { parseArgs } from 'node:util';
-import { isStandalone } from './standalone';
 
 /** Launch options: flag, else environment variable, else default. */
 export interface CliOptions {
@@ -14,16 +13,15 @@ export type CliResult = { kind: 'run'; options: CliOptions } | { kind: 'help' } 
 export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 7860;
 
-const SOURCE_USAGE = `  bun run dev [options]      development (bun --hot, HMR)
-  bun run start [options]    production`;
-const STANDALONE_USAGE = '  llama-webui [options]';
+const USAGE = `  pnpm dev [options]      development (Vite, HMR)
+  pnpm start [options]    production (builds, then runs dist/server/main.js)`;
 
-/** `--help`; the usage lines depend on how it runs: compiled executable or from source. */
-export const helpText = (standalone = isStandalone) => `llama-webui: web UI to drive llama-server \
-(API, WebSocket and UI in a single Bun process).
+/** `--help`. */
+export const helpText = () => `llama-webui: web UI to drive llama-server \
+(API, WebSocket and UI in a single Node.js process).
 
 Usage:
-${standalone ? STANDALONE_USAGE : SOURCE_USAGE}
+${USAGE}
 
 Options:
   --host <address>       listen address (default: ${DEFAULT_HOST}); 0.0.0.0 to open it to the local network

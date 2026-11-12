@@ -45,7 +45,8 @@ export default defineConfig(({ command }) => ({
         license: { fileName: 'THIRD-PARTY-LICENSES.md' },
         rolldownOptions: {
           input: { main: r('server/main.ts') },
-          output: { entryFileNames: '[name].js' },
+          // One file: `server/index.ts` finds the UI next to it (`dist/server/main.js` → `dist/web`).
+          output: { entryFileNames: '[name].js', codeSplitting: false },
         },
       },
     },

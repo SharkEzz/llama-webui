@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import type { GpuReading } from '../gpu';
-import { NVML_WORKER, NvmlMonitor, type WorkerLike, workerUrl } from './monitor';
+import { NvmlMonitor, type WorkerLike, workerUrl } from './monitor';
 
 const GPU_A: GpuReading = {
   key: 'nvidia:GPU-a',
@@ -56,22 +56,7 @@ test('lowering the interval keeps the last sample fresh until the worker samples
   expect(mon.gpus()).toEqual([]);
 });
 
-test('workerUrl: next to the module from source, under the entrypoint root in the compiled executable', async () => {
-  const fromSource = workerUrl(false);
-  expect(fromSource).toBe(new URL('./worker.ts', import.meta.url).href);
-  expect(existsSync(fileURLToPath(fromSource))).toBe(true);
-  // The compile entrypoints' root is server/: the worker is embedded at server/<NVML_WORKER>.
-  expect(existsSync(`${import.meta.dirname}/../../${NVML_WORKER}`)).toBe(true);
-  // The compiled branch reads Bun.main (the executable's path): stubbed on Node, the real one under `bun test`.
-  const g = globalThis as { Bun?: unknown };
-  const stub = g.Bun === undefined;
-  if (stub) g.Bun = { main: '/opt/llama-webui/llama-webui', pathToFileURL };
-  try {
-    const expected = stub
-      ? `file:///opt/llama-webui/${NVML_WORKER}`
-      : new URL(`./${NVML_WORKER}`, pathToFileURL(Bun.main)).href;
-    expect(workerUrl(true)).toBe(expected);
-  } finally {
-    if (stub) delete g.Bun;
-  }
+test('workerUrl: the worker next to this module', () => {
+  expect(workerUrl()).toBe(new URL('./worker.ts', import.meta.url).href);
+  expect(existsSync(fileURLToPath(workerUrl()))).toBe(true);
 });

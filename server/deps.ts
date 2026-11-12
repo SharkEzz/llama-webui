@@ -1,4 +1,4 @@
-import type { AppDeps } from './app';
+import type { AppDeps } from './api';
 import { RunExecutor } from './bench/execute';
 import { readHardware } from './bench/hardware';
 import { BenchRunner } from './bench/runner';
@@ -14,7 +14,6 @@ import { HfClient } from './hf/client';
 import { DownloadQueue } from './hf/downloader';
 import type { Monitor } from './monitor/monitor';
 import { PlacementTracker } from './monitor/placement';
-import type { WebRoutes } from './routes/web';
 import { activeProfileId, type Runtime } from './runtime';
 import { binaryPath, buildCommand, profilePaths } from './supervisor/args';
 import { WsHub } from './ws/hub';
@@ -23,10 +22,7 @@ export interface DepsOptions {
   db: Database;
   runtime: Runtime;
   monitor: Monitor;
-  web: WebRoutes;
   hostname: string;
-  port: number;
-  development: boolean;
   /** Hugging Face Hub and CDN requests (the contract suite passes one that never reaches the network). */
   fetch?: typeof fetch;
 }
@@ -110,9 +106,6 @@ export function createDeps(o: DepsOptions): AppDeps {
     monitor,
     placement,
     activeProfileId: () => activeProfileId(supervisor),
-    web: o.web,
     hostname: o.hostname,
-    port: o.port,
-    development: o.development,
   };
 }

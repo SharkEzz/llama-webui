@@ -168,3 +168,24 @@ test('a second mount on the same server swaps the listeners and does not listen 
   const { frames } = await socket(first.base);
   expect(frames).toEqual([{ type: 'hello', payload: { serverTime: expect.any(Number), bootId: 'boot-2' } }]);
 });
+
+test('a mount from a re-evaluated host module (a development reload) still replaces the listeners', async () => {
+  const first = await boot({ tag: 'one' });
+  vi.resetModules();
+  const fresh = (await import('./host')) as typeof import('./host');
+  expect(fresh.mount).not.toBe(mount);
+  const hub = new WsHub('boot-2');
+  open.push({ server: first.server, hub });
+  await fresh.mount({
+    server: first.server,
+    fetch: app('two').fetch,
+    hub,
+    web,
+    hostname: '127.0.0.1',
+    port: 0,
+    dev: true,
+  });
+  expect([first.server.listenerCount('request'), first.server.listenerCount('upgrade')]).toEqual([1, 1]);
+  const { frames } = await socket(first.base);
+  expect(frames).toEqual([{ type: 'hello', payload: { serverTime: expect.any(Number), bootId: 'boot-2' } }]);
+});

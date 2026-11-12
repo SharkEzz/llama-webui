@@ -14,10 +14,9 @@ catalog:
   "@types/node": ^26.6.6
   # Server API, and its RPC types in web (N7). Pinned to 4.13.x: v5 is a refactoring candidate.
   hono: ~4.13.18
-# Install scripts pnpm may run (strictDepBuilds fails on any other).
-allowBuilds:
-  # Peer of bun-plugin-tailwind; without its postinstall, node_modules/.bin/bun shadows the system Bun and fails.
-  bun: true
+  # Left out of the server bundle (vite.config.ts): dependencies of the root package, which runs dist/, and of server.
+  "@hono/node-server": ^2.1.7
+  ws: ^8.22.2
 minimumReleaseAgeExclude:
   - "@biomejs/biome@2.6.7"
   - "@biomejs/cli-android-arm64@2.6.7"
