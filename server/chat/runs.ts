@@ -3,6 +3,7 @@ import { type LlamaTimings, probeUrl, streamChatCompletion } from 'llamacpp-js/c
 import { LlamaHttpError, LlamaStreamCutError, LlamaStreamError } from 'llamacpp-js/errors';
 import type { ConversationsRepo } from '../db/conversations';
 import { HttpError, notFound } from '../http';
+import { llamaFetch } from '../llamaFetch';
 import { buildChatRequest, llamaErrorMessage } from './request';
 
 export interface ChatTarget {
@@ -17,6 +18,7 @@ export interface ChatRunsDeps {
   repo: ConversationsRepo;
   /** llama-server ready to answer, otherwise null. */
   target(): ChatTarget | null;
+  /** `llamaFetch` by default: a reply can take longer to start than `fetch` waits (300 s). */
   fetch?: typeof fetch;
   now?: () => number;
   /** Writes the text so far to the DB at most every `flushMs`. */
@@ -47,7 +49,7 @@ class Run implements ChatRun {
   private final: ChatMessage | null = null;
   private readonly abort = new AbortController();
   private stopped = false;
-  /** DB closed (Bun reload): no more writes. */
+  /** DB closed (development reload): no more writes. */
   private detached = false;
   readonly done: Promise<void>;
 
@@ -85,7 +87,7 @@ class Run implements ChatRun {
 
   /**
    * Immediate stop before the DB closes: the reply is saved as “stopped” right away and subscribers receive
-   * `done` (their SSE streams close; otherwise they would stay open after a Bun reload).
+   * `done` (their SSE streams close; otherwise they would stay open after a development reload).
    */
   detach(): void {
     this.stop();
@@ -170,7 +172,7 @@ export class ChatRuns {
   private readonly deps: Required<Omit<ChatRunsDeps, 'target'>>;
 
   constructor(private readonly o: ChatRunsDeps) {
-    this.deps = { repo: o.repo, fetch: o.fetch ?? fetch, now: o.now ?? Date.now, flushMs: o.flushMs ?? 1000 };
+    this.deps = { repo: o.repo, fetch: o.fetch ?? llamaFetch, now: o.now ?? Date.now, flushMs: o.flushMs ?? 1000 };
   }
 
   send(conversationId: number, content: string): ChatRun {

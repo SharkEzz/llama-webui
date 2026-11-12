@@ -1,7 +1,8 @@
-import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
+import { describe, expect, test } from 'vitest';
 import { HttpError } from '../http';
 import { tempDir } from '../testing/tempDir';
+import { writeFileDeep } from '../testing/write';
 import { HfClient } from './client';
 import { fileDest, repoDir } from './paths';
 import { hfEndpoint, hfTokenPath, resolveHfToken } from './token';
@@ -10,7 +11,7 @@ import { groupRepoFiles } from './variants';
 describe('token', () => {
   test('HF_TOKEN first, then the hf token file', async () => {
     using dir = tempDir('lw-hf-');
-    await Bun.write(join(dir.path, 'hf', 'token'), ' hf_file \n');
+    await writeFileDeep(join(dir.path, 'hf', 'token'), ' hf_file \n');
     const env = { HF_HOME: join(dir.path, 'hf') };
     expect(await resolveHfToken({ ...env, HF_TOKEN: 'hf_env' })).toEqual({ token: 'hf_env', source: 'env' });
     expect(await resolveHfToken({ ...env, HUGGING_FACE_HUB_TOKEN: 'hf_old' })).toEqual({

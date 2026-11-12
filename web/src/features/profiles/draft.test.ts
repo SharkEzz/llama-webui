@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import type { Profile } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { commandChanged } from './draft';
 
 const base: Profile = {

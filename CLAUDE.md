@@ -1,51 +1,57 @@
-Default to using Bun instead of Node.js.
+L'app tourne sur Node (≥ 26.13, un seul processus) ; pnpm installe et lance les scripts.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun check` instead of `tsc --noEmit`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+- Lancer : `pnpm dev` (développement, HMR), `pnpm start` (build puis production) ; un fichier TS se lance par `node <fichier>` (syntaxe effaçable).
+- Tests : Vitest (`pnpm test`, voir « Testing ») ; type check : `pnpm check` (`tsc -b`) ; build : `pnpm build` (`vite build`).
+- Install : `pnpm install` (voir « Installation (pnpm) ») ; un outil ponctuel : `pnpm dlx`.
+- `.env` du dossier courant : chargé par les points d'entrée (`server/env.ts`, `parseEnv` de `node:util` : l'environnement l'emporte, sauf avec `--env-override` ou `LLAMA_WEBUI_ENV_OVERRIDE=1` dans l'environnement ou le `.env`) ; pas de `dotenv`, seul `.env` est lu (ni `.env.local` ni fichier par mode, pas d'expansion de `$VAR`). `useEnvProxy()` (même fichier, après le `.env`) fait passer `fetch` par `HTTP_PROXY`/`HTTPS_PROXY` s'il y en a un (`http.setGlobalProxyFromEnv`, loopback toujours en direct) : le `fetch` de Node les ignore sinon.
+- Le dépôt ne tourne que sur Node : aucune API ni commande Bun ; `scripts/no-bun.test.ts` échoue sur toute mention de Bun hors de son allowlist (l'historique `docs/superpowers/`, les skills vendorisés, quelques lignes motivées, chacune par son texte).
+
+## Installation (pnpm)
+
+L'app, ses tests et son build tournent sur Node ; pnpm installe et lance les scripts.
+
+- `pnpm install` à la racine installe tout le dépôt, `site/` compris : un seul `pnpm-lock.yaml` (à commiter avec tout changement de dépendance ; la CI fait `pnpm install --frozen-lockfile`). Workspaces, catalogue et réglages pnpm dans `pnpm-workspace.yaml` (pas de champ `workspaces` dans `package.json`, pas de réglage dans `.npmrc`).
+- Le `catalog:` de `pnpm-workspace.yaml` fixe les versions qui doivent bouger ensemble (`"react": "catalog:"`) : pour une de ses entrées, changer la version là, pas dans les `package.json`. D'autres dépendances partagées (`@types/react`, `lucide-react`, `shadcn`…) ont encore leur version dans chaque `package.json` : candidat de refactoring (backlog de `docs/superpowers/plans/2026-11-12-node-migration-notes.md`), à ne pas migrer au passage.
+- `allowBuilds` (absent tant qu'aucun paquet n'en a besoin) liste les scripts d'installation autorisés ; un paquet non listé qui en a un fait échouer l'installation : décider `true` (une fonctionnalité en a besoin) ou `false`. Garder les entrées `minimumReleaseAgeExclude` que pnpm ajoute.
+- `hono`, `@hono/node-server` et `ws` restent hors du bundle serveur (`vite.config.ts`) : dépendances du `package.json` racine (d'où `dist/server/main.js` les résout) **et** de `server/`, versions dans le `catalog:`.
+- Biome ne détecte pas React depuis une version `catalog:` : le domaine `react` est activé explicitement pour `web/**` et `site/**` dans `biome.json`.
 
 ## APIs
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+- HTTP : un serveur `node:http` routé par `mount()` (`server/host.ts`) : l'API Hono par `@hono/node-server`, le WebSocket `/ws` par `ws`, l'UI par Vite (dev) ou `staticWeb` (production). Pas d'`express`.
+- SQLite goes through `Database` from `server/db/sqlite.ts` (`node:sqlite`). Don't use `bun:sqlite` or `better-sqlite3`.
+- `WebSocket` (client) et `fetch` sont globaux dans Node. Le `fetch` de Node abandonne après 300 s sans en-têtes de réponse, et après 300 s entre deux chunks, sans réglage possible : une requête à llama-server qui peut rester muette plus longtemps (flux du chat, requêtes du bench) passe par `llamaFetch` (`server/llamaFetch.ts`, `node:http`, même signature et mêmes erreurs).
+
+**Dans ce projet :** fichiers, processus, pauses et hachages passent par `node:*`, jamais `Bun.file`/`Bun.write`/`Bun.spawn`/`Bun.sleep`/`Bun.which`/`Bun.CryptoHasher`/`Bun.$`/`Bun.argv`/`import.meta.dir`. Côté serveur, `server/proc.ts` : `spawnProc` (flux web, `exited`, lève une erreur tout de suite si le lancement échoue), `readText`, `fileExists` (faux pour un dossier), `fileRange`, `which` ; pauses `setTimeout` de `node:timers/promises`, sha256 `createHash` de `node:crypto`, `import.meta.dirname`. Les tests écrivent avec `writeFileDeep` (`server/testing/write.ts`, crée les dossiers parents). SQLite : `Database` de `server/db/sqlite.ts`, enveloppe de `DatabaseSync` (`node:sqlite`) avec la surface qu'utilisent les dépôts (`query()` en cache, `get()` → `null`, `run(sql)` à plusieurs instructions, `transaction(fn)`, booléens et `undefined` liés en 1/0/NULL, nombre de valeurs vérifié, clés étrangères coupées par défaut : `openDb()` les active). NVML : `node:ffi` (expérimental, sans flag) dans un processus enfant (`fork`, `server/collectors/nvml/sampler.ts` : pas un worker thread, dont un appel bloqué dans le pilote retiendrait la sortie de Node), handles en `bigint` ; le sampler (`worker.ts`, imports avec extension `.ts`) tourne tel quel en dev, `dist/server/nvml-worker.js` en production ; `LLAMA_WEBUI_NVML_LIB` (comme `LLAMA_WEBUI_NVIDIA_SMI`) pour tester son absence (repli `nvidia-smi`).
+
+**Routes API (Hono) :** toute route `/api` est dans l'app Hono de `createApi()` (`server/api.ts`) ; `mount()` (`server/host.ts`) lui passe `/api/*` (`getRequestListener` de `@hono/node-server`) et garde `/ws` et l'UI. Chaque `server/routes/<domaine>.ts` exporte une fonction (dépendances) → `new Hono<Env>()` **chaînée**, handlers inline (types du client `hc`), montée par `.route('/', …)` dans `createApi`. Middlewares de `createApi` pour toutes les routes, rien à envelopper : `jsonCharset` (remet `application/json;charset=utf-8`, que `c.json` n'envoie pas), `guardMw` (garde de `server/security.ts`), `allow.mw` (405 + `Allow`, HEAD compté comme GET, motif le plus spécifique) ; `notFound` → `Unknown route`, `onError` → `errorResponse`. Hono prend la première route qui correspond : un chemin statique avant le `:param` qui l'attraperait (`/api/downloads/clear` avant `/api/downloads/:id`), vérifié par `shadowed()` dans la suite de contrat. Validateurs de `server/http.ts` : `id('Profile')` (`:id` entier positif, sinon 404, avant le corps), `body(Schema, { object: true })` (`@hono/zod-validator` : `Invalid JSON`, `JSON object expected`, puis le `ZodError`), `json(check)` (vérification impérative, `json(object)`) ; un handler qui cherche ou répond 409 avant de lire le corps le lit lui-même (`object(await c.req.json())`, type déclaré pour le client par `accepts<T>()`, qui ne lit rien) ou le passe tel quel (`json(passthrough)`) ; `query('clé', …)` déclare les clés de query lues (ne refuse rien, le handler lit toujours `searchParams`). Requêtes : `new URL(c.req.url).searchParams` ; signal : `c.req.raw.signal`. **Client typé :** le web appelle l'API par `call(client.<chemin>.$<méthode>({ param, query, json }, { init }))` (`web/src/lib/api.ts`, `hc` de `hono/client`, `byId(id)` pour `:id`), typé par `AppType` de `@llama-webui/server/api` (`server/rpc.ts`, types seulement) : jamais de `fetch('/api…')` ni de cast sur une réponse (une réponse brute comme `/api/server/props` se restreint par des guards, `web/src/lib/props.ts`) ; une erreur de type se corrige côté serveur (`c.json<T>()`, type de retour d'un check). Une réponse est typée par le `c.json(…)` du handler ; un corps seulement par `body(Schema)`, `accepts<T>()` ou le retour d'un `json(check)` (`json(object)` accepte tout objet). Le web ne référence `server` que pour les types : le projet `web/tsconfig.json` n'a aucun `types` (DOM seul) et `web/src/lib/no-node-types.ts` échoue si les types globaux de Node y entrent ; un type importé de `node:*` par la déclaration de l'API (`server/.tsbuild/rpc.d.ts`) deviendrait `any` sans erreur (`skipLibCheck`) : `server/rpc.test.ts` n'y admet que `hono`, `zod`, `@llama-webui/shared` et `llamacpp-js/metrics` ; ses tests ont `web/tsconfig.test.json` (types Node). Tests de routes : `app.request()` sous Vitest (`app.onError((err) => errorResponse(err))` sur une app de domaine).
 
 ## Testing
 
-Use `bun test` to run tests.
+`pnpm test` lance toutes les suites : `test:unit` (`vitest run`), puis `pnpm --filter llamacpp-js test` (`node --test`).
 
 ```ts#index.test.ts
-import { test, expect } from "bun:test";
+import { expect, test } from 'vitest';
 
-test("hello world", () => {
+test('hello world', () => {
   expect(1).toBe(1);
 });
 ```
 
+**Dans ce projet :** `vitest.config.ts` (racine) définit un projet Vitest par base de code (`server` avec `scripts/`, `shared`, `web` et `site` avec leur alias `@`), `environment: 'node'`, imports explicites (pas de globals), `oxc: { target: 'esnext' }` pour garder `using` natif. Un fichier lancé seul : `pnpm exec vitest run <chemin>`, un nom : `-t '<regex>'`. Vitest échoue sur un `.resolves`/`.rejects` non attendu : toujours `await expect(…).rejects`. `vi.fn()` pour un callback enregistré (pas de `mock.module`, les dépendances sont injectées). **Suite de contrat** (`server/contract/`) : chaque route de l'API rejouée en HTTP réel contre l'hôte Node (`mount()` avec la vraie API), comparée à `golden.json` ; une route ajoutée va dans `ROUTES` de `cases.ts` (le test échoue sinon) ; un changement de comportement voulu → `UPDATE_GOLDEN=1 pnpm exec vitest run server/contract/contract.test.ts` puis relire le diff du golden. `server/build.test.ts` fait un vrai `vite build` (client découpé, three.js seulement dans les chunks de Topology, aucun `node:*` côté client, bundle serveur sans autre import que Node, `hono`, `@hono/node-server`, `ws`, sampler NVML qui démarre depuis le bundle) ; `server/dev.test.ts` la boucle de dev ; `server/host.test.ts` l'hôte.
+
 ## Type checking
 
-Use `bun check` to type check the project. It reads `tsconfig.json` and reports the same errors as `tsc`.
+`pnpm check` = `tsc -b` puis `pnpm --filter llama-webui-site typecheck` (`react-router typegen && tsc`). TypeScript 7 (`tsc` natif), version dans le `catalog:`.
 
-- `bun check src/index.ts` checks one file and what it imports
-- `bun --check src/index.ts`, `bun test --check` and `bun build --check` type check first, and do nothing else if there is an error
-
-**Dans ce projet :** le `tsconfig.json` racine est une solution (project references, options communes dans `tsconfig.base.json`) : `bun check --no-script -b` vérifie chaque projet avec ses propres options (`packages/llamacpp-js` en types Node seuls, ses tests dans `tsconfig.test.json`, `packages/webui-shared`, `server`, `scripts`, `web`). Un projet ne voit qu'un autre qu'il liste dans ses `references`. Nouveau dossier de code → un projet référencé, pas de `paths` vers des sources d'un autre package.
+**Dans ce projet :** le `tsconfig.json` racine est une solution (project references, options communes dans `tsconfig.base.json`) : `tsc -b` vérifie chaque projet avec ses propres options (`packages/llamacpp-js` en types Node seuls, ses tests dans `tsconfig.test.json`, `packages/webui-shared`, `server`, `scripts`, `web`) et écrit les déclarations dans `.tsbuild/` (ignoré par git). Un projet ne voit qu'un autre qu'il liste dans ses `references`. Nouveau dossier de code → un projet référencé, pas de `paths` vers des sources d'un autre package.
 
 ## Format et lint (Biome)
 
 Biome (devDependency épinglée, config dans `biome.json`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`server/`, `packages/` et `web/`). `web/src/components/ui/**` (shadcn généré) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn.
 
-- `bun run lint` : vérifie format + lint + imports (lecture seule) ; `bun run lint:fix` applique les corrections sûres.
-- **Avant de clore un jalon / milestone / lot de travail** (et avant de commiter ou d'ouvrir une PR), tout doit être vert : `bun run lint`, `bun run check`, `bun test`. Zéro erreur et zéro warning Biome.
+- `pnpm lint` : vérifie format + lint + imports (lecture seule) ; `pnpm lint:fix` applique les corrections sûres.
+- **Avant de clore un jalon / milestone / lot de travail** (et avant de commiter ou d'ouvrir une PR), tout doit être vert : `pnpm lint`, `pnpm check`, `pnpm test`. Zéro erreur et zéro warning Biome.
 - Ne pas désactiver une règle ni la baisser en `warn` pour faire passer le lint. Si une règle est un faux positif, `// biome-ignore lint/<groupe>/<règle>: <raison>` ciblé et motivé (voir `useExhaustiveDependencies` : les dépendances « déclencheur » sont volontaires). Pour lire la dernière valeur dans un effet sans le relancer, préférer `useEffectEvent` (React 19) à un ignore ; pour réinitialiser un état au changement d'identité, un `key` sur le composant plutôt qu'un effet.
 
 ## Langue
@@ -54,9 +60,9 @@ L'UI, les messages du serveur (erreurs, validations zod, logs, `--help`), les co
 
 ## Packages (`packages/`)
 
-`packages/webui-shared/` (`@llama-webui/shared`) : types, schémas zod et logique pure partagés par le serveur et le web. `packages/llamacpp-js/` : tout ce qui parle à llama.cpp (API HTTP de `llama-server`, métriques, `--help`, sortie de `llama-bench`, `/proc`), destiné à être publié sur npm. Règles de `llamacpp-js` (vérifiées par `tests/package.test.ts`, son projet TS et ses tests rejoués sous Node en CI) :
+`packages/webui-shared/` (`@llama-webui/shared`) : types, schémas zod et logique pure partagés par le serveur et le web. `packages/llamacpp-js/` : tout ce qui parle à llama.cpp (API HTTP de `llama-server`, métriques, `--help`, sortie de `llama-bench`, `/proc`), destiné à être publié sur npm. Règles de `llamacpp-js` (vérifiées par `tests/package.test.ts`, son projet TS et ses tests, sous Node en CI) :
 
-- **Exception à « préférer Bun » :** cible Node ≥ 24 **et** Bun, donc uniquement des API web et `node:*` dans `src/` (`fetch`, `node:child_process`, `node:fs/promises`), jamais `Bun.*`. Ses tests sont dans `tests/` (hors de `src/`) et utilisent `node:test` + `node:assert/strict` : ils tournent sous `bun test` et sous Node (`bun run --cwd packages/llamacpp-js test:node`, en CI). Bun n'implémente qu'une partie de `node:test` (ni snapshots, ni `mock.module()`, `test.only` ne filtre pas) : s'en tenir à ce que les deux supportent ; ce qui demande `Bun.build` passe `{ skip }` sans `Bun`.
+- **Cible :** Node ≥ 24, donc uniquement des API web et `node:*` dans `src/` (`fetch`, `node:child_process`, `node:fs/promises`) ; son projet TS n'a que les types Node. Ses tests sont dans `tests/` (hors de `src/`) et utilisent `node:test` + `node:assert/strict`, sous Node (`pnpm --filter llamacpp-js test` = `node --test 'tests/*.test.ts'`, en CI sous Node 26 et, dans un job à part sans installation, sous Node 24, la version minimale). Les contrôles de bundling de `tests/package.test.ts` passent par Rolldown (devDependency) et passent `{ skip }` sans installation.
 - Aucune dépendance ni import de `@llama-webui/*` ; ce qui est un choix de llama-webui (superviseur, `buildCommand`, formulation des erreurs pour l'utilisateur, caches) reste dans l'app.
 - TS exécutable tel quel par Node : imports relatifs avec extension `.ts`, `import type`, syntaxe effaçable (`erasableSyntaxOnly` : pas d'`enum`, de `namespace` ni de propriétés de paramètre).
 - Tree-shakeable : ESM, `"sideEffects": false`, aucun état ni effet au chargement d'un module, un export par module dans `package.json` ; seul `llamacpp-js/node` utilise des API Node, le reste tourne aussi dans le navigateur.
@@ -64,122 +70,52 @@ L'UI, les messages du serveur (erreurs, validations zod, logs, `--help`), les co
 
 ## Frontend
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+Vite : `vite.config.ts` à la racine construit le client (`web/`, React, Tailwind par `@tailwindcss/vite`, alias `@`) et le serveur.
 
-**Dans ce projet :** `server/index.ts` importe `web/index.html` ; un seul process Bun sur le port 7860 sert l'API, le WebSocket et l'UI (Tailwind via `bun-plugin-tailwind` dans `bunfig.toml`). `bun run dev` = `bun --hot` (import HTML de `Bun.serve`, HMR, un seul bundle), `bun run start` = `NODE_ENV=production` : le front est construit au démarrage par `Bun.build` (`server/routes/web.ts`), en mémoire et découpé par page (`Bun.serve` ignore le découpage et inline les `import()` du routeur) ; pas d'étape de build. Le plugin Tailwind y est passé explicitement : un plugin ajouté à `bunfig.toml` doit l'être aussi dans `webPlugins()` (même fichier). `bun run compile` (`scripts/compile.ts`) produit l'exécutable autonome `dist/llama-webui` : mêmes options (`WEB_BUILD_OPTIONS`, `webPlugins()`), l'import HTML est bundlé et découpé à la compilation puis embarqué (`Bun.isStandaloneExecutable` → `{ '/*': index }`), toujours en production ; rien ne doit lire l'arborescence source à l'exécution (`import.meta.dir` vaut `/$bunfs/root` ; un `new Worker` doit être un entrypoint de compilation, cf. `workerUrl()` du worker NVML). Version (`server/version.ts`, barre d'état, `/api/health`) : `dev` depuis les sources, `git describe --tags --always --dirty` dans l'exécutable. `bun scripts/smoke-binary.ts` le vérifie (CI) ; `release.yml` publie les binaires x64/arm64 à chaque tag `v*`, qui doit égaler la version de tous les `package.json` : `bun run release <version>` les aligne (PR, `master` est protégée), puis tag `v<version>` sur `master` après le merge ; `scripts/release.test.ts` échoue s'ils divergent.
+**Dans ce projet :** un seul process Node sur le port 7860 sert l'API, le WebSocket et l'UI. `pnpm dev` = `node server/dev.ts` : Vite en middleware mode (`appType: 'spa'`, HMR sur le même serveur HTTP) et son environnement ssr, dont le module runner évalue `server/index.ts` ; une sauvegarde sous `server/` ou `packages/` réévalue l'entrée dans le même process (dossiers surveillés en entier ; reprise après un rechargement ou un premier démarrage raté une fois le fichier corrigé, seule une erreur d'écoute, port pris, arrête `pnpm dev` ; un `change` que chokidar avale, seconde écriture à moins de 50 ms, est rejoué). `server/index.ts` construit la nouvelle instance, la monte (`mount()` de `server/host.ts`, sur le serveur de `globalThis.__llamaWebuiDevHost` en dev, sinon un `createServer()`), **puis** libère la précédente (`__llamaWebuiDispose`), enregistre son propre dispose, puis lance ses effets (chacun ajoute ce qui le défait à `undo` : une évaluation qui échoue après le montage est quand même libérée au rechargement suivant). `pnpm build` = `vite build` : client découpé par page → `dist/web`, serveur `server/main.ts` → `dist/server/main.js` (un seul fichier, dépendances embarquées sauf `hono`, `@hono/node-server`, `ws` ; `THIRD-PARTY-LICENSES.md` à côté), sampler NVML → `dist/server/nvml-worker.js` (environnement `nvml`, build seulement : Rolldown refuse une seconde entrée sans découpage) ; `pnpm start` = build puis `node dist/server/main.js`, qui sert `dist/web` depuis la mémoire (`staticWeb` de `server/routes/web.ts` : fichier exact immuable, sinon `index.html` sans cache ; sans `dist/web`, `unavailableWeb` répond 503 et l'API marche). Version (`server/version.ts`, barre d'état, `/api/health`) : `dev` en développement, `git describe --tags --always --dirty` au build (`define`), la version du `package.json` sans git. `node scripts/smoke.ts` vérifie le build (CI). **Distribution :** le paquet racine est le paquet publié (`bin` `llama-webui` → `dist/server/main.js`, `files` `dist/server` et `dist/web` seulement : un vieil exécutable traîne parfois dans `dist/`, `os` linux ; `pnpm pack` refuse sans build, `scripts/prepack.ts`) ; ses `dependencies` sont exactement `hono`, `@hono/node-server`, `ws`, en versions **exactes** dans le `catalog:` (une installation depuis le tarball n'a pas de lockfile ; `scripts/package.test.ts`). `node scripts/smoke.ts --tarball [fichier.tgz]` : `pnpm pack`, `npm install` dans un préfixe vide (rien d'autre que ces trois versions), puis les vérifications du smoke par `node_modules/.bin/llama-webui` (CI). `release.yml` (tag `v*`) : `node scripts/release.ts --check`, build, `pnpm pack`, smoke du tarball, `SHA256SUMS`, `gh release create` ; la version de tous les `package.json` s'aligne par `pnpm release <version>` (PR, `master` est protégée) ; `scripts/release.test.ts` échoue s'ils divergent.
 
-**Piège `bun --hot` :** le superviseur llama-server, le ring de logs, le monitoring et la garde des benchmarks (`server/runtime.ts`, `server/bench/gate.ts`) vivent sur `globalThis` pour survivre aux rechargements (sinon chaque sauvegarde tuerait llama-server). Une modification de `server/supervisor/supervisor.ts` (et de ce qu'il importe : `llamacpp-js/client`, `llamacpp-js/node`, `server/logs/lines.ts`), `server/logs/buffer.ts`, `server/bench/gate.ts`, `server/monitor/**` (sauf `placement.ts`, recréé à chaque rechargement), `server/collectors/**`, `packages/llamacpp-js/src/**` (importé par le superviseur et le monitoring) ou `server/runtime.ts` n'est donc **pas** prise en compte à chaud : arrêter Bun (Ctrl-C) et relancer `bun run dev`. Pour la même raison, ne pas tester les erreurs du superviseur avec `instanceof` (classe de l'ancien module) mais par `name`. À l'inverse, `ChatRuns` (`server/chat/runs.ts`), `BenchRunner` et `RunExecutor` (`server/bench/`) sont recréés à chaque rechargement : une génération ou un run ponctuel en cours est interrompu (le serveur arrêté pour lui est relancé) ; un sweep, lui, continue dans le nouveau module (l'élément en cours est rejoué, la garde reste tenue, le serveur n'est relancé qu'à la fin).
-
-**Nouveau fichier web :** le bundler de `bun run dev` peut ne pas voir un fichier `web/src/**` créé après le démarrage (« Could not resolve », alors que `bun check` passe) : relancer `bun run dev`.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+**Piège du rechargement (dev) :** le superviseur llama-server, le ring de logs, le monitoring et la garde des benchmarks (`server/runtime.ts`, `server/bench/gate.ts`) vivent sur `globalThis` pour survivre aux rechargements (sinon chaque sauvegarde tuerait llama-server), comme l'hôte de dev (`__llamaWebuiDevHost`) ; `server/host.ts` garde ses écouteurs sur le serveur lui-même (`Symbol.for`), pas dans un état de module. Une modification de `server/supervisor/supervisor.ts` (et de ce qu'il importe : `llamacpp-js/client`, `llamacpp-js/node`, `server/logs/lines.ts`), `server/logs/buffer.ts`, `server/bench/gate.ts`, `server/monitor/**` (sauf `placement.ts`, recréé à chaque rechargement), `server/collectors/**`, `server/proc.ts`, `packages/llamacpp-js/src/**` (importé par le superviseur et le monitoring), `server/runtime.ts` ou `server/dev.ts` n'est donc **pas** prise en compte à chaud : arrêter (Ctrl-C) et relancer `pnpm dev`. Pour la même raison, ne pas tester les erreurs du superviseur avec `instanceof` (classe de l'ancien module) mais par `name`. À l'inverse, `ChatRuns` (`server/chat/runs.ts`), `BenchRunner` et `RunExecutor` (`server/bench/`) sont recréés à chaque rechargement : une génération ou un run ponctuel en cours est interrompu (le serveur arrêté pour lui est relancé) ; un sweep, lui, continue dans le nouveau module (l'élément en cours est rejoué, la garde reste tenue, le serveur n'est relancé qu'à la fin). Un rechargement ferme les WebSocket (1001) : le client se reconnecte, même `bootId`.
 
 ## Site web et documentation (`site/`)
 
 Le site public (page d'accueil, doc utilisateur, doc développeur) vit dans `site/` et est publié sur GitHub Pages (`https://sharkezz.github.io/llama-webui/`, base `/llama-webui/`). Plan et jalons : `docs/superpowers/plans/2026-11-08-website.md`.
 
-- **Exception à « pas de Vite » :** `site/` utilise Vite + React Router (mode framework, `ssr: false` + prérendu statique) + Tailwind 4 + shadcn + MDX. C'est un package autonome, hors des workspaces Bun (son propre `package.json` et `bun.lock`), mais toujours géré avec Bun (`bun install`, `bun run`, `bun test`). Il n'importe aucun code de `web/` : les composants repris (tokens, verre, jauges…) sont copiés et adaptés.
-- Mêmes règles qualité que l'app (Biome sans warning, type check, tests verts) ; le contenu est en anglais, URLs avec slash final. Les scripts racine couvrent le site : `bun run check` lance aussi `site` → `typecheck` (`react-router typegen` puis `bun check`), `bun test` inclut `site/`, et la CI (`.github/workflows/ci.yml`) construit le site. Biome ignore les `.mdx` (non supportés) et `site/src/components/ui/**` (shadcn).
-- **Commandes :** `bun install` dans `site/` (lockfile séparé), puis depuis la racine `bun run site:dev` (Vite + HMR sur `0.0.0.0:5173`, ouvrir `http://192.168.0.20:5173/llama-webui/`), `bun run site:build` (prérendu + `scripts/postbuild.ts` → `site/dist/`) et `bun run site:preview` (`scripts/serve.ts` sert `dist/` comme GitHub Pages sur le port 4173 : sous `/llama-webui/`, redirection vers le slash final, `404.html`).
+- **Pile :** `site/` utilise Vite + React Router (mode framework, `ssr: false` + prérendu statique) + Tailwind 4 + shadcn + MDX. C'est un projet du workspace pnpm (installé par le `pnpm install` racine, sans lockfile propre), ses scripts lancés par pnpm et exécutés par Node (`node scripts/<nom>.ts`, mêmes règles que `server/` : `node:*`, imports avec extension `.ts`), ses tests dans le projet Vitest `site`. Il n'importe aucun code de `web/` : les composants repris (tokens, verre, jauges…) sont copiés et adaptés.
+- Mêmes règles qualité que l'app (Biome sans warning, type check, tests verts) ; le contenu est en anglais, URLs avec slash final. Les scripts racine couvrent le site : `pnpm check` lance aussi `site` → `typecheck` (`react-router typegen` puis `tsc`), `pnpm test` inclut `site/` (projet Vitest `site`), et la CI (`.github/workflows/ci.yml`) construit le site. Biome ignore les `.mdx` (non supportés) et `site/src/components/ui/**` (shadcn).
+- **Commandes :** après le `pnpm install` racine, depuis la racine `pnpm site:dev` (Vite + HMR sur `0.0.0.0:5173`, ouvrir `http://192.168.0.20:5173/llama-webui/`), `pnpm site:build` (prérendu + `scripts/postbuild.ts` → `site/dist/`) et `pnpm site:preview` (`scripts/serve.ts`, `node:http`, sert `dist/` comme GitHub Pages sur le port 4173, `--port` pour un autre : sous `/llama-webui/`, redirection vers le slash final, `404.html`).
 - **Pages :** chaque `.mdx` de `site/content/{docs,developers}/` devient une route prérendue (`src/routes.ts`, `src/lib/content.ts`). Les liens internes s'écrivent sans basename (`/docs/…/`) : React Router ajoute `/llama-webui`. Le prérendu écrit sous `build/client/llama-webui/` ; `postbuild` remonte ces pages à la racine de `dist/` et transforme le fallback SPA en `404.html` (route `*`). Le déploiement (`.github/workflows/site-deploy.yml`) part à chaque push sur `master` qui touche `site/` (ou à la main, `workflow_dispatch`) : une PR fusionnée publie aussitôt sa doc.
-- **Écrire une page :** front matter YAML `title` + `description` obligatoires (le build échoue sinon ; le titre `h1` vient de là, ne pas en écrire dans le corps), entrée dans `site/content/nav.ts` (`site/src/docs/nav.test.ts` échoue si une page n'y est pas ou si une entrée n'a pas de fichier), sections en `##` / `###` (sommaire). Composants MDX disponibles sans import (`site/src/docs/mdx-components.tsx`) : `Callout` (`note`, `tip`, `warning`, `important`), `Steps` / `Step`, `Tabs` / `Tab`, `Screenshot`, `Kbd`, et pour la doc développeur `Endpoint` (méthode + chemin d'une route, sous le titre qui la nomme), `FileTree` (liste Markdown, nom entre backticks, `/` final pour un dossier) et `ArchitectureDiagram` ; `title="…"` après le langage d'un bloc de code (`bash title="Terminal"`) lui donne un titre. Après `bun run site:build`, `bun run --cwd site check-links` vérifie chaque lien interne et ancre (bloquant en CI). La recherche (Pagefind, index écrit par `postbuild`) n'existe qu'après un build : `site:preview` pour la tester.
-- **Captures d'écran (`site/public/screenshots/<nom>-<dark|light>[-800].webp`) :** elles viennent d'une **instance démo** (jamais l'instance de tous les jours), lancée avec un home neutre pour qu'aucun chemin personnel n'apparaisse : `env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" bun run start --host 0.0.0.0 --port 7861` (`/home/demo/models` → dossier des modèles, `/home/demo/llama.cpp/build/bin` en liens physiques : l'app fait un `realpath` du binaire). `bun run --cwd site demo-seed setup bench sweep start chat` remplit l'instance (vrais modèles sur les GPU : demander à l'utilisateur de les libérer), puis `bun run --cwd site screenshots [nom…]` capture en Chromium headless (sombre et clair) ; `demo-seed generate` puis `screenshots --live` pour Dashboard/System/Topology. Liste et mise en scène des écrans : `site/scripts/shots.ts`. Une modification d'UI qui change un écran capturé → refaire sa capture (et `bun run --cwd site og` si c'est le Dashboard : image Open Graph). La page d'accueil reproduit aussi en React des écrans de l'app, avec leurs vraies valeurs (Dashboard animé du hero, éditeur d'arguments, recommandation Tuning, etc. dans `site/src/landing/`) : les mettre à jour avec eux.
+- **Écrire une page :** front matter YAML `title` + `description` obligatoires (le build échoue sinon ; le titre `h1` vient de là, ne pas en écrire dans le corps), entrée dans `site/content/nav.ts` (`site/src/docs/nav.test.ts` échoue si une page n'y est pas ou si une entrée n'a pas de fichier), sections en `##` / `###` (sommaire). Composants MDX disponibles sans import (`site/src/docs/mdx-components.tsx`) : `Callout` (`note`, `tip`, `warning`, `important`), `Steps` / `Step`, `Tabs` / `Tab`, `Screenshot`, `Kbd`, et pour la doc développeur `Endpoint` (méthode + chemin d'une route, sous le titre qui la nomme), `FileTree` (liste Markdown, nom entre backticks, `/` final pour un dossier) et `ArchitectureDiagram` ; `title="…"` après le langage d'un bloc de code (`bash title="Terminal"`) lui donne un titre. Après `pnpm site:build`, `pnpm --dir site check-links` vérifie chaque lien interne et ancre (bloquant en CI). La recherche (Pagefind, index écrit par `postbuild`) n'existe qu'après un build : `site:preview` pour la tester.
+- **Captures d'écran (`site/public/screenshots/<nom>-<dark|light>[-800].webp`) :** elles viennent d'une **instance démo** (jamais l'instance de tous les jours), lancée avec un home neutre pour qu'aucun chemin personnel n'apparaisse : `env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" pnpm start --host 0.0.0.0 --port 7861` (`/home/demo/models` → dossier des modèles, `/home/demo/llama.cpp/build/bin` en liens physiques : l'app fait un `realpath` du binaire). `pnpm --dir site demo-seed setup bench sweep start chat` remplit l'instance (vrais modèles sur les GPU : demander à l'utilisateur de les libérer), puis `pnpm --dir site screenshots [nom…]` capture en Chromium headless (sombre et clair) ; `demo-seed generate` puis `screenshots --live` pour Dashboard/System/Topology. Liste et mise en scène des écrans : `site/scripts/shots.ts`. Une modification d'UI qui change un écran capturé → refaire sa capture (et `pnpm --dir site og` si c'est le Dashboard : image Open Graph). La page d'accueil reproduit aussi en React des écrans de l'app, avec leurs vraies valeurs (Dashboard animé du hero, éditeur d'arguments, recommandation Tuning, etc. dans `site/src/landing/`) : les mettre à jour avec eux.
 - **Synchroniser la doc avec le code (obligatoire) :** toute modification d'une fonctionnalité, de l'UI, d'une route API, d'un message WebSocket, d'un flag CLI, d'un réglage ou de l'architecture met à jour, **dans la même PR**, la ou les pages correspondantes de `site/content/` (la référence API est écrite à la main : elle dérive si on l'oublie). Correspondance code → pages (chemins sous `site/content/`) :
 
-| Code modifié                                                                                         | Pages à mettre à jour                                                                                   |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `server/routes/<domaine>.ts`, `server/app.ts` (→ `app`), schémas zod de `packages/webui-shared/src/` | `developers/api/<domaine>.mdx` + la page utilisateur de la fonctionnalité                               |
-| `packages/webui-shared/src/ws.ts`, `server/ws/`                                                      | `developers/api/websocket.mdx`                                                                          |
-| `server/cli.ts`, `server/paths.ts`, variables d'environnement                                        | `docs/configuration.mdx`, `developers/architecture.mdx`                                                 |
-| `server/security.ts`, `server/http.ts`                                                               | `docs/security.mdx`, `developers/server/security.mdx`, `developers/api/overview.mdx`                    |
-| `server/supervisor/**`                                                                               | `developers/server/supervisor.mdx`, `docs/server.mdx`                                                   |
-| `server/logs/**`                                                                                     | `developers/server/supervisor.mdx`, `developers/api/server.mdx`, `docs/logs.mdx`                        |
-| `server/monitor/**`, `server/collectors/**`                                                          | `developers/server/monitor.mdx`, `docs/dashboard.mdx`, `docs/system.mdx`, `docs/topology.mdx`           |
-| `server/hardware/**` (PCI, CPU)                                                                      | `developers/api/topology.mdx`, `developers/api/monitor.mdx`, `docs/topology.mdx`, `docs/system.mdx`     |
-| `server/chat/**`                                                                                     | `developers/server/chat.mdx`, `docs/chat.mdx`                                                           |
-| `server/bench/**`                                                                                    | `developers/server/bench.mdx`, `docs/benchmark.mdx`, `docs/sweeps.mdx`                                  |
-| `packages/webui-shared/src/tuning.ts`, `server/tuning/**`                                            | `developers/server/tuning.mdx`, `docs/tuning.mdx`, `docs/sweeps.mdx`, guides concernés                  |
-| `server/hf/**`                                                                                       | `developers/server/hugging-face.mdx`, `docs/hugging-face.mdx`                                           |
-| `server/models/**` (scan, GGUF)                                                                      | `developers/api/models.mdx`, `docs/models.mdx`                                                          |
-| `server/setup.ts`                                                                                    | `developers/api/setup.mdx`, `docs/getting-started/first-run.mdx`                                        |
-| `server/llamatui.ts`                                                                                 | `developers/api/profiles.mdx`, `docs/profiles.mdx`                                                      |
-| `server/db/**` (migrations, tables)                                                                  | `developers/server/database.mdx`                                                                        |
-| `web/src/features/home/setup/**`                                                                     | `docs/getting-started/first-run.mdx`                                                                    |
-| `web/src/features/<page>/**`                                                                         | `docs/<page>.mdx` (`bench` → `benchmark`, HF de `models` → `hugging-face`), captures                    |
-| `web/src/app/**`, `web/src/lib/**`, `web/src/components/**`                                          | `developers/frontend.mdx`                                                                               |
-| `packages/llamacpp-js/**` (module, export, erreur, règle du package)                                 | `developers/llamacpp-js.mdx` + la page serveur qui l'utilise (`supervisor`, `monitor`, `chat`, `bench`) |
-| `packages/webui-shared/src/**` (nouveau module, rôle d'un module)                                    | `developers/shared.mdx`                                                                                 |
-| `packages/webui-shared/src/settings.ts`, page Settings                                               | `docs/settings.mdx`, `developers/api/app.mdx`                                                           |
-| `server/index.ts`, `server/runtime.ts`, `server/routes/web.ts`, piège `bun --hot`                    | `developers/architecture.mdx`                                                                           |
-| scripts `package.json`, arborescence du dépôt                                                        | `developers/getting-started.mdx`                                                                        |
-| `server/testing/**`, `testdata/**` (fakes, fixtures)                                                 | `developers/contributing/testing.mdx`                                                                   |
-| prérequis / installation (README)                                                                    | `docs/getting-started/requirements.mdx`, `docs/getting-started/installation.mdx`                        |
-| conventions de ce fichier (Biome, langue, tests, doc)                                                | `developers/contributing/*.mdx`                                                                         |
+| Code modifié                                                                                                                                                 | Pages à mettre à jour                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `server/routes/<domaine>.ts`, `server/api.ts` et `server/routes/settings.ts` (→ `app`), schémas zod de `packages/webui-shared/src/`                          | `developers/api/<domaine>.mdx` + la page utilisateur de la fonctionnalité                               |
+| `packages/webui-shared/src/ws.ts`, `server/ws/`                                                                                                              | `developers/api/websocket.mdx`                                                                          |
+| `server/cli.ts`, `server/paths.ts`, variables d'environnement                                                                                                | `docs/configuration.mdx`, `developers/architecture.mdx`                                                 |
+| `server/security.ts`, `server/http.ts`                                                                                                                       | `docs/security.mdx`, `developers/server/security.mdx`, `developers/api/overview.mdx`                    |
+| `server/proc.ts`                                                                                                                                             | `developers/contributing/conventions.mdx`, `developers/server/supervisor.mdx`                           |
+| `server/supervisor/**`                                                                                                                                       | `developers/server/supervisor.mdx`, `docs/server.mdx`                                                   |
+| `server/logs/**`                                                                                                                                             | `developers/server/supervisor.mdx`, `developers/api/server.mdx`, `docs/logs.mdx`                        |
+| `server/monitor/**`, `server/collectors/**`                                                                                                                  | `developers/server/monitor.mdx`, `docs/dashboard.mdx`, `docs/system.mdx`, `docs/topology.mdx`           |
+| `server/hardware/**` (PCI, CPU)                                                                                                                              | `developers/api/topology.mdx`, `developers/api/monitor.mdx`, `docs/topology.mdx`, `docs/system.mdx`     |
+| `server/chat/**`                                                                                                                                             | `developers/server/chat.mdx`, `docs/chat.mdx`                                                           |
+| `server/bench/**`                                                                                                                                            | `developers/server/bench.mdx`, `docs/benchmark.mdx`, `docs/sweeps.mdx`                                  |
+| `packages/webui-shared/src/tuning.ts`, `server/tuning/**`                                                                                                    | `developers/server/tuning.mdx`, `docs/tuning.mdx`, `docs/sweeps.mdx`, guides concernés                  |
+| `server/hf/**`                                                                                                                                               | `developers/server/hugging-face.mdx`, `docs/hugging-face.mdx`                                           |
+| `server/models/**` (scan, GGUF)                                                                                                                              | `developers/api/models.mdx`, `docs/models.mdx`                                                          |
+| `server/setup.ts`                                                                                                                                            | `developers/api/setup.mdx`, `docs/getting-started/first-run.mdx`                                        |
+| `server/llamatui.ts`                                                                                                                                         | `developers/api/profiles.mdx`, `docs/profiles.mdx`                                                      |
+| `server/db/**` (migrations, tables)                                                                                                                          | `developers/server/database.mdx`                                                                        |
+| `web/src/features/home/setup/**`                                                                                                                             | `docs/getting-started/first-run.mdx`                                                                    |
+| `web/src/features/<page>/**`                                                                                                                                 | `docs/<page>.mdx` (`bench` → `benchmark`, HF de `models` → `hugging-face`), captures                    |
+| `web/src/app/**`, `web/src/lib/**`, `web/src/components/**`                                                                                                  | `developers/frontend.mdx`                                                                               |
+| `packages/llamacpp-js/**` (module, export, erreur, règle du package)                                                                                         | `developers/llamacpp-js.mdx` + la page serveur qui l'utilise (`supervisor`, `monitor`, `chat`, `bench`) |
+| `packages/webui-shared/src/**` (nouveau module, rôle d'un module)                                                                                            | `developers/shared.mdx`                                                                                 |
+| `packages/webui-shared/src/settings.ts`, page Settings                                                                                                       | `docs/settings.mdx`, `developers/api/app.mdx`                                                           |
+| `server/index.ts`, `server/deps.ts`, `server/runtime.ts`, `server/dev.ts`, `server/host.ts`, `server/routes/web.ts`, `vite.config.ts`, piège du rechargement | `developers/architecture.mdx`                                                                           |
+| scripts `package.json`, arborescence du dépôt                                                                                                                | `developers/getting-started.mdx`                                                                        |
+| `server/testing/**`, `testdata/**` (fakes, fixtures)                                                                                                         | `developers/contributing/testing.mdx`                                                                   |
+| `server/contract/**` (cases, golden)                                                                                                                         | `developers/contributing/testing.mdx` (+ `developers/api/*.mdx` si le golden change)                    |
+| prérequis / installation (README)                                                                                                                            | `docs/getting-started/requirements.mdx`, `docs/getting-started/installation.mdx`                        |
+| conventions de ce fichier (Biome, langue, tests, doc)                                                                                                        | `developers/contributing/*.mdx`                                                                         |

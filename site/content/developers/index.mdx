@@ -11,33 +11,35 @@ If you only want to install and use llama-webui, start with the [user documentat
 
 ## The repository
 
-llama-webui is a Bun monorepo with four workspaces and a separate website. `server/` is the Bun process: it serves the
-REST API, the `/ws` WebSocket and the web UI on one port (7860 by default), supervises one `llama-server`, samples the
-hardware, runs benchmarks and sweeps, relays chat generations and stores everything in a SQLite file. `web/` is the
+llama-webui is a pnpm monorepo: four workspaces for the app and one for the website. `server/` is the Node.js
+process: it serves the REST API, the `/ws` WebSocket and the web UI on one port (7860 by default), supervises one
+`llama-server`, samples the hardware, runs benchmarks and sweeps, relays chat generations and stores everything in a SQLite file. `web/` is the
 React app it serves. `packages/` holds the libraries: `packages/webui-shared/` (the `@llama-webui/shared` package) has
 the types, zod schemas and pure functions both sides use, and `packages/llamacpp-js/` everything that talks to
 llama.cpp (its HTTP API, its metrics, the output of its binaries), written to be published on its own. `site/` is this
-website, a standalone package outside the workspaces.
+website, which imports no code of the app.
 [Development setup](/developers/getting-started/#repository-layout) shows the layout in detail.
 
 ## Tech stack
 
 | Layer | Technology | Where |
 | --- | --- | --- |
-| Runtime | [Bun](https://bun.com) 1.4.4 or later: HTTP and WebSocket server (`Bun.serve`), bundler (`Bun.build`, HTML imports), test runner, `bun:sqlite`, `bun:ffi` | the whole repository |
-| Database | `bun:sqlite`, one file in the data directory, WAL journal | `server/db/` |
+| Runtime | [Node.js](https://nodejs.org) 26.13 or later: one `node:http` server for the API, the WebSocket ([ws](https://github.com/websockets/ws)) and the UI | `server/` |
+| Build | [Vite](https://vite.dev): dev middlewares with HMR, `vite build` for the web client and the server bundle | `vite.config.ts`, `server/dev.ts` |
+| HTTP API | [Hono](https://hono.dev) 4 with `@hono/zod-validator`: one chained app for every `/api` route, served through `@hono/node-server` | `server/api.ts`, `server/routes/` |
+| Database | `node:sqlite` behind a wrapper (`server/db/sqlite.ts`), one file in the data directory, WAL journal | `server/db/` |
 | Validation | [zod](https://zod.dev) 4: request bodies and settings are parsed on the server, TypeScript types are inferred for both sides | `packages/webui-shared/src/`, `server/` |
 | GGUF headers | `@huggingface/gguf` | `server/models/`, `server/hf/` |
 | UI | [React](https://react.dev) 19, [React Router](https://reactrouter.com) 8 (data router, lazy routes) | `web/` |
-| Styling | [Tailwind CSS](https://tailwindcss.com) 4 through `bun-plugin-tailwind` | `web/src/index.css` |
+| Styling | [Tailwind CSS](https://tailwindcss.com) 4 through `@tailwindcss/vite` | `web/src/index.css` |
 | Components | [shadcn/ui](https://ui.shadcn.com) (`base-nova` style) on [Base UI](https://base-ui.com), lucide icons, sonner toasts, cmdk | `web/src/components/ui/` |
 | State | [zustand](https://zustand.docs.pmnd.rs) 5, one store per domain | `web/src/lib/` |
 | Charts and 3D | [uPlot](https://github.com/leeoniya/uPlot) time series, [react-three-fiber](https://r3f.docs.pmnd.rs) and three.js for the Topology page | `web/src/components/charts/`, `web/src/features/topology/` |
 | Text | react-markdown and remark-gfm for chat replies, [Shiki](https://shiki.style) for code blocks | `web/src/features/chat/`, `web/src/lib/highlight.ts` |
-| Quality | TypeScript 7 (`bun check`), [Biome](https://biomejs.dev) 2 (format, lint, imports), `bun test` | `biome.json`, `tsconfig.json` |
+| Quality | TypeScript 7 (`tsc -b`), [Biome](https://biomejs.dev) 2 (format, lint, imports), [Vitest](https://vitest.dev) and `node:test` | `biome.json`, `tsconfig.json`, `vitest.config.ts` |
 
-The website uses its own stack (Vite, React Router in framework mode with prerendering, MDX): it is the one place in
-the repository where Vite is allowed.
+The website uses its own stack (Vite, React Router in framework mode with prerendering, MDX), and its scripts run
+on Node.js like the app's.
 
 ## Map of the developer docs
 
@@ -45,8 +47,8 @@ the repository where Vite is allowed.
 
 - [Development setup](/developers/getting-started/): prerequisites, scripts, the repository layout, the fakes for
   working without llama.cpp, and the quality gate.
-- [Architecture](/developers/architecture/): the single Bun process, its startup, the three channels to the browser,
-  how the UI is served in development and production, and the `bun --hot` pitfall.
+- [Architecture](/developers/architecture/): the single Node.js process, its startup, the three channels to the browser,
+  how the UI is served in development and production, and the development reload pitfall.
 
 ### Server
 
@@ -56,7 +58,7 @@ the repository where Vite is allowed.
 - [Benchmarks and sweeps](/developers/server/bench/): the bench gate, the runner and the sweep queue.
 - [Tuning](/developers/server/tuning/): the memory estimator, presets and system checks.
 - [Hugging Face downloads](/developers/server/hugging-face/): the download queue, resume and verification.
-- [Database](/developers/server/database/): `bun:sqlite`, migrations and repositories.
+- [Database](/developers/server/database/): `node:sqlite`, migrations and repositories.
 - [Security](/developers/server/security/): the request guard of the unauthenticated API.
 
 ### Web app and packages
@@ -78,7 +80,7 @@ the repository where Vite is allowed.
 ### Contributing
 
 - [Conventions](/developers/contributing/conventions/): language, formatting, Biome rules and React patterns.
-- [Testing](/developers/contributing/testing/): `bun test`, captured outputs in `testdata/`, the fakes.
+- [Testing](/developers/contributing/testing/): Vitest and `node:test`, the contract suite, captured outputs in `testdata/`, the fakes.
 - [How-to guides](/developers/contributing/how-to/): adding a page, a collector, a migration, a WebSocket message or
   an API route.
 - [Docs, commits and PRs](/developers/contributing/workflow/): keeping these pages in sync with the code, and the

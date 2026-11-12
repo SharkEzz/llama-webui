@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import type { ChatMessage, Conversation } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { buildChatRequest, llamaErrorMessage } from './request';
 
 const conv: Conversation = {

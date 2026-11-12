@@ -1,12 +1,8 @@
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { getServerProps, type ServerProps, serverPropsOf } from '@/lib/props';
 import { useServer } from '@/lib/server';
 
-/** What llama-server's /props says about default sampling, context and the loaded model. */
-export interface ServerProps {
-  model_path?: string;
-  default_generation_settings?: { n_ctx?: number; params?: Record<string, unknown> };
-}
+export type { ServerProps };
 
 /** /props of the ready server (reread on every state change), otherwise null. */
 export function useServerProps(): ServerProps | null {
@@ -20,8 +16,8 @@ export function useServerProps(): ServerProps | null {
       return;
     }
     let live = true;
-    api<ServerProps>('/server/props').then(
-      (p) => live && setProps(p),
+    getServerProps().then(
+      (p) => live && setProps(serverPropsOf(p)),
       () => live && setProps(null),
     );
     return () => {

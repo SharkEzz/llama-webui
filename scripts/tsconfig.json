@@ -1,6 +1,6 @@
 {
   "extends": "../tsconfig.base.json",
-  "compilerOptions": { "types": ["bun"] },
+  "compilerOptions": { "types": ["node"] },
   "include": ["."],
   "references": [{ "path": "../server" }]
 }

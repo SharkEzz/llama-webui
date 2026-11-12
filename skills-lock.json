@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "skills": {
+    "hono": {
+      "source": "honojs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/hono/SKILL.md",
+      "computedHash": "b9aa6ed86fce02216f2f43c4b5c651ba0055f0785a568d84fc446721fc832172"
+    }
+  }
+}

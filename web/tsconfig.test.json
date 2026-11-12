@@ -1,0 +1,9 @@
+{
+  // Web tests (Vitest on Node): the app's options plus Node's types. The canary is left out: it fails wherever
+  // Node's types are visible, which is the point of it in the app project (tsconfig.json).
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"], "outDir": "${configDir}/.tsbuild/test" },
+  "include": ["src"],
+  "exclude": ["src/lib/no-node-types.ts"],
+  "references": [{ "path": "../server" }, { "path": "../packages/webui-shared" }]
+}

@@ -1,7 +1,7 @@
-import { catalogFrom, type Flag, type FlagCatalog } from '@llama-webui/shared';
+import { catalogFrom, type FlagCatalog } from '@llama-webui/shared';
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { ApiError, api } from './api';
+import { ApiError, call, client } from './api';
 
 interface FlagsStore {
   catalog: FlagCatalog | null;
@@ -18,7 +18,7 @@ export function useFlags(): FlagsStore {
     const st = useFlagsStore.getState();
     if (st.catalog || st.loading || st.error) return;
     useFlagsStore.setState({ loading: true });
-    api<{ flags: Flag[] }>('/flags').then(
+    call(client.flags.$get()).then(
       (r) => useFlagsStore.setState({ catalog: catalogFrom(r.flags), loading: false }),
       (e) => useFlagsStore.setState({ error: e instanceof ApiError ? e.message : String(e), loading: false }),
     );

@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { parseCollapsed } from './sidebarPrefs';
 
 test('parseCollapsed: the sidebar is expanded unless the browser stored "collapsed"', () => {

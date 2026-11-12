@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Facts } from '@/features/system/Facts';
-import { api } from '@/lib/api';
+import { call, client } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatBytes, formatInt, formatParams } from '@/lib/format';
 import { DeleteModelPopover } from './DeleteModelPopover';
@@ -33,7 +33,7 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
     setError(null);
     if (!path) return;
     let live = true;
-    api<ModelDetail>(`/models/info?path=${encodeURIComponent(path)}`).then(
+    call(client.models.info.$get({ query: { path } })).then(
       (d) => live && setDetail(d),
       (e: Error) => live && setError(e.message),
     );

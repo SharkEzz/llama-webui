@@ -15,9 +15,11 @@
       "!**/dist",
       "!**/out",
       "!**/.claude",
+      "!**/.agents",
       "!site/build",
       "!site/dist",
-      "!site/.react-router"
+      "!site/.react-router",
+      "!server/contract/golden.json"
     ]
   },
   "formatter": {
@@ -56,6 +58,14 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["web/**", "site/**"],
+      "linter": {
+        "domains": {
+          "react": "recommended"
+        }
+      }
+    },
     {
       "includes": ["web/src/components/ui/**", "site/src/components/ui/**"],
       "linter": {

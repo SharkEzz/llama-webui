@@ -43,14 +43,14 @@ A request goes through three layers, each with one job:
   it returns a `BenchFinish` that the runner saves.
 
 The gate lives in the runtime (`runtime.benchGate` in `server/runtime.ts`, on `globalThis`), so it survives
-`bun --hot`. The runner and the executor are created in `server/index.ts` and recreated on every reload. This split is
+a development reload. The runner and the executor are created in `server/index.ts` and recreated on every reload. This split is
 what lets a sweep continue in the new module without restarting the server in between (see
 [Reloads, shutdown and restarts](#reloads-shutdown-and-restarts)).
 
 <Callout type="warning">
 
-Like the supervisor, the gate is not reloaded by `bun --hot`: after editing `server/bench/gate.ts`, stop Bun and run
-`bun run dev` again. Changes to `runner.ts`, `execute.ts` and the other files apply on the next reload.
+Like the supervisor, the gate is not reloaded in development: after editing `server/bench/gate.ts`, stop `pnpm dev`
+and run it again. Changes to `runner.ts`, `execute.ts` and the other files apply on the next reload.
 
 </Callout>
 
@@ -165,7 +165,7 @@ A run's status (`BenchStatus`) is one of `queued` (a sweep item waiting its turn
 
 `llama-bench` is looked for next to the `llama-server` binary from the settings (`benchBinary()`: the same directory,
 with `llama-server` replaced by `llama-bench` in the file name; a bare name stays bare and is looked up in the
-`PATH`). The child runs under `setpriv --pdeathsig KILL`, so it dies with Bun, and gets Bun's environment, then the
+`PATH`). The child runs under `setpriv --pdeathsig KILL`, so it dies with llama-webui, and gets llama-webui's environment, then the
 `env` setting, then the source profile's environment (the same `CUDA_VISIBLE_DEVICES`, for example).
 
 ```ts title="server/bench/execute.ts"
@@ -250,7 +250,9 @@ prompt is a sentence on purpose: llama.cpp segfaults on a 2-token prompt with `-
 tokens, at 4 characters per token, the same on every run) followed by an instruction to write a new story. Each request
 asks for exactly `n` tokens (`max_tokens: n`, `ignore_eos: true`) with thinking disabled
 (`chat_template_kwargs: { enable_thinking: false }`). Every request also sends `cache_prompt: false`,
-`temperature: 0`, `seed: 42` and `stream: false`, and times out after 10 minutes (`requestTimeoutMs`).
+`temperature: 0`, `seed: 42` and `stream: false`, and times out after 10 minutes (`requestTimeoutMs`). The requests
+go through `llamaFetch()` (`server/llamaFetch.ts`), a `node:http` request with the signature of `fetch`: Node's own
+`fetch` gives up after 300 s without response headers, well before that timeout, and nothing in Node changes it.
 
   </Step>
   <Step title="Stop">
@@ -439,9 +441,9 @@ A sweep's status (`SweepStatus`) is `running`, `done`, `cancelled` or `interrupt
 
 | Event                               | One-off run in progress | Sweep item in progress                   | Sweep                       | Server stopped by the gate             |
 | ----------------------------------- | ----------------------- | ---------------------------------------- | --------------------------- | -------------------------------------- |
-| `bun --hot` reload                  | `interrupted`           | Back to `queued`, replayed by the new module | Stays `running` and continues | Not restarted between the two modules |
-| Shutdown (`SIGINT`, `SIGTERM`)      | `interrupted`           | `interrupted`                            | `interrupted`               | Not restarted: Bun exits                |
-| Start after Bun was killed          | `interrupted`           | `interrupted`                            | `interrupted`               | Not restarted                           |
+| Development reload                  | `interrupted`           | Back to `queued`, replayed by the new module | Stays `running` and continues | Not restarted between the two modules |
+| Shutdown (`SIGINT`, `SIGTERM`)      | `interrupted`           | `interrupted`                            | `interrupted`               | Not restarted: llama-webui exits        |
+| Start after llama-webui was killed  | `interrupted`           | `interrupted`                            | `interrupted`               | Not restarted                           |
 
 ### A reload during a sweep
 
@@ -478,7 +480,7 @@ On `SIGINT` or `SIGTERM`, a handler that `server/index.ts` puts in front of the 
 `benchRunner.dispose({ restart: false })`: the child is killed, the current run (sweep item included) is saved as
 `interrupted`, and so is the sweep.
 
-When Bun was killed without that chance, rows stay `running`. At the next start the gate is new and not held, so
+When llama-webui was killed without that chance, rows stay `running`. At the next start the gate is new and not held, so
 `server/index.ts` runs `BenchRunsRepo.stopOrphans()` (running runs become `interrupted`, with the error
 `interrupted (llama-webui stopped)` when they had none) and `SweepsRepo.stopOrphans()` (running sweeps become
 `interrupted`). The command of the stopped server was only in memory: llama-webui does not start the profile again.

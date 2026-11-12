@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import type { ServerState } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { LogBuffer } from '../logs/buffer';
 import type { BuiltCommand } from '../supervisor/args';
 import { BenchGate, type ServerControl } from './gate';

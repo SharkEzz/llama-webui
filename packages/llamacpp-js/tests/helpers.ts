@@ -1,4 +1,4 @@
-// Helpers shared by the tests, which run on both `node --test` and `bun test`.
+// Helpers shared by the tests (`node --test`).
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer, type RequestListener } from 'node:http';

@@ -1,6 +1,6 @@
-import { type GpuReading, identityReading, normalizeBusId } from '../gpu';
-import { type GpuNeeds, gpuSkipped, MEASURE_ALL } from '../needs';
-import type { NvmlSymbols } from './symbols';
+import { type GpuReading, identityReading, normalizeBusId } from '../gpu.ts';
+import { type GpuNeeds, gpuSkipped, MEASURE_ALL } from '../needs.ts';
+import type { NvmlSymbols } from './symbols.ts';
 
 export interface NvmlProc {
   pid: number;
@@ -52,18 +52,18 @@ export function readNvmlSystem(lib: NvmlSymbols): NvmlSystem {
   return { driver, cudaDriver };
 }
 
-export function deviceHandles(lib: NvmlSymbols): number[] {
+export function deviceHandles(lib: NvmlSymbols): bigint[] {
   const count = Buffer.alloc(4);
   if (lib.nvmlDeviceGetCount_v2(count) !== SUCCESS) return [];
-  const handles: number[] = [];
+  const handles: bigint[] = [];
   const out = Buffer.alloc(8);
   for (let i = 0; i < count.readUInt32LE(0); i++) {
-    if (lib.nvmlDeviceGetHandleByIndex_v2(i, out) === SUCCESS) handles.push(Number(out.readBigUInt64LE(0)));
+    if (lib.nvmlDeviceGetHandleByIndex_v2(i, out) === SUCCESS) handles.push(out.readBigUInt64LE(0));
   }
   return handles;
 }
 
-function readProcs(lib: NvmlSymbols, h: number, key: string): NvmlProc[] {
+function readProcs(lib: NvmlSymbols, h: bigint, key: string): NvmlProc[] {
   const count = Buffer.alloc(4);
   let cap = 64;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -95,7 +95,7 @@ function readProcs(lib: NvmlSymbols, h: number, key: string): NvmlProc[] {
  * One reading per device, and the processes on it. `filter`: cards no tab shows are only identified (UUID,
  * name, bus id); PCIe throughput, which blocks ~50 ms per card, is read only when some tab shows it.
  */
-export function readNvml(lib: NvmlSymbols, handles: number[], filter: GpuNeeds = MEASURE_ALL): NvmlSnapshot {
+export function readNvml(lib: NvmlSymbols, handles: bigint[], filter: GpuNeeds = MEASURE_ALL): NvmlSnapshot {
   const gpus: GpuReading[] = [];
   const procs: NvmlProc[] = [];
   const u32 = Buffer.alloc(4);

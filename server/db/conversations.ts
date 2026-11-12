@@ -1,4 +1,3 @@
-import type { Database } from 'bun:sqlite';
 import {
   type ChatMessage,
   type Conversation,
@@ -10,6 +9,7 @@ import {
   type MessageStatus,
 } from '@llama-webui/shared';
 import { notFound } from '../http';
+import type { Database } from './sqlite';
 
 interface ConvRow {
   id: number;

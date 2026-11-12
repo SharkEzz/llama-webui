@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import type { TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { CLEARANCE, fitCamera, layoutGraph, pathPoint, peerPath, project } from './layout';
 
 const node = (id: string, kind: TopologyNode['kind'], busId?: string): TopologyNode => ({

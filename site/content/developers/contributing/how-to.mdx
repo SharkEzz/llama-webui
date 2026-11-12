@@ -42,15 +42,15 @@ contiguous.
   </Step>
   <Step title="Load its data">
 
-Put the API calls and the store of the page's domain in `web/src/lib/<domain>.ts` (a zustand store, `api()` from
+Put the API calls and the store of the page's domain in `web/src/lib/<domain>.ts` (a zustand store, `call(client…)` from
 `web/src/lib/api.ts`). If the page follows WebSocket messages that only it needs, start their subscription when it
 mounts, as `BenchPage` does with `startBenchSync()`.
 
   </Step>
   <Step title="Check it">
 
-A file created under `web/src/` while `bun run dev` runs may not be found by the bundler: restart `bun run dev`. To
-check the production split, run `bun run start` (it builds the front end at startup) and open the page.
+`pnpm dev` picks up the new files. To check the production split, run `pnpm start` (it builds the front end with
+`vite build` first) and open the page.
 
   </Step>
 </Steps>
@@ -82,50 +82,57 @@ export type DownloadRequest = z.infer<typeof DownloadRequestSchema>;
   </Step>
   <Step title="Write the handlers">
 
-Each domain has a file in `server/routes/` that exports a function taking its dependencies and returning `Bun.serve`
-routes. Wrap every handler in `guarded()` (`server/http.ts`): it applies the request guard of `server/security.ts`,
-then turns exceptions into JSON responses.
+Each domain has a file in `server/routes/` that exports a function taking its dependencies and returning a chained
+`Hono` app (`new Hono<Env>()`, `Env` from `server/http.ts`). Keep the chain unbroken and the handlers inline: the
+typed client of the web app infers each route from it. The guard, the `405` table and the error responses are
+applied by `createApi()` for every route: there is nothing to wrap.
 
 ```ts title="server/routes/topology.ts"
-export function topologyRoutes({ placement }: TopologyRouteDeps) {
-  return {
-    '/api/topology': {
-      GET: guarded(async () => Response.json({ graph: await readPciTopology(), placement: placement.current })),
-    },
-  };
-}
+export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
+  new Hono<Env>().get('/api/topology', async (c) =>
+    c.json({ graph: await readPciTopology(), placement: placement.current }),
+  );
 ```
+
+Register a static path before a `:param` path of the same method that would match it (`/api/downloads/clear`
+before `/api/downloads/:id`): Hono takes the first match, and the contract suite fails on the wrong order.
 
 The helpers of `server/http.ts` cover the usual cases:
 
 | Helper                                      | Use                                                                        |
 | ------------------------------------------- | -------------------------------------------------------------------------- |
-| `jsonObject(req)`                           | Reads the body; `400` when it is not a JSON object                         |
-| `Schema.parse(…)`                           | A `ZodError` becomes `400` with the first issue and the full `issues` list |
-| `idParam(req, 'Download')`                  | A positive integer `:id`, otherwise `404 Download not found`              |
+| `body(Schema, { object: true })`            | Validates the JSON body with a zod schema (`@hono/zod-validator`): `400 Invalid JSON`, `400 JSON object expected`, then the `ZodError` (first issue + `issues`); read it with `c.req.valid('json')` |
+| `json(check)`                               | A JSON body passed through your own check (`json(object)`: any object), for custom messages |
+| `id('Download')`                            | A positive integer `:id`, otherwise `404 Download not found`; put it before the body validator; `c.req.valid('param').id` |
 | `notFound('Profile')`                       | `404 Profile not found`                                                    |
 | `new HttpError(409, message, code)`         | Any refusal; add a `code` when the web app must react to it                |
 
 ```ts title="server/routes/hf.ts"
-POST: guarded(async (req) => {
-  const body = DownloadRequestSchema.parse(await jsonObject(req));
-  const items = await downloads.enqueue(await downloadInputs(hf, body, modelsDir()));
-  return Response.json({ items }, { status: 202 });
-}),
+.post('/api/downloads', body(DownloadRequestSchema, { object: true }), async (c) => {
+  const items = await downloads.enqueue(await downloadInputs(hf, c.req.valid('json'), modelsDir()));
+  return c.json({ items }, 202);
+})
 ```
+
+When the handler must look something up (and answer `404` or `409`) before the body is checked, do not validate the
+body ahead of it: read it in the handler (`object(await c.req.json())`) or pass it as sent (`json(passthrough)`).
 
   </Step>
   <Step title="Register the routes">
 
-Spread the new function into `routes` in `createApp()` (`server/app.ts`), next to the others and before the `/api/*`
-fallback that answers `404 Unknown route`. A new dependency goes into `AppDeps` and is built in `server/index.ts`.
+Mount the new app in `createApi()` (`server/api.ts`) with `.route('/', xRoutes(deps))`, chained after the others.
+A new dependency goes into `AppDeps` (`server/api.ts`) and is built in `createDeps()` (`server/deps.ts`). Add the
+route to `ROUTES` in `server/contract/cases.ts` (the contract suite fails otherwise), then regenerate the golden
+(see [Testing](/developers/contributing/testing/)).
 
   </Step>
   <Step title="Call it from the web app">
 
-`api<T>(path, init)` (`web/src/lib/api.ts`) prefixes `/api`, sends `content-type: application/json` when there is a
-body, and throws an `ApiError` with `status`, `issues` (zod details on a `400`) and `code`. Branch on `code`, never on
-the message.
+The typed client sees the route as soon as it is registered: `call(client.x[':id'].$post({ ...byId(id), json }))`
+(`web/src/lib/api.ts`) returns the type of the handler's `c.json(…)` and throws an `ApiError` with `status`, `issues`
+(zod details on a `400`) and `code`. Branch on `code`, never on the message. Declare the route's query keys with
+`query(…)` and its body with `body(Schema)` (or `accepts<T>()` when the handler reads it itself) so the client checks
+them too (see [Typed client](/developers/api/overview/#typed-client)).
 
   </Step>
   <Step title="Test it">
@@ -167,8 +174,9 @@ const downloads = new DownloadQueue({
 });
 ```
 
-A subscription to an object that survives `bun --hot` (the supervisor, the log ring, the monitor) must be undone in
-`__llamaWebuiDispose` at the bottom of `server/index.ts`, as `unsubSnapshot()` is: the module runs again on every
+A subscription to an object that survives a development reload (the supervisor, the log ring, the monitor) must be undone on
+the next one: push what it returns onto `undo` in `server/index.ts`, as `undo.push(monitor.onSnapshot(…))` does (the
+dispose function left in `__llamaWebuiDispose` runs that list). The module runs again on every
 reload. Routes that change state themselves can broadcast through the `hub` in their dependencies, as
 `server/routes/bench.ts` does for `bench-deleted`.
 
@@ -270,10 +278,10 @@ Read it in the page with `useMonitor((s) => s.snapshot?.<field>)` and chart a se
 [Add a setting](#add-a-setting)).
 
   </Step>
-  <Step title="Restart Bun">
+  <Step title="Restart pnpm dev">
 
-`server/collectors/**` and `server/monitor/**` live in the runtime and are not hot reloaded: stop Bun and run
-`bun run dev` again to try the change.
+`server/collectors/**` and `server/monitor/**` live in the runtime and are not hot reloaded: stop `pnpm dev` and run
+it again to try the change.
 
   </Step>
 </Steps>
@@ -302,7 +310,7 @@ validates falls back to it. A switch inside `collectors` goes into both the inne
   <Step title="Use it on the server">
 
 Read it with `settings.get()` when it is used (modules receive a getter such as `settings: () => settings.get()`), so a
-change applies without a restart. `PATCH /api/settings` (`server/app.ts`) also calls `monitor.configure()`: a setting
+change applies without a restart. `PATCH /api/settings` (`server/routes/settings.ts`) also calls `monitor.configure()`: a setting
 the monitor or the collectors depend on belongs in `MonitorSettings` and `CollectorSettings`.
 
   </Step>

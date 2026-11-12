@@ -1,3 +1,4 @@
+import { type Spawn, spawnProc } from '../proc';
 import { type GpuReading, normalizeBusId } from './gpu';
 
 const MiB = 1024 ** 2;
@@ -72,7 +73,7 @@ function timeoutAfter(ms: number): { reached: Promise<null> } & Disposable {
 export class NvidiaMonitor {
   private bin: string;
   private intervalMs: number;
-  private spawn: typeof Bun.spawn;
+  private spawn: Spawn;
   private proc: Spawned | null = null;
   private current: GpuReading[] = [];
   private pending: GpuReading[] = [];
@@ -81,11 +82,11 @@ export class NvidiaMonitor {
   private appsTimeoutMs: number;
   private appsInFlight: Promise<void> | null = null;
 
-  constructor(opts: { bin?: string; intervalMs?: number; spawn?: typeof Bun.spawn; appsTimeoutMs?: number } = {}) {
+  constructor(opts: { bin?: string; intervalMs?: number; spawn?: Spawn; appsTimeoutMs?: number } = {}) {
     this.appsTimeoutMs = opts.appsTimeoutMs ?? 3000;
     this.bin = opts.bin ?? 'nvidia-smi';
     this.intervalMs = opts.intervalMs ?? 1000;
-    this.spawn = opts.spawn ?? Bun.spawn;
+    this.spawn = opts.spawn ?? spawnProc;
   }
 
   start(): void {

@@ -1,11 +1,13 @@
-import { Database } from 'bun:sqlite';
-import { expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
+import { copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type BenchSpec, BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { tempDir } from '../testing/tempDir';
 import { BenchRunsRepo } from './benchRuns';
 import { MIGRATIONS } from './migrations';
 import { openDb } from './open';
+import { Database } from './sqlite';
 import { SweepsRepo } from './sweeps';
 
 const hw = { cpu: '', gpus: [], build: null };
@@ -32,10 +34,10 @@ test("a deleted run's id is never handed out again", () => {
 });
 
 const J5_DB = '/tmp/lw-j5/llama-webui.sqlite';
-test.skipIf(!(await Bun.file(J5_DB).exists()))('the migration keeps every J5 run', async () => {
+test.skipIf(!existsSync(J5_DB))('the migration keeps every J5 run', async () => {
   using dir = tempDir('lw-mig-');
   const copy = join(dir.path, 'db.sqlite');
-  await Bun.write(copy, Bun.file(J5_DB));
+  await copyFile(J5_DB, copy);
   const before = (() => {
     using ro = new Database(copy, { readonly: true });
     return ro.query<{ n: number; max: number }, []>('SELECT count(*) n, max(id) max FROM bench_runs').get()!;

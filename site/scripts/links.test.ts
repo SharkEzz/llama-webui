@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import { classify, extractLinks } from './links.ts';
 
 const BASE = '/llama-webui/';

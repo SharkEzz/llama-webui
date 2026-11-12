@@ -8,11 +8,11 @@
 <p align="center">
   <strong>A local control room for <a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a>'s <code>llama-server</code>.</strong><br>
   Launch models, watch every GPU in real time, chat, benchmark, and find the best offload settings for your hardware,<br>
-  all from one browser tab served by a single Bun process.
+  all from one browser tab served by a single Node.js process.
 </p>
 
 <p align="center">
-  <img alt="Bun" src="https://img.shields.io/badge/Bun-1.4-f9f1e1?logo=bun&logoColor=black">
+  <img alt="Node.js 26" src="https://img.shields.io/badge/Node.js-26-5fa04e?logo=nodedotjs&logoColor=white">
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-7-3178c6?logo=typescript&logoColor=white">
   <img alt="Tailwind CSS 4" src="https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss&logoColor=white">
@@ -38,7 +38,7 @@
 another terminal, and a lot of trial and error to fit a big model across several GPUs. llama-webui wraps all of that in
 one dashboard designed for a **single machine you own**:
 
-- **One process, one port.** API, WebSocket and UI are served by Bun on port `7860`. No build step, no database server:
+- **One process, one port.** API, WebSocket and UI are served by one Node.js process on port `7860`. No database server:
   everything lives in a SQLite file.
 - **Mixed hardware.** NVIDIA (NVML), AMD (sysfs) and CPU are first-class, including multi-GPU setups mixing CUDA and
   Vulkan/ROCm devices.
@@ -163,7 +163,7 @@ reconnects on its own.
 | Requirement                                                                      | Notes                                                                                                                                                |
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Linux**                                                                        | Hardware discovery and telemetry read `/proc` and `/sys`. `setpriv` (util-linux) is used to tie `llama-server` to llama-webui.                       |
-| **[Bun](https://bun.com) ≥ 1.4.4**                                               | Only to run from source (the executable includes it). The only runtime needed: no Node.js, no separate build.                                        |
+| **[Node.js](https://nodejs.org) ≥ 26.13**                                        | The runtime. npm, which comes with it, installs a release; [pnpm](https://pnpm.io) 12 runs it from source.                                           |
 | **[llama.cpp](https://github.com/ggml-org/llama.cpp)** build with `llama-server` | Any backend (CUDA, Vulkan, ROCm, CPU…). Put `llama-bench` next to `llama-server` to enable benchmarks and sweeps.                                    |
 | GGUF models                                                                      | In a folder of your choice (set it in Settings).                                                                                                     |
 | _Optional_: NVIDIA driver                                                        | GPU telemetry through NVML, falling back to `nvidia-smi`.                                                                                            |
@@ -172,28 +172,30 @@ reconnects on its own.
 
 ## Installation
 
-llama-webui ships as a **single executable** for Linux (x64 and arm64), Bun runtime and UI included. Download it from
-the [latest release](https://github.com/SharkEzz/llama-webui/releases/latest) (`llama-webui-linux-arm64` on ARM):
+Each [release](https://github.com/SharkEzz/llama-webui/releases) is an npm package, `llama-webui-<version>.tgz`, with
+the SHA-256 of its files in `SHA256SUMS`. Install it with the npm of Node.js 26.13 or later:
 
 ```bash
-mkdir -p ~/.local/bin
-curl -fL -o ~/.local/bin/llama-webui \
-  https://github.com/SharkEzz/llama-webui/releases/latest/download/llama-webui-linux-x64
-chmod +x ~/.local/bin/llama-webui
+VERSION=x.y.z   # the latest release
+BASE=https://github.com/SharkEzz/llama-webui/releases/download/v$VERSION
+curl -fL -O "$BASE/llama-webui-$VERSION.tgz" -O "$BASE/SHA256SUMS"
+sha256sum -c SHA256SUMS
+npm install -g "./llama-webui-$VERSION.tgz"
 llama-webui
 ```
 
-Or run it from source (needs Bun):
+Or run it from source (needs pnpm):
 
 ```bash
 git clone https://github.com/SharkEzz/llama-webui.git
 cd llama-webui
-bun install
-bun run start
+pnpm install
+pnpm start
 ```
 
 Then open **<http://127.0.0.1:7860>**. The status bar shows the running version: the release tag or commit hash of the
-executable, `dev` from source.
+build, `dev` in development. The [installation guide](https://sharkezz.github.io/llama-webui/docs/getting-started/installation/)
+also covers the npm prefix, a systemd service, updates and uninstalling.
 
 On first launch, Home opens a **setup checklist**: it finds your `llama-server` binary (or asks for its path), checks
 the models folder, lists what `llama-bench` and the GPU telemetry can see, and reviews the machine configuration with
@@ -208,7 +210,7 @@ memory fit, started in one click.
 ## Configuration
 
 Launch options can be passed as flags or environment variables (a flag wins over its variable). `llama-webui --help`
-(or `bun run start --help`) lists them.
+(or `pnpm start --help`) lists them.
 
 | Flag                | Environment variable   | Default                                                         |
 | ------------------- | ---------------------- | --------------------------------------------------------------- |
@@ -217,7 +219,7 @@ Launch options can be passed as flags or environment variables (a flag wins over
 | `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR` | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` |
 
 ```bash
-llama-webui --host 0.0.0.0 --port 8080   # from source: bun run start --host 0.0.0.0 --port 8080
+llama-webui --host 0.0.0.0 --port 8080   # from source: pnpm start --host 0.0.0.0 --port 8080
 ```
 
 Hugging Face downloads use the same token as the `hf` CLI: `HF_TOKEN` if set, otherwise the token saved by
@@ -242,19 +244,20 @@ directory, along with profiles, conversations, benchmark runs and sweeps.
 ### Getting started
 
 ```bash
-bun install
-bun run dev        # bun --hot: HMR for the UI, live reload for the server
-bun run compile    # standalone executable in dist/llama-webui (--target bun-linux-arm64)
-bun run release 0.2.0  # set every package.json version, merge, then tag v0.2.0
-bun run check      # type check (server, shared and web)
-bun run test       # every test (bun test)
-bun run lint       # Biome: format + lint + import order (read-only)
-bun run lint:fix   # apply Biome's safe fixes
+pnpm install       # the whole workspace (site/ included), one pnpm-lock.yaml
+pnpm dev           # one Node.js process: Vite middlewares with HMR, server modules reloaded in place
+pnpm start         # vite build, then node dist/server/main.js
+pnpm check         # type check every project (tsc -b), then the website
+pnpm test          # Vitest, then the llamacpp-js tests (node --test)
+pnpm lint          # Biome: format + lint + import order (read-only)
+pnpm lint:fix      # apply Biome's safe fixes
+node scripts/smoke.ts --tarball   # pack, npm install into an empty prefix, smoke-test the installed command
+pnpm release 0.2.0 # set every package.json version, merge, then tag v0.2.0
 ```
 
 ### Architecture
 
-llama-webui is **one Bun process** that serves the UI, a REST API and a WebSocket, and drives `llama-server` as a
+llama-webui is **one Node.js process** that serves the UI, a REST API and a WebSocket, and drives `llama-server` as a
 child process.
 
 ```mermaid
@@ -262,7 +265,7 @@ flowchart LR
   subgraph browser["Browser"]
     ui["React SPA"]
   end
-  subgraph bun["Bun process :7860"]
+  subgraph node["Node.js process :7860"]
     routes["Routes /api/*"]
     hub["WsHub /ws"]
     sup["Supervisor"]
@@ -283,44 +286,45 @@ flowchart LR
 
 | Piece                                                 | Role                                                                                                                                                                                                                                                                                               |
 | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `server/index.ts`                                     | Entry point: opens SQLite, builds the services below and wires their events to the WebSocket, then starts `Bun.serve` (`server/app.ts`, one module per domain in `server/routes/`).                                                                                                                |
+| `server/index.ts`                                     | Builds an instance: opens SQLite, builds the services below, mounts them on the `node:http` server (`server/host.ts`: the Hono API, one module per domain in `server/routes/`, `/ws` and the UI) and wires their events to the WebSocket.                                                          |
 | **Supervisor** (`server/supervisor/`)                 | Owns the single managed `llama-server`: builds its argv from a profile (adding `--host`, `--port`, `--metrics`, `--slots`, `--props`), tracks its state (`idle`, `starting`, `ready`, `stopping`, `crashed`, or `external` for a server it did not launch) and pipes its output into the log ring. |
-| **Monitor** (`server/monitor/`, `server/collectors/`) | Polls every collector once per tick (1 s by default) and merges the results into a `Snapshot`: `llama-server` `/metrics` and `/slots`, NVML through `bun:ffi` in a worker (`nvidia-smi` as a fallback), AMD sysfs, `/proc`, disks and `perf`. History is kept in RAM only.                         |
+| **Monitor** (`server/monitor/`, `server/collectors/`) | Polls every collector once per tick (1 s by default) and merges the results into a `Snapshot`: `llama-server` `/metrics` and `/slots`, NVML through `node:ffi` in a child process (`nvidia-smi` as a fallback), AMD sysfs, `/proc`, disks and `perf`. History is kept in RAM only.                 |
 | **WsHub** (`server/ws/`)                              | Pushes typed messages (`WsMessage` in `packages/webui-shared/src/ws.ts`): `snapshot`, `log`, `server-state`, `placement`, `bench-*`, `sweep-*`. The client reconnects with backoff and re-reads the current state over REST.                                                                       |
 | **ChatRuns** (`server/chat/`)                         | Relays the OpenAI-compatible stream of `llama-server` as SSE and persists messages and stats. A generation is owned by the server, not by the HTTP request: leaving the page does not stop it.                                                                                                     |
 | **BenchRunner** (`server/bench/`)                     | Runs one benchmark at a time (`llama-bench -o json` or a temporary `llama-server`). The **bench gate** stops the managed server for the duration and restarts it afterwards. Sweeps are a queue stored in SQLite, resumed on startup.                                                              |
 | **Tuning** (`server/tuning/`)                         | Memory estimator (GGUF header + devices), presets, sweep search space and system checks.                                                                                                                                                                                                           |
-| **SQLite** (`server/db/`)                             | `bun:sqlite`, migrations in `migrations.ts`, one repository per table: settings, profiles, conversations, benchmark runs, sweeps. Metrics and logs are never persisted.                                                                                                                            |
+| **SQLite** (`server/db/`)                             | `node:sqlite`, migrations in `migrations.ts`, one repository per table: settings, profiles, conversations, benchmark runs, sweeps. Metrics and logs are never persisted.                                                                                                                           |
 | `packages/webui-shared/`                              | Types, zod schemas and pure functions (parsers, phase) used by both sides.                                                                                                                                                                                                                         |
-| `packages/llamacpp-js/`                               | The llama.cpp client: `llama-server` HTTP API, metrics, `--help` flags, `llama-bench` output. No app dependency, Node ≥ 24 and Bun, tree-shakeable.                                                                                                                                                |
+| `packages/llamacpp-js/`                               | The llama.cpp client: `llama-server` HTTP API, metrics, `--help` flags, `llama-bench` output. No app dependency, Node ≥ 24, tree-shakeable.                                                                                                                                                        |
 | `web/`                                                | React 19 SPA. One folder per page in `web/src/features/`, lazy-loaded by the router; API clients and zustand stores per domain in `web/src/lib/`; shared glass components in `web/src/components/glass/`.                                                                                          |
 
-Every `/api/*` route goes through `guarded()` (`server/http.ts`), which applies the checks of `server/security.ts`
-(Host header, Origin, JSON-only writes) and turns errors into JSON responses.
+Every `/api/*` route goes through the middlewares of `createApi()` (`server/api.ts`): the guard of
+`server/security.ts` (Host header, Origin, JSON-only writes), the `405` table, and errors turned into JSON responses.
 
 ### Dev vs production
 
-- `bun run dev` uses the HTML import of `Bun.serve` (`web/index.html`): HMR, a single bundle.
-- `bun run start` (`NODE_ENV=production`) bundles the front end **in memory at startup** with `Bun.build`, split per
-  page (`server/routes/web.ts`). There is no build step and no `dist/` folder. A Bun plugin added to `bunfig.toml` must
-  also be added to `webPlugins()` there.
-- `bun run compile` (`scripts/compile.ts`) builds the standalone executable: the same options bundle the HTML import at
-  compile time (split per page, embedded); it always runs in production and reports `git describe` as its version
-  (`dev` from source). `.github/workflows/release.yml` attaches the x64 and arm64 executables to the release of every
-  `v*` tag, which must match the version of every `package.json` (`bun run release <version>`, merged first).
+- `pnpm dev` (`server/dev.ts`) runs Vite in middleware mode on the app's own HTTP server: HMR for the UI, and its
+  module runner evaluates `server/index.ts` again on every save under `server/` or `packages/`, in the same process.
+- `pnpm build` (`vite build`) writes the UI, split per page, to `dist/web`, and the server, bundled into one file, to
+  `dist/server/main.js` (all dependencies inside except `hono`, `@hono/node-server` and `ws`), with the NVML sampler
+  next to it. `pnpm start` builds, then runs it; it reports `git describe` as its version (`dev` in development).
+- A release is the npm package of the root (`bin` `llama-webui`, `files` `dist/server` and `dist/web`).
+  `.github/workflows/release.yml` builds, packs, smoke-tests the installed tarball and attaches it with its
+  `SHA256SUMS` to the release of every `v*` tag, which must match the version of every `package.json`
+  (`pnpm release <version>`, merged first).
 
 > [!IMPORTANT]
 > **Hot reload and long-lived state.** The supervisor, the log ring, the monitor and the bench gate live on
 > `globalThis` (`server/runtime.ts`) so that saving a file does not kill the loaded model. Changes to
 > `server/supervisor/supervisor.ts`, `server/logs/buffer.ts`, `server/bench/gate.ts`, `server/monitor/**` (except `placement.ts`),
-> `server/collectors/**` or `server/runtime.ts` are therefore **not** picked up by `bun --hot`: stop and restart
-> `bun run dev`. For the same reason, test supervisor errors by `name`, not with `instanceof`. A file created under
-> `web/src/` while `bun run dev` is running may also require a restart.
+> `server/collectors/**`, `server/proc.ts`, `packages/llamacpp-js/src/**` or `server/runtime.ts` are therefore **not**
+> picked up by a reload: stop and restart `pnpm dev`. For the same reason, test supervisor errors by `name`, not with
+> `instanceof`.
 
 ### Conventions
 
 - Code comments, UI strings, commit messages and pull requests are in **English**.
-- Before committing or opening a PR, `bun run lint`, `bun run check` and `bun run test` must all pass, with zero Biome
+- Before committing or opening a PR, `pnpm lint`, `pnpm check` and `pnpm test` must all pass, with zero Biome
   errors or warnings. Do not disable or downgrade a rule; use a targeted `// biome-ignore` with a reason for a genuine
   false positive.
 - `web/src/components/ui/` is generated by shadcn and left untouched (ignored by Biome).
@@ -328,7 +332,7 @@ Every `/api/*` route goes through `guarded()` (`server/http.ts`), which applies 
 
 ### Tech stack
 
-[Bun](https://bun.com) (runtime, HTTP/WebSocket server, bundler, SQLite, tests) ·
+[Node.js](https://nodejs.org) 26 (`node:http`, `node:sqlite`, `node:ffi`) · [pnpm](https://pnpm.io) · [Vite](https://vite.dev) · [Hono](https://hono.dev) · [ws](https://github.com/websockets/ws) · [Vitest](https://vitest.dev) ·
 [React 19](https://react.dev) · [React Router](https://reactrouter.com) · [Tailwind CSS 4](https://tailwindcss.com) ·
 [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com) · [uPlot](https://github.com/leeoniya/uPlot) ·
 [react-three-fiber](https://r3f.docs.pmnd.rs) · [Shiki](https://shiki.style) · [Zustand](https://zustand.docs.pmnd.rs) ·

@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'bun:test';
 import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { describe, expect, test } from 'vitest';
 import { NAV } from '../../content/nav.ts';
 import { contentRoutes } from '../lib/content.ts';
 import { flatten, locate, type NavSection, sectionOf } from './nav.ts';

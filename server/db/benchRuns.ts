@@ -1,4 +1,3 @@
-import type { Database } from 'bun:sqlite';
 import type {
   BenchHardware,
   BenchKind,
@@ -8,6 +7,7 @@ import type {
   FitVerdict,
   Measure,
 } from '@llama-webui/shared';
+import type { Database } from './sqlite';
 
 interface Row {
   id: number;
@@ -152,7 +152,7 @@ export class BenchRunsRepo {
     return row ? toRun(row) : null;
   }
 
-  /** Puts an item back in the queue (Bun reloaded while it was running: it will be replayed). */
+  /** Puts an item back in the queue (the app reloaded while it was running: it will be replayed). */
   requeue(id: number): void {
     this.db.run(
       "UPDATE bench_runs SET status = 'queued', error = NULL, stats_json = NULL, pp_tps = NULL, tg_tps = NULL, vram_mib_json = '[]', log_excerpt = '', duration_ms = NULL WHERE id = ?",
@@ -264,7 +264,7 @@ export class BenchRunsRepo {
       .map((r) => r.id);
   }
 
-  /** On startup: a run left “running” (Bun stopped abruptly) becomes “interrupted”. */
+  /** On startup: a run left “running” (the app stopped abruptly) becomes “interrupted”. */
   stopOrphans(): number {
     return this.db.run(
       "UPDATE bench_runs SET status = 'interrupted', error = COALESCE(error, 'interrupted (llama-webui stopped)') WHERE status = 'running'",

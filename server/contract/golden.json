@@ -1,0 +1,5286 @@
+{
+  "POST /api/health": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/health": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/health": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/health": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/health": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/health": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "ok": true,
+      "version": "<version>",
+      "uptimeMs": "<uptimeMs>"
+    }
+  },
+  "POST /api/settings": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, PATCH"
+    },
+    "body": {
+      "error": "Method not allowed (GET, PATCH)"
+    }
+  },
+  "PUT /api/settings": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, PATCH"
+    },
+    "body": {
+      "error": "Method not allowed (GET, PATCH)"
+    }
+  },
+  "DELETE /api/settings": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, PATCH"
+    },
+    "body": {
+      "error": "Method not allowed (GET, PATCH)"
+    }
+  },
+  "HEAD /api/settings": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/settings": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "binary": "<repo>/testdata/fake/fake-llama-server",
+      "host": "127.0.0.1",
+      "port": "<port>",
+      "modelsDir": "<tmp>/models",
+      "pollIntervalMs": 1000,
+      "historySeconds": 300,
+      "hiddenGpus": [],
+      "defaultProfileId": null,
+      "llamaTuiImportDismissed": false,
+      "onboardingDone": false,
+      "collectors": {
+        "nvml": true,
+        "system": true,
+        "disk": true
+      },
+      "theme": "system",
+      "env": {}
+    }
+  },
+  "PUT /api/profiles": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "PATCH /api/profiles": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "DELETE /api/profiles": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "HEAD /api/profiles": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/profiles": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": [
+      {
+        "id": 1,
+        "name": "A",
+        "model": "<tmp>/models/m.gguf",
+        "args": [],
+        "env": {},
+        "source": "ui",
+        "createdAt": "<time>",
+        "updatedAt": "<time>"
+      },
+      {
+        "id": 2,
+        "name": "B",
+        "model": "<tmp>/models/m.gguf",
+        "args": [],
+        "env": {},
+        "source": "ui",
+        "createdAt": "<time>",
+        "updatedAt": "<time>"
+      }
+    ]
+  },
+  "POST /api/profiles/export": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/profiles/export": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/profiles/export": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/profiles/export": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/profiles/export": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": "attachment; filename*=UTF-8''llama-webui-profiles.json"
+    }
+  },
+  "GET /api/profiles/export": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": "attachment; filename*=UTF-8''llama-webui-profiles.json"
+    },
+    "body": {
+      "profiles": [
+        {
+          "name": "A",
+          "model": "<tmp>/models/m.gguf",
+          "args": [],
+          "env": {}
+        },
+        {
+          "name": "B",
+          "model": "<tmp>/models/m.gguf",
+          "args": [],
+          "env": {}
+        }
+      ]
+    }
+  },
+  "GET /api/profiles/import": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/profiles/import": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/profiles/import": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/profiles/import": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/profiles/import": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "PUT /api/profiles/import/llama-tui": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "PATCH /api/profiles/import/llama-tui": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "DELETE /api/profiles/import/llama-tui": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "HEAD /api/profiles/import/llama-tui": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/profiles/import/llama-tui": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "path": "<tmp>/xdg-config/llama-tui/config.json",
+      "exists": false,
+      "names": [],
+      "dismissed": false,
+      "profileCount": 2
+    }
+  },
+  "POST /api/profiles/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, PUT, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, PUT, DELETE)"
+    }
+  },
+  "PATCH /api/profiles/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, PUT, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, PUT, DELETE)"
+    }
+  },
+  "HEAD /api/profiles/:id": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/profiles/:id": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "id": 1,
+      "name": "A",
+      "model": "<tmp>/models/m.gguf",
+      "args": [],
+      "env": {},
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "GET /api/profiles/:id/duplicate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/profiles/:id/duplicate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/profiles/:id/duplicate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/profiles/:id/duplicate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/profiles/:id/duplicate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "POST /api/profiles/:id/export": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/profiles/:id/export": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/profiles/:id/export": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/profiles/:id/export": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/profiles/:id/export": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": "attachment; filename*=UTF-8''A.json"
+    }
+  },
+  "GET /api/profiles/:id/export": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": "attachment; filename*=UTF-8''A.json"
+    },
+    "body": {
+      "name": "A",
+      "model": "<tmp>/models/m.gguf",
+      "args": [],
+      "env": {}
+    }
+  },
+  "POST /api/state": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/state": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/state": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/state": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/state": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/state": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "server": {
+        "state": {
+          "kind": "idle"
+        },
+        "command": null,
+        "profileId": null
+      },
+      "logSeq": 0,
+      "bootId": "<bootId>"
+    }
+  },
+  "POST /api/server/state": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/server/state": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/server/state": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/server/state": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/server/state": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/server/state": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "state": {
+        "kind": "idle"
+      },
+      "command": null,
+      "profileId": null
+    }
+  },
+  "GET /api/server/start": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/server/start": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/server/start": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/server/start": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/server/start": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/server/switch": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/server/switch": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/server/switch": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/server/switch": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/server/switch": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/server/restart": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/server/restart": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/server/restart": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/server/restart": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/server/restart": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/server/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/server/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/server/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/server/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/server/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "POST /api/server/props": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/server/props": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/server/props": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/server/props": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/server/props": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/server/props": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Server not ready"
+    }
+  },
+  "POST /api/flags": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/flags": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/flags": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/flags": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/flags": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/flags": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "fields": [
+      "flags"
+    ]
+  },
+  "POST /api/logs": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/logs": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/logs": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/logs": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/logs": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/logs": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "lines": [],
+      "seq": 0,
+      "bootId": "<bootId>"
+    }
+  },
+  "POST /api/monitor/snapshot": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/monitor/snapshot": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/monitor/snapshot": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/monitor/snapshot": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/monitor/snapshot": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/monitor/snapshot": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": null
+  },
+  "POST /api/monitor/history": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/monitor/history": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/monitor/history": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/monitor/history": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/monitor/history": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/monitor/history": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "intervalMs": 1000,
+      "capacity": 0,
+      "at": 0,
+      "times": [],
+      "series": {},
+      "bootId": "<bootId>"
+    }
+  },
+  "POST /api/system/info": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/system/info": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/system/info": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/system/info": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/system/info": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/system/info": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "fields": [
+      "cpu",
+      "gpus",
+      "nvidiaSource"
+    ]
+  },
+  "POST /api/models": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, DELETE)"
+    }
+  },
+  "PUT /api/models": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, DELETE)"
+    }
+  },
+  "PATCH /api/models": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, DELETE)"
+    }
+  },
+  "HEAD /api/models": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/models": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "dir": "<tmp>/models",
+      "setting": "<tmp>/models",
+      "home": "<home>",
+      "scannedAt": "<time>",
+      "models": [
+        {
+          "ok": true,
+          "path": "<tmp>/models/m.gguf",
+          "relPath": "m.gguf",
+          "files": [
+            "<tmp>/models/m.gguf"
+          ],
+          "fileBytes": 288,
+          "kind": "model",
+          "arch": "llama",
+          "name": "",
+          "quant": "?",
+          "params": 32,
+          "blockCount": 1,
+          "contextLength": 0,
+          "embeddingLength": 0,
+          "headCount": 1,
+          "headCountKv": 1,
+          "expertCount": 0,
+          "expertUsedCount": 0,
+          "nextnLayers": 0,
+          "recurrent": false,
+          "slidingWindow": null,
+          "hasChatTemplate": false
+        }
+      ]
+    }
+  },
+  "POST /api/models/usage": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/models/usage": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/models/usage": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/models/usage": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/models/usage": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/models/usage": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "path": "<tmp>/models/m.gguf",
+      "files": [
+        "<tmp>/models/m.gguf"
+      ],
+      "fileBytes": 288,
+      "profiles": [
+        {
+          "id": 1,
+          "name": "A",
+          "role": "model"
+        },
+        {
+          "id": 2,
+          "name": "B",
+          "role": "model"
+        }
+      ],
+      "blocked": null
+    }
+  },
+  "POST /api/models/info": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/models/info": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/models/info": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/models/info": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/models/info": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/models/info": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "path": "<tmp>/models/m.gguf",
+      "relPath": "m.gguf",
+      "files": [
+        "<tmp>/models/m.gguf"
+      ],
+      "fileBytes": 288,
+      "kind": "model",
+      "arch": "llama",
+      "name": "",
+      "quant": "?",
+      "params": 32,
+      "blockCount": 1,
+      "contextLength": 0,
+      "embeddingLength": 0,
+      "headCount": 1,
+      "headCountKv": 1,
+      "expertCount": 0,
+      "expertUsedCount": 0,
+      "nextnLayers": 0,
+      "recurrent": false,
+      "slidingWindow": null,
+      "hasChatTemplate": false,
+      "tensorCount": 1,
+      "weights": {
+        "embedBytes": 128,
+        "outputBytes": 0,
+        "layersBytes": 0,
+        "expertsBytes": 0,
+        "otherBytes": 0,
+        "totalBytes": 128
+      }
+    }
+  },
+  "POST /api/hf/status": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/hf/status": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/hf/status": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/hf/status": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/hf/status": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/hf/status": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "token": null,
+      "endpoint": "https://huggingface.co",
+      "user": null,
+      "tokenInvalid": false
+    }
+  },
+  "POST /api/hf/search": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/hf/search": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/hf/search": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/hf/search": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/hf/search": {
+    "status": 502,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/hf/search": {
+    "status": 502,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Hugging Face unreachable: fetch failed",
+      "code": "hf-unreachable"
+    }
+  },
+  "POST /api/hf/repo": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/hf/repo": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/hf/repo": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/hf/repo": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/hf/repo": {
+    "status": 502,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/hf/repo": {
+    "status": 502,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Hugging Face unreachable: fetch failed",
+      "code": "hf-unreachable"
+    }
+  },
+  "PUT /api/downloads": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "PATCH /api/downloads": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "DELETE /api/downloads": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "HEAD /api/downloads": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/downloads": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "items": [],
+      "live": null
+    }
+  },
+  "GET /api/downloads/clear": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/downloads/clear": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/downloads/clear": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/downloads/clear": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/downloads/clear": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/downloads/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (DELETE)"
+    }
+  },
+  "POST /api/downloads/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (DELETE)"
+    }
+  },
+  "PUT /api/downloads/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (DELETE)"
+    }
+  },
+  "PATCH /api/downloads/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (DELETE)"
+    }
+  },
+  "HEAD /api/downloads/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    }
+  },
+  "GET /api/downloads/:id/retry": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/downloads/:id/retry": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/downloads/:id/retry": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/downloads/:id/retry": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/downloads/:id/retry": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "PUT /api/chat": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "PATCH /api/chat": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "DELETE /api/chat": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "HEAD /api/chat": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/chat": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": [
+      {
+        "id": 2,
+        "title": "New conversation",
+        "updatedAt": "<time>",
+        "modelPath": "<tmp>/models/m.gguf",
+        "messageCount": 0,
+        "live": false
+      },
+      {
+        "id": 1,
+        "title": "New conversation",
+        "updatedAt": "<time>",
+        "modelPath": "<tmp>/models/m.gguf",
+        "messageCount": 0,
+        "live": false
+      }
+    ]
+  },
+  "POST /api/chat/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, PATCH, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, PATCH, DELETE)"
+    }
+  },
+  "PUT /api/chat/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, PATCH, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, PATCH, DELETE)"
+    }
+  },
+  "HEAD /api/chat/:id": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/chat/:id": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "id": 1,
+      "title": "New conversation",
+      "profileId": 1,
+      "modelPath": "<tmp>/models/m.gguf",
+      "systemPrompt": "",
+      "sampling": {},
+      "thinking": true,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "GET /api/chat/:id/messages": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/chat/:id/messages": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/chat/:id/messages": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/chat/:id/messages": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/chat/:id/messages": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/chat/:id/regenerate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/chat/:id/regenerate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/chat/:id/regenerate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/chat/:id/regenerate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/chat/:id/regenerate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/chat/:id/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/chat/:id/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/chat/:id/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/chat/:id/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/chat/:id/stop": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "POST /api/chat/:id/stream": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/chat/:id/stream": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/chat/:id/stream": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/chat/:id/stream": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/chat/:id/stream": {
+    "status": 204,
+    "headers": {}
+  },
+  "GET /api/chat/:id/stream": {
+    "status": 204,
+    "headers": {}
+  },
+  "POST /api/bench/runs": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, DELETE)"
+    }
+  },
+  "PUT /api/bench/runs": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, DELETE)"
+    }
+  },
+  "PATCH /api/bench/runs": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, DELETE)"
+    }
+  },
+  "HEAD /api/bench/runs": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/bench/runs": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "runs": [
+        {
+          "id": 2,
+          "kind": "bench",
+          "status": "ok",
+          "spec": {
+            "kind": "bench",
+            "modelPath": "<tmp>/models/m.gguf",
+            "mmprojPath": null,
+            "profileId": null,
+            "p": 512,
+            "n": 128,
+            "r": 3,
+            "params": {},
+            "serverArgs": []
+          },
+          "command": "llama-bench",
+          "hardware": {
+            "cpu": "",
+            "gpus": [],
+            "build": null
+          },
+          "pp": null,
+          "tg": {
+            "tps": 50,
+            "stddev": 0,
+            "tokens": 128
+          },
+          "draftAcceptPct": null,
+          "vramPeak": [],
+          "error": null,
+          "logExcerpt": "",
+          "durationMs": null,
+          "diskReadPeakBps": null,
+          "sweepId": null,
+          "sweepLabel": null,
+          "fit": null,
+          "createdAt": "<time>"
+        },
+        {
+          "id": 1,
+          "kind": "bench",
+          "status": "ok",
+          "spec": {
+            "kind": "bench",
+            "modelPath": "<tmp>/models/m.gguf",
+            "mmprojPath": null,
+            "profileId": null,
+            "p": 512,
+            "n": 128,
+            "r": 3,
+            "params": {},
+            "serverArgs": []
+          },
+          "command": "llama-bench",
+          "hardware": {
+            "cpu": "",
+            "gpus": [],
+            "build": null
+          },
+          "pp": null,
+          "tg": {
+            "tps": 50,
+            "stddev": 0,
+            "tokens": 128
+          },
+          "draftAcceptPct": null,
+          "vramPeak": [],
+          "error": null,
+          "logExcerpt": "",
+          "durationMs": null,
+          "diskReadPeakBps": null,
+          "sweepId": null,
+          "sweepLabel": null,
+          "fit": null,
+          "createdAt": "<time>"
+        }
+      ],
+      "live": null
+    }
+  },
+  "GET /api/bench/run": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/bench/run": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/bench/run": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/bench/run": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/bench/run": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "POST /api/bench/devices": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/bench/devices": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/bench/devices": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/bench/devices": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/bench/devices": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/bench/devices": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "fields": []
+  },
+  "GET /api/bench/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (DELETE)"
+    }
+  },
+  "POST /api/bench/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (DELETE)"
+    }
+  },
+  "PUT /api/bench/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (DELETE)"
+    }
+  },
+  "PATCH /api/bench/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (DELETE)"
+    }
+  },
+  "HEAD /api/bench/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "DELETE"
+    }
+  },
+  "POST /api/bench/from-profile/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/bench/from-profile/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/bench/from-profile/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/bench/from-profile/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/bench/from-profile/:id": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/bench/from-profile/:id": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "modelPath": "<tmp>/models/m.gguf",
+      "mmprojPath": null,
+      "profileId": 1,
+      "params": {},
+      "serverArgs": []
+    }
+  },
+  "GET /api/bench/:id/to-profile": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/bench/:id/to-profile": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/bench/:id/to-profile": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/bench/:id/to-profile": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/bench/:id/to-profile": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/bench/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/bench/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/bench/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/bench/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/bench/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "PUT /api/sweeps": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "PATCH /api/sweeps": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "DELETE /api/sweeps": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, POST"
+    },
+    "body": {
+      "error": "Method not allowed (GET, POST)"
+    }
+  },
+  "HEAD /api/sweeps": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/sweeps": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "sweeps": [
+        {
+          "id": 2,
+          "name": "sB",
+          "status": "done",
+          "spec": {
+            "name": "sB",
+            "modelPath": "<tmp>/models/m.gguf",
+            "mmprojPath": null,
+            "profileId": null,
+            "p": 512,
+            "n": 128,
+            "r": 3,
+            "preset": "chat",
+            "base": {},
+            "space": {
+              "ncmoe": [
+                0,
+                8
+              ]
+            },
+            "serverArgs": [],
+            "includeUnfit": false
+          },
+          "bestRunId": null,
+          "best": null,
+          "counts": {
+            "total": 0,
+            "queued": 0,
+            "running": 0,
+            "ok": 0,
+            "failed": 0,
+            "cancelled": 0,
+            "interrupted": 0
+          },
+          "createdAt": "<time>",
+          "finishedAt": "<time>"
+        },
+        {
+          "id": 1,
+          "name": "sA",
+          "status": "done",
+          "spec": {
+            "name": "sA",
+            "modelPath": "<tmp>/models/m.gguf",
+            "mmprojPath": null,
+            "profileId": null,
+            "p": 512,
+            "n": 128,
+            "r": 3,
+            "preset": "chat",
+            "base": {},
+            "space": {
+              "ncmoe": [
+                0,
+                8
+              ]
+            },
+            "serverArgs": [],
+            "includeUnfit": false
+          },
+          "bestRunId": null,
+          "best": null,
+          "counts": {
+            "total": 0,
+            "queued": 0,
+            "running": 0,
+            "ok": 0,
+            "failed": 0,
+            "cancelled": 0,
+            "interrupted": 0
+          },
+          "createdAt": "<time>",
+          "finishedAt": "<time>"
+        }
+      ],
+      "live": null
+    }
+  },
+  "POST /api/sweeps/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, DELETE)"
+    }
+  },
+  "PUT /api/sweeps/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, DELETE)"
+    }
+  },
+  "PATCH /api/sweeps/:id": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET, DELETE"
+    },
+    "body": {
+      "error": "Method not allowed (GET, DELETE)"
+    }
+  },
+  "HEAD /api/sweeps/:id": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/sweeps/:id": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "sweep": {
+        "id": 1,
+        "name": "sA",
+        "status": "done",
+        "spec": {
+          "name": "sA",
+          "modelPath": "<tmp>/models/m.gguf",
+          "mmprojPath": null,
+          "profileId": null,
+          "p": 512,
+          "n": 128,
+          "r": 3,
+          "preset": "chat",
+          "base": {},
+          "space": {
+            "ncmoe": [
+              0,
+              8
+            ]
+          },
+          "serverArgs": [],
+          "includeUnfit": false
+        },
+        "bestRunId": null,
+        "best": null,
+        "counts": {
+          "total": 0,
+          "queued": 0,
+          "running": 0,
+          "ok": 0,
+          "failed": 0,
+          "cancelled": 0,
+          "interrupted": 0
+        },
+        "createdAt": "<time>",
+        "finishedAt": "<time>"
+      },
+      "runs": []
+    }
+  },
+  "GET /api/sweeps/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/sweeps/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/sweeps/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/sweeps/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/sweeps/:id/cancel": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/sweeps/:id/resume": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/sweeps/:id/resume": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/sweeps/:id/resume": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/sweeps/:id/resume": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/sweeps/:id/resume": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/sweeps/:id/validate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/sweeps/:id/validate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/sweeps/:id/validate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/sweeps/:id/validate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/sweeps/:id/validate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "POST /api/tuning/hardware": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/tuning/hardware": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/tuning/hardware": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/tuning/hardware": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/tuning/hardware": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/tuning/hardware": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "fields": [
+      "cpu",
+      "devices",
+      "devicesError",
+      "ramAvailableBytes",
+      "ramTotalBytes"
+    ]
+  },
+  "GET /api/tuning/estimate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/tuning/estimate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/tuning/estimate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/tuning/estimate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/tuning/estimate": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "GET /api/tuning/plan": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/tuning/plan": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/tuning/plan": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/tuning/plan": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/tuning/plan": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "POST /api/tuning/checks": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/tuning/checks": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/tuning/checks": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/tuning/checks": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/tuning/checks": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/tuning/checks": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "fields": [
+      "at",
+      "checks",
+      "summary"
+    ]
+  },
+  "GET /api/tuning/disk-speed": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PUT /api/tuning/disk-speed": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "PATCH /api/tuning/disk-speed": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "DELETE /api/tuning/disk-speed": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    },
+    "body": {
+      "error": "Method not allowed (POST)"
+    }
+  },
+  "HEAD /api/tuning/disk-speed": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "POST"
+    }
+  },
+  "POST /api/topology": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/topology": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/topology": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/topology": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/topology": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/topology": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "fields": [
+      "graph",
+      "placement"
+    ]
+  },
+  "POST /api/setup": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/setup": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/setup": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/setup": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/setup": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/setup": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "fields": [
+      "bench",
+      "binary",
+      "listen",
+      "llamaListen",
+      "models",
+      "ready",
+      "telemetry"
+    ]
+  },
+  "POST /api/launchpad": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PUT /api/launchpad": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "PATCH /api/launchpad": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "DELETE /api/launchpad": {
+    "status": 405,
+    "headers": {
+      "content-type": "application/json;charset=utf-8",
+      "allow": "GET"
+    },
+    "body": {
+      "error": "Method not allowed (GET)"
+    }
+  },
+  "HEAD /api/launchpad": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    }
+  },
+  "GET /api/launchpad": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "fields": []
+  },
+  "GET /api/profiles/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "PUT /api/profiles/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "DELETE /api/profiles/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "GET /api/profiles/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "PUT /api/profiles/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "DELETE /api/profiles/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "POST /api/profiles/:id/duplicate (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "POST /api/profiles/:id/duplicate (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "GET /api/profiles/:id/export (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "GET /api/profiles/:id/export (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "DELETE /api/downloads/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Download not found"
+    }
+  },
+  "DELETE /api/downloads/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Download not found"
+    }
+  },
+  "POST /api/downloads/:id/retry (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Download not found"
+    }
+  },
+  "POST /api/downloads/:id/retry (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Download not found"
+    }
+  },
+  "GET /api/chat/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "PATCH /api/chat/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "DELETE /api/chat/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "GET /api/chat/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "PATCH /api/chat/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "DELETE /api/chat/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "POST /api/chat/:id/messages (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "POST /api/chat/:id/messages (unknown id)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "content: expected a string"
+    }
+  },
+  "POST /api/chat/:id/regenerate (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "POST /api/chat/:id/regenerate (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "POST /api/chat/:id/stop (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "POST /api/chat/:id/stop (unknown id)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "No reply in progress"
+    }
+  },
+  "GET /api/chat/:id/stream (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "GET /api/chat/:id/stream (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Conversation not found"
+    }
+  },
+  "DELETE /api/bench/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Run not found"
+    }
+  },
+  "DELETE /api/bench/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Run not found"
+    }
+  },
+  "GET /api/bench/from-profile/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "GET /api/bench/from-profile/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "POST /api/bench/:id/to-profile (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Run not found"
+    }
+  },
+  "POST /api/bench/:id/to-profile (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Run not found"
+    }
+  },
+  "POST /api/bench/:id/cancel (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Run not found"
+    }
+  },
+  "POST /api/bench/:id/cancel (unknown id)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "This run is not running"
+    }
+  },
+  "GET /api/sweeps/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "DELETE /api/sweeps/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "GET /api/sweeps/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "DELETE /api/sweeps/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/:id/cancel (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/:id/cancel (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/:id/resume (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/:id/resume (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/:id/validate (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/:id/validate (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Sweep not found"
+    }
+  },
+  "PATCH /api/settings (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "PATCH /api/settings (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "PATCH /api/settings (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "PATCH /api/settings (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "PATCH /api/settings (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "PATCH /api/settings (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: Between 250 and 60000 ms (pollIntervalMs)",
+      "issues": [
+        {
+          "origin": "number",
+          "code": "too_small",
+          "minimum": 250,
+          "inclusive": true,
+          "path": [
+            "pollIntervalMs"
+          ],
+          "message": "Between 250 and 60000 ms"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/profiles (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: Invalid input: expected object, received array",
+      "issues": [
+        {
+          "expected": "object",
+          "code": "invalid_type",
+          "path": [],
+          "message": "Invalid input: expected object, received array"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/profiles (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/profiles (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/profiles (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: cannot be empty (name)",
+      "issues": [
+        {
+          "origin": "string",
+          "code": "too_small",
+          "minimum": 1,
+          "inclusive": true,
+          "path": [
+            "name"
+          ],
+          "message": "cannot be empty"
+        },
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "model"
+          ],
+          "message": "required"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles/import (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/profiles/import (non-object JSON)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "imported": [],
+      "skipped": [
+        {
+          "name": "(unnamed)",
+          "reason": "Invalid input: expected object, received number"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles/import (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/profiles/import (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/profiles/import (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/profiles/import (schema violation)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "imported": [],
+      "skipped": [
+        {
+          "name": "(file)",
+          "reason": "no profile found in this JSON"
+        }
+      ]
+    }
+  },
+  "PUT /api/profiles/:id (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "PUT /api/profiles/:id (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: Invalid input: expected object, received array",
+      "issues": [
+        {
+          "expected": "object",
+          "code": "invalid_type",
+          "path": [],
+          "message": "Invalid input: expected object, received array"
+        }
+      ]
+    }
+  },
+  "PUT /api/profiles/:id (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "PUT /api/profiles/:id (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "PUT /api/profiles/:id (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "PUT /api/profiles/:id (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: cannot be empty (name)",
+      "issues": [
+        {
+          "origin": "string",
+          "code": "too_small",
+          "minimum": 1,
+          "inclusive": true,
+          "path": [
+            "name"
+          ],
+          "message": "cannot be empty"
+        },
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "model"
+          ],
+          "message": "required"
+        }
+      ]
+    }
+  },
+  "POST /api/server/start (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/server/start (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/server/start (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/server/start (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/server/start (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/server/start (schema violation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "POST /api/server/switch (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/server/switch (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/server/switch (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/server/switch (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/server/switch (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/server/switch (schema violation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Profile not found"
+    }
+  },
+  "DELETE /api/models (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "DELETE /api/models (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "DELETE /api/models (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "DELETE /api/models (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "DELETE /api/models (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "DELETE /api/models (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: path required (path)",
+      "issues": [
+        {
+          "origin": "string",
+          "code": "too_small",
+          "minimum": 1,
+          "inclusive": true,
+          "path": [
+            "path"
+          ],
+          "message": "path required"
+        }
+      ]
+    }
+  },
+  "POST /api/downloads (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/downloads (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/downloads (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/downloads (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/downloads (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/downloads (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: Repository id expected (org/name) (repo)",
+      "issues": [
+        {
+          "origin": "string",
+          "code": "invalid_format",
+          "format": "regex",
+          "pattern": "/^\\w(?:[\\w.-]*\\w)?\\/\\w(?:[\\w.-]*\\w)?$/",
+          "path": [
+            "repo"
+          ],
+          "message": "Repository id expected (org/name)"
+        },
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "revision"
+          ],
+          "message": "Invalid input: expected string, received undefined"
+        },
+        {
+          "expected": "array",
+          "code": "invalid_type",
+          "path": [
+            "keys"
+          ],
+          "message": "Invalid input: expected array, received undefined"
+        }
+      ]
+    }
+  },
+  "POST /api/chat (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/chat (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/chat (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/chat (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/chat (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/chat (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "profileId: expected an integer or null"
+    }
+  },
+  "PATCH /api/chat/:id (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "PATCH /api/chat/:id (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "PATCH /api/chat/:id (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "PATCH /api/chat/:id (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "PATCH /api/chat/:id (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "PATCH /api/chat/:id (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: Invalid input: expected string, received number (title)",
+      "issues": [
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "title"
+          ],
+          "message": "Invalid input: expected string, received number"
+        }
+      ]
+    }
+  },
+  "POST /api/chat/:id/messages (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/chat/:id/messages (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/chat/:id/messages (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/chat/:id/messages (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/chat/:id/messages (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/chat/:id/messages (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "content: expected a string"
+    }
+  },
+  "POST /api/bench/run (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/bench/run (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/bench/run (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/bench/run (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/bench/run (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/bench/run (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: “bench” or “server” (kind)",
+      "issues": [
+        {
+          "code": "invalid_value",
+          "values": [
+            "bench",
+            "server"
+          ],
+          "path": [
+            "kind"
+          ],
+          "message": "“bench” or “server”"
+        },
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "modelPath"
+          ],
+          "message": "required"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/sweeps (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/sweeps (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/sweeps (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/sweeps (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/sweeps (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: required (name)",
+      "issues": [
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "name"
+          ],
+          "message": "required"
+        },
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "modelPath"
+          ],
+          "message": "required"
+        },
+        {
+          "code": "invalid_value",
+          "values": [
+            "chat",
+            "agent",
+            "context",
+            "fit",
+            "big"
+          ],
+          "path": [
+            "preset"
+          ],
+          "message": "unknown preset"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps/:id/resume (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/sweeps/:id/resume (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/sweeps/:id/resume (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/sweeps/:id/resume (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/sweeps/:id/resume (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/sweeps/:id/resume (schema violation)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Nothing to resume: no interrupted or queued item"
+    }
+  },
+  "POST /api/sweeps/:id/validate (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/sweeps/:id/validate (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/sweeps/:id/validate (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/sweeps/:id/validate (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/sweeps/:id/validate (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/sweeps/:id/validate (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: Too small: expected number to be >=1 (n)",
+      "issues": [
+        {
+          "origin": "number",
+          "code": "too_small",
+          "minimum": 1,
+          "inclusive": true,
+          "path": [
+            "n"
+          ],
+          "message": "Too small: expected number to be >=1"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/estimate (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/tuning/estimate (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/tuning/estimate (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/tuning/estimate (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/tuning/estimate (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/tuning/estimate (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: Invalid input: expected string, received undefined (modelPath)",
+      "issues": [
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "modelPath"
+          ],
+          "message": "Invalid input: expected string, received undefined"
+        },
+        {
+          "code": "invalid_value",
+          "values": [
+            "chat",
+            "agent",
+            "context",
+            "fit",
+            "big"
+          ],
+          "path": [
+            "preset"
+          ],
+          "message": "Invalid option: expected one of \"chat\"|\"agent\"|\"context\"|\"fit\"|\"big\""
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/plan (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/tuning/plan (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/tuning/plan (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/tuning/plan (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/tuning/plan (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/tuning/plan (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: required (name)",
+      "issues": [
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "name"
+          ],
+          "message": "required"
+        },
+        {
+          "expected": "string",
+          "code": "invalid_type",
+          "path": [
+            "modelPath"
+          ],
+          "message": "required"
+        },
+        {
+          "code": "invalid_value",
+          "values": [
+            "chat",
+            "agent",
+            "context",
+            "fit",
+            "big"
+          ],
+          "path": [
+            "preset"
+          ],
+          "message": "unknown preset"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/disk-speed (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/tuning/disk-speed (non-object JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON object expected"
+    }
+  },
+  "POST /api/tuning/disk-speed (no body, no content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/tuning/disk-speed (no body, JSON content-type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid JSON"
+    }
+  },
+  "POST /api/tuning/disk-speed (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/tuning/disk-speed (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid data: Too small: expected string to have >=1 characters (modelPath)",
+      "issues": [
+        {
+          "origin": "string",
+          "code": "too_small",
+          "minimum": 1,
+          "inclusive": true,
+          "path": [
+            "modelPath"
+          ],
+          "message": "Too small: expected string to have >=1 characters"
+        }
+      ]
+    }
+  },
+  "GET /api/health (foreign Origin)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Origin not allowed"
+    }
+  },
+  "GET /api/health (same Origin)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "ok": true,
+      "version": "<version>",
+      "uptimeMs": "<uptimeMs>"
+    }
+  },
+  "GET /api/health (Host evil.example)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Host not allowed"
+    }
+  },
+  "GET /api/health (Host a b)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid host"
+    }
+  },
+  "GET /api/health (Host localhost)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "ok": true,
+      "version": "<version>",
+      "uptimeMs": "<uptimeMs>"
+    }
+  },
+  "POST /api/profiles (foreign Origin)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Origin not allowed"
+    }
+  },
+  "GET /chat/12 (Host evil.example)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html;charset=utf-8",
+      "cache-control": "no-cache"
+    },
+    "body": "<!doctype html><title>llama-webui</title>"
+  },
+  "GET /api/nope": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Unknown route"
+    }
+  },
+  "POST /api/nope": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Unknown route"
+    }
+  },
+  "GET /chat/12 (deep SPA URL)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html;charset=utf-8",
+      "cache-control": "no-cache"
+    },
+    "body": "<!doctype html><title>llama-webui</title>"
+  },
+  "GET / (the app)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html;charset=utf-8",
+      "cache-control": "no-cache"
+    },
+    "body": "<!doctype html><title>llama-webui</title>"
+  },
+  "GET /ws (no upgrade)": {
+    "status": 426,
+    "headers": {
+      "content-type": "text/plain;charset=utf-8"
+    },
+    "body": "WebSocket upgrade expected"
+  },
+  "POST /ws (no upgrade)": {
+    "status": 426,
+    "headers": {
+      "content-type": "text/plain;charset=utf-8"
+    },
+    "body": "WebSocket upgrade expected"
+  },
+  "DELETE /api/bench/runs?failed=1": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "deleted": 0
+    }
+  },
+  "DELETE /api/bench/runs (no failed=1)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "?failed=1 expected"
+    }
+  },
+  "POST /api/bench/1/cancel": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "This run is not running"
+    }
+  },
+  "POST /api/sweeps/1/cancel": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "This sweep is not running"
+    }
+  },
+  "POST /api/chat/1/stop": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "No reply in progress"
+    }
+  },
+  "POST /api/downloads/clear": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "deleted": 0
+    }
+  },
+  "POST /api/downloads/999999/retry": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Download not found"
+    }
+  },
+  "DELETE /api/downloads/999999": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Download not found"
+    }
+  },
+  "POST /api/server/restart": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "No profile to restart"
+    }
+  },
+  "POST /api/server/stop": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "state": {
+        "kind": "idle"
+      },
+      "command": null,
+      "profileId": null
+    }
+  },
+  "POST /api/profiles/import/llama-tui": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "llama-tui config not found (<tmp>/xdg-config/llama-tui/config.json)"
+    }
+  },
+  "DELETE /api/profiles/2": {
+    "status": 204,
+    "headers": {}
+  },
+  "DELETE /api/chat/2": {
+    "status": 204,
+    "headers": {}
+  },
+  "DELETE /api/bench/2": {
+    "status": 204,
+    "headers": {}
+  },
+  "DELETE /api/sweeps/2": {
+    "status": 204,
+    "headers": {}
+  },
+  "POST /api/profiles/1/duplicate": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "id": 3,
+      "name": "A (copy)",
+      "model": "<tmp>/models/m.gguf",
+      "args": [],
+      "env": {},
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "POST /api/bench/1/to-profile": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "id": 4,
+      "name": "m — bench #1",
+      "model": "m.gguf",
+      "args": [],
+      "env": {},
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "cwd": "<tmp>/models"
+    }
+  },
+  "GET /api/profiles (after the changes)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": [
+      {
+        "id": 1,
+        "name": "A",
+        "model": "<tmp>/models/m.gguf",
+        "args": [],
+        "env": {},
+        "source": "ui",
+        "createdAt": "<time>",
+        "updatedAt": "<time>"
+      },
+      {
+        "id": 3,
+        "name": "A (copy)",
+        "model": "<tmp>/models/m.gguf",
+        "args": [],
+        "env": {},
+        "source": "ui",
+        "createdAt": "<time>",
+        "updatedAt": "<time>"
+      },
+      {
+        "id": 4,
+        "name": "m — bench #1",
+        "model": "m.gguf",
+        "args": [],
+        "env": {},
+        "source": "ui",
+        "createdAt": "<time>",
+        "updatedAt": "<time>",
+        "cwd": "<tmp>/models"
+      }
+    ]
+  },
+  "WS /ws (hello)": {
+    "status": 101,
+    "headers": {},
+    "body": {
+      "type": "hello",
+      "payload": {
+        "serverTime": "<time>",
+        "bootId": "<bootId>"
+      }
+    }
+  },
+  "WS /ws (ping → pong)": {
+    "status": 101,
+    "headers": {},
+    "body": {
+      "type": "pong"
+    }
+  },
+  "POST /api/server/start (fake server)": {
+    "status": 202,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "state": {
+        "kind": "starting",
+        "profile": "A",
+        "profileId": 1,
+        "pid": "<pid>",
+        "host": "127.0.0.1",
+        "port": "<port>",
+        "since": "<time>"
+      },
+      "command": "<repo>/testdata/fake/fake-llama-server -m <tmp>/models/m.gguf -lv 4 --host 127.0.0.1 --port <port> --metrics --slots --props",
+      "profileId": 1
+    }
+  },
+  "GET /api/server/state (fake server ready)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "state": {
+        "kind": "ready",
+        "profile": "A",
+        "profileId": 1,
+        "pid": "<pid>",
+        "host": "127.0.0.1",
+        "port": "<port>",
+        "since": "<time>"
+      },
+      "command": "<repo>/testdata/fake/fake-llama-server -m <tmp>/models/m.gguf -lv 4 --host 127.0.0.1 --port <port> --metrics --slots --props",
+      "profileId": 1
+    }
+  },
+  "POST /api/chat/1/messages (SSE)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache"
+    },
+    "body": {
+      "first": {
+        "event": "start",
+        "data": {
+          "type": "start",
+          "user": {
+            "id": 1,
+            "conversationId": 1,
+            "role": "user",
+            "content": "Hello",
+            "reasoning": "",
+            "status": "done",
+            "error": null,
+            "stats": null,
+            "model": null,
+            "createdAt": "<time>"
+          },
+          "assistant": {
+            "id": 2,
+            "conversationId": 1,
+            "role": "assistant",
+            "content": "",
+            "reasoning": "",
+            "status": "streaming",
+            "error": null,
+            "stats": null,
+            "model": "<tmp>/models/m.gguf",
+            "createdAt": "<time>"
+          }
+        }
+      },
+      "last": "done"
+    }
+  },
+  "POST /api/server/stop (running)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "state": {
+        "kind": "idle"
+      },
+      "command": "<repo>/testdata/fake/fake-llama-server -m <tmp>/models/m.gguf -lv 4 --host 127.0.0.1 --port <port> --metrics --slots --props",
+      "profileId": 1
+    }
+  }
+}

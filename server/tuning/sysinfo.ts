@@ -1,6 +1,7 @@
 import { readdir, realpath, stat } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { resolveModelDisk } from '../collectors/disk';
+import { readText, spawnProc, which } from '../proc';
 
 export interface SysReadings {
   /** scaling_governor of every core; empty when unreadable. */
@@ -46,7 +47,7 @@ export interface SysDeps {
 
 async function text(path: string): Promise<string | null> {
   try {
-    return (await Bun.file(path).text()).trim();
+    return (await readText(path)).trim();
   } catch {
     return null;
   }
@@ -62,7 +63,7 @@ async function listDir(path: string): Promise<string[] | null> {
 
 /** Absolute, symlink-free path of a binary (bare name looked up in the PATH); null when not found. */
 export async function resolveBinary(binary: string): Promise<string | null> {
-  const p = binary.includes('/') ? binary : Bun.which(binary);
+  const p = binary.includes('/') ? binary : which(binary);
   if (!p) return null;
   try {
     return await realpath(isAbsolute(p) ? p : join(process.cwd(), p));
@@ -87,7 +88,7 @@ async function gitRoot(dir: string): Promise<string | null> {
 
 async function lastCommitMs(repo: string): Promise<number | null> {
   try {
-    const proc = Bun.spawn(['git', '-C', repo, 'log', '-1', '--format=%ct'], {
+    const proc = spawnProc(['git', '-C', repo, 'log', '-1', '--format=%ct'], {
       stdin: 'ignore',
       stdout: 'pipe',
       stderr: 'ignore',

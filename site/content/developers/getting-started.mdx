@@ -4,7 +4,7 @@ description: Install the tools, run llama-webui in development or production mod
 ---
 
 This page gets a working copy of llama-webui running for development: prerequisites, installation, the two ways to run
-the server, every script, the repository layout, how to work without GPUs or without llama.cpp, and the checks every
+the server and the package, every script, the repository layout, how to work without GPUs or without llama.cpp, and the checks every
 change must pass.
 
 ## Prerequisites
@@ -12,66 +12,42 @@ change must pass.
 | Tool | Why |
 | --- | --- |
 | **Linux** | Hardware discovery and telemetry read `/proc` and `/sys`. |
-| **[Bun](https://bun.com) 1.4.4 or later** | Runtime, bundler, test runner and package manager for the whole repository. CI pins 1.4.4. |
-| **`setpriv`** (util-linux) | Every `llama-server` and `llama-bench` process is launched as `setpriv --pdeathsig KILL -- …`, so it dies with Bun. |
-| **Git** | To clone the repository. |
+| **[Node.js](https://nodejs.org) 26.13 or later** | The runtime of the app, its tests, its build and the website's scripts. CI pins 26.13. |
+| **[pnpm](https://pnpm.io) 12** | Installs the workspace and runs the scripts (`npm install -g pnpm`, into a prefix you own: [Install Node.js](/docs/getting-started/installation/#install)). |
+| **`setpriv`** (util-linux) | Every `llama-server` and `llama-bench` process is launched as `setpriv --pdeathsig KILL -- …`, so it dies with llama-webui. |
+| **Git** | To clone the repository; the build reads its version from `git describe`. |
 | A llama.cpp build (optional) | Needed to run real models. Without it, use the [fake binaries](#without-llamacpp). |
-| Node.js (website only) | The website's build runs the React Router CLI on Node.js; CI installs Node 24 for it. |
 
 The [user requirements](/docs/getting-started/requirements/) list the optional pieces (NVIDIA driver, `amdgpu`,
 `perf`) and what each one unlocks.
 
 ## Install
 
-<Steps>
-  <Step title="Clone the repository">
-
 ```bash title="Terminal"
 git clone https://github.com/SharkEzz/llama-webui.git
 cd llama-webui
+pnpm install
 ```
 
-  </Step>
-  <Step title="Install the workspaces">
-
-```bash title="Terminal"
-bun install
-```
-
-This installs the workspaces declared in the root `package.json`: `packages/*` (`webui-shared`, `llamacpp-js`),
-`server` and `web`.
-
-  </Step>
-  <Step title="Install the website">
-
-The website (`site/`) is a standalone package with its own `bun.lock`, outside the workspaces. `bun run check` and
-`bun test` cover it too, so install it even if you only work on the app.
-
-```bash title="Terminal"
-cd site
-bun install
-cd ..
-```
-
-  </Step>
-</Steps>
+`pnpm install` installs the whole pnpm workspace, declared in `pnpm-workspace.yaml`: `packages/*` (`webui-shared`,
+`llamacpp-js`), `server`, `web` and the website, `site/`, all from one `pnpm-lock.yaml`. The same file holds the
+`catalog:` of the versions that move together (React, Vite, TypeScript, zod, the three runtime dependencies…): change
+a version there, not in a `package.json`. A dependency change commits its `pnpm-lock.yaml`; CI installs with
+`--frozen-lockfile`.
 
 ## Run llama-webui
-
-There is no build step in either mode: Bun runs the TypeScript sources directly. A third way, the standalone
-executable, is built with `bun run compile` (see [Standalone executable](#standalone-executable)).
 
 <Tabs>
   <Tab title="Development">
 
 ```bash title="Terminal"
-bun run dev
+pnpm dev
 ```
 
-`bun run dev` is `bun --hot server/index.ts`. The UI is served through the HTML import of `Bun.serve`
-(`web/index.html`) with hot module replacement, and the browser console is streamed to your terminal
-(`development: { hmr: true, console: true }` in `server/app.ts`). Saving a server file re-evaluates the server modules
-in place, without restarting the process or `llama-server`. It prints:
+`pnpm dev` is `node server/dev.ts`: one Node.js process, one port. Vite runs in middleware mode on the app's HTTP
+server and serves the UI with hot module replacement; its server-side module runner evaluates `server/index.ts`, and
+saving a file under `server/` or `packages/` evaluates it again in the same process, without restarting
+`llama-server`. It prints:
 
 ```text
 llama-webui on http://127.0.0.1:7860 (dev, HMR)
@@ -81,100 +57,114 @@ llama-webui on http://127.0.0.1:7860 (dev, HMR)
   <Tab title="Production">
 
 ```bash title="Terminal"
-bun run start
+pnpm start
 ```
 
-`bun run start` is `NODE_ENV=production bun server/index.ts`. At startup, `Bun.build` bundles the UI in memory,
-minified and split per page (`server/routes/web.ts`); there is no HMR and no hot reload. If the build fails, the API
-and the WebSocket still start and every page answers `503` with the build error.
+`pnpm start` is `pnpm build && node dist/server/main.js`. `vite build` writes the UI, split per page, to `dist/web`
+and the server, bundled into one file, to `dist/server/main.js`; the server reads `dist/web` into memory at startup
+and has no HMR and no reload. Without `dist/web`, every page answers `503` and the API and the WebSocket still work.
+It prints its version, `git describe --tags --always --dirty` at build time:
+
+```text
+llama-webui on http://127.0.0.1:7860 (v0.2.1-77-ge1dbe93)
+```
 
   </Tab>
 </Tabs>
 
-### Standalone executable
+Both accept the launch options (`--host`, `--port`, `--data-dir`, or their `LLAMA_WEBUI_*` variables), listed by
+`pnpm start --help` and documented in [Launch options](/docs/configuration/); a `.env` file in the clone is read too.
+Two habits keep development away from your everyday instance:
+
+- Use a separate data directory. `data/` and `*.sqlite` are ignored by Git, so `pnpm dev --data-dir ./data` keeps a
+  development database inside the clone.
+- Use another port if an instance already runs on 7860: `pnpm dev --port 7861`.
+
+`pnpm dev` keeps some state alive across reloads, and changes to those files need a full restart. Read
+[the development reload pitfall](/developers/architecture/#the-development-reload-pitfall) before changing the supervisor, the monitor,
+the collectors, the log ring or the bench gate.
+
+### The package
+
+A release is the npm package of the repository's root ([Distribution](/developers/architecture/#distribution)):
 
 ```bash title="Terminal"
-bun run compile                                   # dist/llama-webui, for this machine
-bun run compile --target bun-linux-arm64 --outfile dist/llama-webui-arm64
-bun scripts/smoke-binary.ts dist/llama-webui      # starts it and checks the UI it serves
+pnpm build                          # dist/server and dist/web
+node scripts/smoke.ts               # starts the build and checks the API, the UI and the WebSocket
+pnpm pack                           # llama-webui-<version>.tgz (refused without a build)
+node scripts/smoke.ts --tarball     # packs, installs with npm into an empty prefix, checks the installed command
 ```
 
-`scripts/compile.ts` builds one file holding the Bun runtime, the server and the UI, always in production mode: the
-UI is bundled and split per page at compile time and embedded, so the executable needs neither the sources nor
-`node_modules`. `--target` accepts the Linux targets of `bun build --compile`; arm64 is cross-compiled. It prints
-`llama-webui on http://127.0.0.1:7860 (standalone fa823b5)` when it starts: its version, also shown in the status bar,
-is `git describe --tags --always --dirty` at compile time (the tag, else the short commit hash; `--version <name>`
-overrides it). From source, the status bar shows `dev`.
-[Serving the UI](/developers/architecture/#serving-the-ui) explains what changes inside the executable.
-
-Both scripts accept the launch options (`--host`, `--port`, `--data-dir`, or their `LLAMA_WEBUI_*` variables), listed
-by `bun run start --help` and documented in [Launch options](/docs/configuration/). Two habits keep development away
-from your everyday instance:
-
-- Use a separate data directory. `data/` and `*.sqlite` are ignored by Git, so `bun run dev --data-dir ./data` keeps a
-  development database inside the clone.
-- Use another port if an instance already runs on 7860: `bun run dev --port 7861`.
-
-`bun --hot` keeps some state alive across reloads, and changes to those files need a full restart. Read
-[the `bun --hot` pitfall](/developers/architecture/#the-bun---hot-pitfall) before changing the supervisor, the monitor,
-the collectors, the log ring or the bench gate.
+To try the installed command by hand, install the tarball into a folder of its own rather than your global prefix:
+`npm install -g --prefix /tmp/lw ./llama-webui-<version>.tgz`, then `/tmp/lw/bin/llama-webui`.
 
 ## Scripts
 
-The root `package.json` defines every script. The `packages/*`, `server` and `web` workspaces have none.
+The root `package.json` defines the app's scripts; the website has its own, in `site/package.json`.
 
 | Script | Runs | What it does |
 | --- | --- | --- |
-| `bun run dev` | `bun --hot server/index.ts` | Development server with HMR and hot reload. |
-| `bun run start` | `NODE_ENV=production bun server/index.ts` | Production server, UI built in memory at startup. |
-| `bun run compile` | `bun scripts/compile.ts` | Standalone executable in `dist/llama-webui` (`--target`, `--outfile`, `--version`). |
-| `bun run release` | `bun scripts/release.ts` | Sets the version of every `package.json` before a release tag ([Releases](/developers/contributing/workflow/#releases)). |
-| `bun run check` | `bun check --no-script -b && bun run --cwd site typecheck` | Type checks every project the root `tsconfig.json` references (`packages/*`, `server/`, `scripts/`, `web/`, each with its own options: [Type checking](/developers/contributing/testing/#type-checking)), then the website. |
-| `bun run lint` | `biome check` | Format, lint and import order, read-only. |
-| `bun run lint:fix` | `biome check --write` | Applies Biome's safe fixes. |
-| `bun run format` | `biome format --write` | Formats only. |
-| `bun run test` | `bun test` | Runs every test file: `server/`, `packages/`, `web/` and `site/`. |
-| `bun run site:dev` | `bun run --cwd site dev` | Website dev server (Vite, HMR) on `0.0.0.0:5173`. |
-| `bun run site:build` | `bun run --cwd site build` | Prerenders the website into `site/dist/`. |
-| `bun run site:preview` | `bun run --cwd site preview` | Serves `site/dist/` the way GitHub Pages does, on port 4173. |
+| `pnpm dev` | `node server/dev.ts` | Development server: Vite middlewares with HMR, server modules reloaded in place. |
+| `pnpm build` | `vite build` | The UI in `dist/web`, the server in `dist/server/main.js`, the NVML sampler in `dist/server/nvml-worker.js`. |
+| `pnpm start` | `pnpm build && node dist/server/main.js` | Builds, then runs the production server. |
+| `pnpm test` | `pnpm test:unit && pnpm --filter llamacpp-js test` | Every Vitest project (`server` with `scripts/`, `shared`, `web`, `site`), then the `llamacpp-js` tests on `node --test`. |
+| `pnpm test:unit` | `vitest run` | The Vitest projects only. |
+| `pnpm check` | `tsc -b && pnpm --filter llama-webui-site typecheck` | Type checks every project the root `tsconfig.json` references (`packages/*`, `server/`, `scripts/`, `web/`, each with its own options: [Type checking](/developers/contributing/testing/#type-checking)), then the website. |
+| `pnpm lint` | `biome check` | Format, lint and import order, read-only. |
+| `pnpm lint:fix` | `biome check --write` | Applies Biome's safe fixes. |
+| `pnpm format` | `biome format --write` | Formats only. |
+| `pnpm release` | `node scripts/release.ts` | Sets the version of every `package.json` before a release tag ([Releases](/developers/contributing/workflow/#releases)). |
+| `pnpm site:dev` | `pnpm --filter llama-webui-site dev` | Website dev server (Vite, HMR) on `0.0.0.0:5173`. |
+| `pnpm site:build` | `pnpm --filter llama-webui-site build` | Prerenders the website into `site/dist/`. |
+| `pnpm site:preview` | `pnpm --filter llama-webui-site preview` | Serves `site/dist/` the way GitHub Pages does, on port 4173. |
 
-The website has more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typecheck`), run with
-`bun run --cwd site <script>`; [Docs, commits and PRs](/developers/contributing/workflow/) covers them.
+`pnpm pack` also runs `prepack` (`node scripts/prepack.ts`), which refuses to pack without a build. The website has
+more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typecheck`), run with
+`pnpm --dir site <script>`; [Docs, commits and PRs](/developers/contributing/workflow/) covers them.
 
 ## Repository layout
 
 <FileTree>
-- `server/` the Bun process (workspace `@llama-webui/server`)
-  - `index.ts` entry point: opens the database, builds the services, wires their events to the WebSocket
-  - `app.ts` `Bun.serve`: routes, `/ws`, health and settings
-  - `runtime.ts` state that survives `bun --hot` (supervisor, log ring, monitor, bench gate)
-  - `cli.ts` launch options and `--help`
-  - `paths.ts` data directory and database path
-  - `http.ts` `HttpError`, `guarded()`, JSON error responses
+- `server/` the Node.js process (workspace `@llama-webui/server`)
+  - `main.ts` production entry, bundled to `dist/server/main.js`
+  - `dev.ts` `pnpm dev`: Vite in middleware mode, the entry reloaded on every save
+  - `index.ts` builds an instance: opens the database, builds the services, mounts them, wires their events to the WebSocket
+  - `deps.ts` `createDeps()`: constructs the services and wires them together, without starting any work
+  - `host.ts` `mount()`: the `node:http` server's routing (`/api/*` to Hono, `/ws` to `ws`, the UI)
+  - `api.ts` `createApi()`: the Hono app of every `/api` route (health included)
+  - `rpc.ts` `AppType`, the API's route types for the web's typed client (`@llama-webui/server/api`, types only)
+  - `runtime.ts` state that survives a development reload (supervisor, log ring, monitor, bench gate)
+  - `cli.ts` launch options and `--help`; `env.ts` the `.env` file and the proxy variables
+  - `paths.ts` data directory and database path; `version.ts` the version the build sets
+  - `http.ts` `HttpError`, JSON error responses, the API's middlewares (guard, `405` table) and validators
+  - `proc.ts` child processes and file reads on `node:*` (`spawnProc`, `readText`, `fileExists`, `fileRange`, `which`)
+  - `llamaFetch.ts` `fetch` over `node:http` for the requests to llama-server that outlast `fetch`'s 300 s limits
   - `security.ts` the request guard (Host, Origin, JSON-only writes)
   - `setup.ts` first-run report and launch pad
   - `llamatui.ts` llama-tui config import
-  - `routes/` one module per API domain, plus `web.ts` for the production UI build and its shared bundler options
+  - `routes/` one module per API domain, plus `web.ts` for the UI (Vite in development, `dist/web` in production)
   - `supervisor/` the managed `llama-server`: command line, health, external server detection, `--help` flags
   - `monitor/` the sampling tick, history ring, model placement
-  - `collectors/` NVML (in `nvml/`, through `bun:ffi` in a worker), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
+  - `collectors/` NVML (in `nvml/`, through `node:ffi` in a child process), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
   - `chat/` server-owned chat generations
   - `bench/` the bench gate, runner, executor and output parsers
   - `tuning/` memory estimator, sweep space, system checks
   - `hf/` Hugging Face client and download queue
   - `models/` models folder scan and GGUF header reading
   - `hardware/` PCIe topology and CPU info from sysfs and `/proc`
-  - `db/` `bun:sqlite`: connection, migrations, one repository per table
+  - `db/` `node:sqlite` wrapper, connection, migrations, one repository per table
   - `logs/` the log ring buffer and line splitter
   - `ws/` the WebSocket hub
-  - `testing/` test helpers (`tempDir`)
+  - `testing/` test helpers (`tempDir`, `writeFileDeep`, `declarationImports`)
+  - `contract/` the HTTP contract suite: raw HTTP client, cases, golden record
 - `web/` the React app (workspace `@llama-webui/web`)
   - `index.html` HTML entry, applies the theme before the first paint
+  - `tsconfig.json` the app (DOM types only), `tsconfig.test.json` its tests (Node types)
   - `src/`
     - `main.tsx` starts the stores and the WebSocket, renders the router
     - `app/` router, layout, sidebar, status bar
     - `features/` one folder per page
-    - `lib/` API client, WebSocket client, zustand stores, formatting
+    - `lib/` typed API client, WebSocket client, zustand stores, formatting
     - `components/` shared components: `glass/`, `charts/`, and `ui/` (generated shadcn)
     - `index.css` Tailwind, theme tokens
 - `packages/` the monorepo's libraries, one folder per package
@@ -182,8 +172,8 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
     - `src/` one module per domain, re-exported by `index.ts`
   - `llamacpp-js/` the llama.cpp client: HTTP API, metrics, `--help`, `llama-bench` output (workspace `llamacpp-js`)
     - `src/` one module per subpath export, `node.ts` for the process and filesystem helpers
-    - `tests/` its tests (`node:test`), run by `bun test` and by Node (`test:node`)
-- `site/` this website (standalone package)
+    - `tests/` its tests (`node:test`), run by `node --test`
+- `site/` this website (workspace `llama-webui-site`)
   - `content/` the `.mdx` pages and `nav.ts`
   - `src/` routes, layout, docs components, landing page
   - `scripts/` build, preview, link check, demo seeding, screenshots
@@ -191,12 +181,13 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
 - `testdata/` captured outputs used by the tests
   - `fake/` stand-ins for `llama-server` and `llama-bench`, with their fixtures
   - `llama-bench/` `llama-bench` JSON, stderr and `--list-devices` captures
-- `scripts/` `compile.ts` (standalone executable), `smoke-binary.ts` (its smoke test) and `release.ts` (versions)
+- `scripts/` `smoke.ts` (the build and the tarball smoke tests), `prepack.ts` (no pack without a build), `release.ts` (versions), and the tests of the package and the repository
 - `docs/` README assets and design plans
-- `package.json` workspaces and scripts
-- `tsconfig.json` the project references type checked by `bun check -b`; `tsconfig.base.json` their shared options
+- `package.json` the published package (`bin`, `files`) and the scripts
+- `pnpm-workspace.yaml` the workspace, its `catalog:` and pnpm's settings
+- `vite.config.ts` the client and server builds; `vitest.config.ts` one Vitest project per code base
+- `tsconfig.json` the project references type checked by `tsc -b`; `tsconfig.base.json` their shared options
 - `biome.json` format and lint rules
-- `bunfig.toml` the Tailwind plugin for the HTML import
 </FileTree>
 
 The [Web app](/developers/frontend/) and [Shared package](/developers/shared/) pages describe `web/src/` and
@@ -209,15 +200,16 @@ still work. A few things help when you work on telemetry code:
 
 - The **collectors** switches in [Settings](/docs/settings/) turn NVML, the system sampler and the disk sampler on or
   off.
-- NVIDIA cards are read through NVML, with `nvidia-smi` as the fallback. `LLAMA_WEBUI_NVIDIA_SMI` overrides the
-  `nvidia-smi` binary the fallback runs, which lets you test it missing.
+- NVIDIA cards are read through NVML, with `nvidia-smi` as the fallback. `LLAMA_WEBUI_NVML_LIB` overrides the NVML
+  library the worker opens and `LLAMA_WEBUI_NVIDIA_SMI` the `nvidia-smi` binary the fallback runs, which lets you test
+  either one missing (`LLAMA_WEBUI_NVML_LIB=/nonexistent pnpm dev` reads NVIDIA cards through `nvidia-smi`).
 - Hardware parsers are tested against captured files in `testdata/` (`nvidia-gpu.csv`, `fdinfo-*.txt`,
   `metrics-*.txt`, `slots-*.json`…), so most collector changes can be covered by a test without the hardware.
 
 ## Without llama.cpp
 
 `testdata/fake/` holds two stand-ins that the tests launch instead of the real binaries. Each is a small shell
-wrapper that runs a TypeScript fake with `bun` (or `$BUN_PATH`):
+wrapper that runs a TypeScript fake with `node`:
 
 - `fake-llama-server` answers `--version`, listens on `127.0.0.1` at the `--port` it receives (8080 without one),
   returns `503` on `/health` while it "loads", then serves `/health`, `/slots`, `/metrics` and `/props` from the
@@ -265,12 +257,13 @@ Before you close a piece of work, commit, or open a pull request, these three co
 root, with zero errors and zero Biome warnings:
 
 ```bash title="Terminal"
-bun run lint
-bun run check
-bun test
+pnpm lint
+pnpm check
+pnpm test
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same commands, then builds the website and checks its links. Do not disable a
-Biome rule or lower it to a warning to get a green run: for a genuine false positive, add a targeted
+CI (`.github/workflows/ci.yml`) runs the same commands, then `pnpm build`, the two smoke tests, the website build and
+its link check, and runs the `llamacpp-js` tests again on Node 24, the package's minimum. Do not disable a Biome rule
+or lower it to a warning to get a green run: for a genuine false positive, add a targeted
 `// biome-ignore lint/<group>/<rule>: <reason>` comment. `web/src/components/ui/` (generated shadcn components) is
 ignored by Biome. [Conventions](/developers/contributing/conventions/) has the full rules.

@@ -1,6 +1,6 @@
-import type { Settings, ThemeMode } from '@llama-webui/shared';
+import type { ThemeMode } from '@llama-webui/shared';
 import { create } from 'zustand';
-import { api } from './api';
+import { call, client } from './api';
 
 const KEY = 'llama-webui:theme';
 const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -41,7 +41,7 @@ export const useTheme = create<ThemeState>((set) => {
     resolved: resolve(mode),
     setMode(next) {
       set({ mode: next, resolved: apply(next) });
-      api<Settings>('/settings', { method: 'PATCH', body: JSON.stringify({ theme: next }) }).catch(() => {});
+      call(client.settings.$patch({ json: { theme: next } })).catch(() => {});
     },
   };
 });
@@ -52,7 +52,7 @@ export function startThemeSync() {
     const { mode } = useTheme.getState();
     if (mode === 'system') useTheme.setState({ resolved: apply('system') });
   });
-  api<Settings>('/settings')
+  call(client.settings.$get())
     .then((s) => {
       if (s.theme !== useTheme.getState().mode) useTheme.setState({ mode: s.theme, resolved: apply(s.theme) });
     })

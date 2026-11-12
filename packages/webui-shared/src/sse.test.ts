@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { SseParser } from 'llamacpp-js/sse';
+import { expect, test } from 'vitest';
 import { formatSse } from './sse';
 
 test('formatSse writes one event the parser reads back', () => {

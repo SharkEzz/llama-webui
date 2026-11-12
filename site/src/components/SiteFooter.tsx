@@ -22,7 +22,7 @@ const COLUMNS = [
     title: 'Built on',
     links: [
       { label: 'llama.cpp', href: SITE.llamaCpp },
-      { label: 'Bun', href: 'https://bun.com' },
+      { label: 'Node.js', href: 'https://nodejs.org' },
     ],
   },
 ] as const;

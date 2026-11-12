@@ -1,4 +1,6 @@
-import { expect, test } from 'bun:test';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { expect, test } from 'vitest';
+import type { Spawn } from '../proc';
 import { MemBandwidthSampler, parsePerfLine } from './membw';
 
 test('parsePerfLine: perf stat CSV, unsupported counts', () => {
@@ -35,7 +37,7 @@ function fakePerf(
       },
     });
     return { stdout: stream, exited: Promise.resolve(0), kill: () => killed() };
-  }) as unknown as typeof Bun.spawn;
+  }) as unknown as Spawn;
   return { spawn, calls };
 }
 
@@ -51,7 +53,7 @@ test('MemBandwidthSampler: system read/write rates from per-interval CAS counts 
   const perf = fakePerf((argv) => (argv.includes('-a') ? SYS : []));
   using s = new MemBandwidthSampler({ spawn: perf.spawn, now: () => now });
   s.start();
-  await Bun.sleep(10);
+  await sleep(10);
   expect(perf.calls[0]).toEqual([
     'perf',
     'stat',
@@ -89,7 +91,7 @@ test('MemBandwidthSampler: perf missing or event unknown → unknown, retried on
   const dead = fakePerf(() => []);
   using d = new MemBandwidthSampler({ spawn: dead.spawn, now: () => now });
   d.start();
-  await Bun.sleep(10);
+  await sleep(10);
   expect(d.sample()).toBeNull();
   expect(d.sample()).toBeNull();
   expect(dead.calls).toHaveLength(1);
@@ -104,7 +106,7 @@ test('MemBandwidthSampler: one perf per followed PID, replaced when the PID chan
   using s = new MemBandwidthSampler({ spawn: perf.spawn, now: () => 0 });
   s.start();
   s.setPid(42);
-  await Bun.sleep(10);
+  await sleep(10);
   expect(perf.calls[1]).toEqual([
     'perf',
     'stat',
@@ -124,7 +126,7 @@ test('MemBandwidthSampler: one perf per followed PID, replaced when the PID chan
   expect(perf.calls).toHaveLength(2); // same PID: nothing relaunched
 
   s.setPid(7);
-  await Bun.sleep(10);
+  await sleep(10);
   expect(perf.calls).toHaveLength(3);
   expect(s.procSample()).toBeNull();
   s.setPid(7);
@@ -141,7 +143,7 @@ test('MemBandwidthSampler: a new interval restarts the streams with it', async (
   s.start();
   s.setPid(42);
   s.configure(500);
-  await Bun.sleep(10);
+  await sleep(10);
   expect(perf.calls).toHaveLength(4);
   expect(perf.calls[2]).toContain('500');
   expect(perf.calls[3]).toContain('500');
@@ -158,7 +160,7 @@ test('MemBandwidthSampler: a PID perf cannot attach to is not retried, even when
   for (let tick = 0; tick < 5; tick++) {
     s.setPid(7);
     expect(s.procSample()).toBeNull();
-    await Bun.sleep(5);
+    await sleep(5);
     now += 30_000;
   }
   expect(perf.calls.filter((c) => c.includes('-p'))).toHaveLength(1);
@@ -170,7 +172,7 @@ test('MemBandwidthSampler: system perf failing every time is retried once per de
   using s = new MemBandwidthSampler({ spawn: perf.spawn, now: () => now });
   s.start();
   for (let i = 0; i < 200; i++) {
-    await Bun.sleep(1);
+    await sleep(1);
     expect(s.sample()).toBeNull();
     now += 1000;
   }
@@ -187,7 +189,7 @@ test('MemBandwidthSampler: perf that dies after giving values is relaunched afte
   using s = new MemBandwidthSampler({ spawn: sysOnce.spawn, now: () => now });
   s.start();
   s.setPid(42);
-  await Bun.sleep(10);
+  await sleep(10);
   expect(s.sample()).toBeNull(); // dead: no stale values
   expect(s.procSample()).toBeNull();
   s.setPid(42);
@@ -196,5 +198,5 @@ test('MemBandwidthSampler: perf that dies after giving values is relaunched afte
   s.sample();
   s.setPid(42);
   expect(sysOnce.calls).toHaveLength(4);
-  await Bun.sleep(10);
+  await sleep(10);
 });

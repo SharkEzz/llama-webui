@@ -253,8 +253,8 @@ the event type, then one `data:` line with the whole `ChatEvent` as single-line 
 | `done`  | `{ type, message: ChatMessage }`                              | Last event: the reply as saved (`done`, `stopped` or `error`, with its `stats`). The server closes the stream right after. |
 
 Between events, the server writes a `: ping` comment every 15 seconds (`PING_MS = 15_000`): a long prompt can be
-processed for a while without any token. The route also lifts Bun's idle timeout for this request
-(`server.timeout(req, 0)`), which would otherwise drop a connection silent for 10 seconds.
+processed for a while without any token, and a proxy may drop a silent connection (Node's own server has no idle
+timeout).
 
 ### Replay then follow
 
@@ -277,7 +277,7 @@ Closing the stream never stops the reply. To get it back, the web app (`web/src/
 3. If the stream answers `204` (the reply ended in between) or ends without a `done` event, read
    `GET /api/chat/:id` again.
 
-A stream can end without `done` when Bun reloads or stops: `ChatRuns.dispose()` saves each running reply as `stopped`
+A stream can end without `done` when llama-webui reloads (in development) or stops: `ChatRuns.dispose()` saves each running reply as `stopped`
 and sends `done` to its subscribers first, but a killed process sends nothing. On the next start, a reply left
 `streaming` is marked `stopped` (`stopOrphans()`).
 

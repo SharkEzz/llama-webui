@@ -1,6 +1,7 @@
 import type { Profile } from '@llama-webui/shared';
+import type { InferRequestType } from 'hono/client';
 import { create } from 'zustand';
-import { api } from './api';
+import { byId, call, client } from './api';
 import { plural } from './format';
 
 interface ProfilesStore {
@@ -13,7 +14,7 @@ export const useProfiles = create<ProfilesStore>()((set) => ({
   profiles: [],
   loaded: false,
   async reload() {
-    const profiles = await api<Profile[]>('/profiles');
+    const profiles = await call(client.profiles.$get());
     set({ profiles, loaded: true });
   },
 }));
@@ -32,16 +33,18 @@ export interface LlamaTuiStatus {
   profileCount: number;
 }
 
-const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) });
+/** What `POST /api/profiles` accepts (the input of `ProfileInputSchema`). */
+export type NewProfile = InferRequestType<typeof client.profiles.$post>['json'];
 
-export const createProfile = (input: unknown) => api<Profile>('/profiles', { method: 'POST', ...json(input) });
+export const createProfile = (input: NewProfile) => call(client.profiles.$post({ json: input }));
+/** The server validates the body after finding the profile (404 first): it takes it as sent. */
 export const updateProfile = (id: number, input: unknown) =>
-  api<Profile>(`/profiles/${id}`, { method: 'PUT', ...json(input) });
-export const deleteProfile = (id: number) => api<void>(`/profiles/${id}`, { method: 'DELETE' });
-export const duplicateProfile = (id: number) => api<Profile>(`/profiles/${id}/duplicate`, { method: 'POST' });
-export const importProfiles = (raw: unknown) => api<ImportResult>('/profiles/import', { method: 'POST', ...json(raw) });
-export const llamaTuiStatus = () => api<LlamaTuiStatus>('/profiles/import/llama-tui');
-export const importLlamaTui = () => api<ImportResult>('/profiles/import/llama-tui', { method: 'POST' });
+  call(client.profiles[':id'].$put({ ...byId(id), json: input }));
+export const deleteProfile = (id: number) => call(client.profiles[':id'].$delete(byId(id)));
+export const duplicateProfile = (id: number) => call(client.profiles[':id'].duplicate.$post(byId(id)));
+export const importProfiles = (raw: unknown) => call(client.profiles.import.$post({ json: raw }));
+export const llamaTuiStatus = () => call(client.profiles.import['llama-tui'].$get());
+export const importLlamaTui = () => call(client.profiles.import['llama-tui'].$post());
 
 /** Import summary for a toast: “2 profiles imported, 1 skipped”. */
 export function importSummary(r: ImportResult): string {

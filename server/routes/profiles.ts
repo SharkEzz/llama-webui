@@ -1,8 +1,10 @@
-import { parseProfileImport } from '@llama-webui/shared';
+import { type ProfileInputSchema, parseProfileImport } from '@llama-webui/shared';
+import { Hono } from 'hono';
+import type { z } from 'zod';
 import type { ProfilesRepo } from '../db/profiles';
 import { toInput } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
-import { guarded, HttpError, idParam, notFound } from '../http';
+import { accepts, type Env, HttpError, id, json, notFound, passthrough } from '../http';
 import { readLlamaTuiProfiles } from '../llamatui';
 
 export interface ProfileRouteDeps {
@@ -36,25 +38,25 @@ export function profileRoutes(deps: ProfileRouteDeps) {
       throw notFound('Profile');
     })();
 
-  return {
-    '/api/profiles': {
-      GET: guarded(() => Response.json(profiles.list())),
-      POST: guarded(async (req) => Response.json(profiles.create(await req.json()), { status: 201 })),
-    },
-    '/api/profiles/export': {
-      GET: guarded(() => attachment('llama-webui-profiles.json', { profiles: profiles.list().map(toInput) })),
-    },
-    '/api/profiles/import': {
-      POST: guarded(async (req) => {
-        const parsed = parseProfileImport(await req.json());
+  // Static paths before `/api/profiles/:id` (Hono matches in registration order).
+  return (
+    new Hono<Env>()
+      .get('/api/profiles', (c) => c.json(profiles.list()))
+      // The repo validates (one parse of the schema, as for an import): the body is only declared here.
+      .post('/api/profiles', accepts<z.input<typeof ProfileInputSchema>>(), async (c) =>
+        c.json(profiles.create(await c.req.json()), 201),
+      )
+      .get('/api/profiles/export', () =>
+        attachment('llama-webui-profiles.json', { profiles: profiles.list().map(toInput) }),
+      )
+      .post('/api/profiles/import', json(passthrough), (c) => {
+        const parsed = parseProfileImport(c.req.valid('json'));
         const { imported, skipped } = profiles.importMany(parsed.profiles, 'import');
-        return Response.json({ imported, skipped: [...parsed.rejected, ...skipped] });
-      }),
-    },
-    '/api/profiles/import/llama-tui': {
-      GET: guarded(async () => {
+        return c.json({ imported, skipped: [...parsed.rejected, ...skipped] });
+      })
+      .get('/api/profiles/import/llama-tui', async (c) => {
         const cfg = await readLlamaTuiProfiles();
-        return Response.json({
+        return c.json({
           path: cfg.path,
           exists: cfg.exists,
           names: cfg.profiles.map((p) => p.name),
@@ -62,8 +64,8 @@ export function profileRoutes(deps: ProfileRouteDeps) {
           dismissed: settings.get().llamaTuiImportDismissed,
           profileCount: profiles.count(),
         });
-      }),
-      POST: guarded(async () => {
+      })
+      .post('/api/profiles/import/llama-tui', async (c) => {
         const cfg = await readLlamaTuiProfiles();
         if (!cfg.exists) throw new HttpError(404, `llama-tui config not found (${cfg.path})`);
         if (cfg.error) throw new HttpError(400, `Unreadable llama-tui config: ${cfg.error}`);
@@ -72,25 +74,23 @@ export function profileRoutes(deps: ProfileRouteDeps) {
           const def = profiles.list().find((p) => p.name === cfg.defaultProfile);
           if (def) settings.patch({ defaultProfileId: def.id });
         }
-        return Response.json({ imported, skipped: [...cfg.rejected, ...skipped] });
-      }),
-    },
-    '/api/profiles/:id': {
-      GET: guarded((req) => Response.json(mustGet(idParam(req, 'Profile')))),
-      PUT: guarded(async (req) => Response.json(profiles.update(idParam(req, 'Profile'), await req.json()))),
-      DELETE: guarded((req) => {
-        removeProfile(deps, idParam(req, 'Profile'));
-        return new Response(null, { status: 204 });
-      }),
-    },
-    '/api/profiles/:id/duplicate': {
-      POST: guarded((req) => Response.json(profiles.duplicate(idParam(req, 'Profile')), { status: 201 })),
-    },
-    '/api/profiles/:id/export': {
-      GET: guarded((req) => {
-        const p = mustGet(idParam(req, 'Profile'));
+        return c.json({ imported, skipped: [...cfg.rejected, ...skipped] });
+      })
+      .get('/api/profiles/:id', id('Profile'), (c) => c.json(mustGet(c.req.valid('param').id)))
+      // The repo looks the profile up before parsing the body (404 beats 400): the body is passed as sent.
+      .put('/api/profiles/:id', id('Profile'), json(passthrough), (c) =>
+        c.json(profiles.update(c.req.valid('param').id, c.req.valid('json'))),
+      )
+      .delete('/api/profiles/:id', id('Profile'), (c) => {
+        removeProfile(deps, c.req.valid('param').id);
+        return c.body(null, 204);
+      })
+      .post('/api/profiles/:id/duplicate', id('Profile'), (c) =>
+        c.json(profiles.duplicate(c.req.valid('param').id), 201),
+      )
+      .get('/api/profiles/:id/export', id('Profile'), (c) => {
+        const p = mustGet(c.req.valid('param').id);
         return attachment(`${p.name}.json`, toInput(p));
-      }),
-    },
-  };
+      })
+  );
 }

@@ -1,11 +1,12 @@
 /**
  * Renders the Open Graph image (public/og.png, 1200 × 630): wordmark, tagline and a slice of the Dashboard capture.
- * Run after recapturing the dashboard: `bun run og`.
+ * Run after recapturing the dashboard: `pnpm og`.
  */
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import puppeteer from 'puppeteer-core';
 
-const root = join(import.meta.dir, '..');
+const root = join(import.meta.dirname, '..');
 const font = join(root, 'node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2');
 const shot = join(root, 'public/screenshots/dashboard-dark.webp');
 const out = join(root, 'public/og.png');
@@ -44,7 +45,7 @@ h1 { position: absolute; left: 64px; top: 124px; width: 1000px; font-size: 62px;
 </body></html>`;
 
 const file = '/tmp/llama-webui-og.html';
-await Bun.write(file, html);
+writeFileSync(file, html);
 const browser = await puppeteer.launch({
   executablePath: '/usr/bin/chromium',
   args: ['--allow-file-access-from-files'],

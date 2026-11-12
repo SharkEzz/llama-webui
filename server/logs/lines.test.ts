@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { isIdleNoise } from './lines';
 
 test('the idle loop line of -lv 4 is noise, the request lines are not (#16)', () => {

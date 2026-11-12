@@ -1,6 +1,6 @@
 ---
 title: Supervisor
-description: How llama-webui starts, watches and stops llama-server, the state machine behind it, external server detection, and how it survives bun --hot.
+description: How llama-webui starts, watches and stops llama-server, the state machine behind it, external server detection, and how it survives a development reload.
 ---
 
 The supervisor owns the one `llama-server` process llama-webui manages: it builds the command line, spawns it, follows
@@ -55,7 +55,7 @@ when the launch itself failed (the process never ran).
 | From                   | Event                                                                     | To         |
 | ---------------------- | ------------------------------------------------------------------------- | ---------- |
 | `idle`, `crashed`      | `start()`: the process is spawned                                         | `starting` |
-| `idle`, `crashed`      | `start()`: the profile's `cwd` does not exist, or `Bun.spawn` throws      | `crashed` (with `message`) |
+| `idle`, `crashed`      | `start()`: the profile's `cwd` does not exist, or `spawnProc` throws      | `crashed` (with `message`) |
 | `idle`, `crashed`      | `start()`: something already answers on the profile's port               | `external` (and `start()` rejects) |
 | `idle`                 | the external watcher finds something answering on the settings port      | `external` |
 | `starting`             | `/health` answers `200`                                                   | `ready`    |
@@ -153,8 +153,10 @@ setting or the profile also stops `-lv 4` from being added.
 3. If something answers on `cmd.host`:`cmd.port`: when it is a `llama-server` (`probeLlamaServer()`), it switches to
    `external` and rejects with the same "port in use" error; any other service rejects with
    `port <port> is in use by another service`, the state unchanged.
-4. It records `cmd` as the last command, checks that `cmd.cwd` exists, and calls `Bun.spawn(cmd.argv, …)` with that
-   `cwd` and `env`, `stdin` ignored, `stdout` and `stderr` piped. A missing directory or a spawn error logs
+4. It records `cmd` as the last command, checks that `cmd.cwd` exists, and calls `spawnProc(cmd.argv, …)` with that
+   `cwd` and `env`, `stdin` ignored, `stdout` and `stderr` piped. `spawnProc` (`server/proc.ts`, on
+   `node:child_process`) throws at once when the process cannot start: `spawn <binary> ENOENT` for a missing binary,
+   `spawn <binary> EACCES` for a file that is not executable. A missing directory or a spawn error logs
    `[llama-webui] launch failed: …` and sets `crashed` with that message.
 5. It pushes the lines of `launchLines()` (`server/supervisor/args.ts`) to the log ring: the launch line,
    `LAUNCH_LOG_PREFIX` (`[llama-webui] launch:`) followed by `display`, then `P2P_LOG_LINE` when `GGML_CUDA_P2P` is in
@@ -196,7 +198,7 @@ sends `SIGTERM`, and waits for the process to exit for up to `killTimeoutMs` (5,
   stops the monitor, awaits `supervisor.stop()`, then calls `process.exit(0)`. `server/index.ts` prepends its own
   handler, which saves running chat replies first (see [Chat runs](/developers/server/chat/)).
 - On `exit`, it calls `killNow()`, a synchronous `SIGKILL` as a last resort.
-- If Bun is killed outright, `setpriv`'s parent-death signal takes care of `llama-server`.
+- If llama-webui is killed outright, `setpriv`'s parent-death signal takes care of `llama-server`.
 
 ## One operation at a time
 
@@ -209,7 +211,7 @@ operation in progress (`op`):
 
 Errors raised by the supervisor are `SupervisorError` instances (`name = 'SupervisorError'`). `server/routes/server.ts`
 turns them into `409` responses by checking `e.name`, not `instanceof`, for the reason given in
-[Surviving bun --hot](#surviving-bun---hot).
+[Surviving a development reload](#surviving-a-development-reload).
 
 ## External servers
 
@@ -267,9 +269,9 @@ to find the server to talk to, the bench gate, the external watcher, and the rou
 - `activeProfileId(supervisor)`: the profile of the managed server while it is `starting`, `ready` or `stopping`, else
   `null`. The profile routes use it to refuse deleting the running profile.
 
-## Surviving bun --hot
+## Surviving a development reload
 
-`bun run dev` re-evaluates the server modules on every save, and a code reload must neither kill nor orphan
+`pnpm dev` re-evaluates the server modules on every save (`server/dev.ts`), and a code reload must neither kill nor orphan
 `llama-server`. So `getRuntime()` keeps one `Runtime` on `globalThis.__llamaWebuiRuntime`:
 
 ```ts title="server/runtime.ts"
@@ -288,11 +290,12 @@ it as is. Consequences:
 - The supervisor, the log ring, the monitor and the bench gate are instances of the **first** version of their
   modules. Changes to `server/supervisor/supervisor.ts`, `server/logs/buffer.ts`, `server/bench/gate.ts`,
   `server/runtime.ts`, `server/monitor/**` (except `placement.ts`) or `server/collectors/**` only apply after stopping
-  Bun and running `bun run dev` again.
+  `pnpm dev` and running it again.
 - A `SupervisorError` thrown by the surviving instance is the old module's class, which fails `instanceof` against the
   new import. Compare `name` instead, as `errorResponse()` does for `HttpError` (`isHttpError()`).
-- Each evaluation of `server/index.ts` subscribes again, so it first calls `globalThis.__llamaWebuiDispose()`, left by
-  the previous evaluation, which unsubscribes the old listeners, clears its timers and closes its database handle.
+- Each evaluation of `server/index.ts` subscribes again, so once it has mounted the new instance it calls
+  `globalThis.__llamaWebuiDispose()`, left by the previous evaluation, which unsubscribes the old listeners, clears
+  its timers and closes its database handle.
 
 The other files of `server/supervisor/` hold plain functions. `args.ts`, `external.ts` and `flags.ts` are called from
 the routes and `server/index.ts`, so a reload picks up their changes. `supervisor.ts` also imports `llamacpp-js/client`
@@ -318,5 +321,5 @@ spawns its own `llama-server` (on `127.0.0.1` and the settings port), and `serve
 - While a benchmark runs, the server routes refuse every lifecycle call with `409 A benchmark is running`, and the
   external watcher is paused: the benchmark's own `llama-server` on the settings port is not an external server.
 
-The gate survives `bun --hot` so that a sweep continues in the new module without a restart of the server in between.
+The gate survives a development reload so that a sweep continues in the new module without a restart of the server in between.
 [Benchmarks and sweeps](/developers/server/bench/) covers the runner and the reload hand-over.

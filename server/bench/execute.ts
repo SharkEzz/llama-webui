@@ -16,6 +16,7 @@ import { benchBinary } from 'llamacpp-js/node';
 import type { BenchFinish } from '../db/benchRuns';
 import type { LogBuffer } from '../logs/buffer';
 import { LineSplitter } from '../logs/lines';
+import { fileExists, type Spawned, spawnProc } from '../proc';
 import { type BuiltCommand, binaryPath, buildCommand } from '../supervisor/args';
 import { benchFailure } from './parse';
 import { runServerTrial, TrialCancelled } from './server';
@@ -38,7 +39,7 @@ export interface ExecutorDeps {
 export type ExecResult = BenchFinish &
   Required<Pick<BenchFinish, 'status' | 'vramPeak' | 'logExcerpt' | 'durationMs' | 'diskReadPeakBps'>>;
 
-type Child = ReturnType<typeof Bun.spawn>;
+type Child = Spawned;
 
 interface Exec {
   run: BenchRun;
@@ -151,7 +152,7 @@ export class RunExecutor {
     let result: BenchFinish;
     try {
       this.setLive(ex, {});
-      if (!(await Bun.file(spec.modelPath).exists())) throw new Error(`Model not found: ${spec.modelPath}`);
+      if (!(await fileExists(spec.modelPath))) throw new Error(`Model not found: ${spec.modelPath}`);
       const { argv, cmd } = this.commandOf(spec);
       result = ex.cancelled
         ? { status: 'cancelled' }
@@ -187,7 +188,7 @@ export class RunExecutor {
     return true;
   }
 
-  /** Reload or Bun shutdown: immediate SIGKILL, resolved when the child exits. */
+  /** Reload or shutdown: immediate SIGKILL, resolved when the child exits. */
   async killNow(): Promise<void> {
     const ex = this.cur;
     if (!ex) return;
@@ -257,7 +258,7 @@ export class RunExecutor {
     let proc: Child;
     try {
       // Environment of the settings then of the source profile (CUDA_VISIBLE_DEVICES…: same cards as the server).
-      proc = Bun.spawn(argv, {
+      proc = spawnProc(argv, {
         env: { ...process.env, ...this.deps.settings().env, ...this.source(ex.spec)?.env },
         stdin: 'ignore',
         stdout: 'pipe',

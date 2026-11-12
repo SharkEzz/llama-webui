@@ -1,5 +1,5 @@
-import { afterAll, afterEach, expect, test } from 'bun:test';
 import { join, resolve } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import {
   type BenchLive,
   type BenchRun,
@@ -16,24 +16,26 @@ import {
   sweepCtx,
 } from '@llama-webui/shared';
 import { probeHealth } from 'llamacpp-js/client';
+import { afterAll, afterEach, expect, test } from 'vitest';
 import { BenchRunsRepo } from '../db/benchRuns';
 import { openDb } from '../db/open';
 import { SweepsRepo } from '../db/sweeps';
-import { HttpError } from '../http';
+import { errorResponse, HttpError } from '../http';
 import { LogBuffer } from '../logs/buffer';
 import { sweepRoutes } from '../routes/sweeps';
 import type { BuiltCommand } from '../supervisor/args';
 import { tempDir } from '../testing/tempDir';
+import { writeFileDeep } from '../testing/write';
 import { type ExecutorDeps, RunExecutor } from './execute';
 import { BenchGate, type ServerControl } from './gate';
 import { BenchRunner } from './runner';
 import { WARMUP_PROMPT } from './server';
 
-const FAKE = resolve(import.meta.dir, '../../testdata/fake/fake-llama-server');
+const FAKE = resolve(import.meta.dirname, '../../testdata/fake/fake-llama-server');
 const modelDir = tempDir('lw-bench-');
 afterAll(() => modelDir[Symbol.dispose]());
 const MODEL = join(modelDir.path, 'a.gguf');
-await Bun.write(MODEL, '');
+await writeFileDeep(MODEL, '');
 const cmdA = { display: 'cmdA', profileName: 'A', profileId: 1, port: 8080 } as BuiltCommand;
 
 afterEach(() => {
@@ -214,7 +216,7 @@ test('a reload while the server is stopping restarts it once the stop is over', 
   const run = await runner.start(spec, { stopServer: true });
   runner.dispose({ restart: true });
   release();
-  await Bun.sleep(50);
+  await sleep(50);
   expect(calls).toEqual(['stop', 'start:cmdA']);
   expect(repo.get(run.id)!.status).toBe('interrupted');
 });
@@ -317,7 +319,7 @@ test('cancelSweep cancels the queue and releases the gate', async () => {
   const { runner, calls, repo, sweeps, sweepLives, gate } = setup();
   const { sweep } = sweepOf(repo, sweeps, [1, 2, 3]);
   await runner.startSweep(sweep.id, { stopServer: true });
-  await Bun.sleep(100);
+  await sleep(100);
   expect(runner.cancelSweep(sweep.id)).toBe(true);
   await sweepEnd(sweepLives);
   expect(repo.list({ sweepId: sweep.id }).map((r) => r.status)).toEqual(['cancelled', 'cancelled', 'cancelled']);
@@ -331,14 +333,14 @@ test('after a reload the interrupted item is replayed only once the killed proce
   const first = setup();
   const { sweep } = sweepOf(first.repo, first.sweeps, [1, 2]);
   await first.runner.startSweep(sweep.id, { stopServer: true });
-  while (!first.runs.some((r) => r.status === 'running')) await Bun.sleep(10);
-  await Bun.sleep(80);
+  while (!first.runs.some((r) => r.status === 'running')) await sleep(10);
+  await sleep(80);
   // A killed process that is slow to exit (the driver frees its VRAM): replaying before that means two llama-bench on the same cards.
   const kill = first.executor.killNow.bind(first.executor);
   let exitedAt = 0;
   first.executor.killNow = async () => {
     await kill();
-    await Bun.sleep(300);
+    await sleep(300);
     exitedAt = Date.now();
   };
   first.runner.dispose({ restart: true });
@@ -349,7 +351,7 @@ test('after a reload the interrupted item is replayed only once the killed proce
     calls: first.calls,
   });
   await second.runner.resume();
-  while (!second.runs.some((r) => r.status === 'running')) await Bun.sleep(5);
+  while (!second.runs.some((r) => r.status === 'running')) await sleep(5);
   expect(exitedAt).toBeGreaterThan(0);
   await sweepEnd(second.sweepLives);
   expect(first.repo.list({ sweepId: sweep.id }).map((r) => r.status)).toEqual(['ok', 'ok']);
@@ -362,8 +364,8 @@ test('a reload hands the held gate to the next runner, which replays the interru
   const { sweep } = sweepOf(first.repo, first.sweeps, [1, 2, 3]);
   await first.runner.startSweep(sweep.id, { stopServer: true });
   // During item 2.
-  while (first.repo.list({ sweepId: sweep.id }).filter((r) => r.status === 'ok').length < 1) await Bun.sleep(10);
-  await Bun.sleep(80);
+  while (first.repo.list({ sweepId: sweep.id }).filter((r) => r.status === 'ok').length < 1) await sleep(10);
+  await sleep(80);
   first.runner.dispose({ restart: true });
   const second = setup(8080, undefined, undefined, {
     gate: first.gate,
@@ -402,7 +404,7 @@ test('validating an interrupted sweep also finishes its interrupted items', asyn
   const second = repo.list({ sweepId: sweep.id }).find((r) => r.sweepLabel === '-ncmoe 2')!;
   repo.finish(second.id, { status: 'interrupted', error: 'interrupted' });
   sweeps.setStatus(sweep.id, 'interrupted');
-  const routes = sweepRoutes({
+  const app = sweepRoutes({
     sweeps,
     benchRuns: repo,
     benchRunner: runner,
@@ -410,18 +412,15 @@ test('validating an interrupted sweep also finishes its interrupted items', asyn
     monitor: null!,
     hub: { broadcast() {} } as never,
   });
-  const req = Object.assign(
-    new Request(`http://127.0.0.1:7860/api/sweeps/${sweep.id}/validate`, {
+  app.onError((err) => errorResponse(err));
+  const req = () =>
+    app.request(`/api/sweeps/${sweep.id}/validate`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ n: 1, stopServer: true }),
-    }),
-    {
-      params: { id: String(sweep.id) },
-    },
-  );
-  expect((await routes['/api/sweeps/:id/validate'].POST(req as never, null as never))!.status).toBe(202);
-  while (sweeps.get(sweep.id)!.status === 'running') await Bun.sleep(10);
+    });
+  expect((await req()).status).toBe(202);
+  while (sweeps.get(sweep.id)!.status === 'running') await sleep(10);
   expect(repo.list({ sweepId: sweep.id }).filter((r) => r.status === 'interrupted')).toEqual([]);
   expect(sweeps.get(sweep.id)!.status).toBe('done');
 }, 20_000);
@@ -450,7 +449,7 @@ test('the VRAM sampler takes its last reading when the run ends, then stops', as
     expect(runs.at(-1)!.vramPeak).toEqual([{ key: 'g0', name: 'Fake GPU', mib: 2048 }]);
     // Released with the run: no reading afterwards (a leaked sampler would keep polling every SAMPLE_MS).
     const after = calls;
-    await Bun.sleep(1200);
+    await sleep(1200);
     expect(calls).toBe(after);
   }
 }, 20_000);
@@ -460,7 +459,7 @@ test('server validation runs get the sweep context when the profile sets no -c (
   const { sweep } = sweepOf(repo, sweeps, [1, 2]);
   await runner.startSweep(sweep.id, { stopServer: true });
   await sweepEnd(sweepLives);
-  const routes = sweepRoutes({
+  const app = sweepRoutes({
     sweeps,
     benchRuns: repo,
     benchRunner: runner,
@@ -468,16 +467,15 @@ test('server validation runs get the sweep context when the profile sets no -c (
     monitor: null!,
     hub: { broadcast() {} } as never,
   });
-  const req = Object.assign(
-    new Request(`http://127.0.0.1:7860/api/sweeps/${sweep.id}/validate`, {
+  app.onError((err) => errorResponse(err));
+  const req = () =>
+    app.request(`/api/sweeps/${sweep.id}/validate`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ n: 1, stopServer: true }),
-    }),
-    { params: { id: String(sweep.id) } },
-  );
-  expect((await routes['/api/sweeps/:id/validate'].POST(req as never, null as never))!.status).toBe(202);
-  while (sweeps.get(sweep.id)!.status === 'running') await Bun.sleep(10);
+    });
+  expect((await req()).status).toBe(202);
+  while (sweeps.get(sweep.id)!.status === 'running') await sleep(10);
   const validation = repo.list({ sweepId: sweep.id }).find((r) => r.kind === 'server')!;
   expect(ctxFromArgs(sweep.spec.serverArgs)).toBeUndefined();
   expect(ctxFromArgs(validation.spec.serverArgs)).toBe(sweepCtx(sweep.spec));
@@ -492,7 +490,7 @@ test('resuming a sweep whose model was deleted is one 400, before anything stops
     { spec: { ...spec, modelPath: '/nulle/part.gguf', r: 1 } as BenchSpec, label: 'x', fit: 'fits' },
   ]);
   sweeps.setStatus(sw.id, 'interrupted');
-  const routes = sweepRoutes({
+  const app = sweepRoutes({
     sweeps,
     benchRuns: repo,
     benchRunner: runner,
@@ -500,15 +498,14 @@ test('resuming a sweep whose model was deleted is one 400, before anything stops
     monitor: null!,
     hub: { broadcast() {} } as never,
   });
-  const req = Object.assign(
-    new Request(`http://127.0.0.1:7860/api/sweeps/${sw.id}/resume`, {
+  app.onError((err) => errorResponse(err));
+  const req = () =>
+    app.request(`/api/sweeps/${sw.id}/resume`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ stopServer: true }),
-    }),
-    { params: { id: String(sw.id) } },
-  );
-  const res = (await routes['/api/sweeps/:id/resume'].POST(req as never, null as never))!;
+    });
+  const res = await req();
   expect(res.status).toBe(400);
   expect(((await res.json()) as { error: string }).error).toBe('Model not found: /nulle/part.gguf');
   expect(calls).toEqual([]);

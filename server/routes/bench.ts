@@ -11,6 +11,7 @@ import {
   sweepCtx,
   withCtx,
 } from '@llama-webui/shared';
+import { Hono } from 'hono';
 import { benchBinary } from 'llamacpp-js/node';
 import { listDevices } from '../bench/hardware';
 import type { BenchRunner } from '../bench/runner';
@@ -18,7 +19,7 @@ import { type BenchRunsRepo, MAX_RUNS } from '../db/benchRuns';
 import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
 import type { SweepsRepo } from '../db/sweeps';
-import { guarded, HttpError, idParam, jsonObject, notFound } from '../http';
+import { type Env, HttpError, id, json, notFound, object, query } from '../http';
 import { binaryPath, profilePaths } from '../supervisor/args';
 import type { WsHub } from '../ws/hub';
 
@@ -44,10 +45,11 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
     return name;
   };
 
-  return {
-    '/api/bench/runs': {
-      GET: guarded((req) => {
-        const q = new URL(req.url).searchParams;
+  // Static paths before `/api/bench/:id` (Hono matches in registration order).
+  return (
+    new Hono<Env>()
+      .get('/api/bench/runs', query('kind', 'status', 'sweep', 'limit', 'model'), (c) => {
+        const q = new URL(c.req.url).searchParams;
         const kind = q.get('kind');
         const status = q.get('status');
         const sweep = q.get('sweep');
@@ -60,40 +62,24 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
           sweepId: sweep === 'all' ? 'all' : sweep && /^\d+$/.test(sweep) ? Number(sweep) : 'none',
           limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, MAX_RUNS) : undefined,
         });
-        return Response.json({ runs, live: benchRunner.live });
-      }),
-      DELETE: guarded((req) => {
-        if (new URL(req.url).searchParams.get('failed') !== '1') throw new HttpError(400, '?failed=1 expected');
+        return c.json({ runs, live: benchRunner.live });
+      })
+      .delete('/api/bench/runs', query('failed'), (c) => {
+        if (new URL(c.req.url).searchParams.get('failed') !== '1') throw new HttpError(400, '?failed=1 expected');
         const ids = benchRuns.deleteFailed();
         if (ids.length > 0) hub.broadcast({ type: 'bench-deleted', payload: { ids } });
-        return Response.json({ deleted: ids.length });
-      }),
-    },
-    '/api/bench/run': {
-      POST: guarded(async (req) => {
-        const body = await jsonObject(req);
+        return c.json({ deleted: ids.length });
+      })
+      // The spec is a field of the body: its errors keep their paths (`kind`, not `spec.kind`).
+      .post('/api/bench/run', json(object), async (c) => {
+        const body = c.req.valid('json');
         const spec = BenchSpecSchema.parse(body.spec);
         const run = await benchRunner.start(spec, { stopServer: body.stopServer === true });
-        return Response.json(run, { status: 202 });
-      }),
-    },
-    '/api/bench/devices': {
-      GET: guarded(async () => Response.json(await listDevices(benchBinary(binaryPath(settings.get()))))),
-    },
-    '/api/bench/:id': {
-      DELETE: guarded((req) => {
-        const id = idParam(req, 'Run');
-        const run = benchRuns.get(id);
-        if (!run) throw notFound('Run');
-        if (run.status === 'running') throw new HttpError(409, 'This run is still running: cancel it first');
-        benchRuns.delete(id);
-        hub.broadcast({ type: 'bench-deleted', payload: { ids: [id] } });
-        return new Response(null, { status: 204 });
-      }),
-    },
-    '/api/bench/from-profile/:id': {
-      GET: guarded((req) => {
-        const profile = profiles.get(idParam(req, 'Profile'));
+        return c.json(run, 202);
+      })
+      .get('/api/bench/devices', async (c) => c.json(await listDevices(benchBinary(binaryPath(settings.get())))))
+      .get('/api/bench/from-profile/:id', id('Profile'), (c) => {
+        const profile = profiles.get(c.req.valid('param').id);
         if (!profile) throw notFound('Profile');
         const paths = profilePaths(profile, home);
         const { params, rest } = paramsFromServerArgs(profile.args);
@@ -104,12 +90,19 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
           params,
           serverArgs: rest,
         };
-        return Response.json(draft);
-      }),
-    },
-    '/api/bench/:id/to-profile': {
-      POST: guarded((req) => {
-        const run = benchRuns.get(idParam(req, 'Run'));
+        return c.json(draft);
+      })
+      .delete('/api/bench/:id', id('Run'), (c) => {
+        const { id } = c.req.valid('param');
+        const run = benchRuns.get(id);
+        if (!run) throw notFound('Run');
+        if (run.status === 'running') throw new HttpError(409, 'This run is still running: cancel it first');
+        benchRuns.delete(id);
+        hub.broadcast({ type: 'bench-deleted', payload: { ids: [id] } });
+        return c.body(null, 204);
+      })
+      .post('/api/bench/:id/to-profile', id('Run'), (c) => {
+        const run = benchRuns.get(c.req.valid('param').id);
         if (!run) throw notFound('Run');
         if (run.status === 'running') throw new HttpError(409, 'This run is still running');
         const { spec } = run;
@@ -129,15 +122,11 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
           args: [...serverArgs(spec.params), ...withCtx(spec.serverArgs, sweep ? sweepCtx(sweep.spec) : null)],
           env: origin?.env ?? {},
         });
-        return Response.json(profile, { status: 201 });
-      }),
-    },
-    '/api/bench/:id/cancel': {
-      POST: guarded((req) => {
-        const id = idParam(req, 'Run');
-        if (!benchRunner.cancel(id)) throw new HttpError(409, 'This run is not running');
-        return new Response(null, { status: 204 });
-      }),
-    },
-  };
+        return c.json(profile, 201);
+      })
+      .post('/api/bench/:id/cancel', id('Run'), (c) => {
+        if (!benchRunner.cancel(c.req.valid('param').id)) throw new HttpError(409, 'This run is not running');
+        return c.body(null, 204);
+      })
+  );
 }

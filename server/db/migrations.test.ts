@@ -1,8 +1,8 @@
-import { Database } from 'bun:sqlite';
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { MIGRATIONS, runMigrations } from './migrations';
 import { openDb } from './open';
 import { ProfilesRepo } from './profiles';
+import { Database } from './sqlite';
 
 const profile = (name: string) => ({ name, model: `/m/${name}.gguf`, args: [], env: {} });
 

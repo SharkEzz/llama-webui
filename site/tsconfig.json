@@ -10,7 +10,7 @@
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "types": ["bun", "vite/client"],
+    "types": ["node", "vite/client"],
     "rootDirs": [".", "./.react-router/types"],
     "skipLibCheck": true,
     "strict": true,

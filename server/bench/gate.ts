@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { defer, type ServerState } from '@llama-webui/shared';
 import { HttpError } from '../http';
 import type { LogBuffer } from '../logs/buffer';
@@ -25,8 +26,8 @@ const POLL_MS = 100;
 /**
  * The server gate during benchmarks: a single holder (one-off run or sweep), the managed server stopped once on
  * acquire and restarted once on release, the external server detector paused while it is held.
- * Lives in the runtime (survives `bun --hot`): the runner is recreated on every reload, the gate is not, so a
- * sweep resumes in the new module without restarting the server in between. Changing this file requires restarting Bun.
+ * Lives in the runtime (survives a development reload): the runner is recreated on every reload, the gate is not, so a
+ * sweep resumes in the new module without restarting the server in between. Changing this file requires restarting `pnpm dev`.
  */
 export class BenchGate {
   private holding = false;
@@ -64,7 +65,7 @@ export class BenchGate {
       const deadline = Date.now() + (this.deps.stoppingTimeoutMs ?? 60_000);
       while (server.state.kind === 'stopping') {
         if (Date.now() > deadline) throw new HttpError(409, 'llama-server is taking too long to stop: try again');
-        await Bun.sleep(POLL_MS);
+        await sleep(POLL_MS);
       }
       const s = server.state;
       if (s.kind === 'external')
@@ -144,7 +145,7 @@ export class BenchGate {
     const token = { cancelled: false, settled };
     this.pending = token;
     void settled
-      .then(() => Bun.sleep(this.deps.adoptGraceMs ?? 3000))
+      .then(() => sleep(this.deps.adoptGraceMs ?? 3000))
       .then(() => {
         if (token.cancelled || this.pending !== token) return;
         this.pending = null;

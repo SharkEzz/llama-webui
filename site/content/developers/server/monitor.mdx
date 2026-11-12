@@ -16,7 +16,7 @@ lives in `server/monitor/`, the readers of each data source in `server/collector
 | `server/collectors/registry.ts`    | `Collectors`: creates the collectors and follows the settings.                               |
 | `server/collectors/needs.ts`       | `GpuNeeds`: what the GPU readers must read.                                                  |
 | `llamacpp-js/client`, `llamacpp-js/metrics` | `fetchLlama()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)). |
-| `server/collectors/nvml/`          | NVIDIA through NVML (`bun:ffi`) in a Worker.                                                 |
+| `server/collectors/nvml/`          | NVIDIA through NVML (`node:ffi`) in a child process (`nvml/sampler.ts`).                     |
 | `server/collectors/nvidia.ts`      | `NvidiaMonitor`, the `nvidia-smi` fallback.                                                  |
 | `server/collectors/amdgpu.ts`      | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                          |
 | `server/collectors/gpu.ts`         | Shared GPU helpers: `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`.              |
@@ -33,8 +33,8 @@ The user-facing pages are the [Dashboard](/docs/dashboard/), [System](/docs/syst
 
 `startMonitor(runtime, settings)` (`server/runtime.ts`) creates the monitor once per process with
 `Monitor.start()`, which starts the collectors, runs a first tick at once, then one every `pollIntervalMs`
-(1,000 ms by default, at least 250 ms). The `Monitor` lives in the runtime, so it survives `bun --hot`: a change to
-`server/monitor/**` (except `placement.ts`) or `server/collectors/**` needs a full restart of Bun.
+(1,000 ms by default, at least 250 ms). The `Monitor` lives in the runtime, so it survives a development reload: a
+change to `server/monitor/**` (except `placement.ts`) or `server/collectors/**` needs a restart of `pnpm dev`.
 
 A tick that is still running when the next one is due makes that one skip (`inFlight`), so a slow source never
 stacks ticks. `tick()` catches everything: an error is logged as `[llama-webui] monitoring tick:` and the next tick
@@ -105,7 +105,8 @@ export const historyPoints = (historySeconds: number, intervalMs: number) =>
 
 With the defaults (`historySeconds = 300`, `pollIntervalMs = 1000`) a series holds 300 points. The settings schema
 bounds `historySeconds` to 30 to 1,800 and `pollIntervalMs` to at least 250, so a series holds at most 7,200 points.
-The history is only in memory: it survives `bun --hot` with the monitor, and is lost when Bun stops.
+The history is only in memory: it survives a development reload with the monitor, and is lost when
+llama-webui stops.
 
 The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`):
 
@@ -168,18 +169,35 @@ managed server always has these endpoints, since `buildCommand()` adds `--metric
 
 ### NVIDIA through NVML
 
-`nvml/worker.ts` runs the sampling loop in a Bun `Worker`, because reading the PCIe throughput counters blocks about
-50 ms per GPU. It opens `libnvidia-ml.so.1` with `bun:ffi` (`nvml/symbols.ts`), calls `nvmlInit_v2`, then posts one
+`nvml/worker.ts` runs the sampling loop off the server's thread, because reading the PCIe throughput counters blocks
+about 50 ms per GPU. It runs in a child process (`sampler()`, `nvml/sampler.ts`: `fork()` with an IPC channel), not
+a worker thread: Node's exit waits for every thread, so one stuck in an NVML call (a driver fault) would hold the
+server forever, Ctrl-C included, while a child process is killed (`SIGKILL`) whatever it is doing. It opens `libnvidia-ml.so.1` (or `$LLAMA_WEBUI_NVML_LIB` when set,
+to test the library missing) with `dlopen()` from `node:ffi` (`nvml/symbols.ts`), calls `nvmlInit_v2`, then posts one
 `sample` per interval (100 ms at least). The protocol:
 
-| Direction       | Message                                          |
-| --------------- | ------------------------------------------------ |
-| main to worker  | `{ type: 'start', intervalMs, needs }`, then `{ type: 'configure', intervalMs, needs }` |
-| worker to main  | `{ type: 'ready' }`, `{ type: 'error', message }`, `{ type: 'sample', snapshot }`       |
+| Direction         | Message                                          |
+| ----------------- | ------------------------------------------------ |
+| server to sampler | `{ type: 'start', intervalMs, needs, lib? }`, then `{ type: 'configure', intervalMs, needs }` |
+| sampler to server | `{ type: 'ready' }`, `{ type: 'error', message }`, `{ type: 'sample', snapshot }`       |
 
 `readNvml()` (`nvml/read.ts`) reads, per card: name, UUID, bus ID, utilization, memory utilization, VRAM, temperature,
 power and power limits, persistence mode, clocks, fan, current and maximum PCIe link, PCIe throughput, the compute
-processes, and the driver and CUDA driver versions.
+processes, and the driver and CUDA driver versions. Device handles are pointers, kept as `bigint`; out-parameters are
+`Buffer`s. The typed `dlopen()` checks the `NvmlSymbols` interface against the symbol definitions.
+
+`node:ffi` is experimental in Node 26: the sampler starts with `--disable-warning=ExperimentalWarning`, so its warning
+does not print on every start. `workerUrl()` (`nvml/monitor.ts`) finds its module next to the one that starts it:
+
+| Run                        | Sampler                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------- |
+| `pnpm dev`, tests          | `nvml/worker.ts`, run as is by Node (type stripping: its imports keep their `.ts` extension) |
+| `node dist/server/main.js` | `dist/server/nvml-worker.js`, built by the `nvml` environment of `vite.config.ts`        |
+
+The child and its channel are `unref()`'d: they never keep the server alive. `stop()` kills the child, a sampler that
+cannot load or crashes exits (the same failure as an `error`: `null` at startup, cleared readings later), and a
+sampler whose server is gone, even killed, exits on the channel's `disconnect`. It costs a process of its own, about
+116 MiB of RSS with NVML loaded.
 
 On the main side, `NvmlMonitor.start()` resolves `null` when the worker reports an error or is not ready within
 3 seconds, and `Collectors` falls back to `nvidia-smi`. A sample older than three intervals is ignored: a worker stuck
@@ -302,7 +320,7 @@ An external server has no placement: it writes nothing to the ring.
    `collectors` (`packages/webui-shared/src/settings.ts`) controls it.
 4. Call it from `Monitor.doTick()` or `sampleMachine()`, push its series with `push()` or `known()`, and put its value
    in the snapshot.
-5. Stop Bun and run `bun run dev` again: the monitor does not reload.
+5. Stop `pnpm dev` and run it again: the monitor does not reload.
 
 The pages that show the new figure ([System](/docs/system/), [Dashboard](/docs/dashboard/)) change in the same pull
 request, with this page. See also [How-to guides](/developers/contributing/how-to/).

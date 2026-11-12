@@ -3,12 +3,13 @@ title: Database
 description: The SQLite database behind llama-webui, where it lives, its pragmas, the append-only migrations, the repositories, settings storage and the GGUF cache.
 ---
 
-llama-webui stores everything that must outlive a restart in one SQLite database, opened with `bun:sqlite`. The code
-lives in `server/db/`: `open.ts` opens the file, `migrations.ts` creates and evolves the schema, and one repository
-class per table (or pair of tables) reads and writes it.
+llama-webui stores everything that must outlive a restart in one SQLite database, opened with `node:sqlite` through a
+small wrapper. The code lives in `server/db/`: `sqlite.ts` wraps the driver, `open.ts` opens the file, `migrations.ts`
+creates and evolves the schema, and one repository class per table (or pair of tables) reads and writes it.
 
 | File                          | Role                                                                          |
 | ----------------------------- | ----------------------------------------------------------------------------- |
+| `server/db/sqlite.ts`         | `Database`: the wrapper around `node:sqlite` that every repository takes.     |
 | `server/db/open.ts`           | `openDb(path)`: opens the file, sets the pragmas, runs the migrations.        |
 | `server/db/migrations.ts`     | `MIGRATIONS` and `runMigrations()`.                                           |
 | `server/db/settings.ts`       | `SettingsRepo`: the `settings` table.                                         |
@@ -55,8 +56,33 @@ export function openDb(path: string): Database {
   and `ON DELETE SET NULL` (see [Tables](#tables)).
 
 The database handle is not kept in the runtime. `server/index.ts` opens it on each evaluation and closes it in its
-dispose function, so a `bun --hot` reload closes the old handle and opens a new one, which also runs any new
+dispose function, so a development reload closes the old handle and opens a new one, which also runs any new
 migration. Tests open a migrated database in memory with `openDb(':memory:')`.
+
+## The `Database` wrapper
+
+`Database` (`server/db/sqlite.ts`) wraps `DatabaseSync` from `node:sqlite` with the surface the repositories were
+written against, where it differs from `DatabaseSync`:
+
+| Call                             | Behaviour                                                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `query<Row, Params>(sql)`        | A statement cached by its SQL text, with `get()`, `all()` and `run()`. `get()` returns `null` when no row matches. |
+| `prepare<Row, Params>(sql)`      | The same, without the cache (a statement reused in a loop).                                                     |
+| `run(sql, params?)`              | `{ changes, lastInsertRowid }`. Without parameters, `sql` may hold several statements.                         |
+| `transaction(fn)`                | Returns a function that runs `fn` in a transaction and returns its value; nested, it uses a savepoint.         |
+| `close()`, `using`               | Closes the handle; a second `close()` does nothing.                                                            |
+
+- Values: an integral number binds as `INTEGER` (`node:sqlite` alone binds every number as `REAL`), `true` and `false`
+  as `1` and `0`, `undefined` as `NULL`. A statement given more or fewer values than it has `?` placeholders throws
+  `SQLite query expected N values, received M` (`node:sqlite` alone would bind the missing ones as `NULL`). Only
+  positional `?` placeholders are supported.
+- A transaction whose function throws is rolled back and the error rethrown; when SQLite has already rolled back
+  itself (an `OR ROLLBACK` conflict), the original error is the one thrown.
+- Foreign keys are off on a new handle; `openDb()` turns them on. `{ readonly: true }` opens a
+  file read-only.
+- Rows are objects without a prototype: compare them with `toEqual`, not `instanceof Object`.
+
+`server/db/sqlite.test.ts` covers each of these points.
 
 ## Migrations
 
@@ -94,7 +120,7 @@ already broken. `runMigrations(db, upTo)` stops at version `upTo`: tests use it 
    other tables reference the one rebuilt (entries 10 to 14, for `bench_runs`, predate it).
 4. Update the repository that owns the table, and its tests.
 
-The migration runs at the next start, or at the next `bun --hot` reload in development.
+The migration runs at the next start, or at the next reload in development (`pnpm dev`).
 
 ## Tables
 
@@ -151,14 +177,14 @@ routes. They convert rows to the shared types (`Profile`, `Conversation`, `ChatM
 
 ### Interrupted work at startup
 
-A row can be left in a running state if Bun was killed. On startup `server/index.ts` resets them:
+A row can be left in a running state if llama-webui was killed. On startup `server/index.ts` resets them:
 
 - `ConversationsRepo.stopOrphans()`: messages left `streaming` become `stopped`.
 - `BenchRunsRepo.stopOrphans()`: runs left `running` become `interrupted`, with the error
   `interrupted (llama-webui stopped)` unless they had one.
 - `SweepsRepo.stopOrphans()`: sweeps left `running` become `interrupted` (the Sweeps page offers to resume them).
 
-The bench and sweep resets are skipped when the bench gate is still held, which only happens on a `bun --hot` reload:
+The bench and sweep resets are skipped when the bench gate is still held, which only happens on a development reload:
 the sweep then continues in the new module (see [Benchmarks and sweeps](/developers/server/bench/)). Downloads left
 `downloading` are resumed by the download queue rather than reset.
 

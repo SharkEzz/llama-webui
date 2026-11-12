@@ -8,26 +8,27 @@ its database. Everything else is changed from the [Settings](/docs/settings/) pa
 
 ## Flags and environment variables
 
-Each flag has an environment variable. Pass flags after `llama-webui` (the executable), or after `bun run start` (or
-`bun run dev`) from source:
+Each flag has an environment variable. Pass flags after `llama-webui`, or after `pnpm start` (or `pnpm dev`) from a
+clone:
 
-| Flag                | Environment variable   | Default                                                         | Effect                                                                                        |
-| ------------------- | ---------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `--host <address>`  | `LLAMA_WEBUI_HOST`     | `127.0.0.1`                                                     | Address the interface, API and WebSocket listen on. `0.0.0.0` listens on every interface.     |
-| `--port <port>`     | `LLAMA_WEBUI_PORT`     | `7860`                                                          | HTTP port of the interface, API and WebSocket: an integer from 1 to 65535.                    |
-| `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR` | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` | Folder of the database (see [Data directory](#data-directory)).                              |
-| `-h`, `--help`      |                        |                                                                 | Prints the help and exits.                                                                    |
+| Flag                | Environment variable       | Default                                                         | Effect                                                                                    |
+| ------------------- | -------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `--host <address>`  | `LLAMA_WEBUI_HOST`         | `127.0.0.1`                                                     | Address the interface, API and WebSocket listen on. `0.0.0.0` listens on every interface. |
+| `--port <port>`     | `LLAMA_WEBUI_PORT`         | `7860`                                                          | HTTP port of the interface, API and WebSocket: an integer from 1 to 65535.                |
+| `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR`     | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` | Folder of the database (see [Data directory](#data-directory)).                           |
+| `--env-override`    | `LLAMA_WEBUI_ENV_OVERRIDE` | off                                                             | Lets the `.env` file replace the variables the environment already sets (see below).      |
+| `-h`, `--help`      |                            |                                                                 | Prints the help and exits.                                                                |
 
 ```bash title="Terminal"
 llama-webui --host 0.0.0.0 --port 8080
 # Same thing with environment variables
 LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 llama-webui
-# From source
-bun run start --host 0.0.0.0 --port 8080
+# From a clone
+pnpm start --host 0.0.0.0 --port 8080
 ```
 
-Both `--port 8080` and `--port=8080` work. Once listening, llama-webui prints the address to open, for example
-`llama-webui on http://127.0.0.1:7860`.
+Both `--port 8080` and `--port=8080` work. Once listening, llama-webui prints the address to open, followed by its
+version, for example `llama-webui on http://127.0.0.1:7860 (v0.2.1)`.
 
 <Callout type="warning" title="Before using --host 0.0.0.0">
 
@@ -44,6 +45,15 @@ For each option, llama-webui takes the first value it finds:
 2. the environment variable (an empty variable counts as unset);
 3. the default.
 
+A `.env` file in the folder llama-webui starts from (the current folder, or the clone with `pnpm start` or `pnpm dev`)
+is loaded at startup:
+its variables fill what the environment does not set. With `--env-override`, or `LLAMA_WEBUI_ENV_OVERRIDE=1` (or
+`true`) set in the environment or in the `.env` itself, they also replace the variables the environment already sets.
+A command-line option still wins over both.
+
+Only `.env` is read: a `.env.local` or a per-mode file such as `.env.production` is not. Values are taken as written,
+so a `$VAR` reference is not expanded.
+
 ### Invalid options
 
 An unknown option, a missing value, an empty value (`--host=`), an extra argument or a port outside 1 to 65535 stops
@@ -55,13 +65,15 @@ llama-webui: invalid --port: “70000” (integer from 1 to 65535)
 
 ### The help
 
-`llama-webui --help` prints:
+`llama-webui --help` (or `pnpm start --help`) prints:
 
 ```text
-llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Bun process).
+llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Node.js process).
 
 Usage:
-  llama-webui [options]
+  llama-webui [options]   installed package (npm install -g llama-webui-<version>.tgz)
+  pnpm dev [options]      development (Vite, HMR), from the repository
+  pnpm start [options]    production (builds, then runs dist/server/main.js), from the repository
 
 Options:
   --host <address>       listen address (default: 127.0.0.1); 0.0.0.0 to open it to the local network
@@ -72,6 +84,9 @@ Options:
   --data-dir <path>      data directory (SQLite database); default: $XDG_DATA_HOME/llama-webui,
                          else ~/.local/share/llama-webui
                          env: LLAMA_WEBUI_DATA_DIR
+  --env-override         let .env (working directory, loaded at startup) replace the variables the environment
+                         already sets; without it, .env only fills those it does not set
+                         env: LLAMA_WEBUI_ENV_OVERRIDE=1 (in the environment or in .env)
   -h, --help             show this help
 
 A flag takes precedence over the matching environment variable.
@@ -81,18 +96,13 @@ Hugging Face downloads (Models page):
                          saved by `hf auth login` is used (HF_TOKEN_PATH, else $HF_HOME/token,
                          default ~/.cache/huggingface/token)
   HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
+  HTTPS_PROXY, HTTP_PROXY, NO_PROXY
+                         proxy for the requests to Hugging Face; localhost and loopback addresses are
+                         never proxied
 ```
 
-From source, `bun run start --help` prints the same text, with these usage lines instead:
-
-```text
-Usage:
-  bun run dev [options]      development (bun --hot, HMR)
-  bun run start [options]    production
-```
-
-`bun run start` is the normal way to run llama-webui from source. `bun run dev` reloads the code when a file changes
-and is meant for working on llama-webui itself; it takes the same options.
+From a clone, `pnpm start` builds the interface, then starts the server. `pnpm dev` reloads the code when a file
+changes and is meant for working on llama-webui itself; both take the same options as `llama-webui`.
 
 ### In a systemd service
 
@@ -103,7 +113,7 @@ With the user service from [Installation](/docs/getting-started/installation/#ru
 [Service]
 WorkingDirectory=%h
 Environment=LLAMA_WEBUI_HOST=0.0.0.0
-ExecStart=%h/.local/bin/llama-webui --port 8080
+ExecStart=/usr/bin/node /home/you/.local/bin/llama-webui --port 8080
 Restart=on-failure
 ```
 
@@ -185,6 +195,20 @@ saying the token was rejected.
 | `HF_ENDPOINT`   | `https://huggingface.co`                                  | Hub endpoint, for example a mirror                  |
 
 Downloaded files go to `<models folder>/<org>/<name>/`; see [Hugging Face downloads](/docs/hugging-face/).
+
+### Behind a proxy
+
+llama-webui sends its requests to Hugging Face (search, repository listings, downloads) through the proxy the usual
+variables name, set in the environment or in `.env`:
+
+| Variable                    | Effect                                                                             |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| `HTTPS_PROXY`, `HTTP_PROXY` | Address of the proxy for `https://` and `http://` requests (`http://proxy:3128`)   |
+| `NO_PROXY`                  | Comma-separated hosts reached directly (`example.com`, `.example.com`, an address) |
+
+The lowercase names work too. `localhost`, `127.0.0.1` and `::1` are always reached directly, so the requests to
+`llama-server` never go through the proxy. If a profile makes `llama-server` listen on another address of the machine
+(`--host 192.168.1.20`), add that address to `NO_PROXY`.
 
 ## Everything else is in Settings
 

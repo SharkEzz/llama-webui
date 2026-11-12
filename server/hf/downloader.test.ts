@@ -1,19 +1,24 @@
-import { afterEach, describe, expect, mock, test } from 'bun:test';
-import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, statSync } from 'node:fs';
+import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { DownloadItem, DownloadLive } from '@llama-webui/shared';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { DownloadInput } from '../db/downloads';
 import { DownloadsRepo } from '../db/downloads';
 import { openDb } from '../db/open';
 import { HttpError } from '../http';
+import { fileExists } from '../proc';
 import { type TempDir, tempDir } from '../testing/tempDir';
+import { writeFileDeep } from '../testing/write';
 import { HfClient } from './client';
 import { DownloadQueue, type Handover } from './downloader';
 
 const ENDPOINT = 'https://hf.test';
 const SHA = 'a'.repeat(40);
 const data = (n: number, seed = 1) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed) & 255);
-const sha256 = (b: Uint8Array) => new Bun.CryptoHasher('sha256').update(b).digest('hex');
+const sha256 = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 
 interface CdnCall {
   path: string;
@@ -98,7 +103,7 @@ function cut(head: Uint8Array, signal: AbortSignal, o: { hang?: boolean } = {}):
 const until = async (cond: () => boolean | Promise<boolean>) => {
   for (let i = 0; i < 400; i++) {
     if (await cond()) return;
-    await Bun.sleep(5);
+    await sleep(5);
   }
   throw new Error('timed out');
 };
@@ -115,9 +120,9 @@ function setup(files: Record<string, Uint8Array>, o: { free?: number; dbPath?: s
   const hub = fakeHub(files);
   const make = (dbPath = o.dbPath ?? ':memory:') => {
     const repo = new DownloadsRepo(openDb(dbPath));
-    const onItem = mock((_: DownloadItem) => {});
-    const onLive = mock((_: DownloadLive | null) => {});
-    const onDeleted = mock((_: number[]) => {});
+    const onItem = vi.fn((_: DownloadItem) => {});
+    const onLive = vi.fn((_: DownloadLive | null) => {});
+    const onDeleted = vi.fn((_: number[]) => {});
     const queue = new DownloadQueue({
       repo,
       hf: new HfClient({ env: { HF_ENDPOINT: ENDPOINT, HF_TOKEN: 'hf_secret' }, fetch: hub.fetch }),
@@ -143,7 +148,14 @@ function setup(files: Record<string, Uint8Array>, o: { free?: number; dbPath?: s
     dir: repoDir,
     files: paths.map((p) => ({ path: p, size: files[p]!.length, sha256: sha256(files[p]!) })),
   });
-  const file = (p: string) => Bun.file(join(repoDir, p));
+  const file = (p: string) => ({
+    bytes: () => readFile(join(repoDir, p)),
+    exists: () => fileExists(join(repoDir, p)),
+    // 0 for a missing file.
+    get size() {
+      return statSync(join(repoDir, p), { throwIfNoEntry: false })?.size ?? 0;
+    },
+  });
   return { hub, make, input, file, repoDir, tmp };
 }
 
@@ -163,7 +175,7 @@ describe('DownloadQueue', () => {
     await queue.idle();
     expect(statuses(onItem, item!.id)).toEqual(['queued', 'downloading', 'done']);
     expect(repo.get(item!.id)).toMatchObject({ status: 'done', bytesDone: 5000, totalBytes: 5000 });
-    for (const [p, b] of Object.entries(files)) expect(new Uint8Array(await s.file(p).arrayBuffer())).toEqual(b);
+    for (const [p, b] of Object.entries(files)) expect(new Uint8Array(await s.file(p).bytes())).toEqual(b);
     expect(await s.file('Q8/m-00001-of-00002.gguf.part').exists()).toBe(false);
     expect(onLive).toHaveBeenLastCalledWith(null);
     expect(onLive).toHaveBeenCalledWith(expect.objectContaining({ phase: 'downloading', bytesDone: 5000 }));
@@ -179,25 +191,25 @@ describe('DownloadQueue', () => {
   test('resumes an existing .part with a Range request', async () => {
     const body = data(4000);
     const s = setup({ 'm.gguf': body });
-    await Bun.write(join(s.repoDir, 'm.gguf.part'), body.slice(0, 1500));
+    await writeFileDeep(join(s.repoDir, 'm.gguf.part'), body.slice(0, 1500));
     const { queue, repo } = s.make();
     const [item] = await queue.enqueue([s.input('m.gguf')]);
     await queue.idle();
     expect(repo.get(item!.id)!.status).toBe('done');
     expect(s.hub.cdnCalls().map((c) => c.range)).toEqual(['bytes=1500-']);
-    expect(new Uint8Array(await s.file('m.gguf').arrayBuffer())).toEqual(body);
+    expect(new Uint8Array(await s.file('m.gguf').bytes())).toEqual(body);
   });
 
   test('starts over when the server ignores the Range header', async () => {
     const body = data(4000);
     const s = setup({ 'm.gguf': body });
-    await Bun.write(join(s.repoDir, 'm.gguf.part'), body.slice(0, 1500));
+    await writeFileDeep(join(s.repoDir, 'm.gguf.part'), body.slice(0, 1500));
     s.hub.script(() => new Response(body, { status: 200 }));
     const { queue, repo } = s.make();
     const [item] = await queue.enqueue([s.input('m.gguf')]);
     await queue.idle();
     expect(repo.get(item!.id)!.status).toBe('done');
-    expect(new Uint8Array(await s.file('m.gguf').arrayBuffer())).toEqual(body);
+    expect(new Uint8Array(await s.file('m.gguf').bytes())).toEqual(body);
   });
 
   test('a connection cut mid-file is resumed where it stopped', async () => {
@@ -209,7 +221,7 @@ describe('DownloadQueue', () => {
     await queue.idle();
     expect(repo.get(item!.id)!.status).toBe('done');
     expect(s.hub.cdnCalls().map((c) => c.range)).toEqual([null, 'bytes=2000-']);
-    expect(new Uint8Array(await s.file('m.gguf').arrayBuffer())).toEqual(body);
+    expect(new Uint8Array(await s.file('m.gguf').bytes())).toEqual(body);
   });
 
   test('a body that ends early without an error is resumed, not started over; the hash is not read again', async () => {
@@ -222,7 +234,7 @@ describe('DownloadQueue', () => {
     expect(repo.get(item!.id)!.status).toBe('done');
     expect(s.hub.cdnCalls().map((c) => c.range)).toEqual([null, 'bytes=2000-']);
     expect(onLive.mock.calls.some(([l]) => l?.phase === 'verifying')).toBe(false);
-    expect(new Uint8Array(await s.file('m.gguf').arrayBuffer())).toEqual(body);
+    expect(new Uint8Array(await s.file('m.gguf').bytes())).toEqual(body);
   });
 
   test('network errors are retried, then the item fails once the retries are spent', async () => {
@@ -238,7 +250,7 @@ describe('DownloadQueue', () => {
     expect(onLive.mock.calls.filter(([l]) => l?.phase === 'retrying')).toHaveLength(2);
 
     s.hub.script(...Array.from({ length: 6 }, () => down));
-    await Bun.file(join(s.repoDir, 'm.gguf')).delete();
+    await rm(join(s.repoDir, 'm.gguf'));
     const [ko] = await queue.enqueue([s.input('m.gguf')]);
     await queue.idle();
     expect(repo.get(ko!.id)).toMatchObject({ status: 'error', code: 'hf-unreachable' });
@@ -272,7 +284,7 @@ describe('DownloadQueue', () => {
     s.hub.script((c) => cut(files['a.gguf'].slice(0, 1000), c.signal, { hang: true }));
     const { queue, repo, onItem } = s.make();
     const [a, b] = await queue.enqueue([s.input('a.gguf'), s.input('b.gguf')]);
-    await until(async () => (await s.file('a.gguf.part').size) === 1000);
+    await until(async () => s.file('a.gguf.part').size === 1000);
     expect(queue.live).toMatchObject({ id: a!.id, bytesDone: 1000 });
     await queue.cancel(b!.id);
     expect(repo.get(b!.id)!.status).toBe('canceled');
@@ -297,7 +309,7 @@ describe('DownloadQueue', () => {
     );
     const { queue, repo } = s.make();
     const [item] = await queue.enqueue([s.input('m-00001-of-00002.gguf', Object.keys(files))]);
-    await until(async () => (await s.file('m-00002-of-00002.gguf.part').size) === 500);
+    await until(async () => s.file('m-00002-of-00002.gguf.part').size === 500);
     expect(repo.get(item!.id)!.files[0]!.done).toBe(true);
     await queue.cancel(item!.id);
     await queue.idle();
@@ -305,7 +317,7 @@ describe('DownloadQueue', () => {
     await queue.retry(item!.id);
     await queue.idle();
     expect(repo.get(item!.id)).toMatchObject({ status: 'done', bytesDone: 4000 });
-    for (const [p, b] of Object.entries(files)) expect(new Uint8Array(await s.file(p).arrayBuffer())).toEqual(b);
+    for (const [p, b] of Object.entries(files)) expect(new Uint8Array(await s.file(p).bytes())).toEqual(b);
   });
 
   test('concurrent or repeated requests for one variant queue it once; retry refuses a variant already queued', async () => {
@@ -341,7 +353,7 @@ describe('DownloadQueue', () => {
       code: 'disk-full',
     });
     expect(repo.list()).toHaveLength(0);
-    await Bun.write(join(s.repoDir, 'n.gguf'), files['n.gguf']);
+    await writeFileDeep(join(s.repoDir, 'n.gguf'), files['n.gguf']);
     s.hub.script((c) => cut(files['m.gguf'].slice(0, 10), c.signal, { hang: true }));
     const created = await queue.enqueue([s.input('m.gguf'), s.input('n.gguf')]);
     expect(created.map((i) => i.key)).toEqual(['m.gguf']);
@@ -372,7 +384,7 @@ describe('DownloadQueue', () => {
     s.hub.script((c) => cut(body.slice(0, 2500), c.signal, { hang: true }));
     const first = s.make();
     const [item] = await first.queue.enqueue([s.input('m.gguf')]);
-    await until(async () => (await s.file('m.gguf.part').size) === 2500);
+    await until(async () => s.file('m.gguf.part').size === 2500);
     first.queue.dispose();
     const second = s.make();
     expect(second.repo.get(item!.id)!.status).toBe('downloading');
@@ -381,7 +393,7 @@ describe('DownloadQueue', () => {
     await second.queue.idle();
     expect(second.repo.get(item!.id)!.status).toBe('done');
     expect(s.hub.cdnCalls().map((c) => c.range)).toEqual([null, 'bytes=2500-']);
-    expect(new Uint8Array(await s.file('m.gguf').arrayBuffer())).toEqual(body);
+    expect(new Uint8Array(await s.file('m.gguf').bytes())).toEqual(body);
     // The disposed queue wrote nothing after it let go.
     expect(statuses(first.onItem, item!.id)).toEqual(['queued', 'downloading']);
     expect(first.onLive).not.toHaveBeenLastCalledWith(null);

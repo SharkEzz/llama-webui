@@ -14,7 +14,7 @@ soon as a change forgets it.
 
 | Code you change                                                              | Pages to update                                                                                                                  |
 | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `server/routes/<domain>.ts`, `server/app.ts`, zod schemas in `packages/webui-shared/src/`   | `/developers/api/<domain>/` (`server/app.ts` is [Health and settings](/developers/api/app/)) and the user page of the feature    |
+| `server/routes/<domain>.ts`, `server/api.ts`, zod schemas in `packages/webui-shared/src/`   | `/developers/api/<domain>/` (`server/api.ts` and `server/routes/settings.ts` are [Health and settings](/developers/api/app/)) and the user page of the feature    |
 | `packages/webui-shared/src/ws.ts`, `server/ws/`                                             | [WebSocket](/developers/api/websocket/)                                                                                          |
 | `server/cli.ts`, `server/paths.ts`, environment variables                    | [Launch options](/docs/configuration/), [Architecture](/developers/architecture/)                                                |
 | `server/security.ts`, `server/http.ts`                                       | [Security](/docs/security/) (user), [Security](/developers/server/security/) (server), [API overview](/developers/api/overview/) |
@@ -45,8 +45,8 @@ The rules on these pages come from `CLAUDE.md` at the root of the repository: wh
 
 ## Write a docs page
 
-The website lives in `site/`, a package of its own (Vite, React Router with prerendering, Tailwind, MDX) outside the
-Bun workspaces, with its own `package.json` and `bun.lock`. Every `.mdx` file under `site/content/docs/` or
+The website lives in `site/`, a package of the pnpm workspace (Vite, React Router with prerendering, Tailwind, MDX),
+installed by the root `pnpm install` and run on Node.js: its scripts are `node scripts/<name>.ts`. Every `.mdx` file under `site/content/docs/` or
 `site/content/developers/` becomes a prerendered page: `docs/getting-started/installation.mdx` is
 `/docs/getting-started/installation/`, and an `index.mdx` is the page of its folder.
 
@@ -99,11 +99,10 @@ turned into hyphens, punctuation dropped.
   </Step>
   <Step title="Preview it">
 
-Install the site's dependencies once, then run the site from the root of the repository:
+After `pnpm install` at the root (it installs the site too), run the site from the root of the repository:
 
 ```bash title="Terminal"
-cd site && bun install && cd ..
-bun run site:dev
+pnpm site:dev
 ```
 
 `site:dev` serves the site with hot reload on port 5173 on every interface: open `http://<host>:5173/llama-webui/`.
@@ -112,9 +111,9 @@ bun run site:dev
   <Step title="Build and check the links">
 
 ```bash title="Terminal"
-bun run site:build
-bun run --cwd site check-links
-bun run site:preview
+pnpm site:build
+pnpm --dir site check-links
+pnpm site:preview
 ```
 
 `site:build` prerenders every page, then `scripts/postbuild.ts` writes `site/dist/`: the pages, a `404.html`, the
@@ -142,7 +141,7 @@ Captures come from a demo instance, never from the one you use every day. It run
 that no personal path or account appears:
 
 ```bash title="Terminal"
-env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" bun run start --host 0.0.0.0 --port 7861
+env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" pnpm start --host 0.0.0.0 --port 7861
 ```
 
 `/home/demo/models` points to the models folder, and `/home/demo/llama.cpp/build/bin` holds hard links to the llama.cpp
@@ -152,7 +151,7 @@ binaries: the app resolves the binary's real path, so a symbolic link would show
   <Step title="Fill it">
 
 ```bash title="Terminal"
-bun run --cwd site demo-seed setup bench sweep start chat
+pnpm --dir site demo-seed setup bench sweep start chat
 ```
 
 `site/scripts/demo-seed.ts` drives the real API: settings and profiles (`setup`), `llama-bench` and server runs
@@ -163,9 +162,9 @@ the GPUs, so free them first.
   <Step title="Capture">
 
 ```bash title="Terminal"
-bun run --cwd site screenshots            # every screen but the live and manual ones, or: screenshots server logs
-bun run --cwd site demo-seed generate
-bun run --cwd site screenshots --live     # Dashboard, System and Topology, during a generation
+pnpm --dir site screenshots            # every screen but the live and manual ones, or: screenshots server logs
+pnpm --dir site demo-seed generate
+pnpm --dir site screenshots --live     # Dashboard, System and Topology, during a generation
 ```
 
 `site/scripts/screenshots.ts` opens each screen in headless Chromium (`/usr/bin/chromium`), switches the theme through
@@ -176,7 +175,7 @@ when you name it.
   </Step>
   <Step title="Update what depends on them">
 
-After a new Dashboard capture, run `bun run --cwd site og` to render the Open Graph image (`site/public/og.png`). The
+After a new Dashboard capture, run `pnpm --dir site og` to render the Open Graph image (`site/public/og.png`). The
 landing page also redraws some app screens in React with their real values (the hero's live Dashboard, the argument
 editor, the Tuning recommendation, in `site/src/landing/`): update them when those screens change.
 
@@ -218,37 +217,42 @@ feat: First-run setup checklist and profile launch pad on Home (#10)
 Before a commit, a pull request or the end of a milestone, these must pass from the root of the repository:
 
 ```bash title="Terminal"
-bun run lint
-bun run check
-bun test
+pnpm lint
+pnpm check
+pnpm test
 ```
 
-- `bun run lint`: Biome with zero errors and zero warnings (format, lint, sorted imports).
-- `bun run check`: the type checks of every project (`bun check -b`: `packages/*`, `server/`, `scripts/`, `web/`), then
+- `pnpm lint`: Biome with zero errors and zero warnings (format, lint, sorted imports).
+- `pnpm check`: the type checks of every project (`tsc -b`: `packages/*`, `server/`, `scripts/`, `web/`), then
   `site/`.
-- `bun test`: every test file, `web/src/` included ([Run the tests](/developers/contributing/testing/#run-the-tests)).
+- `pnpm test`: every Vitest project, `web/src/` and `site/` included, then the `llamacpp-js` tests on `node --test`
+  ([Run the tests](/developers/contributing/testing/#run-the-tests)).
 
-When the change touches `site/`, including its pages, also run `bun run site:build`, then
-`bun run --cwd site check-links`.
+When the change touches the server, the build or the package, also run `pnpm build`, then `node scripts/smoke.ts`
+and `node scripts/smoke.ts --tarball`, as CI does.
+
+When the change touches `site/`, including its pages, also run `pnpm site:build`, then
+`pnpm --dir site check-links`.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `master`, on Ubuntu with Bun 1.4.4 and
-Node.js 24 (the React Router CLI that builds the site runs on Node, and Vite 8 needs a recent version):
+`.github/workflows/ci.yml` runs on every pull request and every push to `master`, on Ubuntu with Node.js 26.13 and
+pnpm:
 
 | Step                                         | Command                                              |
 | -------------------------------------------- | ---------------------------------------------------- |
-| Install the app's dependencies               | `bun install --frozen-lockfile`                      |
-| Install the site's dependencies              | `bun install --frozen-lockfile` in `site/`           |
-| Lint                                         | `bun run lint`                                       |
-| Type check                                   | `bun run check`                                      |
-| Tests                                        | `bun test`                                           |
-| Build the standalone executable              | `bun run compile`                                    |
-| Smoke-test it (help, version, UI)            | `bun scripts/smoke-binary.ts dist/llama-webui`       |
-| Build the site                               | `bun run site:build`                                 |
-| Check the site's links                       | `bun run --cwd site check-links`                     |
+| Install the dependencies (site included)     | `pnpm install --frozen-lockfile`                     |
+| Lint                                         | `pnpm lint`                                          |
+| Type check                                   | `pnpm check`                                         |
+| Tests                                        | `pnpm test`                                          |
+| Build the app                                | `pnpm build`                                         |
+| Smoke-test the build (help, version, UI, WebSocket) | `node scripts/smoke.ts`                       |
+| The same, on the package installed from its tarball | `node scripts/smoke.ts --tarball`             |
+| Build the site                               | `pnpm site:build`                                    |
+| Check the site's links                       | `pnpm --dir site check-links`                        |
 
-`--frozen-lockfile` fails when a lockfile is out of date: commit `bun.lock` (and `site/bun.lock`) with any dependency
+A second job runs the tests of `packages/llamacpp-js/` on Node.js 24, the lowest version it supports, without any
+install. `--frozen-lockfile` fails when the lockfile is out of date: commit `pnpm-lock.yaml` with any dependency
 change.
 
 `.github/workflows/site-deploy.yml` publishes `site/dist/` to GitHub Pages: on every push to `master` that changes
@@ -257,12 +261,12 @@ never deploys: the site changes it brings go live when it is merged.
 
 ## Releases
 
-Every `package.json` (root, `server`, `shared`, `web`, `site`) carries the version of the last release, and the tag
+Every `package.json` (root, `server`, `shared`, `llamacpp-js`, `web`, `site`) carries the version of the last release, and the tag
 must match it. A release takes two steps:
 
 ```bash title="Terminal"
 # 1. Set the version everywhere, then commit it through a pull request
-bun run release 0.2.0
+pnpm release 0.2.0
 # 2. Once it is merged, tag master
 git fetch origin
 git tag v0.2.0 origin/master
@@ -270,12 +274,14 @@ git push origin v0.2.0
 ```
 
 `scripts/release.test.ts` fails when the `package.json` versions differ, and `.github/workflows/release.yml`, which
-runs when a `v*` tag is pushed, first checks that they match the tag (`bun scripts/release.ts --check v0.2.0`). The
-executables report the tag as their version (`git describe`, shown in the status bar).
+runs when a `v*` tag is pushed, first checks that they match the tag (`node scripts/release.ts --check v0.2.0`). The
+build reports the tag as its version (`git describe`, shown in the status bar and by `/api/health`).
 
-An executable built from an untagged commit reports its short hash instead (`fa823b5`), and `-dirty` when built with
-uncommitted changes.
+A build from an untagged commit reports the last tag, the number of commits since and the short hash instead
+(`v0.2.0-3-gfa823b5`), and `-dirty` when built with uncommitted changes.
 
-The workflow compiles `llama-webui-linux-x64` and `llama-webui-linux-arm64` (`bun run compile --target …`),
-smoke-tests the x64 executable, writes `SHA256SUMS`, and creates the GitHub Release with generated notes. The
-[Installation](/docs/getting-started/installation/) page downloads from the latest release.
+The workflow then builds, packs the root package (`pnpm pack --pack-destination release`), installs the tarball with
+npm into an empty prefix and smoke-tests the installed command (`node scripts/smoke.ts --tarball`), writes
+`SHA256SUMS`, and creates the GitHub Release with generated notes and those two files
+([Distribution](/developers/architecture/#distribution)). The [Installation](/docs/getting-started/installation/) page
+installs from a release.

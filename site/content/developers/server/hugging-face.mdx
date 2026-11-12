@@ -169,8 +169,8 @@ is marked done.
   </Step>
 </Steps>
 
-When every file is done, the item becomes `done`. The `.part` is opened with `node:fs` in append mode: the code notes
-that `Bun.file().writer()` always truncates.
+When every file is done, the item becomes `done`. The `.part` is opened with `node:fs` in append mode, and the
+checksum is a `node:crypto` sha256 hash.
 
 ### Range resume
 
@@ -232,9 +232,9 @@ the live state.
 | Event                          | What happens                                                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
 | Shutdown (`SIGINT`, `SIGTERM`) | `dispose()` aborts the transfer and keeps the `.part` and the row, still `downloading`                       |
-| Bun killed                     | Same state on disk: the `.part` and a `downloading` row                                                       |
+| llama-webui killed             | Same state on disk: the `.part` and a `downloading` row                                                       |
 | Next start                     | `downloads.resume()` in `server/index.ts` starts the loop, which takes the `downloading` item first and resumes it from its `.part` |
-| `bun --hot` reload             | The old queue's `dispose()` aborts the transfer, the new queue resumes it once the old writer has let go     |
+| Development reload             | The old queue's `dispose()` aborts the transfer, the new queue resumes it once the old writer has let go     |
 
 There is no orphan cleanup for downloads: an interrupted item carries on where it stopped.
 
@@ -253,13 +253,18 @@ before it starts.
    `$HF_HOME/token`, with `HF_HOME` defaulting to `$XDG_CACHE_HOME/huggingface`, then `~/.cache/huggingface`.
 
 It runs on every call (each API request and each download attempt), so an `hf auth login` done while llama-webui runs
-is picked up without a restart. The environment variables are read from Bun's environment, set at launch. The token is
+is picked up without a restart. The environment variables are read from the process environment, set at launch. The token is
 never stored by llama-webui; `HfStatus.token` only says where it came from (`env`, `file` or `null`).
 
 `hfEndpoint()` returns `HF_ENDPOINT` (a mirror, for example), trimmed and without trailing slashes, or
 `https://huggingface.co`. It is the base of the API calls and of the `resolve` URLs, the origin the token is sent to,
 and the start of the repository page link (`HfRepo.url`). See
 [Launch options](/docs/configuration/#hugging-face) for how users set these variables.
+
+The client and the downloader call Node's `fetch`, which ignores `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` unless
+Node is started with `--use-env-proxy`. The entry points call `useEnvProxy()` (`server/env.ts`) instead, after `.env`
+is loaded: when a proxy variable is set, `http.setGlobalProxyFromEnv()` routes `fetch` through it, with `localhost`,
+`127.0.0.1` and `::1` added to `NO_PROXY` so the requests to `llama-server` stay direct.
 
 ## WebSocket messages
 

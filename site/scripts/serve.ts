@@ -2,53 +2,95 @@
  * Serves dist/ the way GitHub Pages does, for local checks: everything under /llama-webui/, "dir" redirects to
  * "dir/" when dir/index.html exists, unknown paths get 404.html with a 404 status, text is gzipped and everything is
  * cached for 10 minutes (Pages' max-age), so Lighthouse runs here are comparable.
- * Usage: bun scripts/serve.ts [--port 4173]  (listens on 0.0.0.0)
+ * Usage: pnpm preview [--port 4173]  (node scripts/serve.ts, listens on 0.0.0.0)
  */
-import { join, normalize } from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { extname, join, normalize } from 'node:path';
 import { parseArgs } from 'node:util';
+import { gzipSync } from 'node:zlib';
+import { cliArgs } from './argv.ts';
 
 const BASE = '/llama-webui';
-const dist = join(import.meta.dir, '..', 'dist');
-const { values } = parseArgs({ args: Bun.argv.slice(2), options: { port: { type: 'string', default: '4173' } } });
+
+/** The types of the files the site ships (Node has no lookup); anything else is binary. */
+const TYPES: Record<string, string> = {
+  '.html': 'text/html;charset=utf-8',
+  '.css': 'text/css;charset=utf-8',
+  '.js': 'text/javascript;charset=utf-8',
+  '.json': 'application/json;charset=utf-8',
+  '.txt': 'text/plain;charset=utf-8',
+  '.xml': 'application/xml',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.woff2': 'font/woff2',
+};
+const typeOf = (path: string) => TYPES[extname(path)] ?? 'application/octet-stream';
 
 const COMPRESSIBLE = /^(text\/|application\/(javascript|json|xml)|image\/svg)/;
 
 /** A file response, gzipped when the client accepts it and the type is text. */
-async function send(req: Request, file: Blob, status = 200) {
-  const headers = new Headers({ 'content-type': file.type, 'cache-control': 'max-age=600' });
-  if (COMPRESSIBLE.test(file.type) && req.headers.get('accept-encoding')?.includes('gzip')) {
-    headers.set('content-encoding', 'gzip');
-    headers.set('vary', 'accept-encoding');
-    return new Response(Bun.gzipSync(new Uint8Array(await file.arrayBuffer())), { status, headers });
+async function send(req: IncomingMessage, res: ServerResponse, path: string, status = 200) {
+  const type = typeOf(path);
+  let body = await readFile(path);
+  const headers: Record<string, string> = { 'content-type': type, 'cache-control': 'max-age=600' };
+  if (COMPRESSIBLE.test(type) && req.headers['accept-encoding']?.includes('gzip')) {
+    headers['content-encoding'] = 'gzip';
+    headers.vary = 'accept-encoding';
+    body = gzipSync(body);
   }
-  return new Response(file, { status, headers });
+  res.writeHead(status, { ...headers, 'content-length': String(body.length) });
+  res.end(req.method === 'HEAD' ? undefined : body);
 }
 
-async function existing(path: string) {
-  const file = Bun.file(path);
-  return (await file.exists()) ? file : null;
+function redirect(res: ServerResponse, location: string) {
+  res.writeHead(301, { location, 'content-length': '0' }).end();
 }
 
-const server = Bun.serve({
-  hostname: '0.0.0.0',
-  port: Number(values.port),
-  async fetch(req) {
-    const url = new URL(req.url);
-    if (url.pathname === '/' || url.pathname === BASE) return Response.redirect(`${BASE}/`, 301);
-    if (!url.pathname.startsWith(`${BASE}/`)) return new Response('Not found', { status: 404 });
+const isFile = (path: string) =>
+  stat(path).then(
+    (s) => s.isFile(),
+    () => false,
+  );
 
-    const rel = normalize(decodeURIComponent(url.pathname.slice(BASE.length))).replace(/^(\.\.(\/|$))+/, '');
-    const path = join(dist, rel);
-    if (!url.pathname.endsWith('/')) {
-      const file = await existing(path);
-      if (file) return send(req, file);
-      if (await existing(join(path, 'index.html'))) return Response.redirect(`${url.pathname}/${url.search}`, 301);
-    } else {
-      const index = await existing(join(path, 'index.html'));
-      if (index) return send(req, index);
+/** The preview server for `dist` (not listening yet). */
+export function serveDist(dist: string): Server {
+  return createServer(async (req, res) => {
+    try {
+      // Parsed as a URL: `..` and `%2e%2e` segments are resolved before the base is checked.
+      const url = new URL(req.url ?? '/', 'http://localhost');
+      if (url.pathname === '/' || url.pathname === BASE) return redirect(res, `${BASE}/`);
+      if (!url.pathname.startsWith(`${BASE}/`)) {
+        res.writeHead(404, { 'content-type': 'text/plain;charset=utf-8', 'content-length': '9' });
+        return res.end(req.method === 'HEAD' ? undefined : 'Not found');
+      }
+
+      const rel = normalize(decodeURIComponent(url.pathname.slice(BASE.length))).replace(/^(\.\.(\/|$))+/, '');
+      const path = join(dist, rel);
+      if (!url.pathname.endsWith('/')) {
+        if (await isFile(path)) return await send(req, res, path);
+        if (await isFile(join(path, 'index.html'))) return redirect(res, `${url.pathname}/${url.search}`);
+      } else if (await isFile(join(path, 'index.html'))) {
+        return await send(req, res, join(path, 'index.html'));
+      }
+      await send(req, res, join(dist, '404.html'), 404);
+    } catch (err) {
+      console.error(`serve: ${req.url}: ${err instanceof Error ? err.message : String(err)}`);
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
     }
-    return send(req, Bun.file(join(dist, '404.html')), 404);
-  },
-});
+  });
+}
 
-console.log(`Serving dist/ like GitHub Pages at http://${server.hostname}:${server.port}${BASE}/`);
+if (import.meta.main) {
+  const { values } = parseArgs({
+    args: cliArgs(),
+    options: { port: { type: 'string', default: '4173' } },
+  });
+  const hostname = '0.0.0.0';
+  const port = Number(values.port);
+  serveDist(join(import.meta.dirname, '..', 'dist')).listen(port, hostname, () => {
+    console.log(`Serving dist/ like GitHub Pages at http://${hostname}:${port}${BASE}/`);
+  });
+}

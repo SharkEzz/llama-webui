@@ -1,5 +1,5 @@
 {
-  // The library alone, as a Node user sees it: Node types only (no Bun, no DOM), syntax Node can strip.
+  // The library alone, as a Node user sees it: Node types only (no DOM), syntax Node can strip.
   // The tests (tests/, node:test) have their own project with the same options: tsconfig.test.json.
   "compilerOptions": {
     "lib": ["ESNext"],

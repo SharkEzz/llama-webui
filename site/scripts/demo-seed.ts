@@ -2,7 +2,7 @@
  * Fills the llama-webui *demo* instance with curated content for the website screenshots (see screenshots.ts).
  * It drives the real API, so it runs real models on the GPUs: never point it at your everyday instance.
  *
- *   bun scripts/demo-seed.ts <step…> [--base http://192.168.0.20:7861]
+ *   pnpm demo-seed <step…> [--base http://192.168.0.20:7861]
  *
  * Steps, in the usual order:
  *   setup     settings (onboarding done, llama-server on :8091, iGPU hidden) and the demo profiles
@@ -14,13 +14,14 @@
  *   stop      stops llama-server
  *
  * The demo instance itself runs with a neutral home so no personal path shows up:
- *   env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" bun run start --host 0.0.0.0 --port 7861
+ *   env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" pnpm start --host 0.0.0.0 --port 7861
  * with /home/demo/models -> the real models folder and /home/demo/llama.cpp/build/bin hard-linked from the build.
  */
 import { parseArgs } from 'node:util';
+import { cliArgs } from './argv.ts';
 
 const { values, positionals } = parseArgs({
-  args: Bun.argv.slice(2),
+  args: cliArgs(),
   allowPositionals: true,
   options: { base: { type: 'string', default: 'http://192.168.0.20:7861' } },
 });

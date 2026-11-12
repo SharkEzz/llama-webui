@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { navGroups, ROUTES } from './routes';
 
 test('navGroups splits consecutive entries of the same group', () => {

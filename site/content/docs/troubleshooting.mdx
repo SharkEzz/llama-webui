@@ -25,7 +25,7 @@ Or a profile goes to **Crashed** with code 127 right after **Start**, and the Lo
 [Settings](/docs/settings/): `/home/you/llama.cpp/build/bin/llama-server`. Check it in a terminal with
 `ls -l /home/you/llama.cpp/build/bin/llama-server`, and `chmod +x` it if needed.
 
-If the crash message is instead `Executable not found in $PATH: "setpriv"`, install `util-linux`, which provides
+If the crash message is instead `spawn setpriv ENOENT`, install `util-linux`, which provides
 `setpriv`: llama-webui uses it to start `llama-server` as a child process.
 
 ### Benchmark and Tuning see no GPU
@@ -157,7 +157,7 @@ page, and the profile's card on the launch pad, give the reason, the exit code o
 | Message                                     | Cause                                                       | Fix                                                                         |
 | ------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `directory not found: …`                    | The profile's **Working directory** does not exist.         | Fix or empty the field on the [Profiles](/docs/profiles/) page.             |
-| `Executable not found in $PATH: "setpriv"`  | `setpriv` is missing.                                       | Install `util-linux`.                                                       |
+| `spawn setpriv ENOENT`                      | `setpriv` is missing.                                       | Install `util-linux`.                                                       |
 | `code 127`                                  | The binary cannot be run.                                   | See [`llama-server` cannot be found](#llama-server-cannot-be-found).        |
 | Another exit code                           | `llama-server` stopped on its own: bad argument, unreadable model, out of memory. | Read the last lines on the Logs page, or under **Latest logs** on the Server page. |
 
@@ -252,7 +252,7 @@ names in the **Hardware** card: they change when the build changes backends (see
 | `… not found on Hugging Face (or private …)`               | Check the repository id. A private repository needs a token from an account that can read it.                                            |
 | `Hugging Face rejected the token`                          | Create a new token, then set it again (below). The sheet's header says `The token from … was rejected.`                                  |
 | `Hugging Face rate limit reached, try again later`         | Wait, then click **Retry**.                                                                                                              |
-| `Hugging Face unreachable: …`                              | Check the network, or `HF_ENDPOINT` if you use a mirror.                                                                                 |
+| `Hugging Face unreachable: …`                              | Check the network, `HF_ENDPOINT` if you use a mirror, or `HTTPS_PROXY` [behind a proxy](/docs/configuration/#behind-a-proxy).            |
 | `Checksum mismatch for …: the file was deleted`            | The downloaded file did not match its sha256. Click **Retry** to download it again.                                                      |
 | `Not enough disk space: …` or `Disk full`                  | Free space on the disk of the models folder. llama-webui keeps 1.0 GiB free on top of the download.                                      |
 
@@ -297,7 +297,7 @@ status stays **Disconnected**, and the API answers `Host not allowed`.
 
 ### llama-webui does not start
 
-**What you see:** `llama-webui` (or `bun run start`) stops with `Failed to start server. Is port 7860 in use?`
+**What you see:** `llama-webui` (or `pnpm start` from a clone) stops with `Error: listen EADDRINUSE: address already in use 127.0.0.1:7860`.
 
 **Cause:** another program, often a second llama-webui, already listens on that port.
 

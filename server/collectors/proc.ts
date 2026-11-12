@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { readText } from '../proc';
 
 export function parseStat(text: string): { utime: number; stime: number } | null {
   const close = text.lastIndexOf(')');
@@ -29,8 +30,8 @@ export class ProcSampler {
     let statText: string, statusText: string;
     try {
       [statText, statusText] = await Promise.all([
-        Bun.file(join(this.procRoot, String(pid), 'stat')).text(),
-        Bun.file(join(this.procRoot, String(pid), 'status')).text(),
+        readText(join(this.procRoot, String(pid), 'stat')),
+        readText(join(this.procRoot, String(pid), 'status')),
       ]);
     } catch {
       if (this.prev?.pid === pid) this.prev = null;

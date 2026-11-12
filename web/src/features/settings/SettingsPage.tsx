@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { SystemInfo } from '@/features/system/SystemPage';
-import { api } from '@/lib/api';
+import { call, client } from '@/lib/api';
 import { formatDuration } from '@/lib/format';
 import { type SettingsErrors, useSettingsEditor } from '@/lib/settings';
 import { useTheme } from '@/lib/theme';
@@ -138,7 +138,7 @@ function Monitoring({ settings, save }: SectionProps) {
   const [history, setHistory] = useState(settings.historySeconds);
   useEffect(() => setHistory(settings.historySeconds), [settings.historySeconds]);
   useEffect(() => {
-    void api<SystemInfo>('/system/info').then(setInfo, () => {});
+    void call(client.system.info.$get()).then(setInfo, () => {});
   }, []);
   const c = settings.collectors;
 

@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { DEFAULT_HOST, DEFAULT_PORT, helpText, parseCli } from './cli';
 
 test('parseCli: defaults without flag or env', () => {
@@ -47,13 +47,18 @@ test('parseCli: unknown option, missing value, positional, empty value', () => {
   expect(parseCli(['--data-dir='], {}).kind).toBe('error');
 });
 
-test('helpText: binary usage in the compiled executable, bun scripts from source', () => {
-  const standalone = helpText(true);
-  expect(standalone).toContain('  llama-webui [options]');
-  expect(standalone).not.toContain('bun run');
-  const source = helpText(false);
-  expect(source).toContain('bun run dev [options]');
-  expect(source).toContain('bun run start [options]');
-  expect(source.split('\n')[0]).toBe(standalone.split('\n')[0]);
-  expect(source).toContain('--data-dir <path>');
+test('helpText: the installed command and the pnpm scripts, one Node.js process', () => {
+  const text = helpText();
+  expect(text).toContain('llama-webui [options]');
+  expect(text).toContain('pnpm dev [options]');
+  expect(text).toContain('pnpm start [options]');
+  expect(text).toContain('single Node.js process');
+  expect(text).not.toMatch(/\bbun\b/i);
+  expect(text).toContain('--data-dir <path>');
+  expect(text).toContain('--env-override');
+  expect(text).toContain('env: LLAMA_WEBUI_ENV_OVERRIDE');
+});
+
+test('parseCli: --env-override is accepted (read by the entry points before the .env is loaded)', () => {
+  expect(parseCli(['--env-override'], {}).kind).toBe('run');
 });

@@ -1,6 +1,6 @@
-import type { Database } from 'bun:sqlite';
 import { type Profile, type ProfileInput, ProfileInputSchema, type ProfileSource } from '@llama-webui/shared';
 import { HttpError, notFound } from '../http';
+import type { Database } from './sqlite';
 
 interface Row {
   id: number;

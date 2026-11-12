@@ -1,36 +1,22 @@
 import type { GpuReading } from '../gpu';
 import type { GpuNeeds } from '../needs';
 import type { NvmlProc, NvmlSnapshot, NvmlSystem } from './read';
+import { sampler, type WorkerLike } from './sampler';
 
-export interface WorkerLike {
-  postMessage(m: unknown): void;
-  terminate(): void;
-  unref?(): void;
-  onmessage: ((e: { data: unknown }) => void) | null;
-  onerror: ((e: unknown) => void) | null;
-}
+export type { WorkerLike };
 
 type WorkerMsg = { type: 'ready' } | { type: 'error'; message: string } | { type: 'sample'; snapshot: NvmlSnapshot };
 
-/** The worker, relative to `server/`: also a compile entrypoint (`scripts/compile.ts`). */
-export const NVML_WORKER = 'collectors/nvml/worker.ts';
-
 /**
- * From source, the worker sits next to this module. In the compiled executable, this module is bundled into the
- * entrypoint (`Bun.main`) and the worker is embedded under its path relative to `server/`, the entrypoints' root.
+ * The worker, next to the module that starts it: `worker.ts` next to this file when Node runs the sources
+ * (development, tests), `nvml-worker.js` next to `main.js` in the production bundle (`vite.config.ts`).
  */
-export const workerUrl = (standalone = Bun.isStandaloneExecutable): string =>
-  standalone
-    ? new URL(`./${NVML_WORKER}`, Bun.pathToFileURL(Bun.main)).href
-    : new URL('./worker.ts', import.meta.url).href;
+export const workerUrl = (moduleUrl = import.meta.url): string =>
+  new URL(moduleUrl.endsWith('.ts') ? './worker.ts' : './nvml-worker.js', moduleUrl).href;
 
-const defaultWorker = (): WorkerLike => {
-  const w = new Worker(workerUrl()) as unknown as WorkerLike;
-  w.unref?.(); // Bun-specific: never keep the TUI alive
-  return w;
-};
+const defaultWorker = (): WorkerLike => sampler(new URL(workerUrl()));
 
-/** NVIDIA readings from NVML in a Worker; same surface as NvidiaMonitor (gpus/procVram/refreshApps/stop). */
+/** NVIDIA readings from NVML in a child process (`sampler.ts`); same surface as NvidiaMonitor (gpus/procVram/refreshApps/stop). */
 export class NvmlMonitor {
   private current: GpuReading[] = [];
   private procs: NvmlProc[] = [];
@@ -57,6 +43,8 @@ export class NvmlMonitor {
     intervalMs: number;
     /** What to read; everything when absent. */
     needs?: GpuNeeds;
+    /** The NVML library to open (`LLAMA_WEBUI_NVML_LIB`); the system's `libnvidia-ml.so.1` when absent. */
+    lib?: string;
     createWorker?: () => WorkerLike;
     readyTimeoutMs?: number;
     now?: () => number;
@@ -95,7 +83,12 @@ export class NvmlMonitor {
           giveUp();
         }
       };
-      worker.postMessage({ type: 'start', intervalMs: o.intervalMs, ...(o.needs ? { needs: o.needs } : {}) });
+      worker.postMessage({
+        type: 'start',
+        intervalMs: o.intervalMs,
+        ...(o.needs ? { needs: o.needs } : {}),
+        ...(o.lib ? { lib: o.lib } : {}),
+      });
     });
   }
 

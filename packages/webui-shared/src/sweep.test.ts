@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import type { BenchRun, Measure } from './bench';
 import { withCtx } from './bench';
 import { expandSpace, itemLabel, rankRuns, SweepSpecSchema, sweepCtx } from './sweep';

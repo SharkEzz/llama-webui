@@ -1,5 +1,5 @@
 {
-  // Solution file: `bun check -b` checks every project below, each with its own options.
+  // Solution file: `tsc -b` checks every project below, each with its own options.
   "files": [],
   "references": [
     { "path": "packages/llamacpp-js" },
@@ -7,6 +7,7 @@
     { "path": "packages/webui-shared" },
     { "path": "server" },
     { "path": "scripts" },
-    { "path": "web" }
+    { "path": "web" },
+    { "path": "web/tsconfig.test.json" }
   ]
 }

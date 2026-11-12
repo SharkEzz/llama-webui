@@ -1,5 +1,6 @@
-import { expect, test } from 'bun:test';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { ChatEvent } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { ConversationsRepo } from '../db/conversations';
 import { openDb } from '../db/open';
 import { ChatRuns } from './runs';
@@ -8,7 +9,7 @@ const enc = new TextEncoder();
 const chunk = (delta: Record<string, string>, extra: Record<string, unknown> = {}) =>
   `data: ${JSON.stringify({ choices: [{ index: 0, delta }], ...extra })}\n\n`;
 const TIMINGS = { prompt_n: 10, prompt_per_second: 200, predicted_n: 3, predicted_per_second: 51.23 };
-const tick = () => Bun.sleep(5);
+const tick = () => sleep(5);
 
 /** A fake llama-server: the test pushes the stream chunks one by one. */
 function setup() {

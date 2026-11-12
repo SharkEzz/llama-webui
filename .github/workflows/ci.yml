@@ -12,24 +12,36 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0 # tags and history: the executable's version comes from `git describe`
-      - uses: oven-sh/setup-bun@v2
+          fetch-depth: 0 # tags and history: the build's version comes from `git describe`
+      # pnpm installs (version from `packageManager`) and runs the gate, on Node.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
         with:
-          bun-version: 1.4.4
-      # The React Router CLI (site build) and the llamacpp-js tests run on Node too.
+          node-version: 26.13
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm check
+      # Vitest, then llamacpp-js (node --test).
+      - run: pnpm test
+      # Production build: starts from an empty data directory, serves the production UI and the WebSocket.
+      - run: pnpm build
+      - run: node scripts/smoke.ts
+      # The package as a user installs it: pnpm pack, npm install into an empty prefix, the same checks through its bin.
+      - run: node scripts/smoke.ts --tarball
+      - run: pnpm site:build
+      - run: pnpm --dir site check-links
+
+  # llamacpp-js still supports Node >= 24, while the workspace needs Node 26: its tests (no dependencies) run on the
+  # lowest supported version too.
+  llamacpp-js-node24:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - run: bun install --frozen-lockfile
-      - run: bun install --frozen-lockfile
-        working-directory: site
-      - run: bun run lint
-      - run: bun run check
-      - run: bun test
-      # llamacpp-js targets Node >= 24 too: its tests (node:test) run again under Node, on the TypeScript sources.
-      - run: bun run --cwd packages/llamacpp-js test:node
-      # Standalone executable: builds, starts, serves the production UI.
-      - run: bun run compile
-      - run: bun scripts/smoke-binary.ts dist/llama-webui
-      - run: bun run site:build
-      - run: bun run --cwd site check-links
+          # Otherwise setup-node reads `packageManager` and looks for pnpm, which this job does not install.
+          package-manager-cache: false
+      - run: node --test 'tests/*.test.ts'
+        working-directory: packages/llamacpp-js

@@ -1,4 +1,4 @@
-// Everything that runs anywhere (Node, Bun, browsers). Process and filesystem helpers are in `llamacpp-js/node`.
+// Everything that runs anywhere (Node, browsers). Process and filesystem helpers are in `llamacpp-js/node`.
 export * from './bench.ts';
 export * from './client.ts';
 export * from './errors.ts';

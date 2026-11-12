@@ -1,4 +1,4 @@
-import { isLoopback, type Settings, stateHost } from '@llama-webui/shared';
+import { isLoopback, stateHost } from '@llama-webui/shared';
 import {
   CircleAlert,
   Copy,
@@ -22,11 +22,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LogRow } from '@/features/logs/LogRow';
-import { api } from '@/lib/api';
+import { call, client } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatDuration, formatInt } from '@/lib/format';
 import { useLogs } from '@/lib/logs';
 import { useProfiles } from '@/lib/profiles';
+import { getServerProps, isRecord } from '@/lib/props';
 import { isRunning, restartServer, startProfile, stopServer, switchProfile, useServer } from '@/lib/server';
 import { useNow } from '@/lib/useNow';
 import { ServerStateBadge } from './ServerStateBadge';
@@ -43,7 +44,7 @@ export function ServerPage() {
 
   useEffect(() => {
     void reload().catch(() => {});
-    void api<Settings>('/settings').then(
+    void call(client.settings.$get()).then(
       (s) => setDefaultId(s.defaultProfileId),
       () => {},
     );
@@ -215,12 +216,12 @@ function PropsCard() {
     setProps(null);
     setError(null);
     if (!key) return;
-    api<Props>('/server/props').then(setProps, (e: Error) => setError(e.message));
+    getServerProps().then(setProps, (e: Error) => setError(e.message));
   }, [key]);
 
-  const gen = (props?.default_generation_settings ?? {}) as Props;
-  const modalities = Object.entries((props?.modalities ?? {}) as Record<string, boolean>)
-    .filter(([, on]) => on)
+  const gen: Props = isRecord(props?.default_generation_settings) ? props.default_generation_settings : {};
+  const modalities = Object.entries(isRecord(props?.modalities) ? props.modalities : {})
+    .filter(([, on]) => on === true)
     .map(([m]) => ({ vision: 'image', video: 'video', audio: 'audio' })[m] ?? m);
 
   return (

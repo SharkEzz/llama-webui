@@ -1,13 +1,18 @@
 import type { WsMessage } from '@llama-webui/shared';
-import type { ServerWebSocket } from 'bun';
+
+/** What the hub needs of a client socket: a `ws` socket (`server/ws/attach.ts`). */
+export interface WsLike {
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+}
 
 const PING_INTERVAL_MS = 15_000;
 const MAX_MISSED_PINGS = 2;
 
 /** WS client registry: broadcast and heartbeat (ping every 15 s, close after 2 pings without a pong). */
 export class WsHub {
-  private readonly clients = new Map<ServerWebSocket<unknown>, { missed: number }>();
-  private readonly timer: Timer;
+  private readonly clients = new Map<WsLike, { missed: number }>();
+  private readonly timer: ReturnType<typeof setInterval>;
 
   constructor(
     private readonly bootId: string,
@@ -16,17 +21,17 @@ export class WsHub {
     this.timer = setInterval(() => this.heartbeat(), pingIntervalMs);
   }
 
-  attach(ws: ServerWebSocket<unknown>): void {
+  attach(ws: WsLike): void {
     this.clients.set(ws, { missed: 0 });
     this.send(ws, { type: 'hello', payload: { serverTime: Date.now(), bootId: this.bootId } });
   }
 
-  detach(ws: ServerWebSocket<unknown>): void {
+  detach(ws: WsLike): void {
     this.clients.delete(ws);
   }
 
   /** Call for every text message received from a client. */
-  receive(ws: ServerWebSocket<unknown>, raw: string | Buffer): void {
+  receive(ws: WsLike, raw: string | Buffer): void {
     let msg: WsMessage;
     try {
       msg = JSON.parse(String(raw));
@@ -56,7 +61,7 @@ export class WsHub {
     this.clients.clear();
   }
 
-  private send(ws: ServerWebSocket<unknown>, msg: WsMessage): void {
+  private send(ws: WsLike, msg: WsMessage): void {
     ws.send(JSON.stringify(msg));
   }
 

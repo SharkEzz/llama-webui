@@ -13,16 +13,16 @@ export type CliResult = { kind: 'run'; options: CliOptions } | { kind: 'help' } 
 export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 7860;
 
-const SOURCE_USAGE = `  bun run dev [options]      development (bun --hot, HMR)
-  bun run start [options]    production`;
-const STANDALONE_USAGE = '  llama-webui [options]';
+const USAGE = `  llama-webui [options]   installed package (npm install -g llama-webui-<version>.tgz)
+  pnpm dev [options]      development (Vite, HMR), from the repository
+  pnpm start [options]    production (builds, then runs dist/server/main.js), from the repository`;
 
-/** `--help`; the usage lines depend on how it runs: compiled executable or from source. */
-export const helpText = (standalone = Bun.isStandaloneExecutable) => `llama-webui: web UI to drive llama-server \
-(API, WebSocket and UI in a single Bun process).
+/** `--help`. */
+export const helpText = () => `llama-webui: web UI to drive llama-server \
+(API, WebSocket and UI in a single Node.js process).
 
 Usage:
-${standalone ? STANDALONE_USAGE : SOURCE_USAGE}
+${USAGE}
 
 Options:
   --host <address>       listen address (default: ${DEFAULT_HOST}); 0.0.0.0 to open it to the local network
@@ -33,6 +33,9 @@ Options:
   --data-dir <path>      data directory (SQLite database); default: $XDG_DATA_HOME/llama-webui,
                          else ~/.local/share/llama-webui
                          env: LLAMA_WEBUI_DATA_DIR
+  --env-override         let .env (working directory, loaded at startup) replace the variables the environment
+                         already sets; without it, .env only fills those it does not set
+                         env: LLAMA_WEBUI_ENV_OVERRIDE=1 (in the environment or in .env)
   -h, --help             show this help
 
 A flag takes precedence over the matching environment variable.
@@ -42,6 +45,9 @@ Hugging Face downloads (Models page):
                          saved by \`hf auth login\` is used (HF_TOKEN_PATH, else $HF_HOME/token,
                          default ~/.cache/huggingface/token)
   HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
+  HTTPS_PROXY, HTTP_PROXY, NO_PROXY
+                         proxy for the requests to Hugging Face; localhost and loopback addresses are
+                         never proxied
 `;
 
 function parsePort(raw: string, source: string): number | string {
@@ -51,9 +57,9 @@ function parsePort(raw: string, source: string): number | string {
   return port;
 }
 
-/** Reads the arguments (without `bun` or the script) and the environment; never exits, reads nothing else. */
+/** Reads the arguments (without `node` or the script) and the environment; never exits, reads nothing else. */
 export function parseCli(argv: string[], env: Record<string, string | undefined> = process.env): CliResult {
-  let values: { host?: string; port?: string; 'data-dir'?: string; help?: boolean };
+  let values: { host?: string; port?: string; 'data-dir'?: string; 'env-override'?: boolean; help?: boolean };
   try {
     ({ values } = parseArgs({
       args: argv,
@@ -61,6 +67,8 @@ export function parseCli(argv: string[], env: Record<string, string | undefined>
         host: { type: 'string' },
         port: { type: 'string' },
         'data-dir': { type: 'string' },
+        // Applied by the entry points (`loadDotEnv`), before the options are parsed: declared for strict parsing.
+        'env-override': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
       strict: true,
@@ -89,7 +97,7 @@ export function parseCli(argv: string[], env: Record<string, string | undefined>
 }
 
 /** Process launch options; prints the help (code 0) or the error (code 2) and exits when needed. */
-export function cliOptionsOrExit(argv = Bun.argv.slice(2)): CliOptions {
+export function cliOptionsOrExit(argv = process.argv.slice(2)): CliOptions {
   const res = parseCli(argv);
   if (res.kind === 'run') return res.options;
   if (res.kind === 'help') {

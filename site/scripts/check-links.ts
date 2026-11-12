@@ -1,25 +1,25 @@
 /**
- * Checks every internal link of the built site (dist/, after `bun run build`): the target page or file exists, page
+ * Checks every internal link of the built site (dist/, after `pnpm build`): the target page or file exists, page
  * links use the trailing-slash form, and #anchors exist on their page. Exits with 1 and lists the broken links.
  * External links are not fetched.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, globSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { classify, extractLinks, type PageLinks } from './links.ts';
 
 const BASE = '/llama-webui/';
-const dist = join(import.meta.dir, '..', 'dist');
+const dist = join(import.meta.dirname, '..', 'dist');
 
 if (!existsSync(join(dist, 'index.html'))) {
-  console.error('check-links: dist/index.html not found, run `bun run build` first');
+  console.error('check-links: dist/index.html not found, run `pnpm build` first');
   process.exit(1);
 }
 
 // 404.html is the SPA fallback (an empty shell, rendered in the browser): nothing to check in it.
-const files = [...new Bun.Glob('**/index.html').scanSync(dist)].sort();
+const files = globSync('**/index.html', { cwd: dist }).sort();
 const pages = new Map<string, PageLinks>();
 for (const file of files) {
-  pages.set(file.replace(/index\.html$/, ''), extractLinks(await Bun.file(join(dist, file)).text()));
+  pages.set(file.replace(/index\.html$/, ''), extractLinks(readFileSync(join(dist, file), 'utf8')));
 }
 
 const broken: string[] = [];

@@ -1,43 +1,58 @@
 ---
 title: Architecture
-description: The single Bun process behind llama-webui, its startup and shutdown, the REST, WebSocket and SSE channels, UI serving, and the bun --hot pitfall.
+description: The single Node.js process behind llama-webui, its startup and shutdown, the REST, WebSocket and SSE channels, UI serving, and the development reload pitfall.
 ---
 
-llama-webui is one Bun process. `server/index.ts` builds every service and `server/app.ts` hands them to `Bun.serve`,
-which serves the web UI, the REST API under `/api/*` and the `/ws` WebSocket on one port (7860 by default). The same
-process supervises one `llama-server`, samples the hardware, runs benchmarks and relays chat generations.
+llama-webui is one Node.js process (Node 26.13 or later). `server/index.ts` builds every service and `mount()`
+(`server/host.ts`) puts them on one `node:http` server, which serves the web UI, the REST API under `/api/*` and the
+`/ws` WebSocket on one port (7860 by default). The same process supervises one `llama-server`, samples the hardware,
+runs benchmarks and relays chat generations.
 
 <ArchitectureDiagram />
 
 ## Startup sequence
 
-`server/index.ts` is the entry point of both `bun run dev` and `bun run start`. Under `bun --hot` it is evaluated again
-on every reload, so it is written to run more than once. In order, it:
+`server/index.ts` is the composition root of both `pnpm dev` and `pnpm start`. In development, `server/dev.ts`
+evaluates it again on every server-side save, inside the same process, so it is written to run more than once. In
+production, `server/main.ts` (bundled to `dist/server/main.js`) sets `NODE_ENV` to `production` if it is unset and
+imports it. Both entry points first load `.env` from the working directory (`loadDotEnv()`, `server/env.ts`): its
+variables fill what the environment lacks, and replace it too with `--env-override`
+(read from the arguments before they are parsed) or `LLAMA_WEBUI_ENV_OVERRIDE=1`. Only that file is read (no
+`.env.local`, no per-mode file), and `parseEnv()` does not expand `$VAR` references. They then call `useEnvProxy()`
+(same file): with `HTTP_PROXY` or `HTTPS_PROXY` set, `fetch` goes through that proxy, loopback excepted (see
+[Hugging Face](/developers/server/hugging-face/)). In order, `server/index.ts`:
 
 1. Reads the launch options with `cliOptionsOrExit()` (see [Launch options](#launch-options)).
-2. Calls `globalThis.__llamaWebuiDispose()` if a previous evaluation left one, to release that instance (see
-   [What a reload recreates](#what-a-reload-recreates)).
-3. Opens the database with `openDb(dbPath(cli.dataDir))`: creates the data directory, opens
-   `llama-webui.sqlite` with `bun:sqlite`, sets `journal_mode = WAL` and `foreign_keys = ON`, and runs the migrations.
-4. Gets the runtime with `getRuntime()` (`server/runtime.ts`): the supervisor, the log ring, the boot id and the bench
+2. Opens the database with `openDb(dbPath(cli.dataDir))`: creates the data directory, opens
+   `llama-webui.sqlite` with `node:sqlite`, sets `journal_mode = WAL` and `foreign_keys = ON`, and runs the migrations.
+3. Gets the runtime with `getRuntime()` (`server/runtime.ts`): the supervisor, the log ring, the boot id and the bench
    gate, created on the first call and kept on `globalThis` afterwards.
-5. Creates the `WsHub` with the runtime's `bootId`, and the settings, profiles and conversations repositories. Chat
-   replies left `streaming` by a killed process are marked `stopped` (`conversations.stopOrphans()`).
-6. Creates `ChatRuns`. Its `target()` sends generations to the managed server when it is `ready`, or to an external
-   server.
-7. Prepares the web routes: the HTML import in development and in the standalone executable, `Bun.build` in
-   production from source (see [Serving the UI](#serving-the-ui)).
-8. Starts the monitor with `startMonitor()`, once per process: later calls return the running one.
-9. Creates the bench repositories, the `RunExecutor` and the `BenchRunner`, and calls `benchRunner.resume()`. On a cold
-   start (bench gate not held), runs and sweeps left `running` are first marked `interrupted`.
-10. Creates the Hugging Face client and the `DownloadQueue`, and calls `downloads.resume()` to pick up the items left
-    queued or downloading.
-11. Creates the `PlacementTracker`, which replays the log ring to find the loaded model's placement.
-12. Calls `createApp()`, which starts `Bun.serve`.
-13. Subscribes the WebSocket hub to the services (table below), installs its shutdown handler, starts the external
-    server watcher, and stores its own dispose function in `globalThis.__llamaWebuiDispose`.
+4. Prepares the web handler: Vite's middlewares in development, the files of `pnpm build` in production (see
+   [Serving the UI](#serving-the-ui)).
+5. Starts the monitor with `startMonitor()`, once per process: later calls return the running one.
+6. Calls `createDeps()` (`server/deps.ts`), which only constructs and wires the services, without starting any work:
+   the `WsHub` with the runtime's `bootId`; the settings, profiles, conversations, bench run, sweep and download
+   repositories; `ChatRuns`, whose `target()` sends generations to the managed server when it is `ready`, or to an
+   external server; the `RunExecutor` and the `BenchRunner`; the Hugging Face client and the `DownloadQueue`; and the
+   `PlacementTracker`, which replays the log ring to find the loaded model's placement.
+7. Calls `mount()` with the API (`createApi(deps).fetch`), the hub and the web handler, on the development host's
+   HTTP server or on a new one (see [Routes](#routes)). The first mount listens on the port; a later one swaps the
+   listeners of the previous evaluation.
+8. Calls `globalThis.__llamaWebuiDispose()` if a previous evaluation left one, to release that instance (see
+   [What a reload recreates](#what-a-reload-recreates)). It comes after the new instance is built and mounted, so a
+   reload that fails before this point leaves the old one serving.
+9. Stores its own dispose function in `globalThis.__llamaWebuiDispose`, before the steps below: this instance is
+   mounted, so if one of them throws (a reload of a broken file), the next reload still finds it to release.
+10. Marks the chat replies left `streaming` by a killed process as `stopped` (`conversations.stopOrphans()`).
+11. Marks the runs and sweeps left `running` as `interrupted` on a cold start (bench gate not held), and calls
+   `benchRunner.resume()` in every case.
+12. Gives the monitor the profile → model path resolver it uses for the model's disk.
+13. Calls `downloads.resume()` to pick up the items left queued or downloading.
+14. Subscribes the WebSocket hub to the services (table below), installs its shutdown handler and starts the external
+    server watcher; each adds what undoes it to the `undo` list the dispose function runs.
 
-It finally prints `llama-webui on http://<host>:<port>`, followed by `(dev, HMR)` in development.
+It finally prints `llama-webui on http://<host>:<port>`, followed by `(dev, HMR)` in development or by the version
+in production.
 
 The services do not know about the WebSocket: `index.ts` passes them callbacks or subscribes to them, and broadcasts
 each event as a `WsMessage` to every client. The benchmark and sweep routes also broadcast directly when they delete
@@ -59,36 +74,44 @@ The external server watcher (`externalWatcher()` in `server/supervisor/external.
 
 ## Routes
 
-`createApp()` in `server/app.ts` passes a single `routes` object to `Bun.serve`:
+`mount()` in `server/host.ts` routes the requests of the `node:http` server by path:
 
-- `/api/health` and `/api/settings`, defined in `app.ts` itself;
-- the routes of each domain, spread from `server/routes/<domain>.ts`: `profileRoutes`, `serverRoutes`,
-  `monitorRoutes`, `modelRoutes`, `hfRoutes`, `chatRoutes`, `benchRoutes`, `sweepRoutes`, `tuningRoutes`,
-  `topologyRoutes` and `setupRoutes`;
-- `/api/*`, a catch-all that answers `404` with `{ "error": "Unknown route" }`, so an unknown API path never receives
-  the app's HTML;
-- `/ws`, which upgrades the request to a WebSocket or answers `426`;
-- the web routes, last: the UI files and the SPA fallback `/*`, so reloading `/chat/12` serves the app.
+- `/api/*`, handed to the [Hono](https://hono.dev) app built by `createApi()` (`server/api.ts`), through the
+  `getRequestListener()` adapter of `@hono/node-server`;
+- `/ws`: an upgrade runs `guard()`, then goes to a `WebSocketServer({ noServer: true })` of the `ws` library, which
+  hands the socket to the `WsHub` (`attachSocket()`, `server/ws/attach.ts`); a request without an upgrade runs
+  `guard()`, then gets `426`. A refused upgrade gets the guard's answer on the raw socket, which is destroyed once
+  the answer is flushed. A client message over 4,096 bytes (`maxPayload`: the protocol only has `ping` and `pong`)
+  closes the socket with code `1009`;
+- anything else, to the web handler: the UI files and the SPA fallback, so reloading `/chat/12` serves the app.
 
-Each route module exports a function that takes only the dependencies it needs and returns paths mapped to handlers
-by method. Every handler, `/ws` included, is wrapped in `guarded()`:
+Only a WebSocket upgrade takes that route: `mount()` sets the server's `shouldUpgradeCallback`, so a request with
+another `Upgrade` header (`h2c`, which `curl --http2` sends) is a plain request. An upgrade on another path is closed in
+production, and left to Vite's HMR WebSocket in development. A `Host` header
+that is not an authority gets `403` with `Invalid host`, as from the guard. A second `mount()` on the same server (a
+development reload) removes the listeners of the previous one before adding its own, and only the first one listens.
+
+`createApi()` mounts the request guard, the `405` table and the JSON charset middleware, defines `/api/health`, then
+mounts the routes of each domain from `server/routes/<domain>.ts` with `.route('/', …)`: `settingsRoutes`,
+`profileRoutes`, `serverRoutes`, `monitorRoutes`, `topologyRoutes`, `setupRoutes`, `modelRoutes`, `hfRoutes`,
+`tuningRoutes`, `chatRoutes`, `benchRoutes` and `sweepRoutes`. An unknown API path gets `404` with
+`{ "error": "Unknown route" }` (Hono's `notFound`), so it never receives the app's HTML, and whatever a route throws
+goes through `onError`.
+
+Each route module exports a function that takes only the dependencies it needs and returns a chained `Hono` app:
 
 ```ts title="server/routes/topology.ts"
-export function topologyRoutes({ placement }: TopologyRouteDeps) {
-  return {
-    '/api/topology': {
-      GET: guarded(async () => Response.json({ graph: await readPciTopology(), placement: placement.current })),
-    },
-  };
-}
+export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
+  new Hono<Env>().get('/api/topology', async (c) =>
+    c.json({ graph: await readPciTopology(), placement: placement.current }),
+  );
 ```
 
-`guarded()` (`server/http.ts`) runs `guard()` from `server/security.ts` first (Host header, Origin, JSON-only writes),
-then the handler, and turns any exception into a JSON response: an `HttpError` keeps its status and returns
-`{ error, code? }`, a `ZodError` becomes a `400` with the zod `issues`, a JSON `SyntaxError` a `400`, and anything else
-a `500` with `Internal error`. `idParam()`, `jsonObject()` and `notFound()` are the helpers routes use for path ids
-and bodies. The [API overview](/developers/api/overview/) documents the error shape and the
-[Security](/developers/server/security/) page the guard.
+`errorResponse()` (`server/http.ts`) turns an exception into a JSON response: an `HttpError` keeps its status and
+returns `{ error, code? }`, a `ZodError` becomes a `400` with the zod `issues`, invalid JSON a `400`, and anything
+else a `500` with `Internal error`. The `id()`, `body()` and `json()` validators and `notFound()` are the helpers
+routes use for path ids and bodies. The [API overview](/developers/api/overview/) documents the error shape and the
+order of the middlewares, the [Security](/developers/server/security/) page the guard.
 
 ## Channels to the browser
 
@@ -116,82 +139,76 @@ client).
 
 A chat generation belongs to the server, not to the HTTP request (see [Chat runs](/developers/server/chat/)). The SSE
 response only subscribes to the run: events `start`, `delta` and `done` (`ChatEvent` in `packages/webui-shared/src/chat.ts`,
-formatted by `formatSse()`), plus a `: ping` comment every `PING_MS = 15_000` ms. Bun closes a connection that stays
-silent for 10 seconds, so the route also disables the idle timeout for this request (`server.timeout(req, 0)`): a long
-prompt can be processed without sending anything. A client that leaves only unsubscribes; the generation goes on, and
-`GET /api/chat/:id/stream` attaches to it again.
+formatted by `formatSse()`), plus a `: ping` comment every `PING_MS = 15_000` ms: a long prompt can be processed
+without sending anything, and a proxy may drop a silent connection (Node's own server has no idle timeout). A client
+that leaves only unsubscribes; the generation goes on, and `GET /api/chat/:id/stream` attaches to it again.
 
 ## Serving the UI
 
-From source, the UI is never built ahead of time. `server/index.ts` picks one of three route sets: the HTML import
-in development, a build at startup in production, and the HTML import again, bundled at compile time, in the
-standalone executable (`Bun.isStandaloneExecutable`).
+One `vite.config.ts` at the root of the repository describes both halves of the app: the web client (`web/`, with
+`@vitejs/plugin-react` and `@tailwindcss/vite`) and the server (`server/main.ts`). `server/index.ts` picks the web
+handler `mount()` sends every other path to.
 
 ### Development
 
-`server/index.ts` imports `web/index.html` and serves it as `{ '/*': index }`. `Bun.serve` bundles the page on the fly,
-with hot module replacement and the browser console streamed to the terminal
-(`development: { hmr: true, console: true }`). Tailwind comes from `bun-plugin-tailwind`, declared in `bunfig.toml`
-under `[serve.static]`.
+`pnpm dev` runs `node server/dev.ts`. `startDev()` creates the `node:http` server and a Vite server in middleware mode
+(`appType: 'spa'`), whose HMR WebSocket shares that HTTP server, then publishes both on
+`globalThis.__llamaWebuiDevHost = { http, web }`. The web handler is Vite's middlewares: the UI is transformed on
+request, with hot module replacement. The server entry, `server/index.ts`, is evaluated by the module runner of
+Vite's `ssr` environment (see [The development reload pitfall](#the-development-reload-pitfall)).
 
 ### Production
 
-With `NODE_ENV=production`, `buildWebRoutes()` in `server/routes/web.ts` builds the front end once, at startup, in
-memory:
+`pnpm start` runs `pnpm build`, then `node dist/server/main.js`. `vite build` writes three outputs:
 
-```ts title="server/routes/web.ts"
-export const WEB_BUILD_OPTIONS = {
-  splitting: true,
-  minify: true,
-  // Absolute paths: a deep URL (/chat/12) must not look for its chunks under /chat/.
-  publicPath: '/',
-  define: { 'process.env.NODE_ENV': '"production"' },
-} as const satisfies Partial<Bun.BuildConfig>;
+- the client, `web/` → `dist/web`, split per page: each page loads only its own chunks, so the Topology page's
+  three.js (about 1 MB) stays out of the others;
+- the server, `server/main.ts` → `dist/server/main.js`, one file with its dependencies bundled, except `hono`,
+  `@hono/node-server` and `ws`, the network-facing ones, which stay `dependencies` installed with the app. The
+  licenses of the bundled code are written next to it, in `THIRD-PARTY-LICENSES.md`;
+- the NVML sampler, `server/collectors/nvml/worker.ts` → `dist/server/nvml-worker.js`, next to `main.js`, which starts
+  it as a child process. It has its own environment (`nvml`, build only): Rolldown takes a single input when code splitting is off, and
+  development runs the worker's sources as is.
 
-const result = await Bun.build({
-  ...WEB_BUILD_OPTIONS,
-  entrypoints: [entry],
-  target: 'browser',
-  plugins: await webPlugins(), // [tailwind], imported lazily
-});
-```
+The build also replaces `LLAMA_WEBUI_VERSION` (a `define`) with `git describe --tags --always --dirty`, or the version
+of `package.json` without git. It becomes `APP_VERSION` (`server/version.ts`), which `/api/health` reports and the
+status bar shows: the tag, else the short commit hash. In development, it is `dev`.
 
-Each output file becomes a route at `/<name>` with `Cache-Control: public, max-age=31536000, immutable` (the names are
-content-hashed). The HTML becomes the `/*` fallback with `Cache-Control: no-cache`, since it points to the current
-chunks. Nothing is written to disk.
+At startup, `staticWeb()` in `server/routes/web.ts` reads `dist/web` (next to the bundle: `dist/server/main.js` →
+`dist/web`) into memory once. A file's exact path is served with `Cache-Control: public, max-age=31536000, immutable`
+(the names are content-hashed). Any other path gets `index.html` with `Cache-Control: no-cache`, since it points to
+the current chunks.
 
-`Bun.serve`'s HTML import would also bundle the page in production, but into a single file: it ignores code splitting
-and inlines the router's `import()` calls, so every page would load everything, including the Topology page's
-three.js (about 1 MB). `Bun.build` splits, so each page loads only its own chunks. The `[serve.static]` plugins of
-`bunfig.toml` only apply to the HTML import, so a Bun plugin added there must also be added to `webPlugins()`, which
-both this build and the executable's use.
+If `dist/web` is missing or unreadable, `unavailableWeb()` serves a `503` with the error for every page until the next
+startup. The API, the WebSocket and `llama-server` control keep working.
 
-If the build fails (a broken import, a failing plugin), `unavailableWebRoutes()` serves a `503` with the error for
-every page until the next startup. The API, the WebSocket and `llama-server` control keep working.
+### Distribution
 
-### Standalone executable
+A release is the npm package of the repository's root: `pnpm pack` after `pnpm build` writes
+`llama-webui-<version>.tgz` (about 1.5 MB), which `npm install -g ./llama-webui-<version>.tgz` turns into a
+`llama-webui` command. The root `package.json` is the packed one:
 
-`bun run compile` (`scripts/compile.ts`) runs `Bun.build` with `compile` on `server/index.ts`, with the same
-`WEB_BUILD_OPTIONS` and `webPlugins()`. The `web/index.html` import is then bundled at compile time, split per page
-(unlike the on-the-fly bundling of `Bun.serve`) and embedded under `/$bunfs/root/`; `Bun.serve` serves that manifest
-from `{ '/*': index }`, with an ETag per file. The `define` also replaces `process.env.NODE_ENV` in the server code,
-so the executable always runs in production, without HMR. A second constant, `LLAMA_WEBUI_VERSION`, carries
-`git describe --tags --always --dirty` (or `--version <name>`) into `APP_VERSION` (`server/version.ts`), which
-`/api/health` reports and the status bar shows: the tag, else the short commit hash. From source, it is `dev`.
+- `bin` maps `llama-webui` to `dist/server/main.js`, which starts with `#!/usr/bin/env node`. Node runs it from its
+  real path, so `dist/web` and `nvml-worker.js` are found next to it even through the link npm creates.
+- `files` ships `dist/server` (the bundle, the NVML sampler and `THIRD-PARTY-LICENSES.md`) and `dist/web`, plus the
+  `README.md`, `LICENSE` and `package.json` npm always adds; `os` is `linux` and `engines` asks for Node.js 26.13.
+- `dependencies` are the three libraries left out of the bundle, `hono`, `@hono/node-server` and `ws`, at exact
+  versions (the pnpm catalog): an install from the tarball has no lockfile, and none of the three has dependencies of
+  its own, so the installed tree is exactly the one tested. The workspace packages and every other library are
+  bundled.
 
-Inside the executable, `import.meta.dir` is `/$bunfs/root`, so nothing may read the source tree at runtime:
+`node scripts/smoke.ts --tarball [file.tgz]` checks the package the way a user gets it: it packs the root (or takes
+the given tarball), installs it with npm into an empty prefix, checks that npm installed nothing but the package and
+those three versions, then runs the build's smoke checks through `node_modules/.bin/llama-webui`. Packing never
+builds: `pnpm pack` runs `scripts/prepack.ts` first, which refuses without `dist/server/main.js`,
+`dist/server/nvml-worker.js` and `dist/web/index.html`, so a package without its command cannot be written; run
+`pnpm build` before it. CI runs it on every
+pull request, and `release.yml` runs it on the tarball it publishes.
 
-- the startup build is skipped, and `bun-plugin-tailwind` (with its native binding) is imported lazily by
-  `webPlugins()` and marked `external`, so it stays out of the binary;
-- the NVML worker (`server/collectors/nvml/worker.ts`) is a second compile entrypoint. Bundled, `monitor.ts` lives in
-  the entrypoint, so `workerUrl()` resolves the worker against `Bun.main` (`collectors/nvml/worker.ts`, relative to
-  `server/`, the entrypoints' root) instead of `import.meta.url`. Without it, NVML would silently fall back to
-  `nvidia-smi`;
-- `bunfig.toml` autoloading is off (`autoloadBunfig: false`); `.env` in the working directory is still loaded, as
-  with `bun run start`.
-
-`.github/workflows/release.yml` builds `llama-webui-linux-x64` and `llama-webui-linux-arm64` for every `v*` tag,
-smoke-tests the x64 one and attaches both, with `SHA256SUMS`, to the GitHub Release.
+Up to v0.2.1, llama-webui ran on Bun and shipped as a standalone executable. The port to Node.js kept the API's answers
+but one: the contract suite replays each route against a golden record taken before the move to Hono and to
+Node.js, and changed once on purpose (an invalid `Host` gets `403` instead of `500`)
+([Testing](/developers/contributing/testing/)).
 
 ## Launch options
 
@@ -206,7 +223,7 @@ variable counts as unset.
 
 `parseCli()` is pure: it takes the arguments and the environment and returns `run`, `help` or `error`, which keeps it
 testable. `cliOptionsOrExit()` prints `HELP_TEXT` and exits with code 0 for `-h`/`--help`, or prints the error and the
-help and exits with code 2. The options are read again on every `bun --hot` reload, with the same arguments. User-facing
+help and exits with code 2. The options are read again on every development reload, with the same arguments. User-facing
 details are on [Launch options](/docs/configuration/).
 
 ## Shutdown
@@ -221,16 +238,22 @@ Two handlers run on `SIGINT` and `SIGTERM`:
 2. The runtime's handler, installed once by `getRuntime()`: it stops the monitor, stops the managed `llama-server`
    (`SIGTERM`, then `SIGKILL` after 5 seconds), and exits with code 0. A second signal during this stop is ignored.
 
-A `process.on('exit')` handler also kills the managed server with `SIGKILL` as a last resort. If Bun dies without
+A `process.on('exit')` handler also kills the managed server with `SIGKILL` as a last resort. If the process dies without
 running any handler, `setpriv --pdeathsig KILL` makes the kernel kill `llama-server` and `llama-bench` with it. On the
 next start, the orphan cleanup of the [startup sequence](#startup-sequence) settles whatever was left `streaming` or
 `running`.
 
-## The `bun --hot` pitfall
+## The development reload pitfall
 
-`bun run dev` runs under `bun --hot`. On every save, Bun resets its module registry and evaluates every module again,
-inside the same process: `globalThis` survives, module-level state does not. Without care, each save would create a
-new supervisor that has lost track of the running `llama-server`, and kill or orphan the loaded model.
+`pnpm dev` watches `server/` and `packages/`. On every save there, the module runner of `server/dev.ts` evaluates
+`server/index.ts` and the modules it imports again, inside the same process: `globalThis` survives, module-level
+state does not. Without care, each save would create a new supervisor that has lost track of the running
+`llama-server`, and kill or orphan the loaded model.
+
+A reload that fails (a syntax error, an import of a missing file) leaves the previous instance serving, and the next
+save that fixes it reloads again. A first evaluation that fails (`pnpm dev` started while a file is broken) waits the
+same way, with nothing listening yet; only a listen error (port taken) ends `pnpm dev`. `server/dev.ts` also replays a change its file watcher drops, a second write less
+than 50 ms after the first (a format on save), so the reload always runs the last content.
 
 ### What survives a reload
 
@@ -240,9 +263,9 @@ new supervisor that has lost track of the running `llama-server`, and kill or or
 export interface Runtime {
   supervisor: Supervisor;
   logs: LogBuffer;
-  /** ID of this llama-webui boot (stable across bun --hot): the client ties log numbering to it. */
+  /** ID of this llama-webui boot (stable across development reloads): the client ties log numbering to it. */
   bootId: string;
-  /** Always-on monitoring, started once by startMonitor() (also survives bun --hot). */
+  /** Always-on monitoring, started once by startMonitor() (also survives development reloads). */
   monitor: Promise<Monitor> | null;
   /** Server gate during benchmarks: held across a reload, so a sweep resumes without a restart. */
   benchGate: BenchGate;
@@ -252,18 +275,20 @@ export interface Runtime {
 - `supervisor`: the managed `llama-server`, its state and its child process.
 - `logs`: the `LogBuffer` ring of 10,000 lines.
 - `bootId`: `crypto.randomUUID()`, generated once per process. The client compares it to detect a real restart.
-- `monitor`: the `Monitor`, with its collectors and the NVML worker, started once by `startMonitor()`.
+- `monitor`: the `Monitor`, with its collectors and the NVML sampler process, started once by `startMonitor()`.
 - `benchGate` (`server/bench/gate.ts`): the gate that stops the managed server for a benchmark and restarts it
   afterwards. It is held across a reload so that a sweep continues in the new module without restarting the server in
   between.
 
-The shutdown signal handlers are installed once, with the runtime.
+The shutdown signal handlers are installed once, with the runtime. The development host
+(`globalThis.__llamaWebuiDevHost`: the HTTP server and Vite's middlewares) belongs to `server/dev.ts` and is never
+re-evaluated: every evaluation of `server/index.ts` mounts on it again.
 
 ### Files that need a full restart
 
 These objects were built from the first evaluation of their modules. After a reload the new code is loaded, but the
 live objects keep running the old one, along with the modules they imported at startup. A change to these files
-therefore has no effect until Bun restarts:
+therefore has no effect until the process restarts:
 
 - `server/supervisor/supervisor.ts`, and what it imports: `llamacpp-js/client` (`probeHealth()`), `llamacpp-js/node`
   (`findLlamaServerPid()`) and `server/logs/lines.ts` (`LineSplitter`)
@@ -272,15 +297,18 @@ therefore has no effect until Bun restarts:
 - `server/monitor/**`, except `server/monitor/placement.ts` (the `PlacementTracker` is recreated on every reload)
 - `server/collectors/**`
 - `packages/llamacpp-js/src/**`, imported by the supervisor and the monitor (`fetchLlama()`, the `/metrics` math)
+- `server/proc.ts`, imported by the supervisor and the collectors (`spawnProc()`, `readText()`)
 - `server/runtime.ts`
 
-After changing any of them, stop Bun with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run `bun run dev` again.
+After changing any of them, stop `pnpm dev` with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run it again.
 
 ### What a reload recreates
 
-Everything else in `server/index.ts` is created again: the database connection, the WebSocket hub, the repositories,
+Everything else `server/index.ts` and `createDeps()` build is created again: the database connection, the WebSocket hub, the repositories,
 `ChatRuns`, `RunExecutor`, `BenchRunner`, the Hugging Face client, the `DownloadQueue`, the `PlacementTracker` and the
-`Bun.serve` routes. Before that, the new evaluation calls the dispose function the previous one left on `globalThis`.
+listeners `mount()` puts on the HTTP server. Once it has mounted them, the new evaluation calls the dispose function
+the previous one left on `globalThis`, then stores its own before it starts any work: an evaluation that throws
+after its mount is released by the next reload like any other.
 It clears the external server timer, unsubscribes from the supervisor, the logs, the monitor and the placement,
 removes its signal handlers, disposes the hub (every socket is closed with code `1001`), `ChatRuns`, the bench runner
 and the download queue, and closes the database.
@@ -311,8 +339,3 @@ object that lives in the runtime.
 `HttpError` does the same (`override name = 'HttpError'`): the bench gate lives in the runtime and throws the class
 of the first evaluation of `server/http.ts`, so `errorResponse()` recognizes it with `isHttpError()` (its `name` and a
 numeric `status`) rather than `instanceof`. Its refusals keep their `409` and `code: "server-running"` after a reload.
-
-### New files in web/src
-
-The development bundler may not see a file created under `web/src/` after `bun run dev` started: the import fails with
-"Could not resolve" while `bun check` passes. Restart `bun run dev`.

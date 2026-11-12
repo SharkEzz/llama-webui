@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import {
   type BenchHardware,
   type BenchLive,
@@ -12,6 +13,7 @@ import {
 import type { BenchFinish, BenchRunsRepo } from '../db/benchRuns';
 import type { SweepsRepo } from '../db/sweeps';
 import { HttpError, notFound } from '../http';
+import { fileExists } from '../proc';
 import type { BuiltCommand } from '../supervisor/args';
 import type { RunExecutor } from './execute';
 import type { BenchGate } from './gate';
@@ -50,7 +52,7 @@ const INTERRUPTED = 'interrupted (llama-webui reloaded or stopped)';
 
 /**
  * The benchmarks: one-off runs and sweeps, one at a time. The gate stops the managed server once and restarts it
- * once; the executor runs each run. Recreated on every `bun --hot` reload: dispose() hands over and the
+ * once; the executor runs each run. Recreated on every development reload: dispose() hands over and the
  * new runner resumes a running sweep (resume).
  */
 export class BenchRunner {
@@ -91,8 +93,8 @@ export class BenchRunner {
   }
 
   private async checkFiles(spec: Pick<BenchSpec, 'modelPath' | 'mmprojPath'>): Promise<void> {
-    if (!(await Bun.file(spec.modelPath).exists())) throw new HttpError(400, `Model not found: ${spec.modelPath}`);
-    if (spec.mmprojPath && !(await Bun.file(spec.mmprojPath).exists()))
+    if (!(await fileExists(spec.modelPath))) throw new HttpError(400, `Model not found: ${spec.modelPath}`);
+    if (spec.mmprojPath && !(await fileExists(spec.mmprojPath)))
       throw new HttpError(400, `Projector not found: ${spec.mmprojPath}`);
   }
 
@@ -251,7 +253,7 @@ export class BenchRunner {
       if (!done) return;
       lastRun = done.id;
       this.deps.onSweep(this.deps.sweeps.get(id)!);
-      if (this.deps.pauseMs !== 0 && this.deps.repo.nextQueued(id)) await Bun.sleep(this.deps.pauseMs ?? 1000);
+      if (this.deps.pauseMs !== 0 && this.deps.repo.nextQueued(id)) await sleep(this.deps.pauseMs ?? 1000);
     }
     if (this.disposed) return;
     const sw = this.deps.sweeps.setStatus(id, state.cancelled ? 'cancelled' : 'done', {
@@ -328,7 +330,7 @@ export class BenchRunner {
   }
 
   /**
-   * Reload (`restart: true`) or Bun shutdown. The child is killed. A one-off run is “interrupted”; a sweep item goes
+   * Reload (`restart: true`) or shutdown. The child is killed. A one-off run is “interrupted”; a sweep item goes
    * back to the queue on reload (the new runner replays it) and the sweep stays “running”. The gate is handed back
    * later: the new module takes it over, otherwise it restarts the server.
    */

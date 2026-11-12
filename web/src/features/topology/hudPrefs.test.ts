@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { parseCollapsed } from './hudPrefs';
 
 test('parseCollapsed: cards are open by default, only known cards and booleans are kept', () => {

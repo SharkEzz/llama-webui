@@ -6,11 +6,12 @@ import {
   PRESET_IDS,
   SweepSpecSchema,
 } from '@llama-webui/shared';
+import { Hono } from 'hono';
 import { benchBinary } from 'llamacpp-js/node';
 import { z } from 'zod';
 import type { BenchRunner } from '../bench/runner';
 import type { SettingsRepo } from '../db/settings';
-import { guarded, HttpError, jsonObject } from '../http';
+import { body, type Env, HttpError, json, object, query } from '../http';
 import type { Monitor } from '../monitor/monitor';
 import type { Runtime } from '../runtime';
 import { binaryPath } from '../supervisor/args';
@@ -39,6 +40,8 @@ const EstimateRequest = z.strictObject({
 });
 
 /** Latest disk measurements and estimates, per model (in memory: lost on reload, which is harmless). */
+const DiskSpeedRequest = z.strictObject({ modelPath: z.string().min(1) });
+
 const diskSpeeds = new Map<string, DiskSpeed>();
 const lastEstimates = new Map<string, Estimate>();
 
@@ -50,13 +53,11 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
       gpus: monitor.latest()?.allGpus,
     });
 
-  return {
-    '/api/tuning/hardware': {
-      GET: guarded(async () => Response.json(await hardware())),
-    },
-    '/api/tuning/estimate': {
-      POST: guarded(async (req) => {
-        const body = EstimateRequest.parse(await jsonObject(req));
+  return (
+    new Hono<Env>()
+      .get('/api/tuning/hardware', async (c) => c.json(await hardware()))
+      .post('/api/tuning/estimate', body(EstimateRequest, { object: true }), async (c) => {
+        const body = c.req.valid('json');
         const [model, mmproj, hw] = await Promise.all([
           loadModel(body.modelPath),
           mmprojBytes(body.mmprojPath),
@@ -64,23 +65,20 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
         ]);
         const e = estimate({ model, hw, preset: body.preset, mmprojBytes: mmproj, pinned: body.pinned, ctx: body.ctx });
         lastEstimates.set(body.modelPath, e);
-        return Response.json(e);
-      }),
-    },
-    '/api/tuning/plan': {
-      POST: guarded(async (req) => {
-        const spec = SweepSpecSchema.parse((await jsonObject(req)).spec);
+        return c.json(e);
+      })
+      // The spec is a field of the body: its errors keep their paths (`modelPath`, not `spec.modelPath`).
+      .post('/api/tuning/plan', json(object), async (c) => {
+        const spec = SweepSpecSchema.parse(c.req.valid('json').spec);
         const [model, mmproj, hw] = await Promise.all([
           loadModel(spec.modelPath),
           mmprojBytes(spec.mmprojPath),
           hardware(),
         ]);
-        return Response.json(planSweep({ model, hw, spec, mmprojBytes: mmproj }));
-      }),
-    },
-    '/api/tuning/checks': {
-      GET: guarded(async (req) => {
-        const modelPath = new URL(req.url).searchParams.get('model') || null;
+        return c.json(planSweep({ model, hw, spec, mmprojBytes: mmproj }));
+      })
+      .get('/api/tuning/checks', query('model'), async (c) => {
+        const modelPath = new URL(c.req.url).searchParams.get('model') || null;
         const snap = monitor.latest();
         const gpus = snap?.allGpus ?? [];
         const [hw, model, readings] = await Promise.all([
@@ -109,18 +107,15 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
           now: Date.now(),
         });
         const report: ChecksReport = { checks, summary: summarize(checks), at: Date.now() };
-        return Response.json(report);
-      }),
-    },
-    '/api/tuning/disk-speed': {
-      POST: guarded(async (req) => {
-        const { modelPath } = z.strictObject({ modelPath: z.string().min(1) }).parse(await jsonObject(req));
+        return c.json(report);
+      })
+      .post('/api/tuning/disk-speed', body(DiskSpeedRequest, { object: true }), async (c) => {
+        const { modelPath } = c.req.valid('json');
         if (benchRunner.busy) throw new HttpError(409, 'A benchmark is running: the measurement would be skewed');
         await loadModel(modelPath);
         const d = await measureDiskSpeed(modelPath);
         diskSpeeds.set(modelPath, d);
-        return Response.json(d);
-      }),
-    },
-  };
+        return c.json(d);
+      })
+  );
 }

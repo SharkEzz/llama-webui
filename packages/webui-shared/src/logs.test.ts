@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { type LogLine, type LogView, mergeLogs, onBoot } from './logs';
 
 const line = (seq: number): LogLine => ({ seq, text: `l${seq}`, level: 'info', kind: 'other' });

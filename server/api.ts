@@ -1,4 +1,4 @@
-import type { Database } from 'bun:sqlite';
+import { Hono } from 'hono';
 import type { BenchRunner } from './bench/runner';
 import type { ChatRuns } from './chat/runs';
 import type { BenchRunsRepo } from './db/benchRuns';
@@ -6,10 +6,11 @@ import type { ConversationsRepo } from './db/conversations';
 import type { DownloadsRepo } from './db/downloads';
 import type { ProfilesRepo } from './db/profiles';
 import type { SettingsRepo } from './db/settings';
+import type { Database } from './db/sqlite';
 import type { SweepsRepo } from './db/sweeps';
 import type { HfClient } from './hf/client';
 import type { DownloadQueue } from './hf/downloader';
-import { guarded, withMethodNotAllowed } from './http';
+import { allowTable, apiRoutes, type Env, errorResponse, guardMw, jsonCharset } from './http';
 import type { Monitor } from './monitor/monitor';
 import type { PlacementTracker } from './monitor/placement';
 import { benchRoutes } from './routes/bench';
@@ -24,11 +25,11 @@ import { setupRoutes } from './routes/setup';
 import { sweepRoutes } from './routes/sweeps';
 import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
-import type { WebRoutes } from './routes/web';
 import type { Runtime } from './runtime';
 import { APP_VERSION } from './version';
 import type { WsHub } from './ws/hub';
 
+/** The objects the API is made of (`createDeps()`, `server/deps.ts`). */
 export interface AppDeps {
   db: Database;
   hub: WsHub;
@@ -48,49 +49,39 @@ export interface AppDeps {
   monitor: Monitor;
   /** Placement of the loaded model (from llama-server logs), for the Topology page. */
   placement: PlacementTracker;
-  /** Web UI: HTML import (development, HMR) or files built at startup (production). */
-  web: WebRoutes;
+  /** The listen address (`--host`): the first-run checks say whether the UI is open to the network. */
   hostname: string;
-  port: number;
-  development: boolean;
 }
 
 const startedAt = Date.now();
 
-export function createApp(deps: AppDeps) {
-  const { hub, settings, monitor, port, development } = deps;
-  return Bun.serve({
-    port,
-    hostname: deps.hostname,
-    development: development ? { hmr: true, console: true } : false,
-    routes: withMethodNotAllowed({
-      '/api/health': {
-        GET: guarded(() => Response.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt })),
-      },
-      ...settingsRoutes({ settings, monitor }),
-      ...profileRoutes(deps),
-      ...serverRoutes({ ...deps, benchBusy: () => deps.benchRunner.busy }),
-      ...monitorRoutes({ monitor, bootId: deps.runtime.bootId }),
-      ...modelRoutes(deps),
-      ...hfRoutes(deps),
-      ...chatRoutes(deps),
-      ...benchRoutes(deps),
-      ...sweepRoutes(deps),
-      ...tuningRoutes(deps),
-      ...topologyRoutes(deps),
-      ...setupRoutes(deps),
-      '/api/*': guarded(() => Response.json({ error: 'Unknown route' }, { status: 404 })),
-      '/ws': guarded((req, server) => {
-        if (server.upgrade(req)) return undefined;
-        return new Response('WebSocket upgrade expected', { status: 426 });
-      }),
-      // Any other path serves the app (SPA fallback `/*`: reloading /chat works).
-      ...deps.web,
-    }),
-    websocket: {
-      open: (ws) => hub.attach(ws),
-      message: (ws, msg) => hub.receive(ws, msg),
-      close: (ws) => hub.detach(ws),
-    },
-  });
+/**
+ * The HTTP API (`/api/*`): one chained Hono app, one `.route()` per domain file. Every request goes through the
+ * charset fix, the guard (host, origin, JSON) and the 405 table first; within a domain file, a static path is
+ * registered before the `:param` pattern that would catch it (Hono matches in registration order).
+ */
+export function createApi(deps: AppDeps) {
+  const { settings, monitor } = deps;
+  const allow = allowTable();
+  const api = new Hono<Env>()
+    .use(jsonCharset, guardMw, allow.mw)
+    .get('/api/health', (c) => c.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt }))
+    .route('/', settingsRoutes({ settings, monitor }))
+    .route('/', profileRoutes(deps))
+    .route('/', serverRoutes({ ...deps, benchBusy: () => deps.benchRunner.busy }))
+    .route('/', monitorRoutes({ monitor, bootId: deps.runtime.bootId }))
+    .route('/', topologyRoutes(deps))
+    .route('/', setupRoutes(deps))
+    .route('/', modelRoutes(deps))
+    .route('/', hfRoutes(deps))
+    .route('/', tuningRoutes(deps))
+    .route('/', chatRoutes(deps))
+    .route('/', benchRoutes(deps))
+    .route('/', sweepRoutes(deps));
+  allow.load(apiRoutes(api));
+  api.notFound((c) => c.json({ error: 'Unknown route' }, 404));
+  api.onError((err) => errorResponse(err));
+  return api;
 }
+
+export type AppType = ReturnType<typeof createApi>;

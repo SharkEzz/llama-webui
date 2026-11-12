@@ -1,10 +1,11 @@
 ---
 title: Health and settings
-description: The routes server/app.ts defines itself, the health check and the settings read and patch, with every field of the settings schema.
+description: The health check createApi defines itself and the settings read and patch, with every field of the settings schema, plus the fallbacks of the host.
 ---
 
-`server/app.ts` defines a few routes itself, next to the domain tables it spreads in: the health check, the settings,
-the `/api/*` fallback and the `/ws` upgrade. The settings schema is `SettingsSchema` (`packages/webui-shared/src/settings.ts`), stored
+`createApi()` (`server/api.ts`) defines the health check itself, next to the domain apps it mounts (the settings come
+from `server/routes/settings.ts`), and the `/api/*` fallback; `mount()` (`server/host.ts`) adds the `/ws` upgrade and
+the web app. The settings schema is `SettingsSchema` (`packages/webui-shared/src/settings.ts`), stored
 by `SettingsRepo` (`server/db/settings.ts`). The common rules (guard, error shape, `400` on invalid data) are on the
 [API overview](/developers/api/overview/).
 
@@ -14,7 +15,7 @@ by `SettingsRepo` (`server/db/settings.ts`). The common rules (guard, error shap
 
 <Endpoint method="GET" path="/api/health" />
 
-Answers as long as the Bun process serves requests, whatever the state of `llama-server`. It goes through the guard
+Answers as long as the Node.js process serves requests, whatever the state of `llama-server`. It goes through the guard
 like every API route.
 
 **Response**: `200`
@@ -22,8 +23,8 @@ like every API route.
 | Field      | Type    | Description                                                                 |
 | ---------- | ------- | --------------------------------------------------------------------------- |
 | `ok`       | boolean | Always `true`.                                                              |
-| `version`  | string  | `APP_VERSION` (`server/version.ts`): `dev` from source; in the executable, `git describe` at compile time (tag, else short commit hash). Shown in the status bar. |
-| `uptimeMs` | number  | Milliseconds since `server/app.ts` was loaded (`startedAt`).                |
+| `version`  | string  | `APP_VERSION` (`server/version.ts`): `dev` in development (`pnpm dev`); in a build (`pnpm build`), `git describe --tags --always --dirty` at build time (tag, else short commit hash), the `package.json` version without git. Shown in the status bar. |
+| `uptimeMs` | number  | Milliseconds since `server/api.ts` was loaded (`startedAt`).                |
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/health
@@ -136,11 +137,11 @@ curl -X PATCH http://127.0.0.1:7860/api/settings \
 
 ## Fallbacks
 
-`server/app.ts` also registers, after the domain routes:
+After the domain routes, `createApi()` and `mount()` (`server/host.ts`) handle:
 
-- `/api/*`: any other path under `/api/` gets `404` `{ "error": "Unknown route" }`, and so does, most of the time, a
-  method that a known path does not define (see
+- `/api/*`: any other path under `/api/` gets `404` `{ "error": "Unknown route" }`; a method that a known path does
+  not define gets `405` with an `Allow` header (see
   [How routes are registered](/developers/api/overview/#how-routes-are-registered)).
 - `/ws`: the WebSocket upgrade (`426` without an upgrade). See [WebSocket](/developers/api/websocket/).
-- The web app's routes (`deps.web`) for every other path: the HTML import with HMR in development, the bundle built at
-  startup in production (`server/routes/web.ts`).
+- The web app for every other path: Vite's middlewares with HMR in development, the files of `pnpm build` (`dist/web`)
+  in production (`staticWeb()`, `server/routes/web.ts`).

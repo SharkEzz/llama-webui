@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { BenchRunsRepo } from './benchRuns';
 import { openDb } from './open';
 import { ProfilesRepo } from './profiles';

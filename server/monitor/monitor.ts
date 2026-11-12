@@ -43,7 +43,7 @@ const isActive = (s: ServerState) =>
 /**
  * Permanent sampling (llama-tui's Poller): one tick every `pollIntervalMs`, whether tabs are open or not. Each tick
  * produces a Snapshot (broadcast to subscribers) and adds a point to every history series.
- * Lives in the runtime (survives bun --hot).
+ * Lives in the runtime (survives a development reload).
  */
 export class Monitor {
   private history: History;

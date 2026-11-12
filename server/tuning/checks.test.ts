@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import type { GpuSample } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { type CheckContext, runChecks } from './checks';
 import { hw3 } from './fixtures';
 import { retainedBusIds } from './match';

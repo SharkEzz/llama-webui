@@ -84,7 +84,10 @@ return { messages, stream: true, ...sampling, chat_template_kwargs: { enable_thi
 
 ## Reading the stream
 
-`Run.run()` iterates `streamChatCompletion(baseUrl, body, { fetch, signal })` with an `AbortController`. The generator
+`Run.run()` iterates `streamChatCompletion(baseUrl, body, { fetch, signal })` with an `AbortController`. The `fetch`
+it passes is `llamaFetch()` (`server/llamaFetch.ts`), a `node:http` request with the same signature and errors: Node's
+own `fetch` gives up after 300 s without response headers, and after 300 s between two chunks, which a long prompt
+can exceed before its first token. The generator
 posts the body, reads the response with `SseParser` and yields each chunk; its errors say what went wrong, and
 `failureMessage()` words them for the conversation:
 
@@ -137,8 +140,8 @@ event: done
 data: {"type":"done","message":{"id":42,"status":"done","stats":{…},…}}
 ```
 
-- Bun closes a connection that stays silent for 10 seconds, so `sse()` calls `server.timeout(req, 0)` and writes a
-  `: ping` comment every `PING_MS` (15,000 ms): a long prompt can be processed without a single token.
+- `sse()` writes a `: ping` comment every `PING_MS` (15,000 ms): a long prompt can be processed without a single
+  token, and a proxy may drop a silent connection (Node's own server has no idle timeout).
 - The stream closes right after `done`.
 - A client that disconnects only unsubscribes (`cancel()`); the run goes on.
 
@@ -200,10 +203,10 @@ that the SSE streams close, and blocks any later write from that run.
 - **llama-webui stops** (`SIGINT`, `SIGTERM`): `server/index.ts` prepends a handler that disposes the chat runs (and
   the benchmark runner and the download queue) before the runtime's handler stops `llama-server`. Without that order,
   the replies would see `llama-server` disconnect and end as `error`.
-- **`bun --hot` reload**: `ChatRuns` is created by `server/index.ts`, not kept in the runtime, so it does not survive.
+- **Development reload**: `ChatRuns` is created by `server/index.ts`, not kept in the runtime, so it does not survive.
   The previous module's dispose function calls `chatRuns.dispose()` before closing its database handle: a reply in
   progress ends as `stopped`, and the new module starts with no run.
-- **Bun killed** (`SIGKILL`, crash): nothing runs. At the next start, `conversations.stopOrphans()` turns every message
+- **llama-webui killed** (`SIGKILL`, crash): nothing runs. At the next start, `conversations.stopOrphans()` turns every message
   left `streaming` into `stopped`.
 
 ## Tests

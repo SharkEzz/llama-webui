@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import { clock, createSimulation, HISTORY_SECONDS, MAX_REQUESTS, RUN } from './telemetry.ts';
 
 describe('createSimulation', () => {

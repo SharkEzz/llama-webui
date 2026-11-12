@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import type { BenchDevice } from '@llama-webui/shared';
+import { expect, test } from 'vitest';
 import { otSuggestions, replacedProfileParams } from './tuning';
 
 const dev = (id: string, name: string, totalMib: number): BenchDevice => ({

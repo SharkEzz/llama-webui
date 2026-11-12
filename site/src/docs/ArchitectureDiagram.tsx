@@ -66,7 +66,7 @@ function Boxes({ nodes, className }: { nodes: Node[]; className: string }) {
 }
 
 /**
- * How llama-webui fits together, top to bottom: the browser, the single Bun process and its modules, and what they
+ * How llama-webui fits together, top to bottom: the browser, the single Node.js process and its modules, and what they
  * talk to on the machine. Container queries lay the boxes out for the width of the docs column.
  */
 export function ArchitectureDiagram() {
@@ -83,16 +83,17 @@ export function ArchitectureDiagram() {
 
       <Link labels={['UI bundle', 'REST /api/*', 'WebSocket /ws', 'SSE chat streams']} />
 
-      <Tier title="llama-webui: one Bun process, port 7860" accent>
+      <Tier title="llama-webui: one Node.js process, port 7860" accent>
         <div className={cn(BOX, 'mb-2')}>
-          <p className="font-medium">Bun.serve</p>
+          <p className="font-medium">node:http server</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            UI (HTML import in dev, Bun.build at startup in production), API routes wrapped in guarded(), WebSocket hub.
+            UI (Vite middlewares in dev, the vite build output in production), API routes in one Hono app through
+            @hono/node-server (guard, 405 table), WebSocket hub on ws.
           </p>
         </div>
         <Boxes nodes={MODULES} className="grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-4" />
         <div className={cn(BOX, 'mt-2')}>
-          <p className="font-medium">SQLite (bun:sqlite)</p>
+          <p className="font-medium">SQLite (node:sqlite)</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Settings, profiles, conversations, benchmark runs, sweeps, downloads, model cache, in the data directory.
           </p>
@@ -106,8 +107,8 @@ export function ArchitectureDiagram() {
       </Tier>
 
       <figcaption className="mt-4 px-1 text-xs text-muted-foreground">
-        The supervisor, the monitor, the logs and the bench gate live on globalThis, so they survive{' '}
-        <code className="font-mono whitespace-nowrap">bun --hot</code> reloads.
+        The supervisor, the monitor, the logs and the bench gate live on globalThis, so they survive the reloads of{' '}
+        <code className="font-mono whitespace-nowrap">pnpm dev</code>.
       </figcaption>
     </figure>
   );
