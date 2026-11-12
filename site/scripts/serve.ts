@@ -9,6 +9,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, join, normalize } from 'node:path';
 import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
+import { cliArgs } from './argv.ts';
 
 const BASE = '/llama-webui';
 
@@ -84,7 +85,7 @@ export function serveDist(dist: string): Server {
 
 if (import.meta.main) {
   const { values } = parseArgs({
-    args: process.argv.slice(2),
+    args: cliArgs(),
     options: { port: { type: 'string', default: '4173' } },
   });
   const hostname = '0.0.0.0';

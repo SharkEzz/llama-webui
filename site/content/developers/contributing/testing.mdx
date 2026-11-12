@@ -399,6 +399,10 @@ The site's unit tests run with the others under Vitest (project `site`):
   entry has no file or appears twice, or when a page sits in the wrong section.
 - `site/src/lib/content.test.ts` checks how a file maps to its route.
 - `site/scripts/links.test.ts` tests the link checker's helpers.
+- `site/scripts/serve.test.ts` drives the preview server (`serveDist()`) on a small `dist/`: trailing-slash redirects,
+  content types and cache, gzip for text only, `404.html` and `Not found`, `HEAD`.
+- `site/scripts/cli.test.ts` starts `serve.ts` with `-- --port 0`: a script reads its flags after the `--` that pnpm
+  passes through.
 - `site/src/landing/telemetry.test.ts` checks that the landing page's simulated dashboard is deterministic, so the
   prerendered HTML and the hydrated page start from the same frame.
 

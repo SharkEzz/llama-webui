@@ -18,9 +18,10 @@
  * with /home/demo/models -> the real models folder and /home/demo/llama.cpp/build/bin hard-linked from the build.
  */
 import { parseArgs } from 'node:util';
+import { cliArgs } from './argv.ts';
 
 const { values, positionals } = parseArgs({
-  args: process.argv.slice(2),
+  args: cliArgs(),
   allowPositionals: true,
   options: { base: { type: 'string', default: 'http://192.168.0.20:7861' } },
 });
