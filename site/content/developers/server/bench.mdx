@@ -237,7 +237,9 @@ It spawns the server and polls `/health` every 500 ms until it answers `200`. It
   </Step>
   <Step title="Warm up">
 
-One `POST /completion` with the prompt `Hello.` and `n_predict: 16`.
+One `POST /completion` with `WARMUP_PROMPT` (`Write one short sentence about the sea.`) and `n_predict: 16`. The
+prompt is a sentence on purpose: llama.cpp segfaults on a 2-token prompt with `-sm tensor` and an MTP draft
+(`--spec-type draft-mtp`), and the earlier `Hello.` crashed every such run.
 
   </Step>
   <Step title="Measure">
@@ -267,6 +269,11 @@ conversation.
 When the server dies during a request (a CUDA out of memory, for example), the socket closes before its output is read.
 The trial then waits up to `EXIT_GRACE_MS = 2000` ms for the process to exit, so that the error is the server's own
 line rather than the closed connection.
+
+A server trial keeps the last 10 lines that match `ERROR_LINE` apart from its 50-line tail, and passes both to
+`benchFailure()`. A crash can bury the error under more lines than the tail keeps: on a `GGML_ASSERT` llama.cpp prints a
+gdb backtrace after the `cudaMalloc failed: out of memory` line, and the run would otherwise read as a bare
+`llama-server exited (code SIGABRT)`.
 
 ### Failure messages
 

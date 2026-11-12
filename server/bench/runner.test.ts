@@ -8,6 +8,7 @@ import {
   ctxFromArgs,
   DEFAULT_SETTINGS,
   type GpuSample,
+  isOomError,
   type ServerState,
   type Sweep,
   type SweepLive,
@@ -26,6 +27,7 @@ import { tempDir } from '../testing/tempDir';
 import { type ExecutorDeps, RunExecutor } from './execute';
 import { BenchGate, type ServerControl } from './gate';
 import { BenchRunner } from './runner';
+import { WARMUP_PROMPT } from './server';
 
 const FAKE = resolve(import.meta.dir, '../../testdata/fake/fake-llama-server');
 const modelDir = tempDir('lw-bench-');
@@ -224,6 +226,35 @@ test("a bench run gets its profile's environment", async () => {
   });
   await end;
   expect(runs.at(-1)!.status).toBe('failed');
+});
+
+test('a server that dies of OOM is reported as OOM even when a long backtrace follows the allocation error', async () => {
+  // llama.cpp prints a gdb backtrace on GGML_ASSERT: more lines than the trial keeps after the cudaMalloc failure.
+  const backtrace = Array.from(
+    { length: 80 },
+    (_, i) => `#${i}  0x00007f739bb3219b in frame_${i} () from libggml-base.so.0`,
+  );
+  const lines = [
+    'ggml_backend_cuda_buffer_type_alloc_buffer: allocating 8192.00 MiB on device 0: cudaMalloc failed: out of memory',
+    'ggml-backend-meta.cpp:1857: GGML_ASSERT(meta_buf_ctx->bufs[i]) failed',
+    ...backtrace,
+  ];
+  const { runner, runs, end } = setup(18091, undefined, {
+    profile: () => ({ env: { FAKE_EXIT_LINES: lines.join('|') } }),
+  });
+  await runner.start(BenchSpecSchema.parse({ kind: 'server', modelPath: MODEL, profileId: 1, r: 1, p: 16, n: 4 }), {
+    stopServer: true,
+  });
+  await end;
+  const run = runs.at(-1)!;
+  expect(run.status).toBe('failed');
+  expect(isOomError(run.error)).toBe(true);
+  expect(run.error).toContain('cudaMalloc failed: out of memory');
+}, 20_000);
+
+test('the warm-up prompt is a sentence: a 2-token prompt crashes llama-server with -sm tensor and an MTP draft', () => {
+  // llama.cpp segfaults on a 2-token prompt with -sm tensor and --spec-type draft-mtp ("Hello." did, every time).
+  expect(WARMUP_PROMPT.split(/\s+/).length).toBeGreaterThanOrEqual(6);
 });
 
 test("a server run runs in its profile's directory", async () => {
