@@ -31,10 +31,6 @@ const PENDING: string[] = [
   'site/content/developers/index.mdx',
   'site/content/developers/server/database.mdx',
   'site/content/developers/shared.mdx',
-  'site/content/docs/getting-started/installation.mdx',
-  'site/content/docs/getting-started/requirements.mdx',
-  'site/src/landing/FinalCta.tsx',
-  'site/src/landing/HardwareBand.tsx',
 ];
 
 /** Every text line not ignored by git (tracked or new) that names Bun, as `path:line:text`. */

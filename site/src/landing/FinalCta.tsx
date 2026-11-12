@@ -13,7 +13,7 @@ export function FinalCta() {
           Run it on your machine.
         </h2>
         <p className="mt-5 max-w-[56ch] text-lg text-muted-foreground text-pretty">
-          Clone the repository, install with Bun and open port 7860. A setup checklist takes it from there.
+          Install a release with npm, start it and open port 7860. A setup checklist takes it from there.
         </p>
         <div className="mt-10 flex flex-wrap gap-3">
           <Button size="lg" nativeButton={false} render={<Link to="/docs/getting-started/installation/" />}>

@@ -3,7 +3,7 @@ title: Requirements
 description: What llama-webui needs to run, and the optional pieces (llama-bench, GPU drivers, perf) that unlock benchmarks, GPU telemetry and DRAM bandwidth.
 ---
 
-llama-webui needs Linux and a llama.cpp build with `llama-server` (and Bun, to run it from source). Everything else is optional: each extra piece
+llama-webui needs Linux, Node.js and a llama.cpp build with `llama-server`. Everything else is optional: each extra piece
 unlocks part of the app, and the [setup checklist](/docs/getting-started/first-run/) shows which ones it found on
 your machine. The install steps themselves are on the [Installation](/docs/getting-started/installation/) page.
 
@@ -13,7 +13,7 @@ your machine. The install steps themselves are on the [Installation](/docs/getti
 | ------------------------------------- | -------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
 | Linux, with `/proc` and `/sys`        | Yes      | Hardware discovery and telemetry                                               | llama-webui does not run                                         |
 | `setpriv` (util-linux)                | Yes      | Ties every `llama-server` and `llama-bench` to llama-webui                     | Nothing can be started                                           |
-| Bun 1.4.4 or later                    | Source   | Runs llama-webui from a clone (the executable includes it)                     | Use the executable                                               |
+| Node.js 26.13 or later                | Yes      | Runs llama-webui (npm, which comes with it, installs a release)                | llama-webui does not run                                         |
 | `llama-server`                        | Yes      | Runs your models                                                               | The setup checklist cannot be finished                           |
 | GGUF models                           | Yes      | Something to run                                                               | Nothing to start: download some from the Models page             |
 | `llama-bench`                         | No       | llama-bench benchmarks, sweeps, Tuning's view of your GPUs                     | Only real-server benchmarks; no sweeps                           |
@@ -43,12 +43,12 @@ setpriv --version
 If `setpriv` is missing, every launch fails: the server ends in the crashed state, and the [Logs](/docs/logs/) page
 shows a line starting with `[llama-webui] launch failed:`.
 
-## Bun
+## Node.js
 
-The executable from a release includes Bun: there is nothing to install. To run llama-webui from source, Bun 1.4.4 or
-later is the only runtime: no Node.js, no separate build step, the interface is bundled in memory when llama-webui
-starts. Check your version with `bun --version`; the [Installation](/docs/getting-started/installation/#install) page
-shows how to install it.
+llama-webui runs on Node.js 26.13 or later, on any processor Node.js supports: a release is plain JavaScript, with
+nothing compiled for one architecture. npm, which comes with Node.js, installs a release; running from a clone also
+needs [pnpm](https://pnpm.io) 12, which builds the interface (`pnpm start`). Check your version with `node --version`;
+the [Installation](/docs/getting-started/installation/#install) page shows how to get a current one.
 
 ## llama.cpp
 

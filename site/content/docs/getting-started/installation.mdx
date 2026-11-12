@@ -1,18 +1,19 @@
 ---
 title: Installation
-description: Install llama-webui on Linux from a single executable or from source, point it at your llama.cpp build, and open it in your browser.
+description: Install llama-webui on Linux from a release with npm, or run it from source, point it at your llama.cpp build, and open it in your browser.
 ---
 
-llama-webui ships as a single executable for Linux (x64 and arm64): it holds the Bun runtime, the server and the
-interface, so there is nothing else to install. You can also run it from a clone of its repository with
-[Bun](https://bun.com). Either way, one process serves the API, the WebSocket and the interface.
+llama-webui is a [Node.js](https://nodejs.org) application for Linux. Each release is an npm package that you
+install with `npm install -g`, which gives you a `llama-webui` command. You can also run it from a clone of its
+repository with [pnpm](https://pnpm.io). Either way, one Node.js process serves the API, the WebSocket and the
+interface.
 
 ## What you need
 
 | Requirement                                       | Why                                                                                                    |
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | **Linux**                                         | Hardware discovery and telemetry read `/proc` and `/sys`. `setpriv` (util-linux) ties `llama-server` to llama-webui. |
-| **[Bun](https://bun.com) 1.4.4 or later**         | Only to run from source. The executable includes it.                                                   |
+| **[Node.js](https://nodejs.org) 26.13 or later**  | Runs llama-webui. npm comes with it; [pnpm](https://pnpm.io) 12 is needed only to run from source.     |
 | **A [llama.cpp](https://github.com/ggml-org/llama.cpp) build** | `llama-server` is required. `llama-bench`, next to it, enables benchmarks and sweeps.       |
 | **GGUF models**                                   | In a folder of your choice, set during the first run.                                                  |
 
@@ -84,33 +85,53 @@ Backends can be combined in one build, for example `-DGGML_CUDA=ON` and `-DGGML_
 cards: llama-webui then lists every device and can split a model across them.
 
   </Step>
+  <Step title="Install Node.js">
+
+llama-webui needs Node.js 26.13 or later. Check the version you have:
+
+```bash title="Terminal"
+node --version
+```
+
+If it is older, or missing, install a current release with a version manager such as [fnm](https://github.com/Schniz/fnm)
+(`fnm install 26`) or from [nodejs.org](https://nodejs.org/en/download). With a version manager, npm installs global
+packages into your home folder. With the Node.js of your distribution, they would go to a system folder: point npm at
+your home once, and make sure `~/.local/bin` is in your `PATH`:
+
+```bash title="Terminal"
+npm config set prefix ~/.local
+```
+
+  </Step>
   <Step title="Get llama-webui">
 
 <Tabs>
-  <Tab title="Executable">
+  <Tab title="Release">
 
-Download the executable for your processor from the
-[latest release](https://github.com/SharkEzz/llama-webui/releases/latest) (`llama-webui-linux-x64` or
-`llama-webui-linux-arm64`) into a folder of your `PATH`, and make it executable:
+Each [release](https://github.com/SharkEzz/llama-webui/releases) holds the package, `llama-webui-<version>.tgz`, and
+the SHA-256 of its files, `SHA256SUMS`. Set `VERSION` to the latest release (without the `v`), download both, check
+the package and install it:
 
 ```bash title="Terminal"
-mkdir -p ~/.local/bin
-curl -fL -o ~/.local/bin/llama-webui \
-  https://github.com/SharkEzz/llama-webui/releases/latest/download/llama-webui-linux-x64
-chmod +x ~/.local/bin/llama-webui
+VERSION=x.y.z   # the latest release, for example 1.2.3
+BASE=https://github.com/SharkEzz/llama-webui/releases/download/v$VERSION
+curl -fL -O "$BASE/llama-webui-$VERSION.tgz" -O "$BASE/SHA256SUMS"
+sha256sum -c SHA256SUMS
+npm install -g "./llama-webui-$VERSION.tgz"
 ```
 
-The release also lists the SHA-256 of each file (`SHA256SUMS`), to check the download with `sha256sum`.
+npm copies the package, so you can delete the two files afterwards. It also installs the three libraries llama-webui
+uses for HTTP and WebSocket, at the exact versions the release was tested with; everything else is bundled.
 
   </Tab>
   <Tab title="From source">
 
-Needs [Bun](https://bun.com) 1.4.4 or later (`curl -fsSL https://bun.com/install | bash`, then open a new terminal).
+Needs [pnpm](https://pnpm.io) 12 (`npm install -g pnpm`, or `corepack enable pnpm`).
 
 ```bash title="Terminal"
 git clone https://github.com/SharkEzz/llama-webui.git
 cd llama-webui
-bun install
+pnpm install
 ```
 
   </Tab>
@@ -120,7 +141,7 @@ bun install
   <Step title="Start it">
 
 <Tabs>
-  <Tab title="Executable">
+  <Tab title="Release">
 
 ```bash title="Terminal"
 llama-webui
@@ -130,10 +151,10 @@ llama-webui
   <Tab title="From source">
 
 ```bash title="Terminal"
-bun run start
+pnpm start
 ```
 
-The interface is built in memory when it starts (under a second).
+`pnpm start` builds the interface (a few seconds), then starts the server.
 
   </Tab>
 </Tabs>
@@ -153,7 +174,7 @@ llama-webui listens on `127.0.0.1` by default, so only the machine it runs on ca
 the same network, listen on every interface, then open `http://<server-address>:7860`:
 
 ```bash title="Terminal"
-llama-webui --host 0.0.0.0        # from source: bun run start --host 0.0.0.0
+llama-webui --host 0.0.0.0        # from source: pnpm start --host 0.0.0.0
 ```
 
 <Callout type="warning" title="No authentication">
@@ -165,30 +186,39 @@ DNS-rebinding attempts, but only use `--host 0.0.0.0` on a network you trust, an
 </Callout>
 
 `--port` changes the port and `--data-dir` the folder that holds the database. Each flag has an environment variable
-(`LLAMA_WEBUI_HOST`, `LLAMA_WEBUI_PORT`, `LLAMA_WEBUI_DATA_DIR`); `llama-webui --help` (or `bun run start --help`)
-lists them, and
-[Launch options](/docs/configuration/) describes each one.
+(`LLAMA_WEBUI_HOST`, `LLAMA_WEBUI_PORT`, `LLAMA_WEBUI_DATA_DIR`); `llama-webui --help` (or `pnpm start --help`)
+lists them, and [Launch options](/docs/configuration/) describes each one.
 
 ## Run it as a service
 
 A systemd user service starts llama-webui with your session and restarts it if it stops. It runs as your user, so
-`llama-server` can read your models and GPUs as it does from a terminal. This example assumes the executable is in
-`~/.local/bin`:
+`llama-server` can read your models and GPUs as it does from a terminal.
 
-```ini title="~/.config/systemd/user/llama-webui.service"
+A service does not get the `PATH` of your terminal, so the unit names Node.js and llama-webui by their full paths.
+This command writes it with the paths of your installation filled in:
+
+```bash title="Terminal"
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/llama-webui.service <<EOF
 [Unit]
 Description=llama-webui
 
 [Service]
 WorkingDirectory=%h
-ExecStart=%h/.local/bin/llama-webui
+ExecStart=$(realpath "$(command -v node)") $(npm prefix -g)/bin/llama-webui
 Restart=on-failure
 
 [Install]
 WantedBy=default.target
+EOF
 ```
 
-From source, point `WorkingDirectory` at the clone (`%h/llama-webui`) and use `ExecStart=%h/.bun/bin/bun run start`.
+The `ExecStart` line then reads, for example,
+`ExecStart=/usr/bin/node /home/you/.local/bin/llama-webui`. If you later move to another Node.js version with a
+version manager, install llama-webui again with it and write the unit again.
+
+From source, build once with `pnpm build`, point `WorkingDirectory` at the clone (`%h/llama-webui`) and start the
+built server: `ExecStart=/usr/bin/node %h/llama-webui/dist/server/main.js`, with the path of your `node`.
 
 ```bash title="Terminal"
 systemctl --user daemon-reload
@@ -213,13 +243,15 @@ orphan process keeps your VRAM.
 ## Update
 
 The status bar, at the top right of every page, shows the version that runs: the release tag (or the short commit
-hash of the build), `dev` from source. With the executable, download the latest release again over the old file
-(same `curl` command as above). From source:
+hash of the build), `dev` from source. To update a release, run the commands of
+[Get llama-webui](#install) again with the new `VERSION`: `npm install -g` replaces the installed version. From
+source:
 
 ```bash title="Terminal"
 cd llama-webui
 git pull
-bun install
+pnpm install
+pnpm build   # for the service; pnpm start builds by itself
 ```
 
 Then restart llama-webui (`systemctl --user restart llama-webui` for the service). The database is migrated on
@@ -227,9 +259,13 @@ startup: profiles, conversations, benchmark runs and settings are kept.
 
 ## Uninstall
 
-Stop llama-webui, then delete the executable (or the clone) and the data folder (`$XDG_DATA_HOME/llama-webui`, by
-default `~/.local/share/llama-webui`). Your models and your llama.cpp build are never touched.
+Stop llama-webui, then remove the package (or delete the clone) and the data folder (`$XDG_DATA_HOME/llama-webui`,
+by default `~/.local/share/llama-webui`). Your models and your llama.cpp build are never touched.
 
 ```bash title="Terminal"
-rm -rf ~/.local/bin/llama-webui ~/.local/share/llama-webui   # from source: also rm -rf ~/llama-webui
+npm uninstall -g llama-webui        # from source: rm -rf ~/llama-webui
+rm -rf ~/.local/share/llama-webui
 ```
+
+For the service, also run `systemctl --user disable --now llama-webui` and delete
+`~/.config/systemd/user/llama-webui.service`.

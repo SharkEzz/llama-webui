@@ -19,12 +19,12 @@ another machine as described in
 
 No. The repository has no image and no Dockerfile. llama-webui is meant to run directly on the machine with the GPUs:
 it reads that machine's `/proc` and `/sys` and starts `llama-server` as its own child process. Installing it is
-downloading a single executable, see [Installation](/docs/getting-started/installation/).
+one `npm install -g` of a release, see [Installation](/docs/getting-started/installation/).
 
 ### Do I need Node.js?
 
 Yes: llama-webui runs on Node.js 26.13 or later. One Node.js process serves the API, the WebSocket and the
-interface, and stores the data in SQLite. `pnpm start` builds the interface, then starts the server.
+interface, and stores the data in SQLite. A release is an npm package: npm, which comes with Node.js, installs it.
 
 ### Do I need a GPU?
 
@@ -109,8 +109,8 @@ the same page, reads back. An import never overwrites a profile with the same na
 
 ### How do I update llama-webui?
 
-Download the latest release over the executable, then restart llama-webui. From source, pull the repository and
-install the dependencies instead:
+Install the new release with `npm install -g`, as the first time, then restart llama-webui. From source, pull the
+repository and install the dependencies instead:
 
 ```bash title="Terminal"
 git pull

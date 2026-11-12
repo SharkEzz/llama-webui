@@ -8,7 +8,8 @@ its database. Everything else is changed from the [Settings](/docs/settings/) pa
 
 ## Flags and environment variables
 
-Each flag has an environment variable. Pass flags after `pnpm start` (or `pnpm dev`), from the clone:
+Each flag has an environment variable. Pass flags after `llama-webui`, or after `pnpm start` (or `pnpm dev`) from a
+clone:
 
 | Flag                | Environment variable       | Default                                                         | Effect                                                                                    |
 | ------------------- | -------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -19,9 +20,11 @@ Each flag has an environment variable. Pass flags after `pnpm start` (or `pnpm d
 | `-h`, `--help`      |                            |                                                                 | Prints the help and exits.                                                                |
 
 ```bash title="Terminal"
-pnpm start --host 0.0.0.0 --port 8080
+llama-webui --host 0.0.0.0 --port 8080
 # Same thing with environment variables
-LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 pnpm start
+LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 llama-webui
+# From a clone
+pnpm start --host 0.0.0.0 --port 8080
 ```
 
 Both `--port 8080` and `--port=8080` work. Once listening, llama-webui prints the address to open, followed by its
@@ -42,7 +45,8 @@ For each option, llama-webui takes the first value it finds:
 2. the environment variable (an empty variable counts as unset);
 3. the default.
 
-A `.env` file in the folder llama-webui starts from (the clone, with `pnpm start` or `pnpm dev`) is loaded at startup:
+A `.env` file in the folder llama-webui starts from (the current folder, or the clone with `pnpm start` or `pnpm dev`)
+is loaded at startup:
 its variables fill what the environment does not set. With `--env-override`, or `LLAMA_WEBUI_ENV_OVERRIDE=1` (or
 `true`) set in the environment or in the `.env` itself, they also replace the variables the environment already sets.
 A command-line option still wins over both.
@@ -58,7 +62,7 @@ llama-webui: invalid --port: “70000” (integer from 1 to 65535)
 
 ### The help
 
-`pnpm start --help` prints:
+`llama-webui --help` (or `pnpm start --help`) prints:
 
 ```text
 llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Node.js process).
@@ -91,8 +95,8 @@ Hugging Face downloads (Models page):
   HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
 ```
 
-`pnpm start` is the normal way to run llama-webui: it builds the interface, then starts the server. `pnpm dev` reloads
-the code when a file changes and is meant for working on llama-webui itself; it takes the same options.
+From a clone, `pnpm start` builds the interface, then starts the server. `pnpm dev` reloads the code when a file
+changes and is meant for working on llama-webui itself; both take the same options as `llama-webui`.
 
 ### In a systemd service
 
@@ -103,7 +107,7 @@ With the user service from [Installation](/docs/getting-started/installation/#ru
 [Service]
 WorkingDirectory=%h
 Environment=LLAMA_WEBUI_HOST=0.0.0.0
-ExecStart=%h/.local/bin/llama-webui --port 8080
+ExecStart=/usr/bin/node /home/you/.local/bin/llama-webui --port 8080
 Restart=on-failure
 ```
 
@@ -145,7 +149,7 @@ A second llama-webui with its own `--data-dir` and `--port` has its own settings
 try things without touching your everyday setup:
 
 ```bash title="Terminal"
-pnpm start --port 7861 --data-dir ~/llama-webui-test
+llama-webui --port 7861 --data-dir ~/llama-webui-test
 ```
 
 Only one `llama-server` can listen on a given port, and llama-webui treats a `llama-server` it did not start on its

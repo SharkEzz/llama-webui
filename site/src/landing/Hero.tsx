@@ -23,7 +23,7 @@ export function Hero() {
           </Button>
         </div>
         <p className="mt-5 text-sm text-muted-foreground">
-          Free and open source under the MIT license. Runs on Linux, as a single executable.
+          Free and open source under the MIT license. Runs on Linux, on Node.js.
         </p>
       </div>
       <div className="mx-auto mt-16 max-w-7xl px-4 sm:mt-20 sm:px-6">
