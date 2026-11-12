@@ -52,6 +52,13 @@ A test file sits next to its module: `server/bench/parse.test.ts` tests `server/
 | `web/src/` | Pure UI logic: the Topology page's flows, layout, pacing and smoothing (`web/src/features/topology/`), the benchmark form mapping (`web/src/lib/bench.ts`)                                 |
 | `site/`    | The link checker helpers, the sidebar and content routes, the landing page's telemetry simulation                                                                                         |
 
+`scripts/` holds the tests of the repository itself: the published package's fields (`package.test.ts`), the
+versions of every `package.json` (`release.test.ts`), and the guard `scripts/no-bun.test.ts`, which fails on a line
+naming the old runtime outside its allowlist. It runs `git grep` over every file Git does not ignore, new files
+included; the allowlist holds the history (`docs/superpowers/`), vendored skills, and a few lines matched by their
+text, each with its reason, and a second test fails when an entry no longer matches anything. llama-webui runs on
+Node.js only: write about Node.js, or add an entry with its reason when a line has to name the old runtime.
+
 There are no component or browser tests (no DOM library is installed). When a page has logic worth testing, it lives in
 a plain module next to the page, as `flows.ts` does for the Topology page.
 

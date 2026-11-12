@@ -4,7 +4,7 @@ L'app tourne sur Node (≥ 26.13, un seul processus) ; pnpm installe et lance le
 - Tests : Vitest (`pnpm test`, voir « Testing ») ; type check : `pnpm check` (`tsc -b`) ; build : `pnpm build` (`vite build`).
 - Install : `pnpm install` (voir « Installation (pnpm) ») ; un outil ponctuel : `pnpm dlx`.
 - `.env` du dossier courant : chargé par les points d'entrée (`server/env.ts`, `parseEnv` de `node:util` : l'environnement l'emporte, sauf avec `--env-override` ou `LLAMA_WEBUI_ENV_OVERRIDE=1` dans l'environnement ou le `.env`) ; pas de `dotenv`.
-- Le dépôt ne tourne que sur Node (depuis N11) : aucune API ni commande Bun ; `scripts/no-bun.test.ts` échoue sur toute mention de Bun hors de l'historique (`docs/superpowers/`).
+- Le dépôt ne tourne que sur Node (depuis N11) : aucune API ni commande Bun ; `scripts/no-bun.test.ts` échoue sur toute mention de Bun hors de son allowlist (l'historique `docs/superpowers/`, les skills vendorisés, quelques lignes motivées, chacune par son texte).
 
 ## Installation (pnpm)
 
@@ -90,7 +90,7 @@ Le site public (page d'accueil, doc utilisateur, doc développeur) vit dans `sit
 
 | Code modifié                                                                                                                                                 | Pages à mettre à jour                                                                                   |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `server/routes/<domaine>.ts`, `server/api.ts` (→ `app`), schémas zod de `packages/webui-shared/src/`                                                         | `developers/api/<domaine>.mdx` + la page utilisateur de la fonctionnalité                               |
+| `server/routes/<domaine>.ts`, `server/api.ts` et `server/routes/settings.ts` (→ `app`), schémas zod de `packages/webui-shared/src/`                          | `developers/api/<domaine>.mdx` + la page utilisateur de la fonctionnalité                               |
 | `packages/webui-shared/src/ws.ts`, `server/ws/`                                                                                                              | `developers/api/websocket.mdx`                                                                          |
 | `server/cli.ts`, `server/paths.ts`, variables d'environnement                                                                                                | `docs/configuration.mdx`, `developers/architecture.mdx`                                                 |
 | `server/security.ts`, `server/http.ts`                                                                                                                       | `docs/security.mdx`, `developers/server/security.mdx`, `developers/api/overview.mdx`                    |

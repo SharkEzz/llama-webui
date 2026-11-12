@@ -21,6 +21,11 @@ const ALLOW: { path: string; line?: RegExp; reason: string }[] = [
     reason: 'the one history sentence: where the contract golden comes from',
   },
   {
+    path: 'site/content/developers/contributing/testing.mdx',
+    line: /the guard `scripts\/no-bun\.test\.ts`/,
+    reason: 'the guard documented for contributors, by its file name',
+  },
+  {
     path: 'CLAUDE.md',
     line: /aucune API ni commande Bun|Don't use `bun:sqlite`|jamais `Bun\.file`/,
     reason: 'the rules name the APIs an agent must not reach for',

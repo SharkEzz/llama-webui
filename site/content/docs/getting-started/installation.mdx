@@ -242,8 +242,8 @@ orphan process keeps your VRAM.
 
 ## Update
 
-The status bar, at the top right of every page, shows the version that runs: the release tag (or the short commit
-hash of the build), `dev` from source. To update a release, run the commands of
+The status bar, at the top right of every page, shows the version that runs: the release tag, or for a build from
+a clone what `git describe` printed when it was built (`v0.2.1-77-ge1dbe93`); `pnpm dev` shows `dev`. To update a release, run the commands of
 [Get llama-webui](#install) again with the new `VERSION`: `npm install -g` replaces the installed version. From
 source:
 
@@ -259,13 +259,16 @@ startup: profiles, conversations, benchmark runs and settings are kept.
 
 ## Uninstall
 
-Stop llama-webui, then remove the package (or delete the clone) and the data folder (`$XDG_DATA_HOME/llama-webui`,
-by default `~/.local/share/llama-webui`). Your models and your llama.cpp build are never touched.
+Stop llama-webui (and remove its service, if you made one), then remove the package (or delete the clone) and the
+data folder (`$XDG_DATA_HOME/llama-webui`, by default `~/.local/share/llama-webui`). Your models and your llama.cpp
+build are never touched.
 
 ```bash title="Terminal"
+# Only if you made the service
+systemctl --user disable --now llama-webui
+rm ~/.config/systemd/user/llama-webui.service
+systemctl --user daemon-reload
+
 npm uninstall -g llama-webui        # from source: rm -rf ~/llama-webui
 rm -rf ~/.local/share/llama-webui
 ```
-
-For the service, also run `systemctl --user disable --now llama-webui` and delete
-`~/.config/systemd/user/llama-webui.service`.

@@ -13,7 +13,7 @@ change must pass.
 | --- | --- |
 | **Linux** | Hardware discovery and telemetry read `/proc` and `/sys`. |
 | **[Node.js](https://nodejs.org) 26.13 or later** | The runtime of the app, its tests, its build and the website's scripts. CI pins 26.13. |
-| **[pnpm](https://pnpm.io) 12** | Installs the workspace and runs the scripts (`npm install -g pnpm`). |
+| **[pnpm](https://pnpm.io) 12** | Installs the workspace and runs the scripts (`npm install -g pnpm`, into a prefix you own: [Install Node.js](/docs/getting-started/installation/#install)). |
 | **`setpriv`** (util-linux) | Every `llama-server` and `llama-bench` process is launched as `setpriv --pdeathsig KILL -- …`, so it dies with llama-webui. |
 | **Git** | To clone the repository; the build reads its version from `git describe`. |
 | A llama.cpp build (optional) | Needed to run real models. Without it, use the [fake binaries](#without-llamacpp). |
