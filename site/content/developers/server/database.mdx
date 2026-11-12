@@ -72,9 +72,10 @@ repositories were written against, where the two drivers differ:
 | `transaction(fn)`                | Returns a function that runs `fn` in a transaction and returns its value; nested, it uses a savepoint.         |
 | `close()`, `using`               | Closes the handle; a second `close()` does nothing.                                                            |
 
-- Values: `true` and `false` bind as `1` and `0`, `undefined` as `NULL`. A statement given more or fewer values than
-  it has `?` placeholders throws `SQLite query expected N values, received M` (`node:sqlite` alone would bind the
-  missing ones as `NULL`). Only positional `?` placeholders are supported.
+- Values: an integral number binds as `INTEGER` (`node:sqlite` alone binds every number as `REAL`), `true` and `false`
+  as `1` and `0`, `undefined` as `NULL`. A statement given more or fewer values than it has `?` placeholders throws
+  `SQLite query expected N values, received M` (`node:sqlite` alone would bind the missing ones as `NULL`). Only
+  positional `?` placeholders are supported.
 - A transaction whose function throws is rolled back and the error rethrown; when SQLite has already rolled back
   itself (an `OR ROLLBACK` conflict), the original error is the one thrown.
 - Foreign keys are off on a new handle; `openDb()` turns them on. `{ readonly: true }` opens a

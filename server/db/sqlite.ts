@@ -22,9 +22,17 @@ export interface DatabaseOptions {
   create?: boolean;
 }
 
-/** bun:sqlite binds booleans as 1/0 and `undefined` as NULL; Bun's node:sqlite refuses both. */
-const bind = (params: Binding[]): SQLInputValue[] =>
-  params.map((p) => (p === undefined ? null : typeof p === 'boolean' ? Number(p) : p));
+/**
+ * As bun:sqlite: booleans bind as 1/0 and `undefined` as NULL (Bun's node:sqlite refuses both), and an integral number
+ * as INTEGER (node:sqlite binds every number as REAL: `'3.0'` in a TEXT column, `? / 2` dividing as floats).
+ */
+const bindOne = (p: Binding): SQLInputValue => {
+  if (p === undefined) return null;
+  if (typeof p === 'boolean') return BigInt(p);
+  if (typeof p === 'number' && Number.isSafeInteger(p)) return BigInt(p);
+  return p;
+};
+const bind = (params: Binding[]): SQLInputValue[] => params.map(bindOne);
 
 /**
  * The number of `?` placeholders in `sql`, skipping quoted strings and names and comments. bun:sqlite throws when the

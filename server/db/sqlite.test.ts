@@ -59,6 +59,17 @@ test('booleans bind as 1 and 0, undefined as NULL (Bun refuses them in node:sqli
   ]);
 });
 
+test('an integral number binds as INTEGER, as in bun:sqlite (node:sqlite binds every number as REAL)', () => {
+  using db = withTable();
+  expect(db.query('SELECT typeof(?) t, ? / 2 half, typeof(?) f').get(3, 7, 1.5)).toEqual({
+    t: 'integer',
+    half: 3,
+    f: 'real',
+  });
+  db.run('INSERT INTO t(a, b) VALUES (?, ?)', [1, 3]);
+  expect(rows(db)).toEqual([{ a: 1, b: '3' }]); // TEXT column: '3', not '3.0'
+});
+
 test('a transaction returns its value and commits; a throw rolls back and rethrows the same error', () => {
   using db = withTable();
   expect(db.transaction((b: string) => db.run('INSERT INTO t(b) VALUES (?)', [b]).lastInsertRowid)('ok')).toBe(1);
