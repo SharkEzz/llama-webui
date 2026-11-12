@@ -52,7 +52,7 @@ order, and the first that fails answers:
 
 | Rule                                                                                                                | Response                                                                     |
 | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| The request URL and the `Host` header (or the URL's host when there is none) parse as `http://<host>`; Bun builds the URL from `Host`, so `Host: a b` fails here | `403` `{"error":"Invalid host"}` |
+| The request URL and the `Host` header (or the URL's host when there is none) parse as `http://<host>`; the host builds the URL from `Host` (`server/host.ts`), so `Host: a b` fails here | `403` `{"error":"Invalid host"}` |
 | Its hostname is `localhost`, ends with `.localhost`, or is an IPv4 or IPv6 literal (brackets removed, any case)     | `403` `{"error":"Host not allowed"}`                                         |
 | When an `Origin` header is present, it equals `` `${url.protocol}//${host}` `` exactly                              | `403` `{"error":"Origin not allowed"}`                                       |
 | For `POST`, `PUT`, `PATCH` and `DELETE`: a `Content-Type`, when present, matches `/^application\/json\b/i`, and a request with a body has one | `415` `{"error":"JSON body expected (content-type: application/json)"}` |
@@ -69,7 +69,9 @@ What follows from these rules:
   every write and the WebSocket get `403`. The guard does not read `X-Forwarded-Proto`, which any client can set, so
   this setup is not supported; trusting it would need an explicit setting naming the proxy.
 - `application/json; charset=utf-8` passes the content-type rule. A write without a body and without a
-  `Content-Type` (for example `POST /api/server/stop`) passes too; with a body, it must be JSON. A cross-site
+  `Content-Type` (for example `POST /api/server/stop`) passes too; with a body, it must be JSON. The guard detects a
+  body from the headers, a `Content-Length` above 0 or a `Transfer-Encoding`, not from the body stream: Node's
+  adapter (`@hono/node-server`) gives every write a body stream, even an empty one. A cross-site
   `fetch()` that sends `application/json` triggers a CORS preflight, which gets no CORS headers back.
 
 ## Where it applies
@@ -89,8 +91,8 @@ Whatever a validator or a handler throws afterwards reaches the API's `onError`,
 
 - Every `/api/*` request goes through it, routes and the `404` `{"error":"Unknown route"}` alike: it is mounted with
   `.use()` ahead of every domain file, so a new route is guarded without doing anything.
-- The WebSocket endpoint is guarded too: the `/ws` route of `server/app.ts` runs `guard()` on the upgrade request
-  before `server.upgrade(req)`, so another site cannot open the socket (browsers always send `Origin` on a WebSocket
+- The WebSocket endpoint is guarded too: `mount()` (`server/host.ts`) runs `guard()` on a `/ws` upgrade request
+  before handing it to the `ws` library, so another site cannot open the socket (browsers always send `Origin` on a WebSocket
   handshake). A request to `/ws` that is not an upgrade gets `426` `WebSocket upgrade expected`.
 - The web interface itself (the HTML page, its bundles and the SPA fallback, `server/routes/web.ts`) is not guarded:
   it is static and holds no data. That is why a page opened through a host name loads, then has all its API calls
@@ -104,7 +106,7 @@ Every error an `/api` route returns is a JSON object with an `error` string, and
 | -------------------------------------- | --------------- | ---------------------------------------------------------------- |
 | `new HttpError(status, message)`       | `status`        | `{ "error": message }`                                           |
 | `new HttpError(status, message, code)` | `status`        | `{ "error": message, "code": code }`                             |
-| An `HttpError` of an older module (`bun --hot`) | `status` | the same: `isHttpError()` checks `name === 'HttpError'` and a numeric `status`, not `instanceof` |
+| An `HttpError` of an older module (development reload) | `status` | the same: `isHttpError()` checks `name === 'HttpError'` and a numeric `status`, not `instanceof` |
 | A `ZodError`                           | `400`           | `{ "error": "Invalid data: <first issue> (<path>)", "issues": [...] }`, the path only when the issue has one |
 | A `SyntaxError`, or Hono's `Malformed JSON in request body` (body is not JSON) | `400` | `{ "error": "Invalid JSON" }` |
 | Anything else                          | `500`           | `{ "error": "Internal error" }`, and the error is logged         |
@@ -117,7 +119,7 @@ clients.
 
 ## What `--host` changes
 
-`server/index.ts` passes `--host` (or `LLAMA_WEBUI_HOST`, default `DEFAULT_HOST = '127.0.0.1'`) as Bun's `hostname`.
+`server/index.ts` passes `--host` (or `LLAMA_WEBUI_HOST`, default `DEFAULT_HOST = '127.0.0.1'`) as the `hostname` the HTTP server listens on.
 That decides who can connect, and nothing else: the guard applies the same rules on every address, and no
 authentication appears. With a non-loopback address, `GET /api/setup` reports `listen.exposed: true` (from
 `isLoopback()`, `packages/webui-shared/src/setup.ts`), and the setup checklist shows a network access reminder.

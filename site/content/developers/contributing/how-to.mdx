@@ -49,8 +49,8 @@ mounts, as `BenchPage` does with `startBenchSync()`.
   </Step>
   <Step title="Check it">
 
-A file created under `web/src/` while `bun run dev` runs may not be found by the bundler: restart `bun run dev`. To
-check the production split, run `bun run start` (it builds the front end at startup) and open the page.
+`pnpm dev` picks up the new files. To check the production split, run `pnpm start` (it builds the front end with
+`vite build` first) and open the page.
 
   </Step>
 </Steps>
@@ -121,7 +121,7 @@ body ahead of it: read it in the handler (`object(await c.req.json())`) or pass 
   <Step title="Register the routes">
 
 Mount the new app in `createApi()` (`server/api.ts`) with `.route('/', xRoutes(deps))`, chained after the others.
-A new dependency goes into `AppDeps` (`server/app.ts`) and is built in `createDeps()` (`server/deps.ts`). Add the
+A new dependency goes into `AppDeps` (`server/api.ts`) and is built in `createDeps()` (`server/deps.ts`). Add the
 route to `ROUTES` in `server/contract/cases.ts` (the contract suite fails otherwise), then regenerate the golden
 (see [Testing](/developers/contributing/testing/)).
 
@@ -174,7 +174,7 @@ const downloads = new DownloadQueue({
 });
 ```
 
-A subscription to an object that survives `bun --hot` (the supervisor, the log ring, the monitor) must be undone in
+A subscription to an object that survives a development reload (the supervisor, the log ring, the monitor) must be undone in
 `__llamaWebuiDispose` at the bottom of `server/index.ts`, as `unsubSnapshot()` is: the module runs again on every
 reload. Routes that change state themselves can broadcast through the `hub` in their dependencies, as
 `server/routes/bench.ts` does for `bench-deleted`.
@@ -277,10 +277,10 @@ Read it in the page with `useMonitor((s) => s.snapshot?.<field>)` and chart a se
 [Add a setting](#add-a-setting)).
 
   </Step>
-  <Step title="Restart Bun">
+  <Step title="Restart pnpm dev">
 
-`server/collectors/**` and `server/monitor/**` live in the runtime and are not hot reloaded: stop Bun and run
-`bun run dev` again to try the change.
+`server/collectors/**` and `server/monitor/**` live in the runtime and are not hot reloaded: stop `pnpm dev` and run
+it again to try the change.
 
   </Step>
 </Steps>
@@ -309,7 +309,7 @@ validates falls back to it. A switch inside `collectors` goes into both the inne
   <Step title="Use it on the server">
 
 Read it with `settings.get()` when it is used (modules receive a getter such as `settings: () => settings.get()`), so a
-change applies without a restart. `PATCH /api/settings` (`server/app.ts`) also calls `monitor.configure()`: a setting
+change applies without a restart. `PATCH /api/settings` (`server/routes/settings.ts`) also calls `monitor.configure()`: a setting
 the monitor or the collectors depend on belongs in `MonitorSettings` and `CollectorSettings`.
 
   </Step>

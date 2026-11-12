@@ -5,7 +5,8 @@ description: The /ws channel, from connection and guard to the hello message, bo
 
 llama-webui pushes its live events over one WebSocket, `/ws`. The server side is `WsHub` (`server/ws/hub.ts`), the
 message types are the `WsMessage` union (`packages/webui-shared/src/ws.ts`), and the web app's client is `useWs` and `onWs()`
-(`web/src/lib/ws.ts`). The events themselves are wired in `server/index.ts`.
+(`web/src/lib/ws.ts`). The events themselves are wired in `server/index.ts`. `mount()` (`server/host.ts`) accepts the
+upgrade with the `ws` library and hands each socket to the hub (`attachSocket()`, `server/ws/attach.ts`).
 
 ## Connect
 
@@ -32,7 +33,7 @@ ws.onmessage = (event) => {
 };
 ```
 
-Run it with `bun watch.ts`. Import `WsMessage` from `@llama-webui/shared` to type `msg`.
+Run it with `node watch.ts` (Node 26 runs TypeScript and has a global `WebSocket`). Import `WsMessage` from `@llama-webui/shared` to type `msg`.
 
 ## hello and bootId
 
@@ -43,7 +44,7 @@ On every new connection, `WsHub.attach()` sends `hello` to that client before an
 ```
 
 `bootId` identifies the llama-webui process (`crypto.randomUUID()` in `getRuntime()`, `server/runtime.ts`). It lives
-on `globalThis` with the supervisor and the log ring, so it is the same after a `bun --hot` reload, and changes only
+on `globalThis` with the supervisor and the log ring, so it is the same after a development reload, and changes only
 when llama-webui restarts. Log line numbers (`seq`) and the monitor history belong to one boot: they start over when
 the `bootId` changes. `GET /api/state`, `GET /api/logs` and `GET /api/monitor/history` return the `bootId` too, so a
 client can tell which boot a REST answer comes from.
@@ -60,7 +61,7 @@ The heartbeat is made of application messages, not WebSocket protocol pings:
   `pong`.
 - A client can send `ping` too: the hub answers `pong` right away.
 
-On a `bun --hot` reload, `server/index.ts` disposes of the old hub: it closes every client with code `1001`
+On a development reload, `server/index.ts` disposes of the old hub: it closes every client with code `1001`
 and reason `shutdown`, and the clients reconnect to the new one (same `bootId`).
 
 ## Messages
@@ -253,7 +254,7 @@ a progress bar comes back without waiting for the next `*-progress` message.
 
 Then the `bootId` decides what the client keeps:
 
-- **Same `bootId`** (a network drop, a `bun --hot` reload): the numbering goes on. The logs store asks for the lines
+- **Same `bootId`** (a network drop, a development reload): the numbering goes on. The logs store asks for the lines
   from its next expected `seq` and merges them by number (`mergeLogs()`, `packages/webui-shared/src/logs.ts`).
 - **Different `bootId`** (llama-webui restarted): the log numbering restarted at 0 and the history is empty. The
   clients drop what they hold: the logs store starts over (`onBoot()`) and reads `GET /api/logs?since=0`, the monitor

@@ -3,8 +3,9 @@ title: Web app
 description: How the React app in web/src is organized, how its zustand stores are fed by REST and the WebSocket, and its conventions for errors, numbers and theming.
 ---
 
-The web app is a React 19 single-page app in `web/`, served by the Bun process (see
-[Serving the UI](/developers/architecture/#serving-the-ui)). Its entry is `web/index.html`, which loads
+The web app is a React 19 single-page app in `web/`, served by the Node.js process (see
+[Serving the UI](/developers/architecture/#serving-the-ui)): Vite's middlewares with HMR in development, the output of
+`vite build` (`dist/web`) in production. Its entry is `web/index.html`, which loads
 `web/src/main.tsx`. It imports types, schemas and pure functions from `@llama-webui/shared` and never talks to
 `llama-server` directly: everything goes through the llama-webui API.
 
@@ -79,7 +80,7 @@ const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, n
 { path: 'dashboard', ...page(() => import('@/features/dashboard/DashboardPage'), 'DashboardPage') },
 ```
 
-`load` must stay a literal `import()` so that `Bun.build` can split the page into its own chunk: the initial bundle
+`load` must stay a literal `import()` so that `vite build` can split the page into its own chunk: the initial bundle
 only holds the shell, and the Topology page's three.js scene only loads with that page. On the first load of a deep
 URL, `hydrateFallbackElement` renders `<AppLayout loading />`, the shell with a `PageSkeleton`, until the page's code
 arrives. Unknown paths render the placeholder page with "Page not found".
@@ -174,7 +175,7 @@ another conversation aborts the fetch, which only unsubscribes: the generation g
 
 ### Resynchronizing with bootId
 
-The server sends `hello` with its `bootId` first on every connection. The `bootId` is stable across `bun --hot`
+The server sends `hello` with its `bootId` first on every connection. The `bootId` is stable across development
 reloads and changes only when llama-webui restarts, so it tells a reconnection apart from a restart:
 
 - `useLogs` ties its lines to the boot (`LogView.bootId`). Log line numbers restart from 0 on every boot, so on a new

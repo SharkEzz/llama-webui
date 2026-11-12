@@ -1,13 +1,11 @@
 ---
 title: Testing
-description: Run the tests (Vitest, node:test, Bun) and the type check (tsc -b), write a test, and use the captured outputs, fake llama-server and llama-bench, fixtures and site checks.
+description: Run the tests (Vitest, node:test) and the type check (tsc -b), write a test, and use the captured outputs, fake llama-server and llama-bench, fixtures and site checks.
 ---
 
 Tests run on Node with [Vitest](https://vitest.dev) and sit next to the code they test, except those of
 [llamacpp-js](/developers/llamacpp-js/), which use Node's own runner, `node:test`
-([Tests of llamacpp-js](#tests-of-llamacpp-js)). While the app itself still runs on Bun, the server-side tests run
-under Bun too ([Tests under Bun](#tests-under-bun)). They cover logic rather than
-screens: parsers fed with real captured outputs from `testdata/`, the estimator, the repositories against SQLite, and the
+([Tests of llamacpp-js](#tests-of-llamacpp-js)). They cover logic rather than screens: parsers fed with real captured outputs from `testdata/`, the estimator, the repositories against SQLite, and the
 benchmark runner driving fake `llama-server` and `llama-bench` binaries.
 
 ## Run the tests
@@ -18,13 +16,12 @@ From the root of the repository:
 pnpm test
 ```
 
-It runs three suites one after the other, and is the command CI runs:
+It runs two suites one after the other, and is the command CI runs:
 
 | Script                           | Command                                                    | Runs                                                        |
 | -------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
-| `test:unit`                      | `vitest run`                                               | Every `*.test.ts` of `server/`, `scripts/`, `packages/webui-shared/`, `web/` and `site/` but the three Bun-only files, on Node |
+| `test:unit`                      | `vitest run`                                               | Every `*.test.ts` of `server/`, `scripts/`, `packages/webui-shared/`, `web/` and `site/`, on Node |
 | `test` of `llamacpp-js`          | `node --test 'tests/*.test.ts'`                            | The tests of `packages/llamacpp-js/`, on Node               |
-| `test:bun`                       | `bun test ./server ./scripts ./packages/webui-shared ./packages/llamacpp-js` | The server-side and `llamacpp-js` tests again, under Bun |
 
 `vitest.config.ts` at the root defines one Vitest project per code base: `server` (with `scripts/`), `shared`, `web`
 (with the `@/` alias to `web/src/`) and `site` (with its own `@/` alias). Imports are explicit
@@ -37,8 +34,9 @@ It runs three suites one after the other, and is the command CI runs:
 | `pnpm exec vitest run -t 'sweep'`                  | Tests whose name matches the regular expression      |
 | `pnpm exec vitest`                                 | Watch mode: reruns the tests a change affects        |
 
-A test has 5 seconds by default. Tests that spawn processes or build the front end pass a longer timeout as the third
-argument of `test()` (`}, 20_000);` in `server/bench/runner.test.ts`, `30_000` in `server/routes/web.test.ts`).
+A test has 5 seconds by default. Tests that spawn processes, reload or build the app pass a longer timeout as the
+third argument of `test()` or `beforeAll()` (`}, 20_000);` in `server/bench/runner.test.ts`, `120_000` for the build of
+`server/build.test.ts`).
 
 ## Where tests live
 
@@ -101,21 +99,22 @@ test('settings: defaults, then a persisted patch', () => {
 - **Promises** are awaited: `await expect(p).rejects.toThrow()`. Vitest fails a test that leaves a `.resolves` or
   `.rejects` assertion unawaited.
 
-### Tests under Bun
+### Host, build and development loop
 
-Until the app runs on Node, `pnpm test:bun` replays the tests of `server/`, `scripts/`, `packages/webui-shared/` and
-`packages/llamacpp-js/` under `bun test`: Bun's runner answers the `vitest` imports itself and implements `node:test`. The two runtimes do not behave the same everywhere
-(Bun's `node:sqlite` refuses booleans, which `server/db/sqlite.ts` converts), and only this replay sees a difference
-that breaks the app under Bun.
+Route tests call the Hono app of a domain (or `createApi()`) with `app.request()`, without a server; set
+`app.onError((err) => errorResponse(err))` on a domain app to get the API's error replies. Three files test what runs
+around the API, under Vitest like the others:
 
-Two files need the Bun runtime and run only there, excluded from Vitest by `BUN_ONLY` in `vitest.config.ts`:
-`server/routes/web.test.ts` (builds the front end with `Bun.build`) and `server/contract/contract.test.ts` (the
-[HTTP contract suite](#http-contract-suite), which boots the app). They import from `bun:test`. Route tests call the
-Hono app of a domain (or `createApi()`) with `app.request()`, without a server, and run under Vitest; set
-`app.onError((err) => errorResponse(err))` on a domain app to get the API's error replies.
-
-A test that reads a Bun global on a code path the app takes only under Bun stubs it where it is missing, as the
-compiled-executable branch of `workerUrl` does in `server/collectors/nvml/monitor.test.ts`.
+- `server/host.test.ts` mounts the host (`mount()`, `server/host.ts`) on a real `node:http` server: `/api/*` to the
+  API and any other path to the web handler, a body-less `POST` through the guard, an invalid `Host`, `/ws` with and
+  without an upgrade, an upgrade on another path, and a second mount on the same server.
+- `server/build.test.ts` runs one real `vite build` into a temporary directory: the client is split per page,
+  three.js is only in the Topology chunks, no client chunk imports a `node:` module, `staticWeb()` serves every file a
+  deep URL references, and the server bundle (`main.js`) imports only Node built-ins, `hono`, `@hono/node-server` and
+  `ws`, with `THIRD-PARTY-LICENSES.md` next to it.
+- `server/dev.test.ts` starts the development loop (`startDev()`, `server/dev.ts`) on a small entry in a temporary
+  directory: an edit evaluates the entry again, a syntax error then its fix and a missing import then its creation
+  recover, and of two quick writes the last one wins.
 
 ### Tests of llamacpp-js
 
@@ -148,12 +147,6 @@ describe('parseSlots', () => {
 - The bundling checks of `tests/package.test.ts` bundle an import of the package with Rolldown (a devDependency of
   `llamacpp-js`) for the browser: tree-shaking keeps only what one function needs, and the browser-safe modules pull no
   Node built-in. Without an install, as in the Node 24 job, they pass `{ skip }` and Node reports them as skipped.
-
-<Callout type="warning">
-Bun implements only part of `node:test`: tests, `describe`, hooks, `t.plan()` and `t.mock` work, but snapshots,
-`mock.module()`, `node:test/reporters` and code coverage do not, and `test.only()` does not filter. A test that uses
-them passes under Node and breaks `pnpm test:bun`: stick to what both runners support.
-</Callout>
 
 ## Captured outputs
 
@@ -271,8 +264,8 @@ Two modules build inputs in code, for tests that need a model or a machine:
 ## HTTP contract suite
 
 `server/contract/` records what the API answers, over real HTTP, so that a change of server framework or runtime has
-to give the same replies. `contract.test.ts` boots the real app (`createApp`, with the objects `createDeps()` builds
-for `server/index.ts`) on a free port, in a temporary data directory, with its own runtime, a monitor without
+to give the same replies. `contract.test.ts` boots the real app under Vitest (the host, `mount()`, with `createApi()`
+and the objects `createDeps()` builds for `server/index.ts`) on a free port, in a temporary data directory, with its own runtime, a monitor without
 collectors, a `fetch` that fails as offline for Hugging Face, and the fake `llama-server` as the `binary` setting.
 It sends every case, then compares each reply with `server/contract/golden.json`.
 
@@ -320,7 +313,7 @@ to the table, with a `body` entry (methods and one schema-breaking body) when it
 When a change of behaviour is intended, regenerate the golden and read its diff before committing it:
 
 ```bash title="Terminal"
-UPDATE_GOLDEN=1 bun test ./server/contract/contract.test.ts
+UPDATE_GOLDEN=1 pnpm exec vitest run server/contract/contract.test.ts
 git diff server/contract/golden.json
 ```
 
@@ -378,7 +371,7 @@ then not a `number`. A type the API's declaration imports from `node:*` would no
 silently becomes `any` in the web. `server/rpc.test.ts` therefore rebuilds `server/.tsbuild/rpc.d.ts` and lists what
 it imports, following its relative imports (`declarationImports()`, `server/testing/declarations.ts`): only `hono`,
 `zod`, `@llama-webui/shared` and `llamacpp-js/metrics` are allowed. The production build test
-(`server/routes/web.test.ts`) also checks that no chunk of the bundle imports a `node:` module. A referenced project may not set `noEmit`, so the base sets
+(`server/build.test.ts`) also checks that no chunk of the bundle imports a `node:` module. A referenced project may not set `noEmit`, so the base sets
 `emitDeclarationOnly` with `outDir: .tsbuild/`: `tsc -b` writes the declarations and its build info there (ignored by
 git), and skips a project that has not changed since. The projects do not enable the same options:
 

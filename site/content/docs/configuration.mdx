@@ -8,8 +8,7 @@ its database. Everything else is changed from the [Settings](/docs/settings/) pa
 
 ## Flags and environment variables
 
-Each flag has an environment variable. Pass flags after `llama-webui` (the executable), or after `bun run start` (or
-`bun run dev`) from source:
+Each flag has an environment variable. Pass flags after `pnpm start` (or `pnpm dev`), from the clone:
 
 | Flag                | Environment variable   | Default                                                         | Effect                                                                                        |
 | ------------------- | ---------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -19,15 +18,13 @@ Each flag has an environment variable. Pass flags after `llama-webui` (the execu
 | `-h`, `--help`      |                        |                                                                 | Prints the help and exits.                                                                    |
 
 ```bash title="Terminal"
-llama-webui --host 0.0.0.0 --port 8080
+pnpm start --host 0.0.0.0 --port 8080
 # Same thing with environment variables
-LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 llama-webui
-# From source
-bun run start --host 0.0.0.0 --port 8080
+LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 pnpm start
 ```
 
-Both `--port 8080` and `--port=8080` work. Once listening, llama-webui prints the address to open, for example
-`llama-webui on http://127.0.0.1:7860`.
+Both `--port 8080` and `--port=8080` work. Once listening, llama-webui prints the address to open, followed by its
+version, for example `llama-webui on http://127.0.0.1:7860 (v0.2.1)`.
 
 <Callout type="warning" title="Before using --host 0.0.0.0">
 
@@ -44,6 +41,9 @@ For each option, llama-webui takes the first value it finds:
 2. the environment variable (an empty variable counts as unset);
 3. the default.
 
+A `.env` file in the folder llama-webui starts from (the clone, with `pnpm start` or `pnpm dev`) is loaded at startup:
+its variables fill what the environment does not set, and a variable already set wins.
+
 ### Invalid options
 
 An unknown option, a missing value, an empty value (`--host=`), an extra argument or a port outside 1 to 65535 stops
@@ -55,13 +55,14 @@ llama-webui: invalid --port: “70000” (integer from 1 to 65535)
 
 ### The help
 
-`llama-webui --help` prints:
+`pnpm start --help` prints:
 
 ```text
-llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Bun process).
+llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Node.js process).
 
 Usage:
-  llama-webui [options]
+  pnpm dev [options]      development (Vite, HMR)
+  pnpm start [options]    production (builds, then runs dist/server/main.js)
 
 Options:
   --host <address>       listen address (default: 127.0.0.1); 0.0.0.0 to open it to the local network
@@ -83,16 +84,8 @@ Hugging Face downloads (Models page):
   HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
 ```
 
-From source, `bun run start --help` prints the same text, with these usage lines instead:
-
-```text
-Usage:
-  bun run dev [options]      development (bun --hot, HMR)
-  bun run start [options]    production
-```
-
-`bun run start` is the normal way to run llama-webui from source. `bun run dev` reloads the code when a file changes
-and is meant for working on llama-webui itself; it takes the same options.
+`pnpm start` is the normal way to run llama-webui: it builds the interface, then starts the server. `pnpm dev` reloads
+the code when a file changes and is meant for working on llama-webui itself; it takes the same options.
 
 ### In a systemd service
 
@@ -145,7 +138,7 @@ A second llama-webui with its own `--data-dir` and `--port` has its own settings
 try things without touching your everyday setup:
 
 ```bash title="Terminal"
-llama-webui --port 7861 --data-dir ~/llama-webui-test
+pnpm start --port 7861 --data-dir ~/llama-webui-test
 ```
 
 Only one `llama-server` can listen on a given port, and llama-webui treats a `llama-server` it did not start on its

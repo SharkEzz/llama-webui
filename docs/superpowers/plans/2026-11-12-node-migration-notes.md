@@ -70,6 +70,22 @@ changes in the plan.
 - (N7) A route answering `Response.json(…)` (`/api/server/props`) has an untyped reply; the web narrows it with
   guards (`web/src/lib/props.ts`). `hc` sends no body without `json`: the `'{}'` bodies of retry, clear, to-profile,
   stop and regenerate are gone (the guard passes a body-less write, checked in the app).
+- (N8) chokidar (under Vite's watcher) throttles `change` per file on the leading edge for 50 ms with no trailing
+  event: a second write within 50 ms (format on save, two quick `sed -i`) was lost and the dev reload kept the first
+  content (6/6 in a repro). `server/dev.ts` re-stats each changed file 60 ms later (`ino:mtimeNs:size`) and replays a
+  dropped change. Vite also watches files outside `root` one by one and loses such a watch after two atomic replaces:
+  `server/` and `packages/` are watched as directories.
+- (N8) A module-level `WeakMap` in `server/host.ts` was lost when the module runner re-evaluated it: the second mount
+  attached a second `upgrade` listener ("handleUpgrade() was called more than once", dev process crash). The
+  listeners now live on the server object under `Symbol.for('llama-webui.host.mounted')`.
+- (N8) `dist/server/main.js` resolves `hono`, `@hono/node-server` and `ws` from the repo root: under pnpm they must be
+  root `dependencies` (not only `server/`'s). The server is bundled into one file (`codeSplitting: false`): with
+  chunks, `index.ts` went to `dist/server/assets/` and `../web/` pointed nowhere (503 in production).
+- (N8) Bun loaded `.env` from the working directory for `bun run dev`/`start`; Node does not. `server/env.ts`
+  (`process.loadEnvFile`, under the variables already set) is called by both entry points; `--env-file-if-exists`
+  would print ".env not found" on every start. Bun's `.env.local`/`.env.<NODE_ENV>` are not loaded (never used here).
+- (N8) The bundled NVML monitor keeps `new URL('./worker.ts', import.meta.url)`: no such file next to `main.js`, and
+  `Worker` is not global on Node, so NVIDIA monitoring falls back to nvidia-smi until N9.
 
 ## Refactoring and optimisation backlog (for the R milestones, after the merge)
 
@@ -102,6 +118,8 @@ gain.
 | Zod schemas for the `json(object)` / `json(passthrough)` bodies          | `server/routes/{server,settings,profiles,bench,tuning,sweeps,chat}.ts` | The typed client checks those bodies too (`{ profileID }` would fail to compile); changes validation messages, so the golden                                           |
 | Typed reply for `/api/server/props` (`c.json` of a shared `ServerProps`) | `server/routes/server.ts`, `web/src/lib/props.ts`                      | One type instead of web guards over llama-server's raw JSON                                                                                                            |
 | `query()` validators that parse (`limit`, `since`, `sweep` as numbers)   | `server/routes/{bench,server}.ts`                                      | Handlers read `c.req.valid('query')` instead of `searchParams` + `Number()`                                                                                            |
+| Stream files from disk instead of holding `dist/web` in memory           | `server/routes/web.ts`                                                 | All of `dist/web` (~5 MB) held in memory; fine for a local app, revisit with compression                                                                               | N8       |
+| Drop the dropped-change replay once chokidar emits trailing events       | `server/dev.ts`                                                        | Workaround for chokidar 5's leading-edge throttle; check on each chokidar/Vite bump                                                                                    | N8       |
 
 Resolved by the port itself (no action): fonts were base64-inlined into a 568 KB CSS file by Bun's bundler; Vite emits
 them as files.

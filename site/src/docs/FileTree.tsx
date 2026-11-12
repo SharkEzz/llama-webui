@@ -59,7 +59,7 @@ function Items({ list }: { list: El }) {
  * then an optional description. Nested lists are subfolders.
  *
  * <FileTree>
- * - `server/` the Bun process
+ * - `server/` the Node.js process
  *   - `routes/` one file per API domain
  * - `package.json`
  * </FileTree>

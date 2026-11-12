@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 const PILLARS = [
   [
     'One process, one port.',
-    'API, WebSocket and UI are served by Bun on port 7860. No build step, no database server: everything lives in a SQLite file.',
+    'API, WebSocket and UI are served by one Node.js process on port 7860. No database server: everything lives in a SQLite file.',
   ],
   [
     'Mixed hardware.',

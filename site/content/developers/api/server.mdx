@@ -92,8 +92,8 @@ The four routes share these `409` refusals, without a `code`:
 | `port <port> is in use by another service`                  | Something that is not a `llama-server` answers HTTP on the profile's port. The state does not change.           |
 
 Stop only gets the first one: it waits for an operation in progress instead of refusing. The supervisor errors are
-recognized by `name === 'SupervisorError'`, not with `instanceof`: the supervisor survives `bun --hot` and throws the
-class of the old module. The user-side view of an external server is on [Server](/docs/server/#an-external-server).
+recognized by `name === 'SupervisorError'`, not with `instanceof`: the supervisor survives a development reload and throws
+the class of the old module. The user-side view of an external server is on [Server](/docs/server/#an-external-server).
 
 ### Start the server
 
@@ -239,7 +239,7 @@ curl http://127.0.0.1:7860/api/flags
 The lines of the log ring: the stdout and stderr of `llama-server`, and llama-webui's own lines about it
 (`[llama-webui] launch: <command>`, `[llama-webui] GGML_CUDA_P2P is set: …`, `[llama-webui] llama-server exited (code …)`,
 `[bench] stopping llama-server for the benchmark`…). The ring is in memory only and keeps the last 10,000 lines (`LogBuffer(10_000)` in
-`server/runtime.ts`); it survives `bun --hot`, not a restart. New lines are pushed as
+`server/runtime.ts`); it survives a development reload, not a restart. New lines are pushed as
 [`log`](/developers/api/websocket/#log) messages.
 
 **Query**

@@ -19,8 +19,8 @@ file path:
 import { EMPTY_LOG_VIEW, type LogLine, type LogView, mergeLogs, onBoot } from '@llama-webui/shared';
 ```
 
-Tests sit next to their module (`packages/webui-shared/src/<module>.test.ts`) and run with Vitest on Node, then
-again under Bun while the app runs on it ([Tests under Bun](/developers/contributing/testing/#tests-under-bun)).
+Tests sit next to their module (`packages/webui-shared/src/<module>.test.ts`) and run with Vitest on Node
+([Testing](/developers/contributing/testing/)).
 
 ## Modules
 
@@ -28,7 +28,7 @@ again under Bun while the app runs on it ([Tests under Bun](/developers/contribu
 | --- | --- |
 | `bench.ts` | `BenchParamsSchema`, the flags llama-webui can translate for both `llama-bench` and `llama-server` (`ngl`, `ot`, `ncmoe`, `dev`, `ts`, `sm`, `fa`, `ctk`, `ctv`, `t`, `b`, `ub`); `BenchSpecSchema` for a run; the `BenchRun`, `BenchLive` and `BenchDevice` types; `serverArgs()` and `benchArgs()` (parameters to each tool's arguments), `paramsFromServerArgs()`, `ctxFromArgs()`, `ignoredByBench()`; `OOM_ERROR` and `isOomError()`. |
 | `chat.ts` | `SamplingSchema`, `ConversationPatchSchema`, the conversation and message types, `ChatEvent` (the SSE events `start`, `delta`, `done`), `statsFromTimings()`, `DEFAULT_TITLE`, `isDefaultTitle()`, `autoTitle()`. |
-| `dispose.ts` | `defer(fn)`: a `Disposable` for `using`, with the same `Symbol.dispose` fallback `Bun.build` emits, for browsers that lack it. |
+| `dispose.ts` | `defer(fn)`: a `Disposable` for `using`, with the same `Symbol.dispose` fallback Vite's build emits for `using`, for browsers that lack it. |
 | `format.ts` | `LOCALE = 'en-US'`, the locale of every number shown to the user, and `fmtInt()` for the server's messages; `web/src/lib/format.ts` imports `LOCALE` from here. |
 | `hf.ts` | Hugging Face: `HF_REPO_RE`, `parseHfInput()`, the status, search, repository and variant types, `DownloadItem`, `DownloadLive`, `DownloadRequestSchema`, `isDownloadActive()`, `vramFit()`. |
 | `logs.ts` | `LogLine`, `classifyLine()` (level and kind), `filterLogs()`, the client's `LogView` with `EMPTY_LOG_VIEW`, `onBoot()` and `mergeLogs()`, `LAUNCH_LOG_PREFIX` and `P2P_LOG_LINE`. |
@@ -119,7 +119,7 @@ the text itself.
 
 The package imports nothing from `server/` or `web/`: its modules import zod, the browser-safe modules of
 `llamacpp-js` (never `llamacpp-js/node`) and each other, and only the tests use
-`vitest` and `node:path`. Keep it that way. The same module runs in Bun and in the browser bundle, so a module that
+`vitest` and `node:path`. Keep it that way. The same module runs on the server (Node) and in the browser bundle, so a module that
 reached into the server would drag server code into the UI, and one that needed the DOM would break on the server.
 Inputs that depend on the environment are passed in instead of read: `profileModelPath()` takes the home directory as
 an argument and expands `~` itself, without `node:os` or `node:path`.

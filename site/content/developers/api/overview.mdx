@@ -9,14 +9,14 @@ Checked against commit `bbc6a5b`.
 
 </Callout>
 
-llama-webui has one HTTP API. Its own web app uses it, and so can your scripts and integrations. The route table is
-in `server/app.ts`, the routes themselves in `server/routes/` (one file per domain), the handler wrapper and errors in
+llama-webui has one HTTP API. Its own web app uses it, and so can your scripts and integrations. The Hono app is
+built by `createApi()` in `server/api.ts`, the HTTP host in `server/host.ts`, the routes themselves in `server/routes/` (one file per domain), the handler wrapper and errors in
 `server/http.ts`, and the request guard in `server/security.ts`. Types and zod schemas come from `packages/webui-shared/src/`
 (`@llama-webui/shared`).
 
 ## Base URL
 
-One Bun process serves the API, the WebSocket and the web app on one address, `http://127.0.0.1:7860` by default
+One Node.js process serves the API, the WebSocket and the web app on one address, `http://127.0.0.1:7860` by default
 (`DEFAULT_HOST` and `DEFAULT_PORT` in `server/cli.ts`). `--host` and `--port`, or `LLAMA_WEBUI_HOST` and
 `LLAMA_WEBUI_PORT`, change it: see [Launch options](/docs/configuration/).
 
@@ -174,9 +174,9 @@ export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
   api.onError((err) => errorResponse(err));
 ```
 
-`createApp()` in `server/app.ts` starts `Bun.serve()` and sends every `/api/*` request to that app
-(`api.fetch(req, { server })`); `/ws` and the web routes stay `Bun.serve` routes. Every API request goes through
-three middlewares first, in this order:
+`mount()` in `server/host.ts` puts that app on a `node:http` server through `@hono/node-server`
+(`getRequestListener()`) and sends it every `/api/*` request; `/ws` (the `ws` library) and the web app are handled by
+the host itself. Every API request goes through three middlewares first, in this order:
 
 - `jsonCharset` gives a JSON reply the `application/json;charset=utf-8` type the API has always used (`c.json()`
   alone says `application/json`). A route that sets its own type keeps it.
@@ -211,8 +211,9 @@ The web app calls the API through Hono's client (`hc` from `hono/client`), typed
 `server/rpc.ts` is the package entry `@llama-webui/server/api`: it exports `AppType`, the inferred type of
 `createApi()`, and nothing at runtime. Its declaration holds the whole route schema (paths, methods, `param`, `query`,
 `json` inputs, `c.json()` outputs and statuses) and imports only `hono`, `@llama-webui/shared` and
-`llamacpp-js/metrics`, so the browser project never sees Bun's or Node's types. `Env` types `c.env.server` by the one
-method the routes call, `timeout()`, for the same reason.
+`llamacpp-js/metrics`, so the browser project never sees Bun's or Node's types. For the same reason `Env` types the
+bindings as a plain `object`: the Node adapter passes its `incoming` and `outgoing` objects there, and no route reads
+them.
 
 What the client checks follows what the route declares:
 
@@ -230,7 +231,7 @@ To add a route, see [How-to guides](/developers/contributing/how-to/).
 
 | Page                                                   | Source                       | Routes | Paths                                                         |
 | ------------------------------------------------------ | ---------------------------- | ------ | ------------------------------------------------------------- |
-| [Health and settings](/developers/api/app/)            | `server/app.ts`              | 3      | `/api/health`, `/api/settings`                                |
+| [Health and settings](/developers/api/app/)            | `server/api.ts`, `server/routes/settings.ts` | 3 | `/api/health`, `/api/settings`                                |
 | [Setup and launch pad](/developers/api/setup/)         | `server/routes/setup.ts`     | 2      | `/api/setup`, `/api/launchpad`                                |
 | [Profiles](/developers/api/profiles/)                  | `server/routes/profiles.ts`  | 11     | `/api/profiles/*`                                             |
 | [Server, state and logs](/developers/api/server/)      | `server/routes/server.ts`    | 9      | `/api/state`, `/api/server/*`, `/api/flags`, `/api/logs`      |

@@ -1,6 +1,6 @@
 ---
 title: Conventions
-description: Language, number formatting, Biome rules, React and Bun idioms, generated shadcn components and the hot-reload rules every change follows.
+description: Language, number formatting, Biome rules, React and built-in API idioms, generated shadcn components and the hot-reload rules every change follows.
 ---
 
 These rules apply to `server/`, `packages/`, `web/` and `site/`. They come from `CLAUDE.md` at the root of the repository
@@ -83,11 +83,11 @@ the generated shadcn components (see [Generated shadcn components](#generated-sh
 
 | Command            | Runs                       | Effect                                     |
 | ------------------ | -------------------------- | ------------------------------------------ |
-| `bun run lint`     | `biome check`              | Format, lint and imports, read-only        |
-| `bun run lint:fix` | `biome check --write`      | Applies the safe fixes                     |
-| `bun run format`   | `biome format --write`     | Formats only                               |
+| `pnpm lint`        | `biome check`              | Format, lint and imports, read-only        |
+| `pnpm lint:fix`    | `biome check --write`      | Applies the safe fixes                     |
+| `pnpm format`      | `biome format --write`     | Formats only                               |
 
-Before a commit, a pull request or the end of a milestone, `bun run lint` must report zero errors and zero warnings
+Before a commit, a pull request or the end of a milestone, `pnpm lint` must report zero errors and zero warnings
 (see [the quality gate](/developers/contributing/workflow/#the-quality-gate)).
 
 ### Never disable a rule
@@ -139,33 +139,32 @@ The web app uses React 19. Three rules cover most effect-related lint reports:
   return <SamplingForm key={current.id} current={current} props={props} />;
   ```
 
-## Bun first
+## Built-ins first
 
-The app runs on Bun and uses built-in APIs rather than npm packages that do the same job. Files, processes, timers,
-hashes and SQLite go through `node:*`, so that the code also runs on Node (the app is moving to Node); what only Bun
-provides still uses Bun:
+The app runs on Node.js (26.13 or later) and uses built-in APIs rather than npm packages that do the same job: files,
+processes, timers, hashes and SQLite go through `node:*`. The few packages it adds are listed here:
 
 | Need                          | Used                                  | Where                                                      |
 | ----------------------------- | ------------------------------------- | ---------------------------------------------------------- |
-| HTTP routes                   | Hono, served by `Bun.serve`           | `server/api.ts`, `server/routes/*.ts`                      |
-| WebSocket, UI                 | `Bun.serve`                           | `server/app.ts`                                            |
+| HTTP server                   | `node:http`, routed by `mount()`      | `server/host.ts`                                           |
+| HTTP routes                   | Hono, through `@hono/node-server`     | `server/api.ts`, `server/routes/*.ts`                      |
+| WebSocket                     | `ws` (`noServer`)                     | `server/host.ts`, `server/ws/attach.ts`                    |
 | SQLite                        | `Database` (`node:sqlite`)            | `server/db/sqlite.ts`: every repository                    |
 | Reading files                 | `readText`, `fileExists`, `fileRange` | `server/proc.ts` (`node:fs`): collectors, hardware readers |
 | Child processes               | `spawnProc`, `which`                  | `server/proc.ts` (`node:child_process`): supervisor, bench |
-| Production front end          | `Bun.build`                           | `server/routes/web.ts`                                     |
-| NVML                          | `bun:ffi` in a `Worker`               | `server/collectors/nvml/`                                  |
+| Front end, server bundle      | Vite (`vite build`, dev middlewares)  | `vite.config.ts`, `server/dev.ts`, `server/routes/web.ts`  |
+| NVML                          | `bun:ffi` in a `Worker` (on Node, the `nvidia-smi` fallback for now) | `server/collectors/nvml/`  |
 | Checksums                     | `createHash` (`node:crypto`)          | `server/hf/downloader.ts`                                  |
 | Pauses                        | `setTimeout` (`node:timers/promises`) | Supervisor, benchmarks, tests                              |
-| Tests                         | `bun:test`                            | Every `*.test.ts` but those of `packages/llamacpp-js/`     |
+| Tests                         | Vitest                                | Every `*.test.ts` but those of `packages/llamacpp-js/`     |
 
 Directories and file handles go through `node:fs` or `node:fs/promises` (`readdir`, `stat`, `realpath`, `open`,
 `statfs`); tests write files with `writeFileDeep()` (`server/testing/write.ts`), which creates the parent directories.
-There is no Express, `ws`, `better-sqlite3`, `execa` or `dotenv` (Bun loads `.env` itself), and no Vite, Jest or
-Vitest in the app. Two exceptions: `site/` is built with Vite and React Router, is installed with pnpm and is run and
-tested with Bun; `packages/llamacpp-js/` targets Node 24 or later as
-well as Bun, so its sources use only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), never
-`Bun.*`, and its tests use `node:test` so that they run on Node as well as under `bun test`
-([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
+There is no Express, `better-sqlite3`, `execa` or `dotenv` (`server/env.ts` loads `.env` with Node's
+`process.loadEnvFile()`), and no Jest. Two exceptions: `site/` is built with Vite and React Router, is installed with
+pnpm and its scripts run with Bun; `packages/llamacpp-js/` targets Node 24 or later as well as Bun, so its sources use
+only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), never `Bun.*`, and its tests use
+`node:test` with no dependency ([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
 
 ### Code idioms
 
@@ -187,18 +186,16 @@ they stay comparable with shadcn updates. Leave them untouched: put the project'
 
 ## Hot reload
 
-`bun run dev` runs the server under `bun --hot`, and some modules deliberately survive a reload:
+`pnpm dev` evaluates the server entry again on every save under `server/` or `packages/` (`server/dev.ts`), in the
+same process, and some modules deliberately survive a reload:
 
 - The supervisor, the log ring, the monitor and the bench gate live on `globalThis` (`server/runtime.ts`) so that saving
   a file does not kill the loaded model. A change to `server/supervisor/supervisor.ts`, `server/logs/buffer.ts`,
   `server/bench/gate.ts`, `server/monitor/**` (except `placement.ts`), `server/collectors/**` or `server/runtime.ts` is
-  not picked up: stop Bun with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run `bun run dev` again.
+  not picked up: stop `pnpm dev` with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run it again.
 - For the same reason, recognize supervisor errors by `name` (`e.name === 'SupervisorError'`), never with `instanceof`:
   the surviving supervisor throws the class from the old version of the module.
-- A file created under `web/src/` while `bun run dev` runs may not be found by the bundler ("Could not resolve", while
-  `bun run check` passes): restart `bun run dev`.
-- A Bun plugin added to `bunfig.toml` must also be passed to `Bun.build` in `server/routes/web.ts`, which builds the
-  production front end.
+- Vite plugins are declared once, in `vite.config.ts`: development and `pnpm build` both use them.
 
 [Architecture](/developers/architecture/) explains which modules are recreated on a reload and what happens to a
 generation, a benchmark or a sweep in progress.

@@ -14,7 +14,7 @@
  *   stop      stops llama-server
  *
  * The demo instance itself runs with a neutral home so no personal path shows up:
- *   env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" bun run start --host 0.0.0.0 --port 7861
+ *   env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" pnpm start --host 0.0.0.0 --port 7861
  * with /home/demo/models -> the real models folder and /home/demo/llama.cpp/build/bin hard-linked from the build.
  */
 import { parseArgs } from 'node:util';

@@ -232,9 +232,9 @@ the live state.
 | Event                          | What happens                                                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
 | Shutdown (`SIGINT`, `SIGTERM`) | `dispose()` aborts the transfer and keeps the `.part` and the row, still `downloading`                       |
-| Bun killed                     | Same state on disk: the `.part` and a `downloading` row                                                       |
+| llama-webui killed             | Same state on disk: the `.part` and a `downloading` row                                                       |
 | Next start                     | `downloads.resume()` in `server/index.ts` starts the loop, which takes the `downloading` item first and resumes it from its `.part` |
-| `bun --hot` reload             | The old queue's `dispose()` aborts the transfer, the new queue resumes it once the old writer has let go     |
+| Development reload             | The old queue's `dispose()` aborts the transfer, the new queue resumes it once the old writer has let go     |
 
 There is no orphan cleanup for downloads: an interrupted item carries on where it stopped.
 
@@ -253,7 +253,7 @@ before it starts.
    `$HF_HOME/token`, with `HF_HOME` defaulting to `$XDG_CACHE_HOME/huggingface`, then `~/.cache/huggingface`.
 
 It runs on every call (each API request and each download attempt), so an `hf auth login` done while llama-webui runs
-is picked up without a restart. The environment variables are read from Bun's environment, set at launch. The token is
+is picked up without a restart. The environment variables are read from the process environment, set at launch. The token is
 never stored by llama-webui; `HfStatus.token` only says where it came from (`env`, `file` or `null`).
 
 `hfEndpoint()` returns `HF_ENDPOINT` (a mirror, for example), trimmed and without trailing slashes, or

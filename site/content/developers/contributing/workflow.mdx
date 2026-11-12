@@ -142,7 +142,7 @@ Captures come from a demo instance, never from the one you use every day. It run
 that no personal path or account appears:
 
 ```bash title="Terminal"
-env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" bun run start --host 0.0.0.0 --port 7861
+env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" pnpm start --host 0.0.0.0 --port 7861
 ```
 
 `/home/demo/models` points to the models folder, and `/home/demo/llama.cpp/build/bin` holds hard links to the llama.cpp
@@ -233,22 +233,22 @@ When the change touches `site/`, including its pages, also run `bun run site:bui
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `master`, on Ubuntu with Bun 1.4.4 and
-Node.js 24 (the React Router CLI that builds the site runs on Node, and Vite 8 needs a recent version):
+`.github/workflows/ci.yml` runs on every pull request and every push to `master`, on Ubuntu with Node.js 26.13 and
+pnpm, plus Bun 1.4.4 for the site's scripts:
 
 | Step                                         | Command                                              |
 | -------------------------------------------- | ---------------------------------------------------- |
-| Install the app's dependencies               | `bun install --frozen-lockfile`                      |
-| Install the site's dependencies              | `bun install --frozen-lockfile` in `site/`           |
-| Lint                                         | `bun run lint`                                       |
-| Type check                                   | `bun run check`                                      |
-| Tests                                        | `bun test`                                           |
-| Build the standalone executable              | `bun run compile`                                    |
-| Smoke-test it (help, version, UI)            | `bun scripts/smoke-binary.ts dist/llama-webui`       |
+| Install the dependencies (site included)     | `pnpm install --frozen-lockfile`                     |
+| Lint                                         | `pnpm lint`                                          |
+| Type check                                   | `pnpm check`                                         |
+| Tests                                        | `pnpm test`                                          |
+| Build the app                                | `pnpm build`                                         |
+| Smoke-test the build (help, version, UI, WebSocket) | `node scripts/smoke.ts`                       |
 | Build the site                               | `bun run site:build`                                 |
 | Check the site's links                       | `bun run --cwd site check-links`                     |
 
-`--frozen-lockfile` fails when a lockfile is out of date: commit `bun.lock` (and `site/bun.lock`) with any dependency
+A second job runs the tests of `packages/llamacpp-js/` on Node.js 24, the lowest version it supports, without any
+install. `--frozen-lockfile` fails when the lockfile is out of date: commit `pnpm-lock.yaml` with any dependency
 change.
 
 `.github/workflows/site-deploy.yml` publishes `site/dist/` to GitHub Pages: on every push to `master` that changes
