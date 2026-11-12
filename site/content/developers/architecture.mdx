@@ -192,7 +192,10 @@ A release is the npm package of the repository's root: `pnpm pack` after `pnpm b
 
 `node scripts/smoke.ts --tarball [file.tgz]` checks the package the way a user gets it: it packs the root (or takes
 the given tarball), installs it with npm into an empty prefix, checks that npm installed nothing but the package and
-those three versions, then runs the build's smoke checks through `node_modules/.bin/llama-webui`. CI runs it on every
+those three versions, then runs the build's smoke checks through `node_modules/.bin/llama-webui`. Packing never
+builds: `pnpm pack` runs `scripts/prepack.ts` first, which refuses without `dist/server/main.js`,
+`dist/server/nvml-worker.js` and `dist/web/index.html`, so a package without its command cannot be written; run
+`pnpm build` before it. CI runs it on every
 pull request, and `release.yml` runs it on the tarball it publishes.
 
 ## Launch options

@@ -33,8 +33,8 @@ export default defineConfig(({ command }) => ({
   environments: {
     client: { build: { outDir: r('dist/web'), emptyOutDir: true } },
     ssr: {
-      // Dependencies are bundled, except the network-facing ones: their security fixes reach users at install,
-      // without a release (they are `dependencies` of the package).
+      // Dependencies are bundled, except the network-facing ones, `dependencies` of the published package at exact
+      // versions (an install from the tarball has no lockfile): a fix in one of them ships with a release.
       resolve: { noExternal: true, external: ['hono', '@hono/node-server', 'ws'] },
       build: {
         ssr: true,

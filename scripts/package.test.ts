@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { expect, test } from 'vitest';
 
 const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'));
@@ -22,5 +24,24 @@ test('the runtime dependencies are pinned to exact versions', () => {
   for (const name of Object.keys(pkg.dependencies)) {
     const line = workspace.split('\n').find((l) => l.replace(/"/g, '').startsWith(`  ${name}:`));
     expect(line, name).toMatch(/:\s+\d+\.\d+\.\d+$/);
+  }
+});
+
+test('packing without a build fails instead of shipping a package with no command', () => {
+  // npm runs `prepack` before `pnpm pack` (and `npm pack`) writes the tarball, from the package's root.
+  expect(pkg.scripts.prepack).toBe('node scripts/prepack.ts');
+  const script = join(import.meta.dirname, 'prepack.ts');
+  const empty = mkdtempSync(join(tmpdir(), 'lw-prepack-'));
+  try {
+    const refused = spawnSync(process.execPath, [script], { cwd: empty, encoding: 'utf8' });
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toContain('pnpm build');
+    for (const file of ['dist/server/main.js', 'dist/server/nvml-worker.js', 'dist/web/index.html']) {
+      mkdirSync(dirname(join(empty, file)), { recursive: true });
+      writeFileSync(join(empty, file), '');
+    }
+    expect(spawnSync(process.execPath, [script], { cwd: empty }).status).toBe(0);
+  } finally {
+    rmSync(empty, { recursive: true, force: true });
   }
 });
