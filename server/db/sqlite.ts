@@ -26,28 +26,65 @@ export interface DatabaseOptions {
 const bind = (params: Binding[]): SQLInputValue[] =>
   params.map((p) => (p === undefined ? null : typeof p === 'boolean' ? Number(p) : p));
 
-const wrap = <Row, P extends Binding[]>(s: StatementSync): Query<Row, P> => ({
-  get: (...p) => (s.get(...bind(p)) as Row | undefined) ?? null,
-  all: (...p) => s.all(...bind(p)) as Row[],
-  run: (...p) => s.run(...bind(p)) as Changes,
+/**
+ * The number of `?` placeholders in `sql`, skipping quoted strings and names and comments. bun:sqlite throws when the
+ * values do not match; node:sqlite binds the missing ones as NULL and exposes no count.
+ */
+export function placeholders(sql: string): number {
+  /** Index of the last character of `token` after `from`, or the end of `sql` when it is not closed. */
+  const end = (token: string, from: number) => {
+    const at = sql.indexOf(token, from);
+    return at === -1 ? sql.length : at + token.length - 1;
+  };
+  let n = 0;
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i];
+    // A doubled quote ('it''s') closes and reopens the string: the characters skipped are the same.
+    if (c === "'" || c === '"' || c === '`') i = end(c, i + 1);
+    else if (c === '[') i = end(']', i + 1);
+    else if (c === '-' && sql[i + 1] === '-') i = end('\n', i + 2);
+    else if (c === '/' && sql[i + 1] === '*') i = end('*/', i + 2);
+    else if (c === '?') n++;
+  }
+  return n;
+}
+
+interface Prepared {
+  s: StatementSync;
+  n: number;
+}
+
+const check = (n: number, p: Binding[]): SQLInputValue[] => {
+  if (p.length !== n) throw new RangeError(`SQLite query expected ${n} values, received ${p.length}`);
+  return bind(p);
+};
+
+const wrap = <Row, P extends Binding[]>({ s, n }: Prepared): Query<Row, P> => ({
+  get: (...p) => (s.get(...check(n, p)) as Row | undefined) ?? null,
+  all: (...p) => s.all(...check(n, p)) as Row[],
+  run: (...p) => s.run(...check(n, p)) as Changes,
 });
 
 export class Database implements Disposable {
   #raw: DatabaseSync;
-  #cache = new Map<string, StatementSync>();
+  #cache = new Map<string, Prepared>();
 
   constructor(path: string, o: DatabaseOptions = {}) {
     // Foreign keys off unless turned on, as in bun:sqlite (`openDb()` turns them on).
     this.#raw = new DatabaseSync(path, { readOnly: o.readonly ?? false, enableForeignKeyConstraints: false });
   }
 
-  #stmt(sql: string): StatementSync {
-    let s = this.#cache.get(sql);
-    if (!s) {
-      s = this.#raw.prepare(sql);
-      this.#cache.set(sql, s);
+  #prepare(sql: string): Prepared {
+    return { s: this.#raw.prepare(sql), n: placeholders(sql) };
+  }
+
+  #stmt(sql: string): Prepared {
+    let p = this.#cache.get(sql);
+    if (!p) {
+      p = this.#prepare(sql);
+      this.#cache.set(sql, p);
     }
-    return s;
+    return p;
   }
 
   /** A statement cached by its SQL text, as bun:sqlite's `query()`. Only the first statement of `sql` runs. */
@@ -57,16 +94,14 @@ export class Database implements Disposable {
 
   /** Like `query()`, without the cache. */
   prepare<Row = unknown, P extends Binding[] = Binding[]>(sql: string): Query<Row, P> {
-    return wrap<Row, P>(this.#raw.prepare(sql));
+    return wrap<Row, P>(this.#prepare(sql));
   }
 
   /** Runs `sql`; without parameters it may hold several statements (`prepare()` would drop all but the first). */
   run(sql: string, params: Binding[] = []): Changes {
-    if (params.length > 0) return this.#stmt(sql).run(...bind(params)) as Changes;
+    if (params.length > 0) return wrap(this.#stmt(sql)).run(...params);
     this.#raw.exec(sql);
-    return this.#stmt(
-      'SELECT changes() AS changes, last_insert_rowid() AS lastInsertRowid',
-    ).get() as unknown as Changes;
+    return wrap<Changes, []>(this.#stmt('SELECT changes() AS changes, last_insert_rowid() AS lastInsertRowid')).get()!;
   }
 
   /**

@@ -25,6 +25,16 @@ test('get returns null when no row matches, all the rows, run the changes and th
   expect(db.prepare<{ b: string }, [number]>('SELECT b FROM t WHERE a = ?').get(2)).toEqual({ b: 'y' });
 });
 
+test('a value count that does not match the placeholders throws, as in bun:sqlite (node:sqlite binds NULL)', () => {
+  using db = withTable();
+  expect(() => db.query('SELECT ?, ? v').get(1)).toThrow('SQLite query expected 2 values, received 1');
+  expect(() => db.prepare('SELECT ? v').all(1, 2)).toThrow('SQLite query expected 1 values, received 2');
+  expect(() => db.run('INSERT INTO t(a, b) VALUES (?, ?)', [1])).toThrow('SQLite query expected 2 values, received 1');
+  expect(rows(db)).toEqual([]);
+  // A ? inside a string, a quoted name or a comment is not a placeholder.
+  expect(db.query(`SELECT '?' AS "q?", ? AS v -- ?\n /* ? */`).get(1)).toEqual({ 'q?': '?', v: 1 });
+});
+
 test('RETURNING rows are read through get', () => {
   using db = withTable();
   expect(db.query<{ id: number }, [string]>('INSERT INTO t(b) VALUES (?) RETURNING id').get('r')).toEqual({ id: 1 });
