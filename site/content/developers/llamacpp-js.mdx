@@ -76,7 +76,9 @@ The errors are classes with a fixed `name`, so a caller can test them with `inst
 | `LlamaStreamError` | A streamed completion sent an `error` event. | `error`, the `LlamaError`. |
 | `LlamaStreamCutError` | The stream ended or broke before `[DONE]`. | The read error as `cause`, when there is one. |
 
-A `fetch` that fails before any response (nothing listens, a timeout) throws its own error unchanged. The probes and
+A `fetch` that fails before any response (nothing listens, a timeout) throws its own error unchanged. Node's `fetch`
+has timeouts of its own (300 s without response headers, 300 s between two chunks): for a request that can stay
+silent longer, pass another `fetch`, as llama-webui does with `llamaFetch()` (`server/llamaFetch.ts`). The probes and
 `fetchLlama()` never throw: a server that does not answer is `null`, `false` or `health: 'down'`.
 `contextOverflow(error)` reads the prompt and context sizes of an `exceed_context_size_error`, from its fields or, on
 builds that only put them in the message, from its text.

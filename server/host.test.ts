@@ -1,4 +1,6 @@
 import { createServer, type Server } from 'node:http';
+import { connect } from 'node:net';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { Hono } from 'hono';
 import { afterEach, expect, test, vi } from 'vitest';
 import { request } from './contract/wire';
@@ -123,6 +125,74 @@ test('a WebSocket on /ws gets the hub hello and its pong; a foreign Origin is re
     { error: 'Origin not allowed' },
   ]);
   // The first client left (its close detached it), the refused one never came in.
+  await vi.waitFor(() => expect(hub.size()).toBe(0));
+});
+
+const REFUSED_UPGRADE = [
+  'GET /ws HTTP/1.1',
+  'Host: 127.0.0.1',
+  'Origin: http://evil.example',
+  'Upgrade: websocket',
+  'Connection: Upgrade',
+  'Sec-WebSocket-Version: 13',
+  'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+  '',
+  '',
+].join('\r\n');
+
+test('a refused upgrade whose client resets the connection does not raise an uncaught exception', async () => {
+  const { base, port } = await boot();
+  const uncaught = vi.fn();
+  process.on('uncaughtException', uncaught);
+  try {
+    // Reset right after the request, and once the refusal has been read.
+    for (const waitForAnswer of [false, true]) {
+      for (let i = 0; i < 5; i++) {
+        const client = connect(port, '127.0.0.1');
+        client.on('error', () => {});
+        await new Promise<void>((resolve) => client.once('connect', () => resolve()));
+        const answered = new Promise<void>((resolve) => client.once('data', () => resolve()));
+        client.write(REFUSED_UPGRADE);
+        if (waitForAnswer) await answered;
+        client.resetAndDestroy();
+        await sleep(20);
+      }
+    }
+    expect(uncaught).not.toHaveBeenCalled();
+  } finally {
+    process.off('uncaughtException', uncaught);
+  }
+  expect((await request(base, { method: 'GET', path: '/api/x' })).status).toBe(200);
+});
+
+test('a refused upgrade is closed by the server, even when the client keeps its side open', async () => {
+  const { server, port } = await boot();
+  const client = connect({ port, host: '127.0.0.1', allowHalfOpen: true });
+  try {
+    let answer = '';
+    client.on('data', (chunk) => {
+      answer += String(chunk);
+    });
+    const ended = new Promise<void>((resolve) => client.once('end', () => resolve()));
+    client.write(REFUSED_UPGRADE);
+    await ended;
+    expect(answer).toMatch(/^HTTP\/1\.1 403 Forbidden\r\n/);
+    expect(answer).toContain('{"error":"Origin not allowed"}');
+    const connections = () => new Promise<number>((resolve) => server.getConnections((_err, n) => resolve(n)));
+    await vi.waitFor(async () => expect(await connections()).toBe(0));
+  } finally {
+    client.destroy();
+  }
+});
+
+test('a frame larger than the protocol needs closes the socket (1009)', async () => {
+  const { base, hub } = await boot();
+  const code = await new Promise<number>((resolve) => {
+    const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/ws`);
+    ws.onmessage = () => ws.send(JSON.stringify({ type: 'ping', pad: 'x'.repeat(64 * 1024) }));
+    ws.onclose = (e) => resolve(e.code);
+  });
+  expect(code).toBe(1009);
   await vi.waitFor(() => expect(hub.size()).toBe(0));
 });
 

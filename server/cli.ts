@@ -45,6 +45,9 @@ Hugging Face downloads (Models page):
                          saved by \`hf auth login\` is used (HF_TOKEN_PATH, else $HF_HOME/token,
                          default ~/.cache/huggingface/token)
   HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
+  HTTPS_PROXY, HTTP_PROXY, NO_PROXY
+                         proxy for the requests to Hugging Face; localhost and loopback addresses are
+                         never proxied
 `;
 
 function parsePort(raw: string, source: string): number | string {

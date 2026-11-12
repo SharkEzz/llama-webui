@@ -252,7 +252,7 @@ names in the **Hardware** card: they change when the build changes backends (see
 | `… not found on Hugging Face (or private …)`               | Check the repository id. A private repository needs a token from an account that can read it.                                            |
 | `Hugging Face rejected the token`                          | Create a new token, then set it again (below). The sheet's header says `The token from … was rejected.`                                  |
 | `Hugging Face rate limit reached, try again later`         | Wait, then click **Retry**.                                                                                                              |
-| `Hugging Face unreachable: …`                              | Check the network, or `HF_ENDPOINT` if you use a mirror.                                                                                 |
+| `Hugging Face unreachable: …`                              | Check the network, `HF_ENDPOINT` if you use a mirror, or `HTTPS_PROXY` [behind a proxy](/docs/configuration/#behind-a-proxy).            |
 | `Checksum mismatch for …: the file was deleted`            | The downloaded file did not match its sha256. Click **Retry** to download it again.                                                      |
 | `Not enough disk space: …` or `Disk full`                  | Free space on the disk of the models folder. llama-webui keeps 1.0 GiB free on top of the download.                                      |
 

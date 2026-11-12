@@ -17,7 +17,10 @@ evaluates it again on every server-side save, inside the same process, so it is 
 production, `server/main.ts` (bundled to `dist/server/main.js`) sets `NODE_ENV` to `production` if it is unset and
 imports it. Both entry points first load `.env` from the working directory (`loadDotEnv()`, `server/env.ts`): its
 variables fill what the environment lacks, and replace it too with `--env-override`
-(read from the arguments before they are parsed) or `LLAMA_WEBUI_ENV_OVERRIDE=1`. In order, `server/index.ts`:
+(read from the arguments before they are parsed) or `LLAMA_WEBUI_ENV_OVERRIDE=1`. Only that file is read (no
+`.env.local`, no per-mode file), and `parseEnv()` does not expand `$VAR` references. They then call `useEnvProxy()`
+(same file): with `HTTP_PROXY` or `HTTPS_PROXY` set, `fetch` goes through that proxy, loopback excepted (see
+[Hugging Face](/developers/server/hugging-face/)). In order, `server/index.ts`:
 
 1. Reads the launch options with `cliOptionsOrExit()` (see [Launch options](#launch-options)).
 2. Opens the database with `openDb(dbPath(cli.dataDir))`: creates the data directory, opens
@@ -38,13 +41,15 @@ variables fill what the environment lacks, and replace it too with `--env-overri
 8. Calls `globalThis.__llamaWebuiDispose()` if a previous evaluation left one, to release that instance (see
    [What a reload recreates](#what-a-reload-recreates)). It comes after the new instance is built and mounted, so a
    reload that fails before this point leaves the old one serving.
-9. Marks the chat replies left `streaming` by a killed process as `stopped` (`conversations.stopOrphans()`).
-10. Marks the runs and sweeps left `running` as `interrupted` on a cold start (bench gate not held), and calls
+9. Stores its own dispose function in `globalThis.__llamaWebuiDispose`, before the steps below: this instance is
+   mounted, so if one of them throws (a reload of a broken file), the next reload still finds it to release.
+10. Marks the chat replies left `streaming` by a killed process as `stopped` (`conversations.stopOrphans()`).
+11. Marks the runs and sweeps left `running` as `interrupted` on a cold start (bench gate not held), and calls
    `benchRunner.resume()` in every case.
-11. Gives the monitor the profile → model path resolver it uses for the model's disk.
-12. Calls `downloads.resume()` to pick up the items left queued or downloading.
-13. Subscribes the WebSocket hub to the services (table below), installs its shutdown handler, starts the external
-    server watcher, and stores its own dispose function in `globalThis.__llamaWebuiDispose`.
+12. Gives the monitor the profile → model path resolver it uses for the model's disk.
+13. Calls `downloads.resume()` to pick up the items left queued or downloading.
+14. Subscribes the WebSocket hub to the services (table below), installs its shutdown handler and starts the external
+    server watcher; each adds what undoes it to the `undo` list the dispose function runs.
 
 It finally prints `llama-webui on http://<host>:<port>`, followed by `(dev, HMR)` in development or by the version
 in production.
@@ -75,7 +80,9 @@ The external server watcher (`externalWatcher()` in `server/supervisor/external.
   `getRequestListener()` adapter of `@hono/node-server`;
 - `/ws`: an upgrade runs `guard()`, then goes to a `WebSocketServer({ noServer: true })` of the `ws` library, which
   hands the socket to the `WsHub` (`attachSocket()`, `server/ws/attach.ts`); a request without an upgrade runs
-  `guard()`, then gets `426`;
+  `guard()`, then gets `426`. A refused upgrade gets the guard's answer on the raw socket, which is destroyed once
+  the answer is flushed. A client message over 4,096 bytes (`maxPayload`: the protocol only has `ping` and `pong`)
+  closes the socket with code `1009`;
 - anything else, to the web handler: the UI files and the SPA fallback, so reloading `/chat/12` serves the app.
 
 Only a WebSocket upgrade takes that route: `mount()` sets the server's `shouldUpgradeCallback`, so a request with
@@ -300,7 +307,8 @@ After changing any of them, stop `pnpm dev` with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> 
 Everything else `server/index.ts` and `createDeps()` build is created again: the database connection, the WebSocket hub, the repositories,
 `ChatRuns`, `RunExecutor`, `BenchRunner`, the Hugging Face client, the `DownloadQueue`, the `PlacementTracker` and the
 listeners `mount()` puts on the HTTP server. Once it has mounted them, the new evaluation calls the dispose function
-the previous one left on `globalThis`.
+the previous one left on `globalThis`, then stores its own before it starts any work: an evaluation that throws
+after its mount is released by the next reload like any other.
 It clears the external server timer, unsubscribes from the supervisor, the logs, the monitor and the placement,
 removes its signal handlers, disposes the hub (every socket is closed with code `1001`), `ChatRuns`, the bench runner
 and the download queue, and closes the database.

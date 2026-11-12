@@ -2,6 +2,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import type { BenchPhase, Measure } from '@llama-webui/shared';
 import { ERROR_LINE } from 'llamacpp-js/bench';
 import { probeHealth } from 'llamacpp-js/client';
+import { llamaFetch } from '../llamaFetch';
 import { LineSplitter } from '../logs/lines';
 import { type Spawned, spawnProc } from '../proc';
 import type { BuiltCommand } from '../supervisor/args';
@@ -69,7 +70,8 @@ function measure(values: number[], tokens: number): Measure {
  * TrialCancelled on cancellation; the server is always stopped at the end.
  */
 export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrialResult> {
-  const fetchImpl = o.fetch ?? fetch;
+  // Not `fetch`: it gives up after 300 s without response headers, before `requestTimeoutMs`.
+  const fetchImpl = o.fetch ?? llamaFetch;
   const now = o.now ?? Date.now;
   const loadTimeoutMs = o.loadTimeoutMs ?? 10 * 60_000;
   const requestTimeoutMs = o.requestTimeoutMs ?? 10 * 60_000;

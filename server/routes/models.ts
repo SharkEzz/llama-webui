@@ -1,4 +1,3 @@
-import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { type ModelDeleted, ModelDeleteSchema, type ModelDetail, type ModelList } from '@llama-webui/shared';
 import { Hono } from 'hono';
@@ -15,6 +14,7 @@ import { deleteModelFiles, findEntry, type ModelUsers, modelUsage } from '../mod
 import { readModel } from '../models/gguf';
 import { scanModels, toSummary } from '../models/scan';
 import { weightSizes } from '../models/sizes';
+import { fileExists } from '../proc';
 import { expandHome } from '../supervisor/args';
 import { removeProfile } from './profiles';
 
@@ -87,13 +87,7 @@ export function modelRoutes(deps: ModelRouteDeps) {
       const path = new URL(c.req.url).searchParams.get('path') ?? '';
       if (!path.startsWith('/') || !path.endsWith('.gguf'))
         throw new HttpError(400, 'Absolute path to a .gguf file expected');
-      if (
-        !(await stat(path).then(
-          (s) => s.isFile(),
-          () => false,
-        ))
-      )
-        throw notFound('File');
+      if (!(await fileExists(path))) throw notFound('File');
       let info: Awaited<ReturnType<typeof readModel>>;
       try {
         info = await readModel(path);

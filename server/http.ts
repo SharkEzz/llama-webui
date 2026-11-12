@@ -153,23 +153,22 @@ export const apiRoutes = (app: Hono<Env>): RouteEntry[] =>
 const segments = (path: string) => path.split('/').slice(1);
 const isParam = (segment: string) => segment.startsWith(':');
 
-function matches(pattern: string, path: string): boolean {
-  const p = segments(pattern);
-  const s = segments(path);
-  // Like Hono's router, a `:param` never matches an empty segment (`/api/profiles/` is an unknown route, not a 405).
-  return p.length === s.length && p.every((seg, i) => (isParam(seg) && s[i] !== '') || seg === s[i]);
-}
+/** Like Hono's router, a `:param` never matches an empty segment (`/api/profiles/` is an unknown route, not a 405). */
+const matchesSegments = (p: string[], s: string[]): boolean =>
+  p.length === s.length && p.every((seg, i) => (isParam(seg) && s[i] !== '') || seg === s[i]);
 
-/** Negative when `a` is more specific: at the first segment where they differ in kind, static beats `:param`. */
-function specificity(a: string, b: string): number {
-  const x = segments(a);
-  const y = segments(b);
+const matches = (pattern: string, path: string): boolean => matchesSegments(segments(pattern), segments(path));
+
+/** Negative when `x` is more specific: at the first segment where they differ in kind, static beats `:param`. */
+function specificitySegments(x: string[], y: string[]): number {
   for (let i = 0; i < Math.min(x.length, y.length); i++) {
     const d = Number(isParam(x[i] as string)) - Number(isParam(y[i] as string));
     if (d !== 0) return d;
   }
   return 0;
 }
+
+const specificity = (a: string, b: string): number => specificitySegments(segments(a), segments(b));
 
 /**
  * Hono matches in registration order: a static path registered after a `:param` pattern of the same method that
@@ -198,25 +197,28 @@ export function shadowed(routes: RouteEntry[]): string[] {
  * matching pattern: on to `notFound`. `load` takes the app's routes once they are all registered.
  */
 export function allowTable() {
-  let byPath = new Map<string, Set<string>>();
+  // One entry per pattern, its segments split once: the middleware runs on every API request.
+  let patterns: { segments: string[]; methods: Set<string> }[] = [];
   const mw: MiddlewareHandler = async (c, next) => {
     const method = c.req.method === 'HEAD' ? 'GET' : c.req.method;
     if (!(METHODS as readonly string[]).includes(method)) return next();
-    let best: string | undefined;
-    for (const pattern of byPath.keys())
-      if (matches(pattern, c.req.path) && (best === undefined || specificity(pattern, best) < 0)) best = pattern;
-    const methods = best === undefined ? undefined : byPath.get(best);
-    if (methods === undefined || methods.has(method)) return next();
+    const path = segments(c.req.path);
+    let best: (typeof patterns)[number] | undefined;
+    for (const p of patterns)
+      if (matchesSegments(p.segments, path) && (!best || specificitySegments(p.segments, best.segments) < 0)) best = p;
+    if (!best || best.methods.has(method)) return next();
+    const { methods } = best;
     const allow = METHODS.filter((m) => methods.has(m)).join(', ');
     return Response.json({ error: `Method not allowed (${allow})` }, { status: 405, headers: { Allow: allow } });
   };
   const load = (routes: RouteEntry[]) => {
-    byPath = new Map();
+    const byPath = new Map<string, Set<string>>();
     for (const r of routes) {
       const set = byPath.get(r.path) ?? new Set<string>();
       set.add(r.method);
       byPath.set(r.path, set);
     }
+    patterns = [...byPath].map(([path, methods]) => ({ segments: segments(path), methods }));
   };
   return { mw, load };
 }

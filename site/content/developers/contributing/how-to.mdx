@@ -174,8 +174,9 @@ const downloads = new DownloadQueue({
 });
 ```
 
-A subscription to an object that survives a development reload (the supervisor, the log ring, the monitor) must be undone in
-`__llamaWebuiDispose` at the bottom of `server/index.ts`, as `unsubSnapshot()` is: the module runs again on every
+A subscription to an object that survives a development reload (the supervisor, the log ring, the monitor) must be undone on
+the next one: push what it returns onto `undo` in `server/index.ts`, as `undo.push(monitor.onSnapshot(…))` does (the
+dispose function left in `__llamaWebuiDispose` runs that list). The module runs again on every
 reload. Routes that change state themselves can broadcast through the `hub` in their dependencies, as
 `server/routes/bench.ts` does for `bench-deleted`.
 

@@ -250,7 +250,9 @@ prompt is a sentence on purpose: llama.cpp segfaults on a 2-token prompt with `-
 tokens, at 4 characters per token, the same on every run) followed by an instruction to write a new story. Each request
 asks for exactly `n` tokens (`max_tokens: n`, `ignore_eos: true`) with thinking disabled
 (`chat_template_kwargs: { enable_thinking: false }`). Every request also sends `cache_prompt: false`,
-`temperature: 0`, `seed: 42` and `stream: false`, and times out after 10 minutes (`requestTimeoutMs`).
+`temperature: 0`, `seed: 42` and `stream: false`, and times out after 10 minutes (`requestTimeoutMs`). The requests
+go through `llamaFetch()` (`server/llamaFetch.ts`), a `node:http` request with the signature of `fetch`: Node's own
+`fetch` gives up after 300 s without response headers, well before that timeout, and nothing in Node changes it.
 
   </Step>
   <Step title="Stop">

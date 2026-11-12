@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import type { DiskSpeed } from '@llama-webui/shared';
 import { HttpError } from '../http';
-import { fileExists, fileRange } from '../proc';
+import { fileRange } from '../proc';
 
 const GiB = 1024 ** 3;
 const MIN_BYTES = 64 * 1024 ** 2;
@@ -15,8 +15,10 @@ export async function measureDiskSpeed(
   o: { bytes?: number; offsetFraction?: number; now?: () => number } = {},
 ): Promise<DiskSpeed> {
   const now = o.now ?? performance.now.bind(performance);
-  if (!(await fileExists(path))) throw new HttpError(404, `File not found: ${path}`);
-  const { size } = await stat(path);
+  // One stat for both the check and the size: the file can go away between two (a download renamed, a deletion).
+  const info = await stat(path).catch(() => null);
+  if (!info?.isFile()) throw new HttpError(404, `File not found: ${path}`);
+  const { size } = info;
   // At most 1 GiB, at most the whole file; below 64 MiB the measurement is meaningless.
   const bytes = Math.min(o.bytes ?? GiB, size);
   if (bytes < MIN_BYTES) throw new HttpError(400, `File too small to measure (${Math.round(size / 1024 ** 2)} MiB)`);
