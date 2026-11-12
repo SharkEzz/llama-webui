@@ -2,7 +2,7 @@
  * Fills the llama-webui *demo* instance with curated content for the website screenshots (see screenshots.ts).
  * It drives the real API, so it runs real models on the GPUs: never point it at your everyday instance.
  *
- *   bun scripts/demo-seed.ts <step…> [--base http://192.168.0.20:7861]
+ *   pnpm demo-seed <step…> [--base http://192.168.0.20:7861]
  *
  * Steps, in the usual order:
  *   setup     settings (onboarding done, llama-server on :8091, iGPU hidden) and the demo profiles
@@ -20,7 +20,7 @@
 import { parseArgs } from 'node:util';
 
 const { values, positionals } = parseArgs({
-  args: Bun.argv.slice(2),
+  args: process.argv.slice(2),
   allowPositionals: true,
   options: { base: { type: 'string', default: 'http://192.168.0.20:7861' } },
 });

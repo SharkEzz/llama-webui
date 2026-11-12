@@ -9,12 +9,12 @@
  * Then writes dist/sitemap.xml with trailing-slash URLs, and indexes the documentation for search into dist/pagefind/
  * (only the content marked data-pagefind-body: the docs article, not the home page).
  */
-import { cpSync, existsSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, globSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import * as pagefind from 'pagefind';
 import { SITE } from '../src/lib/site.ts';
 
-const root = join(import.meta.dir, '..');
+const root = join(import.meta.dirname, '..');
 const client = join(root, 'build/client');
 const dist = join(root, 'dist');
 const basenameDir = join(client, 'llama-webui');
@@ -32,11 +32,11 @@ for (const entry of readdirSync(client)) {
 if (existsSync(basenameDir)) cpSync(basenameDir, dist, { recursive: true });
 cpSync(join(client, 'index.html'), join(dist, '404.html'));
 
-const pages = [...new Bun.Glob('**/index.html').scanSync(dist)]
+const pages = globSync('**/index.html', { cwd: dist })
   .map((file) => relative('.', file).replace(/index\.html$/, ''))
   .sort();
 const urls = pages.map((page) => `  <url><loc>${SITE.url}/${page}</loc></url>`).join('\n');
-await Bun.write(
+writeFileSync(
   join(dist, 'sitemap.xml'),
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
 );
@@ -48,7 +48,7 @@ if (indexed.errors.length > 0) throw new Error(`pagefind: ${indexed.errors.join(
 await index.writeFiles({ outputPath: join(dist, 'pagefind') });
 await pagefind.close();
 // addDirectory counts every HTML file it read; the entry file counts the pages actually indexed (data-pagefind-body).
-const entry = await Bun.file(join(dist, 'pagefind/pagefind-entry.json')).json();
+const entry = JSON.parse(readFileSync(join(dist, 'pagefind/pagefind-entry.json'), 'utf8'));
 const searchable = Object.values(entry.languages as Record<string, { page_count: number }>).reduce(
   (n, l) => n + l.page_count,
   0,

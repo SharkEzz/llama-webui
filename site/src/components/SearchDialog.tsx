@@ -102,7 +102,7 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       .catch(() =>
         setError(
           import.meta.env.DEV
-            ? 'No search index in dev: run `bun run site:build`, then `bun run site:preview`.'
+            ? 'No search index in dev: run `pnpm site:build`, then `pnpm site:preview`.'
             : 'Search is unavailable.',
         ),
       );

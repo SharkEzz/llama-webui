@@ -2,8 +2,8 @@
  * Screens of the app captured for the website (see screenshots.ts). Each shot is taken in dark and light.
  * `prepare` puts the page in the state to show (open a sheet, type in an editor…); keep it deterministic.
  *
- * Shots tagged `live` need a generation running (bun scripts/demo-seed.ts generate) and are captured on their own:
- *   bun scripts/screenshots.ts --live
+ * Shots tagged `live` need a generation running (pnpm demo-seed generate) and are captured on their own:
+ *   pnpm screenshots --live
  * Shots tagged `manual` are only captured when named (their state can't be recreated once the demo is seeded).
  */
 import type { Page } from 'puppeteer-core';

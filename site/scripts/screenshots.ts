@@ -1,7 +1,7 @@
 /**
  * Captures the app for the website, in dark and light, with the local Chromium (headless).
  *
- *   bun scripts/screenshots.ts [name…] [--live] [--base http://192.168.0.20:7861] [--themes dark,light]
+ *   pnpm screenshots [name…] [--live] [--base http://192.168.0.20:7861] [--themes dark,light]
  *
  * Without names: every shot except `live` and `manual` ones; --live: the shots that need a running generation.
  *
@@ -16,7 +16,7 @@ import sharp from 'sharp';
 import { SHOTS } from './shots.ts';
 
 const { values, positionals } = parseArgs({
-  args: Bun.argv.slice(2),
+  args: process.argv.slice(2),
   allowPositionals: true,
   options: {
     base: { type: 'string', default: 'http://192.168.0.20:7861' },
@@ -26,7 +26,7 @@ const { values, positionals } = parseArgs({
 });
 
 const VIEWPORT = { width: 1600, height: 1000, deviceScaleFactor: 2 };
-const outDir = join(import.meta.dir, '..', 'public', 'screenshots');
+const outDir = join(import.meta.dirname, '..', 'public', 'screenshots');
 const base = values.base.replace(/\/$/, '');
 const themes = values.themes.split(',') as ('dark' | 'light')[];
 const shots = positionals.length

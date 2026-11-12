@@ -1,5 +1,5 @@
 /**
- * Maps MDX files under content/ to site routes. Pure (no fs) so it can be unit tested with bun test;
+ * Maps MDX files under content/ to site routes. Pure (no fs) so it can be unit tested with Vitest;
  * src/routes.ts feeds it the file list.
  */
 
