@@ -15,6 +15,7 @@
       "!**/dist",
       "!**/out",
       "!**/.claude",
+      "!**/.agents",
       "!site/build",
       "!site/dist",
       "!site/.react-router"

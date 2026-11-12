@@ -40,20 +40,20 @@ files (64 `bun:test`, 8 `node:test` in `llamacpp-js`).
 
 ## Decisions (do not re-litigate)
 
-| Topic | Decision |
-| --- | --- |
-| Runtime / packages | Node 26 (`engines.node >= 26.13`; installed: 26.13.0), pnpm 12 workspace (installed: 12.19.0); `site/` joins the workspace (one lockfile, `catalog:`) |
-| TS toolchain | Everything goes through Vite/Rolldown (dev, tests, build). Source keeps extensionless imports, `moduleResolution: bundler`, parameter properties (25 files) and the `@/` alias. Native type stripping only for standalone scripts (`server/dev.ts`, `scripts/`, `site/scripts/`, `testdata/fake/`, the NVML worker in dev). Node 26.13 has no `--experimental-transform-types`: those files must be erasable TS with `.ts` import extensions |
-| Dev | One process, one port, server modules hot-reloaded through Vite without killing llama-server (`globalThis` singletons kept) |
-| HTTP | Full Hono adoption: chained routes, middleware, `@hono/zod-validator`, typed RPC client (`hc`) in `web` replacing the `api<T>()` call sites |
-| WebSocket | Raw `ws` library (`noServer`), same hub (`server/ws/hub.ts`) |
-| SQLite | Built-in `node:sqlite`, behind a wrapper that keeps the `bun:sqlite` surface in use |
-| NVML | Built-in `node:ffi` (experimental) in a `worker_threads` worker; the nvidia-smi fallback stays |
-| Tests | Vitest 5 for the 64 `bun:test` files; `llamacpp-js` keeps `node:test`; its Bun replay and its "and Bun" target claim go away |
-| Distribution | No standalone binary. npm-shaped package (`bin: llama-webui`, `dist/`), **not published** for now but kept publishable. A GitHub release carries the `pnpm pack` tarball + `SHA256SUMS`, installed with `npm install -g <tarball URL>` |
-| `llamacpp-js` | Stays a workspace package, bundled into the app; its rules do not change |
-| Git | Long-lived branch `node`, one PR per milestone into it |
-| Refactoring | Out of the port: dedicated milestones afterwards; candidates are recorded in the notes file |
+| Topic              | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime / packages | Node 26 (`engines.node >= 26.13`; installed: 26.13.0), pnpm 12 workspace (installed: 12.19.0); `site/` joins the workspace (one lockfile, `catalog:`)                                                                                                                                                                                                                                                                                        |
+| TS toolchain       | Everything goes through Vite/Rolldown (dev, tests, build). Source keeps extensionless imports, `moduleResolution: bundler`, parameter properties (25 files) and the `@/` alias. Native type stripping only for standalone scripts (`server/dev.ts`, `scripts/`, `site/scripts/`, `testdata/fake/`, the NVML worker in dev). Node 26.13 has no `--experimental-transform-types`: those files must be erasable TS with `.ts` import extensions |
+| Dev                | One process, one port, server modules hot-reloaded through Vite without killing llama-server (`globalThis` singletons kept)                                                                                                                                                                                                                                                                                                                  |
+| HTTP               | Full Hono adoption: chained routes, middleware, `@hono/zod-validator`, typed RPC client (`hc`) in `web` replacing the `api<T>()` call sites                                                                                                                                                                                                                                                                                                  |
+| WebSocket          | Raw `ws` library (`noServer`), same hub (`server/ws/hub.ts`)                                                                                                                                                                                                                                                                                                                                                                                 |
+| SQLite             | Built-in `node:sqlite`, behind a wrapper that keeps the `bun:sqlite` surface in use                                                                                                                                                                                                                                                                                                                                                          |
+| NVML               | Built-in `node:ffi` (experimental) in a `worker_threads` worker; the nvidia-smi fallback stays                                                                                                                                                                                                                                                                                                                                               |
+| Tests              | Vitest 5 for the 64 `bun:test` files; `llamacpp-js` keeps `node:test`; its Bun replay and its "and Bun" target claim go away                                                                                                                                                                                                                                                                                                                 |
+| Distribution       | No standalone binary. npm-shaped package (`bin: llama-webui`, `dist/`), **not published** for now but kept publishable. A GitHub release carries the `pnpm pack` tarball + `SHA256SUMS`, installed with `npm install -g <tarball URL>`                                                                                                                                                                                                       |
+| `llamacpp-js`      | Stays a workspace package, bundled into the app; its rules do not change                                                                                                                                                                                                                                                                                                                                                                     |
+| Git                | Long-lived branch `node`, one PR per milestone into it                                                                                                                                                                                                                                                                                                                                                                                       |
+| Refactoring        | Out of the port: dedicated milestones afterwards; candidates are recorded in the notes file                                                                                                                                                                                                                                                                                                                                                  |
 
 Defaults taken without asking (the user saw them and did not object; revisit only with a reason):
 
@@ -174,13 +174,13 @@ whether Vitest's transform leaves `using` native.
   `testdata/fake/fake-llama-server` and `fake-llama-bench` are `/bin/sh` wrappers doing `exec "${BUN_PATH:-bun}"
   x.ts`; their `.ts` use `Bun.serve`, `Bun.file`, `Bun.sleep` and are covered by no tsconfig project.
 - **Tooling**: `bun check --no-script -b` on TypeScript 7.0.2 (root tsconfig is a solution: llamacpp-js, its tests,
-  webui-shared, server, scripts, web; `site` checked separately). `typescript` is a root *peer* dependency. Five
+  webui-shared, server, scripts, web; `site` checked separately). `typescript` is a root _peer_ dependency. Five
   projects set `types: ["bun"]`. Biome 2.6.7 (unchanged by the port). CI: `.github/workflows/{ci,release,
   site-deploy}.yml` on `oven-sh/setup-bun@v2` 1.4.4 (+ Node 24).
 - **Site**: Vite 8 + React Router 8 + Tailwind 4 + MDX, own `bun.lock`; `site/scripts/{postbuild,check-links,serve,
   og,screenshots,demo-seed}.ts` use `Bun.serve`, `Bun.Glob`, `Bun.gzipSync`, `Bun.file`, `Bun.write`, `Bun.argv`,
-  `import.meta.dir`; 5 `bun:test` files. `site/vite.config.ts` is an in-repo reference for Vite 8 + `@tailwindcss/vite`
-  + the `@` alias.
+  `import.meta.dir`; 5 `bun:test` files. `site/vite.config.ts` is an in-repo reference for Vite 8 with
+  `@tailwindcss/vite` and the `@` alias.
 - **Docs**: README (51 mentions of bun), CLAUDE.md (91), 29 of 60 `site/content/**/*.mdx` (388; heaviest:
   `developers/getting-started`, `architecture`, `contributing/{testing,workflow,conventions}`,
   `docs/getting-started/{installation,requirements}`), `site/src/docs/ArchitectureDiagram.tsx` and a few landing
@@ -210,7 +210,7 @@ Dev entry (how re-evaluation is triggered):
 const http = createServer();
 const vite = await createViteServer({
   server: { middlewareMode: true, ws: { server: http } }, // HMR socket shares the port
-  appType: 'spa',                                          // index.html transform + deep-URL fallback
+  appType: 'spa', // index.html transform + deep-URL fallback
 });
 (globalThis as DevGlobals).__llamaWebuiDevHost = { http, web: vite.middlewares };
 const ssr = vite.environments.ssr;
@@ -243,14 +243,14 @@ Parallel pairs: N4 ∥ N5; N7 ∥ N8–N9; N10 ∥ N6–N9.
 Throwaway branch `spike/node-port`, never merged. Output: the "Spike findings" section of the notes file. No gate, no
 docs.
 
-| Item | Pass criterion | Fallback |
-| --- | --- | --- |
-| (a) Dev loop: `server/dev.ts` as above with a stub Hono app, the real `getRuntime()`, and `testdata/fake/fake-llama-server` | Saving a file under `server/routes/` re-runs `index.ts` in < 1 s without a request. The llama-server PID and `bootId` are unchanged. A browser tab keeps HMR, and `/ws` reconnects with the same `bootId`. Editing `packages/webui-shared` updates both sides. A syntax error leaves the old instance serving. Ctrl-C stops llama-server through `runtime.ts`. Files outside Vite's `root` (`server/**`, `packages/**`) are watched. Middleware mode installs no signal handlers of its own | First: explicit `vite.watcher.on('change')` → `ssr.moduleGraph.invalidateAll()` + `runner.clearCache()` + re-import. Second: `rolldown --watch` to a dev bundle, then `import('./server.js?t=…')` in the same process |
-| (b) NVML | Largely answered (fact 1). Remaining: the worker as a `.ts` file run by native type stripping, 10 minutes of sampling without a crash, clean `terminate()` | nvidia-smi collector only (already automatic) |
-| (c) RPC types: stub 70 chained routes modelled on `profiles.ts`/`bench.ts` with real shared schemas, web → server project reference | `tsc -b` cold and incremental times recorded against today's baseline. No TS7056/TS2742 in declaration emit. A canary in `web` (`const t: number = setTimeout(() => {}, 0)`) still compiles, proving Node globals do not leak. Editor completion on `client.api.…` under ~1 s | Per-domain exported types (`ProfilesApi`…) and per-domain `hc` clients |
-| (d) Build shape | `vite build` with `builder: {}` yields `dist/web` (> 10 JS chunks, `WebGLRenderer` absent from the entry chunk, fonts as files) and `dist/server/{main,nvml-worker}.js`. `node dist/server/main.js` boots from a directory outside the repo, serves a deep URL and all its assets; `node:sqlite`/`node:ffi` stay external. Also try `noExternal: true` and record the trade-off | Server built by a small separate `rolldown` config; web stays on Vite |
-| (e) Bun on a pnpm tree: in a scratch worktree, `pnpm install`, then today's full gate with Bun | `bun run lint && bun run check && bun test`, `bun run start`, `bun run compile` and the smoke all pass | `nodeLinker: hoisted` until N8; if that fails, fold the lockfile switch into N8 |
-| (f) Vitest 5 smoke | One test with `using`, `import … from 'node:sqlite'`, `import.meta.dirname` and a numeric third-argument timeout passes on Node 26 | Pin the transform target |
+| Item                                                                                                                                | Pass criterion                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Fallback                                                                                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| (a) Dev loop: `server/dev.ts` as above with a stub Hono app, the real `getRuntime()`, and `testdata/fake/fake-llama-server`         | Saving a file under `server/routes/` re-runs `index.ts` in < 1 s without a request. The llama-server PID and `bootId` are unchanged. A browser tab keeps HMR, and `/ws` reconnects with the same `bootId`. Editing `packages/webui-shared` updates both sides. A syntax error leaves the old instance serving. Ctrl-C stops llama-server through `runtime.ts`. Files outside Vite's `root` (`server/**`, `packages/**`) are watched. Middleware mode installs no signal handlers of its own | First: explicit `vite.watcher.on('change')` → `ssr.moduleGraph.invalidateAll()` + `runner.clearCache()` + re-import. Second: `rolldown --watch` to a dev bundle, then `import('./server.js?t=…')` in the same process |
+| (b) NVML                                                                                                                            | Largely answered (fact 1). Remaining: the worker as a `.ts` file run by native type stripping, 10 minutes of sampling without a crash, clean `terminate()`                                                                                                                                                                                                                                                                                                                                  | nvidia-smi collector only (already automatic)                                                                                                                                                                         |
+| (c) RPC types: stub 70 chained routes modelled on `profiles.ts`/`bench.ts` with real shared schemas, web → server project reference | `tsc -b` cold and incremental times recorded against today's baseline. No TS7056/TS2742 in declaration emit. A canary in `web` (`const t: number = setTimeout(() => {}, 0)`) still compiles, proving Node globals do not leak. Editor completion on `client.api.…` under ~1 s                                                                                                                                                                                                               | Per-domain exported types (`ProfilesApi`…) and per-domain `hc` clients                                                                                                                                                |
+| (d) Build shape                                                                                                                     | `vite build` with `builder: {}` yields `dist/web` (> 10 JS chunks, `WebGLRenderer` absent from the entry chunk, fonts as files) and `dist/server/{main,nvml-worker}.js`. `node dist/server/main.js` boots from a directory outside the repo, serves a deep URL and all its assets; `node:sqlite`/`node:ffi` stay external. Also try `noExternal: true` and record the trade-off                                                                                                             | Server built by a small separate `rolldown` config; web stays on Vite                                                                                                                                                 |
+| (e) Bun on a pnpm tree: in a scratch worktree, `pnpm install`, then today's full gate with Bun                                      | `bun run lint && bun run check && bun test`, `bun run start`, `bun run compile` and the smoke all pass                                                                                                                                                                                                                                                                                                                                                                                      | `nodeLinker: hoisted` until N8; if that fails, fold the lockfile switch into N8                                                                                                                                       |
+| (f) Vitest 5 smoke                                                                                                                  | One test with `using`, `import … from 'node:sqlite'`, `import.meta.dirname` and a numeric third-argument timeout passes on Node 26                                                                                                                                                                                                                                                                                                                                                          | Pin the transform target                                                                                                                                                                                              |
 
 If (a) or (c) fail even with their fallback, stop and go back to the user before N1.
 
@@ -269,18 +269,18 @@ share one resolver, alias and `define` configuration. Bundle the two workspace p
 
 ```yaml
 packages: [packages/*, server, web, site]
-catalog:            # only what two or more projects share
+catalog: # only what two or more projects share
   typescript: ~7.0.2
   react: ^19.3.1
   react-dom: ^19.3.1
   react-router: ^8.5.1
   tailwindcss: ^4.3.5
-  '@tailwindcss/vite': ^4.3.5
+  "@tailwindcss/vite": ^4.3.5
   vite: ^8.3.8
   zod: ^4.6.7
   shiki: ^4.6.0
-  '@types/node': ^26.6.6
-allowBuilds: {}     # filled from the ERR_PNPM_IGNORED_BUILDS list of the first install
+  "@types/node": ^26.6.6
+allowBuilds: {} # filled from the ERR_PNPM_IGNORED_BUILDS list of the first install
 ```
 
 For each package pnpm lists, set `true` only if a feature needs its script (sharp for `site og`/`screenshots`, the
@@ -309,7 +309,7 @@ export interface Spawned {
   pid: number;
   stdout: ReadableStream<Uint8Array> | null; // Readable.toWeb(child.stdout)
   stderr: ReadableStream<Uint8Array> | null;
-  exited: Promise<number | null>;            // resolves on 'exit'
+  exited: Promise<number | null>; // resolves on 'exit'
   readonly exitCode: number | null;
   readonly signalCode: NodeJS.Signals | null;
   kill(signal?: NodeJS.Signals): void;
@@ -340,20 +340,26 @@ change their import line only.
 ```ts
 import { Database as Raw, type SQLInputValue, type Statement } from 'node:sqlite';
 export class Database {
-  #raw: Raw; #cache = new Map<string, Statement>(); #depth = 0;
-  constructor(path: string) { this.#raw = new Raw(path); }
+  #raw: Raw;
+  #cache = new Map<string, Statement>();
+  #depth = 0;
+  constructor(path: string) {
+    this.#raw = new Raw(path);
+  }
   query<Row, P extends SQLInputValue[] = SQLInputValue[]>(sql: string) {
-    const s = this.#stmt(sql);                                    // cached, as Bun's query()
+    const s = this.#stmt(sql); // cached, as Bun's query()
     return {
       get: (...p: P) => (s.get(...p) as Row | undefined) ?? null, // Bun returns null
       all: (...p: P) => s.all(...p) as Row[],
       run: (...p: P) => s.run(...p) as { changes: number; lastInsertRowid: number },
     };
   }
-  prepare<Row, P extends SQLInputValue[]>(sql: string) { /* same shape, uncached */ }
+  prepare<Row, P extends SQLInputValue[]>(sql: string) {
+    /* same shape, uncached */
+  }
   run(sql: string, params?: SQLInputValue[]) {
     if (params?.length) return this.#stmt(sql).run(...params);
-    this.#raw.exec(sql);                                          // may hold several statements (fact 2)
+    this.#raw.exec(sql); // may hold several statements (fact 2)
     return this.#stmt('SELECT changes() AS changes, last_insert_rowid() AS lastInsertRowid').get();
   }
   transaction<A extends unknown[], R>(fn: (...a: A) => R) {
@@ -361,11 +367,22 @@ export class Database {
       const sp = this.#depth > 0;
       this.#raw.exec(sp ? `SAVEPOINT s${this.#depth}` : 'BEGIN');
       this.#depth++;
-      try { const r = fn(...a); this.#depth--; this.#raw.exec(sp ? `RELEASE s${this.#depth}` : 'COMMIT'); return r; }
-      catch (e) { this.#depth--; this.#raw.exec(sp ? `ROLLBACK TO s${this.#depth}; RELEASE s${this.#depth}` : 'ROLLBACK'); throw e; }
+      try {
+        const r = fn(...a);
+        this.#depth--;
+        this.#raw.exec(sp ? `RELEASE s${this.#depth}` : 'COMMIT');
+        return r;
+      } catch (e) {
+        this.#depth--;
+        this.#raw.exec(sp ? `ROLLBACK TO s${this.#depth}; RELEASE s${this.#depth}` : 'ROLLBACK');
+        throw e;
+      }
     };
   }
-  close() { this.#cache.clear(); this.#raw.close(); }
+  close() {
+    this.#cache.clear();
+    this.#raw.close();
+  }
 }
 ```
 
@@ -431,35 +448,40 @@ export const profileRoutes = (deps: ProfileRouteDeps) =>
   new Hono<Env>()
     .get('/api/profiles', (c) => c.json(deps.profiles.list()))
     .post('/api/profiles', body(ProfileInputSchema), (c) => c.json(deps.profiles.create(c.req.valid('json')), 201))
-    .post('/api/profiles/import', /* … */)                 // static paths BEFORE '/api/profiles/:id'
+    .post('/api/profiles/import' /* … */) // static paths BEFORE '/api/profiles/:id'
     .get('/api/profiles/:id', id('Profile'), (c) => c.json(mustGet(c.req.valid('param').id)))
-    .put('/api/profiles/:id', id('Profile'), body(ProfileInputSchema), /* … */);
+    .put('/api/profiles/:id', id('Profile'), body(ProfileInputSchema) /* … */);
 
 // server/api.ts
 export function createApi(deps: AppDeps) {
   const allow = allowTable();
   const api = new Hono<Env>()
-    .use('/api/*', guardMw, allow.mw)                      // guard first, as guarded() does today
+    .use('/api/*', guardMw, allow.mw) // guard first, as guarded() does today
     .route('/', healthRoutes())
     .route('/', settingsRoutes(deps)) /* …12 factories… */;
   allow.load(api.routes);
   api.notFound((c) => c.json({ error: 'Unknown route' }, 404));
-  api.onError((err) => errorResponse(err));                // existing function, kept verbatim
+  api.onError((err) => errorResponse(err)); // existing function, kept verbatim
   return api;
 }
 export type AppType = ReturnType<typeof createApi>;
 
 // server/http.ts
-export const body = <S extends z.ZodType>(schema: S) => every(
-  jsonOnly,                                                // content-type not JSON → the 'Invalid JSON' path (fact 11)
-  zValidator('json', schema, (r) => {
-    if (r.success) return;
-    if (!isPlainObject(r.data)) throw new HttpError(400, 'JSON object expected'); // keeps jsonObject()'s message
-    throw r.error;                                         // ZodError → errorResponse → 'Invalid data: … (path)' + issues
-  }));
-export const id = (what: string) => validator('param', (p: { id?: string }) => {
-  const n = Number(p.id); if (!Number.isInteger(n) || n <= 0) throw notFound(what); return { id: n };
-});
+export const body = <S extends z.ZodType>(schema: S) =>
+  every(
+    jsonOnly, // content-type not JSON → the 'Invalid JSON' path (fact 11)
+    zValidator('json', schema, (r) => {
+      if (r.success) return;
+      if (!isPlainObject(r.data)) throw new HttpError(400, 'JSON object expected'); // keeps jsonObject()'s message
+      throw r.error; // ZodError → errorResponse → 'Invalid data: … (path)' + issues
+    }),
+  );
+export const id = (what: string) =>
+  validator('param', (p: { id?: string }) => {
+    const n = Number(p.id);
+    if (!Number.isInteger(n) || n <= 0) throw notFound(what);
+    return { id: n };
+  });
 // errorResponse gains one branch: HTTPException 400 'Malformed JSON…' → { error: 'Invalid JSON' }
 ```
 
@@ -501,7 +523,7 @@ from shared types (surfaces in N7); deep-instantiation errors on long chains (ch
 
 ```ts
 import { hc } from 'hono/client';
-import type { AppType } from '@llama-webui/server/api';  // type-only; verbatimModuleSyntax erases it
+import type { AppType } from '@llama-webui/server/api'; // type-only; verbatimModuleSyntax erases it
 export const client = hc<AppType>('/').api;
 export async function call<T>(req: Promise<ClientResponse<T>>): Promise<T> {
   /* same mapping as api(): ApiError(status, error, issues, code); network failure → ApiError(0, 'llama-webui server unreachable') */
@@ -535,13 +557,17 @@ http.on('request', (req, res) => (isApiOrWs(req.url) ? api(req, res) : web(req, 
 
 const wss = new WebSocketServer({ noServer: true });
 http.on('upgrade', (req, socket, head) => {
-  if (pathOf(req) !== '/ws') { if (!dev) socket.destroy(); return; } // dev: Vite's listener owns the rest
-  const refused = guard(asRequest(req));                             // same Host/Origin rules
+  if (pathOf(req) !== '/ws') {
+    if (!dev) socket.destroy();
+    return;
+  } // dev: Vite's listener owns the rest
+  const refused = guard(asRequest(req)); // same Host/Origin rules
   if (refused) return void socket.end(statusLine(refused));
   wss.handleUpgrade(req, socket, head, (ws) => {
     hub.attach(ws);
     ws.on('message', (d, binary) => !binary && hub.receive(ws, d.toString()));
-    ws.on('close', () => hub.detach(ws)); ws.on('error', () => {});
+    ws.on('close', () => hub.detach(ws));
+    ws.on('error', () => {});
   });
 });
 ```
