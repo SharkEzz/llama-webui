@@ -1,6 +1,6 @@
 /**
  * HTTP client for llama-server: health probes, the monitoring reads, `/props` and streamed chat completions. Only
- * `fetch` (injectable everywhere, for tests or another transport), so it runs in Node, Bun and browsers.
+ * `fetch` (injectable everywhere, for tests or another transport), so it runs in Node and in browsers.
  */
 import { type LlamaError, LlamaHttpError, LlamaReplyError, LlamaStreamCutError, LlamaStreamError } from './errors.ts';
 import { type Health, type LlamaRaw, parsePrometheus, parseSlots } from './metrics.ts';

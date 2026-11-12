@@ -1,5 +1,5 @@
 {
-  // The web app: DOM only, no Bun or Node types (src/lib/no-node-types.ts fails otherwise). It sees the server
+  // The web app: DOM only, no Node types (src/lib/no-node-types.ts fails otherwise). It sees the server
   // through its declarations, for the typed API client (`@llama-webui/server/api`). Tests: tsconfig.test.json.
   "compilerOptions": {
     "target": "ESNext",

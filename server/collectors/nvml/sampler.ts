@@ -2,7 +2,7 @@
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-/** What `NvmlMonitor` drives: the sampler, with the surface of a web `Worker` (Bun's, which it was written for). */
+/** What `NvmlMonitor` drives: the sampler, with the surface of a web `Worker`. */
 export interface WorkerLike {
   postMessage(m: unknown): void;
   terminate(): void;

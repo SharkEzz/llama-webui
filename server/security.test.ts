@@ -56,7 +56,7 @@ test('guard: the body is judged from content-length and transfer-encoding, not f
   expect(guard(streamed({ 'content-length': '2', 'content-type': 'application/json' }))).toBeUndefined();
 });
 
-test('guard: a Host that is not an authority is a 403, not a crash (Bun builds req.url from it)', async () => {
+test('guard: a Host that is not an authority is a 403, not a crash (req.url is built from it)', async () => {
   const bad = { url: 'http://a b/api/health', method: 'GET', headers: new Headers({ host: 'a b' }), body: null };
   const r = guard(bad as unknown as Request);
   expect(r?.status).toBe(403);

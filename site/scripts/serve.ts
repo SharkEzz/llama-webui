@@ -13,7 +13,7 @@ import { cliArgs } from './argv.ts';
 
 const BASE = '/llama-webui';
 
-/** The types of the files the site ships (Node has no lookup), as Bun reported them; anything else is binary. */
+/** The types of the files the site ships (Node has no lookup); anything else is binary. */
 const TYPES: Record<string, string> = {
   '.html': 'text/html;charset=utf-8',
   '.css': 'text/css;charset=utf-8',
@@ -58,7 +58,7 @@ const isFile = (path: string) =>
 export function serveDist(dist: string): Server {
   return createServer(async (req, res) => {
     try {
-      // Parsed as a URL, like Bun did: `..` and `%2e%2e` segments are resolved before the base is checked.
+      // Parsed as a URL: `..` and `%2e%2e` segments are resolved before the base is checked.
       const url = new URL(req.url ?? '/', 'http://localhost');
       if (url.pathname === '/' || url.pathname === BASE) return redirect(res, `${BASE}/`);
       if (!url.pathname.startsWith(`${BASE}/`)) {

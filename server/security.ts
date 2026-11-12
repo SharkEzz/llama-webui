@@ -24,7 +24,7 @@ function trustedHostname(hostname: string): boolean {
  * Returns an error response, or undefined if the request passes.
  */
 export function guard(req: Pick<Request, 'url' | 'method' | 'headers'>): Response | undefined {
-  // Bun builds `req.url` from the Host header: a Host that is not an authority (`a b`) makes it unparsable too.
+  // `req.url` is built from the Host header (server/host.ts): a Host that is not an authority (`a b`) makes it unparsable too.
   let url: URL;
   let host: string;
   let hostname: string;

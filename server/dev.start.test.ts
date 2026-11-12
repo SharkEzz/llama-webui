@@ -1,5 +1,5 @@
 // The dev loop (`server/dev.ts`) when the entry fails on its first evaluation: `pnpm dev` started while a file is
-// broken waits for the fix (as `bun --hot` did), except for a listen error (port taken), which ends it.
+// broken waits for the fix, except for a listen error (port taken), which ends it.
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';

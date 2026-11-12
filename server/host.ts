@@ -43,7 +43,7 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
 
 /**
- * What the guard reads of a request, from Node's: `req.url` is built from the Host header, as Bun did (a Host that is
+ * What the guard reads of a request, from Node's: `req.url` is built from the Host header (a Host that is
  * not an authority makes it unparsable: the guard answers `Invalid host`).
  */
 function head(req: IncomingMessage): Pick<Request, 'url' | 'method' | 'headers'> {
@@ -123,7 +123,7 @@ export function mount(o: MountOptions): Promise<number> {
   server.on('upgrade', upgrade);
   server[MOUNTED] = { request, upgrade };
   // Node hands every request with an `Upgrade` header to the `upgrade` listeners, `h2c` included (`curl --http2`):
-  // only a WebSocket upgrade goes there, any other is a plain request (as on Bun). Vite's HMR upgrades are WebSocket.
+  // only a WebSocket upgrade goes there, any other is a plain request. Vite's HMR upgrades are WebSocket.
   server.shouldUpgradeCallback = (req) => req.headers.upgrade?.toLowerCase() === 'websocket';
 
   const bound = () => (o.server.address() as AddressInfo).port;

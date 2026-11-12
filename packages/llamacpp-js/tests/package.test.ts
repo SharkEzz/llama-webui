@@ -1,4 +1,5 @@
-// The package's contract as a future npm library: no dependency on the app, no Bun API, tree-shakeable.
+// The package's contract as a future npm library: no dependency on the app, tree-shakeable. Node APIs only: its
+// project (tsconfig.json) has Node's types alone, so `tsc -b` refuses anything else.
 import assert from 'node:assert/strict';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,11 +15,10 @@ const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8')) as {
 };
 const sources = (await readdir(SRC)).filter((f) => f.endsWith('.ts'));
 
-test('the sources import nothing from the monorepo and use no Bun API', async () => {
+test('the sources import nothing from the monorepo', async () => {
   for (const f of sources) {
     const text = await readFile(join(SRC, f), 'utf8');
     assert.deepEqual({ f, app: /@llama-webui\//.test(text) }, { f, app: false });
-    assert.deepEqual({ f, bun: /\bBun\.|from ['"]bun/.test(text) }, { f, bun: false });
     // Node runs the sources as they are: a relative import names its .ts file.
     assert.deepEqual({ f, bare: /from '\.\/[^']*(?<!\.ts)'/.test(text) }, { f, bare: false });
   }

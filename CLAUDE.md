@@ -4,7 +4,7 @@ L'app tourne sur Node (≥ 26.13, un seul processus) ; pnpm installe et lance le
 - Tests : Vitest (`pnpm test`, voir « Testing ») ; type check : `pnpm check` (`tsc -b`) ; build : `pnpm build` (`vite build`).
 - Install : `pnpm install` (voir « Installation (pnpm) ») ; un outil ponctuel : `pnpm dlx`.
 - `.env` du dossier courant : chargé par les points d'entrée (`server/env.ts`, `parseEnv` de `node:util` : l'environnement l'emporte, sauf avec `--env-override` ou `LLAMA_WEBUI_ENV_OVERRIDE=1` dans l'environnement ou le `.env`) ; pas de `dotenv`.
-- Bun ne sert plus à rien dans le dépôt (depuis N11) ; seul `packages/llamacpp-js` reste compatible Bun (voir « Packages »).
+- Le dépôt ne tourne que sur Node (depuis N11) : aucune API ni commande Bun ; `scripts/no-bun.test.ts` échoue sur toute mention de Bun hors de l'historique (`docs/superpowers/`).
 
 ## Installation (pnpm)
 
@@ -62,7 +62,7 @@ L'UI, les messages du serveur (erreurs, validations zod, logs, `--help`), les co
 
 `packages/webui-shared/` (`@llama-webui/shared`) : types, schémas zod et logique pure partagés par le serveur et le web. `packages/llamacpp-js/` : tout ce qui parle à llama.cpp (API HTTP de `llama-server`, métriques, `--help`, sortie de `llama-bench`, `/proc`), destiné à être publié sur npm. Règles de `llamacpp-js` (vérifiées par `tests/package.test.ts`, son projet TS et ses tests, sous Node en CI) :
 
-- **Cible :** Node ≥ 24 **et** Bun, donc uniquement des API web et `node:*` dans `src/` (`fetch`, `node:child_process`, `node:fs/promises`), jamais `Bun.*`. Ses tests sont dans `tests/` (hors de `src/`) et utilisent `node:test` + `node:assert/strict`, sous Node (`pnpm --filter llamacpp-js test` = `node --test 'tests/*.test.ts'`, en CI sous Node 26 et, dans un job à part sans installation, sous Node 24, la version minimale). Les contrôles de bundling de `tests/package.test.ts` passent par Rolldown (devDependency) et passent `{ skip }` sans installation.
+- **Cible :** Node ≥ 24, donc uniquement des API web et `node:*` dans `src/` (`fetch`, `node:child_process`, `node:fs/promises`) ; son projet TS n'a que les types Node. Ses tests sont dans `tests/` (hors de `src/`) et utilisent `node:test` + `node:assert/strict`, sous Node (`pnpm --filter llamacpp-js test` = `node --test 'tests/*.test.ts'`, en CI sous Node 26 et, dans un job à part sans installation, sous Node 24, la version minimale). Les contrôles de bundling de `tests/package.test.ts` passent par Rolldown (devDependency) et passent `{ skip }` sans installation.
 - Aucune dépendance ni import de `@llama-webui/*` ; ce qui est un choix de llama-webui (superviseur, `buildCommand`, formulation des erreurs pour l'utilisateur, caches) reste dans l'app.
 - TS exécutable tel quel par Node : imports relatifs avec extension `.ts`, `import type`, syntaxe effaçable (`erasableSyntaxOnly` : pas d'`enum`, de `namespace` ni de propriétés de paramètre).
 - Tree-shakeable : ESM, `"sideEffects": false`, aucun état ni effet au chargement d'un module, un export par module dans `package.json` ; seul `llamacpp-js/node` utilise des API Node, le reste tourne aussi dans le navigateur.

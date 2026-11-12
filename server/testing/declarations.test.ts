@@ -10,10 +10,10 @@ test('declarationImports follows relative declarations and lists every other spe
     `${dir.path}/http.d.ts`,
     'import type { Stats } from \'node:fs\';\nexport type B = { s: Stats; d: import("./deep/x").X };\n',
   );
-  await writeFileDeep(`${dir.path}/deep/x.d.ts`, "export * from 'bun';\nexport type X = 1;\n");
+  await writeFileDeep(`${dir.path}/deep/x.d.ts`, "export * from 'vite';\nexport type X = 1;\n");
   expect(declarationImports(`${dir.path}/rpc.d.ts`)).toEqual([
-    'bun (deep/x.d.ts)',
     'hono/types (rpc.d.ts)',
     'node:fs (http.d.ts)',
+    'vite (deep/x.d.ts)',
   ]);
 });

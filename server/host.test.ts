@@ -63,7 +63,7 @@ test('/api/* reaches the Hono app; any other path the web handler', async () => 
   expect([api.status, JSON.parse(api.body)]).toEqual([200, { tag: 'one' }]);
   const page = await request(base, { method: 'GET', path: '/chat/12' });
   expect([page.status, page.body]).toEqual([200, 'web /chat/12']);
-  // `/api` alone is not an API path (Bun's `/api/*` route did not match it).
+  // `/api` alone is not an API path (`/api/*` does not match it).
   expect((await request(base, { method: 'GET', path: '/api' })).body).toBe('web /api');
 });
 
@@ -190,7 +190,7 @@ test('a mount from a re-evaluated host module (a development reload) still repla
   expect(frames).toEqual([{ type: 'hello', payload: { serverTime: expect.any(Number), bootId: 'boot-2' } }]);
 });
 
-test('a request with a non-WebSocket Upgrade header (h2c) is answered as a plain request, as on Bun', async () => {
+test('a request with a non-WebSocket Upgrade header (h2c) is answered as a plain request', async () => {
   for (const dev of [false, true]) {
     const { base } = await boot({ dev });
     const h2c = { connection: 'Upgrade, HTTP2-Settings', upgrade: 'h2c', 'http2-settings': 'AAMAAABkAAQCAAAAAAIAAAAA' };

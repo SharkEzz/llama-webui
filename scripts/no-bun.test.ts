@@ -10,40 +10,18 @@ const ALLOW: { path: string; line?: RegExp; reason: string }[] = [
   { path: 'docs/superpowers/', reason: 'plans and specs: the history of the project, Bun era included' },
   { path: '.agents/skills/', reason: 'vendored skills, not ours to edit' },
   { path: 'scripts/no-bun.test.ts', reason: 'this test' },
+  {
+    path: 'server/contract/',
+    line: /homedir|HOME/,
+    reason: 'the golden was recorded under Bun, whose homedir() ignored a HOME set at run time',
+  },
 ];
 
 /** Files not swept yet (the N12 tasks empty this list). */
 const PENDING: string[] = [
-  '.gitignore',
   'CLAUDE.md',
   'README.md',
-  'packages/llamacpp-js/src/client.ts',
-  'packages/llamacpp-js/src/index.ts',
-  'packages/llamacpp-js/src/node.ts',
-  'packages/llamacpp-js/tests/package.test.ts',
-  'packages/llamacpp-js/tsconfig.json',
-  'packages/webui-shared/tsconfig.json',
   'scripts/package.test.ts',
-  'server/cli.ts',
-  'server/collectors/nvml/sampler.ts',
-  'server/contract/cases.ts',
-  'server/contract/contract.test.ts',
-  'server/contract/wire.ts',
-  'server/db/benchRuns.ts',
-  'server/db/sqlite.test.ts',
-  'server/db/sqlite.ts',
-  'server/dev.start.test.ts',
-  'server/hf/downloader.test.ts',
-  'server/host.test.ts',
-  'server/host.ts',
-  'server/http.ts',
-  'server/proc.ts',
-  'server/routes/web.test.ts',
-  'server/routes/web.ts',
-  'server/rpc.test.ts',
-  'server/security.test.ts',
-  'server/security.ts',
-  'server/testing/declarations.test.ts',
   'site/content/developers/api/overview.mdx',
   'site/content/developers/contributing/conventions.mdx',
   'site/content/developers/contributing/testing.mdx',
@@ -51,17 +29,12 @@ const PENDING: string[] = [
   'site/content/developers/frontend.mdx',
   'site/content/developers/getting-started.mdx',
   'site/content/developers/index.mdx',
-  'site/content/developers/llamacpp-js.mdx',
   'site/content/developers/server/database.mdx',
   'site/content/developers/shared.mdx',
   'site/content/docs/getting-started/installation.mdx',
   'site/content/docs/getting-started/requirements.mdx',
-  'site/scripts/argv.ts',
-  'site/scripts/serve.ts',
   'site/src/landing/FinalCta.tsx',
   'site/src/landing/HardwareBand.tsx',
-  'web/src/lib/no-node-types.ts',
-  'web/tsconfig.json',
 ];
 
 /** Every text line not ignored by git (tracked or new) that names Bun, as `path:line:text`. */
@@ -76,7 +49,7 @@ function mentions(): { path: string; text: string }[] {
     .split('\n')
     .filter(Boolean)
     .map((l) => {
-      const [path, , ...text] = l.split(':');
+      const [path = '', , ...text] = l.split(':');
       return { path, text: text.join(':') };
     });
 }

@@ -66,7 +66,7 @@ test('staticWeb rejects without an index.html; unavailableWeb then answers every
   expect(page.body).toContain('missing');
 });
 
-test('staticWeb: every answer has its Content-Length, HEAD included (as Bun sent it)', async () => {
+test('staticWeb: every answer has its Content-Length, HEAD included', async () => {
   using dir = tempDir('lw-web-');
   await writeFileDeep(`${dir.path}/index.html`, '<!doctype html><title>app</title>');
   await writeFileDeep(`${dir.path}/assets/a-1.js`, 'export {};');

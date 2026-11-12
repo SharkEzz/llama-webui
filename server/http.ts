@@ -71,8 +71,8 @@ export const guardMw: MiddlewareHandler = async (c, next) => {
 };
 
 /**
- * `c.json()` says `application/json`; the API has always said `application/json;charset=utf-8` (Bun's
- * `Response.json`). Only that exact value is rewritten: a route that sets its own type keeps it.
+ * `c.json()` says `application/json`; the API has always said `application/json;charset=utf-8`
+ * (the contract suite pins it). Only that exact value is rewritten: a route that sets its own type keeps it.
  */
 export const jsonCharset: MiddlewareHandler = async (c, next) => {
   await next();
@@ -193,8 +193,8 @@ export function shadowed(routes: RouteEntry[]): string[] {
 }
 
 /**
- * 405 with `Allow` for a method the most specific matching pattern lacks (HEAD counts as GET), as Bun's router did
- * with `withMethodNotAllowed`: `GET /api/profiles/import` (POST only) must not fall to `/api/profiles/:id` (#37). No
+ * 405 with `Allow` for a method the most specific matching pattern lacks (HEAD counts as GET), as the API always
+ * answered: `GET /api/profiles/import` (POST only) must not fall to `/api/profiles/:id` (#37). No
  * matching pattern: on to `notFound`. `load` takes the app's routes once they are all registered.
  */
 export function allowTable() {

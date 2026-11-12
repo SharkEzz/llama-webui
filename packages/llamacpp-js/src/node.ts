@@ -1,6 +1,6 @@
 /**
  * What needs the machine rather than HTTP: running the binaries, finding their paths and processes. Node APIs only
- * (`node:child_process`, `node:fs`, `node:path`), so it runs in Node ≥ 24 and Bun, not in a browser.
+ * (`node:child_process`, `node:fs`, `node:path`), so it runs in Node ≥ 24, not in a browser.
  */
 import { execFile } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';

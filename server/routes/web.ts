@@ -7,7 +7,7 @@ import type { WebHandler } from '../host';
  * `dist/web`, split per page (each page loads its own chunks: the Topology page's three.js stays out of the others).
  */
 
-/** Types of the files `vite build` writes to `dist/web`, as Bun's bundler typed them. */
+/** Types of the files `vite build` writes to `dist/web`, with the types the UI has always been served with. */
 const TYPES: Record<string, string> = {
   '.html': 'text/html;charset=utf-8',
   '.js': 'text/javascript;charset=utf-8',

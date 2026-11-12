@@ -1,5 +1,5 @@
-// Child processes and file reads on node:*, shaped like the Bun subset the server used (web streams, `exited`), so
-// call sites read them the same way: `new Response(proc.stdout).text()`, `for await (const chunk of proc.stdout)`.
+// Child processes and file reads on node:*, with web streams and an `exited` promise, so call sites read them
+// alike: `new Response(proc.stdout).text()`, `for await (const chunk of proc.stdout)`.
 import { type ChildProcess, spawn } from 'node:child_process';
 import { accessSync, constants, createReadStream, existsSync, statSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
@@ -51,8 +51,8 @@ function spawnErrorCode(bin: string, cwd: string | undefined, path: string): str
 }
 
 /**
- * Starts `argv`. Throws at once when the process cannot start (missing binary or `cwd`, not executable), as
- * `Bun.spawn` did: callers handle a failed launch in a `try`/`catch` around this call.
+ * Starts `argv`. Throws at once when the process cannot start (missing binary or `cwd`, not executable):
+ * callers handle a failed launch in a `try`/`catch` around this call.
  */
 export const spawnProc: Spawn = (argv, o = {}) => {
   const [bin, ...args] = argv;
@@ -68,8 +68,8 @@ export const spawnProc: Spawn = (argv, o = {}) => {
     child.once('error', () => {});
     throw new Error(`spawn ${bin} ${spawnErrorCode(bin, o.cwd, (o.env ?? process.env).PATH ?? '')}`);
   }
-  // Node reports a failed kill() (other than ESRCH) as an 'error' event, which crashes the server without a listener;
-  // Bun.spawn's kill() did not. Callers already ignore kill failures.
+  // Node reports a failed kill() (other than ESRCH) as an 'error' event, which crashes the server without a listener.
+  // Callers already ignore kill failures.
   child.on('error', () => {});
   const exited = new Promise<number | null>((resolve) => child.once('exit', (code) => resolve(code)));
   const proc: Spawned & { child: ChildProcess } = {
@@ -94,7 +94,7 @@ export const spawnProc: Spawn = (argv, o = {}) => {
 /** The whole file as UTF-8; rejects when it cannot be read (call sites add their own `.catch`). */
 export const readText = (path: string): Promise<string> => readFile(path, 'utf8');
 
-/** True for a regular file only (false for a directory or a missing path), like `Bun.file(path).exists()`. */
+/** True for a regular file only (false for a directory or a missing path). */
 export const fileExists = (path: string): Promise<boolean> =>
   stat(path).then(
     (s) => s.isFile(),
@@ -121,7 +121,7 @@ const isExecutable = (p: string): boolean => {
 };
 
 /**
- * Absolute path of an executable found in `path` (a PATH-style list), null if none, like `Bun.which`. A name with a
+ * Absolute path of an executable found in `path` (a PATH-style list), null if none. A name with a
  * slash is not looked up: it is returned if it is an executable file, else null.
  */
 export function which(bin: string, path = process.env.PATH ?? ''): string | null {

@@ -1,6 +1,7 @@
-// SQLite on node:sqlite, with the bun:sqlite surface the repositories use: `query()` caches its statement, `get()`
-// returns null for no row, `run(sql)` takes several statements, `transaction(fn)` returns a function. The class is
-// `DatabaseSync`: Bun's node:sqlite has no `Database` export (Node 26 keeps `DatabaseSync` as its alias).
+// SQLite on node:sqlite, with the surface the repositories were written against: `query()` caches its statement,
+// `get()` returns null for no row, `run(sql)` takes several statements, `transaction(fn)` returns a function, and
+// values are bound strictly (see `bindOne`, `placeholders`). The class is `DatabaseSync` (Node 26 also exports it as
+// `Database`).
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
 
 export type Binding = string | number | bigint | boolean | null | undefined | Uint8Array;
@@ -18,13 +19,13 @@ export interface Query<Row, P extends Binding[]> {
 
 export interface DatabaseOptions {
   readonly?: boolean;
-  /** Accepted for bun:sqlite parity: a missing file is always created (unless `readonly`). */
+  /** Accepted and ignored: a missing file is always created (unless `readonly`). */
   create?: boolean;
 }
 
 /**
- * As bun:sqlite: booleans bind as 1/0 and `undefined` as NULL (Bun's node:sqlite refuses both), and an integral number
- * as INTEGER (node:sqlite binds every number as REAL: `'3.0'` in a TEXT column, `? / 2` dividing as floats).
+ * What the repositories rely on: booleans bind as 1/0 and `undefined` as NULL, and an integral number as INTEGER
+ * (node:sqlite binds every number as REAL: `'3.0'` in a TEXT column, `? / 2` dividing as floats).
  */
 const bindOne = (p: Binding): SQLInputValue => {
   if (p === undefined) return null;
@@ -35,8 +36,8 @@ const bindOne = (p: Binding): SQLInputValue => {
 const bind = (params: Binding[]): SQLInputValue[] => params.map(bindOne);
 
 /**
- * The number of `?` placeholders in `sql`, skipping quoted strings and names and comments. bun:sqlite throws when the
- * values do not match; node:sqlite binds the missing ones as NULL and exposes no count.
+ * The number of `?` placeholders in `sql`, skipping quoted strings and names and comments. A statement run with
+ * another number of values throws; node:sqlite would bind the missing ones as NULL, and exposes no count.
  */
 export function placeholders(sql: string): number {
   /** Index of the last character of `token` after `from`, or the end of `sql` when it is not closed. */
@@ -78,7 +79,7 @@ export class Database implements Disposable {
   #cache = new Map<string, Prepared>();
 
   constructor(path: string, o: DatabaseOptions = {}) {
-    // Foreign keys off unless turned on, as in bun:sqlite (`openDb()` turns them on).
+    // Foreign keys off unless turned on, SQLite's default (`openDb()` turns them on).
     this.#raw = new DatabaseSync(path, { readOnly: o.readonly ?? false, enableForeignKeyConstraints: false });
   }
 
@@ -95,7 +96,7 @@ export class Database implements Disposable {
     return p;
   }
 
-  /** A statement cached by its SQL text, as bun:sqlite's `query()`. Only the first statement of `sql` runs. */
+  /** A statement cached by its SQL text. Only the first statement of `sql` runs. */
   query<Row = unknown, P extends Binding[] = Binding[]>(sql: string): Query<Row, P> {
     return wrap<Row, P>(this.#stmt(sql));
   }
@@ -113,7 +114,7 @@ export class Database implements Disposable {
   }
 
   /**
-   * Wraps `fn` in a transaction, as bun:sqlite (better-sqlite3's algorithm): a savepoint when one is already open, and
+   * Wraps `fn` in a transaction (better-sqlite3's algorithm): a savepoint when one is already open, and
    * a rollback only while SQLite has not already rolled back itself, so the error thrown is always `fn`'s.
    */
   transaction<A extends unknown[], R>(fn: (...a: A) => R): (...a: A) => R {
@@ -131,7 +132,7 @@ export class Database implements Disposable {
     };
   }
 
-  /** Closes the handle; a second call does nothing, as in bun:sqlite. */
+  /** Closes the handle; a second call does nothing. */
   close(): void {
     if (!this.#raw.isOpen) return;
     this.#cache.clear();

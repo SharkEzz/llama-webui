@@ -1,5 +1,5 @@
-// Raw HTTP/1.1 over node:net for the contract suite. Not fetch: the client must send the same bytes under Bun and
-// Node, and the behaviour under test depends on request framing (a body-less POST/DELETE, a foreign Host header).
+// Raw HTTP/1.1 over node:net for the contract suite. Not fetch: the client sends exact bytes, and the behaviour
+// under test depends on request framing (a body-less POST/DELETE, a foreign Host header).
 import { connect } from 'node:net';
 
 export interface WireRequest {

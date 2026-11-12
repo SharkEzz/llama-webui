@@ -25,7 +25,7 @@ test('get returns null when no row matches, all the rows, run the changes and th
   expect(db.prepare<{ b: string }, [number]>('SELECT b FROM t WHERE a = ?').get(2)).toEqual({ b: 'y' });
 });
 
-test('a value count that does not match the placeholders throws, as in bun:sqlite (node:sqlite binds NULL)', () => {
+test('a value count that does not match the placeholders throws (node:sqlite alone binds NULL)', () => {
   using db = withTable();
   expect(() => db.query('SELECT ?, ? v').get(1)).toThrow('SQLite query expected 2 values, received 1');
   expect(() => db.prepare('SELECT ? v').all(1, 2)).toThrow('SQLite query expected 1 values, received 2');
@@ -47,7 +47,7 @@ test('run without parameters executes every statement and returns the changes of
   expect(db.run("UPDATE t SET a = 0 WHERE b IN ('1', '2')").changes).toBe(2);
 });
 
-test('booleans bind as 1 and 0, undefined as NULL (Bun refuses them in node:sqlite)', () => {
+test('booleans bind as 1 and 0, undefined as NULL (node:sqlite alone refuses them)', () => {
   using db = withTable();
   db.query('INSERT INTO t(a, b) VALUES (?, ?)').run(true, 't');
   db.run('INSERT INTO t(a, b) VALUES (?, ?)', [false, 'f']);
@@ -59,7 +59,7 @@ test('booleans bind as 1 and 0, undefined as NULL (Bun refuses them in node:sqli
   ]);
 });
 
-test('an integral number binds as INTEGER, as in bun:sqlite (node:sqlite binds every number as REAL)', () => {
+test('an integral number binds as INTEGER (node:sqlite alone binds every number as REAL)', () => {
   using db = withTable();
   expect(db.query('SELECT typeof(?) t, ? / 2 half, typeof(?) f').get(3, 7, 1.5)).toEqual({
     t: 'integer',

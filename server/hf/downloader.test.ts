@@ -151,7 +151,7 @@ function setup(files: Record<string, Uint8Array>, o: { free?: number; dbPath?: s
   const file = (p: string) => ({
     bytes: () => readFile(join(repoDir, p)),
     exists: () => fileExists(join(repoDir, p)),
-    // 0 for a missing file, like Bun.file().size.
+    // 0 for a missing file.
     get size() {
       return statSync(join(repoDir, p), { throwIfNoEntry: false })?.size ?? 0;
     },

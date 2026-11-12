@@ -264,7 +264,7 @@ export class BenchRunsRepo {
       .map((r) => r.id);
   }
 
-  /** On startup: a run left “running” (Bun stopped abruptly) becomes “interrupted”. */
+  /** On startup: a run left “running” (the app stopped abruptly) becomes “interrupted”. */
   stopOrphans(): number {
     return this.db.run(
       "UPDATE bench_runs SET status = 'interrupted', error = COALESCE(error, 'interrupted (llama-webui stopped)') WHERE status = 'running'",

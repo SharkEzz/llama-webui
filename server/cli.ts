@@ -54,7 +54,7 @@ function parsePort(raw: string, source: string): number | string {
   return port;
 }
 
-/** Reads the arguments (without `bun` or the script) and the environment; never exits, reads nothing else. */
+/** Reads the arguments (without `node` or the script) and the environment; never exits, reads nothing else. */
 export function parseCli(argv: string[], env: Record<string, string | undefined> = process.env): CliResult {
   let values: { host?: string; port?: string; 'data-dir'?: string; 'env-override'?: boolean; help?: boolean };
   try {

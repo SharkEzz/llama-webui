@@ -86,9 +86,9 @@ builds that only put them in the message, from its text.
 `packages/llamacpp-js/tests/package.test.ts` and the type check enforce them:
 
 - **No dependency.** No `dependencies` in its `package.json`, and no import of `@llama-webui/*`.
-- **Node 24 or later, and Bun.** `engines.node` is `>=24`. The sources use web and `node:*` APIs only, never `Bun.*`:
-  its project (`packages/llamacpp-js/tsconfig.json`) is checked with the Node types alone, so a Bun API does not type
-  check. Its tests, in `tests/` (out of `src/`, which holds only what the package ships), are written with
+- **Node 24 or later.** `engines.node` is `>=24`. The sources use web and `node:*` APIs only: its project
+  (`packages/llamacpp-js/tsconfig.json`) is checked with the Node types alone, so any other runtime's API does not
+  type check. Its tests, in `tests/` (out of `src/`, which holds only what the package ships), are written with
   `node:test` and `node:assert` and run on Node; their project (`tsconfig.test.json`) has the Node types
   only too ([Tests of llamacpp-js](/developers/contributing/testing/#tests-of-llamacpp-js)).
 - **TypeScript that Node runs as is.** Node 24 strips types itself, so the sources are executed without a build:
