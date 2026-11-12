@@ -2,7 +2,6 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { DEFAULT_SETTINGS, type ServerState } from '@llama-webui/shared';
-import type { ServerWebSocket } from 'bun';
 import { expect, test } from 'vitest';
 import { MAX_RUNS } from '../db/benchRuns';
 import { ConversationsRepo } from '../db/conversations';
@@ -11,7 +10,7 @@ import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
 import { errorResponse } from '../http';
 import { tempDir } from '../testing/tempDir';
-import { WsHub } from '../ws/hub';
+import { WsHub, type WsLike } from '../ws/hub';
 import { benchRoutes } from './bench';
 import { chatRoutes } from './chat';
 import { serverRoutes } from './server';
@@ -85,7 +84,7 @@ test('/api/server/props: a reply from llama-server that is not JSON is a 502 (#3
 test('WsHub ignores a frame that parses to something other than an object (#37)', () => {
   const hub = new WsHub('boot', 60_000);
   const sent: string[] = [];
-  const ws = { send: (d: string) => sent.push(d), close() {} } as unknown as ServerWebSocket<unknown>;
+  const ws: WsLike = { send: (d) => void sent.push(d), close() {} };
   hub.attach(ws);
   for (const frame of ['null', '42', '[]', '"ping"']) expect(() => hub.receive(ws, frame)).not.toThrow();
   hub.receive(ws, '{"type":"ping"}');
