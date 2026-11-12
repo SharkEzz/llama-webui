@@ -31,15 +31,10 @@ test('every module has its own export and the package has no side effects', () =
   for (const f of sources) assert.deepEqual({ f, exported: exported.has(f) }, { f, exported: true });
 });
 
-// The bundling checks use Bun's bundler: they run under `bun test` and are skipped under `node --test`.
-interface Bundler {
-  build(o: { entrypoints: string[]; target: 'browser'; minify: boolean }): Promise<{
-    success: boolean;
-    outputs: { text(): Promise<string> }[];
-  }>;
-}
-const bundler = (globalThis as { Bun?: Bundler }).Bun;
-const needsBun = { skip: bundler ? false : 'needs Bun.build (run under bun test)' };
+// The bundling checks use Rolldown (Vite's bundler, a devDependency): skipped where the package has no install, as
+// in the Node 24 CI job.
+const bundler = await import('rolldown').catch(() => null);
+const needsBundler = { skip: bundler ? false : 'needs rolldown (pnpm install)' };
 
 const tmp = await mkdtemp(join(tmpdir(), 'llamacpp-js-'));
 after(() => rm(tmp, { recursive: true, force: true }));
@@ -51,19 +46,23 @@ async function bundle(spec: string, names: string[]): Promise<string> {
     entry,
     `import { ${names.join(', ')} } from ${JSON.stringify(join(ROOT, spec))};\nconsole.log(${names.join(', ')});\n`,
   );
-  const out = await bundler!.build({ entrypoints: [entry], target: 'browser', minify: false });
-  assert.equal(out.success, true);
-  return out.outputs[0]!.text();
+  const build = await bundler!.rolldown({ input: entry, platform: 'browser', logLevel: 'silent' });
+  try {
+    const { output } = await build.generate({ format: 'esm' });
+    return output[0].code;
+  } finally {
+    await build.close();
+  }
 }
 
-test('importing one function from the root keeps only what it needs', needsBun, async () => {
+test('importing one function from the root keeps only what it needs', needsBundler, async () => {
   const js = await bundle('src/index.ts', ['parseHelp']);
   assert.ok(js.includes('function parseHelp'));
   for (const unused of ['streamChatCompletion', 'SseParser', 'parsePrometheus', 'LlamaHttpError', 'parseBenchJson'])
     assert.deepEqual({ unused, kept: js.includes(unused) }, { unused, kept: false });
 });
 
-test('the browser-safe modules bundle for the browser without Node built-ins', needsBun, async () => {
+test('the browser-safe modules bundle for the browser without Node built-ins', needsBundler, async () => {
   const js = await bundle('src/index.ts', ['streamChatCompletion', 'fetchLlama', 'parseBenchJson', 'describeFlag']);
   assert.doesNotMatch(js, /node:|child_process/);
 });

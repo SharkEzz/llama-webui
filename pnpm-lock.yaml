@@ -229,6 +229,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
+      rolldown:
+        specifier: 1.2.18
+        version: 1.2.18
 
   packages/webui-shared:
     dependencies:
