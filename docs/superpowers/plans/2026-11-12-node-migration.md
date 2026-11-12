@@ -88,7 +88,9 @@ Checked on this machine or against current docs/source during planning.
 5. **`@hono/vite-dev-server` is not used**: it loads the app with `ssrLoadModule(entry)` lazily per request, sends a
    browser full-reload on server changes, and has no WebSocket handling.
 6. Vite 8's module runner, on `full-reload`, clears its evaluated modules and **re-imports the entrypoints
-   immediately**: eager re-evaluation of `server/index.ts` needs no custom watcher (to confirm in N0(a)).
+   immediately**: eager re-evaluation of `server/index.ts` needs no custom watcher (to confirm in N0(a)). (N0) True for
+   a successful reload only: after a failed one (syntax error) the fix is ignored, and two writes within ms leave the
+   first content; `dev.ts` needs a small watcher fallback plus `awaitWriteFinish` (see N8).
 7. Vite 8.3.x: `server.ws: { server?: HttpServer }`; its upgrade listener only takes sockets whose
    `sec-websocket-protocol` is `vite-hmr`/`vite-ping`. `/ws` and HMR can share one `http.Server`.
 8. `@hono/node-ws` 1.3.1 peers `@hono/node-server ^1.19` while node-server is at 2.x; node-server's own
@@ -120,6 +122,12 @@ Hono app type); whether `bun check -b` and `tsc -b` report the same set; Bun's `
 binding rules and `defensive`; which dependencies carry install scripts; whether `pnpm pack` packs a `private: true`
 package; Node's HEAD and body-less request behaviour against Bun's; whether `ws.send()` on a closing socket can throw;
 whether Vitest's transform leaves `using` native.
+
+(N0) Since verified in the spike (details in the notes): `ssr` emits `full-reload` on a server change; files outside
+`root` are watched once imported; middleware mode installs no signal handlers; the multi-environment build keys work
+and `node:ffi`/`node:sqlite` stay external; `tsc -b` is clean (0.9 s cold, no TS7056/TS2742) and reports the same
+errors as `bun check -b`; the only install script is Bun's own; Vitest needs `oxc: { target: 'esnext' }` to keep
+`using` native.
 
 ## Inventory (what exists today)
 
@@ -280,11 +288,13 @@ catalog: # only what two or more projects share
   zod: ^4.6.7
   shiki: ^4.6.0
   "@types/node": ^26.6.6
-allowBuilds: {} # filled from the ERR_PNPM_IGNORED_BUILDS list of the first install
+allowBuilds:
+  bun: true # (N0) the only package with a build script; `false` leaves a broken node_modules/.bin/bun
 ```
 
 For each package pnpm lists, set `true` only if a feature needs its script (sharp for `site og`/`screenshots`, the
-Tailwind oxide binary); set the rest to `false`.
+Tailwind oxide binary); set the rest to `false`. (N0) sharp and oxide need no entry; pnpm also adds
+`minimumReleaseAgeExclude` entries for packages younger than its default minimum age: keep them.
 
 Gate (Bun runs, pnpm installs): `bun run lint`, `bun run check`, `bun test`, llamacpp-js `test:node`,
 `bun run compile` + `bun scripts/smoke-binary.ts dist/llama-webui`, `bun run site:build` + `check-links`.
@@ -402,6 +412,7 @@ target runtime.
 
 - Root `vitest.config.ts` with `projects` (server, web with the `@` alias, shared, scripts, site),
   `environment: 'node'`, explicit imports (no globals), `clearMocks: false` if a test relies on mock state.
+  (N0) Top-level `oxc: { target: 'esnext' }`, or `using` is downleveled.
 - The 64 files: `bun:test` → `vitest`; 3 `mock()` → `vi.fn()`; `%p` → `%o`; `test.skipIf` unchanged.
 - `await` the four `.rejects` in `server/models/gguf.test.ts:164,168,174,220`.
 - llamacpp-js: `"test": "node --test 'tests/*.test.ts'"`; the Bun replay goes; CI runs it on Node 24 and 26.
@@ -414,7 +425,8 @@ Gate: `pnpm lint`, `pnpm check`, `pnpm test`, the remaining `bun test` files, `b
 links.
 Docs: `developers/contributing/testing.mdx`, CLAUDE.md "Testing" and "Type checking".
 Risks: `tsc -b` emits declarations where `bun check` wrote nothing, so TS4023/TS2742-class errors may appear (N0(c)
-measures; fallback: keep `bun check` until N8).
+measures; fallback: keep `bun check` until N8). (N0) None appeared on a 69-route stub API; the fallback is not
+expected to be needed.
 
 ### N5 — HTTP contract suite (M). Parallel with N4
 
@@ -505,7 +517,10 @@ Rules for the port:
 - **Tests**: `routes.test.ts`, `models.test.ts`, `http.test.ts` move to `app.request(...)`; the #37 test stays,
   expressed on `createApi`.
 - The repo has a `hono` skill (`.claude/skills/hono`) with the Hono CLI for quick in-process checks; it does not
-  replace N5.
+  replace N5. (N0) `@hono/cli@next` (1.0 rc) works on this API given a file that default-exports the app: `hono
+  routes` shows registration order (check the #37 static-before-param rule), `hono snapshot --status-only` + `hono
+  batch - --compact` give a quick before/after loop. It runs paramless GETs only, so 405s, bodies and the guard stay
+  N5's job. Adding it as a devDependency needs `esbuild: false` in `allowBuilds`.
 
 Gate: as N5; the contract golden must be **byte-identical**. Any diff is fixed, or brought to the user as an explicit
 contract change.
@@ -533,7 +548,9 @@ export async function call<T>(req: Promise<ClientResponse<T>>): Promise<T> {
 
 - `ApiError`/`apiError` are unchanged. The SSE endpoints keep `readSse` on the raw `Response`.
 - Under `tsc -b`, web reads the server's emitted `.d.ts` (`server/.tsbuild/`). Node types stay out because `web` does
-  not list `node` in `types`; commit the N0(c) canary as a type test. Add a build assertion that the web bundle
+  not list `node` in `types`; commit the N0(c) canary as a type test. (N0) `web/tsconfig.json` lists `bun` for its
+  tests, which brings Node's types: split web into an app project (`types: []`, later `vite/client`) holding the
+  canary and a tests project; the canary fails as soon as either has Node's types. Add a build assertion that the web bundle
   contains no `node:` specifier.
 
 Gate: as N6. Docs: `developers/frontend.mdx`, `developers/api/overview.mdx`; CLAUDE.md (`references` rule gains
@@ -572,6 +589,11 @@ http.on('upgrade', (req, socket, head) => {
 });
 ```
 
+- (N0) `dev.ts`, after `ssr.runner.import(entry)`: on a watcher `change`, if the file is in the ssr module graph but
+  not evaluated (the previous reload failed), clear `runner.evaluatedModules` and re-import the entry once; and
+  `server.watch.awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 }`. Both were needed in the spike.
+- (N0) Build: Vite bundles hono/zod into `main.js` by default; list the server's npm dependencies in
+  `environments.ssr.resolve.external` (and keep the two workspace packages in `noExternal`).
 - Prod `web` handler: exact path → bytes with `Cache-Control: public, max-age=31536000, immutable`; anything else →
   `index.html` with `no-cache`; `dist/web` missing → the existing 503 text. No gzip, no ETag (as today; backlog).
 - `guard()` replaces `req.body !== null` with `Number(content-length) > 0 || transfer-encoding` (fact 9).
@@ -618,7 +640,8 @@ w.unref(); // adapt 'message'/'error' events to WorkerLike.onmessage/onerror
   `.ts` import extensions (already erasable; its one cross-package import is type-only). Prod:
   `new URL('./nvml-worker.js', import.meta.url)`; `vite.config.ts` gains the worker entry.
 - `types: ["bun"]` and `@types/bun` leave `server`, `scripts`, `web`, `packages/webui-shared` (→ `node`, and
-  `vite/client` for web). `site` keeps them until N10.
+  `vite/client` for web). `site` keeps them until N10. (N0) Web's app project gets `vite/client` only; `node` goes
+  to its tests project (N7 canary).
 
 Gate: as N8, plus on this machine: NVML source active, PCIe throughput present; with the library path broken the
 nvidia-smi fallback engages.
@@ -645,6 +668,9 @@ Risk: `sharp`/`pagefind` under `allowBuilds`.
   `os: ["linux"]`, `engines`; runtime externals in `dependencies` via `catalog:`; the two workspace packages in
   `devDependencies` (bundled; a `workspace:*` dependency would be rewritten to a version that cannot install).
   `private: true` stays unless `pnpm pack` refuses it (unverified).
+- (N0) Zero-dependency data for the decision: `noExternal: true` gives a 304 kB `main.js` importing only `node:*`,
+  boots from an empty directory, and `build.license` writes `THIRD-PARTY-LICENSES.md`; the externals variant is
+  20 kB plus a 4-package, 12 MiB install. Ask the user before starting N11.
 - `scripts/smoke.ts --tarball`: `pnpm pack`, `npm install --prefix $tmp ./llama-webui-x.tgz`, then the N8 checks
   through `$tmp/node_modules/.bin/llama-webui`. A missing runtime dependency fails here.
 - `release.yml`: version check (`scripts/release.ts --check`), build, pack, tarball smoke, `SHA256SUMS`,
