@@ -179,7 +179,7 @@ so the executable always runs in production, without HMR. A second constant, `LL
 `git describe --tags --always --dirty` (or `--version <name>`) into `APP_VERSION` (`server/version.ts`), which
 `/api/health` reports and the status bar shows: the tag, else the short commit hash. From source, it is `dev`.
 
-Inside the executable, `import.meta.dir` is `/$bunfs/root`, so nothing may read the source tree at runtime:
+Inside the executable, `import.meta.dirname` is `/$bunfs/root`, so nothing may read the source tree at runtime:
 
 - the startup build is skipped, and `bun-plugin-tailwind` (with its native binding) is imported lazily by
   `webPlugins()` and marked `external`, so it stays out of the binary;

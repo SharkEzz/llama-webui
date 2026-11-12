@@ -25,8 +25,8 @@ Migration vers Node en cours (branche `node`, plan `docs/superpowers/plans/2026-
 - `Bun.redis` for Redis. Don't use `ioredis`.
 - `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
 - `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
+
+**Dans ce projet (migration Node, depuis N2) :** fichiers, processus, pauses et hachages passent par `node:*`, jamais `Bun.file`/`Bun.write`/`Bun.spawn`/`Bun.sleep`/`Bun.which`/`Bun.CryptoHasher`/`Bun.$`/`Bun.argv`/`import.meta.dir`. Côté serveur, `server/proc.ts` : `spawnProc` (même forme que `Bun.spawn` : flux web, `exited`, lève une erreur tout de suite si le lancement échoue), `readText`, `fileExists` (faux pour un dossier), `fileRange`, `which` ; pauses `setTimeout` de `node:timers/promises`, sha256 `createHash` de `node:crypto`, `import.meta.dirname`. Les tests écrivent avec `writeFileDeep` (`server/testing/write.ts`, crée les dossiers parents comme `Bun.write`). `Bun.isStandaloneExecutable` se lit par `isStandalone` (`server/standalone.ts`) pour que les modules se chargent sous Node. Restent Bun jusqu'à N6/N8 : `Bun.serve`, `Bun.build` et l'import HTML, `bun:sqlite`, `bun:ffi`, `scripts/compile.ts`.
 
 ## Testing
 
@@ -169,6 +169,7 @@ Le site public (page d'accueil, doc utilisateur, doc développeur) vit dans `sit
 | `packages/webui-shared/src/ws.ts`, `server/ws/`                                                      | `developers/api/websocket.mdx`                                                                          |
 | `server/cli.ts`, `server/paths.ts`, variables d'environnement                                        | `docs/configuration.mdx`, `developers/architecture.mdx`                                                 |
 | `server/security.ts`, `server/http.ts`                                                               | `docs/security.mdx`, `developers/server/security.mdx`, `developers/api/overview.mdx`                    |
+| `server/proc.ts`                                                                                     | `developers/contributing/conventions.mdx`, `developers/server/supervisor.mdx`                           |
 | `server/supervisor/**`                                                                               | `developers/server/supervisor.mdx`, `docs/server.mdx`                                                   |
 | `server/logs/**`                                                                                     | `developers/server/supervisor.mdx`, `developers/api/server.mdx`, `docs/logs.mdx`                        |
 | `server/monitor/**`, `server/collectors/**`                                                          | `developers/server/monitor.mdx`, `docs/dashboard.mdx`, `docs/system.mdx`, `docs/topology.mdx`           |

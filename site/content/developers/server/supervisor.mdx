@@ -55,7 +55,7 @@ when the launch itself failed (the process never ran).
 | From                   | Event                                                                     | To         |
 | ---------------------- | ------------------------------------------------------------------------- | ---------- |
 | `idle`, `crashed`      | `start()`: the process is spawned                                         | `starting` |
-| `idle`, `crashed`      | `start()`: the profile's `cwd` does not exist, or `Bun.spawn` throws      | `crashed` (with `message`) |
+| `idle`, `crashed`      | `start()`: the profile's `cwd` does not exist, or `spawnProc` throws      | `crashed` (with `message`) |
 | `idle`, `crashed`      | `start()`: something already answers on the profile's port               | `external` (and `start()` rejects) |
 | `idle`                 | the external watcher finds something answering on the settings port      | `external` |
 | `starting`             | `/health` answers `200`                                                   | `ready`    |
@@ -153,8 +153,10 @@ setting or the profile also stops `-lv 4` from being added.
 3. If something answers on `cmd.host`:`cmd.port`: when it is a `llama-server` (`probeLlamaServer()`), it switches to
    `external` and rejects with the same "port in use" error; any other service rejects with
    `port <port> is in use by another service`, the state unchanged.
-4. It records `cmd` as the last command, checks that `cmd.cwd` exists, and calls `Bun.spawn(cmd.argv, …)` with that
-   `cwd` and `env`, `stdin` ignored, `stdout` and `stderr` piped. A missing directory or a spawn error logs
+4. It records `cmd` as the last command, checks that `cmd.cwd` exists, and calls `spawnProc(cmd.argv, …)` with that
+   `cwd` and `env`, `stdin` ignored, `stdout` and `stderr` piped. `spawnProc` (`server/proc.ts`, on
+   `node:child_process`) throws at once when the process cannot start: `spawn <binary> ENOENT` for a missing binary,
+   `spawn <binary> EACCES` for a file that is not executable. A missing directory or a spawn error logs
    `[llama-webui] launch failed: …` and sets `crashed` with that message.
 5. It pushes the lines of `launchLines()` (`server/supervisor/args.ts`) to the log ring: the launch line,
    `LAUNCH_LOG_PREFIX` (`[llama-webui] launch:`) followed by `display`, then `P2P_LOG_LINE` when `GGML_CUDA_P2P` is in

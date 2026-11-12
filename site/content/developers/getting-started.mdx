@@ -151,6 +151,8 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
   - `cli.ts` launch options and `--help`
   - `paths.ts` data directory and database path
   - `http.ts` `HttpError`, `guarded()`, JSON error responses
+  - `proc.ts` child processes and file reads on `node:*` (`spawnProc`, `readText`, `fileExists`, `fileRange`, `which`)
+  - `standalone.ts` whether the code runs inside the standalone executable
   - `security.ts` the request guard (Host, Origin, JSON-only writes)
   - `setup.ts` first-run report and launch pad
   - `llamatui.ts` llama-tui config import
@@ -167,7 +169,7 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
   - `db/` `bun:sqlite`: connection, migrations, one repository per table
   - `logs/` the log ring buffer and line splitter
   - `ws/` the WebSocket hub
-  - `testing/` test helpers (`tempDir`)
+  - `testing/` test helpers (`tempDir`, `writeFileDeep`)
 - `web/` the React app (workspace `@llama-webui/web`)
   - `index.html` HTML entry, applies the theme before the first paint
   - `src/`
@@ -217,7 +219,7 @@ still work. A few things help when you work on telemetry code:
 ## Without llama.cpp
 
 `testdata/fake/` holds two stand-ins that the tests launch instead of the real binaries. Each is a small shell
-wrapper that runs a TypeScript fake with `bun` (or `$BUN_PATH`):
+wrapper that runs a TypeScript fake with `node`:
 
 - `fake-llama-server` answers `--version`, listens on `127.0.0.1` at the `--port` it receives (8080 without one),
   returns `503` on `/health` while it "loads", then serves `/health`, `/slots`, `/metrics` and `/props` from the

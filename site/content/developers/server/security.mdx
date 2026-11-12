@@ -142,8 +142,8 @@ Server page's command card warn when it is not loopback. The benchmark's tempora
 
 ## Processes and arguments
 
-Every process llama-webui starts (`llama-server`, `llama-bench`, `nvidia-smi`, `perf`…) goes through `Bun.spawn` with
-an argument array, never through a shell. A profile argument such as `$(whoami)` reaches `llama-server` as a literal
+Every process llama-webui starts (`llama-server`, `llama-bench`, `nvidia-smi`, `perf`…) goes through `spawnProc`
+(`server/proc.ts`, `node:child_process` without `shell`) with an argument array, never through a shell. A profile argument such as `$(whoami)` reaches `llama-server` as a literal
 string. `shellQuote()` only builds the displayed command.
 
 That does not make the API safe to expose: the `binary` setting can name any program, and profiles set its arguments
