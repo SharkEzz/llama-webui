@@ -3,8 +3,6 @@ import type { GpuNeeds } from '../needs';
 import type { NvmlProc, NvmlSnapshot, NvmlSystem } from './read';
 import { sampler, type WorkerLike } from './sampler';
 
-export type { WorkerLike };
-
 type WorkerMsg = { type: 'ready' } | { type: 'error'; message: string } | { type: 'sample'; snapshot: NvmlSnapshot };
 
 /**
@@ -14,7 +12,7 @@ type WorkerMsg = { type: 'ready' } | { type: 'error'; message: string } | { type
 export const workerUrl = (moduleUrl = import.meta.url): string =>
   new URL(moduleUrl.endsWith('.ts') ? './worker.ts' : './nvml-worker.js', moduleUrl).href;
 
-const defaultWorker = (): WorkerLike => sampler(new URL(workerUrl()));
+const defaultWorker = (): WorkerLike => sampler(workerUrl());
 
 /** NVIDIA readings from NVML in a child process (`sampler.ts`); same surface as NvidiaMonitor (gpus/procVram/refreshApps/stop). */
 export class NvmlMonitor {

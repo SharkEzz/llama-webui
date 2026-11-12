@@ -1,5 +1,4 @@
 import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { DEFAULT_SETTINGS, type ServerState } from '@llama-webui/shared';
 import { expect, test } from 'vitest';
@@ -9,6 +8,7 @@ import { openDb } from '../db/open';
 import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
 import { errorResponse } from '../http';
+import { listen } from '../testing/listen';
 import { tempDir } from '../testing/tempDir';
 import { WsHub, type WsLike } from '../ws/hub';
 import { benchRoutes } from './bench';
@@ -66,8 +66,7 @@ test('GET /api/chat/:id/stream is a 404 for a conversation that does not exist, 
 
 test('/api/server/props: a reply from llama-server that is not JSON is a 502 (#37)', async () => {
   const llama = createServer((_req, res) => res.end('<html>not json</html>'));
-  await new Promise<void>((r) => llama.listen(0, '127.0.0.1', r));
-  const state: ServerState = { kind: 'external', pid: null, port: (llama.address() as AddressInfo).port };
+  const state: ServerState = { kind: 'external', pid: null, port: Number(new URL(await listen(llama)).port) };
   const app = serverRoutes({
     runtime: { supervisor: { state, lastCommand: null }, logs: null } as never,
     profiles: null!,

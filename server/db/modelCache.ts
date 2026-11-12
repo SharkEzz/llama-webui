@@ -29,7 +29,7 @@ export class ModelCacheRepo {
   /** Forgets files that are no longer there. */
   prune(keep: Set<string>): void {
     const paths = this.db.query<{ path: string }, []>('SELECT path FROM model_cache').all();
-    const drop = this.db.prepare('DELETE FROM model_cache WHERE path = ?');
+    const drop = this.db.query('DELETE FROM model_cache WHERE path = ?');
     this.db.transaction(() => {
       for (const { path } of paths) if (!keep.has(path)) drop.run(path);
     })();

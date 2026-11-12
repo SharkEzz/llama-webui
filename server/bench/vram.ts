@@ -33,11 +33,12 @@ export class VramProbe implements VramPeaks {
     const sysRoot = o.sysRoot ?? '/sys';
     if (gpus.some((g) => g.vendor === 'nvidia')) {
       try {
-        this.smi = spawnProc(
+        const smi = spawnProc(
           ['nvidia-smi', '--query-gpu=uuid,memory.used', '--format=csv,noheader,nounits', '-lms', String(intervalMs)],
-          { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
+          { stderr: 'ignore' },
         );
-        this.smiDone = this.read(this.smi.stdout as ReadableStream<Uint8Array>);
+        this.smi = smi;
+        this.smiDone = this.read(smi.stdout);
       } catch {}
     }
     const amd = gpus.filter((g) => g.vendor === 'amd' && g.vramTotalBytes > 0);

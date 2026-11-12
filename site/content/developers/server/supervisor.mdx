@@ -154,7 +154,7 @@ setting or the profile also stops `-lv 4` from being added.
    `external` and rejects with the same "port in use" error; any other service rejects with
    `port <port> is in use by another service`, the state unchanged.
 4. It records `cmd` as the last command, checks that `cmd.cwd` exists, and calls `spawnProc(cmd.argv, …)` with that
-   `cwd` and `env`, `stdin` ignored, `stdout` and `stderr` piped. `spawnProc` (`server/proc.ts`, on
+   `cwd` and `env`; `stdout` and `stderr` are piped (the default), standard input is never given. `spawnProc` (`server/proc.ts`, on
    `node:child_process`) throws at once when the process cannot start: `spawn <binary> ENOENT` for a missing binary,
    `spawn <binary> EACCES` for a file that is not executable. A missing directory or a spawn error logs
    `[llama-webui] launch failed: …` and sets `crashed` with that message.

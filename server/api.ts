@@ -10,7 +10,7 @@ import type { Database } from './db/sqlite';
 import type { SweepsRepo } from './db/sweeps';
 import type { HfClient } from './hf/client';
 import type { DownloadQueue } from './hf/downloader';
-import { allowTable, apiRoutes, type Env, errorResponse, guardMw, jsonCharset } from './http';
+import { allowTable, apiRoutes, type Env, errorResponse, guardMw } from './http';
 import type { Monitor } from './monitor/monitor';
 import type { PlacementTracker } from './monitor/placement';
 import { benchRoutes } from './routes/bench';
@@ -57,14 +57,14 @@ const startedAt = Date.now();
 
 /**
  * The HTTP API (`/api/*`): one chained Hono app, one `.route()` per domain file. Every request goes through the
- * charset fix, the guard (host, origin, JSON) and the 405 table first; within a domain file, a static path is
+ * guard (host, origin, JSON) and the 405 table first; within a domain file, a static path is
  * registered before the `:param` pattern that would catch it (Hono matches in registration order).
  */
 export function createApi(deps: AppDeps) {
   const { settings, monitor } = deps;
   const allow = allowTable();
   const api = new Hono<Env>()
-    .use(jsonCharset, guardMw, allow.mw)
+    .use(guardMw, allow.mw)
     .get('/api/health', (c) => c.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt }))
     .route('/', settingsRoutes({ settings, monitor }))
     .route('/', profileRoutes(deps))
@@ -83,5 +83,3 @@ export function createApi(deps: AppDeps) {
   api.onError((err) => errorResponse(err));
   return api;
 }
-
-export type AppType = ReturnType<typeof createApi>;

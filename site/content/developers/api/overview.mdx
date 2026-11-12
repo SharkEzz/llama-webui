@@ -47,7 +47,7 @@ protect it from people on your network. It applies three checks, in this order:
 
 | Check          | Rule                                                                                                                                      | Refusal                                                          |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `Host`         | The header (or the URL's host) parses, and its hostname is `localhost`, ends in `.localhost`, or is an IPv4 or IPv6 literal.             | `403` `Invalid host` or `403` `Host not allowed`                 |
+| `Host`         | The header (or the URL's host) parses, and its hostname is `localhost`, ends in `.localhost`, or is an IPv4 or IPv6 literal.             | `403` `Host not allowed`; `400` when it does not parse           |
 | `Origin`       | When the header is present, it equals `<scheme>//<Host header>` exactly.                                                                  | `403` `Origin not allowed`                                       |
 | `content-type` | For `POST`, `PUT`, `PATCH` and `DELETE`: a `content-type`, when sent, is `application/json` (parameters such as `; charset=utf-8` allowed), and a request with a body sends it. | `415` `JSON body expected (content-type: application/json)` |
 
@@ -59,6 +59,9 @@ protect it from people on your network. It applies three checks, in this order:
   body without asking, but `application/json` needs a CORS preflight, which llama-webui never grants. A write without
   a body and without a `content-type` passes (`curl -X POST http://127.0.0.1:7860/api/server/stop`).
 
+A `Host` header that is not a host at all (`Host: a b`) is a malformed request, not a refusal: the HTTP adapter
+answers `400` without a body before the guard runs.
+
 A refusal has the usual error shape, without a `code`:
 
 ```bash title="Terminal"
@@ -67,7 +70,7 @@ curl -i http://127.0.0.1:7860/api/health -H 'Origin: http://example.com'
 
 ```text
 HTTP/1.1 403 Forbidden
-content-type: application/json;charset=utf-8
+content-type: application/json
 
 {"error":"Origin not allowed"}
 ```
@@ -135,7 +138,7 @@ Every other error has no `code`.
 | `201`  | A resource was created (profile, duplicate, conversation, profile from a benchmark run); the body is the new resource.                                 |
 | `202`  | The operation started and goes on in the background (server start, switch and restart, benchmark run, sweep, download); follow it over the WebSocket. |
 | `204`  | Success without a body (deletions, cancellations, a chat stream with no reply in progress).                                                            |
-| `400`  | Invalid body, JSON or query parameter.                                                                                                                  |
+| `400`  | Invalid body, JSON or query parameter; a `Host` header that does not parse (no body).                                                                  |
 | `401`  | Hugging Face rejected the token (`hf-unauthorized`).                                                                                                    |
 | `403`  | Refused by the guard (`Host`, `Origin`), or a gated Hugging Face repository.                                                                           |
 | `404`  | Unknown route, unknown id, or missing file.                                                                                                             |
@@ -165,7 +168,7 @@ export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
 
 ```ts title="server/api.ts"
   const api = new Hono<Env>()
-    .use(jsonCharset, guardMw, allow.mw)
+    .use(guardMw, allow.mw)
     .get('/api/health', (c) => c.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt }))
     .route('/', settingsRoutes({ settings, monitor }))
     // … one .route() per domain file
@@ -176,10 +179,9 @@ export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
 
 `mount()` in `server/host.ts` puts that app on a `node:http` server through `@hono/node-server`
 (`getRequestListener()`) and sends it every `/api/*` request; `/ws` (the `ws` library) and the web app are handled by
-the host itself. Every API request goes through three middlewares first, in this order:
+the host itself. A JSON reply has the `application/json` type that `c.json()` gives it. Every API request goes
+through two middlewares first, in this order:
 
-- `jsonCharset` gives a JSON reply the `application/json;charset=utf-8` type the API has always used (`c.json()`
-  alone says `application/json`). A route that sets its own type keeps it.
 - `guardMw` applies the request guard of `server/security.ts` (see [Security](/developers/server/security/)).
 - `allow.mw` (`allowTable()`, `server/http.ts`) answers `405` `{ "error": "Method not allowed (POST)" }` with
   `Allow: POST` when the path is known but the method is not one of its routes (`HEAD` counts as `GET`). It takes
@@ -195,14 +197,15 @@ Then:
 - Path parameters go through the `id(what)` validator: anything but a positive integer gives `404` `<what> not
   found`, the same answer as an id that does not exist, and before any body check.
 - A body validated by a zod schema goes through `body(Schema)` (`@hono/zod-validator`): no JSON body is `400`
-  `Invalid JSON`, then, with `{ object: true }`, a JSON value that is not an object is `400` `JSON object expected`,
-  then the schema's `ZodError`. A body with an imperative check goes through `json(check)`, with the same first two
+  `Invalid JSON`, then a JSON value that is not an object is `400` `JSON object expected`, then the schema's
+  `ZodError`. A body with an imperative check goes through `json(check)`, with the same first two
   messages (`object(body)` throws the second).
 - A handler that answers `404` or `409` before reading its body reads it itself (`object(await c.req.json())`), so a
   busy resource is `409` even with a malformed body. `accepts<T>()` declares that body's type for the typed client and
   reads nothing.
-- `query(...keys)` declares the query keys a route reads (`query('path')`). It never refuses a request: the handler
-  still reads `new URL(c.req.url).searchParams` and decides what a missing key means.
+- `query(...keys)` declares the query keys a route reads (`query('path')`) and gives them to the handler as
+  `c.req.valid('query')`: the first value of each key present, decoded as `URLSearchParams` does. It never refuses a
+  request: the handler decides what a missing key means.
 - `notFound(what)` is the shared `404` `<what> not found`.
 
 ### Typed client

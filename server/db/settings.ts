@@ -42,7 +42,7 @@ export class SettingsRepo {
       merged[key] = key !== 'env' && isPlainObject(was) && isPlainObject(value) ? { ...was, ...value } : value;
     }
     const next = SettingsSchema.parse(merged);
-    const upsert = this.db.prepare('INSERT OR REPLACE INTO settings(key, value_json) VALUES (?, ?)');
+    const upsert = this.db.query('INSERT OR REPLACE INTO settings(key, value_json) VALUES (?, ?)');
     this.db.transaction(() => {
       for (const key of KEYS) {
         if (key in partial) upsert.run(key, JSON.stringify(next[key]));

@@ -1,8 +1,8 @@
 import { createServer, type Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { afterEach, expect, test } from 'vitest';
 import { request } from '../contract/wire';
 import type { WebHandler } from '../host';
+import { listen } from '../testing/listen';
 import { tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';
 import { staticWeb, unavailableWeb } from './web';
@@ -15,8 +15,7 @@ afterEach(async () => {
 async function serve(handler: WebHandler): Promise<string> {
   const s = createServer(handler);
   servers.push(s);
-  await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
-  return `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
+  return listen(s);
 }
 
 test('staticWeb: a built file is immutable with its type; any other path is the app, never cached', async () => {

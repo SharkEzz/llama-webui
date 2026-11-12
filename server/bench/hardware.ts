@@ -14,9 +14,6 @@ let cpu: Promise<string> | null = null;
 /** Output of a short command (stdout + stderr), killed after `timeoutMs`; rejects when it fails or crashes. */
 async function output(argv: string[], timeoutMs = 5000): Promise<string> {
   const proc = spawnProc(argv, {
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
     timeout: timeoutMs,
     killSignal: 'SIGKILL',
   });
@@ -37,16 +34,20 @@ class OutputError extends Error {
   }
 }
 
-/** Modification time of a binary (looked up in the PATH), 0 if unreadable: part of the cache keys. */
-const mtimeOf = (binary: string): Promise<number> =>
-  stat(which(binary) ?? binary).then(
+/** A binary's file: looked up in the PATH, the name itself when it is not found. */
+const fileOf = (binary: string): string => which(binary) ?? binary;
+
+/** Modification time of a file, 0 if unreadable: part of the cache keys. */
+const mtimeOf = (file: string): Promise<number> =>
+  stat(file).then(
     (s) => s.mtimeMs,
     () => 0,
   );
 
 /** “b12119 (6f1e65437)” from `<binary> --version`, cached per binary and modification time (a rebuild is read again); null if unreadable. */
 export async function buildOf(binary: string): Promise<string | null> {
-  const key = `${which(binary) ?? binary}:${await mtimeOf(binary)}`;
+  const file = fileOf(binary);
+  const key = `${file}:${await mtimeOf(file)}`;
   let p = builds.get(key);
   if (!p) {
     p = output([binary, '--version']).then(
@@ -105,7 +106,7 @@ async function readDeviceList(benchBinary: string): Promise<DeviceList> {
  * is a snapshot from the first read: the live one comes from the monitor (`readTuningHardware`).
  */
 export async function listDevicesResult(benchBinary: string): Promise<DeviceList> {
-  const key = `${benchBinary}:${await mtimeOf(benchBinary)}`;
+  const key = `${benchBinary}:${await mtimeOf(fileOf(benchBinary))}`;
   let p = devices.get(key);
   if (!p) {
     p = readDeviceList(benchBinary);

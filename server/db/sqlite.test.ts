@@ -22,13 +22,13 @@ test('get returns null when no row matches, all the rows, run the changes and th
     { a: 1, b: 'x' },
     { a: 2, b: 'y' },
   ]);
-  expect(db.prepare<{ b: string }, [number]>('SELECT b FROM t WHERE a = ?').get(2)).toEqual({ b: 'y' });
+  expect(db.query<{ b: string }, [number]>('SELECT b FROM t WHERE a = ?').get(2)).toEqual({ b: 'y' });
 });
 
 test('a value count that does not match the placeholders throws (node:sqlite alone binds NULL)', () => {
   using db = withTable();
   expect(() => db.query('SELECT ?, ? v').get(1)).toThrow('SQLite query expected 2 values, received 1');
-  expect(() => db.prepare('SELECT ? v').all(1, 2)).toThrow('SQLite query expected 1 values, received 2');
+  expect(() => db.query('SELECT ? v').all(1, 2)).toThrow('SQLite query expected 1 values, received 2');
   expect(() => db.run('INSERT INTO t(a, b) VALUES (?, ?)', [1])).toThrow('SQLite query expected 2 values, received 1');
   expect(rows(db)).toEqual([]);
   // A ? inside a string, a quoted name or a comment is not a placeholder.
@@ -40,9 +40,15 @@ test('RETURNING rows are read through get', () => {
   expect(db.query<{ id: number }, [string]>('INSERT INTO t(b) VALUES (?) RETURNING id').get('r')).toEqual({ id: 1 });
 });
 
-test('run without parameters executes every statement and returns the changes of the last write', () => {
+test('exec runs every statement; run returns the changes of its one statement, and refuses several', () => {
   using db = withTable();
-  db.run("CREATE TABLE u(x); INSERT INTO t(b) VALUES ('1'); INSERT INTO t(b) VALUES ('2')");
+  db.exec("CREATE TABLE u(x); INSERT INTO t(b) VALUES ('1'); INSERT INTO t(b) VALUES ('2')");
+  const several = 'SQLite query holds several statements: use exec()';
+  expect(() => db.run("INSERT INTO t(b) VALUES ('3'); INSERT INTO t(b) VALUES ('4')")).toThrow(several);
+  expect(() => db.query("SELECT 1; SELECT ';'").get()).toThrow(several);
+  expect(rows(db).map((r) => r.b)).toEqual(['1', '2']);
+  // A closing semicolon, a comment after it and a semicolon inside a string are one statement.
+  expect(db.query("SELECT ';' AS v; -- done\n /* ; */ ").get()).toEqual({ v: ';' });
   expect(db.query('SELECT name FROM sqlite_master WHERE name = ?').get('u')).toEqual({ name: 'u' });
   expect(db.run("UPDATE t SET a = 0 WHERE b IN ('1', '2')").changes).toBe(2);
 });
@@ -108,7 +114,7 @@ test('an error that made SQLite roll back the transaction itself is rethrown as 
 test('foreign keys are off by default, readonly refuses writes, close is idempotent, using closes', () => {
   using dir = tempDir('lw-sqlite-');
   const path = join(dir.path, 'f.sqlite');
-  const db = new Database(path, { create: true });
+  const db = new Database(path);
   expect(db.query<{ foreign_keys: number }, []>('PRAGMA foreign_keys').get()!.foreign_keys).toBe(0);
   db.run('CREATE TABLE t(a)');
   db.close();

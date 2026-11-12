@@ -22,7 +22,7 @@ export interface SupervisorOptions {
   now?: () => number;
 }
 
-type Child = Spawned;
+type Child = Spawned<'pipe', 'pipe'>;
 
 export class Supervisor {
   private _state: ServerState = { kind: 'idle' };
@@ -142,14 +142,14 @@ export class Supervisor {
     if (!existsSync(cmd.cwd)) return fail(`directory not found: ${cmd.cwd}`);
     let proc: Child;
     try {
-      proc = spawnProc(cmd.argv, { cwd: cmd.cwd, env: cmd.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+      proc = spawnProc(cmd.argv, { cwd: cmd.cwd, env: cmd.env });
     } catch (e) {
       return fail((e as Error).message);
     }
     this.proc = proc;
     for (const line of launchLines(cmd)) this.logs.push(line);
-    this.pipe(proc.stdout as ReadableStream<Uint8Array>);
-    this.pipe(proc.stderr as ReadableStream<Uint8Array>);
+    this.pipe(proc.stdout);
+    this.pipe(proc.stderr);
     this.set({
       kind: 'starting',
       profile: cmd.profileName,

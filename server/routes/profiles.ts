@@ -24,7 +24,7 @@ export function removeProfile({ profiles, settings, activeProfileId }: ProfileRo
 function attachment(filename: string, body: unknown): Response {
   return new Response(`${JSON.stringify(body, null, 2)}\n`, {
     headers: {
-      'content-type': 'application/json; charset=utf-8',
+      'content-type': 'application/json',
       'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
     },
   });

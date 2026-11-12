@@ -83,8 +83,11 @@ test('settings: defaults, then a persisted patch', () => {
   deleted when the test ends, even when it fails. At module level, where `using` would release it before the tests run,
   call `afterAll(() => dir[Symbol.dispose]())`.
 - **Files** are written with `writeFileDeep(path, data)` (`server/testing/write.ts`), which creates the parent
-  directories (fake `/proc` and `/sys` trees), and read with `node:fs/promises`; pauses are `setTimeout` from
+  directories (fake `/proc` and `/sys` trees), and read with `node:fs/promises`; `writeFileAtomic(path, text)` (same
+  file) replaces a file in one step, as an editor's safe write does. Pauses are `setTimeout` from
   `node:timers/promises`.
+- **HTTP servers**: `listen(server)` (`server/testing/listen.ts`) binds a `node:http` server to a free loopback port
+  and resolves its base URL.
 - **Databases**: `openDb(':memory:')` gives a fresh database with every migration applied; `openDb()` on a path in a
   temporary directory tests a real file.
 - **Dependencies are injected.** Server classes and builders take their collaborators as arguments, so a test passes

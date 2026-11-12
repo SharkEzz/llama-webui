@@ -101,14 +101,14 @@ The helpers of `server/http.ts` cover the usual cases:
 
 | Helper                                      | Use                                                                        |
 | ------------------------------------------- | -------------------------------------------------------------------------- |
-| `body(Schema, { object: true })`            | Validates the JSON body with a zod schema (`@hono/zod-validator`): `400 Invalid JSON`, `400 JSON object expected`, then the `ZodError` (first issue + `issues`); read it with `c.req.valid('json')` |
+| `body(Schema)`                              | Validates the JSON body with a zod schema (`@hono/zod-validator`): `400 Invalid JSON`, `400 JSON object expected`, then the `ZodError` (first issue + `issues`); read it with `c.req.valid('json')` |
 | `json(check)`                               | A JSON body passed through your own check (`json(object)`: any object), for custom messages |
 | `id('Download')`                            | A positive integer `:id`, otherwise `404 Download not found`; put it before the body validator; `c.req.valid('param').id` |
 | `notFound('Profile')`                       | `404 Profile not found`                                                    |
 | `new HttpError(409, message, code)`         | Any refusal; add a `code` when the web app must react to it                |
 
 ```ts title="server/routes/hf.ts"
-.post('/api/downloads', body(DownloadRequestSchema, { object: true }), async (c) => {
+.post('/api/downloads', body(DownloadRequestSchema), async (c) => {
   const items = await downloads.enqueue(await downloadInputs(hf, c.req.valid('json'), modelsDir()));
   return c.json({ items }, 202);
 })

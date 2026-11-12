@@ -67,7 +67,7 @@ export function modelRoutes(deps: ModelRouteDeps) {
       };
       return c.json(list);
     })
-    .delete('/api/models', body(ModelDeleteSchema, { object: true }), async (c) => {
+    .delete('/api/models', body(ModelDeleteSchema), async (c) => {
       const body = c.req.valid('json');
       const { dir, entry } = await entryOf(body.path);
       const usage = await modelUsage(entry, users);
@@ -79,12 +79,12 @@ export function modelRoutes(deps: ModelRouteDeps) {
       return c.json(result);
     })
     .get('/api/models/usage', query('path'), async (c) => {
-      const path = new URL(c.req.url).searchParams.get('path');
+      const { path } = c.req.valid('query');
       if (!path) throw new HttpError(400, 'path required');
       return c.json(await modelUsage((await entryOf(path)).entry, users));
     })
     .get('/api/models/info', query('path'), async (c) => {
-      const path = new URL(c.req.url).searchParams.get('path') ?? '';
+      const path = c.req.valid('query').path ?? '';
       if (!path.startsWith('/') || !path.endsWith('.gguf'))
         throw new HttpError(400, 'Absolute path to a .gguf file expected');
       if (!(await fileExists(path))) throw notFound('File');

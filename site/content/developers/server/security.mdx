@@ -52,7 +52,7 @@ order, and the first that fails answers:
 
 | Rule                                                                                                                | Response                                                                     |
 | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| The request URL and the `Host` header (or the URL's host when there is none) parse as `http://<host>`; the host builds the URL from `Host` (`server/host.ts`), so `Host: a b` fails here | `403` `{"error":"Invalid host"}` |
+| The request URL and the `Host` header (or the URL's host when there is none) parse as `http://<host>`; over HTTP the adapter refuses such a request first (`400`, no body, which `server/host.ts` does not rewrite), so this rule only answers a caller of `guard()` itself | `400` `{"error":"Invalid host"}` |
 | Its hostname is `localhost`, ends with `.localhost`, or is an IPv4 or IPv6 literal (brackets removed, any case)     | `403` `{"error":"Host not allowed"}`                                         |
 | When an `Origin` header is present, it equals `` `${url.protocol}//${host}` `` exactly                              | `403` `{"error":"Origin not allowed"}`                                       |
 | For `POST`, `PUT`, `PATCH` and `DELETE`: a `Content-Type`, when present, matches `/^application\/json\b/i`, and a request with a body has one | `415` `{"error":"JSON body expected (content-type: application/json)"}` |
@@ -93,11 +93,11 @@ Whatever a validator or a handler throws afterwards reaches the API's `onError`,
   `.use()` ahead of every domain file, so a new route is guarded without doing anything.
 - The WebSocket endpoint is guarded too: `mount()` (`server/host.ts`) runs `guard()` on a `/ws` upgrade request
   before handing it to the `ws` library, so another site cannot open the socket (browsers always send `Origin` on a WebSocket
-  handshake). A request to `/ws` that is not an upgrade gets `426` `WebSocket upgrade expected`. The refusal of an
-  upgrade is written to the raw socket (`writeRaw()`), which first gets an `error` listener: Node removes its own
-  before it emits `upgrade`, and a client that resets the connection would otherwise end the process with an
-  uncaught `ECONNRESET`. The socket is destroyed once the answer is flushed, and an accepted client can send
-  messages of 4,096 bytes at most.
+  handshake). A request to `/ws` that is not an upgrade gets `426` `WebSocket upgrade expected`. An upgrade the
+  guard refuses is not treated as one: the server's `shouldUpgradeCallback` runs the guard first, so the refusal is
+  an ordinary response (Node writes it and handles a client that resets the connection), sent with
+  `Connection: close` so the server closes the socket even when the client keeps its side open. An accepted client
+  can send messages of 4,096 bytes at most.
 - The web interface itself (the HTML page, its bundles and the SPA fallback, `server/routes/web.ts`) is not guarded:
   it is static and holds no data. That is why a page opened through a host name loads, then has all its API calls
   refused with `Host not allowed`.

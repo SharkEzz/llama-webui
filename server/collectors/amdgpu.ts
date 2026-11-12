@@ -168,11 +168,7 @@ const ratioPct = (v: number | null, max: number | null): number | null =>
  * Reading power/runtime_status does not wake the device; reading the GPU attributes does.
  */
 export async function isRuntimeSuspended(card: AmdCard): Promise<boolean> {
-  try {
-    return (await readFile(join(card.devicePath, 'power', 'runtime_status'), 'utf8')).trim() === 'suspended';
-  } catch {
-    return false;
-  }
+  return (await readText(join(card.devicePath, 'power', 'runtime_status'))) === 'suspended';
 }
 
 /** Placeholder sample for a suspended card: identity only, every metric unknown. */

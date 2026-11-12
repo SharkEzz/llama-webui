@@ -4,12 +4,12 @@ import { once } from 'node:events';
 import { readdirSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { isBuiltin } from 'node:module';
-import type { AddressInfo } from 'node:net';
 import { join, resolve } from 'node:path';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { request } from './contract/wire';
 import { staticWeb } from './routes/web';
+import { listen } from './testing/listen';
 import { tempDir } from './testing/tempDir';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -53,8 +53,7 @@ afterAll(() => server?.close());
 
 test('served by staticWeb, a deep URL finds every file its page references, from the root', async () => {
   server = createServer(await staticWeb(web));
-  await new Promise<void>((r) => server?.listen(0, '127.0.0.1', r));
-  const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const base = await listen(server);
   const page = await request(base, { method: 'GET', path: '/chat/12' });
   expect(page.headers['cache-control']).toBe('no-cache');
   const refs = [...page.body.matchAll(/(?:src|href)="([^"]+\.(?:js|css|svg))"/g)].map((m) => m[1] as string);

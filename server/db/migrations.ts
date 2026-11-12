@@ -177,24 +177,24 @@ const violations = (db: Database) =>
 
 function runRebuild(db: Database, m: Rebuild, version: number): void {
   const fk = db.query<{ foreign_keys: number }, []>('PRAGMA foreign_keys').get()?.foreign_keys ?? 0;
-  db.run('PRAGMA foreign_keys = OFF');
+  db.exec('PRAGMA foreign_keys = OFF');
   try {
     db.transaction(() => {
       // A violation already there (an old database) is not the rebuild's: only new ones abort it.
       const before = violations(db);
-      for (const sql of m.rebuild) db.run(sql);
+      for (const sql of m.rebuild) db.exec(sql);
       const broken = [...violations(db)].filter((v) => !before.has(v));
       if (broken.length > 0) throw new Error(`migration ${version}: broken foreign keys (${broken.join(', ')})`);
       db.run('UPDATE schema_version SET version = ?', [version]);
     })();
   } finally {
-    if (fk) db.run('PRAGMA foreign_keys = ON');
+    if (fk) db.exec('PRAGMA foreign_keys = ON');
   }
 }
 
 /** Brings the schema to `upTo` (the last version by default; tests stop earlier to fill an old schema). */
 export function runMigrations(db: Database, upTo: number = MIGRATIONS.length): void {
-  db.run('CREATE TABLE IF NOT EXISTS schema_version(version INTEGER NOT NULL)');
+  db.exec('CREATE TABLE IF NOT EXISTS schema_version(version INTEGER NOT NULL)');
   const row = db.query<{ version: number }, []>('SELECT version FROM schema_version LIMIT 1').get();
   let current = row?.version ?? 0;
   if (!row) db.run('INSERT INTO schema_version(version) VALUES (0)');
@@ -203,7 +203,7 @@ export function runMigrations(db: Database, upTo: number = MIGRATIONS.length): v
     const next = current + 1;
     if (typeof m === 'string')
       db.transaction(() => {
-        db.run(m);
+        db.exec(m);
         db.run('UPDATE schema_version SET version = ?', [next]);
       })();
     else runRebuild(db, m, next);

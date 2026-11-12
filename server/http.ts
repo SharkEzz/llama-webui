@@ -70,16 +70,6 @@ export const guardMw: MiddlewareHandler = async (c, next) => {
   await next();
 };
 
-/**
- * `c.json()` says `application/json`; the API has always said `application/json;charset=utf-8`
- * (the contract suite pins it). Only that exact value is rewritten: a route that sets its own type keeps it.
- */
-export const jsonCharset: MiddlewareHandler = async (c, next) => {
-  await next();
-  if (c.res.headers.get('content-type') === 'application/json')
-    c.res.headers.set('content-type', 'application/json;charset=utf-8');
-};
-
 /** Positive integer `:id`, otherwise 404 (before any body check: 404 beats 400). */
 export const id = (what: string) =>
   validator('param', (p: Record<string, string>) => {
@@ -88,25 +78,31 @@ export const id = (what: string) =>
     return { id: n };
   });
 
-/**
- * Declares a route's query keys, for the web's typed client (`query: { path }`). Refuses nothing: a missing key is the
- * handler's call. `c.req.valid('query')` holds the first value of each key present, decoded by Hono; the handlers
- * read `new URL(c.req.url).searchParams` instead, whose decoding the contract suite records.
- */
-export const query = <K extends string>(...keys: K[]) =>
-  validator('query', (q: Record<string, string | string[]>) => {
-    const out: { [k in K]?: string } = {};
-    for (const k of keys) {
-      const v = q[k];
-      const first = Array.isArray(v) ? v[0] : v;
-      if (first !== undefined) out[k] = first;
-    }
-    return out;
-  });
+type QueryOf<K extends string> = { [k in K]?: string };
 
 /**
- * JSON body passed through `check`. The body is read with `c.req.json()` whatever the media type, like `req.json()`
- * before (Hono's validator alone gives `{}` to a type outside its list); the guard has already refused a non-JSON one.
+ * A route's query keys, typed for the web's client (`query: { path }`) and for the handler, which reads them from
+ * `c.req.valid('query')`: the first value of each key present, decoded by `URLSearchParams` (the decoding the contract
+ * suite records; Hono's own differs). Refuses nothing: a missing key is the handler's call.
+ */
+export const query =
+  <K extends string>(
+    ...keys: K[]
+  ): MiddlewareHandler<Env, string, { in: { query: QueryOf<K> }; out: { query: QueryOf<K> } }> =>
+  async (c, next) => {
+    const params = new URL(c.req.url).searchParams;
+    const out: QueryOf<K> = {};
+    for (const k of keys) {
+      const v = params.get(k);
+      if (v !== null) out[k] = v;
+    }
+    c.req.addValidatedData('query', out);
+    await next();
+  };
+
+/**
+ * JSON body passed through `check`. The body is read with `c.req.json()` whatever the media type (Hono's validator
+ * alone gives `{}` to a type outside its list); the guard has already refused a non-JSON one.
  */
 export const json = <T>(check: (body: unknown) => T) =>
   validator('json', async (_value, c) => check(await c.req.json()));
@@ -116,15 +112,15 @@ const JSON_MEDIA = /^application\/([\w.-]+\+)?json$/i;
 const isJsonMedia = (type: string | undefined) => JSON_MEDIA.test((type ?? '').split(';')[0]?.trim() ?? '');
 
 /**
- * JSON body validated by `schema` (`@hono/zod-validator`), with the messages of `Schema.parse(await jsonObject(req))`:
- * a body that is not a JSON media type, or not JSON, is `Invalid JSON`; with `object`, a non-object is `JSON object
- * expected` before any schema message; otherwise the `ZodError` (→ `Invalid data: … (path)` + `issues`).
+ * JSON object validated by `schema` (`@hono/zod-validator`): a body that is not a JSON media type, or not JSON, is
+ * `Invalid JSON`; a non-object is `JSON object expected` before any schema message; otherwise the `ZodError`
+ * (→ `Invalid data: … (path)` + `issues`).
  */
-export const body = <S extends z.ZodType>(schema: S, o: { object?: boolean } = {}) =>
+export const body = <S extends z.ZodType>(schema: S) =>
   zValidator('json', schema, (r, c) => {
     if (!isJsonMedia(c.req.header('content-type'))) throw new HttpError(400, 'Invalid JSON');
     if (r.success) return;
-    if (o.object) object(r.data);
+    object(r.data);
     throw r.error;
   });
 

@@ -92,7 +92,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
       return c.json({ flags });
     })
     .get('/api/logs', query('since'), (c) => {
-      const since = Number(new URL(c.req.url).searchParams.get('since') ?? 0);
+      const since = Number(c.req.valid('query').since ?? 0);
       return c.json({
         lines: logs.since(Number.isFinite(since) ? since : 0),
         seq: logs.seq,

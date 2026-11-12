@@ -56,7 +56,7 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
   return (
     new Hono<Env>()
       .get('/api/tuning/hardware', async (c) => c.json(await hardware()))
-      .post('/api/tuning/estimate', body(EstimateRequest, { object: true }), async (c) => {
+      .post('/api/tuning/estimate', body(EstimateRequest), async (c) => {
         const body = c.req.valid('json');
         const [model, mmproj, hw] = await Promise.all([
           loadModel(body.modelPath),
@@ -78,7 +78,7 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
         return c.json(planSweep({ model, hw, spec, mmprojBytes: mmproj }));
       })
       .get('/api/tuning/checks', query('model'), async (c) => {
-        const modelPath = new URL(c.req.url).searchParams.get('model') || null;
+        const modelPath = c.req.valid('query').model || null;
         const snap = monitor.latest();
         const gpus = snap?.allGpus ?? [];
         const [hw, model, readings] = await Promise.all([
@@ -109,7 +109,7 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
         const report: ChecksReport = { checks, summary: summarize(checks), at: Date.now() };
         return c.json(report);
       })
-      .post('/api/tuning/disk-speed', body(DiskSpeedRequest, { object: true }), async (c) => {
+      .post('/api/tuning/disk-speed', body(DiskSpeedRequest), async (c) => {
         const { modelPath } = c.req.valid('json');
         if (benchRunner.busy) throw new HttpError(409, 'A benchmark is running: the measurement would be skewed');
         await loadModel(modelPath);

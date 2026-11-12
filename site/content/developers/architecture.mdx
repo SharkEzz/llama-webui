@@ -80,18 +80,19 @@ The external server watcher (`externalWatcher()` in `server/supervisor/external.
   `getRequestListener()` adapter of `@hono/node-server`;
 - `/ws`: an upgrade runs `guard()`, then goes to a `WebSocketServer({ noServer: true })` of the `ws` library, which
   hands the socket to the `WsHub` (`attachSocket()`, `server/ws/attach.ts`); a request without an upgrade runs
-  `guard()`, then gets `426`. A refused upgrade gets the guard's answer on the raw socket, which is destroyed once
-  the answer is flushed. A client message over 4,096 bytes (`maxPayload`: the protocol only has `ping` and `pong`)
+  `guard()`, then gets `426`. An upgrade the guard refuses is never handed over as one (`shouldUpgradeCallback`): it
+  stays a plain request, answered by the guard on a connection the server closes. A client message over 4,096 bytes (`maxPayload`: the protocol only has `ping` and `pong`)
   closes the socket with code `1009`;
 - anything else, to the web handler: the UI files and the SPA fallback, so reloading `/chat/12` serves the app.
 
 Only a WebSocket upgrade takes that route: `mount()` sets the server's `shouldUpgradeCallback`, so a request with
 another `Upgrade` header (`h2c`, which `curl --http2` sends) is a plain request. An upgrade on another path is closed in
 production, and left to Vite's HMR WebSocket in development. A `Host` header
-that is not an authority gets `403` with `Invalid host`, as from the guard. A second `mount()` on the same server (a
+that is not an authority never reaches the app: the HTTP adapter cannot build the request and answers `400` without a
+body, which `mount()` does not rewrite. A second `mount()` on the same server (a
 development reload) removes the listeners of the previous one before adding its own, and only the first one listens.
 
-`createApi()` mounts the request guard, the `405` table and the JSON charset middleware, defines `/api/health`, then
+`createApi()` mounts the request guard and the `405` table, defines `/api/health`, then
 mounts the routes of each domain from `server/routes/<domain>.ts` with `.route('/', …)`: `settingsRoutes`,
 `profileRoutes`, `serverRoutes`, `monitorRoutes`, `topologyRoutes`, `setupRoutes`, `modelRoutes`, `hfRoutes`,
 `tuningRoutes`, `chatRoutes`, `benchRoutes` and `sweepRoutes`. An unknown API path gets `404` with

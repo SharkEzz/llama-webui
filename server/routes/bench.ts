@@ -49,15 +49,13 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
   return (
     new Hono<Env>()
       .get('/api/bench/runs', query('kind', 'status', 'sweep', 'limit', 'model'), (c) => {
-        const q = new URL(c.req.url).searchParams;
-        const kind = q.get('kind');
-        const status = q.get('status');
-        const sweep = q.get('sweep');
-        const limit = Number(q.get('limit'));
+        const q = c.req.valid('query');
+        const { kind, status, sweep } = q;
+        const limit = Number(q.limit);
         const runs = benchRuns.list({
           kind: kind && KINDS.has(kind) ? (kind as BenchKind) : undefined,
           status: status && STATUSES.has(status) ? (status as BenchStatus) : undefined,
-          modelPath: q.get('model') || undefined,
+          modelPath: q.model || undefined,
           // By default: one-off runs only; “all” or a sweep id for the others.
           sweepId: sweep === 'all' ? 'all' : sweep && /^\d+$/.test(sweep) ? Number(sweep) : 'none',
           limit: Number.isInteger(limit) && limit > 0 ? Math.min(limit, MAX_RUNS) : undefined,
@@ -65,7 +63,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
         return c.json({ runs, live: benchRunner.live });
       })
       .delete('/api/bench/runs', query('failed'), (c) => {
-        if (new URL(c.req.url).searchParams.get('failed') !== '1') throw new HttpError(400, '?failed=1 expected');
+        if (c.req.valid('query').failed !== '1') throw new HttpError(400, '?failed=1 expected');
         const ids = benchRuns.deleteFailed();
         if (ids.length > 0) hub.broadcast({ type: 'bench-deleted', payload: { ids } });
         return c.json({ deleted: ids.length });

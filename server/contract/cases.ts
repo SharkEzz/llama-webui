@@ -1,5 +1,6 @@
 // The HTTP contract of the app as data: every route, the requests sent to it, and how a reply is recorded. Runtime
 // neutral (raw HTTP over node:net, see ./wire.ts), so a change of server framework or runtime replays it unchanged.
+import { setTimeout as sleep } from 'node:timers/promises';
 import { readSse, request, type WireRequest, type WireResponse } from './wire';
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -390,7 +391,7 @@ export async function runStreams(base: string, ctx: NormalizeCtx): Promise<Recor
         const res = await request(base, bare('GET', '/api/server/state'));
         const kind = (JSON.parse(res.body) as { state: { kind: string } }).state.kind;
         if (kind !== 'starting') return res;
-        await new Promise((r) => setTimeout(r, 100));
+        await sleep(100);
       }
     })(),
     'fake llama-server start',
@@ -412,5 +413,3 @@ export async function runStreams(base: string, ctx: NormalizeCtx): Promise<Recor
   out['POST /api/server/stop (running)'] = record(await request(base, bare('POST', '/api/server/stop')), ctx);
   return out;
 }
-
-export { readSse };

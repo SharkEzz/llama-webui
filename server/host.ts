@@ -1,8 +1,9 @@
-import { type IncomingMessage, type Server, type ServerResponse, STATUS_CODES } from 'node:http';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Duplex } from 'node:stream';
-import { getRequestListener, RequestError } from '@hono/node-server';
+import { getRequestListener } from '@hono/node-server';
 import { WebSocketServer } from 'ws';
+import { webHeaders } from './llamaFetch';
 import { guard } from './security';
 import { attachSocket } from './ws/attach';
 import type { WsHub } from './ws/hub';
@@ -39,38 +40,20 @@ type Mounted = Server & {
   shouldUpgradeCallback?: (req: IncomingMessage) => boolean;
 };
 
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
-
 /**
  * What the guard reads of a request, from Node's: `req.url` is built from the Host header (a Host that is
- * not an authority makes it unparsable: the guard answers `Invalid host`).
+ * not an authority makes it unparsable: the guard refuses it, 400).
  */
 function head(req: IncomingMessage): Pick<Request, 'url' | 'method' | 'headers'> {
-  const headers = new Headers();
-  for (const [k, v] of Object.entries(req.headers)) {
-    for (const value of Array.isArray(v) ? v : v === undefined ? [] : [v]) headers.append(k, value);
-  }
-  return { url: `http://${req.headers.host ?? ''}${req.url ?? '/'}`, method: req.method ?? 'GET', headers };
+  return {
+    url: `http://${req.headers.host ?? ''}${req.url ?? '/'}`,
+    method: req.method ?? 'GET',
+    headers: webHeaders(req.headers),
+  };
 }
 
-const pathOf = (req: IncomingMessage) => (req.url ?? '/').split('?', 1)[0] ?? '/';
-
-/**
- * A `Response` written as is to a socket that asked for an upgrade, which is then closed: destroyed once the answer
- * is flushed (`end()` alone only closes this side, and a client that never closes its own would keep the socket).
- */
-async function writeRaw(socket: Duplex, res: Response): Promise<void> {
-  // Before anything is awaited: Node drops its own 'error' listener when it emits 'upgrade', and without one a
-  // client that resets the connection while it is refused (ECONNRESET) is an uncaught exception: the process ends.
-  socket.on('error', () => {});
-  const body = Buffer.from(await res.arrayBuffer());
-  const lines = [`HTTP/1.1 ${res.status} ${STATUS_CODES[res.status] ?? ''}`];
-  for (const [k, v] of res.headers) lines.push(`${k}: ${v}`);
-  lines.push(`content-length: ${body.length}`, 'connection: close', '', '');
-  socket.once('finish', () => socket.destroy());
-  socket.end(Buffer.concat([Buffer.from(lines.join('\r\n')), body]));
-}
+/** The path of a request, without its query. */
+export const pathOf = (req: IncomingMessage) => (req.url ?? '/').split('?', 1)[0] ?? '/';
 
 /**
  * The largest message a client may send: the protocol only has `ping` and `pong` (`ws` allows 100 MiB by default,
@@ -78,23 +61,28 @@ async function writeRaw(socket: Duplex, res: Response): Promise<void> {
  */
 const MAX_CLIENT_MESSAGE_BYTES = 4096;
 
-/** `/ws` without an upgrade: the same guard as the API, then 426. */
+/**
+ * `/ws` as a plain request, which a WebSocket upgrade the guard refuses is too (`shouldUpgradeCallback`): the same
+ * guard as the API, then 426. A refused upgrade is answered on a connection the server closes: a WebSocket client
+ * may keep its own side open.
+ */
 function wsExpected(req: Request): Response {
-  return (
-    guard(req) ??
-    new Response('WebSocket upgrade expected', {
-      status: 426,
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    })
-  );
+  const refused = guard(req);
+  if (refused) {
+    if (req.headers.has('upgrade')) refused.headers.set('Connection', 'close');
+    return refused;
+  }
+  return new Response('WebSocket upgrade expected', {
+    status: 426,
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+  });
 }
 
+// No `errorHandler`: a request the adapter cannot build (a Host that is not an authority, `a b`) keeps the adapter's
+// own answer, 400 without a body.
 const listenerOptions = {
   // Keep Node's own Request/Response: the app and its tests build them too.
   overrideGlobalObjects: false,
-  // The adapter cannot build the request URL from a Host that is not an authority (`a b`): the guard's answer.
-  errorHandler: (err: unknown) =>
-    err instanceof RequestError ? json(403, { error: 'Invalid host' }) : new Response(null, { status: 500 }),
 };
 
 /**
@@ -118,11 +106,6 @@ export function mount(o: MountOptions): Promise<number> {
       if (!o.dev) socket.destroy();
       return;
     }
-    const refused = guard(head(req));
-    if (refused) {
-      void writeRaw(socket, refused);
-      return;
-    }
     wss.handleUpgrade(req, socket, head_, (client) => attachSocket(o.hub, client));
   };
 
@@ -136,8 +119,10 @@ export function mount(o: MountOptions): Promise<number> {
   server.on('upgrade', upgrade);
   server[MOUNTED] = { request, upgrade };
   // Node hands every request with an `Upgrade` header to the `upgrade` listeners, `h2c` included (`curl --http2`):
-  // only a WebSocket upgrade goes there, any other is a plain request. Vite's HMR upgrades are WebSocket.
-  server.shouldUpgradeCallback = (req) => req.headers.upgrade?.toLowerCase() === 'websocket';
+  // only a WebSocket upgrade goes there, any other is a plain request. Vite's HMR upgrades are WebSocket. One that the
+  // guard refuses on `/ws` stays a plain request too: `wsExpected` answers it, as it answers any refused request.
+  server.shouldUpgradeCallback = (req) =>
+    req.headers.upgrade?.toLowerCase() === 'websocket' && (pathOf(req) !== '/ws' || !guard(head(req)));
 
   const bound = () => (o.server.address() as AddressInfo).port;
   if (o.server.listening) return Promise.resolve(bound());

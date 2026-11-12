@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { listen } from '../testing/listen';
 import { readSse, request } from './wire';
 
 let base = '';
@@ -30,8 +30,7 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
 });
 
 beforeAll(async () => {
-  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
-  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  base = await listen(server);
 });
 afterAll(() => {
   server.closeAllConnections();

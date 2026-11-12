@@ -31,10 +31,10 @@ export class WsHub {
   }
 
   /** Call for every text message received from a client. */
-  receive(ws: WsLike, raw: string | Buffer): void {
+  receive(ws: WsLike, raw: string): void {
     let msg: WsMessage;
     try {
-      msg = JSON.parse(String(raw));
+      msg = JSON.parse(raw);
     } catch {
       return;
     }

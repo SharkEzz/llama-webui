@@ -6,7 +6,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { expect, test, vi } from 'vitest';
 import { tempDir } from '../../testing/tempDir';
 import type { GpuReading } from '../gpu';
-import { NvmlMonitor, type WorkerLike, workerUrl } from './monitor';
+import { NvmlMonitor, workerUrl } from './monitor';
+import type { WorkerLike } from './sampler';
 
 const GPU_A: GpuReading = {
   key: 'nvidia:GPU-a',

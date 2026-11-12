@@ -77,14 +77,12 @@ test('a body-less POST passes the guard over HTTP; a text body is a 415', async 
   expect(text.status).toBe(415);
 });
 
-test('a Host that is not an authority is a 403 Invalid host, as from the guard', async () => {
+test('a Host that is not an authority is a 400, the answer of the HTTP adapter', async () => {
   const { base } = await boot();
-  const res = await request(base, { method: 'GET', path: '/api/x', headers: { Host: 'a b' } });
-  expect([res.status, res.headers['content-type'], JSON.parse(res.body)]).toEqual([
-    403,
-    'application/json;charset=utf-8',
-    { error: 'Invalid host' },
-  ]);
+  for (const path of ['/api/x', '/ws']) {
+    const res = await request(base, { method: 'GET', path, headers: { Host: 'a b' } });
+    expect([res.status, res.body]).toEqual([400, '']);
+  }
 });
 
 test('/ws without an upgrade: guarded, then 426', async () => {
@@ -121,7 +119,7 @@ test('a WebSocket on /ws gets the hub hello and its pong; a foreign Origin is re
   });
   expect([refused.status, refused.headers['content-type'], JSON.parse(refused.body)]).toEqual([
     403,
-    'application/json;charset=utf-8',
+    'application/json',
     { error: 'Origin not allowed' },
   ]);
   // The first client left (its close detached it), the refused one never came in.

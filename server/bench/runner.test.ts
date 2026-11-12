@@ -283,6 +283,24 @@ function sweepOf(repo: BenchRunsRepo, sweeps: SweepsRepo, values: number[]) {
   }));
   return { sweep: sw, runs: repo.enqueue(sw.id, items) };
 }
+/** POSTs a JSON body to the sweep routes over these repositories and this runner. */
+function sweepPost(s: Pick<ReturnType<typeof setup>, 'sweeps' | 'repo' | 'runner'>, path: string, body: unknown) {
+  const app = sweepRoutes({
+    sweeps: s.sweeps,
+    benchRuns: s.repo,
+    benchRunner: s.runner,
+    settings: null!,
+    monitor: null!,
+    hub: { broadcast() {} } as never,
+  });
+  app.onError((err) => errorResponse(err));
+  return app.request(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 const sweepEnd = (lives: (SweepLive | null)[]) =>
   new Promise<void>((resolve) => {
     const t = setInterval(() => {
@@ -404,21 +422,7 @@ test('validating an interrupted sweep also finishes its interrupted items', asyn
   const second = repo.list({ sweepId: sweep.id }).find((r) => r.sweepLabel === '-ncmoe 2')!;
   repo.finish(second.id, { status: 'interrupted', error: 'interrupted' });
   sweeps.setStatus(sweep.id, 'interrupted');
-  const app = sweepRoutes({
-    sweeps,
-    benchRuns: repo,
-    benchRunner: runner,
-    settings: null!,
-    monitor: null!,
-    hub: { broadcast() {} } as never,
-  });
-  app.onError((err) => errorResponse(err));
-  const req = () =>
-    app.request(`/api/sweeps/${sweep.id}/validate`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ n: 1, stopServer: true }),
-    });
+  const req = () => sweepPost({ sweeps, repo, runner }, `/api/sweeps/${sweep.id}/validate`, { n: 1, stopServer: true });
   expect((await req()).status).toBe(202);
   while (sweeps.get(sweep.id)!.status === 'running') await sleep(10);
   expect(repo.list({ sweepId: sweep.id }).filter((r) => r.status === 'interrupted')).toEqual([]);
@@ -459,21 +463,7 @@ test('server validation runs get the sweep context when the profile sets no -c (
   const { sweep } = sweepOf(repo, sweeps, [1, 2]);
   await runner.startSweep(sweep.id, { stopServer: true });
   await sweepEnd(sweepLives);
-  const app = sweepRoutes({
-    sweeps,
-    benchRuns: repo,
-    benchRunner: runner,
-    settings: null!,
-    monitor: null!,
-    hub: { broadcast() {} } as never,
-  });
-  app.onError((err) => errorResponse(err));
-  const req = () =>
-    app.request(`/api/sweeps/${sweep.id}/validate`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ n: 1, stopServer: true }),
-    });
+  const req = () => sweepPost({ sweeps, repo, runner }, `/api/sweeps/${sweep.id}/validate`, { n: 1, stopServer: true });
   expect((await req()).status).toBe(202);
   while (sweeps.get(sweep.id)!.status === 'running') await sleep(10);
   const validation = repo.list({ sweepId: sweep.id }).find((r) => r.kind === 'server')!;
@@ -490,21 +480,7 @@ test('resuming a sweep whose model was deleted is one 400, before anything stops
     { spec: { ...spec, modelPath: '/nulle/part.gguf', r: 1 } as BenchSpec, label: 'x', fit: 'fits' },
   ]);
   sweeps.setStatus(sw.id, 'interrupted');
-  const app = sweepRoutes({
-    sweeps,
-    benchRuns: repo,
-    benchRunner: runner,
-    settings: null!,
-    monitor: null!,
-    hub: { broadcast() {} } as never,
-  });
-  app.onError((err) => errorResponse(err));
-  const req = () =>
-    app.request(`/api/sweeps/${sw.id}/resume`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ stopServer: true }),
-    });
+  const req = () => sweepPost({ sweeps, repo, runner }, `/api/sweeps/${sw.id}/resume`, { stopServer: true });
   const res = await req();
   expect(res.status).toBe(400);
   expect(((await res.json()) as { error: string }).error).toBe('Model not found: /nulle/part.gguf');

@@ -46,7 +46,7 @@ like. They apply to every API request and to the WebSocket.
 
 | Check            | Rule                                                                                                   | Otherwise                      | Protects against                                                                                     |
 | ---------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `Host` header    | `localhost`, a name ending in `.localhost`, or an IP address (IPv4 or IPv6)                            | `403`, "Host not allowed" ("Invalid host" when it is not a host name at all) | DNS rebinding: a site whose domain name is made to point to your machine                            |
+| `Host` header    | `localhost`, a name ending in `.localhost`, or an IP address (IPv4 or IPv6)                            | `403`, "Host not allowed" (`400` when it is not a host name at all) | DNS rebinding: a site whose domain name is made to point to your machine                            |
 | `Origin` header  | When present, exactly the page's own origin: same scheme, host and port                                | `403`, "Origin not allowed"    | Cross-site requests, including a WebSocket opened by another site                                    |
 | Request body     | A `POST`, `PUT`, `PATCH` or `DELETE` with a body must be sent as `application/json`                    | `415`                          | Cross-site form submissions, which browsers send without asking                                      |
 

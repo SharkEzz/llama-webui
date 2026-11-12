@@ -39,7 +39,7 @@ export interface ExecutorDeps {
 export type ExecResult = BenchFinish &
   Required<Pick<BenchFinish, 'status' | 'vramPeak' | 'logExcerpt' | 'durationMs' | 'diskReadPeakBps'>>;
 
-type Child = Spawned;
+type Child = Spawned<'pipe', 'pipe'>;
 
 interface Exec {
   run: BenchRun;
@@ -260,17 +260,14 @@ export class RunExecutor {
       // Environment of the settings then of the source profile (CUDA_VISIBLE_DEVICES…: same cards as the server).
       proc = spawnProc(argv, {
         env: { ...process.env, ...this.deps.settings().env, ...this.source(ex.spec)?.env },
-        stdin: 'ignore',
-        stdout: 'pipe',
-        stderr: 'pipe',
       });
     } catch (e) {
       return { status: 'failed', error: (e as Error).message };
     }
     ex.proc = proc;
     if (ex.cancelled) this.kill(proc);
-    const stdout = new Response(proc.stdout as ReadableStream<Uint8Array>).text();
-    const stderr = this.pipe(proc.stderr as ReadableStream<Uint8Array>, (l) => {
+    const stdout = new Response(proc.stdout).text();
+    const stderr = this.pipe(proc.stderr, (l) => {
       this.line(ex, l);
       const p = parseBenchProgress(l);
       if (p) {
