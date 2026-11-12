@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util';
+import { isStandalone } from './standalone';
 
 /** Launch options: flag, else environment variable, else default. */
 export interface CliOptions {
@@ -18,7 +19,7 @@ const SOURCE_USAGE = `  bun run dev [options]      development (bun --hot, HMR)
 const STANDALONE_USAGE = '  llama-webui [options]';
 
 /** `--help`; the usage lines depend on how it runs: compiled executable or from source. */
-export const helpText = (standalone = Bun.isStandaloneExecutable) => `llama-webui: web UI to drive llama-server \
+export const helpText = (standalone = isStandalone) => `llama-webui: web UI to drive llama-server \
 (API, WebSocket and UI in a single Bun process).
 
 Usage:
@@ -89,7 +90,7 @@ export function parseCli(argv: string[], env: Record<string, string | undefined>
 }
 
 /** Process launch options; prints the help (code 0) or the error (code 2) and exits when needed. */
-export function cliOptionsOrExit(argv = Bun.argv.slice(2)): CliOptions {
+export function cliOptionsOrExit(argv = process.argv.slice(2)): CliOptions {
   const res = parseCli(argv);
   if (res.kind === 'run') return res.options;
   if (res.kind === 'help') {

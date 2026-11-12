@@ -2,6 +2,7 @@ import { afterAll, expect, test } from 'bun:test';
 import { mkdirSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from '../testing/tempDir';
+import { writeFileDeep } from '../testing/write';
 import { chipsetLabel, cpuLabel, findPciIdsEntry, minKnown, parseLinkSpeed, readPciTopology } from './pci';
 
 const dirs = new DisposableStack();
@@ -132,14 +133,14 @@ async function machine(extra: Record<string, Dev> = {}): Promise<{ sysRoot: stri
   const write = async (dir: string, id: string, d: Dev) => {
     const p = join(dir, id);
     mkdirSync(p, { recursive: true });
-    await Bun.write(join(p, 'vendor'), `${d.vendor}\n`);
-    await Bun.write(join(p, 'device'), `${d.device}\n`);
-    await Bun.write(join(p, 'class'), `${d.cls}\n`);
+    await writeFileDeep(join(p, 'vendor'), `${d.vendor}\n`);
+    await writeFileDeep(join(p, 'device'), `${d.device}\n`);
+    await writeFileDeep(join(p, 'class'), `${d.cls}\n`);
     if (d.link) {
-      await Bun.write(join(p, 'max_link_speed'), `${d.link[0]}\n`);
-      await Bun.write(join(p, 'max_link_width'), `${d.link[1]}\n`);
-      await Bun.write(join(p, 'current_link_speed'), `${d.link[2]}\n`);
-      await Bun.write(join(p, 'current_link_width'), `${d.link[3]}\n`);
+      await writeFileDeep(join(p, 'max_link_speed'), `${d.link[0]}\n`);
+      await writeFileDeep(join(p, 'max_link_width'), `${d.link[1]}\n`);
+      await writeFileDeep(join(p, 'current_link_speed'), `${d.link[2]}\n`);
+      await writeFileDeep(join(p, 'current_link_width'), `${d.link[3]}\n`);
     }
     symlinkSync(p, join(byId, id));
     for (const [cid, c] of Object.entries(d.children ?? {})) await write(p, cid, c);
@@ -149,10 +150,10 @@ async function machine(extra: Record<string, Dev> = {}): Promise<{ sysRoot: stri
   // NVMe controller and its block device.
   const ctrl = join(host, '0000:00:01.2', '0000:02:00.0', 'nvme', 'nvme0');
   mkdirSync(ctrl, { recursive: true });
-  await Bun.write(join(ctrl, 'model'), 'KINGSTON OM8PGP41024N-A0                \n');
+  await writeFileDeep(join(ctrl, 'model'), 'KINGSTON OM8PGP41024N-A0                \n');
   mkdirSync(join(sys, 'block', 'nvme0n1'), { recursive: true });
   symlinkSync(ctrl, join(sys, 'block', 'nvme0n1', 'device'));
-  await Bun.write(join(sys, 'block', 'nvme0n1', 'size'), '2000409264\n');
+  await writeFileDeep(join(sys, 'block', 'nvme0n1', 'size'), '2000409264\n');
   // A loop device must be ignored.
   mkdirSync(join(sys, 'block', 'loop0'), { recursive: true });
 
@@ -163,13 +164,13 @@ async function machine(extra: Record<string, Dev> = {}): Promise<{ sysRoot: stri
     ['hwmon6', 'spd5118', '27750'],
   ] as const) {
     mkdirSync(join(sys, 'class', 'hwmon', h), { recursive: true });
-    await Bun.write(join(sys, 'class', 'hwmon', h, 'name'), `${name}\n`);
-    await Bun.write(join(sys, 'class', 'hwmon', h, 'temp1_input'), `${t}\n`);
+    await writeFileDeep(join(sys, 'class', 'hwmon', h, 'name'), `${name}\n`);
+    await writeFileDeep(join(sys, 'class', 'hwmon', h, 'temp1_input'), `${t}\n`);
   }
   mkdirSync(join(sys, 'devices', 'system', 'node', 'node0'), { recursive: true });
 
   mkdirSync(proc, { recursive: true });
-  await Bun.write(
+  await writeFileDeep(
     join(proc, 'cpuinfo'),
     Array.from({ length: 12 }, (_, i) =>
       [
@@ -181,10 +182,10 @@ async function machine(extra: Record<string, Dev> = {}): Promise<{ sysRoot: stri
       ].join('\n'),
     ).join('\n\n'),
   );
-  await Bun.write(join(proc, 'meminfo'), 'MemTotal:       31968264 kB\nMemFree:        1000000 kB\n');
+  await writeFileDeep(join(proc, 'meminfo'), 'MemTotal:       31968264 kB\nMemFree:        1000000 kB\n');
 
   const ids = join(root, 'pci.ids');
-  await Bun.write(ids, PCI_IDS);
+  await writeFileDeep(ids, PCI_IDS);
   return { sysRoot: sys, procRoot: proc, ids };
 }
 
@@ -312,11 +313,11 @@ test('readPciTopology: a third-party switch or a Thunderbolt bridge is not a chi
     [join(dock, '0000:30:00.0'), '0x1022', '0x1234', '0x060400'],
     [join(dock, '0000:30:00.0', '0000:31:00.0'), '0x2646', '0x5022', '0x010802'],
   ] as const) {
-    await Bun.write(join(dir, 'vendor'), `${vendor}\n`);
-    await Bun.write(join(dir, 'device'), `${device}\n`);
-    await Bun.write(join(dir, 'class'), `${cls}\n`);
+    await writeFileDeep(join(dir, 'vendor'), `${vendor}\n`);
+    await writeFileDeep(join(dir, 'device'), `${device}\n`);
+    await writeFileDeep(join(dir, 'class'), `${cls}\n`);
   }
-  await Bun.write(join(dock, '0000:30:00.0', 'removable'), 'removable\n');
+  await writeFileDeep(join(dock, '0000:30:00.0', 'removable'), 'removable\n');
   const byId = join(sysRoot, 'bus', 'pci', 'devices');
   symlinkSync(dock, join(byId, '0000:00:08.3'));
   symlinkSync(join(dock, '0000:30:00.0'), join(byId, '0000:30:00.0'));
@@ -345,7 +346,7 @@ test('cpuLabel', () => {
 
 test('readPciTopology: a sleeping card reporting width 63 (config read 0xFFFF) gives an unknown width', async () => {
   const { sysRoot, procRoot, ids } = await machine();
-  await Bun.write(join(sysRoot, 'bus', 'pci', 'devices', '0000:01:00.0', 'current_link_width'), '63\n');
+  await writeFileDeep(join(sysRoot, 'bus', 'pci', 'devices', '0000:01:00.0', 'current_link_width'), '63\n');
   const g = await readPciTopology({ sysRoot, procRoot, pciIds: [ids] });
   expect(g.links.find((l) => l.to === 'pci:0000:01:00.0')).toMatchObject({ widthMax: 8, widthCur: null });
 });

@@ -2,6 +2,7 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { CpuInfo } from '@llama-webui/shared';
+import { readText } from '../proc';
 
 export type { CpuInfo };
 
@@ -30,7 +31,7 @@ export function parseCpuinfo(text: string): Omit<CpuInfo, 'numaNodes'> {
 export async function readCpuInfo(procRoot = '/proc', sysRoot = '/sys'): Promise<CpuInfo> {
   let text = '';
   try {
-    text = await Bun.file(join(procRoot, 'cpuinfo')).text();
+    text = await readText(join(procRoot, 'cpuinfo'));
   } catch {}
   let numaNodes = 1;
   try {

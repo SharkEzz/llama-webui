@@ -1,12 +1,14 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { BenchPhase, Measure } from '@llama-webui/shared';
 import { ERROR_LINE } from 'llamacpp-js/bench';
 import { probeHealth } from 'llamacpp-js/client';
 import { LineSplitter } from '../logs/lines';
+import { type Spawned, spawnProc } from '../proc';
 import type { BuiltCommand } from '../supervisor/args';
 import { benchFailure } from './parse';
 import { promptOf } from './prompt';
 
-type Child = ReturnType<typeof Bun.spawn>;
+type Child = Spawned;
 
 export interface ServerTrialOptions {
   cmd: BuiltCommand;
@@ -91,7 +93,7 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
       if (errors.length > 10) errors.shift();
     }
   };
-  const proc = Bun.spawn(cmd.argv, { cwd: cmd.cwd, env: cmd.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  const proc = spawnProc(cmd.argv, { cwd: cmd.cwd, env: cmd.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
   // Stopped when the trial exits, no matter what: SIGTERM, then SIGKILL after killTimeoutMs.
   await using _server = { [Symbol.asyncDispose]: () => stop(proc, killTimeoutMs, o.onLine) };
   o.onSpawn(proc);
@@ -104,7 +106,7 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
     exited = true;
   });
   const exitError = async () => {
-    await Promise.race([piped, Bun.sleep(200)]);
+    await Promise.race([piped, sleep(200)]);
     const exit = proc.exitCode ?? proc.signalCode ?? '-';
     return new Error(benchFailure([...errors, ...tail], exit, 'llama-server').message);
   };
@@ -139,7 +141,7 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
       if (exited) throw await exitError();
       if (now() > deadline) throw new Error(`loading > ${duration(loadTimeoutMs)}`);
       if ((await probeHealth(cmd.port, fetchImpl)) === 200) break;
-      await Bun.sleep(healthPollMs);
+      await sleep(healthPollMs);
     }
     o.onPhase('warmup');
     await post('/completion', { prompt: WARMUP_PROMPT, n_predict: 16 });
@@ -176,7 +178,7 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
     if (e instanceof TrialCancelled || o.signal.aborted) throw new TrialCancelled();
     // A server that dies during a request (CUDA out of memory) closes the socket before its output is seen:
     // give it a moment, to show its own error line rather than the closed connection.
-    if (!exited) await Promise.race([proc.exited, Bun.sleep(EXIT_GRACE_MS)]);
+    if (!exited) await Promise.race([proc.exited, sleep(EXIT_GRACE_MS)]);
     if (exited || proc.exitCode !== null || proc.signalCode !== null) throw await exitError();
     throw e;
   }
@@ -196,7 +198,7 @@ async function stop(proc: Child, killTimeoutMs: number, onLine: (l: string) => v
     try {
       proc.kill('SIGTERM');
     } catch {}
-    const done = await Promise.race([proc.exited.then(() => true), Bun.sleep(killTimeoutMs).then(() => false)]);
+    const done = await Promise.race([proc.exited.then(() => true), sleep(killTimeoutMs).then(() => false)]);
     if (!done) {
       onLine(`not stopped after ${killTimeoutMs} ms, SIGKILL`);
       try {

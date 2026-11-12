@@ -1,4 +1,4 @@
-// Directories and append-mode writes: node:fs (Bun.file().writer() always truncates).
+import { createHash, type Hash } from 'node:crypto';
 import { mkdir, open, rename, rm, rmdir, statfs } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import {
@@ -10,6 +10,7 @@ import {
 } from '@llama-webui/shared';
 import type { DownloadInput, DownloadsRepo } from '../db/downloads';
 import { HttpError, notFound } from '../http';
+import { fileRange } from '../proc';
 import { fmtBytes, GiB } from '../tuning/memory';
 import { type HfClient, hfHttpError } from './client';
 import { fileDest, partPath, sizeOf } from './paths';
@@ -53,7 +54,7 @@ class RangeRejected extends Retryable {}
 /** sha256 of the first `bytes` of a file's `.part`: kept across the attempts of an item, so a retry does not re-read it. */
 interface HashState {
   path: string;
-  hasher: InstanceType<typeof Bun.CryptoHasher>;
+  hasher: Hash;
   bytes: number;
 }
 
@@ -458,10 +459,10 @@ export class DownloadQueue {
     const kept = cur.hash;
     if (kept && kept.path === path && kept.bytes === offset) return kept;
     cur.hash = null;
-    const hash: HashState = { path, hasher: new Bun.CryptoHasher('sha256'), bytes: 0 };
+    const hash: HashState = { path, hasher: createHash('sha256'), bytes: 0 };
     if (offset > 0) {
       this.setLive(cur, { phase: 'verifying', bps: 0, retryAt: null });
-      for await (const chunk of Bun.file(part).slice(0, offset).stream()) {
+      for await (const chunk of fileRange(part, 0, offset)) {
         if (cur.ac.signal.aborted) throw cur.ac.signal.reason;
         hash.hasher.update(chunk);
         hash.bytes += chunk.byteLength;
@@ -510,7 +511,7 @@ export class DownloadQueue {
         // The server ignored the Range header: start over.
         start = 0;
         if (hash) {
-          hash.hasher = new Bun.CryptoHasher('sha256');
+          hash.hasher = createHash('sha256');
           hash.bytes = 0;
         }
       }

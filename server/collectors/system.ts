@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { MemInfo, SystemSample } from '@llama-webui/shared';
 
@@ -60,7 +60,7 @@ const CPU_SENSORS = ['k10temp', 'coretemp'];
 
 const readText = async (p: string): Promise<string | null> => {
   try {
-    return await Bun.file(p).text();
+    return await readFile(p, 'utf8');
   } catch {
     return null;
   }

@@ -1,4 +1,5 @@
 import type { MemBandwidth } from '@llama-webui/shared';
+import { type Spawn, spawnProc } from '../proc';
 
 /*
  * DRAM bandwidth through `perf stat`, without root when perf_event_paranoid ≤ 0 (or CAP_PERFMON on perf):
@@ -45,7 +46,7 @@ export function parsePerfLine(line: string): PerfLine | null {
 interface StreamOptions {
   bin: string;
   args: string[];
-  spawn: typeof Bun.spawn;
+  spawn: Spawn;
   now: () => number;
 }
 
@@ -136,14 +137,14 @@ class PerfStream {
 export interface MemBandwidthOptions {
   bin?: string;
   intervalMs?: number;
-  spawn?: typeof Bun.spawn;
+  spawn?: Spawn;
   now?: () => number;
 }
 
 export class MemBandwidthSampler implements Disposable {
   private readonly bin: string;
   private intervalMs: number;
-  private readonly spawn: typeof Bun.spawn;
+  private readonly spawn: Spawn;
   private readonly now: () => number;
   private system: PerfStream | null = null;
   private proc: PerfStream | null = null;
@@ -152,7 +153,7 @@ export class MemBandwidthSampler implements Disposable {
   constructor(o: MemBandwidthOptions = {}) {
     this.bin = o.bin ?? 'perf';
     this.intervalMs = o.intervalMs ?? 1000;
-    this.spawn = o.spawn ?? Bun.spawn;
+    this.spawn = o.spawn ?? spawnProc;
     this.now = o.now ?? Date.now;
   }
 

@@ -3,10 +3,11 @@
  * - `bun run release 0.2.0`: sets `version` in every package.json (commit it through a PR, then tag `v0.2.0` on master);
  * - `bun scripts/release.ts --check v0.2.0`: fails unless every package.json has that version (release workflow).
  */
+import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-const ROOT = resolve(import.meta.dir, '..');
+const ROOT = resolve(import.meta.dirname, '..');
 
 /** Every package.json carrying the version, relative to the root. */
 export const PACKAGE_FILES = [
@@ -43,7 +44,7 @@ export function withVersion(text: string, version: string): string {
 export async function readVersions(root = ROOT): Promise<Record<string, string | null>> {
   const versions: Record<string, string | null> = {};
   for (const file of PACKAGE_FILES) {
-    const pkg = (await Bun.file(`${root}/${file}`).json()) as { version?: unknown };
+    const pkg = JSON.parse(await readFile(`${root}/${file}`, 'utf8')) as { version?: unknown };
     versions[file] = typeof pkg.version === 'string' ? pkg.version : null;
   }
   return versions;
@@ -51,7 +52,7 @@ export async function readVersions(root = ROOT): Promise<Record<string, string |
 
 if (import.meta.main) {
   const { values, positionals } = parseArgs({
-    args: Bun.argv.slice(2),
+    args: process.argv.slice(2),
     options: { check: { type: 'string' } },
     strict: true,
     allowPositionals: true,
@@ -79,7 +80,7 @@ if (import.meta.main) {
     }
     for (const file of PACKAGE_FILES) {
       const path = `${ROOT}/${file}`;
-      await Bun.write(path, withVersion(await Bun.file(path).text(), version));
+      await writeFile(path, withVersion(await readFile(path, 'utf8'), version));
     }
     console.log(`release: ${PACKAGE_FILES.join(', ')} set to ${version}`);
     console.log(

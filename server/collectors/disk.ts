@@ -1,6 +1,7 @@
 import { readdir, realpath, stat } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import type { DiskSample } from '@llama-webui/shared';
+import { readText } from '../proc';
 
 export type { DiskSample };
 
@@ -87,7 +88,7 @@ export class DiskSampler {
   async sample(modelDisk: string | null): Promise<DiskSample | null> {
     let text: string;
     try {
-      text = await Bun.file(join(this.procRoot, 'diskstats')).text();
+      text = await readText(join(this.procRoot, 'diskstats'));
     } catch {
       return null;
     }

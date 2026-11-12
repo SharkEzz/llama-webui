@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { BenchRun, Estimate, ModelEntry, Profile } from '@llama-webui/shared';
 import { buildLaunchpad, buildSetupReport, readPerfParanoid, type SetupDeps } from './setup';
 import { tempDir } from './testing/tempDir';
+import { writeFileDeep } from './testing/write';
 import { fakeModel } from './tuning/fixtures';
 
 const entry = (path: string, kind: 'model' | 'mmproj', fileBytes: number): ModelEntry =>
@@ -37,7 +38,7 @@ test('setup: binary not found and models folder missing → not ready', async ()
 test('setup: an executable binary and an empty folder → ready, 0 models', async () => {
   using dir = tempDir('lw-setup-');
   const bin = join(dir.path, 'llama-server');
-  await Bun.write(bin, '#!/bin/sh\n');
+  await writeFileDeep(bin, '#!/bin/sh\n');
   chmodSync(bin, 0o755);
   mkdirSync(join(dir.path, 'models'));
   const r = await buildSetupReport(deps({ root: dir.path, resolveBinary: async () => bin }));
@@ -49,7 +50,7 @@ test('setup: an executable binary and an empty folder → ready, 0 models', asyn
 test('setup: a non-executable file or a directory is not a binary', async () => {
   using dir = tempDir('lw-setup-');
   const file = join(dir.path, 'llama-server');
-  await Bun.write(file, 'x');
+  await writeFileDeep(file, 'x');
   chmodSync(file, 0o644);
   expect((await buildSetupReport(deps({ root: dir.path, resolveBinary: async () => file }))).binary.path).toBeNull();
   expect(
@@ -77,7 +78,7 @@ test('setup: counts readable models only (projectors and unreadable files left o
 test('readPerfParanoid: parsed value, null when unreadable', async () => {
   using dir = tempDir('lw-setup-');
   const p = join(dir.path, 'paranoid');
-  await Bun.write(p, '-1\n');
+  await writeFileDeep(p, '-1\n');
   expect(await readPerfParanoid(p)).toBe(-1);
   expect(await readPerfParanoid(join(dir.path, 'missing'))).toBeNull();
 });

@@ -7,7 +7,7 @@ const MAX_MISSED_PINGS = 2;
 /** WS client registry: broadcast and heartbeat (ping every 15 s, close after 2 pings without a pong). */
 export class WsHub {
   private readonly clients = new Map<ServerWebSocket<unknown>, { missed: number }>();
-  private readonly timer: Timer;
+  private readonly timer: ReturnType<typeof setInterval>;
 
   constructor(
     private readonly bootId: string,

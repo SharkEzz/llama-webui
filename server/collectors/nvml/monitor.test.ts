@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { GpuReading } from '../gpu';
 import { NVML_WORKER, NvmlMonitor, type WorkerLike, workerUrl } from './monitor';
 
@@ -57,8 +59,8 @@ test('lowering the interval keeps the last sample fresh until the worker samples
 test('workerUrl: next to the module from source, under the entrypoint root in the compiled executable', async () => {
   const fromSource = workerUrl(false);
   expect(fromSource).toBe(new URL('./worker.ts', import.meta.url).href);
-  expect(await Bun.file(Bun.fileURLToPath(fromSource)).exists()).toBe(true);
+  expect(existsSync(fileURLToPath(fromSource))).toBe(true);
   // The compile entrypoints' root is server/: the worker is embedded at server/<NVML_WORKER>.
-  expect(await Bun.file(`${import.meta.dir}/../../${NVML_WORKER}`).exists()).toBe(true);
-  expect(workerUrl(true)).toBe(new URL(`./${NVML_WORKER}`, Bun.pathToFileURL(Bun.main)).href);
+  expect(existsSync(`${import.meta.dirname}/../../${NVML_WORKER}`)).toBe(true);
+  expect(workerUrl(true)).toBe(new URL(`./${NVML_WORKER}`, pathToFileURL(Bun.main)).href);
 });

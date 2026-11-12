@@ -1,3 +1,4 @@
+import { isStandalone } from '../../standalone';
 import type { GpuReading } from '../gpu';
 import type { GpuNeeds } from '../needs';
 import type { NvmlProc, NvmlSnapshot, NvmlSystem } from './read';
@@ -19,7 +20,7 @@ export const NVML_WORKER = 'collectors/nvml/worker.ts';
  * From source, the worker sits next to this module. In the compiled executable, this module is bundled into the
  * entrypoint (`Bun.main`) and the worker is embedded under its path relative to `server/`, the entrypoints' root.
  */
-export const workerUrl = (standalone = Bun.isStandaloneExecutable): string =>
+export const workerUrl = (standalone = isStandalone): string =>
   standalone
     ? new URL(`./${NVML_WORKER}`, Bun.pathToFileURL(Bun.main)).href
     : new URL('./worker.ts', import.meta.url).href;

@@ -169,8 +169,8 @@ is marked done.
   </Step>
 </Steps>
 
-When every file is done, the item becomes `done`. The `.part` is opened with `node:fs` in append mode: the code notes
-that `Bun.file().writer()` always truncates.
+When every file is done, the item becomes `done`. The `.part` is opened with `node:fs` in append mode, and the
+checksum is a `node:crypto` sha256 hash.
 
 ### Range resume
 

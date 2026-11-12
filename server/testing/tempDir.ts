@@ -1,4 +1,3 @@
-// Directories: node:fs, as Bun recommends (Bun.file and Bun.write only handle files).
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

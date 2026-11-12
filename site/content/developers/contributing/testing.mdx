@@ -70,6 +70,9 @@ test('settings: defaults, then a persisted patch', () => {
 - **Temporary directories** come from `tempDir(prefix)` (`server/testing/tempDir.ts`). With `using`, the directory is
   deleted when the test ends, even when it fails. At module level, where `using` would release it before the tests run,
   call `afterAll(() => dir[Symbol.dispose]())`.
+- **Files** are written with `writeFileDeep(path, data)` (`server/testing/write.ts`), which creates the parent
+  directories (fake `/proc` and `/sys` trees), and read with `node:fs/promises`; pauses are `setTimeout` from
+  `node:timers/promises`.
 - **Databases**: `openDb(':memory:')` gives a fresh database with every migration applied; `openDb()` on a path in a
   temporary directory tests a real file.
 - **Dependencies are injected.** Server classes and builders take their collaborators as arguments, so a test passes
@@ -147,16 +150,17 @@ tested against them rather than against hand-written strings. Biome does not che
 Tests read these files relative to their own location:
 
 ```ts title="server/collectors/nvidia.test.ts"
-const fx = (n: string) => Bun.file(`${import.meta.dir}/../../testdata/${n}`).text();
+const fx = (n: string) => readFile(`${import.meta.dirname}/../../testdata/${n}`, 'utf8');
 ```
 
-The tests of `llamacpp-js` call `fixture(path)` from `packages/llamacpp-js/tests/helpers.ts` instead, which reads with
-`node:fs/promises` so that it works under Node too.
+The tests of `llamacpp-js` call `fixture(path)` from `packages/llamacpp-js/tests/helpers.ts`, which does the same
+relative to `testdata/`.
 
 ## Fake binaries
 
 `testdata/fake/` holds two stand-ins for the llama.cpp binaries. Each is a shell script that runs its TypeScript
-counterpart with `bun` from the `PATH` (or `$BUN_PATH`), so a test can use it wherever the app expects a binary path.
+counterpart with `node` from the `PATH` (a plain Node script: erasable TypeScript, `node:*` APIs only), so a test can
+use it wherever the app expects a binary path.
 
 ### Fake llama-server
 
@@ -210,7 +214,7 @@ spawned fakes; a run can also get them from the profile's environment
 (`profile: () => ({ env: { FAKE_BENCH_OOM: '1' } })`).
 
 ```ts title="server/bench/runner.test.ts"
-const FAKE = resolve(import.meta.dir, '../../testdata/fake/fake-llama-server');
+const FAKE = resolve(import.meta.dirname, '../../testdata/fake/fake-llama-server');
 // …
 const executor = new RunExecutor({
   settings: () => ({ ...DEFAULT_SETTINGS, binary: FAKE, port }),
@@ -244,7 +248,7 @@ One test is skipped unless a local file exists:
 
 ```ts title="server/db/sweeps.test.ts"
 const J5_DB = '/tmp/lw-j5/llama-webui.sqlite';
-test.skipIf(!(await Bun.file(J5_DB).exists()))('the migration keeps every J5 run', async () => {
+test.skipIf(!existsSync(J5_DB))('the migration keeps every J5 run', async () => {
 ```
 
 It needs a database from an early version of the app, before migrations 10 to 14 rebuilt the `bench_runs` table. The

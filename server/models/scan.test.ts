@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { ModelCacheRepo } from '../db/modelCache';
 import { openDb } from '../db/open';
 import { tempDir } from '../testing/tempDir';
+import { writeFileDeep } from '../testing/write';
 import { readModel } from './gguf';
 import { type KvValue, writeGguf } from './gguf.fixture';
 import { groupGgufFiles, scanModels } from './scan';
@@ -39,8 +40,8 @@ test('scanModels skips hidden dirs, classifies mmproj, reports unreadable files 
   );
   mkdirSync(join(dir, '.cache'));
   await writeGguf(join(dir, '.cache', 'x.gguf'), { 'general.architecture': str('llama') }, tensors);
-  await Bun.write(join(dir, 'bad.gguf'), 'not a gguf');
-  await Bun.write(join(dir, 'notes.txt'), 'rien');
+  await writeFileDeep(join(dir, 'bad.gguf'), 'not a gguf');
+  await writeFileDeep(join(dir, 'notes.txt'), 'rien');
 
   const cache = new ModelCacheRepo(openDb(':memory:'));
   let reads = 0;
