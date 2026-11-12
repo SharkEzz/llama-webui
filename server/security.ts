@@ -39,7 +39,11 @@ export function guard(req: Request): Response | undefined {
   if (MUTATING.has(req.method)) {
     const type = req.headers.get('content-type');
     const json = type !== null && /^application\/json\b/i.test(type);
-    if ((type !== null && !json) || (req.body !== null && !json)) {
+    // From the headers, not `req.body`: Node's adapter (`@hono/node-server`) gives every write a body stream, even
+    // a body-less one. Over HTTP/1.1 a body comes with a content-length or a transfer-encoding.
+    const length = req.headers.get('content-length');
+    const body = (length !== null && Number(length) > 0) || req.headers.has('transfer-encoding');
+    if ((type !== null && !json) || (body && !json)) {
       return forbidden('JSON body expected (content-type: application/json)', 415);
     }
   }
