@@ -150,6 +150,7 @@ processes, timers, hashes and SQLite go through `node:*`. The few packages it ad
 | HTTP routes                   | Hono, through `@hono/node-server`     | `server/api.ts`, `server/routes/*.ts`                      |
 | WebSocket                     | `upgradeWebSocket` on `ws`            | `server/host.ts`, `server/ws/attach.ts`                    |
 | Long requests to llama-server | `llamaFetch` (`node:http`)            | `server/llamaFetch.ts`: chat stream, benchmark requests    |
+| Model downloads               | `downloadFetch` (`node:https`)        | `server/llamaFetch.ts`: Hugging Face downloads (HTTP/1.1)  |
 | SQLite                        | `Database` (`node:sqlite`)            | `server/db/sqlite.ts`: every repository                    |
 | Reading files                 | `readText`, `fileExists`, `fileRange` | `server/proc.ts` (`node:fs`): collectors, hardware readers |
 | Child processes               | `spawnProc`, `which`                  | `server/proc.ts` (`node:child_process`): supervisor, bench |

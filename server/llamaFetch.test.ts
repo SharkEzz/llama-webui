@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse, s
 import { setTimeout as sleep } from 'node:timers/promises';
 import { streamChatCompletion } from 'llamacpp-js/client';
 import { afterEach, expect, test, vi } from 'vitest';
-import { llamaFetch } from './llamaFetch';
+import { downloadFetch, llamaFetch } from './llamaFetch';
 import { listen } from './testing/listen';
 
 const open: Server[] = [];
@@ -161,4 +161,59 @@ test('llamaFetch: streamChatCompletion streams through it and stops the request 
   }
   expect(seen).toEqual(['stream=true', 'b']);
   await vi.waitFor(() => expect(closed).toBe(true));
+});
+
+test('downloadFetch: a redirect is the response, with its location, not followed', async () => {
+  let followed = 0;
+  const base = await serve((req, res) => {
+    if (req.url === '/cdn') followed++;
+    res.writeHead(302, { location: '/cdn' }).end();
+  });
+  const res = await downloadFetch(`${base}/resolve`, { redirect: 'manual' });
+  expect([res.status, res.headers.get('location')]).toEqual([302, '/cdn']);
+  await res.body?.cancel();
+  expect(followed).toBe(0);
+});
+
+test('downloadFetch: sends the headers, streams the body, and an abort during it breaks the stream', async () => {
+  let range: string | undefined;
+  const base = await serve((req, res) => {
+    range = req.headers.range;
+    res.writeHead(206, { 'content-range': 'bytes 3-9/10' }).write('one');
+  });
+  const ac = new AbortController();
+  const res = await downloadFetch(base, { headers: { range: 'bytes=3-' }, signal: ac.signal });
+  expect([range, res.status, res.headers.get('content-range')]).toEqual(['bytes=3-', 206, 'bytes 3-9/10']);
+  const reader = res.body!.getReader();
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe('one');
+  ac.abort(new Error('stalled'));
+  await expect(reader.read()).rejects.toThrow('stalled');
+});
+
+test('downloadFetch: an https URL goes through node:https (TLS against a plain HTTP server fails like fetch)', async () => {
+  const base = await serve((_req, res) => {
+    res.end('plain');
+  });
+  const err = await downloadFetch(base.replace('http:', 'https:')).catch((e: unknown) => e as Error);
+  expect(err).toBeInstanceOf(TypeError);
+  expect((err as Error).message).toBe('fetch failed');
+});
+
+test('downloadFetch: goes through the proxy of the environment, like fetch', async () => {
+  let proxied = 0;
+  const proxy = await serve((_req, res) => {
+    proxied++;
+    res.end('proxy');
+  });
+  const base = await serve((_req, res) => {
+    res.end('direct');
+  });
+  const restore = setGlobalProxyFromEnv({ http_proxy: proxy });
+  try {
+    expect(await (await downloadFetch(base)).text()).toBe('proxy');
+  } finally {
+    restore();
+  }
+  expect(proxied).toBe(1);
+  expect(await (await downloadFetch(base)).text()).toBe('direct');
 });
