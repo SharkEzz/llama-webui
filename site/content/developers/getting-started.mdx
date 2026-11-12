@@ -146,7 +146,8 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
 <FileTree>
 - `server/` the Bun process (workspace `@llama-webui/server`)
   - `index.ts` entry point: opens the database, builds the services, wires their events to the WebSocket
-  - `app.ts` `Bun.serve`: routes, `/ws`, health and settings
+  - `deps.ts` `createDeps()`: constructs the services and wires them together, without starting any work
+  - `app.ts` `appRoutes()` (every route, `/ws`, health) and `createApp()` (`Bun.serve`)
   - `runtime.ts` state that survives `bun --hot` (supervisor, log ring, monitor, bench gate)
   - `cli.ts` launch options and `--help`
   - `paths.ts` data directory and database path
@@ -170,6 +171,7 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
   - `logs/` the log ring buffer and line splitter
   - `ws/` the WebSocket hub
   - `testing/` test helpers (`tempDir`, `writeFileDeep`)
+  - `contract/` the HTTP contract suite: raw HTTP client, cases, golden record
 - `web/` the React app (workspace `@llama-webui/web`)
   - `index.html` HTML entry, applies the theme before the first paint
   - `src/`

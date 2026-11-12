@@ -21,19 +21,20 @@ on every reload, so it is written to run more than once. In order, it:
    `llama-webui.sqlite` with `node:sqlite`, sets `journal_mode = WAL` and `foreign_keys = ON`, and runs the migrations.
 4. Gets the runtime with `getRuntime()` (`server/runtime.ts`): the supervisor, the log ring, the boot id and the bench
    gate, created on the first call and kept on `globalThis` afterwards.
-5. Creates the `WsHub` with the runtime's `bootId`, and the settings, profiles and conversations repositories. Chat
-   replies left `streaming` by a killed process are marked `stopped` (`conversations.stopOrphans()`).
-6. Creates `ChatRuns`. Its `target()` sends generations to the managed server when it is `ready`, or to an external
-   server.
-7. Prepares the web routes: the HTML import in development and in the standalone executable, `Bun.build` in
+5. Prepares the web routes: the HTML import in development and in the standalone executable, `Bun.build` in
    production from source (see [Serving the UI](#serving-the-ui)).
-8. Starts the monitor with `startMonitor()`, once per process: later calls return the running one.
-9. Creates the bench repositories, the `RunExecutor` and the `BenchRunner`, and calls `benchRunner.resume()`. On a cold
-   start (bench gate not held), runs and sweeps left `running` are first marked `interrupted`.
-10. Creates the Hugging Face client and the `DownloadQueue`, and calls `downloads.resume()` to pick up the items left
-    queued or downloading.
-11. Creates the `PlacementTracker`, which replays the log ring to find the loaded model's placement.
-12. Calls `createApp()`, which starts `Bun.serve`.
+6. Starts the monitor with `startMonitor()`, once per process: later calls return the running one.
+7. Calls `createDeps()` (`server/deps.ts`), which only constructs and wires the services, without starting any work:
+   the `WsHub` with the runtime's `bootId`; the settings, profiles, conversations, bench run, sweep and download
+   repositories; `ChatRuns`, whose `target()` sends generations to the managed server when it is `ready`, or to an
+   external server; the `RunExecutor` and the `BenchRunner`; the Hugging Face client and the `DownloadQueue`; and the
+   `PlacementTracker`, which replays the log ring to find the loaded model's placement.
+8. Marks the chat replies left `streaming` by a killed process as `stopped` (`conversations.stopOrphans()`).
+9. Marks the runs and sweeps left `running` as `interrupted` on a cold start (bench gate not held), and calls
+   `benchRunner.resume()` in every case.
+10. Gives the monitor the profile → model path resolver it uses for the model's disk.
+11. Calls `downloads.resume()` to pick up the items left queued or downloading.
+12. Calls `createApp()`, which starts `Bun.serve` with `appRoutes()`: the API, `/ws` and the web routes.
 13. Subscribes the WebSocket hub to the services (table below), installs its shutdown handler, starts the external
     server watcher, and stores its own dispose function in `globalThis.__llamaWebuiDispose`.
 
@@ -279,7 +280,7 @@ After changing any of them, stop Bun with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run
 
 ### What a reload recreates
 
-Everything else in `server/index.ts` is created again: the database connection, the WebSocket hub, the repositories,
+Everything else `server/index.ts` and `createDeps()` build is created again: the database connection, the WebSocket hub, the repositories,
 `ChatRuns`, `RunExecutor`, `BenchRunner`, the Hugging Face client, the `DownloadQueue`, the `PlacementTracker` and the
 `Bun.serve` routes. Before that, the new evaluation calls the dispose function the previous one left on `globalThis`.
 It clears the external server timer, unsubscribes from the supervisor, the logs, the monitor and the placement,

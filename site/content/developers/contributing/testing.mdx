@@ -22,7 +22,7 @@ It runs three suites one after the other, and is the command CI runs:
 
 | Script                           | Command                                                    | Runs                                                        |
 | -------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
-| `test:unit`                      | `vitest run`                                               | Every `*.test.ts` of `server/`, `scripts/`, `packages/webui-shared/`, `web/` and `site/` but the two Bun-only files, on Node |
+| `test:unit`                      | `vitest run`                                               | Every `*.test.ts` of `server/`, `scripts/`, `packages/webui-shared/`, `web/` and `site/` but the three Bun-only files, on Node |
 | `test` of `llamacpp-js`          | `node --test 'tests/*.test.ts'`                            | The tests of `packages/llamacpp-js/`, on Node               |
 | `test:bun`                       | `bun test ./server ./scripts ./packages/webui-shared ./packages/llamacpp-js` | The server-side and `llamacpp-js` tests again, under Bun |
 
@@ -108,9 +108,10 @@ Until the app runs on Node, `pnpm test:bun` replays the tests of `server/`, `scr
 (Bun's `node:sqlite` refuses booleans, which `server/db/sqlite.ts` converts), and only this replay sees a difference
 that breaks the app under Bun.
 
-Two files need the Bun runtime and run only there, excluded from Vitest by `BUN_ONLY` in `vitest.config.ts`:
-`server/routes/routes.test.ts` (starts `Bun.serve`) and `server/routes/web.test.ts` (builds the front end with
-`Bun.build`). They import from `bun:test`.
+Three files need the Bun runtime and run only there, excluded from Vitest by `BUN_ONLY` in `vitest.config.ts`:
+`server/routes/routes.test.ts` (starts `Bun.serve`), `server/routes/web.test.ts` (builds the front end with
+`Bun.build`) and `server/contract/contract.test.ts` (the [HTTP contract suite](#http-contract-suite), which boots the
+app). They import from `bun:test`.
 
 A test that reads a Bun global on a code path the app takes only under Bun stubs it where it is missing, as the
 compiled-executable branch of `workerUrl` does in `server/collectors/nvml/monitor.test.ts`.
@@ -265,6 +266,70 @@ Two modules build inputs in code, for tests that need a model or a machine:
 - **`server/models/gguf.fixture.ts`**: `writeGguf(path, kv, tensors)` writes a real GGUF v3 file: header, typed key/value
   pairs (`u32`, `u64`, `f32`, `string`, `u32[]`), tensor infos aligned on 32 bytes, then zero bytes for each tensor. The
   GGUF reader and model scan tests parse these files instead of shipping models.
+
+## HTTP contract suite
+
+`server/contract/` records what the API answers, over real HTTP, so that a change of server framework or runtime has
+to give the same replies. `contract.test.ts` boots the real app (`createApp`, with the objects `createDeps()` builds
+for `server/index.ts`) on a free port, in a temporary data directory, with its own runtime, a monitor without
+collectors, a `fetch` that fails as offline for Hugging Face, and the fake `llama-server` as the `binary` setting.
+It sends every case, then compares each reply with `server/contract/golden.json`.
+
+<FileTree>
+- `server/contract/`
+  - `wire.ts`: raw HTTP/1.1 client on `node:net` (`request`, `readSse`): a request without body carries the headers
+    a browser sends, not the ones a `fetch` implementation adds
+  - `cases.ts`: the route table (`ROUTES`), the generated cases, `normalize()`, `runContract()` and `runStreams()`
+  - `contract.test.ts`: boots the app, runs the cases, compares with the golden
+  - `golden.json`: the recorded replies, one entry per case, in run order
+</FileTree>
+
+The cases, generated from `ROUTES`:
+
+- every method a path lacks, which must be a 405 with an `Allow` header, and `HEAD` on every path;
+- the reads (`GET`) of every route;
+- an `:id` that is not a number (`x`) and one no row has (`999999`);
+- for each route that reads a JSON body:
+  - malformed JSON;
+  - a JSON value that is not an object;
+  - no body, with and without `Content-Type: application/json`;
+  - a `text/plain` body (415);
+  - one body that breaks the route's schema;
+- a foreign `Origin`, a foreign `Host`, `/api/nope`, a deep SPA URL, `/ws` without an upgrade (426);
+- the calls the web sends without a body (`DELETE`, `POST` with `Content-Length: 0`) or with `{}`;
+- a WebSocket (`hello`, then `ping` → `pong`);
+- a chat reply streamed from the fake server (headers, the first event, and the name of the last one).
+
+The calls that change rows run last, on rows seeded for them.
+
+A reply is recorded with:
+- its status;
+- its `content-type`, `allow`, `cache-control` and `content-disposition` headers;
+- its body (JSON parsed, otherwise text).
+
+Values that change from one run to the next become placeholders: the temporary directory (`<tmp>`), the home
+directory (`<home>`), the repository (`<repo>`), ports (`<port>`), timestamps (`<time>`), and `bootId`, `version`,
+`uptimeMs`, `pid`. A route whose answer depends on the machine (`/api/system/info`, `/api/topology`,
+`/api/tuning/hardware`, `/api/tuning/checks`, `/api/setup`, `/api/launchpad`, `/api/bench/devices`, `/api/flags`)
+records the names of its top-level fields, not their values.
+
+A test also checks that `ROUTES` lists every `/api/` route the app registers. A new route fails it until it is added
+to the table, with a `body` entry (methods and one schema-breaking body) when it reads JSON.
+
+When a change of behaviour is intended, regenerate the golden and read its diff before committing it:
+
+```bash title="Terminal"
+UPDATE_GOLDEN=1 bun test ./server/contract/contract.test.ts
+git diff server/contract/golden.json
+```
+
+A failure lists the names of the cases whose reply changed, then the full diff. `golden.json` is written by the test
+and left out of Biome's formatter, so a regeneration changes only the entries that moved.
+
+<Callout type="note">
+The golden pins no Hugging Face success (the suite has no network) and no value of the machine-dependent routes: check
+those screens in the running app after a change of framework or runtime.
+</Callout>
 
 ## Skipped tests
 
