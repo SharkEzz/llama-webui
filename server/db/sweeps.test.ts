@@ -1,4 +1,3 @@
-import { Database } from 'bun:sqlite';
 import { expect, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { copyFile } from 'node:fs/promises';
@@ -8,6 +7,7 @@ import { tempDir } from '../testing/tempDir';
 import { BenchRunsRepo } from './benchRuns';
 import { MIGRATIONS } from './migrations';
 import { openDb } from './open';
+import { Database } from './sqlite';
 import { SweepsRepo } from './sweeps';
 
 const hw = { cpu: '', gpus: [], build: null };

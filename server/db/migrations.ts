@@ -1,4 +1,4 @@
-import type { Database } from 'bun:sqlite';
+import type { Database } from './sqlite';
 
 /**
  * A table rebuild (`CREATE … _v2`, copy, `DROP`, `RENAME`): its statements run in one transaction with the foreign

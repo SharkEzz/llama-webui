@@ -1,4 +1,3 @@
-import type { Database } from 'bun:sqlite';
 import type {
   BenchHardware,
   BenchKind,
@@ -8,6 +7,7 @@ import type {
   FitVerdict,
   Measure,
 } from '@llama-webui/shared';
+import type { Database } from './sqlite';
 
 interface Row {
   id: number;

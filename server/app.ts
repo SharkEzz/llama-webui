@@ -1,4 +1,3 @@
-import type { Database } from 'bun:sqlite';
 import type { BenchRunner } from './bench/runner';
 import type { ChatRuns } from './chat/runs';
 import type { BenchRunsRepo } from './db/benchRuns';
@@ -6,6 +5,7 @@ import type { ConversationsRepo } from './db/conversations';
 import type { DownloadsRepo } from './db/downloads';
 import type { ProfilesRepo } from './db/profiles';
 import type { SettingsRepo } from './db/settings';
+import type { Database } from './db/sqlite';
 import type { SweepsRepo } from './db/sweeps';
 import type { HfClient } from './hf/client';
 import type { DownloadQueue } from './hf/downloader';

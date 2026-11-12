@@ -1,5 +1,5 @@
-import type { Database } from 'bun:sqlite';
 import type { Sweep, SweepSpec, SweepStatus } from '@llama-webui/shared';
+import type { Database } from './sqlite';
 
 interface Row {
   id: number;

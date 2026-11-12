@@ -1,4 +1,3 @@
-import type { Database } from 'bun:sqlite';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { type ModelDeleted, ModelDeleteSchema, type ModelDetail, type ModelList } from '@llama-webui/shared';
@@ -8,6 +7,7 @@ import type { DownloadsRepo } from '../db/downloads';
 import { ModelCacheRepo } from '../db/modelCache';
 import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
+import type { Database } from '../db/sqlite';
 import type { SweepsRepo } from '../db/sweeps';
 import { guarded, HttpError, jsonObject, notFound } from '../http';
 import { deleteModelFiles, findEntry, type ModelUsers, modelUsage } from '../models/delete';

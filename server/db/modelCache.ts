@@ -1,5 +1,5 @@
-import type { Database } from 'bun:sqlite';
 import type { ModelSummary } from '@llama-webui/shared';
+import type { Database } from './sqlite';
 
 /** GGUF summaries already read; an entry holds as long as the stamp (mtime and size of each part) has not changed. */
 export class ModelCacheRepo {

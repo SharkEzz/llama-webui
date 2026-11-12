@@ -1,5 +1,5 @@
-import type { Database } from 'bun:sqlite';
 import { DEFAULT_SETTINGS, type Settings, SettingsSchema } from '@llama-webui/shared';
+import type { Database } from './sqlite';
 
 const KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
 
