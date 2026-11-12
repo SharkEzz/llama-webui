@@ -18,7 +18,7 @@ on every reload, so it is written to run more than once. In order, it:
 2. Calls `globalThis.__llamaWebuiDispose()` if a previous evaluation left one, to release that instance (see
    [What a reload recreates](#what-a-reload-recreates)).
 3. Opens the database with `openDb(dbPath(cli.dataDir))`: creates the data directory, opens
-   `llama-webui.sqlite` with `bun:sqlite`, sets `journal_mode = WAL` and `foreign_keys = ON`, and runs the migrations.
+   `llama-webui.sqlite` with `node:sqlite`, sets `journal_mode = WAL` and `foreign_keys = ON`, and runs the migrations.
 4. Gets the runtime with `getRuntime()` (`server/runtime.ts`): the supervisor, the log ring, the boot id and the bench
    gate, created on the first call and kept on `globalThis` afterwards.
 5. Creates the `WsHub` with the runtime's `bootId`, and the settings, profiles and conversations repositories. Chat

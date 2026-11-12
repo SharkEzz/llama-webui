@@ -24,7 +24,8 @@ importers change their import line only.
   `readonly` key is silently ignored). `enableForeignKeyConstraints` defaults to `true` (`bun:sqlite`: off).
   `bun:sqlite` closes twice without error; `DatabaseSync` throws on the second `close()`.
 - `bun:sqlite` throws when the number of bound values does not match the placeholders; `node:sqlite` binds missing ones
-  as `NULL`. Not reproduced (no parameter count is exposed); call sites pass typed tuples. Logged in the notes.
+  as `NULL` and exposes no parameter count. (Revised during execution, after a review note) The wrapper counts the `?`
+  outside strings, quoted names and comments and throws `bun:sqlite`'s message.
 - Biome clean, `bun run check` clean, gate below green at every commit.
 
 ## Review Focus

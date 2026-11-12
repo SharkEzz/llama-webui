@@ -24,8 +24,8 @@ website, a standalone package outside the workspaces.
 
 | Layer | Technology | Where |
 | --- | --- | --- |
-| Runtime | [Bun](https://bun.com) 1.4.4 or later: HTTP and WebSocket server (`Bun.serve`), bundler (`Bun.build`, HTML imports), test runner, `bun:sqlite`, `bun:ffi` | the whole repository |
-| Database | `bun:sqlite`, one file in the data directory, WAL journal | `server/db/` |
+| Runtime | [Bun](https://bun.com) 1.4.4 or later: HTTP and WebSocket server (`Bun.serve`), bundler (`Bun.build`, HTML imports), test runner, `bun:ffi` | the whole repository |
+| Database | `node:sqlite` behind a wrapper (`server/db/sqlite.ts`), one file in the data directory, WAL journal | `server/db/` |
 | Validation | [zod](https://zod.dev) 4: request bodies and settings are parsed on the server, TypeScript types are inferred for both sides | `packages/webui-shared/src/`, `server/` |
 | GGUF headers | `@huggingface/gguf` | `server/models/`, `server/hf/` |
 | UI | [React](https://react.dev) 19, [React Router](https://reactrouter.com) 8 (data router, lazy routes) | `web/` |
@@ -56,7 +56,7 @@ the repository where Vite is allowed.
 - [Benchmarks and sweeps](/developers/server/bench/): the bench gate, the runner and the sweep queue.
 - [Tuning](/developers/server/tuning/): the memory estimator, presets and system checks.
 - [Hugging Face downloads](/developers/server/hugging-face/): the download queue, resume and verification.
-- [Database](/developers/server/database/): `bun:sqlite`, migrations and repositories.
+- [Database](/developers/server/database/): `node:sqlite`, migrations and repositories.
 - [Security](/developers/server/security/): the request guard of the unauthenticated API.
 
 ### Web app and packages

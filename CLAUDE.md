@@ -21,12 +21,12 @@ Migration vers Node en cours (branche `node`, plan `docs/superpowers/plans/2026-
 ## APIs
 
 - `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
+- SQLite goes through `Database` from `server/db/sqlite.ts` (`node:sqlite`). Don't use `bun:sqlite` or `better-sqlite3`.
 - `Bun.redis` for Redis. Don't use `ioredis`.
 - `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
 - `WebSocket` is built-in. Don't use `ws`.
 
-**Dans ce projet (migration Node, depuis N2) :** fichiers, processus, pauses et hachages passent par `node:*`, jamais `Bun.file`/`Bun.write`/`Bun.spawn`/`Bun.sleep`/`Bun.which`/`Bun.CryptoHasher`/`Bun.$`/`Bun.argv`/`import.meta.dir`. Côté serveur, `server/proc.ts` : `spawnProc` (même forme que `Bun.spawn` : flux web, `exited`, lève une erreur tout de suite si le lancement échoue), `readText`, `fileExists` (faux pour un dossier), `fileRange`, `which` ; pauses `setTimeout` de `node:timers/promises`, sha256 `createHash` de `node:crypto`, `import.meta.dirname`. Les tests écrivent avec `writeFileDeep` (`server/testing/write.ts`, crée les dossiers parents comme `Bun.write`). `Bun.isStandaloneExecutable` se lit par `isStandalone` (`server/standalone.ts`) pour que les modules se chargent sous Node. Restent Bun jusqu'à N6/N8 : `Bun.serve`, `Bun.build` et l'import HTML, `bun:sqlite`, `bun:ffi`, `scripts/compile.ts`.
+**Dans ce projet (migration Node, depuis N2) :** fichiers, processus, pauses et hachages passent par `node:*`, jamais `Bun.file`/`Bun.write`/`Bun.spawn`/`Bun.sleep`/`Bun.which`/`Bun.CryptoHasher`/`Bun.$`/`Bun.argv`/`import.meta.dir`. Côté serveur, `server/proc.ts` : `spawnProc` (même forme que `Bun.spawn` : flux web, `exited`, lève une erreur tout de suite si le lancement échoue), `readText`, `fileExists` (faux pour un dossier), `fileRange`, `which` ; pauses `setTimeout` de `node:timers/promises`, sha256 `createHash` de `node:crypto`, `import.meta.dirname`. Les tests écrivent avec `writeFileDeep` (`server/testing/write.ts`, crée les dossiers parents comme `Bun.write`). `Bun.isStandaloneExecutable` se lit par `isStandalone` (`server/standalone.ts`) pour que les modules se chargent sous Node. SQLite (depuis N3) : `Database` de `server/db/sqlite.ts`, enveloppe de `DatabaseSync` (`node:sqlite`) qui garde la surface `bun:sqlite` (`query()` en cache, `get()` → `null`, `run(sql)` à plusieurs instructions, `transaction(fn)`, booléens et `undefined` liés en 1/0/NULL, nombre de valeurs vérifié, clés étrangères coupées par défaut : `openDb()` les active). Restent Bun jusqu'à N6/N8 : `Bun.serve`, `Bun.build` et l'import HTML, `bun:ffi`, `scripts/compile.ts`.
 
 ## Testing
 

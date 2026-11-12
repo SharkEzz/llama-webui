@@ -92,7 +92,7 @@ export function ArchitectureDiagram() {
         </div>
         <Boxes nodes={MODULES} className="grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-4" />
         <div className={cn(BOX, 'mt-2')}>
-          <p className="font-medium">SQLite (bun:sqlite)</p>
+          <p className="font-medium">SQLite (node:sqlite)</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Settings, profiles, conversations, benchmark runs, sweeps, downloads, model cache, in the data directory.
           </p>

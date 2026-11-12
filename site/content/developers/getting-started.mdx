@@ -166,7 +166,7 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
   - `hf/` Hugging Face client and download queue
   - `models/` models folder scan and GGUF header reading
   - `hardware/` PCIe topology and CPU info from sysfs and `/proc`
-  - `db/` `bun:sqlite`: connection, migrations, one repository per table
+  - `db/` `node:sqlite` wrapper, connection, migrations, one repository per table
   - `logs/` the log ring buffer and line splitter
   - `ws/` the WebSocket hub
   - `testing/` test helpers (`tempDir`, `writeFileDeep`)

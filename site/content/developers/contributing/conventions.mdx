@@ -141,14 +141,14 @@ The web app uses React 19. Three rules cover most effect-related lint reports:
 
 ## Bun first
 
-The app runs on Bun and uses built-in APIs rather than npm packages that do the same job. Files, processes, timers and
-hashes go through `node:*`, so that the code also runs on Node (the app is moving to Node); what only Bun provides
-still uses Bun:
+The app runs on Bun and uses built-in APIs rather than npm packages that do the same job. Files, processes, timers,
+hashes and SQLite go through `node:*`, so that the code also runs on Node (the app is moving to Node); what only Bun
+provides still uses Bun:
 
 | Need                          | Used                                  | Where                                                      |
 | ----------------------------- | ------------------------------------- | ---------------------------------------------------------- |
 | HTTP routes, WebSocket, UI    | `Bun.serve`                           | `server/app.ts`                                            |
-| SQLite                        | `bun:sqlite`                          | `server/db/`                                               |
+| SQLite                        | `Database` (`node:sqlite`)            | `server/db/sqlite.ts`: every repository                    |
 | Reading files                 | `readText`, `fileExists`, `fileRange` | `server/proc.ts` (`node:fs`): collectors, hardware readers |
 | Child processes               | `spawnProc`, `which`                  | `server/proc.ts` (`node:child_process`): supervisor, bench |
 | Production front end          | `Bun.build`                           | `server/routes/web.ts`                                     |
