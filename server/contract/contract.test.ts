@@ -24,7 +24,7 @@ import type { Monitor } from '../monitor/monitor';
 import type { Runtime } from '../runtime';
 import { Supervisor } from '../supervisor/supervisor';
 import { tempDir } from '../testing/tempDir';
-import { cases, type Outcome, ROUTES, runContract } from './cases';
+import { cases, type Outcome, ROUTES, runContract, runStreams } from './cases';
 
 const GOLDEN = join(import.meta.dirname, 'golden.json');
 const REPO = resolve(import.meta.dirname, '../..');
@@ -147,7 +147,7 @@ let app: Awaited<ReturnType<typeof boot>>;
 let outcomes: Record<string, Outcome> = {};
 beforeAll(async () => {
   app = await boot();
-  outcomes = await runContract(app.base, app.ctx);
+  outcomes = { ...(await runContract(app.base, app.ctx)), ...(await runStreams(app.base, app.ctx)) };
 });
 afterAll(() => app?.dispose());
 

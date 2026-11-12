@@ -912,7 +912,9 @@
     "headers": {
       "content-type": "application/json;charset=utf-8"
     },
-    "fields": ["flags"]
+    "fields": [
+      "flags"
+    ]
   },
   "POST /api/logs": {
     "status": 405,
@@ -1135,7 +1137,11 @@
     "headers": {
       "content-type": "application/json;charset=utf-8"
     },
-    "fields": ["cpu", "gpus", "nvidiaSource"]
+    "fields": [
+      "cpu",
+      "gpus",
+      "nvidiaSource"
+    ]
   },
   "POST /api/models": {
     "status": 405,
@@ -1188,7 +1194,9 @@
           "ok": true,
           "path": "<tmp>/models/m.gguf",
           "relPath": "m.gguf",
-          "files": ["<tmp>/models/m.gguf"],
+          "files": [
+            "<tmp>/models/m.gguf"
+          ],
           "fileBytes": 288,
           "kind": "model",
           "arch": "llama",
@@ -1263,7 +1271,9 @@
     },
     "body": {
       "path": "<tmp>/models/m.gguf",
-      "files": ["<tmp>/models/m.gguf"],
+      "files": [
+        "<tmp>/models/m.gguf"
+      ],
       "fileBytes": 288,
       "profiles": [
         {
@@ -1334,7 +1344,9 @@
     "body": {
       "path": "<tmp>/models/m.gguf",
       "relPath": "m.gguf",
-      "files": ["<tmp>/models/m.gguf"],
+      "files": [
+        "<tmp>/models/m.gguf"
+      ],
       "fileBytes": 288,
       "kind": "model",
       "arch": "llama",
@@ -2495,7 +2507,10 @@
             "preset": "chat",
             "base": {},
             "space": {
-              "ncmoe": [0, 8]
+              "ncmoe": [
+                0,
+                8
+              ]
             },
             "serverArgs": [],
             "includeUnfit": false
@@ -2529,7 +2544,10 @@
             "preset": "chat",
             "base": {},
             "space": {
-              "ncmoe": [0, 8]
+              "ncmoe": [
+                0,
+                8
+              ]
             },
             "serverArgs": [],
             "includeUnfit": false
@@ -2609,7 +2627,10 @@
           "preset": "chat",
           "base": {},
           "space": {
-            "ncmoe": [0, 8]
+            "ncmoe": [
+              0,
+              8
+            ]
           },
           "serverArgs": [],
           "includeUnfit": false
@@ -2823,7 +2844,13 @@
     "headers": {
       "content-type": "application/json;charset=utf-8"
     },
-    "fields": ["cpu", "devices", "devicesError", "ramAvailableBytes", "ramTotalBytes"]
+    "fields": [
+      "cpu",
+      "devices",
+      "devicesError",
+      "ramAvailableBytes",
+      "ramTotalBytes"
+    ]
   },
   "GET /api/tuning/estimate": {
     "status": 405,
@@ -2970,7 +2997,11 @@
     "headers": {
       "content-type": "application/json;charset=utf-8"
     },
-    "fields": ["at", "checks", "summary"]
+    "fields": [
+      "at",
+      "checks",
+      "summary"
+    ]
   },
   "GET /api/tuning/disk-speed": {
     "status": 405,
@@ -3070,7 +3101,10 @@
     "headers": {
       "content-type": "application/json;charset=utf-8"
     },
-    "fields": ["graph", "placement"]
+    "fields": [
+      "graph",
+      "placement"
+    ]
   },
   "POST /api/setup": {
     "status": 405,
@@ -3123,7 +3157,15 @@
     "headers": {
       "content-type": "application/json;charset=utf-8"
     },
-    "fields": ["bench", "binary", "listen", "llamaListen", "models", "ready", "telemetry"]
+    "fields": [
+      "bench",
+      "binary",
+      "listen",
+      "llamaListen",
+      "models",
+      "ready",
+      "telemetry"
+    ]
   },
   "POST /api/launchpad": {
     "status": 405,
@@ -3650,7 +3692,9 @@
           "code": "too_small",
           "minimum": 250,
           "inclusive": true,
-          "path": ["pollIntervalMs"],
+          "path": [
+            "pollIntervalMs"
+          ],
           "message": "Between 250 and 60000 ms"
         }
       ]
@@ -3722,13 +3766,17 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": ["name"],
+          "path": [
+            "name"
+          ],
           "message": "cannot be empty"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["model"],
+          "path": [
+            "model"
+          ],
           "message": "required"
         }
       ]
@@ -3866,13 +3914,17 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": ["name"],
+          "path": [
+            "name"
+          ],
           "message": "cannot be empty"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["model"],
+          "path": [
+            "model"
+          ],
           "message": "required"
         }
       ]
@@ -4044,7 +4096,9 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": ["path"],
+          "path": [
+            "path"
+          ],
           "message": "path required"
         }
       ]
@@ -4108,19 +4162,25 @@
           "code": "invalid_format",
           "format": "regex",
           "pattern": "/^\\w(?:[\\w.-]*\\w)?\\/\\w(?:[\\w.-]*\\w)?$/",
-          "path": ["repo"],
+          "path": [
+            "repo"
+          ],
           "message": "Repository id expected (org/name)"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["revision"],
+          "path": [
+            "revision"
+          ],
           "message": "Invalid input: expected string, received undefined"
         },
         {
           "expected": "array",
           "code": "invalid_type",
-          "path": ["keys"],
+          "path": [
+            "keys"
+          ],
           "message": "Invalid input: expected array, received undefined"
         }
       ]
@@ -4236,7 +4296,9 @@
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["title"],
+          "path": [
+            "title"
+          ],
           "message": "Invalid input: expected string, received number"
         }
       ]
@@ -4351,14 +4413,21 @@
       "issues": [
         {
           "code": "invalid_value",
-          "values": ["bench", "server"],
-          "path": ["kind"],
+          "values": [
+            "bench",
+            "server"
+          ],
+          "path": [
+            "kind"
+          ],
           "message": "“bench” or “server”"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["modelPath"],
+          "path": [
+            "modelPath"
+          ],
           "message": "required"
         }
       ]
@@ -4420,19 +4489,31 @@
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["name"],
+          "path": [
+            "name"
+          ],
           "message": "required"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["modelPath"],
+          "path": [
+            "modelPath"
+          ],
           "message": "required"
         },
         {
           "code": "invalid_value",
-          "values": ["chat", "agent", "context", "fit", "big"],
-          "path": ["preset"],
+          "values": [
+            "chat",
+            "agent",
+            "context",
+            "fit",
+            "big"
+          ],
+          "path": [
+            "preset"
+          ],
           "message": "unknown preset"
         }
       ]
@@ -4550,7 +4631,9 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": ["n"],
+          "path": [
+            "n"
+          ],
           "message": "Too small: expected number to be >=1"
         }
       ]
@@ -4612,13 +4695,23 @@
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["modelPath"],
+          "path": [
+            "modelPath"
+          ],
           "message": "Invalid input: expected string, received undefined"
         },
         {
           "code": "invalid_value",
-          "values": ["chat", "agent", "context", "fit", "big"],
-          "path": ["preset"],
+          "values": [
+            "chat",
+            "agent",
+            "context",
+            "fit",
+            "big"
+          ],
+          "path": [
+            "preset"
+          ],
           "message": "Invalid option: expected one of \"chat\"|\"agent\"|\"context\"|\"fit\"|\"big\""
         }
       ]
@@ -4680,19 +4773,31 @@
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["name"],
+          "path": [
+            "name"
+          ],
           "message": "required"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": ["modelPath"],
+          "path": [
+            "modelPath"
+          ],
           "message": "required"
         },
         {
           "code": "invalid_value",
-          "values": ["chat", "agent", "context", "fit", "big"],
-          "path": ["preset"],
+          "values": [
+            "chat",
+            "agent",
+            "context",
+            "fit",
+            "big"
+          ],
+          "path": [
+            "preset"
+          ],
           "message": "unknown preset"
         }
       ]
@@ -4756,7 +4861,9 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": ["modelPath"],
+          "path": [
+            "modelPath"
+          ],
           "message": "Too small: expected string to have >=1 characters"
         }
       ]
@@ -5057,5 +5164,114 @@
         "cwd": "<tmp>/models"
       }
     ]
+  },
+  "WS /ws (hello)": {
+    "status": 101,
+    "headers": {},
+    "body": {
+      "type": "hello",
+      "payload": {
+        "serverTime": "<time>",
+        "bootId": "<bootId>"
+      }
+    }
+  },
+  "WS /ws (ping → pong)": {
+    "status": 101,
+    "headers": {},
+    "body": {
+      "type": "pong"
+    }
+  },
+  "POST /api/server/start (fake server)": {
+    "status": 202,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "state": {
+        "kind": "starting",
+        "profile": "A",
+        "profileId": 1,
+        "pid": "<pid>",
+        "host": "127.0.0.1",
+        "port": "<port>",
+        "since": "<time>"
+      },
+      "command": "<repo>/testdata/fake/fake-llama-server -m <tmp>/models/m.gguf -lv 4 --host 127.0.0.1 --port <port> --metrics --slots --props",
+      "profileId": 1
+    }
+  },
+  "GET /api/server/state (fake server ready)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "state": {
+        "kind": "ready",
+        "profile": "A",
+        "profileId": 1,
+        "pid": "<pid>",
+        "host": "127.0.0.1",
+        "port": "<port>",
+        "since": "<time>"
+      },
+      "command": "<repo>/testdata/fake/fake-llama-server -m <tmp>/models/m.gguf -lv 4 --host 127.0.0.1 --port <port> --metrics --slots --props",
+      "profileId": 1
+    }
+  },
+  "POST /api/chat/1/messages (SSE)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream",
+      "cache-control": "no-cache"
+    },
+    "body": {
+      "first": {
+        "event": "start",
+        "data": {
+          "type": "start",
+          "user": {
+            "id": 1,
+            "conversationId": 1,
+            "role": "user",
+            "content": "Hello",
+            "reasoning": "",
+            "status": "done",
+            "error": null,
+            "stats": null,
+            "model": null,
+            "createdAt": "<time>"
+          },
+          "assistant": {
+            "id": 2,
+            "conversationId": 1,
+            "role": "assistant",
+            "content": "",
+            "reasoning": "",
+            "status": "streaming",
+            "error": null,
+            "stats": null,
+            "model": "<tmp>/models/m.gguf",
+            "createdAt": "<time>"
+          }
+        }
+      },
+      "last": "done"
+    }
+  },
+  "POST /api/server/stop (running)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "state": {
+        "kind": "idle"
+      },
+      "command": "<repo>/testdata/fake/fake-llama-server -m <tmp>/models/m.gguf -lv 4 --host 127.0.0.1 --port <port> --metrics --slots --props",
+      "profileId": 1
+    }
   }
 }

@@ -322,4 +322,94 @@ export async function runContract(
   return out;
 }
 
+/** One SSE event of a stream: its name and its data (JSON when it parses). */
+function sseEvent(block: string, ctx: NormalizeCtx): { event: string | null; data: unknown } {
+  const field = (name: string) =>
+    block
+      .split('\n')
+      .filter((l) => l.startsWith(`${name}: `))
+      .map((l) => l.slice(name.length + 2))
+      .join('\n');
+  const raw = field('data');
+  let data: unknown = raw;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    // kept as text
+  }
+  return { event: field('event') || null, data: normalize(data, ctx) };
+}
+
+function withTimeout<T>(p: Promise<T>, what: string, ms = 15_000): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`contract: ${what} timed out`)), ms)),
+  ]);
+}
+
+/** The WebSocket's first frame (hello) and its reply to a ping. */
+async function webSocketFrames(base: string): Promise<unknown[]> {
+  const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/ws`);
+  const frames: unknown[] = [];
+  try {
+    await withTimeout(
+      new Promise<void>((resolve, reject) => {
+        ws.onerror = () => reject(new Error('contract: WebSocket error'));
+        ws.onmessage = (e) => {
+          frames.push(JSON.parse(String(e.data)));
+          if (frames.length === 1) ws.send(JSON.stringify({ type: 'ping' }));
+          else resolve();
+        };
+      }),
+      'WebSocket hello/pong',
+    );
+  } finally {
+    ws.close();
+  }
+  return frames;
+}
+
+/**
+ * Cases that hold a connection: the WebSocket (hello, ping → pong) and the chat's SSE stream against the fake
+ * llama-server (profile 1). Run after `runContract`, so they change nothing it records.
+ */
+export async function runStreams(base: string, ctx: NormalizeCtx): Promise<Record<string, Outcome>> {
+  const out: Record<string, Outcome> = {};
+  const [hello, pong] = await webSocketFrames(base);
+  out['WS /ws (hello)'] = { status: 101, headers: {}, body: normalize(hello, ctx) };
+  out['WS /ws (ping → pong)'] = { status: 101, headers: {}, body: normalize(pong, ctx) };
+
+  out['POST /api/server/start (fake server)'] = record(
+    await request(base, json('POST', '/api/server/start', '{"profileId":1}')),
+    ctx,
+  );
+  const ready = await withTimeout(
+    (async () => {
+      for (;;) {
+        const res = await request(base, bare('GET', '/api/server/state'));
+        const kind = (JSON.parse(res.body) as { state: { kind: string } }).state.kind;
+        if (kind !== 'starting') return res;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    })(),
+    'fake llama-server start',
+  );
+  out['GET /api/server/state (fake server ready)'] = record(ready, ctx);
+
+  // The whole stream is read (up to `done`), the first event is recorded: deltas depend on timing.
+  const stream = await withTimeout(
+    readSse(base, json('POST', '/api/chat/1/messages', '{"content":"Hello"}'), (t) => t.includes('event: done')),
+    'chat SSE stream',
+  );
+  const blocks = stream.body.split('\n\n').filter((b) => b.trim() !== '');
+  const sse = record({ ...stream, body: '' }, ctx);
+  out['POST /api/chat/1/messages (SSE)'] = {
+    ...sse,
+    body: { first: sseEvent(blocks[0] ?? '', ctx), last: sseEvent(blocks.at(-1) ?? '', ctx).event },
+  };
+
+  out['POST /api/server/stop (running)'] = record(await request(base, bare('POST', '/api/server/stop')), ctx);
+  return out;
+}
+
 export { readSse };
