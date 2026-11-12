@@ -22,9 +22,9 @@ It runs three suites one after the other, and is the command CI runs:
 
 | Script                           | Command                                                    | Runs                                                        |
 | -------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
-| `test:unit`                      | `vitest run`                                               | Every `*.test.ts` of `server/`, `scripts/`, `packages/webui-shared/`, `web/` and `site/`, on Node |
+| `test:unit`                      | `vitest run`                                               | Every `*.test.ts` of `server/`, `scripts/`, `packages/webui-shared/`, `web/` and `site/` but the two Bun-only files, on Node |
 | `test` of `llamacpp-js`          | `node --test 'tests/*.test.ts'`                            | The tests of `packages/llamacpp-js/`, on Node               |
-| `test:bun`                       | `bun test ./server ./scripts ./packages/webui-shared`      | The server-side tests again, under Bun                      |
+| `test:bun`                       | `bun test ./server ./scripts ./packages/webui-shared ./packages/llamacpp-js` | The server-side and `llamacpp-js` tests again, under Bun |
 
 `vitest.config.ts` at the root defines one Vitest project per code base: `server` (with `scripts/`), `shared`, `web`
 (with the `@/` alias to `web/src/`) and `site` (with its own `@/` alias). Imports are explicit
@@ -103,8 +103,8 @@ test('settings: defaults, then a persisted patch', () => {
 
 ### Tests under Bun
 
-Until the app runs on Node, `pnpm test:bun` replays the tests of `server/`, `scripts/` and `packages/webui-shared/`
-under `bun test`: Bun's runner answers the `vitest` imports itself. The two runtimes do not behave the same everywhere
+Until the app runs on Node, `pnpm test:bun` replays the tests of `server/`, `scripts/`, `packages/webui-shared/` and
+`packages/llamacpp-js/` under `bun test`: Bun's runner answers the `vitest` imports itself and implements `node:test`. The two runtimes do not behave the same everywhere
 (Bun's `node:sqlite` refuses booleans, which `server/db/sqlite.ts` converts), and only this replay sees a difference
 that breaks the app under Bun.
 
@@ -146,6 +146,12 @@ describe('parseSlots', () => {
 - The bundling checks of `tests/package.test.ts` bundle an import of the package with Rolldown (a devDependency of
   `llamacpp-js`) for the browser: tree-shaking keeps only what one function needs, and the browser-safe modules pull no
   Node built-in. Without an install, as in the Node 24 job, they pass `{ skip }` and Node reports them as skipped.
+
+<Callout type="warning">
+Bun implements only part of `node:test`: tests, `describe`, hooks, `t.plan()` and `t.mock` work, but snapshots,
+`mock.module()`, `node:test/reporters` and code coverage do not, and `test.only()` does not filter. A test that uses
+them passes under Node and breaks `pnpm test:bun`: stick to what both runners support.
+</Callout>
 
 ## Captured outputs
 

@@ -27,6 +27,12 @@ changes in the plan.
   silently ignored. `node:sqlite` binds missing values as `NULL` where `bun:sqlite` threw: the wrapper counts the `?`
   placeholders and throws the same message. A read of every repository on a copy of the real database gave the same
   JSON through `bun:sqlite` and through the wrapper.
+- (N4) Tests run on Node (Vitest), but the app runs on Bun until N8 and the runtimes differ: `test:bun` replays the
+  server, scripts, shared and llamacpp-js tests under `bun test` (Bun's runner answers `vitest` imports and implements
+  `node:test`); removing the wrapper's boolean shim fails there and passes under Vitest. Bun's `vi` has no
+  `unstubAllGlobals`, so a test that must run on both stubs a global by hand. Bun-only (Bun.serve/Bun.build):
+  `server/routes/routes.test.ts`, `server/routes/web.test.ts`. `tsc -b` on the real tree: clean, no TS2742/TS4023.
+  N8: shrink `test:bun` to nothing (drop the script) once Bun no longer runs the app.
 
 ## Refactoring and optimisation backlog (for the R milestones, after the merge)
 
@@ -42,6 +48,9 @@ gain.
 | Route-level schemas make repo-level `parse` redundant                | `server/db/*`, `server/routes/*`                         | Double validation after N6                                                                                                                                             | planning |
 | `streamSSE` from `hono/streaming`                                    | `server/routes/chat.ts`                                  | Replace the hand-rolled `ReadableStream` SSE                                                                                                                           | planning |
 | Hono v5                                                              | whole server                                             | v5 was at rc during planning; pinned to 4.13.x for the port                                                                                                            | planning |
+| `rolldown` and the `vite` peer of `vitest` in the `catalog:`         | `packages/llamacpp-js/package.json`, root `package.json` | `rolldown` pinned at Vite's version by hand; a Vite bump could install a second Rolldown silently                                                                      | N4       |
+| Type check `vitest.config.ts`                                        | root `tsconfig.json`                                     | Root config files are in no project: a mistyped key (`oxc.taget`) passes `pnpm check` and is ignored                                                                   | N4       |
+| Rolldown skip only on a missing package                              | `packages/llamacpp-js/tests/package.test.ts`             | `import('rolldown').catch(() => null)` also skips when the native binding fails to load                                                                                | N4       |
 | Erasable syntax + `.ts` import extensions repo-wide                  | server, shared, web                                      | One rule set with `llamacpp-js`; lets Node run sources natively (25 files with parameter properties, ~620 extensionless imports)                                       | planning |
 | Silence `INEFFECTIVE_DYNAMIC_IMPORT`                                 | `web/src/lib/downloads.ts`                               | `import()` of `router.tsx`, already statically imported by `main.tsx`: the dynamic import splits nothing (N0(d) build warning)                                         | N0       |
 | Publish to npm                                                       | release pipeline                                         | The package is npm-shaped but unpublished; only the destination changes                                                                                                | planning |

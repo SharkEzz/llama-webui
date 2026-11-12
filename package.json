@@ -16,7 +16,7 @@
     "site:preview": "bun run --cwd site preview",
     "start": "NODE_ENV=production bun server/index.ts",
     "test": "pnpm test:unit && pnpm --filter llamacpp-js test && pnpm test:bun",
-    "test:bun": "bun test ./server ./scripts ./packages/webui-shared",
+    "test:bun": "bun test ./server ./scripts ./packages/webui-shared ./packages/llamacpp-js",
     "test:unit": "vitest run"
   },
   "devDependencies": {

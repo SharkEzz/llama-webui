@@ -1,5 +1,5 @@
 // Unit tests on Node (Vitest). One project per code base. Until N8 the app still runs on Bun: `pnpm test:bun` replays
-// the server, scripts and shared tests under `bun test` too (Bun and Node differ, see server/db/sqlite.ts), including
+// the server, scripts, shared and llamacpp-js tests under `bun test` too (Bun and Node differ, see server/db/sqlite.ts), including
 // the files that boot Bun.serve or Bun.build. llamacpp-js keeps node:test (`pnpm --filter llamacpp-js test`).
 import { fileURLToPath } from 'node:url';
 import { configDefaults, defineConfig } from 'vitest/config';

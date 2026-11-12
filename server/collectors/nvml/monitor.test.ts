@@ -67,7 +67,10 @@ test('workerUrl: next to the module from source, under the entrypoint root in th
   const stub = g.Bun === undefined;
   if (stub) g.Bun = { main: '/opt/llama-webui/llama-webui', pathToFileURL };
   try {
-    expect(workerUrl(true)).toBe(new URL(`./${NVML_WORKER}`, pathToFileURL(Bun.main)).href);
+    const expected = stub
+      ? `file:///opt/llama-webui/${NVML_WORKER}`
+      : new URL(`./${NVML_WORKER}`, pathToFileURL(Bun.main)).href;
+    expect(workerUrl(true)).toBe(expected);
   } finally {
     if (stub) delete g.Bun;
   }
