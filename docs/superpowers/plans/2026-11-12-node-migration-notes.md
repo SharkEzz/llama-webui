@@ -86,6 +86,16 @@ changes in the plan.
   call `--env-override` or `LLAMA_WEBUI_ENV_OVERRIDE=1` (environment or file) lets the file replace it; `--env-file-if-exists` would print ".env not found" on every start. Bun's `.env.local`/`.env.<NODE_ENV>` are not loaded (never used here).
 - (N8) The bundled NVML monitor keeps `new URL('./worker.ts', import.meta.url)`: no such file next to `main.js`, and
   `Worker` is not global on Node, so NVIDIA monitoring falls back to nvidia-smi until N9.
+- (N9) Rolldown refuses a second input when `output.codeSplitting` is `false` (`INVALID_OPTION … multiple inputs are
+  not supported`): the NVML worker gets its own Vite environment (`nvml`, build only, after `ssr`, `emptyOutDir:
+  false`) → `dist/server/nvml-worker.js` (9.6 kB, `node:ffi` and `node:worker_threads` only). Vite leaves
+  `new URL('./worker.ts', import.meta.url)` untouched in the ssr bundle: `workerUrl()` picks the file by the module's
+  extension. The typed `dlopen()` of `@types/node` 26.6 types `functions` from the definitions, so `openNvml()`
+  returns them as `NvmlSymbols` without a cast. Measured on this machine (2 NVIDIA + 2 AMD): `nvidiaSource: nvml`
+  with PCIe rx/tx in dev and prod, `LLAMA_WEBUI_NVML_LIB=/nonexistent` → `nvidia-smi`, SIGINT exit in 50 ms, no
+  ExperimentalWarning. A `dlopen` in the test process itself prints the warning: the real-NVML test checks
+  `/proc/driver/nvidia/version` instead. `requirements.mdx` still describes Bun: its experimental-FFI note waits for
+  its Node rewrite (N12).
 
 ## Refactoring and optimisation backlog (for the R milestones, after the merge)
 

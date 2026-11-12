@@ -16,7 +16,7 @@ lives in `server/monitor/`, the readers of each data source in `server/collector
 | `server/collectors/registry.ts`    | `Collectors`: creates the collectors and follows the settings.                               |
 | `server/collectors/needs.ts`       | `GpuNeeds`: what the GPU readers must read.                                                  |
 | `llamacpp-js/client`, `llamacpp-js/metrics` | `fetchLlama()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)). |
-| `server/collectors/nvml/`          | NVIDIA through NVML (`bun:ffi`) in a Worker; on Node, `nvidia-smi` for now (see below).      |
+| `server/collectors/nvml/`          | NVIDIA through NVML (`node:ffi`) in a worker thread (`node:worker_threads`).                 |
 | `server/collectors/nvidia.ts`      | `NvidiaMonitor`, the `nvidia-smi` fallback.                                                  |
 | `server/collectors/amdgpu.ts`      | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                          |
 | `server/collectors/gpu.ts`         | Shared GPU helpers: `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`.              |
@@ -169,26 +169,30 @@ managed server always has these endpoints, since `buildCommand()` adds `--metric
 
 ### NVIDIA through NVML
 
-<Callout type="note">
-
-On Node, the worker cannot be started from its source file yet (`Worker` is not a global, and the reader uses
-`bun:ffi`), so `NvmlMonitor.start()` resolves `null` and the monitor currently falls back to
-[nvidia-smi](#nvidia-through-nvidia-smi). A later milestone of the move to Node restores NVML.
-
-</Callout>
-
-`nvml/worker.ts` runs the sampling loop in a `Worker`, because reading the PCIe throughput counters blocks about
-50 ms per GPU. It opens `libnvidia-ml.so.1` with `bun:ffi` (`nvml/symbols.ts`), calls `nvmlInit_v2`, then posts one
+`nvml/worker.ts` runs the sampling loop in a worker thread (`node:worker_threads`), because reading the PCIe
+throughput counters blocks about 50 ms per GPU. It opens `libnvidia-ml.so.1` (or `$LLAMA_WEBUI_NVML_LIB` when set,
+to test the library missing) with `dlopen()` from `node:ffi` (`nvml/symbols.ts`), calls `nvmlInit_v2`, then posts one
 `sample` per interval (100 ms at least). The protocol:
 
 | Direction       | Message                                          |
 | --------------- | ------------------------------------------------ |
-| main to worker  | `{ type: 'start', intervalMs, needs }`, then `{ type: 'configure', intervalMs, needs }` |
+| main to worker  | `{ type: 'start', intervalMs, needs, lib? }`, then `{ type: 'configure', intervalMs, needs }` |
 | worker to main  | `{ type: 'ready' }`, `{ type: 'error', message }`, `{ type: 'sample', snapshot }`       |
 
 `readNvml()` (`nvml/read.ts`) reads, per card: name, UUID, bus ID, utilization, memory utilization, VRAM, temperature,
 power and power limits, persistence mode, clocks, fan, current and maximum PCIe link, PCIe throughput, the compute
-processes, and the driver and CUDA driver versions.
+processes, and the driver and CUDA driver versions. Device handles are pointers, kept as `bigint`; out-parameters are
+`Buffer`s. The typed `dlopen()` checks the `NvmlSymbols` interface against the symbol definitions.
+
+`node:ffi` is experimental in Node 26: the worker starts with `--disable-warning=ExperimentalWarning`, so its warning
+does not print on every start. `workerUrl()` (`nvml/monitor.ts`) finds the worker next to the module that starts it:
+
+| Run                        | Worker                                                                                  |
+| -------------------------- | --------------------------------------------------------------------------------------- |
+| `pnpm dev`, tests          | `nvml/worker.ts`, run as is by Node (type stripping: its imports keep their `.ts` extension) |
+| `node dist/server/main.js` | `dist/server/nvml-worker.js`, built by the `nvml` environment of `vite.config.ts`        |
+
+The worker is `unref()`'d: it never keeps the process alive.
 
 On the main side, `NvmlMonitor.start()` resolves `null` when the worker reports an error or is not ready within
 3 seconds, and `Collectors` falls back to `nvidia-smi`. A sample older than three intervals is ignored: a worker stuck

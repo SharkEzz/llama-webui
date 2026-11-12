@@ -111,7 +111,11 @@ around the API, under Vitest like the others:
 - `server/build.test.ts` runs one real `vite build` into a temporary directory: the client is split per page,
   three.js is only in the Topology chunks, no client chunk imports a `node:` module, `staticWeb()` serves every file a
   deep URL references, and the server bundle (`main.js`) imports only Node built-ins, `hono`, `@hono/node-server` and
-  `ws`, with `THIRD-PARTY-LICENSES.md` next to it.
+  `ws`, with `THIRD-PARTY-LICENSES.md` next to it, and `nvml-worker.js`, which imports only Node built-ins and answers
+  `error` from the bundle when the NVML library is missing.
+- `server/collectors/nvml/monitor.test.ts` starts the real NVML worker: with a missing library it resolves `null` at
+  once (the `nvidia-smi` fallback); on a machine with an NVIDIA driver (`/proc/driver/nvidia/version`; skipped in
+  CI) it reads every card.
 - `server/dev.test.ts` starts the development loop (`startDev()`, `server/dev.ts`) on a small entry in a temporary
   directory: an edit evaluates the entry again, a syntax error then its fix and a missing import then its creation
   recover, and of two quick writes the last one wins.

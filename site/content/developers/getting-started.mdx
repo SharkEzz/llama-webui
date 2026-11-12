@@ -162,7 +162,7 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
   - `routes/` one module per API domain, plus `web.ts` for the production UI build and its shared bundler options
   - `supervisor/` the managed `llama-server`: command line, health, external server detection, `--help` flags
   - `monitor/` the sampling tick, history ring, model placement
-  - `collectors/` NVML (in `nvml/`, through `bun:ffi` in a worker), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
+  - `collectors/` NVML (in `nvml/`, through `node:ffi` in a worker thread), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
   - `chat/` server-owned chat generations
   - `bench/` the bench gate, runner, executor and output parsers
   - `tuning/` memory estimator, sweep space, system checks
@@ -216,8 +216,9 @@ still work. A few things help when you work on telemetry code:
 
 - The **collectors** switches in [Settings](/docs/settings/) turn NVML, the system sampler and the disk sampler on or
   off.
-- NVIDIA cards are read through NVML, with `nvidia-smi` as the fallback. `LLAMA_WEBUI_NVIDIA_SMI` overrides the
-  `nvidia-smi` binary the fallback runs, which lets you test it missing.
+- NVIDIA cards are read through NVML, with `nvidia-smi` as the fallback. `LLAMA_WEBUI_NVML_LIB` overrides the NVML
+  library the worker opens and `LLAMA_WEBUI_NVIDIA_SMI` the `nvidia-smi` binary the fallback runs, which lets you test
+  either one missing (`LLAMA_WEBUI_NVML_LIB=/nonexistent pnpm dev` reads NVIDIA cards through `nvidia-smi`).
 - Hardware parsers are tested against captured files in `testdata/` (`nvidia-gpu.csv`, `fdinfo-*.txt`,
   `metrics-*.txt`, `slots-*.json`…), so most collector changes can be covered by a test without the hardware.
 
