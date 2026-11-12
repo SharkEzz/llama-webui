@@ -124,6 +124,7 @@ gain.
 | Clear `__llamaWebuiDispose` once it has run                              | `server/index.ts`                                                      | A reload failing after the dispose re-runs the old hook and never disposes the partial instance (pre-existing; calls are idempotent)                                 | N8       |
 | Map each `RequestError` to its own answer                                | `server/host.ts` (`errorHandler`, `pathOf`)                            | A backslash path or a bad absolute URL answers "Invalid host"; an absolute-form target (`GET http://…/api/x`) goes to the UI (Bun routed both)                      | N8       |
 | `String(err)` in the 503 text                                            | `server/routes/web.ts` (`unavailableWeb`)                              | Bun's text said `Error: ENOENT…`, Node's says `ENOENT…` (cosmetic)                                                                                                   | N8       |
+| 400 for a malformed or missing `Host` (RFC 9112 §3.2)                    | `server/security.ts` (`guard`), `server/host.ts` (`errorHandler`)      | Kept 403 `Invalid host` to match Bun and the golden; the RFC requires 400 for a syntax error. Same JSON body; `Host not allowed` stays 403; golden + security pages | N8       |
 
 Resolved by the port itself (no action): fonts were base64-inlined into a 568 KB CSS file by Bun's bundler; Vite emits
 them as files.
