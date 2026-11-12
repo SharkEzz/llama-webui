@@ -54,4 +54,10 @@ test('helpText: the pnpm scripts, one Node.js process', () => {
   expect(text).toContain('single Node.js process');
   expect(text).not.toMatch(/\bbun\b/i);
   expect(text).toContain('--data-dir <path>');
+  expect(text).toContain('--env-override');
+  expect(text).toContain('env: LLAMA_WEBUI_ENV_OVERRIDE');
+});
+
+test('parseCli: --env-override is accepted (read by the entry points before the .env is loaded)', () => {
+  expect(parseCli(['--env-override'], {}).kind).toBe('run');
 });

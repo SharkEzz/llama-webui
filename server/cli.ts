@@ -32,6 +32,9 @@ Options:
   --data-dir <path>      data directory (SQLite database); default: $XDG_DATA_HOME/llama-webui,
                          else ~/.local/share/llama-webui
                          env: LLAMA_WEBUI_DATA_DIR
+  --env-override         let .env (working directory, loaded at startup) replace the variables the environment
+                         already sets; without it, .env only fills those it does not set
+                         env: LLAMA_WEBUI_ENV_OVERRIDE=1 (in the environment or in .env)
   -h, --help             show this help
 
 A flag takes precedence over the matching environment variable.
@@ -52,7 +55,7 @@ function parsePort(raw: string, source: string): number | string {
 
 /** Reads the arguments (without `bun` or the script) and the environment; never exits, reads nothing else. */
 export function parseCli(argv: string[], env: Record<string, string | undefined> = process.env): CliResult {
-  let values: { host?: string; port?: string; 'data-dir'?: string; help?: boolean };
+  let values: { host?: string; port?: string; 'data-dir'?: string; 'env-override'?: boolean; help?: boolean };
   try {
     ({ values } = parseArgs({
       args: argv,
@@ -60,6 +63,8 @@ export function parseCli(argv: string[], env: Record<string, string | undefined>
         host: { type: 'string' },
         port: { type: 'string' },
         'data-dir': { type: 'string' },
+        // Applied by the entry points (`loadDotEnv`), before the options are parsed: declared for strict parsing.
+        'env-override': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
       strict: true,

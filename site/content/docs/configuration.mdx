@@ -10,12 +10,13 @@ its database. Everything else is changed from the [Settings](/docs/settings/) pa
 
 Each flag has an environment variable. Pass flags after `pnpm start` (or `pnpm dev`), from the clone:
 
-| Flag                | Environment variable   | Default                                                         | Effect                                                                                        |
-| ------------------- | ---------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `--host <address>`  | `LLAMA_WEBUI_HOST`     | `127.0.0.1`                                                     | Address the interface, API and WebSocket listen on. `0.0.0.0` listens on every interface.     |
-| `--port <port>`     | `LLAMA_WEBUI_PORT`     | `7860`                                                          | HTTP port of the interface, API and WebSocket: an integer from 1 to 65535.                    |
-| `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR` | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` | Folder of the database (see [Data directory](#data-directory)).                              |
-| `-h`, `--help`      |                        |                                                                 | Prints the help and exits.                                                                    |
+| Flag                | Environment variable       | Default                                                         | Effect                                                                                    |
+| ------------------- | -------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `--host <address>`  | `LLAMA_WEBUI_HOST`         | `127.0.0.1`                                                     | Address the interface, API and WebSocket listen on. `0.0.0.0` listens on every interface. |
+| `--port <port>`     | `LLAMA_WEBUI_PORT`         | `7860`                                                          | HTTP port of the interface, API and WebSocket: an integer from 1 to 65535.                |
+| `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR`     | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` | Folder of the database (see [Data directory](#data-directory)).                           |
+| `--env-override`    | `LLAMA_WEBUI_ENV_OVERRIDE` | off                                                             | Lets the `.env` file replace the variables the environment already sets (see below).      |
+| `-h`, `--help`      |                            |                                                                 | Prints the help and exits.                                                                |
 
 ```bash title="Terminal"
 pnpm start --host 0.0.0.0 --port 8080
@@ -42,7 +43,9 @@ For each option, llama-webui takes the first value it finds:
 3. the default.
 
 A `.env` file in the folder llama-webui starts from (the clone, with `pnpm start` or `pnpm dev`) is loaded at startup:
-its variables override those of the environment (a command-line option still wins over both).
+its variables fill what the environment does not set. With `--env-override`, or `LLAMA_WEBUI_ENV_OVERRIDE=1` (or
+`true`) set in the environment or in the `.env` itself, they also replace the variables the environment already sets.
+A command-line option still wins over both.
 
 ### Invalid options
 
@@ -73,6 +76,9 @@ Options:
   --data-dir <path>      data directory (SQLite database); default: $XDG_DATA_HOME/llama-webui,
                          else ~/.local/share/llama-webui
                          env: LLAMA_WEBUI_DATA_DIR
+  --env-override         let .env (working directory, loaded at startup) replace the variables the environment
+                         already sets; without it, .env only fills those it does not set
+                         env: LLAMA_WEBUI_ENV_OVERRIDE=1 (in the environment or in .env)
   -h, --help             show this help
 
 A flag takes precedence over the matching environment variable.
