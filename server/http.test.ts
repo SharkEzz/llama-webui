@@ -1,5 +1,18 @@
+import { Hono } from 'hono';
 import { expect, test } from 'vitest';
-import { errorResponse, HttpError } from './http';
+import {
+  allowTable,
+  apiRoutes,
+  type Env,
+  errorResponse,
+  guardMw,
+  HttpError,
+  id,
+  json,
+  jsonCharset,
+  object,
+  shadowed,
+} from './http';
 
 test('an HttpError from an older module (bun --hot) keeps its status and code (#34)', async () => {
   // What the bench gate throws after a reload: same name and fields, another class.
@@ -18,4 +31,89 @@ test('an HttpError from an older module (bun --hot) keeps its status and code (#
   expect(await r.json()).toEqual({ error: 'A server is running', code: 'server-running' });
   expect(errorResponse(new HttpError(404, 'Profile not found')).status).toBe(404);
   expect(errorResponse(new Error('boom')).status).toBe(500);
+});
+
+/** A small API built with the helpers, the way createApi builds the real one. */
+function things() {
+  const allow = allowTable();
+  const app = new Hono<Env>()
+    .use(jsonCharset, guardMw, allow.mw)
+    .post('/api/things/import', (c) => c.text('ok'))
+    .get('/api/things/:id', id('Thing'), (c) => c.json({ id: c.req.valid('param').id }))
+    .post('/api/things', json(object), (c) => c.json(c.req.valid('json'), 201))
+    .get('/api/stream', () => new Response('data: 1\n\n', { headers: { 'Content-Type': 'text/event-stream' } }))
+    .get('/api/empty', (c) => c.body(null, 204));
+  allow.load(apiRoutes(app));
+  app.notFound((c) => c.json({ error: 'Unknown route' }, 404));
+  app.onError((err) => errorResponse(err));
+  return app;
+}
+const post = (body?: string, type?: string) =>
+  ({ method: 'POST', body, headers: type ? { 'Content-Type': type } : {} }) as RequestInit;
+
+test('a method a pattern lacks is a 405 with Allow, not the next matching pattern (#37)', async () => {
+  const app = things();
+  const r = await app.request('/api/things/import');
+  expect(r.status).toBe(405);
+  expect(r.headers.get('allow')).toBe('POST');
+  expect(r.headers.get('content-type')).toBe('application/json;charset=utf-8');
+  expect(await r.json()).toEqual({ error: 'Method not allowed (POST)' });
+  expect((await app.request('/api/things/import', { method: 'HEAD' })).status).toBe(405);
+  expect((await app.request('/api/things/import', { method: 'POST' })).status).toBe(200);
+  expect((await app.request('/api/things/7', { method: 'DELETE' })).headers.get('allow')).toBe('GET');
+  expect((await app.request('/api/things/7', { method: 'HEAD' })).status).toBe(200);
+  const unknown = await app.request('/api/nothing');
+  expect(unknown.status).toBe(404);
+  expect(await unknown.json()).toEqual({ error: 'Unknown route' });
+});
+
+test('id() is a 404 for anything but a positive integer', async () => {
+  const app = things();
+  for (const bad of ['x', '0', '-1', '1.5'])
+    expect(await (await app.request(`/api/things/${bad}`)).json()).toEqual({ error: 'Thing not found' });
+  expect(await (await app.request('/api/things/12')).json()).toEqual({ id: 12 });
+});
+
+test('json(object) keeps the messages of req.json() and jsonObject()', async () => {
+  const app = things();
+  const error = async (init: RequestInit) => {
+    const r = await app.request('/api/things', init);
+    return [r.status, ((await r.json()) as { error: string }).error];
+  };
+  expect(await error(post())).toEqual([400, 'Invalid JSON']);
+  expect(await error(post('', 'application/json'))).toEqual([400, 'Invalid JSON']);
+  expect(await error(post('{', 'application/json'))).toEqual([400, 'Invalid JSON']);
+  expect(await error(post('[1]', 'application/json'))).toEqual([400, 'JSON object expected']);
+  // A JSON media type outside Hono's own list: parsed all the same, as req.json() does.
+  const seq = await app.request('/api/things', post('{"a":1}', 'application/json-seq'));
+  expect([seq.status, await seq.json()]).toEqual([201, { a: 1 }]);
+});
+
+test('jsonCharset only rewrites a bare application/json', async () => {
+  const app = things();
+  expect((await app.request('/api/things/1')).headers.get('content-type')).toBe('application/json;charset=utf-8');
+  expect((await app.request('/api/stream')).headers.get('content-type')).toBe('text/event-stream');
+  const empty = await app.request('/api/empty');
+  expect([empty.status, empty.headers.get('content-type')]).toEqual([204, null]);
+});
+
+test('a static path registered after a parameter that shadows it is reported (#37)', () => {
+  expect(
+    shadowed([
+      { method: 'GET', path: '/api/a/:id' },
+      { method: 'GET', path: '/api/a/b' },
+    ]),
+  ).toEqual(['GET /api/a/b after /api/a/:id']);
+  expect(
+    shadowed([
+      { method: 'GET', path: '/api/a/b' },
+      { method: 'GET', path: '/api/a/:id' },
+    ]),
+  ).toEqual([]);
+  expect(
+    shadowed([
+      { method: 'POST', path: '/api/a/:id' },
+      { method: 'GET', path: '/api/a/b' },
+    ]),
+  ).toEqual([]);
 });

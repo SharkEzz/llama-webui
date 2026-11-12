@@ -9,6 +9,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
+import { createApi } from '../api';
 import { appRoutes, createApp } from '../app';
 import { BenchGate } from '../bench/gate';
 import { BenchRunsRepo } from '../db/benchRuns';
@@ -18,6 +19,7 @@ import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
 import { SweepsRepo } from '../db/sweeps';
 import { createDeps } from '../deps';
+import { apiRoutes, shadowed } from '../http';
 import { LogBuffer } from '../logs/buffer';
 import { writeGguf } from '../models/gguf.fixture';
 import type { Monitor } from '../monitor/monitor';
@@ -165,8 +167,13 @@ beforeAll(async () => {
 afterAll(() => app?.dispose());
 
 test('the route table lists every API route of the app', () => {
-  const registered = Object.keys(appRoutes(app.deps)).filter((p) => p.startsWith('/api/') && p !== '/api/*');
-  expect(ROUTES.map((r) => r.path).sort()).toEqual(registered.sort());
+  const legacy = Object.keys(appRoutes(app.deps)).filter((p) => p.startsWith('/api/') && p !== '/api/*');
+  const hono = new Set(apiRoutes(createApi(app.deps)).map((r) => r.path));
+  expect(ROUTES.map((r) => r.path).sort()).toEqual([...legacy, ...hono].sort());
+});
+
+test('no static API path is registered behind a :param pattern that catches it (#37)', () => {
+  expect(shadowed(apiRoutes(createApi(app.deps)))).toEqual([]);
 });
 
 test('no case that breaks a body or a guard succeeds', () => {

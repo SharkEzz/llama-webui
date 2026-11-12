@@ -1,3 +1,5 @@
+import type { Server } from 'bun';
+import { createApi } from './api';
 import type { BenchRunner } from './bench/runner';
 import type { ChatRuns } from './chat/runs';
 import type { BenchRunsRepo } from './db/benchRuns';
@@ -19,14 +21,12 @@ import { modelRoutes } from './routes/models';
 import { monitorRoutes } from './routes/monitor';
 import { profileRoutes } from './routes/profiles';
 import { serverRoutes } from './routes/server';
-import { settingsRoutes } from './routes/settings';
 import { setupRoutes } from './routes/setup';
 import { sweepRoutes } from './routes/sweeps';
 import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
 import type { WebRoutes } from './routes/web';
 import type { Runtime } from './runtime';
-import { APP_VERSION } from './version';
 import type { WsHub } from './ws/hub';
 
 export interface AppDeps {
@@ -55,19 +55,16 @@ export interface AppDeps {
   development: boolean;
 }
 
-const startedAt = Date.now();
-
-/** Every route of the app (API, `/ws`, then the UI), with the 405s of `withMethodNotAllowed`. */
+/**
+ * Every route of the app for `Bun.serve`: the API paths not ported to Hono yet (exact and `:param` paths win over
+ * `/api/*` in Bun's router, with the 405s of `withMethodNotAllowed`), then `/api/*` → the Hono API, `/ws`, the UI.
+ */
 export function appRoutes(deps: AppDeps) {
-  const { settings, monitor } = deps;
+  const api = createApi(deps);
   return withMethodNotAllowed({
-    '/api/health': {
-      GET: guarded(() => Response.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt })),
-    },
-    ...settingsRoutes({ settings, monitor }),
     ...profileRoutes(deps),
     ...serverRoutes({ ...deps, benchBusy: () => deps.benchRunner.busy }),
-    ...monitorRoutes({ monitor, bootId: deps.runtime.bootId }),
+    ...monitorRoutes({ monitor: deps.monitor, bootId: deps.runtime.bootId }),
     ...modelRoutes(deps),
     ...hfRoutes(deps),
     ...chatRoutes(deps),
@@ -76,7 +73,7 @@ export function appRoutes(deps: AppDeps) {
     ...tuningRoutes(deps),
     ...topologyRoutes(deps),
     ...setupRoutes(deps),
-    '/api/*': guarded(() => Response.json({ error: 'Unknown route' }, { status: 404 })),
+    '/api/*': (req: Request, server: Server<undefined>) => api.fetch(req, { server }),
     '/ws': guarded((req, server) => {
       if (server.upgrade(req)) return undefined;
       return new Response('WebSocket upgrade expected', { status: 426 });

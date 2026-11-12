@@ -6,6 +6,7 @@
   "dependencies": {
     "@huggingface/gguf": "^0.4.6",
     "@llama-webui/shared": "workspace:*",
+    "hono": "catalog:",
     "llamacpp-js": "workspace:*",
     "zod": "catalog:"
   }

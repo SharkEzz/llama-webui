@@ -179,6 +179,9 @@ catalogs:
     '@types/node':
       specifier: ^26.6.6
       version: 26.6.6
+    hono:
+      specifier: ~4.13.18
+      version: 4.13.18
     react:
       specifier: ^19.3.1
       version: 19.3.1
@@ -250,6 +253,9 @@ importers:
       '@llama-webui/shared':
         specifier: workspace:*
         version: link:../packages/webui-shared
+      hono:
+        specifier: 'catalog:'
+        version: 4.13.18
       llamacpp-js:
         specifier: workspace:*
         version: link:../packages/llamacpp-js
@@ -2463,6 +2469,10 @@ packages:
 
   hls.js@1.7.4:
     resolution: {integrity: sha512-3GlxGdPvT2YHvQYOt+yOzT/DEior/qJVNIylHA77kgeoBTdQQqi70GwefNEUmHQeNGyjC8U62+bruqW/Tpm+tg==}
+
+  hono@4.13.18:
+    resolution: {integrity: sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA==}
+    engines: {node: '>=16.9.0'}
 
   html-url-attributes@3.0.1:
     resolution: {integrity: sha512-ol6UPyBWqsrO6EJySPz2O7ZSr856WDrEzM5zMqp+FJJLGMW35cLYmmZnl0vztAZxRUoNZJFTCohfjuIJ8I4QBQ==}
@@ -5609,6 +5619,8 @@ snapshots:
       '@types/hast': 3.0.5
 
   hls.js@1.7.4: {}
+
+  hono@4.13.18: {}
 
   html-url-attributes@3.0.1: {}
 

@@ -12,6 +12,8 @@ catalog:
   zod: ^4.6.7
   shiki: ^4.6.0
   "@types/node": ^26.6.6
+  # Server API, and its RPC types in web (N7). Pinned to 4.13.x: v5 is a refactoring candidate.
+  hono: ~4.13.18
 # Install scripts pnpm may run (strictDepBuilds fails on any other).
 allowBuilds:
   # Peer of bun-plugin-tailwind; without its postinstall, node_modules/.bin/bun shadows the system Bun and fails.
@@ -29,3 +31,4 @@ minimumReleaseAgeExclude:
   - "@biomejs/cli-win32-arm64@2.6.7"
   - "@biomejs/cli-win32-x64@2.6.7"
   - lucide-react@1.72.0
+  - hono@4.13.18

@@ -7,7 +7,7 @@ import { ConversationsRepo } from '../db/conversations';
 import { openDb } from '../db/open';
 import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
-import { guarded, withMethodNotAllowed } from '../http';
+import { errorResponse, guarded, withMethodNotAllowed } from '../http';
 import { tempDir } from '../testing/tempDir';
 import { WsHub } from '../ws/hub';
 import { benchRoutes } from './bench';
@@ -117,16 +117,14 @@ function settingsApp(configure: () => Promise<void>) {
   const dir = tempDir('lw-');
   const db = openDb(join(dir.path, 't.sqlite'));
   const settings = new SettingsRepo(db);
-  const routes = settingsRoutes({ settings, monitor: { configure } });
+  const app = settingsRoutes({ settings, monitor: { configure } });
+  app.onError((err) => errorResponse(err));
   const patch = (body: unknown) =>
-    call(
-      routes['/api/settings'].PATCH,
-      new Request('http://127.0.0.1:7860/api/settings', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
-    );
+    app.request('/api/settings', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
   return {
     settings,
     patch,
