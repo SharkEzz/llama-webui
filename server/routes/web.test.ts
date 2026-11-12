@@ -1,9 +1,10 @@
-import { createServer, type Server } from 'node:http';
+import type { Server } from 'node:http';
 import { afterEach, expect, test } from 'vitest';
 import { request } from '../contract/wire';
 import type { WebHandler } from '../host';
 import { listen } from '../testing/listen';
 import { tempDir } from '../testing/tempDir';
+import { webServer } from '../testing/web';
 import { writeFileDeep } from '../testing/write';
 import { staticWeb, unavailableWeb } from './web';
 
@@ -13,7 +14,7 @@ afterEach(async () => {
 });
 
 async function serve(handler: WebHandler): Promise<string> {
-  const s = createServer(handler);
+  const s = webServer(handler);
   servers.push(s);
   return listen(s);
 }

@@ -1,5 +1,6 @@
-import { type ConversationDetail, type ConversationSummary, formatSse } from '@llama-webui/shared';
-import { Hono } from 'hono';
+import type { ConversationDetail, ConversationSummary } from '@llama-webui/shared';
+import { type Context, Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import type { ChatRun, ChatRuns } from '../chat/runs';
 import type { ConversationsRepo } from '../db/conversations';
 import type { ProfilesRepo } from '../db/profiles';
@@ -14,40 +15,26 @@ export interface ChatRouteDeps {
 }
 
 const PING_MS = 15_000;
-const enc = new TextEncoder();
 
 /**
- * Generation events over SSE, with a regular “: ping” comment: a long prompt can be processed without sending
- * anything, and a proxy may drop a silent connection (Node's own server has no idle timeout). A client that leaves
- * only unsubscribes: the generation goes on.
+ * Generation events over SSE (`streamSSE`), with a regular “: ping” comment: a long prompt can be processed without
+ * sending anything, and a proxy may drop a silent connection (Node's own server has no idle timeout). A client that
+ * leaves only unsubscribes: the generation goes on.
  */
-function sse(run: ChatRun): Response {
-  let leave = () => {};
-  let ping: ReturnType<typeof setInterval> | undefined;
-  const stream = new ReadableStream<Uint8Array>({
-    start(c) {
-      let closed = false;
-      const close = () => {
-        if (closed) return;
-        closed = true;
-        clearInterval(ping);
-        leave();
-        c.close();
-      };
-      ping = setInterval(() => !closed && c.enqueue(enc.encode(': ping\n\n')), PING_MS);
+const sse = (c: Context<Env>, run: ChatRun) =>
+  streamSSE(c, async (stream) => {
+    let leave = () => {};
+    const ping = setInterval(() => void stream.write(': ping\n\n'), PING_MS);
+    await new Promise<void>((resolve) => {
+      stream.onAbort(resolve);
       leave = run.subscribe((e) => {
-        if (closed) return;
-        c.enqueue(enc.encode(formatSse(e.type, e)));
-        if (e.type === 'done') queueMicrotask(close);
+        const sent = stream.writeSSE({ event: e.type, data: JSON.stringify(e) });
+        if (e.type === 'done') void sent.then(() => resolve());
       });
-    },
-    cancel() {
-      clearInterval(ping);
-      leave();
-    },
+    });
+    clearInterval(ping);
+    leave();
   });
-  return new Response(stream, { headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' } });
-}
 
 export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns }: ChatRouteDeps) {
   const isLive = (id: number) => chatRuns.live(id) !== undefined;
@@ -106,9 +93,9 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
         if (typeof content !== 'string') throw new HttpError(400, 'content: expected a string');
         return { content };
       }),
-      (c) => sse(chatRuns.send(c.req.valid('param').id, c.req.valid('json').content)),
+      (c) => sse(c, chatRuns.send(c.req.valid('param').id, c.req.valid('json').content)),
     )
-    .post('/api/chat/:id/regenerate', id('Conversation'), (c) => sse(chatRuns.regenerate(c.req.valid('param').id)))
+    .post('/api/chat/:id/regenerate', id('Conversation'), (c) => sse(c, chatRuns.regenerate(c.req.valid('param').id)))
     .post('/api/chat/:id/stop', id('Conversation'), (c) => {
       if (!chatRuns.stop(c.req.valid('param').id)) throw new HttpError(409, 'No reply in progress');
       return c.body(null, 204);
@@ -117,6 +104,6 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
       const { id } = c.req.valid('param');
       if (!conversations.get(id)) throw notFound('Conversation');
       const run = chatRuns.live(id);
-      return run ? sse(run) : c.body(null, 204);
+      return run ? sse(c, run) : c.body(null, 204);
     });
 }

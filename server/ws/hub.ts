@@ -1,6 +1,6 @@
 import type { WsMessage } from '@llama-webui/shared';
 
-/** What the hub needs of a client socket: a `ws` socket (`server/ws/attach.ts`). */
+/** What the hub needs of a client socket: the adapter's WebSocket context (`server/ws/attach.ts`). */
 export interface WsLike {
   send(data: string): void;
   close(code?: number, reason?: string): void;

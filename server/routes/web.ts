@@ -1,6 +1,8 @@
 import { readdir, readFile } from 'node:fs/promises';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { extname, join, relative } from 'node:path';
-import { pathOf, type WebHandler } from '../host';
+import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response';
+import type { WebHandler } from '../host';
 
 /*
  * Web UI: in development, Vite's middlewares (HMR, `server/dev.ts`); in production, the files `vite build` wrote to
@@ -43,15 +45,14 @@ export async function staticWeb(dir: string): Promise<WebHandler> {
     ),
   );
   files.delete('/index.html');
-  return (req, res) => {
-    const file = files.get(pathOf(req)) ?? index;
-    // An explicit length: headers written before the body would otherwise be sent chunked, and HEAD with no length.
-    res.writeHead(200, {
+  return (c) => {
+    const file = files.get(c.req.path) ?? index;
+    // An explicit length: HEAD answers without the body, and must still say how long it is.
+    return c.body(file.body, 200, {
       'Content-Type': file.type,
-      'Content-Length': file.body.length,
+      'Content-Length': String(file.body.length),
       'Cache-Control': file.cache,
     });
-    res.end(file.body);
   };
 }
 
@@ -61,7 +62,16 @@ export async function staticWeb(dir: string): Promise<WebHandler> {
  */
 export function unavailableWeb(err: unknown): WebHandler {
   const text = `llama-webui: web UI unavailable.\n\n${err instanceof Error ? err.message : String(err)}\n`;
-  return (_req, res) => {
-    res.writeHead(503, { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-store' }).end(text);
+  return (c) => c.body(text, 503, { 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': 'no-store' });
+}
+
+/**
+ * Development: Vite's middlewares, which answer on Node's own response. The adapter then leaves it alone
+ * (`RESPONSE_ALREADY_SENT`).
+ */
+export function nodeWeb(handle: (req: IncomingMessage, res: ServerResponse) => void): WebHandler {
+  return (c) => {
+    handle(c.env.incoming, c.env.outgoing);
+    return RESPONSE_ALREADY_SENT;
   };
 }

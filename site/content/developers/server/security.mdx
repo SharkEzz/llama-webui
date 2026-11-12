@@ -92,7 +92,7 @@ Whatever a validator or a handler throws afterwards reaches the API's `onError`,
 - Every `/api/*` request goes through it, routes and the `404` `{"error":"Unknown route"}` alike: it is mounted with
   `.use()` ahead of every domain file, so a new route is guarded without doing anything.
 - The WebSocket endpoint is guarded too: `mount()` (`server/host.ts`) runs `guard()` on a `/ws` upgrade request
-  before handing it to the `ws` library, so another site cannot open the socket (browsers always send `Origin` on a WebSocket
+  before handing it to `upgradeWebSocket()`, so another site cannot open the socket (browsers always send `Origin` on a WebSocket
   handshake). A request to `/ws` that is not an upgrade gets `426` `WebSocket upgrade expected`. An upgrade the
   guard refuses is not treated as one: the server's `shouldUpgradeCallback` runs the guard first, so the refusal is
   an ordinary response (Node writes it and handles a client that resets the connection), sent with

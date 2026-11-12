@@ -87,7 +87,8 @@ test('settings: defaults, then a persisted patch', () => {
   file) replaces a file in one step, as an editor's safe write does. Pauses are `setTimeout` from
   `node:timers/promises`.
 - **HTTP servers**: `listen(server)` (`server/testing/listen.ts`) binds a `node:http` server to a free loopback port
-  and resolves its base URL.
+  and resolves its base URL; `webServer(handler)` (`server/testing/web.ts`) is a server that answers every request
+  with a web handler alone (`staticWeb()`, `unavailableWeb()`).
 - **Databases**: `openDb(':memory:')` gives a fresh database with every migration applied; `openDb()` on a path in a
   temporary directory tests a real file.
 - **Dependencies are injected.** Server classes and builders take their collaborators as arguments, so a test passes
@@ -115,10 +116,13 @@ Route tests call the Hono app of a domain (or `createApi()`) with `app.request()
 `app.onError((err) => errorResponse(err))` on a domain app to get the API's error replies. Three files test what runs
 around the API, under Vitest like the others:
 
-- `server/host.test.ts` mounts the host (`mount()`, `server/host.ts`) on a real `node:http` server: `/api/*` to the
+- `server/host.test.ts` mounts the host (`mount()`, `server/host.ts`) on a real server (`createHostServer()`): `/api/*` to the
   API and any other path to the web handler, a body-less `POST` through the guard, an invalid `Host`, `/ws` with and
   without an upgrade, a refused upgrade whose client resets the connection or never closes it, an oversized
-  frame, an upgrade on another path, and a second mount on the same server.
+  frame, an upgrade on another path (refused, or left to another `upgrade` listener), and a second mount on the same
+  server.
+- `server/hostServer.test.ts` checks the server itself (`createHostServer()`): it speaks HTTP/1 only (an HTTP/2
+  client gets a protocol error, the app is never called), and HTTP/2 bindings handed to its listener get `505`.
 - `server/build.test.ts` runs one real `vite build` into a temporary directory: the client is split per page,
   three.js is only in the Topology chunks, no client chunk imports a `node:` module, `staticWeb()` serves every file a
   deep URL references, and the server bundle (`main.js`) imports only Node built-ins, `hono`, `@hono/node-server` and

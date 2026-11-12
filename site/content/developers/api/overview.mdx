@@ -177,9 +177,8 @@ export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
   api.onError((err) => errorResponse(err));
 ```
 
-`mount()` in `server/host.ts` puts that app on a `node:http` server through `@hono/node-server`
-(`getRequestListener()`) and sends it every `/api/*` request; `/ws` (the `ws` library) and the web app are handled by
-the host itself. A JSON reply has the `application/json` type that `c.json()` gives it. Every API request goes
+`mount()` in `server/host.ts` sends it every `/api/*` request, from the host's own Hono app on the server of
+`@hono/node-server` (`createHostServer()`, `server/hostServer.ts`), which also answers `/ws` and the web app. A JSON reply has the `application/json` type that `c.json()` gives it. Every API request goes
 through two middlewares first, in this order:
 
 - `guardMw` applies the request guard of `server/security.ts` (see [Security](/developers/server/security/)).

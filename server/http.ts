@@ -205,7 +205,7 @@ export function allowTable() {
     if (!best || best.methods.has(method)) return next();
     const { methods } = best;
     const allow = METHODS.filter((m) => methods.has(m)).join(', ');
-    return Response.json({ error: `Method not allowed (${allow})` }, { status: 405, headers: { Allow: allow } });
+    return c.json({ error: `Method not allowed (${allow})` }, 405, { Allow: allow });
   };
   const load = (routes: RouteEntry[]) => {
     const byPath = new Map<string, Set<string>>();

@@ -2,7 +2,7 @@
 import { fork } from 'node:child_process';
 import { once } from 'node:events';
 import { readdirSync, readFileSync } from 'node:fs';
-import { createServer, type Server } from 'node:http';
+import type { Server } from 'node:http';
 import { isBuiltin } from 'node:module';
 import { join, resolve } from 'node:path';
 import { createBuilder } from 'vite';
@@ -11,6 +11,7 @@ import { request } from './contract/wire';
 import { staticWeb } from './routes/web';
 import { listen } from './testing/listen';
 import { tempDir } from './testing/tempDir';
+import { webServer } from './testing/web';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const dir = tempDir('lw-build-');
@@ -52,7 +53,7 @@ let server: Server | undefined;
 afterAll(() => server?.close());
 
 test('served by staticWeb, a deep URL finds every file its page references, from the root', async () => {
-  server = createServer(await staticWeb(web));
+  server = webServer(await staticWeb(web));
   const base = await listen(server);
   const page = await request(base, { method: 'GET', path: '/chat/12' });
   expect(page.headers['cache-control']).toBe('no-cache');

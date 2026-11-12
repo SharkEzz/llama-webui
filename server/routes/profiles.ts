@@ -1,5 +1,5 @@
 import { type ProfileInputSchema, parseProfileImport } from '@llama-webui/shared';
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import type { z } from 'zod';
 import type { ProfilesRepo } from '../db/profiles';
 import { toInput } from '../db/profiles';
@@ -21,14 +21,12 @@ export function removeProfile({ profiles, settings, activeProfileId }: ProfileRo
   if (settings.get().defaultProfileId === id) settings.patch({ defaultProfileId: null });
 }
 
-function attachment(filename: string, body: unknown): Response {
-  return new Response(`${JSON.stringify(body, null, 2)}\n`, {
-    headers: {
-      'content-type': 'application/json',
-      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
-    },
+/** A JSON download, indented for a person to read. */
+const attachment = (c: Context<Env>, filename: string, body: unknown) =>
+  c.body(`${JSON.stringify(body, null, 2)}\n`, 200, {
+    'content-type': 'application/json',
+    'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
   });
-}
 
 export function profileRoutes(deps: ProfileRouteDeps) {
   const { profiles, settings } = deps;
@@ -46,8 +44,8 @@ export function profileRoutes(deps: ProfileRouteDeps) {
       .post('/api/profiles', accepts<z.input<typeof ProfileInputSchema>>(), async (c) =>
         c.json(profiles.create(await c.req.json()), 201),
       )
-      .get('/api/profiles/export', () =>
-        attachment('llama-webui-profiles.json', { profiles: profiles.list().map(toInput) }),
+      .get('/api/profiles/export', (c) =>
+        attachment(c, 'llama-webui-profiles.json', { profiles: profiles.list().map(toInput) }),
       )
       .post('/api/profiles/import', json(passthrough), (c) => {
         const parsed = parseProfileImport(c.req.valid('json'));
@@ -90,7 +88,7 @@ export function profileRoutes(deps: ProfileRouteDeps) {
       )
       .get('/api/profiles/:id/export', id('Profile'), (c) => {
         const p = mustGet(c.req.valid('param').id);
-        return attachment(`${p.name}.json`, toInput(p));
+        return attachment(c, `${p.name}.json`, toInput(p));
       })
   );
 }

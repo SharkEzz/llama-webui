@@ -1,44 +1,30 @@
-import type { IncomingMessage, Server, ServerResponse } from 'node:http';
+import type { IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { Duplex } from 'node:stream';
-import { getRequestListener } from '@hono/node-server';
-import { WebSocketServer } from 'ws';
+import { type HttpBindings, upgradeWebSocket } from '@hono/node-server';
+import { type Context, Hono, type MiddlewareHandler } from 'hono';
+import { HOST_APP, type HostServer } from './hostServer';
+import { errorResponse } from './http';
 import { webHeaders } from './llamaFetch';
 import { guard } from './security';
-import { attachSocket } from './ws/attach';
+import { hubEvents } from './ws/attach';
 import type { WsHub } from './ws/hub';
 
+/** What the host app sees of a request: the Node adapter's bindings (`incoming`, `outgoing`). */
+export type HostEnv = { Bindings: HttpBindings };
+
 /** The UI: Vite's middlewares in development, the built files in production (`server/routes/web.ts`). */
-export type WebHandler = (req: IncomingMessage, res: ServerResponse) => void;
+export type WebHandler = (c: Context<HostEnv>) => Response | Promise<Response>;
 
 export interface MountOptions {
-  /** Long-lived: in development it survives reloads (the dev host), each evaluation mounts on it again. */
-  server: Server;
+  /** From `createHostServer()`. Long-lived: in development it survives reloads, each evaluation mounts on it again. */
+  server: HostServer;
   /** The API (`createApi(deps).fetch`): `/api/*`. */
-  fetch: (req: Request) => Response | Promise<Response>;
+  fetch: (req: Request, env: object) => Response | Promise<Response>;
   hub: WsHub;
   web: WebHandler;
   hostname: string;
   port: number;
-  /** Development: an upgrade on another path than `/ws` belongs to Vite's HMR listener. */
-  dev: boolean;
 }
-
-type Listeners = {
-  request: (req: IncomingMessage, res: ServerResponse) => void;
-  upgrade: (req: IncomingMessage, socket: Duplex, head: Buffer) => void;
-};
-
-/**
- * The listeners a server got from its last `mount()`, kept on the server itself under a registry symbol: a
- * development reload evaluates this module again, and the new instance must find what the old one mounted.
- */
-const MOUNTED = Symbol.for('llama-webui.host.mounted');
-type Mounted = Server & {
-  [MOUNTED]?: Listeners;
-  /** Set by the `shouldUpgradeCallback` option of `createServer()`, or later (Node's types only know the option). */
-  shouldUpgradeCallback?: (req: IncomingMessage) => boolean;
-};
 
 /**
  * What the guard reads of a request, from Node's: `req.url` is built from the Host header (a Host that is
@@ -53,83 +39,66 @@ function head(req: IncomingMessage): Pick<Request, 'url' | 'method' | 'headers'>
 }
 
 /** The path of a request, without its query. */
-export const pathOf = (req: IncomingMessage) => (req.url ?? '/').split('?', 1)[0] ?? '/';
+const pathOf = (req: IncomingMessage) => (req.url ?? '/').split('?', 1)[0] ?? '/';
 
 /**
- * The largest message a client may send: the protocol only has `ping` and `pong` (`ws` allows 100 MiB by default,
- * buffered whole before the hub parses it). A larger one closes the socket (1009).
+ * The same guard as the API on `/ws`. A WebSocket upgrade it refuses comes here as a plain request
+ * (`shouldUpgradeCallback`), and is answered on a connection the server closes: a WebSocket client may keep its own
+ * side open.
  */
-const MAX_CLIENT_MESSAGE_BYTES = 4096;
-
-/**
- * `/ws` as a plain request, which a WebSocket upgrade the guard refuses is too (`shouldUpgradeCallback`): the same
- * guard as the API, then 426. A refused upgrade is answered on a connection the server closes: a WebSocket client
- * may keep its own side open.
- */
-function wsExpected(req: Request): Response {
-  const refused = guard(req);
-  if (refused) {
-    if (req.headers.has('upgrade')) refused.headers.set('Connection', 'close');
-    return refused;
-  }
-  return new Response('WebSocket upgrade expected', {
-    status: 426,
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-  });
-}
-
-// No `errorHandler`: a request the adapter cannot build (a Host that is not an authority, `a b`) keeps the adapter's
-// own answer, 400 without a body.
-const listenerOptions = {
-  // Keep Node's own Request/Response: the app and its tests build them too.
-  overrideGlobalObjects: false,
+const wsGuard: MiddlewareHandler<HostEnv> = async (c, next) => {
+  const refused = guard(c.req.raw);
+  if (!refused) return next();
+  if (c.req.header('upgrade') !== undefined) refused.headers.set('Connection', 'close');
+  return refused;
 };
 
 /**
- * Mounts one evaluation of the app on `server`: `/api/*` → the API, `/ws` → the WebSocket hub, anything else → the
- * UI. Replaces the listeners a previous `mount()` put on the same server (a development reload), listens on the
- * first call only, and resolves the bound port.
+ * The app of one evaluation: `/api/*` → the API, `/ws` → the WebSocket hub (`upgradeWebSocket` of the Node adapter,
+ * 426 without an upgrade), anything else → the UI.
+ */
+function hostApp(o: MountOptions) {
+  const app = new Hono<HostEnv>()
+    // The adapter hands every WebSocket upgrade to the app, without a response to write to (`outgoing`). One on
+    // another path than `/ws` is answered 404, which the adapter sends only when no other `upgrade` listener is
+    // there: in development, Vite's HMR takes its own.
+    .use(async (c, next) => {
+      if (!c.env.outgoing && c.req.path !== '/ws') return c.body(null, 404);
+      await next();
+    })
+    // `/api/` and below, not `/api` alone (`/api/*` would match it too).
+    .all('/api/:rest{.*}', (c) => o.fetch(c.req.raw, c.env))
+    .all(
+      '/ws',
+      wsGuard,
+      upgradeWebSocket(() => hubEvents(o.hub)),
+      (c) => c.body('WebSocket upgrade expected', 426, { 'Content-Type': 'text/plain;charset=utf-8' }),
+    )
+    .all('*', o.web);
+  app.onError((err) => errorResponse(err));
+  return app;
+}
+
+/**
+ * Mounts one evaluation of the app on `server`: replaces the app a previous `mount()` put there (a development
+ * reload), listens on the first call only, and resolves the bound port.
  */
 export function mount(o: MountOptions): Promise<number> {
-  const api = getRequestListener(o.fetch, listenerOptions);
-  const ws = getRequestListener(wsExpected, listenerOptions);
-  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_CLIENT_MESSAGE_BYTES });
-
-  const request: Listeners['request'] = (req, res) => {
-    const path = pathOf(req);
-    if (path.startsWith('/api/')) void api(req, res);
-    else if (path === '/ws') void ws(req, res);
-    else o.web(req, res);
-  };
-  const upgrade: Listeners['upgrade'] = (req, socket, head_) => {
-    if (pathOf(req) !== '/ws') {
-      if (!o.dev) socket.destroy();
-      return;
-    }
-    wss.handleUpgrade(req, socket, head_, (client) => attachSocket(o.hub, client));
-  };
-
-  const server: Mounted = o.server;
-  const previous = server[MOUNTED];
-  if (previous) {
-    server.off('request', previous.request);
-    server.off('upgrade', previous.upgrade);
-  }
-  server.on('request', request);
-  server.on('upgrade', upgrade);
-  server[MOUNTED] = { request, upgrade };
+  const { server } = o;
+  server[HOST_APP] = hostApp(o).fetch;
   // Node hands every request with an `Upgrade` header to the `upgrade` listeners, `h2c` included (`curl --http2`):
   // only a WebSocket upgrade goes there, any other is a plain request. Vite's HMR upgrades are WebSocket. One that the
-  // guard refuses on `/ws` stays a plain request too: `wsExpected` answers it, as it answers any refused request.
-  server.shouldUpgradeCallback = (req) =>
+  // guard refuses on `/ws` stays a plain request too: `wsGuard` answers it with its body, as it answers any refused
+  // request (the adapter would refuse an upgrade without one).
+  (server as { shouldUpgradeCallback?: (req: IncomingMessage) => boolean }).shouldUpgradeCallback = (req) =>
     req.headers.upgrade?.toLowerCase() === 'websocket' && (pathOf(req) !== '/ws' || !guard(head(req)));
 
-  const bound = () => (o.server.address() as AddressInfo).port;
-  if (o.server.listening) return Promise.resolve(bound());
+  const bound = () => (server.address() as AddressInfo).port;
+  if (server.listening) return Promise.resolve(bound());
   return new Promise((resolve, reject) => {
-    o.server.once('error', reject);
-    o.server.listen(o.port, o.hostname, () => {
-      o.server.off('error', reject);
+    server.once('error', reject);
+    server.listen(o.port, o.hostname, () => {
+      server.off('error', reject);
       resolve(bound());
     });
   });

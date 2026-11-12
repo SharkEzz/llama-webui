@@ -6,7 +6,8 @@ description: The /ws channel, from connection and guard to the hello message, bo
 llama-webui pushes its live events over one WebSocket, `/ws`. The server side is `WsHub` (`server/ws/hub.ts`), the
 message types are the `WsMessage` union (`packages/webui-shared/src/ws.ts`), and the web app's client is `useWs` and `onWs()`
 (`web/src/lib/ws.ts`). The events themselves are wired in `server/index.ts`. `mount()` (`server/host.ts`) accepts the
-upgrade with the `ws` library and hands each socket to the hub (`attachSocket()`, `server/ws/attach.ts`).
+upgrade with `upgradeWebSocket()` of `@hono/node-server` (the `ws` library underneath) and hands each socket to the hub
+(`hubEvents()`, `server/ws/attach.ts`).
 
 ## Connect
 
@@ -61,7 +62,7 @@ The heartbeat is made of application messages, not WebSocket protocol pings:
   `heartbeat`, and forgets it. A client that stops answering is dropped between 30 and 45 seconds after its last
   `pong`.
 - A client can send `ping` too: the hub answers `pong` right away.
-- A client message larger than 4,096 bytes closes the socket with code `1009` (`maxPayload` in `server/host.ts`):
+- A client message larger than 4,096 bytes closes the socket with code `1009` (`maxPayload` in `server/hostServer.ts`):
   `ping` and `pong` are all a client sends.
 
 On a development reload, `server/index.ts` disposes of the old hub: it closes every client with code `1001`

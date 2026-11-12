@@ -1,9 +1,9 @@
 // `pnpm dev`: one Node process, one port. Vite (middleware mode) serves the UI with HMR, and its ssr environment's
 // module runner evaluates the server entry: a server-side save re-evaluates the entry in the same process, so the
 // globals of `server/runtime.ts` (llama-server, the logs, the monitor) survive it. Run by plain `node` (erasable TS,
-// imports only vite, node:* and `./env.ts`).
+// imports only vite, node:*, `./env.ts` and `./hostServer.ts`).
 import { statSync } from 'node:fs';
-import { createServer, type Server } from 'node:http';
+import type { Server } from 'node:http';
 import { resolve, sep } from 'node:path';
 import {
   createServer as createViteServer,
@@ -12,6 +12,7 @@ import {
   type ViteDevServer,
 } from 'vite';
 import { loadDotEnv, overrideFlag, useEnvProxy } from './env.ts';
+import { createHostServer, type HostServer } from './hostServer.ts';
 
 export interface DevOptions {
   /** The server entry, evaluated by the module runner. */
@@ -24,7 +25,7 @@ export interface DevOptions {
 
 /** What `server/index.ts` mounts on in development: the long-lived HTTP server and Vite's middlewares. */
 export interface DevHost {
-  http: Server;
+  http: HostServer;
   web: ViteDevServer['middlewares'];
 }
 
@@ -33,7 +34,7 @@ export interface DevHost {
  * listen. Resolves after the first evaluation.
  */
 export async function startDev(o: DevOptions): Promise<{ vite: ViteDevServer; http: Server }> {
-  const http = createServer();
+  const http = createHostServer();
   const vite = await createViteServer({
     configFile: resolve(import.meta.dirname, '../vite.config.ts'),
     ...o.config,

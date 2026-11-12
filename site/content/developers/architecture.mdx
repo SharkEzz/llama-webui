@@ -36,8 +36,8 @@ variables fill what the environment lacks, and replace it too with `--env-overri
    external server; the `RunExecutor` and the `BenchRunner`; the Hugging Face client and the `DownloadQueue`; and the
    `PlacementTracker`, which replays the log ring to find the loaded model's placement.
 7. Calls `mount()` with the API (`createApi(deps).fetch`), the hub and the web handler, on the development host's
-   HTTP server or on a new one (see [Routes](#routes)). The first mount listens on the port; a later one swaps the
-   listeners of the previous evaluation.
+   HTTP server or on a new one (see [Routes](#routes)). The first mount listens on the port; a later one replaces the
+   app of the previous evaluation.
 8. Calls `globalThis.__llamaWebuiDispose()` if a previous evaluation left one, to release that instance (see
    [What a reload recreates](#what-a-reload-recreates)). It comes after the new instance is built and mounted, so a
    reload that fails before this point leaves the old one serving.
@@ -74,23 +74,26 @@ The external server watcher (`externalWatcher()` in `server/supervisor/external.
 
 ## Routes
 
-`mount()` in `server/host.ts` routes the requests of the `node:http` server by path:
+The HTTP server comes from `createHostServer()` (`server/hostServer.ts`): `createAdaptorServer()` of
+`@hono/node-server`, the Hono adapter for Node, with the `WebSocketServer({ noServer: true })` of the `ws` library
+for its WebSocket upgrades. Requests and upgrades alike go to the Hono app the last `mount()` (`server/host.ts`) put
+on the server, which routes them by path:
 
-- `/api/*`, handed to the [Hono](https://hono.dev) app built by `createApi()` (`server/api.ts`), through the
-  `getRequestListener()` adapter of `@hono/node-server`;
-- `/ws`: an upgrade runs `guard()`, then goes to a `WebSocketServer({ noServer: true })` of the `ws` library, which
-  hands the socket to the `WsHub` (`attachSocket()`, `server/ws/attach.ts`); a request without an upgrade runs
-  `guard()`, then gets `426`. An upgrade the guard refuses is never handed over as one (`shouldUpgradeCallback`): it
-  stays a plain request, answered by the guard on a connection the server closes. A client message over 4,096 bytes (`maxPayload`: the protocol only has `ping` and `pong`)
-  closes the socket with code `1009`;
+- `/api/*`, handed to the [Hono](https://hono.dev) app built by `createApi()` (`server/api.ts`). `/api` alone is not an
+  API path;
+- `/ws`: `guard()` first, then `upgradeWebSocket()` of `@hono/node-server`, which hands the socket to the `WsHub`
+  (`hubEvents()`, `server/ws/attach.ts`); a request without an upgrade gets `426`. An upgrade the guard refuses is never
+  handed over as one (`shouldUpgradeCallback`): it stays a plain request, answered by the guard on a connection the
+  server closes. A client message over 4,096 bytes (`maxPayload`: the protocol only has `ping` and `pong`) closes the
+  socket with code `1009`;
 - anything else, to the web handler: the UI files and the SPA fallback, so reloading `/chat/12` serves the app.
 
-Only a WebSocket upgrade takes that route: `mount()` sets the server's `shouldUpgradeCallback`, so a request with
-another `Upgrade` header (`h2c`, which `curl --http2` sends) is a plain request. An upgrade on another path is closed in
-production, and left to Vite's HMR WebSocket in development. A `Host` header
-that is not an authority never reaches the app: the HTTP adapter cannot build the request and answers `400` without a
-body, which `mount()` does not rewrite. A second `mount()` on the same server (a
-development reload) removes the listeners of the previous one before adding its own, and only the first one listens.
+Only a WebSocket upgrade takes the upgrade route: `mount()` sets the server's `shouldUpgradeCallback`, so a request with
+another `Upgrade` header (`h2c`, which `curl --http2` sends) is a plain request. An upgrade on another path is refused
+with a `404`, unless another `upgrade` listener is there: in development, Vite's HMR WebSocket takes its own. A `Host`
+header that is not an authority never reaches the app: the HTTP adapter cannot build the request and answers `400`
+without a body. A second `mount()` on the same server (a development reload) replaces the app of the previous one,
+and only the first one listens.
 
 `createApi()` mounts the request guard and the `405` table, defines `/api/health`, then
 mounts the routes of each domain from `server/routes/<domain>.ts` with `.route('/', …)`: `settingsRoutes`,
@@ -140,7 +143,7 @@ client).
 
 A chat generation belongs to the server, not to the HTTP request (see [Chat runs](/developers/server/chat/)). The SSE
 response only subscribes to the run: events `start`, `delta` and `done` (`ChatEvent` in `packages/webui-shared/src/chat.ts`,
-formatted by `formatSse()`), plus a `: ping` comment every `PING_MS = 15_000` ms: a long prompt can be processed
+written by `streamSSE()` of `hono/streaming`), plus a `: ping` comment every `PING_MS = 15_000` ms: a long prompt can be processed
 without sending anything, and a proxy may drop a silent connection (Node's own server has no idle timeout). A client
 that leaves only unsubscribes; the generation goes on, and `GET /api/chat/:id/stream` attaches to it again.
 
@@ -152,10 +155,11 @@ handler `mount()` sends every other path to.
 
 ### Development
 
-`pnpm dev` runs `node server/dev.ts`. `startDev()` creates the `node:http` server and a Vite server in middleware mode
+`pnpm dev` runs `node server/dev.ts`. `startDev()` creates the HTTP server (`createHostServer()`) and a Vite server in middleware mode
 (`appType: 'spa'`), whose HMR WebSocket shares that HTTP server, then publishes both on
-`globalThis.__llamaWebuiDevHost = { http, web }`. The web handler is Vite's middlewares: the UI is transformed on
-request, with hot module replacement. The server entry, `server/index.ts`, is evaluated by the module runner of
+`globalThis.__llamaWebuiDevHost = { http, web }`. The web handler is Vite's middlewares, which answer on Node's own
+response (`nodeWeb()`, `server/routes/web.ts`, then `RESPONSE_ALREADY_SENT`): the UI is transformed on request, with
+hot module replacement. The server entry, `server/index.ts`, is evaluated by the module runner of
 Vite's `ssr` environment (see [The development reload pitfall](#the-development-reload-pitfall)).
 
 ### Production
@@ -300,6 +304,7 @@ therefore has no effect until the process restarts:
 - `packages/llamacpp-js/src/**`, imported by the supervisor and the monitor (`fetchLlama()`, the `/metrics` math)
 - `server/proc.ts`, imported by the supervisor and the collectors (`spawnProc()`, `readText()`)
 - `server/runtime.ts`
+- `server/hostServer.ts` and `server/dev.ts`, which create the development host once
 
 After changing any of them, stop `pnpm dev` with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run it again.
 
@@ -307,7 +312,7 @@ After changing any of them, stop `pnpm dev` with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> 
 
 Everything else `server/index.ts` and `createDeps()` build is created again: the database connection, the WebSocket hub, the repositories,
 `ChatRuns`, `RunExecutor`, `BenchRunner`, the Hugging Face client, the `DownloadQueue`, the `PlacementTracker` and the
-listeners `mount()` puts on the HTTP server. Once it has mounted them, the new evaluation calls the dispose function
+app `mount()` puts on the HTTP server. Once it has mounted them, the new evaluation calls the dispose function
 the previous one left on `globalThis`, then stores its own before it starts any work: an evaluation that throws
 after its mount is released by the next reload like any other.
 It clears the external server timer, unsubscribes from the supervisor, the logs, the monitor and the placement,
