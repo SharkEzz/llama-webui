@@ -1,5 +1,5 @@
 // The HTTP contract of the app as data: every route, the requests sent to it, and how a reply is recorded. Runtime
-// neutral (raw HTTP over node:net, see ./wire.ts) so N6 (Hono) and N8 (Node) replay it unchanged.
+// neutral (raw HTTP over node:net, see ./wire.ts), so a change of server framework or runtime replays it unchanged.
 import { readSse, request, type WireRequest, type WireResponse } from './wire';
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';

@@ -13,7 +13,7 @@ catalog:
   shiki: ^4.6.0
   "@types/node": ^26.6.6
   # The runtime dependencies of the published package (scripts/package.test.ts): exact versions, since an install
-  # from the tarball has no lockfile. Server API, and its RPC types in web (N7); v5 is a refactoring candidate.
+  # from the tarball has no lockfile. Server API, and its RPC types in web; v5 is a refactoring candidate.
   hono: 4.13.18
   # Left out of the server bundle (vite.config.ts): dependencies of the root package, which runs dist/, and of server.
   "@hono/node-server": 2.1.7

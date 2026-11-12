@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
 const dir = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig({
-  // Keep `using` native: the default transform downlevels it (N0(f)).
+  // Keep `using` native: the default transform downlevels it.
   oxc: { target: 'esnext' },
   test: {
     environment: 'node',

@@ -1,7 +1,11 @@
 # Node migration — working notes
 
 Companion to [`2026-11-12-node-migration.md`](./2026-11-12-node-migration.md). Three logs, appended to as the port
-advances. Nothing here is implemented during the port unless the plan says so.
+advanced. Nothing here was implemented during the port unless the plan said so.
+
+**Status (N13):** the port is done and merged into `master`. The findings and the contract divergences are its
+record; the [backlog](#refactoring-and-optimisation-backlog-for-the-r-milestones-after-the-merge) is the input of the
+refactoring milestones (R…), to be planned with the user.
 
 ## Spike findings (N0)
 
