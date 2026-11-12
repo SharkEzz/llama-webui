@@ -1,6 +1,6 @@
 {
   "name": "llamacpp-js",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Talk to llama.cpp: llama-server's HTTP API, its metrics, the --help of its binaries and llama-bench's output.",
   "license": "MIT",
