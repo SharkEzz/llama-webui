@@ -193,6 +193,7 @@ export function cases(ctx: { tmp: string; port: number }): Case[] {
   add('guard', 'GET /api/health (foreign Origin)', bare('GET', '/api/health', { Origin: 'http://evil.example' }));
   add('guard', 'GET /api/health (same Origin)', bare('GET', '/api/health', { Origin: self }));
   add('guard', 'GET /api/health (Host evil.example)', bare('GET', '/api/health', { Host: 'evil.example' }));
+  add('guard', 'GET /api/health (Host a b)', bare('GET', '/api/health', { Host: 'a b' }));
   add('guard', 'GET /api/health (Host localhost)', bare('GET', '/api/health', { Host: `localhost:${ctx.port}` }));
   add('guard', 'POST /api/profiles (foreign Origin)', {
     ...json('POST', '/api/profiles', '{"name":"x","model":"/m.gguf"}'),

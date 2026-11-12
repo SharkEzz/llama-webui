@@ -31,17 +31,30 @@ changes in the plan.
   server, scripts, shared and llamacpp-js tests under `bun test` (Bun's runner answers `vitest` imports and implements
   `node:test`); removing the wrapper's boolean shim fails there and passes under Vitest. Bun's `vi` has no
   `unstubAllGlobals`, so a test that must run on both stubs a global by hand. Bun-only (Bun.serve/Bun.build):
-  `server/routes/routes.test.ts`, `server/routes/web.test.ts`. `tsc -b` on the real tree: clean, no TS2742/TS4023.
+  `server/routes/routes.test.ts` (on Vitest since N6, through `app.request`), `server/routes/web.test.ts`. `tsc -b` on the real tree: clean, no TS2742/TS4023.
   N8: shrink `test:bun` to nothing (drop the script) once Bun no longer runs the app.
 - (N5) Pre-existing bug, kept (no behaviour change in N5): a `Host` that is not a valid authority (`Host: a b`) makes
   Bun hand the handler a relative `req.url`, so `new URL(req.url)` in `guard()` (`server/security.ts`) throws outside
   the `try` of `guarded()` and Bun answers its own 500 instead of 403 `Invalid host`. Not in the golden (runtime
-  specific). Fix in N6, where the guard becomes a Hono middleware: build the URL from the path and the `Host` inside
-  the `try`, answer 403 `Invalid host`, add the case to the contract. Bun's `os.homedir()` ignores a `HOME` changed at
+  specific). Fixed in N6 (user-approved contract change): `guard()` parses `req.url` inside its `try` and answers
+  403 `Invalid host`; the case `GET /api/health (Host a b)` is in the golden. Bun's `os.homedir()` ignores a `HOME` changed at
   run time (Node follows it): the contract normalises the home directory to `<home>`. The contract records only the
   top-level field names of machine-dependent successes (`/api/system/info`, topology, tuning hardware and checks,
   setup, launchpad, bench devices, flags) and has no Hugging Face success (no network): after N6 and N8, check those
   screens (System, Topology, Tuning, first run, Hugging Face search) in the running app.
+- (N6) Hono's `c.json()` sends `application/json` without a charset; the golden (Bun's `Response.json`) has
+  `application/json;charset=utf-8`. `jsonCharset` (`server/http.ts`) rewrites exactly that value, so a route that sets
+  its own type (profile export: `application/json; charset=utf-8`) keeps it. Node's `Response.json` also omits the
+  charset: N8 relies on the same middleware for `errorResponse` and the guard's replies.
+- (N6) `@hono/zod-validator` (`body()`) only parses a media type matching Hono's JSON regex
+  (`^application/([\w.-]+\+)?json$`); the guard admits anything matching `^application/json\b`. Divergence, no golden
+  case: a `body()` route answers `Invalid JSON` to a JSON body sent as `application/json-seq` (or another
+  `application/json<non-word>…` type) where it used to parse it. The `json(check)` routes (object or imperative checks,
+  lookup-first bodies) still read the body whatever the media type, as before.
+- (N6) Order kept from before the port: a body validator runs after `id()` (404 beats 400) but before the handler.
+  Where the handler looked something up or answered a 409 before reading the body (PUT `/api/profiles/:id`: the repo
+  looks the profile up before parsing; sweeps `resume` and `validate`), the body is passed through (`passthrough`) or
+  read in the handler, so an unknown id with a bad body is still 404.
 
 ## Refactoring and optimisation backlog (for the R milestones, after the merge)
 
@@ -57,6 +70,9 @@ gain.
 | Route-level schemas make repo-level `parse` redundant                | `server/db/*`, `server/routes/*`                         | Double validation after N6                                                                                                                                             | planning |
 | `streamSSE` from `hono/streaming`                                    | `server/routes/chat.ts`                                  | Replace the hand-rolled `ReadableStream` SSE                                                                                                                           | planning |
 | Hono v5                                                              | whole server                                             | v5 was at rc during planning; pinned to 4.13.x for the port                                                                                                            | planning |
+| Drop `jsonCharset`                                                   | `server/http.ts`                                         | Only there to keep `;charset=utf-8` byte-identical in the golden; JSON is UTF-8 by definition (RFC 8259), clients ignore it                                            | N6       |
+| Query validators (`validator('query')`) and typed `:id` everywhere   | `server/routes/*`                                        | Queries are still read with `new URL(c.req.url).searchParams` (same decoding as before); a validator would type them for `hc`                                          | N6       |
+| One body path for all routes                                         | `server/http.ts` (`body`, `json`)                        | `body()` (zod, Hono's media-type list) and `json()` (any media type) differ on exotic JSON types; one rule after the port                                              | N6       |
 | `rolldown` and the `vite` peer of `vitest` in the `catalog:`         | `packages/llamacpp-js/package.json`, root `package.json` | `rolldown` pinned at Vite's version by hand; a Vite bump could install a second Rolldown silently                                                                      | N4       |
 | Type check `vitest.config.ts`                                        | root `tsconfig.json`                                     | Root config files are in no project: a mistyped key (`oxc.taget`) passes `pnpm check` and is ignored                                                                   | N4       |
 | Rolldown skip only on a missing package                              | `packages/llamacpp-js/tests/package.test.ts`             | `import('rolldown').catch(() => null)` also skips when the native binding fails to load                                                                                | N4       |

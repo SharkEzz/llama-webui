@@ -20,10 +20,13 @@ function trustedHostname(hostname: string): boolean {
  * Returns an error response, or undefined if the request passes.
  */
 export function guard(req: Request): Response | undefined {
-  const url = new URL(req.url);
-  const host = req.headers.get('host') ?? url.host;
+  // Bun builds `req.url` from the Host header: a Host that is not an authority (`a b`) makes it unparsable too.
+  let url: URL;
+  let host: string;
   let hostname: string;
   try {
+    url = new URL(req.url);
+    host = req.headers.get('host') ?? url.host;
     hostname = new URL(`http://${host}`).hostname;
   } catch {
     return forbidden('Invalid host');

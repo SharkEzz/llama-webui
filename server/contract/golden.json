@@ -4898,6 +4898,15 @@
       "error": "Host not allowed"
     }
   },
+  "GET /api/health (Host a b)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json;charset=utf-8"
+    },
+    "body": {
+      "error": "Invalid host"
+    }
+  },
   "GET /api/health (Host localhost)": {
     "status": 200,
     "headers": {

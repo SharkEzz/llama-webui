@@ -37,3 +37,10 @@ test('guard: write without JSON rejected (simple request CSRF)', () => {
   ).toBeUndefined();
   expect(guard(req('http://127.0.0.1:7860/api/server/stop', { method: 'POST' }))).toBeUndefined(); // no body
 });
+
+test('guard: a Host that is not an authority is a 403, not a crash (Bun builds req.url from it)', async () => {
+  const bad = { url: 'http://a b/api/health', method: 'GET', headers: new Headers({ host: 'a b' }), body: null };
+  const r = guard(bad as unknown as Request);
+  expect(r?.status).toBe(403);
+  expect(await r?.json()).toEqual({ error: 'Invalid host' });
+});
