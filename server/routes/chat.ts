@@ -1,9 +1,9 @@
 import { type ConversationDetail, type ConversationSummary, formatSse } from '@llama-webui/shared';
-import type { Server } from 'bun';
+import { type Context, Hono } from 'hono';
 import type { ChatRun, ChatRuns } from '../chat/runs';
 import type { ConversationsRepo } from '../db/conversations';
 import type { ProfilesRepo } from '../db/profiles';
-import { guarded, HttpError, idParam, jsonObject, notFound } from '../http';
+import { type Env, HttpError, id, json, notFound, object } from '../http';
 import { profilePaths } from '../supervisor/args';
 
 export interface ChatRouteDeps {
@@ -21,8 +21,9 @@ const enc = new TextEncoder();
  * “: ping” comment (a long prompt can be processed without sending anything). A client that leaves only
  * unsubscribes: the generation goes on.
  */
-function sse(req: Request, server: Server<undefined>, run: ChatRun): Response {
-  server.timeout(req, 0);
+function sse(c: Context<Env>, run: ChatRun): Response {
+  // Bun's own server, passed by `api.fetch(req, { server })`; absent under `app.request` in tests.
+  c.env?.server?.timeout(c.req.raw, 0);
   let leave = () => {};
   let ping: ReturnType<typeof setInterval> | undefined;
   const stream = new ReadableStream<Uint8Array>({
@@ -58,69 +59,66 @@ export function chatRoutes({ conversations, profiles, activeProfileId, chatRuns 
     return { ...c, live: isLive(id) };
   };
 
-  return {
-    '/api/chat': {
-      GET: guarded(() =>
-        Response.json(conversations.list().map((c): ConversationSummary => ({ ...c, live: isLive(c.id) }))),
-      ),
-      POST: guarded(async (req) => {
-        const body = await jsonObject(req);
+  return new Hono<Env>()
+    .get('/api/chat', (c) =>
+      c.json(conversations.list().map((c): ConversationSummary => ({ ...c, live: isLive(c.id) }))),
+    )
+    .post(
+      '/api/chat',
+      json((body) => {
         // Omitted: the running server's profile; null: none. `Number(null)` would be 0, a profile that never exists.
-        const raw = body.profileId;
+        const raw = object(body).profileId;
         if (raw !== undefined && raw !== null && !Number.isInteger(raw))
           throw new HttpError(400, 'profileId: expected an integer or null');
-        const id = raw === undefined ? activeProfileId() : (raw as number | null);
+        return { profileId: raw as number | null | undefined };
+      }),
+      (c) => {
+        const raw = c.req.valid('json').profileId;
+        const id = raw === undefined ? activeProfileId() : raw;
         const profile = id !== null ? profiles.get(id) : null;
         if (id !== null && !profile) throw notFound('Profile');
-        const c = conversations.create({
+        const created = conversations.create({
           profileId: profile?.id ?? null,
           modelPath: profile ? profilePaths(profile).model : null,
         });
-        return Response.json(detail(c.id), { status: 201 });
-      }),
-    },
-    '/api/chat/:id': {
-      GET: guarded((req) => Response.json(detail(idParam(req, 'Conversation')))),
-      PATCH: guarded(async (req) => {
-        const id = idParam(req, 'Conversation');
-        conversations.patch(id, await jsonObject(req));
-        return Response.json(detail(id));
-      }),
-      DELETE: guarded(async (req) => {
-        const id = idParam(req, 'Conversation');
-        const run = chatRuns.live(id);
-        if (run) {
-          chatRuns.stop(id);
-          await run.done.catch(() => {});
-        }
-        conversations.delete(id);
-        return new Response(null, { status: 204 });
-      }),
-    },
-    '/api/chat/:id/messages': {
-      POST: guarded(async (req, server) => {
-        const id = idParam(req, 'Conversation');
-        const { content } = await jsonObject(req);
+        return c.json(detail(created.id), 201);
+      },
+    )
+    .get('/api/chat/:id', id('Conversation'), (c) => c.json(detail(c.req.valid('param').id)))
+    .patch('/api/chat/:id', id('Conversation'), json(object), (c) => {
+      const { id } = c.req.valid('param');
+      conversations.patch(id, c.req.valid('json'));
+      return c.json(detail(id));
+    })
+    .delete('/api/chat/:id', id('Conversation'), async (c) => {
+      const { id } = c.req.valid('param');
+      const run = chatRuns.live(id);
+      if (run) {
+        chatRuns.stop(id);
+        await run.done.catch(() => {});
+      }
+      conversations.delete(id);
+      return c.body(null, 204);
+    })
+    .post(
+      '/api/chat/:id/messages',
+      id('Conversation'),
+      json((body) => {
+        const { content } = object(body);
         if (typeof content !== 'string') throw new HttpError(400, 'content: expected a string');
-        return sse(req, server, chatRuns.send(id, content));
+        return { content };
       }),
-    },
-    '/api/chat/:id/regenerate': {
-      POST: guarded((req, server) => sse(req, server, chatRuns.regenerate(idParam(req, 'Conversation')))),
-    },
-    '/api/chat/:id/stop': {
-      POST: guarded((req) => {
-        if (!chatRuns.stop(idParam(req, 'Conversation'))) throw new HttpError(409, 'No reply in progress');
-        return new Response(null, { status: 204 });
-      }),
-    },
-    '/api/chat/:id/stream': {
-      GET: guarded((req, server) => {
-        const id = idParam(req, 'Conversation');
-        if (!conversations.get(id)) throw notFound('Conversation');
-        const run = chatRuns.live(id);
-        return run ? sse(req, server, run) : new Response(null, { status: 204 });
-      }),
-    },
-  };
+      (c) => sse(c, chatRuns.send(c.req.valid('param').id, c.req.valid('json').content)),
+    )
+    .post('/api/chat/:id/regenerate', id('Conversation'), (c) => sse(c, chatRuns.regenerate(c.req.valid('param').id)))
+    .post('/api/chat/:id/stop', id('Conversation'), (c) => {
+      if (!chatRuns.stop(c.req.valid('param').id)) throw new HttpError(409, 'No reply in progress');
+      return c.body(null, 204);
+    })
+    .get('/api/chat/:id/stream', id('Conversation'), (c) => {
+      const { id } = c.req.valid('param');
+      if (!conversations.get(id)) throw notFound('Conversation');
+      const run = chatRuns.live(id);
+      return run ? sse(c, run) : c.body(null, 204);
+    });
 }

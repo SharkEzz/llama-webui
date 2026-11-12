@@ -11,14 +11,11 @@ import type { Database } from './db/sqlite';
 import type { SweepsRepo } from './db/sweeps';
 import type { HfClient } from './hf/client';
 import type { DownloadQueue } from './hf/downloader';
-import { guarded, withMethodNotAllowed } from './http';
 import type { Monitor } from './monitor/monitor';
 import type { PlacementTracker } from './monitor/placement';
-import { benchRoutes } from './routes/bench';
-import { chatRoutes } from './routes/chat';
-import { sweepRoutes } from './routes/sweeps';
 import type { WebRoutes } from './routes/web';
 import type { Runtime } from './runtime';
+import { guard } from './security';
 import type { WsHub } from './ws/hub';
 
 export interface AppDeps {
@@ -47,24 +44,20 @@ export interface AppDeps {
   development: boolean;
 }
 
-/**
- * Every route of the app for `Bun.serve`: the API paths not ported to Hono yet (exact and `:param` paths win over
- * `/api/*` in Bun's router, with the 405s of `withMethodNotAllowed`), then `/api/*` → the Hono API, `/ws`, the UI.
- */
-export function appRoutes(deps: AppDeps) {
+/** Every route of the app for `Bun.serve`: `/api/*` → the Hono API, `/ws`, then the UI. */
+function appRoutes(deps: AppDeps) {
   const api = createApi(deps);
-  return withMethodNotAllowed({
-    ...chatRoutes(deps),
-    ...benchRoutes(deps),
-    ...sweepRoutes(deps),
+  return {
     '/api/*': (req: Request, server: Server<undefined>) => api.fetch(req, { server }),
-    '/ws': guarded((req, server) => {
+    '/ws': (req: Request, server: Server<undefined>) => {
+      const refused = guard(req);
+      if (refused) return refused;
       if (server.upgrade(req)) return undefined;
       return new Response('WebSocket upgrade expected', { status: 426 });
-    }),
+    },
     // Any other path serves the app (SPA fallback `/*`: reloading /chat works).
     ...deps.web,
-  });
+  };
 }
 
 export function createApp(deps: AppDeps) {

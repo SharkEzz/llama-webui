@@ -10,7 +10,7 @@ import { join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
 import { createApi } from '../api';
-import { appRoutes, createApp } from '../app';
+import { createApp } from '../app';
 import { BenchGate } from '../bench/gate';
 import { BenchRunsRepo } from '../db/benchRuns';
 import { ConversationsRepo } from '../db/conversations';
@@ -167,9 +167,8 @@ beforeAll(async () => {
 afterAll(() => app?.dispose());
 
 test('the route table lists every API route of the app', () => {
-  const legacy = Object.keys(appRoutes(app.deps)).filter((p) => p.startsWith('/api/') && p !== '/api/*');
-  const hono = new Set(apiRoutes(createApi(app.deps)).map((r) => r.path));
-  expect(ROUTES.map((r) => r.path).sort()).toEqual([...legacy, ...hono].sort());
+  const registered = new Set(apiRoutes(createApi(app.deps)).map((r) => r.path));
+  expect(ROUTES.map((r) => r.path).sort()).toEqual([...registered].sort());
 });
 
 test('no static API path is registered behind a :param pattern that catches it (#37)', () => {

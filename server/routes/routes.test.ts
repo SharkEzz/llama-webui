@@ -1,13 +1,15 @@
-import { expect, test } from 'bun:test';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { DEFAULT_SETTINGS, type ServerState } from '@llama-webui/shared';
 import type { ServerWebSocket } from 'bun';
+import { expect, test } from 'vitest';
 import { MAX_RUNS } from '../db/benchRuns';
 import { ConversationsRepo } from '../db/conversations';
 import { openDb } from '../db/open';
 import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
-import { errorResponse, guarded, withMethodNotAllowed } from '../http';
+import { errorResponse } from '../http';
 import { tempDir } from '../testing/tempDir';
 import { WsHub } from '../ws/hub';
 import { benchRoutes } from './bench';
@@ -15,43 +17,21 @@ import { chatRoutes } from './chat';
 import { serverRoutes } from './server';
 import { settingsRoutes } from './settings';
 
-const ok = () => new Response('ok');
-const call = (handler: unknown, req: Request, params: Record<string, string> = {}) =>
-  (handler as (r: Request, s: null) => Promise<Response>)(Object.assign(req, { params }), null);
-
-test('a method a route does not define is a 405 with Allow, not the next matching route (#37)', async () => {
-  using server = Bun.serve({
-    port: 0,
-    routes: withMethodNotAllowed({
-      '/api/things/import': { POST: guarded(ok) },
-      '/api/things/:id': { GET: guarded(() => Response.json({ error: 'Thing not found' }, { status: 404 })) },
-      '/api/*': guarded(() => Response.json({ error: 'Unknown route' }, { status: 404 })),
-    }),
-    // `Handler` may return undefined (a WebSocket upgrade), which Bun only accepts with a websocket handler.
-    websocket: { message() {} },
-  });
-  const r = await fetch(`http://127.0.0.1:${server.port}/api/things/import`);
-  expect(r.status).toBe(405);
-  expect(r.headers.get('allow')).toBe('POST');
-  expect(await r.json()).toEqual({ error: 'Method not allowed (POST)' });
-  expect((await fetch(`http://127.0.0.1:${server.port}/api/things/import`, { method: 'POST' })).status).toBe(200);
-  expect((await fetch(`http://127.0.0.1:${server.port}/api/nothing`)).status).toBe(404);
-});
-
 function chat() {
   const dir = tempDir('lw-');
   const db = openDb(join(dir.path, 't.sqlite'));
   const conversations = new ConversationsRepo(db);
   const profiles = new ProfilesRepo(db);
   const p = profiles.create({ name: 'A', model: '/m/a.gguf', args: [], env: {} });
-  const routes = chatRoutes({
+  const app = chatRoutes({
     conversations,
     profiles,
     activeProfileId: () => p.id,
     chatRuns: { live: () => null, isLive: () => false } as never,
   });
+  app.onError((err) => errorResponse(err));
   return {
-    routes,
+    app,
     p,
     [Symbol.dispose]: () => {
       db.close();
@@ -60,37 +40,35 @@ function chat() {
   };
 }
 
-const post = (url: string, body: unknown) =>
-  new Request(`http://127.0.0.1:7860${url}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+const post = (body: unknown): RequestInit => ({
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+});
 
 test('POST /api/chat: profileId null records no profile, omitted the active one, a string is a 400 (#37)', async () => {
   using c = chat();
-  const create = c.routes['/api/chat'].POST;
-  const none = await call(create, post('/api/chat', { profileId: null }));
+  const create = (body: unknown) => c.app.request('/api/chat', post(body));
+  const none = await create({ profileId: null });
   expect(none.status).toBe(201);
   expect(((await none.json()) as { profileId: number | null }).profileId).toBeNull();
-  const active = await call(create, post('/api/chat', {}));
+  const active = await create({});
   expect(((await active.json()) as { profileId: number | null }).profileId).toBe(c.p.id);
-  expect((await call(create, post('/api/chat', { profileId: String(c.p.id) }))).status).toBe(400);
-  expect((await call(create, post('/api/chat', { profileId: 999 }))).status).toBe(404);
+  expect((await create({ profileId: String(c.p.id) })).status).toBe(400);
+  expect((await create({ profileId: 999 })).status).toBe(404);
 });
 
 test('GET /api/chat/:id/stream is a 404 for a conversation that does not exist, a 204 without a reply (#37)', async () => {
   using c = chat();
-  const stream = c.routes['/api/chat/:id/stream'].GET;
-  const req = () => new Request('http://127.0.0.1:7860/api/chat/x/stream');
-  expect((await call(stream, req(), { id: '42' })).status).toBe(404);
-  const created = (await (await call(c.routes['/api/chat'].POST, post('/api/chat', {}))).json()) as { id: number };
-  expect((await call(stream, req(), { id: String(created.id) })).status).toBe(204);
+  expect((await c.app.request('/api/chat/42/stream')).status).toBe(404);
+  const created = (await (await c.app.request('/api/chat', post({}))).json()) as { id: number };
+  expect((await c.app.request(`/api/chat/${created.id}/stream`)).status).toBe(204);
 });
 
 test('/api/server/props: a reply from llama-server that is not JSON is a 502 (#37)', async () => {
-  using llama = Bun.serve({ port: 0, fetch: () => new Response('<html>not json</html>') });
-  const state: ServerState = { kind: 'external', pid: null, port: llama.port! };
+  const llama = createServer((_req, res) => res.end('<html>not json</html>'));
+  await new Promise<void>((r) => llama.listen(0, '127.0.0.1', r));
+  const state: ServerState = { kind: 'external', pid: null, port: (llama.address() as AddressInfo).port };
   const app = serverRoutes({
     runtime: { supervisor: { state, lastCommand: null }, logs: null } as never,
     profiles: null!,
@@ -101,6 +79,7 @@ test('/api/server/props: a reply from llama-server that is not JSON is a 502 (#3
   const r = await app.request('/api/server/props');
   expect(r.status).toBe(502);
   expect(await r.json()).toEqual({ error: 'llama-server /props: the reply is not JSON' });
+  await new Promise((r) => llama.close(r));
 });
 
 test('WsHub ignores a frame that parses to something other than an object (#37)', () => {
@@ -166,7 +145,7 @@ test('pollIntervalMs is capped at 60 s (#37)', async () => {
 
 test('GET /api/bench/runs caps an explicit limit at the sweep default, 10,000 (#37)', async () => {
   const limits: (number | undefined)[] = [];
-  const routes = benchRoutes({
+  const app = benchRoutes({
     benchRuns: {
       list: (f: { limit?: number }) => {
         limits.push(f.limit);
@@ -179,8 +158,7 @@ test('GET /api/bench/runs caps an explicit limit at the sweep default, 10,000 (#
     profiles: null!,
     hub: null!,
   });
-  for (const limit of ['20000', '7000'])
-    await call(routes['/api/bench/runs'].GET, new Request(`http://127.0.0.1:7860/api/bench/runs?limit=${limit}`));
+  for (const limit of ['20000', '7000']) await app.request(`/api/bench/runs?limit=${limit}`);
   expect(limits).toEqual([MAX_RUNS, 7000]);
   expect(MAX_RUNS).toBe(10_000);
 });

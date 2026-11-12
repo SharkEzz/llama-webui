@@ -1,11 +1,12 @@
 import { type BenchSpec, rankRuns, SweepSpecSchema, sweepCtx, withCtx } from '@llama-webui/shared';
+import { Hono } from 'hono';
 import { benchBinary } from 'llamacpp-js/node';
 import { z } from 'zod';
 import type { BenchRunner } from '../bench/runner';
 import type { BenchRunsRepo } from '../db/benchRuns';
 import type { SettingsRepo } from '../db/settings';
 import type { SweepsRepo } from '../db/sweeps';
-import { guarded, HttpError, idParam, jsonObject, notFound } from '../http';
+import { type Env, HttpError, id, json, notFound, object } from '../http';
 import type { Monitor } from '../monitor/monitor';
 import { readTuningHardware } from '../tuning/hardware';
 import { loadModel, mmprojBytes } from '../tuning/models';
@@ -27,8 +28,8 @@ const ValidateRequest = z.strictObject({
 });
 
 export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor, hub }: SweepRouteDeps) {
-  const getSweep = (req: Parameters<typeof idParam>[0]) => {
-    const sw = sweeps.get(idParam(req, 'Sweep'));
+  const getSweep = (id: number) => {
+    const sw = sweeps.get(id);
     if (!sw) throw notFound('Sweep');
     return sw;
   };
@@ -36,11 +37,12 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
     if (status === 'running') throw new HttpError(409, 'This sweep is still running: cancel it first');
   };
 
-  return {
-    '/api/sweeps': {
-      GET: guarded(() => Response.json({ sweeps: sweeps.list(), live: benchRunner.sweepLive })),
-      POST: guarded(async (req) => {
-        const body = await jsonObject(req);
+  return (
+    new Hono<Env>()
+      .get('/api/sweeps', (c) => c.json({ sweeps: sweeps.list(), live: benchRunner.sweepLive }))
+      // The spec is a field of the body: its errors keep their paths (`modelPath`, not `spec.modelPath`).
+      .post('/api/sweeps', json(object), async (c) => {
+        const body = c.req.valid('json');
         const spec = SweepSpecSchema.parse(body.spec);
         const [model, mmproj, hw] = await Promise.all([
           loadModel(spec.modelPath),
@@ -80,34 +82,30 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
           },
           { stopServer: body.stopServer === true },
         );
-        return Response.json({ sweep, items: plan.items.length, excluded: plan.excluded }, { status: 202 });
-      }),
-    },
-    '/api/sweeps/:id': {
-      GET: guarded((req) => {
-        const sweep = getSweep(req);
-        return Response.json({ sweep, runs: benchRuns.list({ sweepId: sweep.id }) });
-      }),
-      DELETE: guarded((req) => {
-        const sweep = getSweep(req);
+        return c.json({ sweep, items: plan.items.length, excluded: plan.excluded }, 202);
+      })
+      .get('/api/sweeps/:id', id('Sweep'), (c) => {
+        const sweep = getSweep(c.req.valid('param').id);
+        return c.json({ sweep, runs: benchRuns.list({ sweepId: sweep.id }) });
+      })
+      .delete('/api/sweeps/:id', id('Sweep'), (c) => {
+        const sweep = getSweep(c.req.valid('param').id);
         notRunning(sweep.status);
         const ids = sweeps.delete(sweep.id);
         hub.broadcast({ type: 'bench-deleted', payload: { ids } });
         hub.broadcast({ type: 'sweep-deleted', payload: { id: sweep.id } });
-        return new Response(null, { status: 204 });
-      }),
-    },
-    '/api/sweeps/:id/cancel': {
-      POST: guarded((req) => {
-        if (!benchRunner.cancelSweep(getSweep(req).id)) throw new HttpError(409, 'This sweep is not running');
-        return new Response(null, { status: 204 });
-      }),
-    },
-    '/api/sweeps/:id/resume': {
-      POST: guarded(async (req) => {
-        const sweep = getSweep(req);
+        return c.body(null, 204);
+      })
+      .post('/api/sweeps/:id/cancel', id('Sweep'), (c) => {
+        if (!benchRunner.cancelSweep(getSweep(c.req.valid('param').id).id))
+          throw new HttpError(409, 'This sweep is not running');
+        return c.body(null, 204);
+      })
+      // resume and validate look the sweep up (404, 409) before reading the body: no body validator, read here.
+      .post('/api/sweeps/:id/resume', id('Sweep'), async (c) => {
+        const sweep = getSweep(c.req.valid('param').id);
         notRunning(sweep.status);
-        const body = await jsonObject(req);
+        const body = object(await c.req.json());
         const started = await benchRunner.startSweep(
           () => {
             benchRuns.requeueInterrupted(sweep.id);
@@ -117,14 +115,12 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
           },
           { stopServer: body.stopServer === true, files: sweep.spec },
         );
-        return Response.json(started, { status: 202 });
-      }),
-    },
-    '/api/sweeps/:id/validate': {
-      POST: guarded(async (req) => {
-        const sweep = getSweep(req);
+        return c.json(started, 202);
+      })
+      .post('/api/sweeps/:id/validate', id('Sweep'), async (c) => {
+        const sweep = getSweep(c.req.valid('param').id);
         notRunning(sweep.status);
-        const { n, stopServer } = ValidateRequest.parse(await jsonObject(req));
+        const { n, stopServer } = ValidateRequest.parse(object(await c.req.json()));
         const explored = benchRuns.list({ sweepId: sweep.id }).filter((r) => r.kind === 'bench');
         const best = rankRuns(explored, sweep.spec.preset, sweepCtx(sweep.spec))
           .filter((x) => x.rank !== null)
@@ -158,8 +154,7 @@ export function sweepRoutes({ sweeps, benchRuns, benchRunner, settings, monitor,
           },
           { stopServer: stopServer === true, files: sweep.spec },
         );
-        return Response.json(started, { status: 202 });
-      }),
-    },
-  };
+        return c.json(started, 202);
+      })
+  );
 }

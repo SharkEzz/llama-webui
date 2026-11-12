@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import type { AppDeps } from './app';
 import { allowTable, apiRoutes, type Env, errorResponse, guardMw, jsonCharset } from './http';
+import { benchRoutes } from './routes/bench';
+import { chatRoutes } from './routes/chat';
 import { hfRoutes } from './routes/hf';
 import { modelRoutes } from './routes/models';
 import { monitorRoutes } from './routes/monitor';
@@ -8,6 +10,7 @@ import { profileRoutes } from './routes/profiles';
 import { serverRoutes } from './routes/server';
 import { settingsRoutes } from './routes/settings';
 import { setupRoutes } from './routes/setup';
+import { sweepRoutes } from './routes/sweeps';
 import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
 import { APP_VERSION } from './version';
@@ -33,7 +36,10 @@ export function createApi(deps: AppDeps) {
     .route('/', setupRoutes(deps))
     .route('/', modelRoutes(deps))
     .route('/', hfRoutes(deps))
-    .route('/', tuningRoutes(deps));
+    .route('/', tuningRoutes(deps))
+    .route('/', chatRoutes(deps))
+    .route('/', benchRoutes(deps))
+    .route('/', sweepRoutes(deps));
   allow.load(apiRoutes(api));
   api.notFound((c) => c.json({ error: 'Unknown route' }, 404));
   api.onError((err) => errorResponse(err));

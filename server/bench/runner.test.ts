@@ -20,7 +20,7 @@ import { afterAll, afterEach, expect, test } from 'vitest';
 import { BenchRunsRepo } from '../db/benchRuns';
 import { openDb } from '../db/open';
 import { SweepsRepo } from '../db/sweeps';
-import { HttpError } from '../http';
+import { errorResponse, HttpError } from '../http';
 import { LogBuffer } from '../logs/buffer';
 import { sweepRoutes } from '../routes/sweeps';
 import type { BuiltCommand } from '../supervisor/args';
@@ -404,7 +404,7 @@ test('validating an interrupted sweep also finishes its interrupted items', asyn
   const second = repo.list({ sweepId: sweep.id }).find((r) => r.sweepLabel === '-ncmoe 2')!;
   repo.finish(second.id, { status: 'interrupted', error: 'interrupted' });
   sweeps.setStatus(sweep.id, 'interrupted');
-  const routes = sweepRoutes({
+  const app = sweepRoutes({
     sweeps,
     benchRuns: repo,
     benchRunner: runner,
@@ -412,17 +412,14 @@ test('validating an interrupted sweep also finishes its interrupted items', asyn
     monitor: null!,
     hub: { broadcast() {} } as never,
   });
-  const req = Object.assign(
-    new Request(`http://127.0.0.1:7860/api/sweeps/${sweep.id}/validate`, {
+  app.onError((err) => errorResponse(err));
+  const req = () =>
+    app.request(`/api/sweeps/${sweep.id}/validate`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ n: 1, stopServer: true }),
-    }),
-    {
-      params: { id: String(sweep.id) },
-    },
-  );
-  expect((await routes['/api/sweeps/:id/validate'].POST(req as never, null as never))!.status).toBe(202);
+    });
+  expect((await req()).status).toBe(202);
   while (sweeps.get(sweep.id)!.status === 'running') await sleep(10);
   expect(repo.list({ sweepId: sweep.id }).filter((r) => r.status === 'interrupted')).toEqual([]);
   expect(sweeps.get(sweep.id)!.status).toBe('done');
@@ -462,7 +459,7 @@ test('server validation runs get the sweep context when the profile sets no -c (
   const { sweep } = sweepOf(repo, sweeps, [1, 2]);
   await runner.startSweep(sweep.id, { stopServer: true });
   await sweepEnd(sweepLives);
-  const routes = sweepRoutes({
+  const app = sweepRoutes({
     sweeps,
     benchRuns: repo,
     benchRunner: runner,
@@ -470,15 +467,14 @@ test('server validation runs get the sweep context when the profile sets no -c (
     monitor: null!,
     hub: { broadcast() {} } as never,
   });
-  const req = Object.assign(
-    new Request(`http://127.0.0.1:7860/api/sweeps/${sweep.id}/validate`, {
+  app.onError((err) => errorResponse(err));
+  const req = () =>
+    app.request(`/api/sweeps/${sweep.id}/validate`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ n: 1, stopServer: true }),
-    }),
-    { params: { id: String(sweep.id) } },
-  );
-  expect((await routes['/api/sweeps/:id/validate'].POST(req as never, null as never))!.status).toBe(202);
+    });
+  expect((await req()).status).toBe(202);
   while (sweeps.get(sweep.id)!.status === 'running') await sleep(10);
   const validation = repo.list({ sweepId: sweep.id }).find((r) => r.kind === 'server')!;
   expect(ctxFromArgs(sweep.spec.serverArgs)).toBeUndefined();
@@ -494,7 +490,7 @@ test('resuming a sweep whose model was deleted is one 400, before anything stops
     { spec: { ...spec, modelPath: '/nulle/part.gguf', r: 1 } as BenchSpec, label: 'x', fit: 'fits' },
   ]);
   sweeps.setStatus(sw.id, 'interrupted');
-  const routes = sweepRoutes({
+  const app = sweepRoutes({
     sweeps,
     benchRuns: repo,
     benchRunner: runner,
@@ -502,15 +498,14 @@ test('resuming a sweep whose model was deleted is one 400, before anything stops
     monitor: null!,
     hub: { broadcast() {} } as never,
   });
-  const req = Object.assign(
-    new Request(`http://127.0.0.1:7860/api/sweeps/${sw.id}/resume`, {
+  app.onError((err) => errorResponse(err));
+  const req = () =>
+    app.request(`/api/sweeps/${sw.id}/resume`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ stopServer: true }),
-    }),
-    { params: { id: String(sw.id) } },
-  );
-  const res = (await routes['/api/sweeps/:id/resume'].POST(req as never, null as never))!;
+    });
+  const res = await req();
   expect(res.status).toBe(400);
   expect(((await res.json()) as { error: string }).error).toBe('Model not found: /nulle/part.gguf');
   expect(calls).toEqual([]);

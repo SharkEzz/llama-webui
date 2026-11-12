@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import type { BunRequest, Server } from 'bun';
+import type { Server } from 'bun';
 import type { Hono, MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { validator } from 'hono/validator';
@@ -54,42 +54,11 @@ export function errorResponse(err: unknown): Response {
   return Response.json({ error: 'Internal error' }, { status: 500 });
 }
 
-export type Handler = (
-  req: BunRequest<string>,
-  server: Server<undefined>,
-) => Response | undefined | Promise<Response | undefined>;
-
-/** Applies the guard (host, origin, JSON) then the handler; any exception becomes a JSON response. */
-export function guarded(handler: Handler): Handler {
-  return async (req, server) => {
-    const refused = guard(req);
-    if (refused) return refused;
-    try {
-      return await handler(req, server);
-    } catch (err) {
-      return errorResponse(err);
-    }
-  };
-}
-
-/** Positive integer route parameter (`:id`), otherwise 404. */
-export function idParam(req: BunRequest<string>, what: string): number {
-  const raw = (req.params as Record<string, string>).id;
-  const id = Number(raw);
-  if (!Number.isInteger(id) || id <= 0) throw notFound(what);
-  return id;
-}
-
 /** A JSON object, otherwise 400. */
 export function object(body: unknown): Record<string, unknown> {
   if (typeof body !== 'object' || body === null || Array.isArray(body))
     throw new HttpError(400, 'JSON object expected');
   return body as Record<string, unknown>;
-}
-
-/** JSON object body, otherwise 400. */
-export async function jsonObject(req: Request): Promise<Record<string, unknown>> {
-  return object(await req.json());
 }
 
 /** The guard of `server/security.ts` (host, origin, JSON) ahead of every API route. */
@@ -222,30 +191,4 @@ export function allowTable() {
     }
   };
   return { mw, load };
-}
-
-const isMethodMap = (v: unknown): v is Partial<Record<(typeof METHODS)[number], Handler>> =>
-  typeof v === 'object' &&
-  v !== null &&
-  !(v instanceof Response) &&
-  Object.keys(v).length > 0 &&
-  Object.keys(v).every((k) => (METHODS as readonly string[]).includes(k));
-
-/**
- * Gives every `/api/…` route defined by methods a `405` (with `Allow`) for the methods it lacks. Without it, Bun goes
- * on to the next matching route: `GET /api/profiles/import` (POST only) reached `/api/profiles/:id`.
- */
-export function withMethodNotAllowed<T extends Record<string, unknown>>(routes: T): T {
-  const out: Record<string, unknown> = { ...routes };
-  for (const [path, value] of Object.entries(routes)) {
-    if (!path.startsWith('/api/') || !isMethodMap(value)) continue;
-    const allow = METHODS.filter((m) => m in value).join(', ');
-    const refuse = guarded(() =>
-      Response.json({ error: `Method not allowed (${allow})` }, { status: 405, headers: { Allow: allow } }),
-    );
-    const full: Record<string, Handler> = { ...value } as Record<string, Handler>;
-    for (const m of METHODS) full[m] ??= refuse;
-    out[path] = full;
-  }
-  return out as T;
 }
