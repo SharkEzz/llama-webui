@@ -16,7 +16,7 @@ bun test
 ```
 
 Bun's runner looks for `*.test.ts` files (and the other test suffixes) in every folder except `node_modules` and hidden
-ones, so this runs the tests of `server/`, `shared/`, `web/` and `site/`. It is the command CI runs.
+ones, so this runs the tests of `server/`, `packages/webui-shared/`, `web/` and `site/`. It is the command CI runs.
 
 The root `test` script is `bun test` too: `bun run test` runs the same files.
 
@@ -37,7 +37,7 @@ A test file sits next to its module: `server/bench/parse.test.ts` tests `server/
 | Folder     | What the tests cover                                                                                                                                                                      |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `server/`  | Parsers (`llama-bench` output, `/metrics`, `/slots`, `nvidia-smi`, AMD sysfs and fdinfo, `perf`, startup logs, PCI topology), GGUF reading and the model scan, `llama-server` command lines, external-server detection, tuning, repositories, the bench runner and gate, chat runs, Hugging Face downloads, the security guard, CLI flags, the setup report, the production front-end build |
-| `shared/`  | Pure logic used on both sides: flags from `--help`, benchmark parameters, profile import, sweeps, the SSE parser, chat stats and titles, logs, topology, models, setup checks, Hugging Face inputs, `defer` |
+| `packages/webui-shared/`  | Pure logic used on both sides: flags from `--help`, benchmark parameters, profile import, sweeps, the SSE parser, chat stats and titles, logs, topology, models, setup checks, Hugging Face inputs, `defer` |
 | `web/src/` | Pure UI logic: the Topology page's flows, layout, pacing and smoothing (`web/src/features/topology/`), the benchmark form mapping (`web/src/lib/bench.ts`)                                 |
 | `site/`    | The link checker helpers, the sidebar and content routes, the landing page's telemetry simulation                                                                                         |
 
@@ -90,13 +90,13 @@ tested against them rather than against hand-written strings. Biome does not che
 
 | File                                                   | What it is                                               | Read by                                 |
 | ------------------------------------------------------ | -------------------------------------------------------- | --------------------------------------- |
-| `llama-server-help.txt`                                | `llama-server --help`                                    | `shared/src/flags.test.ts`              |
+| `llama-server-help.txt`                                | `llama-server --help`                                    | `packages/webui-shared/src/flags.test.ts`              |
 | `llama-server-load.txt`, `llama-server-load-mtp.txt`, `llama-server-load-mtp-lv5.txt`, `llama-server-load-tensor.txt` | Startup logs (with MTP, at `-lv 5`, and the `Meta()` buffers of `-sm tensor`) | `server/monitor/placement.test.ts` |
 | `metrics-idle.txt`, `metrics-after.txt`                | Prometheus `/metrics`, idle and after generating tokens  | `server/collectors/llama.test.ts`       |
 | `slots-idle.json`, `slots-busy.json`                   | `/slots`, idle and busy                                  | `server/collectors/llama.test.ts`       |
 | `nvidia-gpu.csv`, `nvidia-apps.csv`                    | `nvidia-smi` CSV queries (GPUs, compute apps)            | `server/collectors/nvidia.test.ts`      |
 | `fdinfo-amd-vram.txt`, `fdinfo-amd-igpu.txt`, `fdinfo-other.txt` | `/proc/<pid>/fdinfo` entries (AMD card, AMD iGPU, another driver) | `server/collectors/amdgpu.test.ts` |
-| `llama-tui-config.json`                                | A llama-tui configuration to import                      | `shared/src/profile.test.ts`            |
+| `llama-tui-config.json`                                | A llama-tui configuration to import                      | `packages/webui-shared/src/profile.test.ts`            |
 | `llama-bench/ok.json`, `oom-stdout.json`, `oom-stderr.txt` | `llama-bench -o json` output, and an out-of-memory failure | `server/bench/parse.test.ts`, the fake `llama-bench` |
 | `llama-bench/list-devices.txt`                         | `llama-bench --list-devices`                             | `server/bench/parse.test.ts`, the fake `llama-bench` |
 | `fake/`                                                | The fake binaries and the files they serve               | See below                               |
@@ -216,14 +216,14 @@ The `check` script runs three type checks with Bun's built-in checker (`bun chec
 
 | Step                                    | Project                                          | Covers                                                    |
 | --------------------------------------- | ------------------------------------------------ | --------------------------------------------------------- |
-| `bun check --no-script`                 | `tsconfig.json`                                  | `server/` and `shared/`                                   |
-| `bun check -p web`                      | `web/tsconfig.json`                              | `web/src/`, with `shared/` through the workspace          |
+| `bun check --no-script`                 | `tsconfig.json`                                  | `server/` and `packages/webui-shared/`                                   |
+| `bun check -p web`                      | `web/tsconfig.json`                              | `web/src/`, with `packages/webui-shared/` through the workspace          |
 | `bun run --cwd site typecheck`          | `site/tsconfig.json`                             | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types |
 
 At the root, a plain `bun check` runs the `check` script itself; `--no-script` makes it run the type checker. The three
 projects do not enable the same options:
 
-| Option                                                          | Root (`server/`, `shared/`) | `web/` | `site/` |
+| Option                                                          | Root (`server/`, `packages/webui-shared/`) | `web/` | `site/` |
 | --------------------------------------------------------------- | --------------------------- | ------ | ------- |
 | `strict`, `verbatimModuleSyntax`, `noFallthroughCasesInSwitch`  | yes                         | yes    | yes     |
 | `noUncheckedIndexedAccess`                                      | yes                         | no     | yes     |

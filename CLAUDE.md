@@ -40,7 +40,7 @@ Use `bun check` to type check the project. It reads `tsconfig.json` and reports 
 
 ## Format et lint (Biome)
 
-Biome (devDependency épinglée, config dans `biome.json`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`server/`, `shared/` et `web/`). `web/src/components/ui/**` (shadcn généré) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn.
+Biome (devDependency épinglée, config dans `biome.json`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`server/`, `packages/webui-shared/` et `web/`). `web/src/components/ui/**` (shadcn généré) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn.
 
 - `bun run lint` : vérifie format + lint + imports (lecture seule) ; `bun run lint:fix` applique les corrections sûres.
 - **Avant de clore un jalon / milestone / lot de travail** (et avant de commiter ou d'ouvrir une PR), tout doit être vert : `bun run lint`, `bun run check`, `bun test`. Zéro erreur et zéro warning Biome.
@@ -48,7 +48,7 @@ Biome (devDependency épinglée, config dans `biome.json`) gère le format, le l
 
 ## Langue
 
-L'UI, les messages du serveur (erreurs, validations zod, logs, `--help`), les commentaires, les noms de tests, les messages de commit et les PR sont **en anglais**. Nombres, dates et unités passent par `web/src/lib/format.ts` (`LOCALE = 'en-US'` de `shared/src/format.ts`, `num`, `fmt`, `plural`, `formatBytes` en KiB/MiB/GiB…), côté serveur par `fmtInt` (`shared/src/format.ts`) : pas de locale codée en dur. Le web ne compare jamais un texte de message du serveur : utiliser un `code` (`HttpError`) ou un helper partagé (`isOomError`, `isDefaultTitle`).
+L'UI, les messages du serveur (erreurs, validations zod, logs, `--help`), les commentaires, les noms de tests, les messages de commit et les PR sont **en anglais**. Nombres, dates et unités passent par `web/src/lib/format.ts` (`LOCALE = 'en-US'` de `packages/webui-shared/src/format.ts`, `num`, `fmt`, `plural`, `formatBytes` en KiB/MiB/GiB…), côté serveur par `fmtInt` (`packages/webui-shared/src/format.ts`) : pas de locale codée en dur. Le web ne compare jamais un texte de message du serveur : utiliser un `code` (`HttpError`) ou un helper partagé (`isOomError`, `isDefaultTitle`).
 
 ## Frontend
 
@@ -142,31 +142,31 @@ Le site public (page d'accueil, doc utilisateur, doc développeur) vit dans `sit
 - **Captures d'écran (`site/public/screenshots/<nom>-<dark|light>[-800].webp`) :** elles viennent d'une **instance démo** (jamais l'instance de tous les jours), lancée avec un home neutre pour qu'aucun chemin personnel n'apparaisse : `env -u HF_TOKEN HOME=/home/demo PATH="/home/demo/llama.cpp/build/bin:$PATH" bun run start --host 0.0.0.0 --port 7861` (`/home/demo/models` → dossier des modèles, `/home/demo/llama.cpp/build/bin` en liens physiques : l'app fait un `realpath` du binaire). `bun run --cwd site demo-seed setup bench sweep start chat` remplit l'instance (vrais modèles sur les GPU : demander à l'utilisateur de les libérer), puis `bun run --cwd site screenshots [nom…]` capture en Chromium headless (sombre et clair) ; `demo-seed generate` puis `screenshots --live` pour Dashboard/System/Topology. Liste et mise en scène des écrans : `site/scripts/shots.ts`. Une modification d'UI qui change un écran capturé → refaire sa capture (et `bun run --cwd site og` si c'est le Dashboard : image Open Graph). La page d'accueil reproduit aussi en React des écrans de l'app, avec leurs vraies valeurs (Dashboard animé du hero, éditeur d'arguments, recommandation Tuning, etc. dans `site/src/landing/`) : les mettre à jour avec eux.
 - **Synchroniser la doc avec le code (obligatoire) :** toute modification d'une fonctionnalité, de l'UI, d'une route API, d'un message WebSocket, d'un flag CLI, d'un réglage ou de l'architecture met à jour, **dans la même PR**, la ou les pages correspondantes de `site/content/` (la référence API est écrite à la main : elle dérive si on l'oublie). Correspondance code → pages (chemins sous `site/content/`) :
 
-| Code modifié                                                                          | Pages à mettre à jour                                                                               |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `server/routes/<domaine>.ts`, `server/app.ts` (→ `app`), schémas zod de `shared/src/` | `developers/api/<domaine>.mdx` + la page utilisateur de la fonctionnalité                           |
-| `shared/src/ws.ts`, `server/ws/`                                                      | `developers/api/websocket.mdx`                                                                      |
-| `server/cli.ts`, `server/paths.ts`, variables d'environnement                         | `docs/configuration.mdx`, `developers/architecture.mdx`                                             |
-| `server/security.ts`, `server/http.ts`                                                | `docs/security.mdx`, `developers/server/security.mdx`, `developers/api/overview.mdx`                |
-| `server/supervisor/**`                                                                | `developers/server/supervisor.mdx`, `docs/server.mdx`                                               |
-| `server/logs/**`                                                                      | `developers/server/supervisor.mdx`, `developers/api/server.mdx`, `docs/logs.mdx`                    |
-| `server/monitor/**`, `server/collectors/**`                                           | `developers/server/monitor.mdx`, `docs/dashboard.mdx`, `docs/system.mdx`, `docs/topology.mdx`       |
-| `server/hardware/**` (PCI, CPU)                                                       | `developers/api/topology.mdx`, `developers/api/monitor.mdx`, `docs/topology.mdx`, `docs/system.mdx` |
-| `server/chat/**`                                                                      | `developers/server/chat.mdx`, `docs/chat.mdx`                                                       |
-| `server/bench/**`                                                                     | `developers/server/bench.mdx`, `docs/benchmark.mdx`, `docs/sweeps.mdx`                              |
-| `shared/src/tuning.ts`, `server/tuning/**`                                            | `developers/server/tuning.mdx`, `docs/tuning.mdx`, `docs/sweeps.mdx`, guides concernés              |
-| `server/hf/**`                                                                        | `developers/server/hugging-face.mdx`, `docs/hugging-face.mdx`                                       |
-| `server/models/**` (scan, GGUF)                                                       | `developers/api/models.mdx`, `docs/models.mdx`                                                      |
-| `server/setup.ts`                                                                     | `developers/api/setup.mdx`, `docs/getting-started/first-run.mdx`                                    |
-| `server/llamatui.ts`                                                                  | `developers/api/profiles.mdx`, `docs/profiles.mdx`                                                  |
-| `server/db/**` (migrations, tables)                                                   | `developers/server/database.mdx`                                                                    |
-| `web/src/features/home/setup/**`                                                      | `docs/getting-started/first-run.mdx`                                                                |
-| `web/src/features/<page>/**`                                                          | `docs/<page>.mdx` (`bench` → `benchmark`, HF de `models` → `hugging-face`), captures                |
-| `web/src/app/**`, `web/src/lib/**`, `web/src/components/**`                           | `developers/frontend.mdx`                                                                           |
-| `shared/src/**` (nouveau module, rôle d'un module)                                    | `developers/shared.mdx`                                                                             |
-| `shared/src/settings.ts`, page Settings                                               | `docs/settings.mdx`, `developers/api/app.mdx`                                                       |
-| `server/index.ts`, `server/runtime.ts`, `server/routes/web.ts`, piège `bun --hot`     | `developers/architecture.mdx`                                                                       |
-| scripts `package.json`, arborescence du dépôt                                         | `developers/getting-started.mdx`                                                                    |
-| `server/testing/**`, `testdata/**` (fakes, fixtures)                                  | `developers/contributing/testing.mdx`                                                               |
-| prérequis / installation (README)                                                     | `docs/getting-started/requirements.mdx`, `docs/getting-started/installation.mdx`                    |
-| conventions de ce fichier (Biome, langue, tests, doc)                                 | `developers/contributing/*.mdx`                                                                     |
+| Code modifié                                                                                         | Pages à mettre à jour                                                                               |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `server/routes/<domaine>.ts`, `server/app.ts` (→ `app`), schémas zod de `packages/webui-shared/src/` | `developers/api/<domaine>.mdx` + la page utilisateur de la fonctionnalité                           |
+| `packages/webui-shared/src/ws.ts`, `server/ws/`                                                      | `developers/api/websocket.mdx`                                                                      |
+| `server/cli.ts`, `server/paths.ts`, variables d'environnement                                        | `docs/configuration.mdx`, `developers/architecture.mdx`                                             |
+| `server/security.ts`, `server/http.ts`                                                               | `docs/security.mdx`, `developers/server/security.mdx`, `developers/api/overview.mdx`                |
+| `server/supervisor/**`                                                                               | `developers/server/supervisor.mdx`, `docs/server.mdx`                                               |
+| `server/logs/**`                                                                                     | `developers/server/supervisor.mdx`, `developers/api/server.mdx`, `docs/logs.mdx`                    |
+| `server/monitor/**`, `server/collectors/**`                                                          | `developers/server/monitor.mdx`, `docs/dashboard.mdx`, `docs/system.mdx`, `docs/topology.mdx`       |
+| `server/hardware/**` (PCI, CPU)                                                                      | `developers/api/topology.mdx`, `developers/api/monitor.mdx`, `docs/topology.mdx`, `docs/system.mdx` |
+| `server/chat/**`                                                                                     | `developers/server/chat.mdx`, `docs/chat.mdx`                                                       |
+| `server/bench/**`                                                                                    | `developers/server/bench.mdx`, `docs/benchmark.mdx`, `docs/sweeps.mdx`                              |
+| `packages/webui-shared/src/tuning.ts`, `server/tuning/**`                                            | `developers/server/tuning.mdx`, `docs/tuning.mdx`, `docs/sweeps.mdx`, guides concernés              |
+| `server/hf/**`                                                                                       | `developers/server/hugging-face.mdx`, `docs/hugging-face.mdx`                                       |
+| `server/models/**` (scan, GGUF)                                                                      | `developers/api/models.mdx`, `docs/models.mdx`                                                      |
+| `server/setup.ts`                                                                                    | `developers/api/setup.mdx`, `docs/getting-started/first-run.mdx`                                    |
+| `server/llamatui.ts`                                                                                 | `developers/api/profiles.mdx`, `docs/profiles.mdx`                                                  |
+| `server/db/**` (migrations, tables)                                                                  | `developers/server/database.mdx`                                                                    |
+| `web/src/features/home/setup/**`                                                                     | `docs/getting-started/first-run.mdx`                                                                |
+| `web/src/features/<page>/**`                                                                         | `docs/<page>.mdx` (`bench` → `benchmark`, HF de `models` → `hugging-face`), captures                |
+| `web/src/app/**`, `web/src/lib/**`, `web/src/components/**`                                          | `developers/frontend.mdx`                                                                           |
+| `packages/webui-shared/src/**` (nouveau module, rôle d'un module)                                    | `developers/shared.mdx`                                                                             |
+| `packages/webui-shared/src/settings.ts`, page Settings                                               | `docs/settings.mdx`, `developers/api/app.mdx`                                                       |
+| `server/index.ts`, `server/runtime.ts`, `server/routes/web.ts`, piège `bun --hot`                    | `developers/architecture.mdx`                                                                       |
+| scripts `package.json`, arborescence du dépôt                                                        | `developers/getting-started.mdx`                                                                    |
+| `server/testing/**`, `testdata/**` (fakes, fixtures)                                                 | `developers/contributing/testing.mdx`                                                               |
+| prérequis / installation (README)                                                                    | `docs/getting-started/requirements.mdx`, `docs/getting-started/installation.mdx`                    |
+| conventions de ce fichier (Biome, langue, tests, doc)                                                | `developers/contributing/*.mdx`                                                                     |

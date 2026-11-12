@@ -5,7 +5,7 @@ description: The route that returns the machine's PCIe graph read from sysfs and
 
 `GET /api/topology` returns what the [Topology](/docs/topology/) page draws: the hardware graph (CPU, memory, GPUs,
 NVMe drives, chipsets and their PCIe links) and how the loaded model is split across devices. The route lives in
-`server/routes/topology.ts`; the types and the pure helpers are in `shared/src/topology.ts`, the graph reader in
+`server/routes/topology.ts`; the types and the pure helpers are in `packages/webui-shared/src/topology.ts`, the graph reader in
 `server/hardware/pci.ts`, the placement tracker in `server/monitor/placement.ts`.
 
 The guard and the error shape follow the common rules of the [API overview](/developers/api/overview/).
@@ -167,7 +167,7 @@ Every change is pushed as the `placement` message of the [WebSocket](/developers
 
 ## Helpers in shared
 
-`shared/src/topology.ts` holds the pure logic the UI uses with this payload:
+`packages/webui-shared/src/topology.ts` holds the pure logic the UI uses with this payload:
 
 | Export              | What it does                                                                                         |
 | ------------------- | ---------------------------------------------------------------------------------------------------- |

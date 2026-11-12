@@ -4,7 +4,7 @@ description: The latest monitoring snapshot, the full history of the series, and
 ---
 
 These routes expose what the monitor samples on every tick: the latest `Snapshot`, the history of every series, and
-the identity of the CPU and GPUs. They live in `server/routes/monitor.ts`; the types are in `shared/src/monitor.ts`,
+the identity of the CPU and GPUs. They live in `server/routes/monitor.ts`; the types are in `packages/webui-shared/src/monitor.ts`,
 the sampling in `server/monitor/` and `server/collectors/` (see [Monitor and collectors](/developers/server/monitor/)).
 The [Dashboard](/docs/dashboard/) and [System](/docs/system/) pages are built on them.
 
@@ -115,7 +115,7 @@ curl http://127.0.0.1:7860/api/system/info
 
 ## The Snapshot structure
 
-A `Snapshot` (`shared/src/monitor.ts`) is the state of one tick. When no server is active (supervisor `idle` or
+A `Snapshot` (`packages/webui-shared/src/monitor.ts`) is the state of one tick. When no server is active (supervisor `idle` or
 `crashed`), the `llama-server` fields are null or empty and only the machine is sampled; `starting`, `ready`,
 `stopping` and `external` count as active.
 
@@ -286,7 +286,7 @@ The `llama-server` process; null without a PID or when it could not be read.
 
 ## History series
 
-The keys of `series` and `points`, from `SERIES` in `shared/src/monitor.ts`. `<key>` is a `GpuSample.key`.
+The keys of `series` and `points`, from `SERIES` in `packages/webui-shared/src/monitor.ts`. `<key>` is a `GpuSample.key`.
 
 | Key                      | Value                                                 |
 | ------------------------ | ----------------------------------------------------- |

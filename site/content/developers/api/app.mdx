@@ -4,7 +4,7 @@ description: The routes server/app.ts defines itself, the health check and the s
 ---
 
 `server/app.ts` defines a few routes itself, next to the domain tables it spreads in: the health check, the settings,
-the `/api/*` fallback and the `/ws` upgrade. The settings schema is `SettingsSchema` (`shared/src/settings.ts`), stored
+the `/api/*` fallback and the `/ws` upgrade. The settings schema is `SettingsSchema` (`packages/webui-shared/src/settings.ts`), stored
 by `SettingsRepo` (`server/db/settings.ts`). The common rules (guard, error shape, `400` on invalid data) are on the
 [API overview](/developers/api/overview/).
 
@@ -41,7 +41,7 @@ and are not part of this schema.
 
 ### Settings fields
 
-`Settings` (`shared/src/settings.ts`). Every field has a default, so a fresh database returns `DEFAULT_SETTINGS`.
+`Settings` (`packages/webui-shared/src/settings.ts`). Every field has a default, so a fresh database returns `DEFAULT_SETTINGS`.
 
 | Field                     | Type                                          | Default        | Limits                 | Description                                                                                                                                                                 |
 | ------------------------- | --------------------------------------------- | -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

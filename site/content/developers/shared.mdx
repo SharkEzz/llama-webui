@@ -3,22 +3,22 @@ title: Shared package
 description: What @llama-webui/shared holds, module by module, why the zod schemas live there, and the pure logic the server and the web app share.
 ---
 
-`@llama-webui/shared` (`shared/src/`) holds what the server and the web app must agree on: the types of every API
+`@llama-webui/shared` (`packages/webui-shared/src/`) holds what the server and the web app must agree on: the types of every API
 response and WebSocket message, the zod schemas of request bodies and settings, and pure functions that both sides
 run. It has no build step and one dependency, zod.
 
 ## The package
 
-`shared/package.json` exports its TypeScript sources directly (`"exports": { ".": "./src/index.ts" }`). `server` and
+`packages/webui-shared/package.json` exports its TypeScript sources directly (`"exports": { ".": "./src/index.ts" }`). `server` and
 `web` depend on it as `workspace:*`, and the root `tsconfig.json` maps `@llama-webui/shared` to
-`shared/src/index.ts`. `index.ts` re-exports every module, so both sides import from the package root and never from a
+`packages/webui-shared/src/index.ts`. `index.ts` re-exports every module, so both sides import from the package root and never from a
 file path:
 
 ```ts title="web/src/lib/logs.ts"
 import { EMPTY_LOG_VIEW, type LogLine, type LogView, mergeLogs, onBoot } from '@llama-webui/shared';
 ```
 
-Tests sit next to their module (`shared/src/<module>.test.ts`) and run with `bun test`.
+Tests sit next to their module (`packages/webui-shared/src/<module>.test.ts`) and run with `bun test`.
 
 ## Modules
 
@@ -49,7 +49,7 @@ Tests sit next to their module (`shared/src/<module>.test.ts`) and run with `bun
 A schema is written once and gives two things: the server validates with it, and both sides get its TypeScript type
 with `z.infer`.
 
-```ts title="shared/src/settings.ts"
+```ts title="packages/webui-shared/src/settings.ts"
 export const SettingsSchema = z.object({
   binary: z.string().min(1, 'Required').default('llama-server'),
   // …
@@ -74,7 +74,7 @@ export const DEFAULT_SETTINGS: Settings = SettingsSchema.parse({});
   `SettingsSchema.parse({})`), and the validation messages the user reads ("Port between 1 and 65535",
   "expected an absolute path") are written in the schema.
 
-Shared rules are shared through the schema too. `serverArgsField` (`shared/src/bench.ts`), used by both
+Shared rules are shared through the schema too. `serverArgsField` (`packages/webui-shared/src/bench.ts`), used by both
 `BenchSpecSchema` and `SweepSpecSchema`, rejects the flags llama-webui sets itself (`RESERVED_FLAGS`: `--host`,
 `--port`, `--metrics`, `--slots`, `--props`, `-m`, `--model`, `-mm`, `--mmproj`) at the index of the offending argument,
 the same rule `ProfileInputSchema` applies to a profile's `args`.
@@ -112,5 +112,5 @@ reached into the server would drag server code into the UI, and one that needed 
 Inputs that depend on the environment are passed in instead of read: `profileModelPath()` takes the home directory as
 an argument and expands `~` itself, without `node:os` or `node:path`.
 
-The root type check (`bun check --no-script`) compiles `shared/` with `lib: ["ESNext"]` and no DOM types, so a DOM API
+The root type check (`bun check --no-script`) compiles `packages/webui-shared/` with `lib: ["ESNext"]` and no DOM types, so a DOM API
 in a shared module fails there.

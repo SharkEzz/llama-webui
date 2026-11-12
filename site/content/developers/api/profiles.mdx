@@ -5,7 +5,7 @@ description: Create, read, update, delete and duplicate llama-server profiles, e
 
 A profile is a saved `llama-server` launch: a model, optional projector, working directory, host, port, arguments and
 environment. The routes are in `server/routes/profiles.ts`, the storage in `ProfilesRepo` (`server/db/profiles.ts`),
-the llama-tui reader in `server/llamatui.ts`, and the schema and import parser in `shared/src/profile.ts`. The common
+the llama-tui reader in `server/llamatui.ts`, and the schema and import parser in `packages/webui-shared/src/profile.ts`. The common
 rules are on the [API overview](/developers/api/overview/); the Profiles page is described on
 [Profiles](/docs/profiles/).
 
@@ -13,7 +13,7 @@ rules are on the [API overview](/developers/api/overview/); the Profiles page is
 
 ### ProfileInput
 
-`ProfileInputSchema` (`shared/src/profile.ts`) is the body of a create or an update, and the import and export format.
+`ProfileInputSchema` (`packages/webui-shared/src/profile.ts`) is the body of a create or an update, and the import and export format.
 It is the profile format of llama-tui. The object is strict: an unknown key is refused (`Unrecognized key`).
 
 | Field    | Type                     | Required | Description                                                                                                              |
@@ -184,7 +184,7 @@ curl -o profiles.json http://127.0.0.1:7860/api/profiles/export
 
 <Endpoint method="POST" path="/api/profiles/import" />
 
-Adds the profiles of a JSON document. `parseProfileImport()` (`shared/src/profile.ts`) accepts:
+Adds the profiles of a JSON document. `parseProfileImport()` (`packages/webui-shared/src/profile.ts`) accepts:
 
 - a whole llama-tui configuration, `{ "profiles": [...] }` (its other keys are ignored), which is also the export
   format;

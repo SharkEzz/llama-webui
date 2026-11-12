@@ -6,7 +6,7 @@ description: The first-run setup report and the launch pad cards of the Home pag
 Two read-only routes feed the Home page (`server/routes/setup.ts`): the setup report behind the
 [first-run checklist](/docs/getting-started/first-run/), and the cards of the [launch pad](/docs/home/). The work is
 done by `buildSetupReport()` and `buildLaunchpad()` (`server/setup.ts`), the types are `SetupReport` and
-`LaunchpadEntry` (`shared/src/setup.ts`). The common rules are on the [API overview](/developers/api/overview/).
+`LaunchpadEntry` (`packages/webui-shared/src/setup.ts`). The common rules are on the [API overview](/developers/api/overview/).
 
 ## Setup report
 
@@ -47,7 +47,7 @@ It runs commands and reads the disk, so it is not free:
 | `llamaListen.exposed`     | boolean                    | That address is not a loopback one, so the network can reach `llama-server`'s API.                                                    |
 | `ready`                   | boolean                    | The required steps pass: `binary.path` is not `null` and `models.exists` is `true`.                                                 |
 
-A `BenchDevice` (`shared/src/bench.ts`) is `{ id, name, totalMib, freeMib, backend }`: the device id (`CUDA0`,
+A `BenchDevice` (`packages/webui-shared/src/bench.ts`) is `{ id, name, totalMib, freeMib, backend }`: the device id (`CUDA0`,
 `Vulkan1`), its name, its total and free memory in MiB as `llama-bench` reports them, and the backend (the letters of
 the id).
 

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { parseProfileImport } from './profile';
 
 test('llama-tui import: whole config', async () => {
-  const raw = await Bun.file(join(import.meta.dir, '../../testdata/llama-tui-config.json')).json();
+  const raw = await Bun.file(join(import.meta.dir, '../../../testdata/llama-tui-config.json')).json();
   const r = parseProfileImport(raw);
   expect(r.profiles.map((p) => p.name)).toEqual(['qwen3.8-27b-mtp', 'qwen3.8-27b-mtp (optimisé) (optimisé)']);
   expect(r.rejected).toEqual([]);

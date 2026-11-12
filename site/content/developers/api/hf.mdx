@@ -5,7 +5,7 @@ description: Routes that search the Hugging Face Hub, describe a repository's GG
 
 These routes back the download sheet of the [Models](/docs/models/) page: the Hub token status, the search, a
 repository's GGUF variants with what is already on disk, and the download queue. They live in `server/routes/hf.ts`;
-the types and the request schema are in `shared/src/hf.ts`, the Hub client and the queue in `server/hf/` (see
+the types and the request schema are in `packages/webui-shared/src/hf.ts`, the Hub client and the queue in `server/hf/` (see
 [Hugging Face downloads](/developers/server/hugging-face/)). The user side is described on the
 [Hugging Face](/docs/hugging-face/) page.
 
@@ -234,7 +234,7 @@ Queues one or more variants of a repository. The server lists the repository aga
 size are left out, and a variant with nothing left to download is skipped: the response can hold fewer items than
 `keys`, or none.
 
-**Body**: `DownloadRequest` (`DownloadRequestSchema`, `shared/src/hf.ts`), strict.
+**Body**: `DownloadRequest` (`DownloadRequestSchema`, `packages/webui-shared/src/hf.ts`), strict.
 
 | Field      | Type     | Required | Description                                                                     |
 | ---------- | -------- | -------- | ------------------------------------------------------------------------------- |

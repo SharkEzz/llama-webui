@@ -4,8 +4,8 @@ description: Conversation routes, sending a message, regenerating and stopping a
 ---
 
 The chat routes store conversations and stream the replies of `llama-server`. They live in `server/routes/chat.ts`;
-the types and the patch schema are in `shared/src/chat.ts`, the SSE helpers (`formatSse()`, `SseParser`) in
-`shared/src/sse.ts`. Generations are run by `ChatRuns` (`server/chat/runs.ts`, see [Chat runs](/developers/server/chat/)).
+the types and the patch schema are in `packages/webui-shared/src/chat.ts`, the SSE helpers (`formatSse()`, `SseParser`) in
+`packages/webui-shared/src/sse.ts`. Generations are run by `ChatRuns` (`server/chat/runs.ts`, see [Chat runs](/developers/server/chat/)).
 The user side is described on the [Chat](/docs/chat/) page.
 
 The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
@@ -32,7 +32,7 @@ role merged, since strict chat templates require alternating roles), the samplin
 
 ## Conversations
 
-`Conversation` (`shared/src/chat.ts`):
+`Conversation` (`packages/webui-shared/src/chat.ts`):
 
 | Field          | Type             | Description                                                                                  |
 | -------------- | ---------------- | -------------------------------------------------------------------------------------------- |
@@ -115,7 +115,7 @@ curl http://127.0.0.1:7860/api/chat/7
 Changes the title, the system prompt, the sampling or the thinking switch. Missing fields keep their value, but
 `sampling` replaces the whole object: send every override you want to keep.
 
-**Body**: `ConversationPatch` (`ConversationPatchSchema`, `shared/src/chat.ts`), strict.
+**Body**: `ConversationPatch` (`ConversationPatchSchema`, `packages/webui-shared/src/chat.ts`), strict.
 
 | Field          | Type       | Required | Description                                  |
 | -------------- | ---------- | -------- | -------------------------------------------- |

@@ -19,7 +19,7 @@ class per table (or pair of tables) reads and writes it.
 | `server/db/downloads.ts`      | `DownloadsRepo`: the `downloads` table (Hugging Face queue).                  |
 | `server/db/modelCache.ts`     | `ModelCacheRepo`: the `model_cache` table.                                    |
 | `server/paths.ts`             | `dataDir()` and `dbPath()`: where the file lives.                              |
-| `shared/src/settings.ts`      | `SettingsSchema` and `DEFAULT_SETTINGS`.                                       |
+| `packages/webui-shared/src/settings.ts`      | `SettingsSchema` and `DEFAULT_SETTINGS`.                                       |
 
 Monitoring history and logs are not in the database: they live in memory (see
 [Monitor and collectors](/developers/server/monitor/)).
@@ -165,7 +165,7 @@ the sweep then continues in the new module (see [Benchmarks and sweeps](/develop
 ## Settings
 
 Settings are one row per key in `settings`, the value stored as JSON. The keys and their defaults come from
-`SettingsSchema` (`shared/src/settings.ts`), and `DEFAULT_SETTINGS` is `SettingsSchema.parse({})`:
+`SettingsSchema` (`packages/webui-shared/src/settings.ts`), and `DEFAULT_SETTINGS` is `SettingsSchema.parse({})`:
 
 | Key                       | Default                                     | Constraint                       |
 | ------------------------- | ------------------------------------------- | -------------------------------- |

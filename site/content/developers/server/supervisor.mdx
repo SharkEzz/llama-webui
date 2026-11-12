@@ -16,7 +16,7 @@ single instance lives in the runtime (`server/runtime.ts`).
 | `server/supervisor/discovery.ts`  | `findLlamaServerPid()`: finds that process in `/proc`.                                     |
 | `server/supervisor/flags.ts`      | `loadFlags()`, `getFlags()`: the flag catalog read from `llama-server --help`.            |
 | `server/runtime.ts`               | `getRuntime()`: the supervisor, the log ring and the bench gate on `globalThis`; shutdown. |
-| `shared/src/server.ts`            | `ServerState` and `ServerView`, shared with the web app.                                   |
+| `packages/webui-shared/src/server.ts`            | `ServerState` and `ServerView`, shared with the web app.                                   |
 
 The HTTP routes that drive it (`/api/server/start`, `/switch`, `/restart`, `/stop`) are in `server/routes/server.ts`
 and documented in [Server, state and logs](/developers/api/server/). The user-facing behavior is on the
@@ -24,10 +24,10 @@ and documented in [Server, state and logs](/developers/api/server/). The user-fa
 
 ## States
 
-The state is a discriminated union on `kind`, defined in `shared/src/server.ts` so that the web app reads the same
+The state is a discriminated union on `kind`, defined in `packages/webui-shared/src/server.ts` so that the web app reads the same
 type:
 
-```ts title="shared/src/server.ts"
+```ts title="packages/webui-shared/src/server.ts"
 export type ServerState =
   | { kind: 'idle' }
   | { kind: 'starting'; profile: string; profileId: number; pid: number; host: string; port: number; since: number }
@@ -115,11 +115,11 @@ const server = [
   `--verbosity`, `--log-verbosity`, `-v`, `--verbose`, `--log-verbose`, or `LLAMA_ARG_LOG_VERBOSITY` in `env`).
 - **Flags llama-webui adds**: `--metrics`, `--slots` and `--props`, which the [monitor](/developers/server/monitor/)
   and the Server page read. A profile cannot set these, nor `--host`, `--port`, `-m`, `--model`, `-mm` or `--mmproj`:
-  `ProfileInputSchema` (`shared/src/profile.ts`) rejects them through `RESERVED_FLAGS`.
+  `ProfileInputSchema` (`packages/webui-shared/src/profile.ts`) rejects them through `RESERVED_FLAGS`.
 
 The final `argv` prefixes that list with `setpriv --pdeathsig KILL --`. `setpriv` (util-linux) sets the parent-death
 signal and then executes `llama-server`, so the kernel kills `llama-server` if llama-webui dies without stopping it.
-`display` is the shell-quoted `llama-server` part only (`shellQuote()` from `shared/src/shell.ts`): it is what the
+`display` is the shell-quoted `llama-server` part only (`shellQuote()` from `packages/webui-shared/src/shell.ts`): it is what the
 Server page shows as the effective command and what the launch log line contains.
 
 ### Paths and `expandHome`
@@ -238,7 +238,7 @@ An external server can be read (chat, monitoring, `/props`) but never stopped: `
 `flags.ts` reads what the installed `llama-server` accepts, for the profile editor's completion and warnings:
 
 - `loadFlags(binary, timeoutMs = 5000)` runs `<binary> --help` with that timeout, and parses its standard output with
-  `parseHelp()` (`shared/src/flags.ts`). It returns `null` when the binary cannot run, exits with a non-zero code, or
+  `parseHelp()` (`packages/webui-shared/src/flags.ts`). It returns `null` when the binary cannot run, exits with a non-zero code, or
   lists no flag.
 - `getFlags(binary)` keeps one promise per binary path, so `--help` runs once per path. A failure is removed from the
   cache, so the next call tries again.

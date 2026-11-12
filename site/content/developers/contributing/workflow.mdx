@@ -14,8 +14,8 @@ soon as a change forgets it.
 
 | Code you change                                                              | Pages to update                                                                                                                  |
 | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `server/routes/<domain>.ts`, `server/app.ts`, zod schemas in `shared/src/`   | `/developers/api/<domain>/` (`server/app.ts` is [Health and settings](/developers/api/app/)) and the user page of the feature    |
-| `shared/src/ws.ts`, `server/ws/`                                             | [WebSocket](/developers/api/websocket/)                                                                                          |
+| `server/routes/<domain>.ts`, `server/app.ts`, zod schemas in `packages/webui-shared/src/`   | `/developers/api/<domain>/` (`server/app.ts` is [Health and settings](/developers/api/app/)) and the user page of the feature    |
+| `packages/webui-shared/src/ws.ts`, `server/ws/`                                             | [WebSocket](/developers/api/websocket/)                                                                                          |
 | `server/cli.ts`, `server/paths.ts`, environment variables                    | [Launch options](/docs/configuration/), [Architecture](/developers/architecture/)                                                |
 | `server/security.ts`, `server/http.ts`                                       | [Security](/docs/security/) (user), [Security](/developers/server/security/) (server), [API overview](/developers/api/overview/) |
 | `server/supervisor/**`                                                       | [Supervisor](/developers/server/supervisor/), [Server](/docs/server/)                                                            |
@@ -24,7 +24,7 @@ soon as a change forgets it.
 | `server/hardware/**` (PCI, CPU)                                              | [Topology](/developers/api/topology/) and [Monitor and system](/developers/api/monitor/) (API), [Topology](/docs/topology/), [System](/docs/system/) |
 | `server/chat/**`                                                             | [Chat runs](/developers/server/chat/), [Chat](/docs/chat/)                                                                       |
 | `server/bench/**`                                                            | [Benchmarks and sweeps](/developers/server/bench/), [Benchmark](/docs/benchmark/), [Sweeps](/docs/sweeps/)                       |
-| `shared/src/tuning.ts`, `server/tuning/**`                                   | [Tuning](/developers/server/tuning/) (server), [Tuning](/docs/tuning/) (user), [Sweeps](/docs/sweeps/), the guides it affects    |
+| `packages/webui-shared/src/tuning.ts`, `server/tuning/**`                                   | [Tuning](/developers/server/tuning/) (server), [Tuning](/docs/tuning/) (user), [Sweeps](/docs/sweeps/), the guides it affects    |
 | `server/hf/**`                                                               | [Hugging Face downloads](/developers/server/hugging-face/) (server), [Hugging Face downloads](/docs/hugging-face/) (user)        |
 | `server/models/**` (scan, GGUF)                                              | [Models](/developers/api/models/) (API), [Models](/docs/models/) (user)                                                          |
 | `server/setup.ts`                                                            | [Setup and launch pad](/developers/api/setup/), [First run](/docs/getting-started/first-run/)                                    |
@@ -33,8 +33,8 @@ soon as a change forgets it.
 | `web/src/features/home/setup/**`                                             | [First run](/docs/getting-started/first-run/)                                                                                    |
 | `web/src/features/<page>/**`                                                 | `/docs/<page>/` and its screenshots (`bench` is [Benchmark](/docs/benchmark/), the Hugging Face part of `models` is [Hugging Face downloads](/docs/hugging-face/)) |
 | `web/src/app/**`, `web/src/lib/**`, `web/src/components/**`                  | [Web app](/developers/frontend/)                                                                                                 |
-| `shared/src/**` (a new module, the role of a module)                         | [Shared package](/developers/shared/)                                                                                            |
-| `shared/src/settings.ts`, the Settings page                                  | [Settings](/docs/settings/), [Health and settings](/developers/api/app/)                                                         |
+| `packages/webui-shared/src/**` (a new module, the role of a module)                         | [Shared package](/developers/shared/)                                                                                            |
+| `packages/webui-shared/src/settings.ts`, the Settings page                                  | [Settings](/docs/settings/), [Health and settings](/developers/api/app/)                                                         |
 | `server/index.ts`, `server/runtime.ts`, `server/routes/web.ts`, hot reload   | [Architecture](/developers/architecture/)                                                                                        |
 | `package.json` scripts, repository layout                                    | [Development setup](/developers/getting-started/)                                                                                |
 | `server/testing/**`, `testdata/**` (fakes, fixtures)                         | [Testing](/developers/contributing/testing/)                                                                                     |
@@ -224,7 +224,7 @@ bun test
 ```
 
 - `bun run lint`: Biome with zero errors and zero warnings (format, lint, sorted imports).
-- `bun run check`: the type checks of `server/` and `shared/`, `web/` and `site/`.
+- `bun run check`: the type checks of `server/` and `packages/webui-shared/`, `web/` and `site/`.
 - `bun test`: every test file, `web/src/` included ([Run the tests](/developers/contributing/testing/#run-the-tests)).
 
 When the change touches `site/`, including its pages, also run `bun run site:build`, then
