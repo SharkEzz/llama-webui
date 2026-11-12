@@ -1,53 +1,67 @@
-import { expect, test } from 'bun:test';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { afterEach, expect, test } from 'vitest';
+import { request } from '../contract/wire';
+import type { WebHandler } from '../host';
 import { tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';
-import { buildWebRoutes, unavailableWebRoutes } from './web';
+import { staticWeb, unavailableWeb } from './web';
 
-test('buildWebRoutes: the real UI, split per page, absolute paths, three.js only in the Topology chunks', async () => {
-  const routes = await buildWebRoutes(`${import.meta.dirname}/../../web/index.html`);
-  const html = routes['/*'];
-  expect(html).toBeInstanceOf(Response);
-  const page = await (html as Response).clone().text();
-  expect((html as Response).headers.get('Cache-Control')).toBe('no-cache');
+const servers: Server[] = [];
+afterEach(async () => {
+  for (const s of servers.splice(0)) await new Promise((r) => s.close(r));
+});
 
-  // Everything the page references is served, from the root (a deep URL like /chat/12 must find it too).
-  const refs = [...page.matchAll(/(?:src|href)="([^"]+\.(?:js|css|svg))"/g)].map((m) => m[1]!);
-  expect(refs.length).toBeGreaterThanOrEqual(2);
-  for (const r of refs) {
-    expect(r.startsWith('/')).toBe(true);
-    expect(routes[r]).toBeInstanceOf(Response);
-  }
+async function serve(handler: WebHandler): Promise<string> {
+  const s = createServer(handler);
+  servers.push(s);
+  await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
+  return `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
+}
 
-  const entry = refs.find((r) => r.endsWith('.js'))!;
-  const entryJs = await (routes[entry] as Response).clone().text();
-  const chunks = Object.keys(routes).filter((k) => k.endsWith('.js'));
-  expect(chunks.length).toBeGreaterThan(10); // one or more per page
-  expect(entryJs).not.toContain('WebGLRenderer');
-  const withThree: string[] = [];
-  const withNode: string[] = [];
-  for (const c of chunks) {
-    const js = await (routes[c] as Response).clone().text();
-    if (js.includes('WebGLRenderer')) withThree.push(c);
-    // The browser has no `node:*` module: one in the bundle means server code leaked past the typed client.
-    if (/(?:from|import)\s*\(?\s*["']node:/.test(js)) withNode.push(c);
-  }
-  expect(withThree.length).toBeGreaterThan(0);
-  expect(withNode).toEqual([]);
-  expect((routes[entry] as Response).headers.get('Cache-Control')).toContain('immutable');
-}, 30_000);
-
-test('buildWebRoutes: a broken front rejects; unavailableWebRoutes then answers every page with the error', async () => {
+test('staticWeb: a built file is immutable with its type; any other path is the app, never cached', async () => {
   using dir = tempDir('lw-web-');
-  await writeFileDeep(
-    `${dir.path}/index.html`,
-    '<html><body><script type="module" src="./app.ts"></script></body></html>',
+  await writeFileDeep(`${dir.path}/index.html`, '<!doctype html><title>app</title>');
+  await writeFileDeep(`${dir.path}/assets/a-1.js`, 'export {};');
+  await writeFileDeep(`${dir.path}/assets/f-2.woff2`, 'font');
+  const base = await serve(await staticWeb(dir.path));
+
+  const js = await request(base, { method: 'GET', path: '/assets/a-1.js' });
+  expect([js.status, js.headers['content-type'], js.headers['cache-control'], js.body]).toEqual([
+    200,
+    'text/javascript;charset=utf-8',
+    'public, max-age=31536000, immutable',
+    'export {};',
+  ]);
+  expect((await request(base, { method: 'GET', path: '/assets/f-2.woff2' })).headers['content-type']).toBe(
+    'font/woff2',
   );
-  await writeFileDeep(`${dir.path}/app.ts`, "import './missing';\n");
-  const err = await buildWebRoutes(`${dir.path}/index.html`).catch((e: unknown) => e);
-  expect(err).toBeInstanceOf(AggregateError);
-  const page = unavailableWebRoutes(err)['/*'] as Response;
-  expect(page.status).toBe(503);
-  const text = await page.clone().text();
-  expect(text).toContain('web UI unavailable');
-  expect(text).toContain('missing');
-}, 30_000);
+  for (const path of ['/', '/chat/12', '/index.html', '/assets/missing.js', '/assets/a-1.js?v=1x']) {
+    const page = await request(base, { method: 'GET', path });
+    const expected = path.startsWith('/assets/a-1.js') ? 'export {};' : '<!doctype html><title>app</title>';
+    expect([path, page.status, page.body]).toEqual([path, 200, expected]);
+    if (expected !== 'export {};') {
+      expect([page.headers['content-type'], page.headers['cache-control']]).toEqual([
+        'text/html;charset=utf-8',
+        'no-cache',
+      ]);
+    }
+  }
+  const head = await request(base, { method: 'HEAD', path: '/chat/12' });
+  expect([head.status, head.headers['content-type'], head.body]).toEqual([200, 'text/html;charset=utf-8', '']);
+});
+
+test('staticWeb rejects without an index.html; unavailableWeb then answers every page 503 with the error', async () => {
+  using dir = tempDir('lw-web-');
+  const err = await staticWeb(`${dir.path}/missing`).catch((e: unknown) => e);
+  expect(err).toBeInstanceOf(Error);
+  const base = await serve(unavailableWeb(err));
+  const page = await request(base, { method: 'GET', path: '/chat/12' });
+  expect([page.status, page.headers['content-type'], page.headers['cache-control']]).toEqual([
+    503,
+    'text/plain;charset=utf-8',
+    'no-store',
+  ]);
+  expect(page.body).toContain('llama-webui: web UI unavailable.');
+  expect(page.body).toContain('missing');
+});

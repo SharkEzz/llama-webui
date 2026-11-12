@@ -32,3 +32,4 @@ minimumReleaseAgeExclude:
   - "@biomejs/cli-win32-x64@2.6.7"
   - lucide-react@1.72.0
   - hono@4.13.18
+  - "@hono/node-server@2.1.7"
