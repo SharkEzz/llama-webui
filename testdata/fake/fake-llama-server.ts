@@ -1,4 +1,48 @@
-// Imitates llama-server for the bench runner and parser tests.
+// Imitates llama-server for the bench runner and parser tests. Plain Node script (erasable TypeScript).
+import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { Readable } from "node:stream";
+import { setTimeout as sleep } from "node:timers/promises";
+
+/** A fetch-style handler on node:http: the request is aborted when the client goes away, the body is streamed. */
+function serve(port: number, hostname: string, handler: (req: Request) => Response | Promise<Response>) {
+  const server = createServer(async (inc, out) => {
+    const ac = new AbortController();
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    out.on("close", () => {
+      if (out.writableFinished) return;
+      ac.abort();
+      void reader?.cancel().catch(() => {});
+    });
+    const method = inc.method ?? "GET";
+    const body = method === "GET" || method === "HEAD" ? undefined : (Readable.toWeb(inc) as ReadableStream<Uint8Array>);
+    let res: Response;
+    try {
+      const init = { method, headers: inc.headers as Record<string, string>, body, signal: ac.signal, duplex: "half" };
+      res = await handler(new Request(`http://${hostname}:${port}${inc.url ?? "/"}`, init as RequestInit));
+    } catch (e) {
+      res = new Response(String(e), { status: 500 });
+    }
+    out.writeHead(res.status, Object.fromEntries(res.headers));
+    if (!res.body) return void out.end();
+    reader = res.body.getReader();
+    try {
+      for (let r = await reader.read(); !r.done; r = await reader.read()) out.write(r.value);
+      out.end();
+    } catch {
+      out.destroy();
+    }
+  });
+  server.listen(port, hostname);
+  return server;
+}
+
+/** A fixture file with its content type. */
+const file = async (path: string) =>
+  new Response(await readFile(path), {
+    headers: { "content-type": path.endsWith(".json") ? "application/json;charset=utf-8" : "text/plain;charset=utf-8" },
+  });
+
 const args = process.argv.slice(2);
 if (args.includes("--help")) {
   // A short catalogue, so a --help call (flag catalogue) exits at once instead of starting a server on 8080.
@@ -13,7 +57,7 @@ const port = Number(args[args.indexOf("--port") + 1] ?? 8080);
 const slow = process.env.FAKE_SLOW_ARG !== undefined && args.includes(process.env.FAKE_SLOW_ARG);
 const loadMs = slow ? Number(process.env.FAKE_SLOW_MS ?? 5000) : Number(process.env.FAKE_LOAD_MS ?? 300);
 const t0 = Date.now();
-const dir = import.meta.dir;
+const dir = import.meta.dirname;
 const log = (s: string) => process.stderr.write(`0.00.000.000 I ${s}\n`);
 
 log("srv  main: loading model");
@@ -26,40 +70,36 @@ if (process.env.FAKE_FAIL_ARG !== undefined && args.includes(process.env.FAKE_FA
   log("ggml_cuda: out of memory");
   process.exit(1);
 }
-const server = Bun.serve({
-  port,
-  hostname: "127.0.0.1",
-  async fetch(req) {
-    const path = new URL(req.url).pathname;
-    const loading = Date.now() - t0 < loadMs;
-    if (path === "/health") return loading ? new Response('{"error":"loading"}', { status: 503 }) : Response.json({ status: "ok" });
-    if (loading) return new Response("", { status: 503 });
-    if (path === "/completion" && req.method === "POST") {
-      const body = (await req.json()) as { n_predict?: number };
-      if (process.env.FAKE_CRASH_ON_PREDICT !== undefined && body.n_predict === Number(process.env.FAKE_CRASH_ON_PREDICT)) {
-        // Dies mid-request, as llama-server does on a CUDA out-of-memory: the socket closes, no answer.
-        log("CUDA error: out of memory");
-        setTimeout(() => process.exit(1), 20);
-        return new Promise<Response>(() => {});
-      }
-      return Response.json({
-        content: "x".repeat(body.n_predict ?? 0),
-        timings: {
-          prompt_n: Math.ceil(((body as { prompt?: string }).prompt ?? "").length / 4),
-          prompt_per_second: Number(process.env.FAKE_PP ?? 1000),
-          predicted_n: body.n_predict ?? 0,
-          predicted_per_second: Number(process.env.FAKE_TG ?? 50),
-          // A repeated raw prompt makes the model copy it: drafts almost all accepted (see server benchmark).
-          ...(process.env.FAKE_DRAFT === "1" ? { draft_n: 40, draft_n_accepted: 40 } : {}),
-        },
-      });
+const server = serve(port, "127.0.0.1", async (req) => {
+  const path = new URL(req.url).pathname;
+  const loading = Date.now() - t0 < loadMs;
+  if (path === "/health") return loading ? new Response('{"error":"loading"}', { status: 503 }) : Response.json({ status: "ok" });
+  if (loading) return new Response("", { status: 503 });
+  if (path === "/completion" && req.method === "POST") {
+    const body = (await req.json()) as { n_predict?: number };
+    if (process.env.FAKE_CRASH_ON_PREDICT !== undefined && body.n_predict === Number(process.env.FAKE_CRASH_ON_PREDICT)) {
+      // Dies mid-request, as llama-server does on a CUDA out-of-memory: the socket closes, no answer.
+      log("CUDA error: out of memory");
+      setTimeout(() => process.exit(1), 20);
+      return new Promise<Response>(() => {});
     }
-    if (path === "/v1/chat/completions" && req.method === "POST") return chat(req);
-    if (path === "/slots") return new Response(Bun.file(`${dir}/slots-busy.json`));
-    if (path === "/metrics") return new Response(Bun.file(`${dir}/metrics-after.txt`));
-    if (path === "/props") return new Response(Bun.file(`${dir}/props.json`));
-    return new Response("not found", { status: 404 });
-  },
+    return Response.json({
+      content: "x".repeat(body.n_predict ?? 0),
+      timings: {
+        prompt_n: Math.ceil(((body as { prompt?: string }).prompt ?? "").length / 4),
+        prompt_per_second: Number(process.env.FAKE_PP ?? 1000),
+        predicted_n: body.n_predict ?? 0,
+        predicted_per_second: Number(process.env.FAKE_TG ?? 50),
+        // A repeated raw prompt makes the model copy it: drafts almost all accepted (see server benchmark).
+        ...(process.env.FAKE_DRAFT === "1" ? { draft_n: 40, draft_n_accepted: 40 } : {}),
+      },
+    });
+  }
+  if (path === "/v1/chat/completions" && req.method === "POST") return chat(req);
+  if (path === "/slots") return file(`${dir}/slots-busy.json`);
+  if (path === "/metrics") return file(`${dir}/metrics-after.txt`);
+  if (path === "/props") return file(`${dir}/props.json`);
+  return new Response("not found", { status: 404 });
 });
 const ANSWER = [
   "## Simulated reply\n\n",
@@ -116,7 +156,7 @@ async function chat(req: Request): Promise<Response> {
         for (const delta of parts) {
           if (cancelled || req.signal.aborted) return;
           send(c, { choices: [{ index: 0, delta }] });
-          if (delay > 0) await Bun.sleep(delay);
+          if (delay > 0) await sleep(delay);
         }
         const n = parts.length;
         send(c, {
@@ -142,7 +182,8 @@ process.on("SIGTERM", () => {
     return;
   }
   log("srv  main: shutting down");
-  server.stop(true);
+  server.closeAllConnections();
+  server.close();
   process.exit(0);
 });
 
