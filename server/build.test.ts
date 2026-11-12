@@ -4,6 +4,7 @@ import { createServer, type Server } from 'node:http';
 import { isBuiltin } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { join, resolve } from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { request } from './contract/wire';
@@ -19,12 +20,17 @@ beforeAll(async () => {
   const builder = await createBuilder({
     configFile: join(ROOT, 'vite.config.ts'),
     logLevel: 'warn',
-    environments: { client: { build: { outDir: web } }, ssr: { build: { outDir: server_ } } },
+    environments: {
+      client: { build: { outDir: web } },
+      ssr: { build: { outDir: server_ } },
+      nvml: { build: { outDir: server_ } },
+    },
   });
-  const { client, ssr } = builder.environments;
-  if (!client || !ssr) throw new Error('no client or ssr environment in vite.config.ts');
+  const { client, ssr, nvml } = builder.environments;
+  if (!client || !ssr || !nvml) throw new Error('no client, ssr or nvml environment in vite.config.ts');
   await builder.build(client);
   await builder.build(ssr);
+  await builder.build(nvml); // after ssr, which empties the directory
 }, 120_000);
 afterAll(() => dir[Symbol.dispose]());
 
@@ -83,4 +89,18 @@ test('the server bundle: main.js, only node:* and the network-facing dependencie
     .filter((line) => !allowed(line.slice(line.indexOf(': ') + 2)));
   expect(external).toEqual([]);
   expect(readFileSync(join(server_, 'main.js'), 'utf8').startsWith('#!/usr/bin/env node')).toBe(true);
+});
+
+test('the NVML worker ships next to main.js and starts from the bundle', async () => {
+  expect(readdirSync(server_).filter((f) => f.endsWith('.js'))).toEqual(['main.js', 'nvml-worker.js']);
+  const file = join(server_, 'nvml-worker.js');
+  expect(specifiers(readFileSync(file, 'utf8')).filter((s) => !isBuiltin(s))).toEqual([]);
+  const w = new Worker(file, { execArgv: ['--disable-warning=ExperimentalWarning'] });
+  try {
+    const answer = new Promise((resolve) => w.once('message', resolve));
+    w.postMessage({ type: 'start', intervalMs: 1000, lib: '/nonexistent/libnvidia-ml.so.1' });
+    expect(await answer).toMatchObject({ type: 'error' });
+  } finally {
+    await w.terminate();
+  }
 });

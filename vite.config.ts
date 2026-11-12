@@ -1,6 +1,7 @@
-// One config for the app: the web client (`web/` → `dist/web`) and the server (`server/main.ts` →
-// `dist/server/main.js`). `pnpm build` builds both (`builder`); `server/dev.ts` serves the client and evaluates the
-// server through the ssr environment's module runner. Vitest reads `vitest.config.ts`, not this file.
+// One config for the app: the web client (`web/` → `dist/web`), the server (`server/main.ts` → `dist/server/main.js`)
+// and its NVML worker (→ `dist/server/nvml-worker.js`). `pnpm build` builds them all (`builder`); `server/dev.ts`
+// serves the client and evaluates the server through the ssr environment's module runner. Vitest reads
+// `vitest.config.ts`, not this file.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -50,5 +51,26 @@ export default defineConfig(({ command }) => ({
         },
       },
     },
+    // The NVML worker (`server/collectors/nvml/monitor.ts` starts it next to `main.js`): its own environment, since
+    // Rolldown takes a single input when `codeSplitting` is false. Built after `ssr`, which empties the directory;
+    // development runs the worker's sources as is (type stripping).
+    ...(command === 'build'
+      ? {
+          nvml: {
+            consumer: 'server' as const,
+            resolve: { noExternal: true },
+            build: {
+              ssr: true,
+              outDir: r('dist/server'),
+              emptyOutDir: false,
+              target: 'esnext',
+              rolldownOptions: {
+                input: { 'nvml-worker': r('server/collectors/nvml/worker.ts') },
+                output: { entryFileNames: '[name].js', codeSplitting: false },
+              },
+            },
+          },
+        }
+      : {}),
   },
 }));
