@@ -16,10 +16,7 @@ import type { Monitor } from './monitor/monitor';
 import type { PlacementTracker } from './monitor/placement';
 import { benchRoutes } from './routes/bench';
 import { chatRoutes } from './routes/chat';
-import { hfRoutes } from './routes/hf';
-import { modelRoutes } from './routes/models';
 import { sweepRoutes } from './routes/sweeps';
-import { tuningRoutes } from './routes/tuning';
 import type { WebRoutes } from './routes/web';
 import type { Runtime } from './runtime';
 import type { WsHub } from './ws/hub';
@@ -57,12 +54,9 @@ export interface AppDeps {
 export function appRoutes(deps: AppDeps) {
   const api = createApi(deps);
   return withMethodNotAllowed({
-    ...modelRoutes(deps),
-    ...hfRoutes(deps),
     ...chatRoutes(deps),
     ...benchRoutes(deps),
     ...sweepRoutes(deps),
-    ...tuningRoutes(deps),
     '/api/*': (req: Request, server: Server<undefined>) => api.fetch(req, { server }),
     '/ws': guarded((req, server) => {
       if (server.upgrade(req)) return undefined;

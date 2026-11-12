@@ -5,11 +5,9 @@ import { expect, test } from 'vitest';
 import { openDb } from '../db/open';
 import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
+import { errorResponse } from '../http';
 import { tempDir } from '../testing/tempDir';
 import { modelRoutes } from './models';
-
-const call = (handler: unknown, req: Request) =>
-  (handler as (r: Request, s: null) => Promise<Response>)(Object.assign(req, { params: {} }), null);
 
 /** A models folder holding unreadable `.gguf` files: the scan lists them (ok: false), which is enough to delete. */
 function setup() {
@@ -25,7 +23,7 @@ function setup() {
   settings.patch({ modelsDir: models });
   const profiles = new ProfilesRepo(db);
   const state = { active: null as number | null, benchModel: null as string | null };
-  const routes = modelRoutes({
+  const app = modelRoutes({
     db,
     settings,
     profiles,
@@ -39,22 +37,17 @@ function setup() {
     sweeps: { running: () => null },
     downloadsRepo: { active: () => [] },
   });
+  app.onError((err) => errorResponse(err));
   const usage = async (path: string) => {
-    const r = await call(
-      routes['/api/models/usage'].GET,
-      new Request(`http://127.0.0.1:7860/api/models/usage?path=${encodeURIComponent(path)}`),
-    );
+    const r = await app.request(`/api/models/usage?path=${encodeURIComponent(path)}`);
     return { status: r.status, body: (await r.json()) as ModelUsage & { error?: string } };
   };
   const remove = async (path: string, deleteProfiles: boolean) => {
-    const r = await call(
-      routes['/api/models'].DELETE,
-      new Request('http://127.0.0.1:7860/api/models', {
-        method: 'DELETE',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path, deleteProfiles }),
-      }),
-    );
+    const r = await app.request('/api/models', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path, deleteProfiles }),
+    });
     return { status: r.status, body: (await r.json()) as ModelDeleted & { error?: string; code?: string } };
   };
   return {

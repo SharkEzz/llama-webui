@@ -1,12 +1,15 @@
 import { Hono } from 'hono';
 import type { AppDeps } from './app';
 import { allowTable, apiRoutes, type Env, errorResponse, guardMw, jsonCharset } from './http';
+import { hfRoutes } from './routes/hf';
+import { modelRoutes } from './routes/models';
 import { monitorRoutes } from './routes/monitor';
 import { profileRoutes } from './routes/profiles';
 import { serverRoutes } from './routes/server';
 import { settingsRoutes } from './routes/settings';
 import { setupRoutes } from './routes/setup';
 import { topologyRoutes } from './routes/topology';
+import { tuningRoutes } from './routes/tuning';
 import { APP_VERSION } from './version';
 
 const startedAt = Date.now();
@@ -27,7 +30,10 @@ export function createApi(deps: AppDeps) {
     .route('/', serverRoutes({ ...deps, benchBusy: () => deps.benchRunner.busy }))
     .route('/', monitorRoutes({ monitor, bootId: deps.runtime.bootId }))
     .route('/', topologyRoutes(deps))
-    .route('/', setupRoutes(deps));
+    .route('/', setupRoutes(deps))
+    .route('/', modelRoutes(deps))
+    .route('/', hfRoutes(deps))
+    .route('/', tuningRoutes(deps));
   allow.load(apiRoutes(api));
   api.notFound((c) => c.json({ error: 'Unknown route' }, 404));
   api.onError((err) => errorResponse(err));

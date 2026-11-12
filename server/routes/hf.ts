@@ -1,10 +1,11 @@
 import { DownloadRequestSchema, isDownloadActive } from '@llama-webui/shared';
+import { Hono } from 'hono';
 import type { DownloadsRepo } from '../db/downloads';
 import type { SettingsRepo } from '../db/settings';
 import type { HfClient } from '../hf/client';
 import type { DownloadQueue } from '../hf/downloader';
 import { describeRepo, downloadInputs } from '../hf/repo';
-import { guarded, HttpError, idParam, jsonObject } from '../http';
+import { body, type Env, HttpError, id } from '../http';
 import { expandHome } from '../supervisor/args';
 
 export interface HfRouteDeps {
@@ -17,51 +18,40 @@ export interface HfRouteDeps {
 export function hfRoutes({ hf, downloads, downloadsRepo, settings }: HfRouteDeps) {
   const modelsDir = () => expandHome(settings.get().modelsDir);
 
-  return {
-    '/api/hf/status': {
-      GET: guarded(async () => Response.json(await hf.status())),
-    },
-    '/api/hf/search': {
-      GET: guarded(async (req) => {
-        const q = (new URL(req.url).searchParams.get('q') ?? '').trim();
+  // `/api/downloads/clear` before `/api/downloads/:id` (Hono matches in registration order).
+  return (
+    new Hono<Env>()
+      .get('/api/hf/status', async (c) => c.json(await hf.status()))
+      .get('/api/hf/search', async (c) => {
+        const q = (new URL(c.req.url).searchParams.get('q') ?? '').trim();
         if (!q || q.length > 200) throw new HttpError(400, 'Search text expected (200 characters at most)');
-        return Response.json(await hf.search(q, { signal: req.signal }));
-      }),
-    },
-    '/api/hf/repo': {
-      GET: guarded(async (req) => {
-        const q = new URL(req.url).searchParams;
+        return c.json(await hf.search(q, { signal: c.req.raw.signal }));
+      })
+      .get('/api/hf/repo', async (c) => {
+        const q = new URL(c.req.url).searchParams;
         const repo = await describeRepo(hf, q.get('id') ?? '', {
           modelsDir: modelsDir(),
           revision: q.get('revision') || undefined,
-          signal: req.signal,
+          signal: c.req.raw.signal,
         });
-        return Response.json(repo);
-      }),
-    },
-    '/api/downloads': {
-      GET: guarded(() => Response.json({ items: downloadsRepo.list(), live: downloads.live })),
-      POST: guarded(async (req) => {
-        const body = DownloadRequestSchema.parse(await jsonObject(req));
-        const items = await downloads.enqueue(await downloadInputs(hf, body, modelsDir()));
-        return Response.json({ items }, { status: 202 });
-      }),
-    },
-    '/api/downloads/clear': {
-      POST: guarded(() => Response.json({ deleted: downloads.clearFinished().length })),
-    },
-    '/api/downloads/:id': {
+        return c.json(repo);
+      })
+      .get('/api/downloads', (c) => c.json({ items: downloadsRepo.list(), live: downloads.live }))
+      .post('/api/downloads', body(DownloadRequestSchema, { object: true }), async (c) => {
+        const items = await downloads.enqueue(await downloadInputs(hf, c.req.valid('json'), modelsDir()));
+        return c.json({ items }, 202);
+      })
+      .post('/api/downloads/clear', (c) => c.json({ deleted: downloads.clearFinished().length }))
       /** Cancels a queued or running download, removes a finished one from the list. */
-      DELETE: guarded(async (req) => {
-        const id = idParam(req, 'Download');
+      .delete('/api/downloads/:id', id('Download'), async (c) => {
+        const { id } = c.req.valid('param');
         const item = downloadsRepo.get(id);
         if (item && isDownloadActive(item.status)) await downloads.cancel(id);
         else downloads.remove(id);
-        return new Response(null, { status: 204 });
-      }),
-    },
-    '/api/downloads/:id/retry': {
-      POST: guarded(async (req) => Response.json(await downloads.retry(idParam(req, 'Download')), { status: 202 })),
-    },
-  };
+        return c.body(null, 204);
+      })
+      .post('/api/downloads/:id/retry', id('Download'), async (c) =>
+        c.json(await downloads.retry(c.req.valid('param').id), 202),
+      )
+  );
 }
