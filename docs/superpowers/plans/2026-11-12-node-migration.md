@@ -57,9 +57,10 @@ files (64 `bun:test`, 8 `node:test` in `llamacpp-js`).
 
 Defaults taken without asking (the user saw them and did not object; revisit only with a reason):
 
-- Package dependencies: npm dependencies (hono, `@hono/node-server`, `ws`, zod, `@huggingface/gguf`) stay external and
-  declared; the two workspace packages are bundled. N0(d) also measures the zero-dependency variant
-  (`noExternal: true` + `build.license`); decide on its results.
+- Package dependencies: **zero-dependency bundle** (user decision after N0(d)). `environments.ssr.resolve.noExternal:
+  true` bundles every npm dependency (hono, `@hono/node-server`, `ws`, zod, `@huggingface/gguf`) and both workspace
+  packages into `dist/server/`; only `node:*` stays external. `build.license` writes `THIRD-PARTY-LICENSES.md`, which
+  ships in the package. The packed package declares no `dependencies`.
 - A divergence between the hand-written API docs and the real behaviour revealed by the contract suite: fix the docs,
   log the divergence, do not change behaviour during the port.
 - Hono pinned to 4.13.x (v5 is at rc: refactoring candidate).
@@ -592,8 +593,10 @@ http.on('upgrade', (req, socket, head) => {
 - (N0) `dev.ts`, after `ssr.runner.import(entry)`: on a watcher `change`, if the file is in the ssr module graph but
   not evaluated (the previous reload failed), clear `runner.evaluatedModules` and re-import the entry once; and
   `server.watch.awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 }`. Both were needed in the spike.
-- (N0) Build: Vite bundles hono/zod into `main.js` by default; list the server's npm dependencies in
-  `environments.ssr.resolve.external` (and keep the two workspace packages in `noExternal`).
+- (N0) Build: `environments.ssr.resolve.noExternal: true` and `build.license: { fileName: 'THIRD-PARTY-LICENSES.md' }`
+  (zero-dependency decision). The spike stub did not import `ws` or `@huggingface/gguf`: check that `ws`'s optional
+  `bufferutil`/`utf-8-validate` requires do not break the bundle (mark them external if they do) and that `main.js`
+  imports only `node:*` (a build test).
 - Prod `web` handler: exact path → bytes with `Cache-Control: public, max-age=31536000, immutable`; anything else →
   `index.html` with `no-cache`; `dist/web` missing → the existing 503 text. No gzip, no ETag (as today; backlog).
 - `guard()` replaces `req.body !== null` with `Number(content-length) > 0 || transfer-encoding` (fact 9).
@@ -665,12 +668,12 @@ Risk: `sharp`/`pagefind` under `allowBuilds`.
 ### N11 — Package and release (M). After N9
 
 - The **root package is the packed one**: `bin: { "llama-webui": "dist/server/main.js" }`, `files: ["dist"]`,
-  `os: ["linux"]`, `engines`; runtime externals in `dependencies` via `catalog:`; the two workspace packages in
-  `devDependencies` (bundled; a `workspace:*` dependency would be rewritten to a version that cannot install).
+  `os: ["linux"]`, `engines`; no `dependencies` (zero-dependency bundle): runtime libraries and the two workspace
+  packages are `devDependencies` (bundled; a `workspace:*` dependency would be rewritten to a version that cannot
+  install). `dist/server/THIRD-PARTY-LICENSES.md` is in the package.
   `private: true` stays unless `pnpm pack` refuses it (unverified).
-- (N0) Zero-dependency data for the decision: `noExternal: true` gives a 304 kB `main.js` importing only `node:*`,
-  boots from an empty directory, and `build.license` writes `THIRD-PARTY-LICENSES.md`; the externals variant is
-  20 kB plus a 4-package, 12 MiB install. Ask the user before starting N11.
+- (N0) Zero-dependency chosen: in the spike, `main.js` was 304 kB importing only `node:*` and booted from an empty
+  directory (externals variant: 20 kB plus a 4-package, 12 MiB install).
 - `scripts/smoke.ts --tarball`: `pnpm pack`, `npm install --prefix $tmp ./llama-webui-x.tgz`, then the N8 checks
   through `$tmp/node_modules/.bin/llama-webui`. A missing runtime dependency fails here.
 - `release.yml`: version check (`scripts/release.ts --check`), build, pack, tarball smoke, `SHA256SUMS`,
