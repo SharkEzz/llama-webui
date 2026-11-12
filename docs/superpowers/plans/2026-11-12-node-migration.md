@@ -57,10 +57,12 @@ files (64 `bun:test`, 8 `node:test` in `llamacpp-js`).
 
 Defaults taken without asking (the user saw them and did not object; revisit only with a reason):
 
-- Package dependencies: **zero-dependency bundle** (user decision after N0(d)). `environments.ssr.resolve.noExternal:
-  true` bundles every npm dependency (hono, `@hono/node-server`, `ws`, zod, `@huggingface/gguf`) and both workspace
-  packages into `dist/server/`; only `node:*` stays external. `build.license` writes `THIRD-PARTY-LICENSES.md`, which
-  ships in the package. The packed package declares no `dependencies`.
+- Package dependencies (user decision after N0(d)): **bundle by default, network-facing libraries external**.
+  `environments.ssr.resolve.noExternal: true` bundles zod, `@hono/zod-validator`, `@huggingface/gguf` and both
+  workspace packages into `dist/server/`; `environments.ssr.resolve.external: ['hono', '@hono/node-server', 'ws']`
+  keeps those three as declared `dependencies`, so their security fixes reach users at install without a release.
+  `build.license` writes `THIRD-PARTY-LICENSES.md` for the bundled code, which ships in the package. A new runtime
+  dependency is bundled unless it is network-facing or a native addon.
 - A divergence between the hand-written API docs and the real behaviour revealed by the contract suite: fix the docs,
   log the divergence, do not change behaviour during the port.
 - Hono pinned to 4.13.x (v5 is at rc: refactoring candidate).
@@ -90,8 +92,8 @@ Checked on this machine or against current docs/source during planning.
    browser full-reload on server changes, and has no WebSocket handling.
 6. Vite 8's module runner, on `full-reload`, clears its evaluated modules and **re-imports the entrypoints
    immediately**: eager re-evaluation of `server/index.ts` needs no custom watcher (to confirm in N0(a)). (N0) True for
-   a successful reload only: after a failed one (syntax error) the fix is ignored, and two writes within ms leave the
-   first content; `dev.ts` needs a small watcher fallback plus `awaitWriteFinish` (see N8).
+   a successful reload only: after a failed one the fix is ignored, and Vite watches files outside `root` one by one,
+   a watch that two quick atomic replaces lose; `dev.ts` needs a directory watch and a recovery path (see N8).
 7. Vite 8.3.x: `server.ws: { server?: HttpServer }`; its upgrade listener only takes sockets whose
    `sec-websocket-protocol` is `vite-hmr`/`vite-ping`. `/ws` and HMR can share one `http.Server`.
 8. `@hono/node-ws` 1.3.1 peers `@hono/node-server ^1.19` while node-server is at 2.x; node-server's own
@@ -125,10 +127,10 @@ package; Node's HEAD and body-less request behaviour against Bun's; whether `ws.
 whether Vitest's transform leaves `using` native.
 
 (N0) Since verified in the spike (details in the notes): `ssr` emits `full-reload` on a server change; files outside
-`root` are watched once imported; middleware mode installs no signal handlers; the multi-environment build keys work
-and `node:ffi`/`node:sqlite` stay external; `tsc -b` is clean (0.9 s cold, no TS7056/TS2742) and reports the same
-errors as `bun check -b`; the only install script is Bun's own; Vitest needs `oxc: { target: 'esnext' }` to keep
-`using` native.
+`root` are watched once imported (but see fact 6); middleware mode installs no signal handlers; the multi-environment
+build keys work and `node:ffi`/`node:sqlite` stay external; `tsc -b` is clean on a stub API (0.9 s cold, no
+TS7056/TS2742) and reports what `bun check -b` reports; in today's tree the only install script is the `bun` peer of
+`bun-plugin-tailwind`; Vitest needs `oxc: { target: 'esnext' }` to keep `using` native.
 
 ## Inventory (what exists today)
 
@@ -225,6 +227,7 @@ const vite = await createViteServer({
 const ssr = vite.environments.ssr;
 if (!isRunnableDevEnvironment(ssr)) throw new Error('ssr environment is not runnable');
 await ssr.runner.import(SERVER_ENTRY); // eager; on change the runner clears its cache and re-imports it
+// (N0) plus the directory watch and failed-reload recovery described in N8
 ```
 
 - `server/index.ts` re-runs top to bottom on every server-file save, as under `bun --hot`. It still starts with
@@ -290,12 +293,15 @@ catalog: # only what two or more projects share
   shiki: ^4.6.0
   "@types/node": ^26.6.6
 allowBuilds:
-  bun: true # (N0) the only package with a build script; `false` leaves a broken node_modules/.bin/bun
+  bun: true # (N0) peer of bun-plugin-tailwind, the only build script; `false` leaves a broken node_modules/.bin/bun
 ```
 
 For each package pnpm lists, set `true` only if a feature needs its script (sharp for `site og`/`screenshots`, the
 Tailwind oxide binary); set the rest to `false`. (N0) sharp and oxide need no entry; pnpm also adds
-`minimumReleaseAgeExclude` entries for packages younger than its default minimum age: keep them.
+`minimumReleaseAgeExclude` entries for packages younger than its default minimum age: keep them. (N0) With `bun:
+true`, every `bun` that a script calls is that peer, not CI's setup-bun: keep CI's `bun-version` equal to the
+lockfile's. pnpm warns on every command that the root `workspaces` field differs from `pnpm-workspace.yaml`: remove
+the field here if the Bun gate stays green without it (else in N13).
 
 Gate (Bun runs, pnpm installs): `bun run lint`, `bun run check`, `bun test`, llamacpp-js `test:node`,
 `bun run compile` + `bun scripts/smoke-binary.ts dist/llama-webui`, `bun run site:build` + `check-links`.
@@ -426,8 +432,8 @@ Gate: `pnpm lint`, `pnpm check`, `pnpm test`, the remaining `bun test` files, `b
 links.
 Docs: `developers/contributing/testing.mdx`, CLAUDE.md "Testing" and "Type checking".
 Risks: `tsc -b` emits declarations where `bun check` wrote nothing, so TS4023/TS2742-class errors may appear (N0(c)
-measures; fallback: keep `bun check` until N8). (N0) None appeared on a 69-route stub API; the fallback is not
-expected to be needed.
+measures; fallback: keep `bun check` until N8). (N0) None appeared on a 69-route stub API, but its handlers
+return explicit shared types; these errors come from inferred, non-exported types, so the risk stays for real handlers.
 
 ### N5 — HTTP contract suite (M). Parallel with N4
 
@@ -551,7 +557,7 @@ export async function call<T>(req: Promise<ClientResponse<T>>): Promise<T> {
 - Under `tsc -b`, web reads the server's emitted `.d.ts` (`server/.tsbuild/`). Node types stay out because `web` does
   not list `node` in `types`; commit the N0(c) canary as a type test. (N0) `web/tsconfig.json` lists `bun` for its
   tests, which brings Node's types: split web into an app project (`types: []`, later `vite/client`) holding the
-  canary and a tests project; the canary fails as soon as either has Node's types. Add a build assertion that the web bundle
+  canary and a tests project that excludes the canary file (the canary fails wherever Node's types are visible). Add a build assertion that the web bundle
   contains no `node:` specifier.
 
 Gate: as N6. Docs: `developers/frontend.mdx`, `developers/api/overview.mdx`; CLAUDE.md (`references` rule gains
@@ -590,13 +596,18 @@ http.on('upgrade', (req, socket, head) => {
 });
 ```
 
-- (N0) `dev.ts`, after `ssr.runner.import(entry)`: on a watcher `change`, if the file is in the ssr module graph but
-  not evaluated (the previous reload failed), clear `runner.evaluatedModules` and re-import the entry once; and
-  `server.watch.awaitWriteFinish: { stabilityThreshold: 50, pollInterval: 10 }`. Both were needed in the spike.
-- (N0) Build: `environments.ssr.resolve.noExternal: true` and `build.license: { fileName: 'THIRD-PARTY-LICENSES.md' }`
-  (zero-dependency decision). The spike stub did not import `ws` or `@huggingface/gguf`: check that `ws`'s optional
-  `bufferutil`/`utf-8-validate` requires do not break the bundle (mark them external if they do) and that `main.js`
-  imports only `node:*` (a build test).
+- (N0) `dev.ts`, as proven by `scripts/spike/reload-scenarios.sh` on the spike branch: `vite.watcher.add([server,
+  packages])` (directories: a per-file watch is lost after two quick atomic replaces); wrap `runner.import` to track
+  the in-flight import and the time of the last failure; on watcher `change`/`add` after an older failure, wait for
+  any in-flight import, then `ssr.moduleGraph.invalidateAll()`, clear `runner.evaluatedModules` and re-import the
+  entry. No `awaitWriteFinish`, no fixed-delay check (it evaluated the entry twice on a slow graph). Port the
+  scenarios (slow graph, syntax error + fix, missing import + create, write bursts, SIGINT mid-reload) as a dev-loop
+  test.
+- (N0) `server/index.ts` must dispose the previous instance only once the new one has mounted (not at the top of the
+  module): a runtime throw after `__llamaWebuiDispose()` would leave the old listeners on a disposed hub.
+- (N0) Build: `environments.ssr.resolve.noExternal: true`, `external: ['hono', '@hono/node-server', 'ws']` and
+  `build.license: { fileName: 'THIRD-PARTY-LICENSES.md' }` (dependency decision). A build test asserts that
+  `main.js` imports only `node:*` and those three packages (with subpaths).
 - Prod `web` handler: exact path → bytes with `Cache-Control: public, max-age=31536000, immutable`; anything else →
   `index.html` with `no-cache`; `dist/web` missing → the existing 503 text. No gzip, no ETag (as today; backlog).
 - `guard()` replaces `req.body !== null` with `Number(content-length) > 0 || transfer-encoding` (fact 9).
@@ -642,9 +653,8 @@ w.unref(); // adapt 'message'/'error' events to WorkerLike.onmessage/onerror
 - Dev runs `worker.ts` by native type stripping: its graph (`worker`, `read`, `symbols`, `../gpu`, `../needs`) gets
   `.ts` import extensions (already erasable; its one cross-package import is type-only). Prod:
   `new URL('./nvml-worker.js', import.meta.url)`; `vite.config.ts` gains the worker entry.
-- `types: ["bun"]` and `@types/bun` leave `server`, `scripts`, `web`, `packages/webui-shared` (→ `node`, and
-  `vite/client` for web). `site` keeps them until N10. (N0) Web's app project gets `vite/client` only; `node` goes
-  to its tests project (N7 canary).
+- `types: ["bun"]` and `@types/bun` leave `server`, `scripts`, `packages/webui-shared` (→ `node`) and `web` (app
+  project → `vite/client` only, tests project → `node`; N7 canary, (N0)). `site` keeps them until N10.
 
 Gate: as N8, plus on this machine: NVML source active, PCIe throughput present; with the library path broken the
 nvidia-smi fallback engages.
@@ -663,17 +673,17 @@ Risk: `node:ffi` may move within 26.x → pin CI to 26.13 and keep the fallback 
 Gate: full Node gate; `pnpm site:build`, `check-links`, `site:preview` serving a deep page; one `og` and one
 `screenshots` run by hand (sharp, Chromium).
 Docs: the site section of CLAUDE.md (commands, demo-instance command line).
-Risk: `sharp`/`pagefind` under `allowBuilds`.
+Risk: `sharp`/`pagefind` under `allowBuilds`. (N0) Neither needed an entry for `site:build` on the pnpm tree.
 
 ### N11 — Package and release (M). After N9
 
 - The **root package is the packed one**: `bin: { "llama-webui": "dist/server/main.js" }`, `files: ["dist"]`,
-  `os: ["linux"]`, `engines`; no `dependencies` (zero-dependency bundle): runtime libraries and the two workspace
-  packages are `devDependencies` (bundled; a `workspace:*` dependency would be rewritten to a version that cannot
-  install). `dist/server/THIRD-PARTY-LICENSES.md` is in the package.
+  `os: ["linux"]`, `engines`; `dependencies` are exactly hono, `@hono/node-server` and `ws` via `catalog:`; the
+  bundled libraries and the two workspace packages are `devDependencies` (a `workspace:*` dependency would be
+  rewritten to a version that cannot install). `dist/server/THIRD-PARTY-LICENSES.md` is in the package.
   `private: true` stays unless `pnpm pack` refuses it (unverified).
-- (N0) Zero-dependency chosen: in the spike, `main.js` was 304 kB importing only `node:*` and booted from an empty
-  directory (externals variant: 20 kB plus a 4-package, 12 MiB install).
+- (N0) Spike data behind the decision (stub server): all bundled, `main.js` 304 kB importing only `node:*`, boots
+  from an empty directory; all external, 20 kB plus a 4-package, 12 MiB install.
 - `scripts/smoke.ts --tarball`: `pnpm pack`, `npm install --prefix $tmp ./llama-webui-x.tgz`, then the N8 checks
   through `$tmp/node_modules/.bin/llama-webui`. A missing runtime dependency fails here.
 - `release.yml`: version check (`scripts/release.ts --check`), build, pack, tarball smoke, `SHA256SUMS`,
