@@ -1,7 +1,7 @@
 // `pnpm dev`: one Node process, one port. Vite (middleware mode) serves the UI with HMR, and its ssr environment's
 // module runner evaluates the server entry: a server-side save re-evaluates the entry in the same process, so the
 // globals of `server/runtime.ts` (llama-server, the logs, the monitor) survive it. Run by plain `node` (erasable TS,
-// imports only vite and node:*).
+// imports only vite, node:* and `./env.ts`).
 import { statSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { resolve, sep } from 'node:path';
@@ -11,6 +11,7 @@ import {
   isRunnableDevEnvironment,
   type ViteDevServer,
 } from 'vite';
+import { loadDotEnv } from './env.ts';
 
 export interface DevOptions {
   /** The server entry, evaluated by the module runner. */
@@ -128,6 +129,7 @@ function replayDroppedChanges(vite: ViteDevServer): void {
 }
 
 if (import.meta.main) {
+  loadDotEnv();
   const root = resolve(import.meta.dirname, '..');
   await startDev({
     entry: resolve(root, 'server/index.ts'),
