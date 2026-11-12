@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { HfTokenSource } from '@llama-webui/shared';
+import { readText } from '../proc';
 
 export type Env = Record<string, string | undefined>;
 
@@ -28,8 +29,7 @@ export function hfTokenPath(env: Env = process.env, home = homedir()): string {
 export async function resolveHfToken(env: Env = process.env, home = homedir()): Promise<HfToken> {
   const fromEnv = (env.HF_TOKEN || env.HUGGING_FACE_HUB_TOKEN || '').trim();
   if (fromEnv) return { token: fromEnv, source: 'env' };
-  const fromFile = await Bun.file(hfTokenPath(env, home))
-    .text()
+  const fromFile = await readText(hfTokenPath(env, home))
     .then((t) => t.trim())
     .catch(() => '');
   return fromFile ? { token: fromFile, source: 'file' } : { token: null, source: null };

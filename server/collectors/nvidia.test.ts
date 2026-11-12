@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { defer } from '@llama-webui/shared';
+import type { Spawn } from '../proc';
 import { type GpuSample, normalizeBusId, selectUsedGpus } from './gpu';
 import { NvidiaMonitor, parseComputeApps, parseNvidiaGpuLine } from './nvidia';
 
@@ -50,7 +51,7 @@ function fakeSpawn(chunks: string[], appsCsv = '') {
       },
     });
     return { stdout: stream, exited: Promise.resolve(0), kill() {} };
-  }) as unknown as typeof Bun.spawn;
+  }) as unknown as Spawn;
 }
 
 test('NvidiaMonitor streams lines split across chunks', async () => {
@@ -89,7 +90,7 @@ test("compute apps with [N/A] memory keep the process on its card, counting the 
 test('NvidiaMonitor without nvidia-smi stays empty', async () => {
   const spawn = (() => {
     throw new Error('ENOENT');
-  }) as unknown as typeof Bun.spawn;
+  }) as unknown as Spawn;
   const mon = new NvidiaMonitor({ spawn });
   mon.start();
   await mon.refreshApps();
@@ -107,7 +108,7 @@ test('a compute-apps read abandoned on timeout may fail later without reaching t
     }),
     exited: Promise.resolve(0),
     kill() {},
-  })) as unknown as typeof Bun.spawn;
+  })) as unknown as Spawn;
   const mon = new NvidiaMonitor({ spawn, appsTimeoutMs: 20 });
   const unhandled: unknown[] = [];
   const onUnhandled = (e: unknown) => unhandled.push(e);
@@ -168,7 +169,7 @@ test('configure restarts a running nvidia-smi stream at the new pace, and only t
       exited: new Promise<number>(() => {}),
       kill: () => kills.push(i),
     };
-  }) as unknown as typeof Bun.spawn;
+  }) as unknown as Spawn;
   const mon = new NvidiaMonitor({ spawn, intervalMs: 1000 });
   mon.configure({ intervalMs: 500 }); // not started: nothing to restart
   expect(argv).toEqual([]);

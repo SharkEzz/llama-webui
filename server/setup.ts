@@ -14,6 +14,7 @@ import {
   type SetupReport,
 } from '@llama-webui/shared';
 import type { ModelInfo } from './models/gguf';
+import { readText } from './proc';
 import { expandHome } from './supervisor/args';
 
 /** What the first-run report reads from the machine (injected: tested without the real binary, GPUs or perf). */
@@ -78,9 +79,7 @@ export async function buildSetupReport(d: SetupDeps): Promise<SetupReport> {
 
 /** `kernel.perf_event_paranoid`, null when unreadable. */
 export async function readPerfParanoid(path = '/proc/sys/kernel/perf_event_paranoid'): Promise<number | null> {
-  const text = await Bun.file(path)
-    .text()
-    .catch(() => null);
+  const text = await readText(path).catch(() => null);
   const n = text === null ? Number.NaN : Number.parseInt(text.trim(), 10);
   return Number.isFinite(n) ? n : null;
 }

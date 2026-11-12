@@ -1,4 +1,4 @@
-import { readdir, realpath } from 'node:fs/promises';
+import { readdir, readFile, realpath } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import type { TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/shared';
 import { physicalDisks } from '../collectors/disk';
@@ -11,7 +11,7 @@ import { readCpuInfo } from './cpu';
 
 export const readText = async (p: string): Promise<string | null> => {
   try {
-    return (await Bun.file(p).text()).trim();
+    return (await readFile(p, 'utf8')).trim();
   } catch {
     return null;
   }

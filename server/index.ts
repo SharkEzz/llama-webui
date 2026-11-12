@@ -18,6 +18,7 @@ import { PlacementTracker } from './monitor/placement';
 import { dbPath } from './paths';
 import { buildWebRoutes, unavailableWebRoutes } from './routes/web';
 import { activeProfileId, getRuntime, serverView, startMonitor } from './runtime';
+import { isStandalone } from './standalone';
 import { binaryPath, buildCommand, profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
 import { APP_VERSION } from './version';
@@ -56,14 +57,14 @@ const chatRuns = new ChatRuns({
 const { supervisor, logs } = runtime;
 // Compiled executable: NODE_ENV is replaced by "production" at compile time (`scripts/compile.ts`).
 const development = process.env.NODE_ENV !== 'production';
-const standalone = Bun.isStandaloneExecutable;
+const standalone = isStandalone;
 // Development: HTML import with HMR. Standalone executable: the same import, bundled (and split per page) at compile
 // time and embedded. Production from source: front end built (and split per page) once, at startup; a front end that
 // fails to build does not block the API or llama-server control.
 const web =
   development || standalone
     ? { '/*': index }
-    : await buildWebRoutes(`${import.meta.dir}/../web/index.html`).catch((err: unknown) => {
+    : await buildWebRoutes(`${import.meta.dirname}/../web/index.html`).catch((err: unknown) => {
         console.error('[llama-webui] web UI unavailable:', err);
         return unavailableWebRoutes(err);
       });

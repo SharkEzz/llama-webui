@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import type { Spawn } from '../proc';
 import { MemBandwidthSampler, parsePerfLine } from './membw';
 
 test('parsePerfLine: perf stat CSV, unsupported counts', () => {
@@ -35,7 +36,7 @@ function fakePerf(
       },
     });
     return { stdout: stream, exited: Promise.resolve(0), kill: () => killed() };
-  }) as unknown as typeof Bun.spawn;
+  }) as unknown as Spawn;
   return { spawn, calls };
 }
 

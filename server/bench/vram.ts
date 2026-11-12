@@ -1,6 +1,8 @@
 import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { GpuSample } from '@llama-webui/shared';
 import { LineSplitter } from '../logs/lines';
+import { readText, type Spawned, spawnProc } from '../proc';
 
 const MIB = 1024 * 1024;
 
@@ -22,16 +24,16 @@ export interface VramPeaks {
  */
 export class VramProbe implements VramPeaks {
   private readonly seen = new Map<string, { first: number; max: number }>();
-  private readonly smi: ReturnType<typeof Bun.spawn> | null = null;
+  private readonly smi: Spawned | null = null;
   private readonly smiDone: Promise<void> = Promise.resolve();
-  private readonly timer: Timer | null = null;
+  private readonly timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(gpus: GpuSample[], o: { intervalMs?: number; sysRoot?: string } = {}) {
     const intervalMs = o.intervalMs ?? 100;
     const sysRoot = o.sysRoot ?? '/sys';
     if (gpus.some((g) => g.vendor === 'nvidia')) {
       try {
-        this.smi = Bun.spawn(
+        this.smi = spawnProc(
           ['nvidia-smi', '--query-gpu=uuid,memory.used', '--format=csv,noheader,nounits', '-lms', String(intervalMs)],
           { stdin: 'ignore', stdout: 'pipe', stderr: 'ignore' },
         );
@@ -42,9 +44,7 @@ export class VramProbe implements VramPeaks {
     if (amd.length > 0) {
       const tick = async () => {
         for (const g of amd) {
-          const text = await Bun.file(join(sysRoot, 'bus/pci/devices', g.busId, 'mem_info_vram_used'))
-            .text()
-            .catch(() => '');
+          const text = await readText(join(sysRoot, 'bus/pci/devices', g.busId, 'mem_info_vram_used')).catch(() => '');
           const bytes = Number(text.trim());
           if (text.trim() !== '' && Number.isFinite(bytes)) this.note(g.key, bytes);
         }
@@ -82,7 +82,7 @@ export class VramProbe implements VramPeaks {
       try {
         this.smi.kill('SIGTERM');
       } catch {}
-      await Promise.race([this.smiDone, Bun.sleep(500)]);
+      await Promise.race([this.smiDone, sleep(500)]);
     }
   }
 }

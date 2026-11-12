@@ -2,6 +2,7 @@ import type { CpuInfo, GpuSample, MemInfo, TuningHardware } from '@llama-webui/s
 import { listDevicesResult } from '../bench/hardware';
 import { parseMeminfo } from '../collectors/system';
 import { readCpuInfo } from '../hardware/cpu';
+import { readText } from '../proc';
 import { withLiveMemory } from './match';
 
 let cpu: Promise<CpuInfo> | null = null;
@@ -16,13 +17,7 @@ export async function readTuningHardware(o: {
   gpus?: GpuSample[];
 }): Promise<TuningHardware> {
   cpu ??= readCpuInfo();
-  const mem =
-    o.mem ??
-    parseMeminfo(
-      await Bun.file('/proc/meminfo')
-        .text()
-        .catch(() => ''),
-    );
+  const mem = o.mem ?? parseMeminfo(await readText('/proc/meminfo').catch(() => ''));
   const list = await listDevicesResult(o.benchBinary);
   return {
     devices: withLiveMemory(list.devices, o.gpus ?? []),

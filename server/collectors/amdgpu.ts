@@ -1,4 +1,4 @@
-import { readdir, readlink, realpath } from 'node:fs/promises';
+import { readdir, readFile, readlink, realpath } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { minKnown, parseLinkSpeed, pciName, readNum, readText, slotLink } from '../hardware/pci';
 import { type GpuReading, identityReading } from './gpu';
@@ -63,7 +63,7 @@ export async function readProcAmdVram(
       }
       let text: string;
       try {
-        text = await Bun.file(join(dir, e)).text();
+        text = await readFile(join(dir, e), 'utf8');
       } catch {
         return;
       }
@@ -169,7 +169,7 @@ const ratioPct = (v: number | null, max: number | null): number | null =>
  */
 export async function isRuntimeSuspended(card: AmdCard): Promise<boolean> {
   try {
-    return (await Bun.file(join(card.devicePath, 'power', 'runtime_status')).text()).trim() === 'suspended';
+    return (await readFile(join(card.devicePath, 'power', 'runtime_status'), 'utf8')).trim() === 'suspended';
   } catch {
     return false;
   }

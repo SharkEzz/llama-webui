@@ -1,6 +1,8 @@
+import { stat } from 'node:fs/promises';
 import type { BenchDevice, BenchHardware, GpuSample } from '@llama-webui/shared';
 import { parseDeviceList } from 'llamacpp-js/bench';
 import { readCpuInfo } from '../hardware/cpu';
+import { spawnProc, which } from '../proc';
 
 const VERSION = /build (\d+), commit (\w+)/;
 const builds = new Map<string, Promise<string | null>>();
@@ -11,7 +13,7 @@ let cpu: Promise<string> | null = null;
 
 /** Output of a short command (stdout + stderr), killed after `timeoutMs`; rejects when it fails or crashes. */
 async function output(argv: string[], timeoutMs = 5000): Promise<string> {
-  const proc = Bun.spawn(argv, {
+  const proc = spawnProc(argv, {
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
@@ -37,16 +39,14 @@ class OutputError extends Error {
 
 /** Modification time of a binary (looked up in the PATH), 0 if unreadable: part of the cache keys. */
 const mtimeOf = (binary: string): Promise<number> =>
-  Bun.file(Bun.which(binary) ?? binary)
-    .stat()
-    .then(
-      (s) => s.mtimeMs,
-      () => 0,
-    );
+  stat(which(binary) ?? binary).then(
+    (s) => s.mtimeMs,
+    () => 0,
+  );
 
 /** “b12119 (6f1e65437)” from `<binary> --version`, cached per binary and modification time (a rebuild is read again); null if unreadable. */
 export async function buildOf(binary: string): Promise<string | null> {
-  const key = `${Bun.which(binary) ?? binary}:${await mtimeOf(binary)}`;
+  const key = `${which(binary) ?? binary}:${await mtimeOf(binary)}`;
   let p = builds.get(key);
   if (!p) {
     p = output([binary, '--version']).then(

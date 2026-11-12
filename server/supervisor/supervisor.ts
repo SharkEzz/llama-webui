@@ -1,9 +1,11 @@
 import { existsSync } from 'node:fs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { ServerState } from '@llama-webui/shared';
 import { probeHealth, probeLlamaServer } from 'llamacpp-js/client';
 import { findLlamaServerPid } from 'llamacpp-js/node';
 import type { LogBuffer } from '../logs/buffer';
 import { isIdleNoise, LineSplitter } from '../logs/lines';
+import { type Spawned, spawnProc } from '../proc';
 import { type BuiltCommand, launchLines } from './args';
 
 export type { ServerState };
@@ -20,7 +22,7 @@ export interface SupervisorOptions {
   now?: () => number;
 }
 
-type Child = ReturnType<typeof Bun.spawn>;
+type Child = Spawned;
 
 export class Supervisor {
   private _state: ServerState = { kind: 'idle' };
@@ -140,7 +142,7 @@ export class Supervisor {
     if (!existsSync(cmd.cwd)) return fail(`directory not found: ${cmd.cwd}`);
     let proc: Child;
     try {
-      proc = Bun.spawn(cmd.argv, { cwd: cmd.cwd, env: cmd.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+      proc = spawnProc(cmd.argv, { cwd: cmd.cwd, env: cmd.env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -244,7 +246,7 @@ export class Supervisor {
     try {
       proc.kill('SIGTERM');
     } catch {}
-    const exited = await Promise.race([proc.exited.then(() => true), Bun.sleep(this.killTimeoutMs).then(() => false)]);
+    const exited = await Promise.race([proc.exited.then(() => true), sleep(this.killTimeoutMs).then(() => false)]);
     if (!exited) {
       this.logs.push(`[llama-webui] not stopped after ${this.killTimeoutMs} ms, SIGKILL`);
       try {

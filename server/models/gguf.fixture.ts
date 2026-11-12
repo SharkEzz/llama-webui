@@ -1,3 +1,5 @@
+import { writeFile } from 'node:fs/promises';
+
 export type KvValue =
   | { type: 'u32'; value: number }
   | { type: 'u64'; value: bigint }
@@ -104,5 +106,5 @@ export async function writeGguf(path: string, kv: Record<string, KvValue>, tenso
   const last = tensors[tensors.length - 1];
   const dataBytes = last ? offsets[offsets.length - 1]! + last.bytes : 0;
   o.raw(new Uint8Array(dataBytes));
-  await Bun.write(path, o.bytes());
+  await writeFile(path, o.bytes());
 }
