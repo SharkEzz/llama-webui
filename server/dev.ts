@@ -96,7 +96,17 @@ export async function startDev(o: DevOptions): Promise<{ vite: ViteDevServer; ht
   vite.watcher.on('add', recover);
   replayDroppedChanges(vite);
 
-  await runner.import(o.entry);
+  // A first evaluation that fails (`pnpm dev` started while a file is broken) waits for the fix, which `recover`
+  // evaluates (`failedAt` is set). A listen error (port taken) is fatal: no edit fixes it.
+  try {
+    await runner.import(o.entry);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).syscall === 'listen') {
+      await vite.close();
+      throw err;
+    }
+    console.error(`[llama-webui] start failed, waiting for a fix: ${err instanceof Error ? err.message : String(err)}`);
+  }
   return { vite, http };
 }
 

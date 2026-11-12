@@ -37,11 +37,21 @@ export async function staticWeb(dir: string): Promise<WebHandler> {
   files.delete('/index.html');
   return (req, res) => {
     const file = files.get((req.url ?? '/').split('?', 1)[0] ?? '/');
+    // An explicit length: headers written before the body would otherwise be sent chunked, and HEAD with no length.
     if (file) {
-      res.writeHead(200, { 'Content-Type': file.type, 'Cache-Control': 'public, max-age=31536000, immutable' });
+      res.writeHead(200, {
+        'Content-Type': file.type,
+        'Content-Length': file.body.length,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      });
       res.end(file.body);
     } else {
-      res.writeHead(200, { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'no-cache' }).end(index);
+      res.writeHead(200, {
+        'Content-Type': 'text/html;charset=utf-8',
+        'Content-Length': index.length,
+        'Cache-Control': 'no-cache',
+      });
+      res.end(index);
     }
   };
 }

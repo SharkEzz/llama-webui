@@ -33,7 +33,11 @@ type Listeners = {
  * development reload evaluates this module again, and the new instance must find what the old one mounted.
  */
 const MOUNTED = Symbol.for('llama-webui.host.mounted');
-type Mounted = Server & { [MOUNTED]?: Listeners };
+type Mounted = Server & {
+  [MOUNTED]?: Listeners;
+  /** Set by the `shouldUpgradeCallback` option of `createServer()`, or later (Node's types only know the option). */
+  shouldUpgradeCallback?: (req: IncomingMessage) => boolean;
+};
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
@@ -118,6 +122,9 @@ export function mount(o: MountOptions): Promise<number> {
   server.on('request', request);
   server.on('upgrade', upgrade);
   server[MOUNTED] = { request, upgrade };
+  // Node hands every request with an `Upgrade` header to the `upgrade` listeners, `h2c` included (`curl --http2`):
+  // only a WebSocket upgrade goes there, any other is a plain request (as on Bun). Vite's HMR upgrades are WebSocket.
+  server.shouldUpgradeCallback = (req) => req.headers.upgrade?.toLowerCase() === 'websocket';
 
   const bound = () => (o.server.address() as AddressInfo).port;
   if (o.server.listening) return Promise.resolve(bound());

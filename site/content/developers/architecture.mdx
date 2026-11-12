@@ -78,7 +78,9 @@ The external server watcher (`externalWatcher()` in `server/supervisor/external.
   `guard()`, then gets `426`;
 - anything else, to the web handler: the UI files and the SPA fallback, so reloading `/chat/12` serves the app.
 
-An upgrade on another path is closed in production, and left to Vite's HMR WebSocket in development. A `Host` header
+Only a WebSocket upgrade takes that route: `mount()` sets the server's `shouldUpgradeCallback`, so a request with
+another `Upgrade` header (`h2c`, which `curl --http2` sends) is a plain request. An upgrade on another path is closed in
+production, and left to Vite's HMR WebSocket in development. A `Host` header
 that is not an authority gets `403` with `Invalid host`, as from the guard. A second `mount()` on the same server (a
 development reload) removes the listeners of the previous one before adding its own, and only the first one listens.
 
@@ -211,7 +213,8 @@ state does not. Without care, each save would create a new supervisor that has l
 `llama-server`, and kill or orphan the loaded model.
 
 A reload that fails (a syntax error, an import of a missing file) leaves the previous instance serving, and the next
-save that fixes it reloads again. `server/dev.ts` also replays a change its file watcher drops, a second write less
+save that fixes it reloads again. A first evaluation that fails (`pnpm dev` started while a file is broken) waits the
+same way, with nothing listening yet; only a listen error (port taken) ends `pnpm dev`. `server/dev.ts` also replays a change its file watcher drops, a second write less
 than 50 ms after the first (a format on save), so the reload always runs the last content.
 
 ### What survives a reload

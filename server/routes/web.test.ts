@@ -65,3 +65,20 @@ test('staticWeb rejects without an index.html; unavailableWeb then answers every
   expect(page.body).toContain('llama-webui: web UI unavailable.');
   expect(page.body).toContain('missing');
 });
+
+test('staticWeb: every answer has its Content-Length, HEAD included (as Bun sent it)', async () => {
+  using dir = tempDir('lw-web-');
+  await writeFileDeep(`${dir.path}/index.html`, '<!doctype html><title>app</title>');
+  await writeFileDeep(`${dir.path}/assets/a-1.js`, 'export {};');
+  const base = await serve(await staticWeb(dir.path));
+  for (const method of ['GET', 'HEAD']) {
+    const js = await request(base, { method, path: '/assets/a-1.js' });
+    const page = await request(base, { method, path: '/chat/12' });
+    expect([method, js.headers['content-length'], js.headers['transfer-encoding']]).toEqual([method, '10', undefined]);
+    expect([method, page.headers['content-length'], page.headers['transfer-encoding']]).toEqual([
+      method,
+      '33',
+      undefined,
+    ]);
+  }
+});
