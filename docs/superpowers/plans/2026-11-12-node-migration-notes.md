@@ -105,6 +105,13 @@ changes in the plan.
   Bun's (308 files, sha256). `serve.ts` needs its own MIME table (Node has no type lookup), copied from the types Bun
   reported for the site's files; Bun's `content-disposition: filename=…` on binary files is not kept (Pages does not
   send it). `pnpm <script> --flag` passes the flag through, so `pnpm site:preview --port 4175` works from the root.
+- N11: `pnpm pack` packs the root with `private: true` and rewrites `catalog:` into the catalog's specifiers; the
+  tarball is 1.5 MB and `npm install` adds 4 packages (9.2 MiB) in about 1 s. `files: ["dist"]` would have shipped
+  `dist/llama-webui`, a 115 MB executable left by the old `bun run compile`: `files` lists `dist/server` and `dist/web`.
+  An install from the tarball has no lockfile, so the catalog's ranges (`^8.22.2`…) would let untested releases in:
+  the three runtime dependencies are pinned exactly (none has dependencies of its own; `ws`'s peers are optional),
+  and the tarball smoke fails if npm installs anything else. `release.yml` was already broken since N8 (`bun run
+  compile` gone): it now publishes the tarball and its `SHA256SUMS`.
 
 ## Refactoring and optimisation backlog (for the R milestones, after the merge)
 

@@ -1,7 +1,8 @@
-# Standalone executables (`bun run compile`) attached to a GitHub Release, for every `v*` tag: the executables report
-# the tag as their version (`git describe`). The tag must match the version of every package.json (`bun run release
-# <version>`, merged before tagging). The quality gate already ran on master (ci.yml); the x64 binary is smoke-tested
-# before publishing.
+# The npm package of the app (`pnpm pack` of the root package: `npm install -g ./llama-webui-<version>.tgz` gives the
+# `llama-webui` command) attached to a GitHub Release, for every `v*` tag: the build reports the tag as its version
+# (`git describe`). The tag must match the version of every package.json (`pnpm release <version>`, merged before
+# tagging). The quality gate already ran on master (ci.yml); the tarball is installed and smoke-tested before
+# publishing.
 name: Release
 
 on:
@@ -19,21 +20,17 @@ jobs:
         with:
           fetch-depth: 0 # tags and history, for `git describe`
       - uses: pnpm/action-setup@v6
-      # No `cache: pnpm` here: the published binaries are built from a fresh install, not from a restored store.
+      # No `cache: pnpm` here: the published package is built from a fresh install, not from a restored store.
       - uses: actions/setup-node@v5
         with:
           node-version: 26.13
-      # The Bun binaries of the releases so far; this workflow moves to Node in N11.
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
       - run: pnpm install --frozen-lockfile
-      - run: bun scripts/release.ts --check "$GITHUB_REF_NAME"
-      # Linux only (/proc, /sys); arm64 is cross-compiled, the UI is bundled on this runner.
-      - run: bun run compile --target bun-linux-x64 --outfile release/llama-webui-linux-x64
-      - run: bun run compile --target bun-linux-arm64 --outfile release/llama-webui-linux-arm64
-      - run: bun scripts/smoke-binary.ts release/llama-webui-linux-x64
-      - run: cd release && sha256sum llama-webui-linux-* > SHA256SUMS
+      - run: node scripts/release.ts --check "$GITHUB_REF_NAME"
+      - run: pnpm build
+      - run: pnpm pack --pack-destination release
+      # Installed with npm into an empty prefix, then started through its bin (scripts/smoke.ts).
+      - run: node scripts/smoke.ts --tarball release/llama-webui-*.tgz
+      - run: cd release && sha256sum llama-webui-*.tgz > SHA256SUMS
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}

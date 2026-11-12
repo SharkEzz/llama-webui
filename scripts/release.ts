@@ -1,7 +1,7 @@
 /**
  * Versions of the repository's package.json files, kept equal to the release tag.
- * - `bun run release 0.2.0`: sets `version` in every package.json (commit it through a PR, then tag `v0.2.0` on master);
- * - `bun scripts/release.ts --check v0.2.0`: fails unless every package.json has that version (release workflow).
+ * - `pnpm release 0.2.0`: sets `version` in every package.json (commit it through a PR, then tag `v0.2.0` on master);
+ * - `node scripts/release.ts --check v0.2.0`: fails unless every package.json has that version (release workflow).
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -68,14 +68,14 @@ if (import.meta.main) {
     if (wrong.length > 0) {
       for (const [file, v] of wrong)
         console.error(`release: ${file} is at ${v ?? 'no version'}, the tag at ${expected}`);
-      console.error(`release: run \`bun run release ${expected}\` and merge it before tagging`);
+      console.error(`release: run \`pnpm release ${expected}\` and merge it before tagging`);
       process.exit(1);
     }
     console.log(`release: every package.json is at ${expected}`);
   } else {
     const version = positionals.length === 1 ? parseVersion(positionals[0] as string) : null;
     if (!version) {
-      console.error('usage: bun run release <version>   (for example 0.2.0)');
+      console.error('usage: pnpm release <version>   (for example 0.2.0)');
       process.exit(2);
     }
     for (const file of PACKAGE_FILES) {

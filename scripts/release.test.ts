@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { parseVersion, readVersions, withVersion } from './release';
 
-test('every package.json has the same version (bun run release <version>)', async () => {
+test('every package.json has the same version (pnpm release <version>)', async () => {
   const versions = Object.values(await readVersions());
   expect(versions.every((v) => v !== null)).toBe(true);
   expect(new Set(versions).size).toBe(1);

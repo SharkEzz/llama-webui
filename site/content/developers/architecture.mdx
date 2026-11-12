@@ -175,6 +175,26 @@ the current chunks.
 If `dist/web` is missing or unreadable, `unavailableWeb()` serves a `503` with the error for every page until the next
 startup. The API, the WebSocket and `llama-server` control keep working.
 
+### Distribution
+
+A release is the npm package of the repository's root: `pnpm pack` after `pnpm build` writes
+`llama-webui-<version>.tgz` (about 1.5 MB), which `npm install -g ./llama-webui-<version>.tgz` turns into a
+`llama-webui` command. The root `package.json` is the packed one:
+
+- `bin` maps `llama-webui` to `dist/server/main.js`, which starts with `#!/usr/bin/env node`. Node runs it from its
+  real path, so `dist/web` and `nvml-worker.js` are found next to it even through the link npm creates.
+- `files` ships `dist/server` (the bundle, the NVML sampler and `THIRD-PARTY-LICENSES.md`) and `dist/web`, plus the
+  `README.md`, `LICENSE` and `package.json` npm always adds; `os` is `linux` and `engines` asks for Node.js 26.13.
+- `dependencies` are the three libraries left out of the bundle, `hono`, `@hono/node-server` and `ws`, at exact
+  versions (the pnpm catalog): an install from the tarball has no lockfile, and none of the three has dependencies of
+  its own, so the installed tree is exactly the one tested. The workspace packages and every other library are
+  bundled.
+
+`node scripts/smoke.ts --tarball [file.tgz]` checks the package the way a user gets it: it packs the root (or takes
+the given tarball), installs it with npm into an empty prefix, checks that npm installed nothing but the package and
+those three versions, then runs the build's smoke checks through `node_modules/.bin/llama-webui`. CI runs it on every
+pull request, and `release.yml` runs it on the tarball it publishes.
+
 ## Launch options
 
 `server/cli.ts` reads three options, each from a flag, else its environment variable, else a default. An empty

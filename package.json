@@ -17,7 +17,7 @@
     "format": "biome format --write",
     "lint": "biome check",
     "lint:fix": "biome check --write",
-    "release": "bun scripts/release.ts",
+    "release": "node scripts/release.ts",
     "site:build": "pnpm --filter llama-webui-site build",
     "site:dev": "pnpm --filter llama-webui-site dev",
     "site:preview": "pnpm --filter llama-webui-site preview",
