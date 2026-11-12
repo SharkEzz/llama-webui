@@ -1,11 +1,12 @@
-// Unit tests on Node (Vitest). One project per code base; the files that still boot Bun.serve or Bun.build run with
-// `bun test` (`pnpm test:bun`) until N6/N8. llamacpp-js keeps node:test (`pnpm --filter llamacpp-js test`).
+// Unit tests on Node (Vitest). One project per code base. Until N8 the app still runs on Bun: `pnpm test:bun` replays
+// the server, scripts and shared tests under `bun test` too (Bun and Node differ, see server/db/sqlite.ts), including
+// the files that boot Bun.serve or Bun.build. llamacpp-js keeps node:test.
 import { fileURLToPath } from 'node:url';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 const dir = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
-/** Files that need the Bun runtime (Bun.serve, Bun.build): run by `pnpm test:bun`; keep the two lists equal. */
+/** Files that need the Bun runtime (Bun.serve, Bun.build): only `pnpm test:bun` runs them. */
 export const BUN_ONLY = ['server/routes/routes.test.ts', 'server/routes/web.test.ts'];
 
 export default defineConfig({

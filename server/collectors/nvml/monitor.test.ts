@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 import type { GpuReading } from '../gpu';
 import { NVML_WORKER, NvmlMonitor, type WorkerLike, workerUrl } from './monitor';
 
@@ -62,11 +62,13 @@ test('workerUrl: next to the module from source, under the entrypoint root in th
   expect(existsSync(fileURLToPath(fromSource))).toBe(true);
   // The compile entrypoints' root is server/: the worker is embedded at server/<NVML_WORKER>.
   expect(existsSync(`${import.meta.dirname}/../../${NVML_WORKER}`)).toBe(true);
-  // The compiled branch reads Bun.main (the executable's path): stubbed, so the test runs on Node.
-  vi.stubGlobal('Bun', { main: '/opt/llama-webui/llama-webui', pathToFileURL });
+  // The compiled branch reads Bun.main (the executable's path): stubbed on Node, the real one under `bun test`.
+  const g = globalThis as { Bun?: unknown };
+  const stub = g.Bun === undefined;
+  if (stub) g.Bun = { main: '/opt/llama-webui/llama-webui', pathToFileURL };
   try {
-    expect(workerUrl(true)).toBe(`file:///opt/llama-webui/${NVML_WORKER}`);
+    expect(workerUrl(true)).toBe(new URL(`./${NVML_WORKER}`, pathToFileURL(Bun.main)).href);
   } finally {
-    vi.unstubAllGlobals();
+    if (stub) delete g.Bun;
   }
 });
