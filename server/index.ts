@@ -1,28 +1,16 @@
 import index from '../web/index.html';
 import { createApp } from './app';
-import { RunExecutor } from './bench/execute';
-import { readHardware } from './bench/hardware';
-import { BenchRunner } from './bench/runner';
-import { ChatRuns } from './chat/runs';
 import { cliOptionsOrExit } from './cli';
-import { BenchRunsRepo } from './db/benchRuns';
-import { ConversationsRepo } from './db/conversations';
-import { DownloadsRepo } from './db/downloads';
 import { openDb } from './db/open';
-import { ProfilesRepo } from './db/profiles';
 import { SettingsRepo } from './db/settings';
-import { SweepsRepo } from './db/sweeps';
-import { HfClient } from './hf/client';
-import { DownloadQueue } from './hf/downloader';
-import { PlacementTracker } from './monitor/placement';
+import { createDeps } from './deps';
 import { dbPath } from './paths';
 import { buildWebRoutes, unavailableWebRoutes } from './routes/web';
-import { activeProfileId, getRuntime, serverView, startMonitor } from './runtime';
+import { getRuntime, serverView, startMonitor } from './runtime';
 import { isStandalone } from './standalone';
-import { binaryPath, buildCommand, profilePaths } from './supervisor/args';
+import { profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
 import { APP_VERSION } from './version';
-import { WsHub } from './ws/hub';
 
 // Flags, else env, else defaults (`--help`). Listens locally by default; --host 0.0.0.0 (or LLAMA_WEBUI_HOST) opens
 // it to the local network (no authentication). Re-read on every `bun --hot` reload: same arguments.
@@ -38,22 +26,6 @@ g.__llamaWebuiDispose?.();
 
 const db = openDb(dbPath(cli.dataDir));
 const runtime = getRuntime();
-const hub = new WsHub(runtime.bootId);
-const settings = new SettingsRepo(db);
-const profiles = new ProfilesRepo(db);
-const conversations = new ConversationsRepo(db);
-// A reply left “streaming” after Bun was killed is marked interrupted.
-conversations.stopOrphans();
-const chatRuns = new ChatRuns({
-  repo: conversations,
-  target: () => {
-    const s = runtime.supervisor.state;
-    if (s.kind === 'external') return { host: null, port: s.port, profileId: null, modelPath: null };
-    if (s.kind !== 'ready') return null;
-    const p = profiles.get(s.profileId);
-    return { host: s.host, port: s.port, profileId: s.profileId, modelPath: p ? profilePaths(p).model : null };
-  },
-});
 const { supervisor, logs } = runtime;
 // Compiled executable: NODE_ENV is replaced by "production" at compile time (`scripts/compile.ts`).
 const development = process.env.NODE_ENV !== 'production';
@@ -68,9 +40,19 @@ const web =
         console.error('[llama-webui] web UI unavailable:', err);
         return unavailableWebRoutes(err);
       });
-const monitor = await startMonitor(runtime, settings.get());
-const benchRuns = new BenchRunsRepo(db);
-const sweeps = new SweepsRepo(db);
+const deps = createDeps({
+  db,
+  runtime,
+  monitor: await startMonitor(runtime, new SettingsRepo(db).get()),
+  web,
+  hostname: HOSTNAME,
+  port: PORT,
+  development,
+});
+const { hub, settings, conversations, chatRuns, benchRuns, sweeps, benchRunner, profiles, downloads, monitor } = deps;
+const { placement } = deps;
+// A reply left “streaming” after Bun was killed is marked interrupted.
+conversations.stopOrphans();
 const benchGate = runtime.benchGate;
 // Cold start: a run left “running” (Bun killed) is marked interrupted, and so is its sweep (Resume button).
 // On reload the gate is still held: the old module has already settled its run and the new one resumes the sweep.
@@ -78,73 +60,15 @@ if (!benchGate.held) {
   benchRuns.stopOrphans();
   sweeps.stopOrphans();
 }
-const allGpus = () => monitor.latest()?.allGpus ?? [];
-const executor = new RunExecutor({
-  settings: () => settings.get(),
-  logs,
-  gpus: allGpus,
-  disk: () => monitor.latest()?.disk?.model?.readBps ?? null,
-  profile: (id) => {
-    const p = profiles.get(id);
-    return p ? { cwd: p.cwd, env: p.env } : null;
-  },
-});
-const benchRunner = new BenchRunner({
-  repo: benchRuns,
-  sweeps,
-  gate: benchGate,
-  executor,
-  hardware: () => readHardware(binaryPath(settings.get()), allGpus()),
-  onLive: (l) => hub.broadcast({ type: 'bench-progress', payload: l }),
-  onRun: (r) => hub.broadcast({ type: 'bench-run', payload: r }),
-  onSweep: (s) => hub.broadcast({ type: 'sweep', payload: s }),
-  onSweepLive: (l) => hub.broadcast({ type: 'sweep-progress', payload: l }),
-  rebuild: (stopped) => {
-    const p = profiles.get(stopped.profileId);
-    return p ? buildCommand(p, settings.get()) : null;
-  },
-});
 void benchRunner.resume();
 monitor.setModelPathResolver((id) => {
   const p = profiles.get(id);
   return p ? profilePaths(p).model : null;
 });
 // Hugging Face downloads: recreated on every reload, the new queue resumes the `.part` the old one let go of.
-const hf = new HfClient();
-const downloadsRepo = new DownloadsRepo(db);
-const downloads = new DownloadQueue({
-  repo: downloadsRepo,
-  hf,
-  onItem: (i) => hub.broadcast({ type: 'download', payload: i }),
-  onLive: (l) => hub.broadcast({ type: 'download-progress', payload: l }),
-  onDeleted: (ids) => hub.broadcast({ type: 'download-deleted', payload: { ids } }),
-});
 downloads.resume();
-// Model placement (startup logs): recreated on every reload, it replays the surviving ring.
-const placement = new PlacementTracker({ logs, supervisor });
 
-const server = createApp({
-  db,
-  hub,
-  settings,
-  profiles,
-  conversations,
-  chatRuns,
-  benchRuns,
-  benchRunner,
-  sweeps,
-  hf,
-  downloads,
-  downloadsRepo,
-  runtime,
-  monitor,
-  placement,
-  activeProfileId: () => activeProfileId(supervisor),
-  web,
-  hostname: HOSTNAME,
-  port: PORT,
-  development,
-});
+const server = createApp(deps);
 
 const unsubState = supervisor.subscribe(() => hub.broadcast({ type: 'server-state', payload: serverView(supervisor) }));
 const unsubLogs = logs.onLines((lines) => hub.broadcast({ type: 'log', payload: lines }));
