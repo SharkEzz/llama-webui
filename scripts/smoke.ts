@@ -24,7 +24,7 @@ process.on('uncaughtException', (err) => {
 
 const help = spawnSync(process.execPath, [main, '--help']);
 if (help.status !== 0) fail(`--help exited with ${help.status}: ${help.stderr.toString()}`);
-if (!help.stdout.toString().includes('pnpm start')) fail('--help does not show the usage');
+if (!help.stdout.toString().includes('llama-webui [options]')) fail('--help does not show the usage');
 
 // A free port: the OS picks one, released right away.
 const probe = createServer();

@@ -64,8 +64,9 @@ llama-webui: invalid --port: “70000” (integer from 1 to 65535)
 llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Node.js process).
 
 Usage:
-  pnpm dev [options]      development (Vite, HMR)
-  pnpm start [options]    production (builds, then runs dist/server/main.js)
+  llama-webui [options]   installed package (npm install -g llama-webui-<version>.tgz)
+  pnpm dev [options]      development (Vite, HMR), from the repository
+  pnpm start [options]    production (builds, then runs dist/server/main.js), from the repository
 
 Options:
   --host <address>       listen address (default: 127.0.0.1); 0.0.0.0 to open it to the local network

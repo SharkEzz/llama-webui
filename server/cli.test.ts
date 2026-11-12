@@ -47,8 +47,9 @@ test('parseCli: unknown option, missing value, positional, empty value', () => {
   expect(parseCli(['--data-dir='], {}).kind).toBe('error');
 });
 
-test('helpText: the pnpm scripts, one Node.js process', () => {
+test('helpText: the installed command and the pnpm scripts, one Node.js process', () => {
   const text = helpText();
+  expect(text).toContain('llama-webui [options]');
   expect(text).toContain('pnpm dev [options]');
   expect(text).toContain('pnpm start [options]');
   expect(text).toContain('single Node.js process');

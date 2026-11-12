@@ -3,6 +3,13 @@
   "version": "0.2.1",
   "private": true,
   "type": "module",
+  "bin": {
+    "llama-webui": "dist/server/main.js"
+  },
+  "files": [
+    "dist/server",
+    "dist/web"
+  ],
   "scripts": {
     "build": "vite build",
     "check": "tsc -b && pnpm --filter llama-webui-site typecheck",
@@ -35,5 +42,8 @@
   "packageManager": "pnpm@12.19.0",
   "engines": {
     "node": ">=26.13"
-  }
+  },
+  "os": [
+    "linux"
+  ]
 }
