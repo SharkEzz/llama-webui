@@ -69,6 +69,18 @@ test('a method a pattern lacks is a 405 with Allow, not the next matching patter
   expect(await unknown.json()).toEqual({ error: 'Unknown route' });
 });
 
+test('an empty segment does not match a :param: a trailing slash stays an unknown route', async () => {
+  const app = things();
+  for (const [path, method] of [
+    ['/api/things/', 'PATCH'],
+    ['/api/things/', 'GET'],
+    ['/api/things//import', 'POST'],
+  ]) {
+    const r = await app.request(path as string, { method });
+    expect([path, method, r.status]).toEqual([path, method, 404]);
+  }
+});
+
 test('id() is a 404 for anything but a positive integer', async () => {
   const app = things();
   for (const bad of ['x', '0', '-1', '1.5'])

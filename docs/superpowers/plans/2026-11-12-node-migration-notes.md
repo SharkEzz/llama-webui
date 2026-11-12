@@ -51,6 +51,9 @@ changes in the plan.
   case: a `body()` route answers `Invalid JSON` to a JSON body sent as `application/json-seq` (or another
   `application/json<non-word>…` type) where it used to parse it. The `json(check)` routes (object or imperative checks,
   lookup-first bodies) still read the body whatever the media type, as before.
+- (N6) Hono routes on the decoded path (`c.req.path`), Bun's router matched the raw one. Divergence, no golden case:
+  a percent-encoded static segment now reaches the static route (`GET /api/profiles/%69mport` is a 405 `Allow: POST`
+  instead of `Profile not found`; a `POST` to it runs the import). The guard still runs first; no client sends these.
 - (N6) Order kept from before the port: a body validator runs after `id()` (404 beats 400) but before the handler.
   Where the handler looked something up or answered a 409 before reading the body (PUT `/api/profiles/:id`: the repo
   looks the profile up before parsing; sweeps `resume` and `validate`), the body is passed through (`passthrough`) or

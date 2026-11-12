@@ -129,7 +129,8 @@ const isParam = (segment: string) => segment.startsWith(':');
 function matches(pattern: string, path: string): boolean {
   const p = segments(pattern);
   const s = segments(path);
-  return p.length === s.length && p.every((seg, i) => isParam(seg) || seg === s[i]);
+  // Like Hono's router, a `:param` never matches an empty segment (`/api/profiles/` is an unknown route, not a 405).
+  return p.length === s.length && p.every((seg, i) => (isParam(seg) && s[i] !== '') || seg === s[i]);
 }
 
 /** Negative when `a` is more specific: at the first segment where they differ in kind, static beats `:param`. */
