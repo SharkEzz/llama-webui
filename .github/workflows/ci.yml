@@ -12,27 +12,25 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0 # tags and history: the executable's version comes from `git describe`
-      # pnpm installs (version from `packageManager`) and runs the gate; the app, its build and the Bun replay of the
-      # server tests still need Bun until the runtime flip.
+          fetch-depth: 0 # tags and history: the build's version comes from `git describe`
+      # pnpm installs (version from `packageManager`) and runs the gate, on Node.
       - uses: pnpm/action-setup@v6
-      # Vitest, tsc, the llamacpp-js tests and the React Router CLI (site build) run on Node.
       - uses: actions/setup-node@v5
         with:
           node-version: 26.13
           cache: pnpm
-      # Same version as the `bun` peer of bun-plugin-tailwind in pnpm-lock.yaml, which scripts run first.
+      # The website's scripts still run with Bun (until N10).
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm check
-      # Vitest (Node), llamacpp-js (node --test), then the server tests again under Bun (`test:bun`).
+      # Vitest, then llamacpp-js (node --test).
       - run: pnpm test
-      # Standalone executable: builds, starts, serves the production UI.
-      - run: bun run compile
-      - run: bun scripts/smoke-binary.ts dist/llama-webui
+      # Production build: starts from an empty data directory, serves the production UI and the WebSocket.
+      - run: pnpm build
+      - run: node scripts/smoke.ts
       - run: bun run site:build
       - run: bun run --cwd site check-links
 
