@@ -31,7 +31,17 @@ const REPO = resolve(import.meta.dirname, '../..');
 const FAKE_SERVER = join(REPO, 'testdata/fake/fake-llama-server');
 
 /** Environment read by the routes (home, llama-tui config, Hugging Face token): pointed into the temp dir. */
-const ENV_KEYS = ['HOME', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME', 'HF_HOME', 'HF_TOKEN', 'HF_TOKEN_PATH'] as const;
+const ENV_KEYS = [
+  'HOME',
+  'XDG_CONFIG_HOME',
+  'XDG_CACHE_HOME',
+  'HF_HOME',
+  'HF_TOKEN',
+  'HF_TOKEN_PATH',
+  'HUGGING_FACE_HUB_TOKEN',
+  'HF_ENDPOINT',
+  'FAKE_CHAT_DELAY_MS',
+] as const;
 
 async function freePort(): Promise<number> {
   const s = createServer();
@@ -61,6 +71,8 @@ async function boot() {
   // Outside HOME: Bun's homedir() ignores this HOME (`<home>` in the golden), Node's follows it.
   process.env.XDG_CONFIG_HOME = join(tmp, 'xdg-config');
   process.env.XDG_CACHE_HOME = join(tmp, 'xdg-cache');
+  // The fake llama-server inherits the environment: no pause between chat chunks, so the stream ends at once.
+  process.env.FAKE_CHAT_DELAY_MS = '0';
   await mkdir(join(tmp, 'home'), { recursive: true });
 
   const modelsDir = join(tmp, 'models');
@@ -145,10 +157,11 @@ async function boot() {
 
 let app: Awaited<ReturnType<typeof boot>>;
 let outcomes: Record<string, Outcome> = {};
+// Above runStreams' own 15 s timeouts, so a stuck stream fails with its name, not as an unnamed hook timeout.
 beforeAll(async () => {
   app = await boot();
   outcomes = { ...(await runContract(app.base, app.ctx)), ...(await runStreams(app.base, app.ctx)) };
-});
+}, 60_000);
 afterAll(() => app?.dispose());
 
 test('the route table lists every API route of the app', () => {
@@ -160,9 +173,10 @@ test('no case that breaks a body or a guard succeeds', () => {
   const kinds = new Map(cases(app.ctx).map((c) => [c.name, c.kind]));
   const wrong = Object.entries(outcomes).filter(([name, o]) => {
     const kind = kinds.get(name);
+    if (name.endsWith('(text/plain)')) return o.status !== 415;
     if (kind === 'violation' || kind === 'body') return o.status < 400;
-    if (name.includes('(text/plain)')) return o.status !== 415;
-    if (name.includes('foreign Origin') || name.includes('Host evil') || name.includes('invalid Host'))
+    // The UI (`/*`) is not guarded: only the API refuses a foreign Host.
+    if (name.includes('foreign Origin') || name.includes('Host evil'))
       return !name.startsWith('GET /chat/') && o.status !== 403;
     return false;
   });
@@ -174,6 +188,7 @@ test('every reply matches the golden record', () => {
   const golden = JSON.parse(readFileSync(GOLDEN, 'utf8')) as Record<string, Outcome>;
   // Same cases in the same order, then the names of the cases whose reply changed, then the diff.
   expect(Object.keys(outcomes)).toEqual(Object.keys(golden));
-  expect(Object.keys(outcomes).filter((name) => !isDeepStrictEqual(outcomes[name], golden[name]))).toEqual([]);
-  expect(outcomes).toEqual(golden);
+  const changed = Object.keys(outcomes).filter((name) => !isDeepStrictEqual(outcomes[name], golden[name]));
+  const pick = (r: Record<string, Outcome>) => Object.fromEntries(changed.map((name) => [name, r[name]]));
+  expect({ changed, replies: pick(outcomes) }).toEqual({ changed: [], replies: pick(golden) });
 });

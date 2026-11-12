@@ -308,7 +308,7 @@ A reply is recorded with:
 - its body (JSON parsed, otherwise text).
 
 Values that change from one run to the next become placeholders: the temporary directory (`<tmp>`), the home
-directory (`<home>`), the repository (`<repo>`), ports (`<port>`), timestamps (`<time>`), and `bootId`, `version`,
+directory (`<home>`), the repository (`<repo>`), ports (`<port>`), timestamps (`<time>`), UUIDs (`<uuid>`), and `bootId`, `version`,
 `uptimeMs`, `pid`. A route whose answer depends on the machine (`/api/system/info`, `/api/topology`,
 `/api/tuning/hardware`, `/api/tuning/checks`, `/api/setup`, `/api/launchpad`, `/api/bench/devices`, `/api/flags`)
 records the names of its top-level fields, not their values.
@@ -323,7 +323,7 @@ UPDATE_GOLDEN=1 bun test ./server/contract/contract.test.ts
 git diff server/contract/golden.json
 ```
 
-A failure lists the names of the cases whose reply changed, then the full diff. `golden.json` is written by the test
+A failure lists the names of the cases whose reply changed, with the diff of those replies only. `golden.json` is written by the test
 and left out of Biome's formatter, so a regeneration changes only the entries that moved.
 
 <Callout type="note">
