@@ -14,7 +14,8 @@ The web app is a React 19 single-page app in `web/`, served by the Bun process (
 - `web/`
   - `index.html` HTML entry; an inline script applies the theme before the first paint
   - `components.json` shadcn configuration (`base-nova` style)
-  - `tsconfig.json` DOM types and the `@/*` → `src/*` alias
+  - `tsconfig.json` the app: DOM types only (no Bun, no Node), the `@/*` → `src/*` alias, references `../server` for the API's types
+  - `tsconfig.test.json` the tests (`*.test.ts`), with Node's types
   - `src/`
     - `main.tsx` starts the store syncs and the WebSocket, renders the router
     - `index.css` Tailwind, theme tokens for light and dark, Shiki colors
@@ -184,10 +185,24 @@ reloads and changes only when llama-webui restarts, so it tells a reconnection a
 
 ## API client and errors
 
-`api<T>(path, init)` in `web/src/lib/api.ts` calls `fetch('/api' + path)`. When a body is given, it sets
-`content-type: application/json`, which the server's guard requires on writes. It parses the JSON response and
-throws an `ApiError` for any status outside 2xx, built by `apiError(status, body)` (the chat's SSE requests,
-`postStream()` in `web/src/lib/chat.ts`, use it too):
+Every API call goes through `client`, Hono's typed client (`hc<AppType>('/').api`, `web/src/lib/api.ts`), whose
+paths, inputs and replies come from the server's routes (see [Typed client](/developers/api/overview/#typed-client)).
+`call()` sends the request and returns the reply's body with the type the route declares:
+
+```ts title="web/src/lib/models.ts"
+export const modelUsage = (path: string) => call(client.models.usage.$get({ query: { path } }));
+```
+
+`param` takes the route's `:id` as a string (`byId(id)`), `query` the declared keys, `json` the body: the client
+sets `content-type: application/json`, which the server's guard requires on a write with a body, and sends no body
+at all when there is no `json`. Options such as a `signal` go in `{ init: { signal } }`. A route that answers raw
+JSON, like `/api/server/props`, is typed `unknown` and narrowed with guards (`web/src/lib/props.ts`), never with a
+cast.
+
+`call()` reads the body as text, parses it when it is JSON (an empty body is `undefined`, as for a `204`) and throws
+an `ApiError` for any status outside 2xx, built by `apiError(status, body)`. The chat's SSE requests,
+`openStream()` in `web/src/lib/chat.ts`, go through `client` too and build their errors the same way; the stream
+itself is read by `readSse()`:
 
 | Field | Content |
 | --- | --- |

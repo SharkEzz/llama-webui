@@ -198,7 +198,29 @@ Then:
   `Invalid JSON`, then, with `{ object: true }`, a JSON value that is not an object is `400` `JSON object expected`,
   then the schema's `ZodError`. A body with an imperative check goes through `json(check)`, with the same first two
   messages (`object(body)` throws the second).
+- A handler that answers `404` or `409` before reading its body reads it itself (`object(await c.req.json())`), so a
+  busy resource is `409` even with a malformed body. `accepts<T>()` declares that body's type for the typed client and
+  reads nothing.
+- `query(...keys)` declares the query keys a route reads (`query('path')`). It never refuses a request: the handler
+  still reads `new URL(c.req.url).searchParams` and decides what a missing key means.
 - `notFound(what)` is the shared `404` `<what> not found`.
+
+### Typed client
+
+The web app calls the API through Hono's client (`hc` from `hono/client`), typed by the routes themselves.
+`server/rpc.ts` is the package entry `@llama-webui/server/api`: it exports `AppType`, the inferred type of
+`createApi()`, and nothing at runtime. Its declaration holds the whole route schema (paths, methods, `param`, `query`,
+`json` inputs, `c.json()` outputs and statuses) and imports only `hono`, `@llama-webui/shared` and
+`llamacpp-js/metrics`, so the browser project never sees Bun's or Node's types. `Env` types `c.env.server` by the one
+method the routes call, `timeout()`, for the same reason.
+
+What the client checks follows what the route declares:
+
+- **Replies** are typed by the handler's `c.json(…)`. A route that answers `Response.json(…)` (`GET
+  /api/server/props`, llama-server's own JSON) is untyped: the web narrows it with guards.
+- **Path and query** come from `id()` and `query()`.
+- **Bodies** are typed by `body(Schema)` (the schema's input), by `accepts<T>()`, or by the return type of a
+  `json(check)` check. A route with `json(object)` or `json(passthrough)` takes any object: a misspelled key compiles.
 
 To add a route, see [How-to guides](/developers/contributing/how-to/).
 

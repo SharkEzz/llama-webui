@@ -42,7 +42,7 @@ contiguous.
   </Step>
   <Step title="Load its data">
 
-Put the API calls and the store of the page's domain in `web/src/lib/<domain>.ts` (a zustand store, `api()` from
+Put the API calls and the store of the page's domain in `web/src/lib/<domain>.ts` (a zustand store, `call(client…)` from
 `web/src/lib/api.ts`). If the page follows WebSocket messages that only it needs, start their subscription when it
 mounts, as `BenchPage` does with `startBenchSync()`.
 
@@ -128,9 +128,11 @@ route to `ROUTES` in `server/contract/cases.ts` (the contract suite fails otherw
   </Step>
   <Step title="Call it from the web app">
 
-`api<T>(path, init)` (`web/src/lib/api.ts`) prefixes `/api`, sends `content-type: application/json` when there is a
-body, and throws an `ApiError` with `status`, `issues` (zod details on a `400`) and `code`. Branch on `code`, never on
-the message.
+The typed client sees the route as soon as it is registered: `call(client.x[':id'].$post({ ...byId(id), json }))`
+(`web/src/lib/api.ts`) returns the type of the handler's `c.json(…)` and throws an `ApiError` with `status`, `issues`
+(zod details on a `400`) and `code`. Branch on `code`, never on the message. Declare the route's query keys with
+`query(…)` and its body with `body(Schema)` (or `accepts<T>()` when the handler reads it itself) so the client checks
+them too (see [Typed client](/developers/api/overview/#typed-client)).
 
   </Step>
   <Step title="Test it">

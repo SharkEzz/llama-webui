@@ -366,11 +366,16 @@ shared options are in `tsconfig.base.json`, which the projects extend.
 | `packages/webui-shared/tsconfig.json`     | `@llama-webui/shared` and its tests        | Bun, no DOM: a browser-only API fails here  |
 | `server/tsconfig.json`                    | `server/`, tests included                  | Bun                                         |
 | `scripts/tsconfig.json`                   | `scripts/`                                 | Bun                                         |
-| `web/tsconfig.json`                       | `web/src/`                                 | DOM, with the `@/` alias                    |
+| `web/tsconfig.json`                       | `web/src/`, tests left out; references `server/` for the API's types | DOM only (`types: []`): a Node or Bun API fails here |
+| `web/tsconfig.test.json`                  | `web/src/` with its tests                  | DOM and Node (the tests run under Vitest on Node) |
 | `site/tsconfig.json` (separate step)      | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types | DOM |
 
 A project only sees another one it lists in its `references` (the server references `llamacpp-js` and
-`webui-shared`, which references `llamacpp-js`). A referenced project may not set `noEmit`, so the base sets
+`webui-shared`, which references `llamacpp-js`; `web` references `server` and `webui-shared`, for types only: the
+web never imports server code at runtime). The web app project lists no `types`, and
+`web/src/lib/no-node-types.ts` fails to compile if Node's types reach it (through a server output type defined in a
+module that imports `node:*`, say): `ReturnType<typeof setTimeout>` is then not a `number`. The production build test
+(`server/routes/web.test.ts`) also checks that no chunk of the bundle imports a `node:` module. A referenced project may not set `noEmit`, so the base sets
 `emitDeclarationOnly` with `outDir: .tsbuild/`: `tsc -b` writes the declarations and its build info there (ignored by
 git), and skips a project that has not changed since. The projects do not enable the same options:
 

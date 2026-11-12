@@ -148,6 +148,7 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
   - `index.ts` entry point: opens the database, builds the services, wires their events to the WebSocket
   - `deps.ts` `createDeps()`: constructs the services and wires them together, without starting any work
   - `api.ts` `createApi()`: the Hono app of every `/api` route (health included)
+  - `rpc.ts` `AppType`, the API's route types for the web's typed client (`@llama-webui/server/api`, types only)
   - `app.ts` `createApp()`: `Bun.serve` with `/api/*` (the Hono app), `/ws` and the UI
   - `runtime.ts` state that survives `bun --hot` (supervisor, log ring, monitor, bench gate)
   - `cli.ts` launch options and `--help`
@@ -175,11 +176,12 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
   - `contract/` the HTTP contract suite: raw HTTP client, cases, golden record
 - `web/` the React app (workspace `@llama-webui/web`)
   - `index.html` HTML entry, applies the theme before the first paint
+  - `tsconfig.json` the app (DOM types only), `tsconfig.test.json` its tests (Node types)
   - `src/`
     - `main.tsx` starts the stores and the WebSocket, renders the router
     - `app/` router, layout, sidebar, status bar
     - `features/` one folder per page
-    - `lib/` API client, WebSocket client, zustand stores, formatting
+    - `lib/` typed API client, WebSocket client, zustand stores, formatting
     - `components/` shared components: `glass/`, `charts/`, and `ui/` (generated shadcn)
     - `index.css` Tailwind, theme tokens
 - `packages/` the monorepo's libraries, one folder per package
