@@ -45,5 +45,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          # Otherwise setup-node reads `packageManager` and looks for pnpm, which this job does not install.
+          package-manager-cache: false
       - run: node --test 'tests/*.test.ts'
         working-directory: packages/llamacpp-js
