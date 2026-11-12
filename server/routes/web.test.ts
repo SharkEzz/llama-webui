@@ -24,10 +24,15 @@ test('buildWebRoutes: the real UI, split per page, absolute paths, three.js only
   expect(chunks.length).toBeGreaterThan(10); // one or more per page
   expect(entryJs).not.toContain('WebGLRenderer');
   const withThree: string[] = [];
+  const withNode: string[] = [];
   for (const c of chunks) {
-    if ((await (routes[c] as Response).clone().text()).includes('WebGLRenderer')) withThree.push(c);
+    const js = await (routes[c] as Response).clone().text();
+    if (js.includes('WebGLRenderer')) withThree.push(c);
+    // The browser has no `node:*` module: one in the bundle means server code leaked past the typed client.
+    if (/(?:from|import)\s*\(?\s*["']node:/.test(js)) withNode.push(c);
   }
   expect(withThree.length).toBeGreaterThan(0);
+  expect(withNode).toEqual([]);
   expect((routes[entry] as Response).headers.get('Cache-Control')).toContain('immutable');
 }, 30_000);
 

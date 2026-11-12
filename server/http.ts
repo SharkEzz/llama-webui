@@ -1,13 +1,15 @@
 import { zValidator } from '@hono/zod-validator';
-import type { Server } from 'bun';
 import type { Hono, MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { validator } from 'hono/validator';
 import { ZodError, type z } from 'zod';
 import { guard } from './security';
 
-/** What every API route sees: `c.env.server` is Bun's server (`api.fetch(req, { server })`), absent in tests. */
-export type Env = { Bindings: { server?: Server<undefined> } };
+/**
+ * What every API route sees: `c.env.server` is Bun's server (`api.fetch(req, { server })`), absent in tests. Typed by
+ * the one method the routes call, so the API's declarations (and the web's typed client) never import Bun's types.
+ */
+export type Env = { Bindings: { server?: { timeout(req: Request, seconds: number): void } } };
 
 /** The methods an API route can define, in the order of `Allow`. */
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
