@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { defer } from './dispose';
 
 test('defer runs at the end of the block, after a return or a throw, in reverse order', () => {
@@ -22,7 +23,7 @@ test('defer waits for the awaits of an async block', async () => {
   let busy = true;
   const run = async () => {
     using _busy = defer(() => (busy = false));
-    await Bun.sleep(5);
+    await sleep(5);
     expect(busy).toBe(true);
   };
   await run();

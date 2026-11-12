@@ -1,8 +1,10 @@
 import { afterAll, expect, test } from 'bun:test';
 import { mkdirSync, symlinkSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { parseLinkSpeed } from '../hardware/pci';
 import { tempDir } from '../testing/tempDir';
+import { writeFileDeep } from '../testing/write';
 import {
   discoverAmdCards,
   isRuntimeSuspended,
@@ -14,7 +16,7 @@ import {
   suspendedAmdReading,
 } from './amdgpu';
 
-const fx = (n: string) => Bun.file(`${import.meta.dir}/../../testdata/${n}`).text();
+const fx = (n: string) => readFile(`${import.meta.dirname}/../../testdata/${n}`, 'utf8');
 
 const dirs = new DisposableStack();
 afterAll(() => dirs.dispose());
@@ -37,10 +39,10 @@ test('readProcAmdVram dedupes by client id', async () => {
   const dir = join(root, '123', 'fdinfo');
   mkdirSync(dir, { recursive: true });
   const vram = await fx('fdinfo-amd-vram.txt');
-  await Bun.write(join(dir, '96'), vram);
-  await Bun.write(join(dir, '97'), vram);
-  await Bun.write(join(dir, '98'), await fx('fdinfo-amd-igpu.txt'));
-  await Bun.write(join(dir, '3'), 'pos: 0\n');
+  await writeFileDeep(join(dir, '96'), vram);
+  await writeFileDeep(join(dir, '97'), vram);
+  await writeFileDeep(join(dir, '98'), await fx('fdinfo-amd-igpu.txt'));
+  await writeFileDeep(join(dir, '3'), 'pos: 0\n');
   const m = await readProcAmdVram(123, root);
   expect(m.get('amd:0000:08:00.0')).toBe(6146240 * 1024);
   expect(m.get('amd:0000:0d:00.0')).toBe(32 * 1024);
@@ -52,7 +54,7 @@ async function drmTree(full = false) {
   const dev = async (card: string, vendor: string, pdev: string) => {
     const real = join(root, 'devices', pdev);
     mkdirSync(join(real, 'hwmon', 'hwmon3'), { recursive: true });
-    await Bun.write(join(real, 'vendor'), `${vendor}\n`);
+    await writeFileDeep(join(real, 'vendor'), `${vendor}\n`);
     mkdirSync(join(root, 'drm', card), { recursive: true });
     symlinkSync(real, join(root, 'drm', card, 'device'));
     return real;
@@ -60,11 +62,11 @@ async function drmTree(full = false) {
   await dev('card0', '0x10de', '0000:01:00.0');
   const amd = await dev('card1', '0x1002', '0000:08:00.0');
   mkdirSync(join(root, 'drm', 'card1-DP-1'), { recursive: true });
-  await Bun.write(join(amd, 'gpu_busy_percent'), '42\n');
-  await Bun.write(join(amd, 'mem_info_vram_used'), '6366834688\n');
-  await Bun.write(join(amd, 'mem_info_vram_total'), '17095983104\n');
-  await Bun.write(join(amd, 'hwmon', 'hwmon3', 'temp1_input'), '38000\n');
-  await Bun.write(join(amd, 'hwmon', 'hwmon3', 'power1_average'), '25000000\n');
+  await writeFileDeep(join(amd, 'gpu_busy_percent'), '42\n');
+  await writeFileDeep(join(amd, 'mem_info_vram_used'), '6366834688\n');
+  await writeFileDeep(join(amd, 'mem_info_vram_total'), '17095983104\n');
+  await writeFileDeep(join(amd, 'hwmon', 'hwmon3', 'temp1_input'), '38000\n');
+  await writeFileDeep(join(amd, 'hwmon', 'hwmon3', 'power1_average'), '25000000\n');
   if (full) {
     const files: Record<string, string> = {
       current_link_speed: '16.0 GT/s PCIe',
@@ -78,7 +80,7 @@ async function drmTree(full = false) {
       'hwmon/hwmon3/pwm1_max': '255',
       'hwmon/hwmon3/power1_cap': '300000000',
     };
-    await Promise.all(Object.entries(files).map(([f, v]) => Bun.write(join(amd, f), `${v}\n`)));
+    await Promise.all(Object.entries(files).map(([f, v]) => writeFileDeep(join(amd, f), `${v}\n`)));
   }
   return join(root, 'drm');
 }
@@ -140,9 +142,9 @@ test('isRuntimeSuspended reads power/runtime_status without touching the device'
   const card = { card: 'card1', pdev: '0000:08:00.0', devicePath: dev, hwmonPath: null, name: 'Radeon RX 9070' };
   expect(await isRuntimeSuspended(card)).toBe(false); // no attribute
   mkdirSync(join(dev, 'power'));
-  await Bun.write(join(dev, 'power', 'runtime_status'), 'active\n');
+  await writeFileDeep(join(dev, 'power', 'runtime_status'), 'active\n');
   expect(await isRuntimeSuspended(card)).toBe(false);
-  await Bun.write(join(dev, 'power', 'runtime_status'), 'suspended\n');
+  await writeFileDeep(join(dev, 'power', 'runtime_status'), 'suspended\n');
   expect(await isRuntimeSuspended(card)).toBe(true);
   expect(suspendedAmdReading(card)).toMatchObject({
     key: 'amd:0000:08:00.0',
@@ -166,7 +168,7 @@ const pciNode =
       max_link_speed: max[0],
       max_link_width: max[1],
     };
-    await Promise.all(Object.entries(files).map(([f, v]) => Bun.write(join(p, f), `${v}\n`)));
+    await Promise.all(Object.entries(files).map(([f, v]) => writeFileDeep(join(p, f), `${v}\n`)));
     return p;
   };
 
@@ -254,18 +256,18 @@ test("a slot port reporting max_link_width 0 leaves the card's width as the maxi
   let g = await readAmdCard(card);
   expect([g.pcieGenMax, g.pcieWidthMax]).toEqual([4, 16]);
   expect(card.linkMax).toBeUndefined();
-  await Bun.write(join(slot, 'max_link_width'), '4\n');
+  await writeFileDeep(join(slot, 'max_link_width'), '4\n');
   g = await readAmdCard(card);
   expect([g.pcieGenMax, g.pcieWidthMax]).toEqual([4, 4]);
   // Known on both ends: kept, no longer read.
   expect(card.linkMax).toEqual({ gen: 4, width: 4 });
-  await Bun.write(join(slot, 'max_link_width'), '0\n');
+  await writeFileDeep(join(slot, 'max_link_width'), '0\n');
   expect((await readAmdCard(card)).pcieWidthMax).toBe(4);
 });
 
 test('a link that is down or retraining (current width 0) has an unknown width, not x0', async () => {
   const { card, up } = await chipsetCard('llt-wd-');
-  await Bun.write(join(up, 'current_link_width'), '0\n');
+  await writeFileDeep(join(up, 'current_link_width'), '0\n');
   expect((await readAmdCard(card)).pcieWidth).toBeNull();
 });
 
@@ -274,17 +276,17 @@ test('pciIdsName names a card from sysfs ids and pci.ids, without lspci (which w
   const root = dir.path;
   const dev = join(root, 'devices', '0000:08:00.0');
   mkdirSync(dev, { recursive: true });
-  await Bun.write(join(dev, 'vendor'), '0x1002\n');
-  await Bun.write(join(dev, 'device'), '0x7550\n');
+  await writeFileDeep(join(dev, 'vendor'), '0x1002\n');
+  await writeFileDeep(join(dev, 'device'), '0x7550\n');
   const ids = join(root, 'pci.ids');
-  await Bun.write(
+  await writeFileDeep(
     ids,
     '# comment\n1000  Broadcom\n\t0001  Other\n1002  Advanced Micro Devices, Inc. [AMD/ATI]\n\t1638  Cezanne [Radeon Vega Series]\n\t7550  Navi 48 [Radeon RX 9070/9070 XT/9070 GRE]\n\t\t1458 2424  Subsys\n1003  ULSI\n',
   );
   expect(await pciIdsName('0000:08:00.0', join(root, 'devices'), [join(root, 'missing.ids'), ids])).toBe(
     'Radeon RX 9070/9070 XT/9070 GRE',
   );
-  await Bun.write(join(dev, 'device'), '0x9999\n');
+  await writeFileDeep(join(dev, 'device'), '0x9999\n');
   expect(await pciIdsName('0000:08:00.0', join(root, 'devices'), [ids])).toBe('AMD GPU 0000:08:00.0');
 });
 
@@ -304,8 +306,8 @@ test('readProcAmdVram skips fds on cards not to read (hidden or suspended), with
   const fd = join(root, '123', 'fd');
   mkdirSync(fdinfo, { recursive: true });
   mkdirSync(fd, { recursive: true });
-  await Bun.write(join(fdinfo, '96'), await fx('fdinfo-amd-vram.txt'));
-  await Bun.write(join(fdinfo, '98'), await fx('fdinfo-amd-igpu.txt'));
+  await writeFileDeep(join(fdinfo, '96'), await fx('fdinfo-amd-vram.txt'));
+  await writeFileDeep(join(fdinfo, '98'), await fx('fdinfo-amd-igpu.txt'));
   symlinkSync('/dev/dri/renderD128', join(fd, '96'));
   symlinkSync('/dev/dri/renderD129', join(fd, '98'));
   const m = await readProcAmdVram(123, root, new Set(['card2', 'renderD129']));

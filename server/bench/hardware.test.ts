@@ -2,17 +2,17 @@ import { expect, test } from 'bun:test';
 import { chmodSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tempDir } from '../testing/tempDir';
+import { writeFileDeep } from '../testing/write';
 import { buildOf, listDevices, listDevicesResult } from './hardware';
 
 test('buildOf reads the version again after the binary is rebuilt', async () => {
   using dir = tempDir('lw-build-');
   const bin = join(dir.path, 'llama-server');
   const write = async (n: number) => {
-    await Bun.write(
+    await writeFileDeep(
       bin,
       `#!/bin/sh\necho "version: ${n} (c${n})" >&2\necho "built with cc (build ${n}, commit c${n})" >&2\n`,
     );
-    // Permissions and modification time: node:fs (Bun.write's `mode` option is ignored, Bun 1.4.4).
     chmodSync(bin, 0o755);
     utimesSync(bin, n * 1000, n * 1000);
   };
@@ -26,7 +26,7 @@ const LIST = 'Available devices:\n  CUDA0: NVIDIA GeForce RTX 5070 Ti (15933 MiB
 
 /** A fake llama-bench whose `--list-devices` prints `body` (shell), with a distinct mtime per version. */
 async function fakeBench(path: string, body: string, version: number) {
-  await Bun.write(path, `#!/bin/sh\n${body}\n`);
+  await writeFileDeep(path, `#!/bin/sh\n${body}\n`);
   chmodSync(path, 0o755);
   utimesSync(path, version * 1000, version * 1000);
 }

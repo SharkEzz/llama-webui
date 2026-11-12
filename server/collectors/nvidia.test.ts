@@ -1,10 +1,13 @@
 import { expect, test } from 'bun:test';
+import { chmod, readFile, rm } from 'node:fs/promises';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { defer } from '@llama-webui/shared';
 import type { Spawn } from '../proc';
+import { writeFileDeep } from '../testing/write';
 import { type GpuSample, normalizeBusId, selectUsedGpus } from './gpu';
 import { NvidiaMonitor, parseComputeApps, parseNvidiaGpuLine } from './nvidia';
 
-const fx = (n: string) => Bun.file(`${import.meta.dir}/../../testdata/${n}`).text();
+const fx = (n: string) => readFile(`${import.meta.dirname}/../../testdata/${n}`, 'utf8');
 const gpuCsv = await fx('nvidia-gpu.csv');
 const LINE =
   '0, GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28, NVIDIA GeForce RTX 5070 Ti, 0, 5895, 16303, 38, 49.86, 00000000:01:00.0';
@@ -60,7 +63,7 @@ test('NvidiaMonitor streams lines split across chunks', async () => {
     c = gpuCsv.slice(120);
   const mon = new NvidiaMonitor({ spawn: fakeSpawn([a, b, c]) });
   mon.start();
-  await Bun.sleep(20);
+  await sleep(20);
   expect(mon.gpus().length).toBe(2);
   expect(mon.gpus()[1]!.name).toBe('NVIDIA GeForce RTX 5060 Ti');
   mon.stop();
@@ -80,7 +83,7 @@ test("compute apps with [N/A] memory keep the process on its card, counting the 
     spawn: fakeSpawn([gpuCsv], '49730, GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28, [N/A]\n'),
   });
   mon.start();
-  await Bun.sleep(20);
+  await sleep(20);
   await mon.refreshApps();
   const card = mon.gpus().find((g) => g.key === 'nvidia:GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28')!;
   expect(mon.procVram(49730).get(card.key)).toBe(card.vramUsedBytes);
@@ -116,7 +119,7 @@ test('a compute-apps read abandoned on timeout may fail later without reaching t
   using _listener = defer(() => process.off('unhandledRejection', onUnhandled));
   await mon.refreshApps();
   fail!(new Error('pipe torn down'));
-  await Bun.sleep(20);
+  await sleep(20);
   expect(unhandled).toEqual([]);
 });
 
@@ -143,19 +146,19 @@ test('selectUsedGpus', () => {
 });
 
 test("hung nvidia-smi compute-apps query times out, is killed, and calls don't pile up", async () => {
-  const dir = `${Bun.env.TMPDIR ?? '/tmp'}/llt-nv-${process.pid}`;
+  const dir = `${process.env.TMPDIR ?? '/tmp'}/llt-nv-${process.pid}`;
   const bin = `${dir}/hung-nvidia-smi`;
-  await Bun.write(bin, '#!/bin/sh\necho $$ >> "$(dirname "$0")/pids"\nexec sleep 30\n');
-  await Bun.$`chmod +x ${bin}`;
+  await writeFileDeep(bin, '#!/bin/sh\necho $$ >> "$(dirname "$0")/pids"\nexec sleep 30\n');
+  await chmod(bin, 0o755);
   const mon = new NvidiaMonitor({ bin, appsTimeoutMs: 300 });
   const t0 = Date.now();
   await Promise.all([mon.refreshApps(), mon.refreshApps()]);
   expect(Date.now() - t0).toBeLessThan(2000);
-  const pids = (await Bun.file(`${dir}/pids`).text()).trim().split('\n').map(Number);
+  const pids = (await readFile(`${dir}/pids`, 'utf8')).trim().split('\n').map(Number);
   expect(pids.length).toBe(1);
-  await Bun.sleep(50);
+  await sleep(50);
   expect(() => process.kill(pids[0]!, 0)).toThrow();
-  await Bun.$`rm -rf ${dir}`;
+  await rm(dir, { recursive: true, force: true });
 });
 
 test('configure restarts a running nvidia-smi stream at the new pace, and only then', async () => {

@@ -1,9 +1,10 @@
 import { expect, test } from 'bun:test';
 import { tempDir } from '../testing/tempDir';
+import { writeFileDeep } from '../testing/write';
 import { buildWebRoutes, unavailableWebRoutes } from './web';
 
 test('buildWebRoutes: the real UI, split per page, absolute paths, three.js only in the Topology chunks', async () => {
-  const routes = await buildWebRoutes(`${import.meta.dir}/../../web/index.html`);
+  const routes = await buildWebRoutes(`${import.meta.dirname}/../../web/index.html`);
   const html = routes['/*'];
   expect(html).toBeInstanceOf(Response);
   const page = await (html as Response).clone().text();
@@ -32,8 +33,11 @@ test('buildWebRoutes: the real UI, split per page, absolute paths, three.js only
 
 test('buildWebRoutes: a broken front rejects; unavailableWebRoutes then answers every page with the error', async () => {
   using dir = tempDir('lw-web-');
-  await Bun.write(`${dir.path}/index.html`, '<html><body><script type="module" src="./app.ts"></script></body></html>');
-  await Bun.write(`${dir.path}/app.ts`, "import './missing';\n");
+  await writeFileDeep(
+    `${dir.path}/index.html`,
+    '<html><body><script type="module" src="./app.ts"></script></body></html>',
+  );
+  await writeFileDeep(`${dir.path}/app.ts`, "import './missing';\n");
   const err = await buildWebRoutes(`${dir.path}/index.html`).catch((e: unknown) => e);
   expect(err).toBeInstanceOf(AggregateError);
   const page = unavailableWebRoutes(err)['/*'] as Response;

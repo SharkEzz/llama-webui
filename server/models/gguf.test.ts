@@ -1,8 +1,10 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { chmodSync, mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { defer } from '@llama-webui/shared';
 import { tempDir } from '../testing/tempDir';
+import { writeFileDeep } from '../testing/write';
 import { ModelReadError, type ParsedShard, parseModel, readModel, type TensorInfo } from './gguf';
 import { type FakeTensor, type KvValue, writeGguf } from './gguf.fixture';
 import { tensorBytes, weightSizes } from './sizes';
@@ -153,7 +155,7 @@ describe('readModel', () => {
     await writeGguf(p2, { 'general.architecture': str('llama') }, DENSE_TENSORS.slice(3));
     const m = await readModel(p1);
     expect(m.files).toEqual([p1, p2]);
-    expect(m.fileBytes).toBe(Bun.file(p1).size + Bun.file(p2).size);
+    expect(m.fileBytes).toBe(statSync(p1).size + statSync(p2).size);
     expect(m.tensors.map((x) => x.name)).toEqual(DENSE_TENSORS.map((x) => x.name));
     expect(m.blockCount).toBe(2);
   });
@@ -170,7 +172,7 @@ describe('readModel', () => {
 
   test('a file that is not a GGUF is a ModelReadError', async () => {
     const path = join(dir, 'junk.gguf');
-    await Bun.write(path, 'hello');
+    await writeFileDeep(path, 'hello');
     expect(readModel(path)).rejects.toBeInstanceOf(ModelReadError);
   });
 
@@ -179,7 +181,7 @@ describe('readModel', () => {
     await writeGguf(path, DENSE_KV, DENSE_TENSORS);
     const a = await readModel(path);
     expect(await readModel(path)).toBe(a);
-    await Bun.sleep(20);
+    await sleep(20);
     await writeGguf(path, DENSE_KV, DENSE_TENSORS.slice(0, 5));
     expect(await readModel(path)).not.toBe(a);
   });
@@ -190,7 +192,7 @@ describe('readModel', () => {
     await writeGguf(p1, DENSE_KV, DENSE_TENSORS.slice(0, 3));
     await writeGguf(p2, { 'general.architecture': str('llama') }, DENSE_TENSORS.slice(3));
     const a = await readModel(p1);
-    await Bun.sleep(20);
+    await sleep(20);
     await writeGguf(p2, { 'general.architecture': str('llama') }, DENSE_TENSORS.slice(3, 5));
     const b = await readModel(p1);
     expect(b).not.toBe(a);
