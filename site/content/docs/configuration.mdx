@@ -42,7 +42,7 @@ For each option, llama-webui takes the first value it finds:
 3. the default.
 
 A `.env` file in the folder llama-webui starts from (the clone, with `pnpm start` or `pnpm dev`) is loaded at startup:
-its variables fill what the environment does not set, and a variable already set wins.
+its variables override those of the environment (a command-line option still wins over both).
 
 ### Invalid options
 

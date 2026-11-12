@@ -3,7 +3,7 @@ L'app tourne sur Node (≥ 26.13, un seul processus) ; pnpm installe et lance le
 - Lancer : `pnpm dev` (développement, HMR), `pnpm start` (build puis production) ; un fichier TS se lance par `node <fichier>` (syntaxe effaçable).
 - Tests : Vitest (`pnpm test`, voir « Testing ») ; type check : `pnpm check` (`tsc -b`) ; build : `pnpm build` (`vite build`).
 - Install : `pnpm install` (voir « Installation (pnpm) ») ; un outil ponctuel : `pnpm dlx`.
-- `.env` du dossier courant : chargé par les points d'entrée (`server/env.ts`, sous les variables déjà définies) ; pas de `dotenv`.
+- `.env` du dossier courant : chargé par les points d'entrée (`server/env.ts`, `parseEnv` de `node:util` : le `.env` l'emporte sur l'environnement) ; pas de `dotenv`.
 - Bun ne sert plus qu'aux scripts du site (`bun run site:*`, `bun run --cwd site …`, jusqu'à N10), à `bun run release` et à `bun:ffi` du worker NVML (N9).
 
 ## Installation (pnpm)

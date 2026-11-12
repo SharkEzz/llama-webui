@@ -15,8 +15,8 @@ runs benchmarks and relays chat generations.
 `server/index.ts` is the composition root of both `pnpm dev` and `pnpm start`. In development, `server/dev.ts`
 evaluates it again on every server-side save, inside the same process, so it is written to run more than once. In
 production, `server/main.ts` (bundled to `dist/server/main.js`) sets `NODE_ENV` to `production` if it is unset and
-imports it. Both entry points first load `.env` from the working directory (`loadDotEnv()`, `server/env.ts`), under
-the variables already set. In order, `server/index.ts`:
+imports it. Both entry points first load `.env` from the working directory (`loadDotEnv()`, `server/env.ts`), whose
+variables override the environment's. In order, `server/index.ts`:
 
 1. Reads the launch options with `cliOptionsOrExit()` (see [Launch options](#launch-options)).
 2. Opens the database with `openDb(dbPath(cli.dataDir))`: creates the data directory, opens

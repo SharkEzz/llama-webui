@@ -8,12 +8,12 @@ afterEach(() => {
   for (const k of KEYS) delete process.env[k];
 });
 
-test('loadDotEnv: the file fills what the environment lacks, a variable already set wins (as Bun loaded .env)', async () => {
+test('loadDotEnv: the file sets its variables and overrides those already in the environment', async () => {
   using dir = tempDir('lw-env-');
   await writeFileDeep(`${dir.path}/.env`, 'LW_ENV_A=from-file\nLW_ENV_B=from-file\n');
   process.env.LW_ENV_B = 'from-env';
   loadDotEnv(`${dir.path}/.env`);
-  expect([process.env.LW_ENV_A, process.env.LW_ENV_B]).toEqual(['from-file', 'from-env']);
+  expect([process.env.LW_ENV_A, process.env.LW_ENV_B]).toEqual(['from-file', 'from-file']);
 });
 
 test('loadDotEnv: no file, nothing happens', () => {

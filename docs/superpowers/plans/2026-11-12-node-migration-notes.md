@@ -82,8 +82,8 @@ changes in the plan.
   root `dependencies` (not only `server/`'s). The server is bundled into one file (`codeSplitting: false`): with
   chunks, `index.ts` went to `dist/server/assets/` and `../web/` pointed nowhere (503 in production).
 - (N8) Bun loaded `.env` from the working directory for `bun run dev`/`start`; Node does not. `server/env.ts`
-  (`process.loadEnvFile`, under the variables already set) is called by both entry points; `--env-file-if-exists`
-  would print ".env not found" on every start. Bun's `.env.local`/`.env.<NODE_ENV>` are not loaded (never used here).
+  (`parseEnv` of `node:util`) is called by both entry points; on the user's call the file overrides the environment
+  (Bun let a variable already set win); `--env-file-if-exists` would print ".env not found" on every start. Bun's `.env.local`/`.env.<NODE_ENV>` are not loaded (never used here).
 - (N8) The bundled NVML monitor keeps `new URL('./worker.ts', import.meta.url)`: no such file next to `main.js`, and
   `Worker` is not global on Node, so NVIDIA monitoring falls back to nvidia-smi until N9.
 
