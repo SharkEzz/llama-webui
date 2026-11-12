@@ -55,6 +55,33 @@ test('a spawn failure throws at once, naming the binary and the cause', async ()
   await new Promise((r) => setTimeout(r, 20));
 });
 
+test('a spawn failure is diagnosed with the PATH of the child environment, a directory is not executable', async () => {
+  using dir = tempDir('lw-proc-');
+  const tool = join(dir.path, 'tool');
+  await writeFile(tool, '#!/bin/sh\n');
+  await chmod(tool, 0o755);
+  // Found in the parent's PATH, missing from the child's: the child cannot start it.
+  const env = { ...process.env, PATH: join(dir.path, 'empty') };
+  const parentPath = process.env.PATH;
+  process.env.PATH = `${dir.path}:${parentPath}`;
+  try {
+    expect(() => spawnProc(['tool'], { env })).toThrow('spawn tool ENOENT');
+  } finally {
+    process.env.PATH = parentPath;
+  }
+  expect(() => spawnProc([dir.path])).toThrow(`spawn ${dir.path} EACCES`);
+  await new Promise((r) => setTimeout(r, 20));
+});
+
+test('an error event after the start (a failed kill) does not crash the process', async () => {
+  const proc = spawnProc(['sleep', '5']);
+  const child = (proc as unknown as { child: import('node:child_process').ChildProcess }).child;
+  // Node reports a kill() failure other than ESRCH as an 'error' event: without a listener, emit() throws.
+  expect(() => child.emit('error', new Error('kill EPERM'))).not.toThrow();
+  proc.kill('SIGKILL');
+  await proc.exited;
+});
+
 test('which looks the binary up in the PATH', async () => {
   expect(which('sh')).toMatch(/^\/.*\/sh$/);
   expect(which('no-such-bin-xyz')).toBeNull();
@@ -70,6 +97,16 @@ test('fileRange reads [start, end)', async () => {
   await writeFile(p, '0123456789');
   expect(await new Response(fileRange(p, 2, 5)).text()).toBe('234');
   expect(await new Response(fileRange(p, 0, 0)).text()).toBe('');
+});
+
+test('fileRange reads in 1 MiB chunks, so the disk speed check is not held back by the stream', async () => {
+  using dir = tempDir('lw-proc-');
+  const p = join(dir.path, 'big');
+  await writeFile(p, new Uint8Array(4 << 20));
+  const sizes: number[] = [];
+  for await (const chunk of fileRange(p, 0, 4 << 20)) sizes.push(chunk.byteLength);
+  expect(sizes[0]).toBe(1 << 20);
+  expect(sizes.reduce((a, b) => a + b, 0)).toBe(4 << 20);
 });
 
 test('fileExists is true for a file only, readText reads UTF-8', async () => {

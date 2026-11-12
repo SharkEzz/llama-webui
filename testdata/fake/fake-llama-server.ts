@@ -4,6 +4,12 @@ import { createServer } from "node:http";
 import { Readable } from "node:stream";
 import { setTimeout as sleep } from "node:timers/promises";
 
+/** Exits once stdout and stderr are flushed: `process.exit` drops the writes still queued on a pipe. */
+const exit = async (code: number): Promise<never> => {
+  for (const s of [process.stdout, process.stderr]) await new Promise<void>((done) => s.write("", () => done()));
+  process.exit(code);
+};
+
 /** A fetch-style handler on node:http: the request is aborted when the client goes away, the body is streamed. */
 function serve(port: number, hostname: string, handler: (req: Request) => Response | Promise<Response>) {
   const server = createServer(async (inc, out) => {
@@ -47,11 +53,11 @@ const args = process.argv.slice(2);
 if (args.includes("--help")) {
   // A short catalogue, so a --help call (flag catalogue) exits at once instead of starting a server on 8080.
   process.stdout.write("----- common params -----\n\n-c,    --ctx-size N                     size of the prompt context\n");
-  process.exit(0);
+  await exit(0);
 }
 if (args.includes("--version")) {
   process.stderr.write("version: 0.0.0-fake (build 1, commit fake)\n");
-  process.exit(0);
+  await exit(0);
 }
 const port = Number(args[args.indexOf("--port") + 1] ?? 8080);
 const slow = process.env.FAKE_SLOW_ARG !== undefined && args.includes(process.env.FAKE_SLOW_ARG);
@@ -64,11 +70,11 @@ log("srv  main: loading model");
 log(`srv  main: cwd ${process.cwd()}`);
 if (process.env.FAKE_EXIT_LINES !== undefined) {
   for (const l of process.env.FAKE_EXIT_LINES.split("|")) log(l);
-  process.exit(1);
+  await exit(1);
 }
 if (process.env.FAKE_FAIL_ARG !== undefined && args.includes(process.env.FAKE_FAIL_ARG)) {
   log("ggml_cuda: out of memory");
-  process.exit(1);
+  await exit(1);
 }
 const server = serve(port, "127.0.0.1", async (req) => {
   const path = new URL(req.url).pathname;
@@ -184,7 +190,7 @@ process.on("SIGTERM", () => {
   log("srv  main: shutting down");
   server.closeAllConnections();
   server.close();
-  process.exit(0);
+  void exit(0);
 });
 
 if (process.env.FAKE_EXIT_AFTER_MS) {

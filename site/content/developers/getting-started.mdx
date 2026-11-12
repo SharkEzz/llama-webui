@@ -16,7 +16,7 @@ change must pass.
 | **`setpriv`** (util-linux) | Every `llama-server` and `llama-bench` process is launched as `setpriv --pdeathsig KILL -- …`, so it dies with Bun. |
 | **Git** | To clone the repository. |
 | A llama.cpp build (optional) | Needed to run real models. Without it, use the [fake binaries](#without-llamacpp). |
-| Node.js (website only) | The website's build runs the React Router CLI on Node.js; CI installs Node 24 for it. |
+| **[Node.js](https://nodejs.org) 26.13 or later** | Runs the [fake binaries](#without-llamacpp) that `bun test` launches, the `llamacpp-js` tests under Node, and the website's build (React Router CLI). |
 
 The [user requirements](/docs/getting-started/requirements/) list the optional pieces (NVIDIA driver, `amdgpu`,
 `perf`) and what each one unlocks.

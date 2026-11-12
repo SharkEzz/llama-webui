@@ -272,6 +272,7 @@ therefore has no effect until Bun restarts:
 - `server/monitor/**`, except `server/monitor/placement.ts` (the `PlacementTracker` is recreated on every reload)
 - `server/collectors/**`
 - `packages/llamacpp-js/src/**`, imported by the supervisor and the monitor (`fetchLlama()`, the `/metrics` math)
+- `server/proc.ts`, imported by the supervisor and the collectors (`spawnProc()`, `readText()`)
 - `server/runtime.ts`
 
 After changing any of them, stop Bun with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run `bun run dev` again.

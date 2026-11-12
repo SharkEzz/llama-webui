@@ -25,7 +25,7 @@ Or a profile goes to **Crashed** with code 127 right after **Start**, and the Lo
 [Settings](/docs/settings/): `/home/you/llama.cpp/build/bin/llama-server`. Check it in a terminal with
 `ls -l /home/you/llama.cpp/build/bin/llama-server`, and `chmod +x` it if needed.
 
-If the crash message is instead `Executable not found in $PATH: "setpriv"`, install `util-linux`, which provides
+If the crash message is instead `spawn setpriv ENOENT`, install `util-linux`, which provides
 `setpriv`: llama-webui uses it to start `llama-server` as a child process.
 
 ### Benchmark and Tuning see no GPU
@@ -157,7 +157,7 @@ page, and the profile's card on the launch pad, give the reason, the exit code o
 | Message                                     | Cause                                                       | Fix                                                                         |
 | ------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `directory not found: …`                    | The profile's **Working directory** does not exist.         | Fix or empty the field on the [Profiles](/docs/profiles/) page.             |
-| `Executable not found in $PATH: "setpriv"`  | `setpriv` is missing.                                       | Install `util-linux`.                                                       |
+| `spawn setpriv ENOENT`                      | `setpriv` is missing.                                       | Install `util-linux`.                                                       |
 | `code 127`                                  | The binary cannot be run.                                   | See [`llama-server` cannot be found](#llama-server-cannot-be-found).        |
 | Another exit code                           | `llama-server` stopped on its own: bad argument, unreadable model, out of memory. | Read the last lines on the Logs page, or under **Latest logs** on the Server page. |
 

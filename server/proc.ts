@@ -33,13 +33,17 @@ export type Spawn = (argv: string[], o?: SpawnOptions) => Spawned;
 const toWeb = (s: ChildProcess['stdout']): ReadableStream<Uint8Array> | null =>
   s ? (Readable.toWeb(s) as ReadableStream<Uint8Array>) : null;
 
-/** Why a spawn failed, as Node would report it: the `'error'` event only comes after `spawn()` has returned. */
-function spawnErrorCode(bin: string, cwd: string | undefined): string {
+/**
+ * Why a spawn failed, as Node would report it: the `'error'` event only comes after `spawn()` has returned. A bare
+ * name is looked up in the child's PATH, as Node does.
+ */
+function spawnErrorCode(bin: string, cwd: string | undefined, path: string): string {
   if (cwd !== undefined && !existsSync(cwd)) return 'ENOENT';
-  const path = bin.includes('/') ? bin : which(bin);
-  if (path === null || !existsSync(path)) return 'ENOENT';
+  const file = bin.includes('/') ? bin : which(bin, path);
+  if (file === null || !existsSync(file)) return 'ENOENT';
+  if (statSync(file).isDirectory()) return 'EACCES';
   try {
-    accessSync(path, constants.X_OK);
+    accessSync(file, constants.X_OK);
   } catch {
     return 'EACCES';
   }
@@ -62,10 +66,14 @@ export const spawnProc: Spawn = (argv, o = {}) => {
   });
   if (child.pid === undefined) {
     child.once('error', () => {});
-    throw new Error(`spawn ${bin} ${spawnErrorCode(bin, o.cwd)}`);
+    throw new Error(`spawn ${bin} ${spawnErrorCode(bin, o.cwd, (o.env ?? process.env).PATH ?? '')}`);
   }
+  // Node reports a failed kill() (other than ESRCH) as an 'error' event, which crashes the server without a listener;
+  // Bun.spawn's kill() did not. Callers already ignore kill failures.
+  child.on('error', () => {});
   const exited = new Promise<number | null>((resolve) => child.once('exit', (code) => resolve(code)));
-  return {
+  const proc: Spawned & { child: ChildProcess } = {
+    child, // the tests emit on it
     pid: child.pid,
     stdout: toWeb(child.stdout),
     stderr: toWeb(child.stderr),
@@ -80,6 +88,7 @@ export const spawnProc: Spawn = (argv, o = {}) => {
       child.kill(signal);
     },
   };
+  return proc;
 };
 
 /** The whole file as UTF-8; rejects when it cannot be read (call sites add their own `.catch`). */
@@ -95,7 +104,10 @@ export const fileExists = (path: string): Promise<boolean> =>
 /** Bytes `[start, end)` of a file as a web stream. */
 export function fileRange(path: string, start: number, end: number): ReadableStream<Uint8Array> {
   if (end <= start) return new ReadableStream({ start: (c) => c.close() });
-  return Readable.toWeb(createReadStream(path, { start, end: end - 1 })) as ReadableStream<Uint8Array>;
+  // 1 MiB reads: the default 64 KiB halves what the disk speed check measures from the page cache.
+  return Readable.toWeb(createReadStream(path, { start, end: end - 1, highWaterMark: 1 << 20 })) as ReadableStream<
+    Uint8Array<ArrayBuffer>
+  >;
 }
 
 const isExecutable = (p: string): boolean => {

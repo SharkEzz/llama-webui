@@ -4,6 +4,12 @@
 import { readFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
+/** Exits once stdout and stderr are flushed: `process.exit` drops the writes still queued on a pipe. */
+const exit = async (code: number): Promise<never> => {
+  for (const s of [process.stdout, process.stderr]) await new Promise<void>((done) => s.write("", () => done()));
+  process.exit(code);
+};
+
 const args = process.argv.slice(2);
 const joined = args.join(" ");
 const dir = `${import.meta.dirname}/../llama-bench`;
@@ -12,7 +18,7 @@ const err = (s: string) => process.stderr.write(`${s}\n`);
 
 if (args.includes("--list-devices")) {
   process.stdout.write(await fixture("list-devices.txt"));
-  process.exit(0);
+  await exit(0);
 }
 process.on("SIGTERM", () => process.exit(143));
 const step = Number(process.env.FAKE_BENCH_STEP_MS ?? 100);
@@ -22,7 +28,7 @@ const oomArg = process.env.FAKE_BENCH_OOM_ARG;
 if (process.env.FAKE_BENCH_OOM === "1" || (oomArg && joined.includes(oomArg))) {
   for (const l of (await fixture("oom-stderr.txt")).split("\n")) if (l) err(l);
   process.stdout.write("[\n");
-  process.exit(1);
+  await exit(1);
 }
 for (const [i, kind] of [[1, "prompt"], [2, "generation"]] as const) {
   err(`llama-bench: benchmark ${i}/2: starting`);
