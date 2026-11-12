@@ -38,7 +38,8 @@ cd llama-webui
 bun install
 ```
 
-This installs the three workspaces declared in the root `package.json`: `shared`, `server` and `web`.
+This installs the workspaces declared in the root `package.json`: `packages/*` (`webui-shared`, `llamacpp-js`),
+`server` and `web`.
 
   </Step>
   <Step title="Install the website">
@@ -120,7 +121,7 @@ the collectors, the log ring or the bench gate.
 
 ## Scripts
 
-The root `package.json` defines every script. The `shared`, `server` and `web` workspaces have none.
+The root `package.json` defines every script. The `packages/*`, `server` and `web` workspaces have none.
 
 | Script | Runs | What it does |
 | --- | --- | --- |
@@ -128,11 +129,11 @@ The root `package.json` defines every script. The `shared`, `server` and `web` w
 | `bun run start` | `NODE_ENV=production bun server/index.ts` | Production server, UI built in memory at startup. |
 | `bun run compile` | `bun scripts/compile.ts` | Standalone executable in `dist/llama-webui` (`--target`, `--outfile`, `--version`). |
 | `bun run release` | `bun scripts/release.ts` | Sets the version of every `package.json` before a release tag ([Releases](/developers/contributing/workflow/#releases)). |
-| `bun run check` | `bun check --no-script && bun check -p web && bun run --cwd site typecheck` | Type checks `server/` and `packages/webui-shared/` (root `tsconfig.json`), then `web/` (its own `tsconfig.json`, with the DOM types and the `@/` alias), then the website. |
+| `bun run check` | `bun check --no-script -b && bun run --cwd site typecheck` | Type checks every project the root `tsconfig.json` references (`packages/*`, `server/`, `scripts/`, `web/`, each with its own options: [Type checking](/developers/contributing/testing/#type-checking)), then the website. |
 | `bun run lint` | `biome check` | Format, lint and import order, read-only. |
 | `bun run lint:fix` | `biome check --write` | Applies Biome's safe fixes. |
 | `bun run format` | `biome format --write` | Formats only. |
-| `bun run test` | `bun test` | Runs every test file: `server/`, `packages/webui-shared/`, `web/` and `site/`. |
+| `bun run test` | `bun test` | Runs every test file: `server/`, `packages/`, `web/` and `site/`. |
 | `bun run site:dev` | `bun run --cwd site dev` | Website dev server (Vite, HMR) on `0.0.0.0:5173`. |
 | `bun run site:build` | `bun run --cwd site build` | Prerenders the website into `site/dist/`. |
 | `bun run site:preview` | `bun run --cwd site preview` | Serves `site/dist/` the way GitHub Pages does, on port 4173. |
@@ -179,6 +180,9 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
 - `packages/` the monorepo's libraries, one folder per package
   - `webui-shared/` types, zod schemas and pure functions (workspace `@llama-webui/shared`)
     - `src/` one module per domain, re-exported by `index.ts`
+  - `llamacpp-js/` the llama.cpp client: HTTP API, metrics, `--help`, `llama-bench` output (workspace `llamacpp-js`)
+    - `src/` one module per subpath export, `node.ts` for the process and filesystem helpers
+    - `tests/` its tests (`node:test`), run by `bun test` and by Node (`test:node`)
 - `site/` this website (standalone package)
   - `content/` the `.mdx` pages and `nav.ts`
   - `src/` routes, layout, docs components, landing page
@@ -190,7 +194,7 @@ The website has more scripts of its own (`check-links`, `demo-seed`, `screenshot
 - `scripts/` `compile.ts` (standalone executable), `smoke-binary.ts` (its smoke test) and `release.ts` (versions)
 - `docs/` README assets and design plans
 - `package.json` workspaces and scripts
-- `tsconfig.json` type check of `server/`, `packages/webui-shared/` and `scripts/`
+- `tsconfig.json` the project references type checked by `bun check -b`; `tsconfig.base.json` their shared options
 - `biome.json` format and lint rules
 - `bunfig.toml` the Tailwind plugin for the HTML import
 </FileTree>
@@ -223,7 +227,7 @@ wrapper that runs a TypeScript fake with `bun` (or `$BUN_PATH`):
   progress on stderr, and prints the JSON of `testdata/llama-bench/ok.json`.
 
 llama-webui finds `llama-bench` by replacing `llama-server` with `llama-bench` in the binary's file name
-(`benchBinary()` in `server/bench/parse.ts`), so the two fakes pair up the same way the real binaries do.
+(`benchBinary()` in `llamacpp-js/node`), so the two fakes pair up the same way the real binaries do.
 
 The server wrapper's comment notes it can be used as the binary setting. Point **llama-server binary** in
 [Settings](/docs/settings/) at the absolute path of `testdata/fake/fake-llama-server` to drive the UI without

@@ -6,8 +6,8 @@ import {
   PRESET_IDS,
   SweepSpecSchema,
 } from '@llama-webui/shared';
+import { benchBinary } from 'llamacpp-js/node';
 import { z } from 'zod';
-import { benchBinary } from '../bench/parse';
 import type { BenchRunner } from '../bench/runner';
 import type { SettingsRepo } from '../db/settings';
 import { guarded, HttpError, jsonObject } from '../http';

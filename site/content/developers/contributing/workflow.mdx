@@ -224,7 +224,8 @@ bun test
 ```
 
 - `bun run lint`: Biome with zero errors and zero warnings (format, lint, sorted imports).
-- `bun run check`: the type checks of `server/` and `packages/webui-shared/`, `web/` and `site/`.
+- `bun run check`: the type checks of every project (`bun check -b`: `packages/*`, `server/`, `scripts/`, `web/`), then
+  `site/`.
 - `bun test`: every test file, `web/src/` included ([Run the tests](/developers/contributing/testing/#run-the-tests)).
 
 When the change touches `site/`, including its pages, also run `bun run site:build`, then

@@ -1,10 +1,10 @@
 import { existsSync } from 'node:fs';
 import type { ServerState } from '@llama-webui/shared';
+import { probeHealth, probeLlamaServer } from 'llamacpp-js/client';
+import { findLlamaServerPid } from 'llamacpp-js/node';
 import type { LogBuffer } from '../logs/buffer';
 import { isIdleNoise, LineSplitter } from '../logs/lines';
 import { type BuiltCommand, launchLines } from './args';
-import { findLlamaServerPid } from './discovery';
-import { probeHealth, probeLlamaServer } from './health';
 
 export type { ServerState };
 

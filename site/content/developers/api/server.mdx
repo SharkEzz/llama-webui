@@ -7,7 +7,7 @@ These routes drive the supervised `llama-server` and read what it reports (`serv
 itself is managed by the `Supervisor` (`server/supervisor/supervisor.ts`, see
 [Supervisor](/developers/server/supervisor/)), its output by the `LogBuffer` ring (`server/logs/buffer.ts`). Types:
 `ServerState` and `ServerView` (`packages/webui-shared/src/server.ts`), `LogLine` (`packages/webui-shared/src/logs.ts`), `Flag`
-(`packages/webui-shared/src/flags.ts`). The common rules are on the [API overview](/developers/api/overview/); the Server page is
+(`llamacpp-js/flags`, re-exported by `@llama-webui/shared`). The common rules are on the [API overview](/developers/api/overview/); the Server page is
 described on [Server](/docs/server/).
 
 ## Server state
@@ -197,7 +197,7 @@ curl http://127.0.0.1:7860/api/server/props
 
 <Endpoint method="GET" path="/api/flags" />
 
-The flags the installed `llama-server` accepts, parsed from `<binary> --help` (`parseHelp()`, `packages/webui-shared/src/flags.ts`,
+The flags the installed `llama-server` accepts, parsed from `<binary> --help` (`parseHelp()`, `llamacpp-js/flags`,
 5-second timeout). The list is cached in memory per binary; a failure is not cached. The argument
 editor uses it for completion, help and warnings: nothing is refused on its word.
 

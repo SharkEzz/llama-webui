@@ -1,7 +1,9 @@
+// llama.cpp's own formats, part of the API both sides share (flags of GET /api/flags, the chat SSE stream).
+export * from 'llamacpp-js/flags';
+export { type SseEvent, SseParser } from 'llamacpp-js/sse';
 export * from './bench';
 export * from './chat';
 export * from './dispose';
-export * from './flags';
 export * from './format';
 export * from './hf';
 export * from './logs';

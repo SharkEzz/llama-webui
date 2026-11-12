@@ -1,8 +1,9 @@
 import type { BenchPhase, Measure } from '@llama-webui/shared';
+import { ERROR_LINE } from 'llamacpp-js/bench';
+import { probeHealth } from 'llamacpp-js/client';
 import { LineSplitter } from '../logs/lines';
 import type { BuiltCommand } from '../supervisor/args';
-import { probeHealth } from '../supervisor/health';
-import { benchFailure, ERROR_LINE } from './parse';
+import { benchFailure } from './parse';
 import { promptOf } from './prompt';
 
 type Child = ReturnType<typeof Bun.spawn>;

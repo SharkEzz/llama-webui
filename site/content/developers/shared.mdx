@@ -5,13 +5,14 @@ description: What @llama-webui/shared holds, module by module, why the zod schem
 
 `@llama-webui/shared` (`packages/webui-shared/src/`) holds what the server and the web app must agree on: the types of every API
 response and WebSocket message, the zod schemas of request bodies and settings, and pure functions that both sides
-run. It has no build step and one dependency, zod.
+run. It has no build step and two dependencies: zod, and [llamacpp-js](/developers/llamacpp-js/) for llama.cpp's own
+formats.
 
 ## The package
 
 `packages/webui-shared/package.json` exports its TypeScript sources directly (`"exports": { ".": "./src/index.ts" }`). `server` and
-`web` depend on it as `workspace:*`, and the root `tsconfig.json` maps `@llama-webui/shared` to
-`packages/webui-shared/src/index.ts`. `index.ts` re-exports every module, so both sides import from the package root and never from a
+`web` depend on it as `workspace:*` and resolve it through their `node_modules`; their `tsconfig.json` references
+`packages/webui-shared/tsconfig.json`. `index.ts` re-exports every module, so both sides import from the package root and never from a
 file path:
 
 ```ts title="web/src/lib/logs.ts"
@@ -27,22 +28,31 @@ Tests sit next to their module (`packages/webui-shared/src/<module>.test.ts`) an
 | `bench.ts` | `BenchParamsSchema`, the flags llama-webui can translate for both `llama-bench` and `llama-server` (`ngl`, `ot`, `ncmoe`, `dev`, `ts`, `sm`, `fa`, `ctk`, `ctv`, `t`, `b`, `ub`); `BenchSpecSchema` for a run; the `BenchRun`, `BenchLive` and `BenchDevice` types; `serverArgs()` and `benchArgs()` (parameters to each tool's arguments), `paramsFromServerArgs()`, `ctxFromArgs()`, `ignoredByBench()`; `OOM_ERROR` and `isOomError()`. |
 | `chat.ts` | `SamplingSchema`, `ConversationPatchSchema`, the conversation and message types, `ChatEvent` (the SSE events `start`, `delta`, `done`), `statsFromTimings()`, `DEFAULT_TITLE`, `isDefaultTitle()`, `autoTitle()`. |
 | `dispose.ts` | `defer(fn)`: a `Disposable` for `using`, with the same `Symbol.dispose` fallback `Bun.build` emits, for browsers that lack it. |
-| `flags.ts` | The `llama-server` flag catalogue: `parseHelp()` reads `--help`, `catalogFrom()`, `flagOf()`, `complete()`, `flagSuggestions()`, `unknownFlags()`, `describeFlag()`. |
 | `format.ts` | `LOCALE = 'en-US'`, the locale of every number shown to the user, and `fmtInt()` for the server's messages; `web/src/lib/format.ts` imports `LOCALE` from here. |
 | `hf.ts` | Hugging Face: `HF_REPO_RE`, `parseHfInput()`, the status, search, repository and variant types, `DownloadItem`, `DownloadLive`, `DownloadRequestSchema`, `isDownloadActive()`, `vramFit()`. |
 | `logs.ts` | `LogLine`, `classifyLine()` (level and kind), `filterLogs()`, the client's `LogView` with `EMPTY_LOG_VIEW`, `onBoot()` and `mergeLogs()`, `LAUNCH_LOG_PREFIX` and `P2P_LOG_LINE`. |
 | `models.ts` | `ModelSummary` (a GGUF header summary), `ModelEntry`, `ModelList`, `ModelDetail`, `profileModelPath()`. |
-| `monitor.ts` | `Snapshot` (the state pushed on every tick), `HistoryDump`, the GPU, system, disk, slot and request types, `SERIES` (history keys), `slotContextTokens()`. |
+| `monitor.ts` | `Snapshot` (the state pushed on every tick), `HistoryDump`, the GPU, system and disk types, `SERIES` (history keys); re-exports the slot and request types and `slotContextTokens()` of `llamacpp-js/metrics`. |
 | `profile.ts` | `ProfileInputSchema`, `Profile`, `RESERVED_FLAGS` with `reservedFlag()` and `reservedFlagMessage()`, `parseProfileImport()` (llama-tui configs, arrays or single profiles). |
 | `server.ts` | `ServerState` (`idle`, `starting`, `ready`, `stopping`, `crashed`, `external`) and `ServerView`. |
 | `settings.ts` | `SettingsSchema` with every default, `Settings`, `ThemeMode`, `DEFAULT_SETTINGS`. |
 | `setup.ts` | `SetupReport` (the first-run checklist), `LaunchpadEntry`, `isLoopback()`. |
 | `shell.ts` | `shellQuote()` and `shellSplit()`: POSIX-shell-style quoting and splitting, without expansion. |
-| `sse.ts` | `SseParser`, an incremental `text/event-stream` reader, and `formatSse()`. |
+| `sse.ts` | `formatSse()`, one event of llama-webui's chat stream. |
 | `sweep.ts` | `SweepSpaceSchema`, `SweepSpecSchema`, `Sweep`, `SweepLive`, `expandSpace()`, `itemLabel()`, `sweepCtx()`, `scoreOf()`, `rankRuns()`, `estimatedSweepSeconds()`. |
 | `topology.ts` | The hardware graph and `ModelPlacement` types (with `P2pStatus`), `placementTotals()`, `hostDevice()`, `Phase` with `PHASE_LABEL` and `phaseOf()`, `pcieBps()`. |
 | `tuning.ts` | `PRESETS`, `PresetId`, `presetOf()`, `NOISE`, the estimate, fit, plan and system check types, `isSetupCheck()`, `deviceRole()`, `gpuDevices()`. |
 | `ws.ts` | `WsMessage`, the union of the 16 messages of `/ws` ([WebSocket](/developers/api/websocket/)). |
+
+### Re-exported from llamacpp-js
+
+Part of the API both sides share is llama.cpp's own format, so it lives in `llamacpp-js` and `index.ts` re-exports it:
+the whole flag catalogue (`llamacpp-js/flags`: `Flag`, `FlagCatalog`, `parseHelp()`, `catalogFrom()`, `flagOf()`,
+`complete()`, `flagSuggestions()`, `unknownFlags()`, `describeFlag()`), `SseParser` and `SseEvent` (`llamacpp-js/sse`),
+and through `monitor.ts` the `SlotView`, `Health`, `RequestStats`, `SpecStats` and `RequestRecord` types. The web app
+keeps importing them from `@llama-webui/shared`. `bench.ts` builds on `BenchMeasure` and `BenchDevice` of
+`llamacpp-js/bench` (`Measure` is the same type; `BenchDevice` adds `otherUsedMib`), `chat.ts` on `LlamaTimings` of
+`llamacpp-js/client`.
 
 ## Why the zod schemas live here
 
@@ -90,7 +100,7 @@ Functions that both sides need to compute the same way live here rather than bei
 | `benchArgs()` | Builds the `llama-bench` arguments (`server/bench/execute.ts`). | Shows a run's arguments in the benchmark history and comparison (`features/bench/`). |
 | `shellQuote()` | Builds the displayed command line of a launch (`server/supervisor/args.ts`) and of a benchmark (`server/bench/execute.ts`). | Formats arguments in the profile editor, the benchmark form and history, and the Tuning page. |
 | `SERIES` | Names the history series the monitor records (`server/monitor/monitor.ts`). | Names the series the charts read. |
-| `slotContextTokens()` | Sums the context the slots use (`server/collectors/llama.ts`). | The Dashboard context card. |
+| `slotContextTokens()` | Sums the context the slots use (`kvUsage()` in `llamacpp-js/metrics`). | The Dashboard context card. |
 | `profileModelPath()` | The model path written into a profile created from a benchmark run (`server/routes/bench.ts`). | The same path in the profile form and the Tuning page's actions. |
 | `defer()` | `using` blocks in the bench gate, runner and executor, the monitor and the external server watcher. | `using` blocks in the stores (`web/src/lib/server.ts`, `monitor.ts`, `chat.ts`…). |
 
@@ -106,11 +116,12 @@ the text itself.
 
 ## What shared may import
 
-The package imports nothing from `server/` or `web/`: its modules import zod and each other, and only the tests use
+The package imports nothing from `server/` or `web/`: its modules import zod, the browser-safe modules of
+`llamacpp-js` (never `llamacpp-js/node`) and each other, and only the tests use
 `bun:test` and `node:path`. Keep it that way. The same module runs in Bun and in the browser bundle, so a module that
 reached into the server would drag server code into the UI, and one that needed the DOM would break on the server.
 Inputs that depend on the environment are passed in instead of read: `profileModelPath()` takes the home directory as
 an argument and expands `~` itself, without `node:os` or `node:path`.
 
-The root type check (`bun check --no-script`) compiles `packages/webui-shared/` with `lib: ["ESNext"]` and no DOM types, so a DOM API
-in a shared module fails there.
+Its project (`packages/webui-shared/tsconfig.json`, checked by `bun check -b`) compiles it with `lib: ["ESNext"]`, the
+Bun types and no DOM types, so a DOM API in a shared module fails there.

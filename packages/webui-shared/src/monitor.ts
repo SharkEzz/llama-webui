@@ -1,5 +1,7 @@
 // Serializable monitoring types (copied from llama-tui, without Map), shared by the server and the UI.
 
+import type { Health, RequestRecord, RequestStats, SlotView, SpecStats } from 'llamacpp-js/metrics';
+
 export interface GpuSample {
   key: string; // "nvidia:<uuid>" | "amd:<pdev>"
   vendor: 'nvidia' | 'amd';
@@ -69,51 +71,14 @@ export interface DiskSample extends DiskRates {
   model: { disk: string; readBps: number } | null;
 }
 
-export interface SlotView {
-  id: number;
-  nCtx: number;
-  processing: boolean;
-  idTask: number | null;
-  nPromptTokens: number;
-  nPromptProcessed: number;
-  nDecoded: number;
-  nRemain: number | null;
-}
-
-/**
- * Tokens used in a slot's context. `n_prompt_tokens` is already the whole context: the prompt plus the tokens generated
- * so far (kept in cache once the request is done). Adding `n_decoded` would count the output twice.
- */
-export const slotContextTokens = (s: SlotView): number => s.nPromptTokens;
-
-export type Health = 'ok' | 'loading' | 'error' | 'down';
-
-export interface RequestStats {
-  genTps: number | null;
-  ppTps: number | null;
-  specAccept: number | null;
-}
-
-export interface SpecStats {
-  acceptCum: number | null;
-  drafts: number;
-  draftTokens: number;
-  accepted: number;
-  meanAcceptedPerDraft: number | null;
-  perPos: number[];
-}
-
-export interface RequestRecord {
-  at: number;
-  promptTokens: number;
-  cachedTokens: number;
-  genTokens: number;
-  promptSec: number | null;
-  genSec: number | null;
-  ppTps: number | null;
-  genTps: number | null;
-  specAccept: number | null;
-}
+export {
+  type Health,
+  type RequestRecord,
+  type RequestStats,
+  type SlotView,
+  type SpecStats,
+  slotContextTokens,
+} from 'llamacpp-js/metrics';
 
 export interface CpuInfo {
   model: string;

@@ -14,7 +14,9 @@ HTTP clients follow it over Server-Sent Events (SSE).
 | `server/routes/chat.ts`    | The `/api/chat` routes and the `sse()` helper that turns a run into a `text/event-stream`.     |
 | `server/db/conversations.ts` | `ConversationsRepo`: the `conversations` and `messages` tables.                              |
 | `packages/webui-shared/src/chat.ts`       | `Conversation`, `ChatMessage`, `ChatEvent`, `MessageStats`, `statsFromTimings()`, the zod schemas. |
-| `packages/webui-shared/src/sse.ts`        | `SseParser` (incremental reader, used on both sides) and `formatSse()`.                         |
+| `packages/webui-shared/src/sse.ts`        | `formatSse()`, one event of llama-webui's own stream.                                          |
+| `llamacpp-js/client`       | `streamChatCompletion()`, the streamed `/v1/chat/completions` ([llamacpp-js](/developers/llamacpp-js/)). |
+| `llamacpp-js/sse`          | `SseParser`, the incremental `text/event-stream` reader used on both sides.                    |
 
 The routes are documented in [Chat](/developers/api/chat/), the user-facing behavior in [Chat](/docs/chat/).
 
@@ -82,19 +84,23 @@ return { messages, stream: true, ...sampling, chat_template_kwargs: { enable_thi
 
 ## Reading the stream
 
-`Run.run()` posts the body with an `AbortController` and reads the response with `SseParser`:
+`Run.run()` iterates `streamChatCompletion(baseUrl, body, { fetch, signal })` with an `AbortController`. The generator
+posts the body, reads the response with `SseParser` and yields each chunk; its errors say what went wrong, and
+`failureMessage()` words them for the conversation:
 
-- An HTTP error (or a response without a body) is turned into a message by `llamaErrorMessage()` when the body is a
-  `llama-server` error object, else `llama-server: HTTP <status> — <text>`.
+- An HTTP error (or a response without a body) is a `LlamaHttpError`: its message comes from `llamaErrorMessage()` when
+  the body is a `llama-server` error object, else `llama-server: HTTP <status> — <text>`. A `fetch` that fails before
+  any response is `llama-server unreachable: <error>`.
 - Each `data:` event is parsed as JSON (an event that does not parse is skipped). An `error` field ends the run with
-  that error. `choices[0].delta.content` and
+  that error (`LlamaStreamError`). `choices[0].delta.content` and
   `choices[0].delta.reasoning_content` are appended to the reply and its reasoning, and emitted as a `delta` event.
 - The time to the first token (`ttftMs`) is taken at the first non-empty content or reasoning delta, so it includes
   the reasoning.
 - The last `timings` object seen is kept for the stats.
-- `data: [DONE]` ends the stream normally. A stream that ends without it is an error.
+- `data: [DONE]` ends the stream normally. A stream that ends or breaks without it is a `LlamaStreamCutError`:
+  `llama-server cut the reply short (stopped or crashed)`.
 
-`llamaErrorMessage()` rewrites a context overflow (`type: 'exceed_context_size_error'`) as `Conversation too long for
+`llamaErrorMessage()` rewrites a context overflow (`contextOverflow()` from `llamacpp-js/errors` reads its sizes) as `Conversation too long for
 the model's context (<prompt> / <context> tokens): start a new conversation or use a profile with a larger context.`
 Other errors become `llama-server: <message>`.
 
@@ -155,7 +161,7 @@ only. `DELETE /api/chat/:id` stops the run and waits for it before deleting the 
 
 ### Stats
 
-`statsFromTimings(timings, ttftMs, durationMs)` maps the `timings` of the last `llama-server` chunk (`LlamaTimings`) to
+`statsFromTimings(timings, ttftMs, durationMs)` maps the `timings` of the last `llama-server` chunk (`LlamaTimings`, from `llamacpp-js/client`) to
 `MessageStats`. `stats` stays `null` when no chunk carried `timings`, for example after a stop.
 
 | `MessageStats` field | From                                    |
@@ -205,4 +211,5 @@ that the SSE streams close, and blocks any later write from that run.
 `server/chat/runs.test.ts` drives `ChatRuns` with a fake `fetch` and an in-memory database: a run that goes on and is
 saved after its listener leaves, a stop that keeps the partial answer, a late subscriber that receives what was
 already written, a stream that breaks, and `dispose()` closing the streams. `server/chat/request.test.ts` covers
-`buildChatRequest()` and `llamaErrorMessage()`.
+`buildChatRequest()` and `llamaErrorMessage()`; the stream reader itself is tested in
+`packages/llamacpp-js/tests/client.test.ts`.

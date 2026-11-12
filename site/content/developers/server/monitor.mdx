@@ -15,8 +15,7 @@ lives in `server/monitor/`, the readers of each data source in `server/collector
 | `server/monitor/placement.ts`      | `PlacementTracker` and `parsePlacement()`: how the model is split across devices, from the logs. |
 | `server/collectors/registry.ts`    | `Collectors`: creates the collectors and follows the settings.                               |
 | `server/collectors/needs.ts`       | `GpuNeeds`: what the GPU readers must read.                                                  |
-| `server/collectors/llama.ts`       | `fetchLlama()` and the math on `/slots` and `/metrics`.                                      |
-| `server/collectors/prometheus.ts`  | `parsePrometheus()`, the `/metrics` text parser.                                              |
+| `llamacpp-js/client`, `llamacpp-js/metrics` | `fetchLlama()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)). |
 | `server/collectors/nvml/`          | NVIDIA through NVML (`bun:ffi`) in a Worker.                                                 |
 | `server/collectors/nvidia.ts`      | `NvidiaMonitor`, the `nvidia-smi` fallback.                                                  |
 | `server/collectors/amdgpu.ts`      | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                          |
@@ -160,8 +159,8 @@ monitor adds a `.catch()` around each call. A missing file, tool or permission r
 
 ### `llama-server`: `/health`, `/slots`, `/metrics`
 
-`fetchLlama(baseUrl)` (`llama.ts`) requests `/health`, then `/slots` and `/metrics` in parallel, each with a timeout of
-800 ms. `parseSlots()` maps the `/slots` JSON to `SlotView`. `parsePrometheus()` reads the `/metrics` text format into
+`fetchLlama(baseUrl)` (`llamacpp-js/client`) requests `/health`, then `/slots` and `/metrics` in parallel, each with a timeout of
+800 ms. `parseSlots()` (`llamacpp-js/metrics`) maps the `/slots` JSON to `SlotView`. `parsePrometheus()` reads the `/metrics` text format into
 a `Map` keyed by the metric name with its labels verbatim (for example
 `llamacpp:spec_decode_num_accepted_tokens_per_pos_total{position="0"}`), skipping comments and non-numeric values. The
 managed server always has these endpoints, since `buildCommand()` adds `--metrics` and `--slots` (see

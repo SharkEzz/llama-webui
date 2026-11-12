@@ -1,7 +1,7 @@
 import type { Database } from 'bun:sqlite';
 import { isLoopback } from '@llama-webui/shared';
+import { benchBinary } from 'llamacpp-js/node';
 import { buildOf, listDevices } from '../bench/hardware';
-import { benchBinary } from '../bench/parse';
 import type { BenchRunsRepo } from '../db/benchRuns';
 import { ModelCacheRepo } from '../db/modelCache';
 import type { ProfilesRepo } from '../db/profiles';

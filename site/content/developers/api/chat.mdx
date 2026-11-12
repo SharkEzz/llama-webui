@@ -4,8 +4,8 @@ description: Conversation routes, sending a message, regenerating and stopping a
 ---
 
 The chat routes store conversations and stream the replies of `llama-server`. They live in `server/routes/chat.ts`;
-the types and the patch schema are in `packages/webui-shared/src/chat.ts`, the SSE helpers (`formatSse()`, `SseParser`) in
-`packages/webui-shared/src/sse.ts`. Generations are run by `ChatRuns` (`server/chat/runs.ts`, see [Chat runs](/developers/server/chat/)).
+the types and the patch schema are in `packages/webui-shared/src/chat.ts`, `formatSse()` in `packages/webui-shared/src/sse.ts`, and `SseParser` in
+`llamacpp-js/sse` ([llamacpp-js](/developers/llamacpp-js/)). Generations are run by `ChatRuns` (`server/chat/runs.ts`, see [Chat runs](/developers/server/chat/)).
 The user side is described on the [Chat](/docs/chat/) page.
 
 The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
@@ -304,7 +304,7 @@ event: done
 data: {"type":"done","message":{"id":42,"conversationId":7,"role":"assistant","content":"The KV cache stores the keys and values of tokens already processed, so they are not computed again.","reasoning":"The user wants a short definition.","status":"done","error":null,"stats":{"ttftMs":182,"promptTokens":24,"cachedTokens":0,"genTokens":21,"ppTps":1450.2,"tgTps":96.4,"draftN":null,"draftAccepted":null,"durationMs":431},"model":"/home/demo/models/Qwen3-8B-Q4_K_M.gguf","createdAt":1762700000004}}
 ```
 
-To read it in TypeScript, `SseParser` from `@llama-webui/shared` accepts chunks split anywhere and skips comments:
+To read it in TypeScript, `SseParser` (from `llamacpp-js/sse`, re-exported by `@llama-webui/shared`) accepts chunks split anywhere and skips comments:
 
 ```ts title="web/src/lib/chat.ts"
 const parser = new SseParser();

@@ -265,12 +265,13 @@ These objects were built from the first evaluation of their modules. After a rel
 live objects keep running the old one, along with the modules they imported at startup. A change to these files
 therefore has no effect until Bun restarts:
 
-- `server/supervisor/supervisor.ts`, and what it imports: `server/supervisor/health.ts` (`probeHealth()`),
-  `server/supervisor/discovery.ts` (`findLlamaServerPid()`) and `server/logs/lines.ts` (`LineSplitter`)
+- `server/supervisor/supervisor.ts`, and what it imports: `llamacpp-js/client` (`probeHealth()`), `llamacpp-js/node`
+  (`findLlamaServerPid()`) and `server/logs/lines.ts` (`LineSplitter`)
 - `server/logs/buffer.ts`
 - `server/bench/gate.ts`
 - `server/monitor/**`, except `server/monitor/placement.ts` (the `PlacementTracker` is recreated on every reload)
 - `server/collectors/**`
+- `packages/llamacpp-js/src/**`, imported by the supervisor and the monitor (`fetchLlama()`, the `/metrics` math)
 - `server/runtime.ts`
 
 After changing any of them, stop Bun with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run `bun run dev` again.

@@ -1,20 +1,76 @@
-import {
-  type Health,
-  type RequestRecord,
-  type RequestStats,
-  type SlotView,
-  type SpecStats,
-  slotContextTokens,
-} from '@llama-webui/shared';
-import { parsePrometheus } from './prometheus';
+/**
+ * llama-server's monitoring endpoints: `/slots` (one entry per slot) and `/metrics` (Prometheus text, `--metrics`),
+ * and the figures derived from two successive reads (live rates, per-request stats, speculative decoding).
+ */
 
-export type { Health, RequestRecord, RequestStats, SlotView, SpecStats };
+export interface SlotView {
+  id: number;
+  nCtx: number;
+  processing: boolean;
+  idTask: number | null;
+  nPromptTokens: number;
+  nPromptProcessed: number;
+  nDecoded: number;
+  nRemain: number | null;
+}
 
+/**
+ * Tokens used in a slot's context. `n_prompt_tokens` is already the whole context: the prompt plus the tokens generated
+ * so far (kept in cache once the request is done). Adding `n_decoded` would count the output twice.
+ */
+export const slotContextTokens = (s: SlotView): number => s.nPromptTokens;
+
+/** `/health`: 200 → `ok`, 503 → `loading`, another status → `error`, no answer → `down`. */
+export type Health = 'ok' | 'loading' | 'error' | 'down';
+
+export interface RequestStats {
+  genTps: number | null;
+  ppTps: number | null;
+  specAccept: number | null;
+}
+
+export interface SpecStats {
+  acceptCum: number | null;
+  drafts: number;
+  draftTokens: number;
+  accepted: number;
+  meanAcceptedPerDraft: number | null;
+  perPos: number[];
+}
+
+export interface RequestRecord {
+  at: number;
+  promptTokens: number;
+  cachedTokens: number;
+  genTokens: number;
+  promptSec: number | null;
+  genSec: number | null;
+  ppTps: number | null;
+  genTps: number | null;
+  specAccept: number | null;
+}
+
+/** One read of a server: when, its health, and (once loaded) its slots and metrics. */
 export interface LlamaRaw {
   at: number;
   health: Health;
   slots: SlotView[] | null;
   metrics: Map<string, number> | null;
+}
+
+/** Parse Prometheus text exposition; key = metric name with labels verbatim. */
+export function parsePrometheus(text: string): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+    const sp = line.lastIndexOf(' ');
+    if (sp <= 0) continue;
+    const value = Number(line.slice(sp + 1));
+    if (!Number.isFinite(value)) continue;
+    out.set(line.slice(0, sp).trim(), value);
+  }
+  return out;
 }
 
 const P = 'llamacpp:';
@@ -41,34 +97,6 @@ export function parseSlots(json: unknown): SlotView[] {
     });
   }
   return out;
-}
-
-async function get(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<Response> {
-  return fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
-}
-
-export async function fetchLlama(baseUrl: string, fetchImpl: typeof fetch = fetch, timeoutMs = 800): Promise<LlamaRaw> {
-  const at = Date.now();
-  let health: Health;
-  try {
-    const r = await get(`${baseUrl}/health`, fetchImpl, timeoutMs);
-    health = r.status === 200 ? 'ok' : r.status === 503 ? 'loading' : 'error';
-    await r.body?.cancel().catch(() => {});
-  } catch {
-    return { at, health: 'down', slots: null, metrics: null };
-  }
-  if (health !== 'ok') return { at, health, slots: null, metrics: null };
-  const [slots, metrics] = await Promise.all([
-    get(`${baseUrl}/slots`, fetchImpl, timeoutMs)
-      .then((r) => r.json())
-      .then(parseSlots)
-      .catch(() => null),
-    get(`${baseUrl}/metrics`, fetchImpl, timeoutMs)
-      .then((r) => r.text())
-      .then(parsePrometheus)
-      .catch(() => null),
-  ]);
-  return { at, health, slots, metrics };
 }
 
 export function liveRates(prev: LlamaRaw | null, cur: LlamaRaw): { genTps: number; ppTps: number } {

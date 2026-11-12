@@ -11,11 +11,13 @@ import {
   serverArgs,
   shellQuote,
 } from '@llama-webui/shared';
+import { parseBenchJson, parseBenchProgress } from 'llamacpp-js/bench';
+import { benchBinary } from 'llamacpp-js/node';
 import type { BenchFinish } from '../db/benchRuns';
 import type { LogBuffer } from '../logs/buffer';
 import { LineSplitter } from '../logs/lines';
 import { type BuiltCommand, binaryPath, buildCommand } from '../supervisor/args';
-import { benchBinary, benchFailure, parseBenchJson, parseBenchProgress } from './parse';
+import { benchFailure } from './parse';
 import { runServerTrial, TrialCancelled } from './server';
 import { VramProbe } from './vram';
 

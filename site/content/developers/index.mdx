@@ -11,11 +11,13 @@ If you only want to install and use llama-webui, start with the [user documentat
 
 ## The repository
 
-llama-webui is a Bun monorepo with three workspaces and a separate website. `server/` is the Bun process: it serves the
+llama-webui is a Bun monorepo with four workspaces and a separate website. `server/` is the Bun process: it serves the
 REST API, the `/ws` WebSocket and the web UI on one port (7860 by default), supervises one `llama-server`, samples the
 hardware, runs benchmarks and sweeps, relays chat generations and stores everything in a SQLite file. `web/` is the
-React app it serves. `packages/webui-shared/` (the `@llama-webui/shared` package) holds the types, zod schemas and pure functions
-both sides use. `site/` is this website, a standalone package outside the workspaces.
+React app it serves. `packages/` holds the libraries: `packages/webui-shared/` (the `@llama-webui/shared` package) has
+the types, zod schemas and pure functions both sides use, and `packages/llamacpp-js/` everything that talks to
+llama.cpp (its HTTP API, its metrics, the output of its binaries), written to be published on its own. `site/` is this
+website, a standalone package outside the workspaces.
 [Development setup](/developers/getting-started/#repository-layout) shows the layout in detail.
 
 ## Tech stack
@@ -57,10 +59,11 @@ the repository where Vite is allowed.
 - [Database](/developers/server/database/): `bun:sqlite`, migrations and repositories.
 - [Security](/developers/server/security/): the request guard of the unauthenticated API.
 
-### Web app and shared code
+### Web app and packages
 
 - [Web app](/developers/frontend/): `web/src/` structure, stores, the WebSocket client, formatting and errors.
 - [Shared package](/developers/shared/): what `@llama-webui/shared` exports and why.
+- [llamacpp-js](/developers/llamacpp-js/): the llama.cpp client library, its entry points and its rules.
 
 ### API reference
 
