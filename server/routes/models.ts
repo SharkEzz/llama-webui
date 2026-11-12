@@ -10,7 +10,7 @@ import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
 import type { Database } from '../db/sqlite';
 import type { SweepsRepo } from '../db/sweeps';
-import { body, type Env, HttpError, notFound } from '../http';
+import { body, type Env, HttpError, notFound, query } from '../http';
 import { deleteModelFiles, findEntry, type ModelUsers, modelUsage } from '../models/delete';
 import { readModel } from '../models/gguf';
 import { scanModels, toSummary } from '../models/scan';
@@ -78,12 +78,12 @@ export function modelRoutes(deps: ModelRouteDeps) {
       const result: ModelDeleted = { deletedFiles: entry.files, deletedProfiles };
       return c.json(result);
     })
-    .get('/api/models/usage', async (c) => {
+    .get('/api/models/usage', query('path'), async (c) => {
       const path = new URL(c.req.url).searchParams.get('path');
       if (!path) throw new HttpError(400, 'path required');
       return c.json(await modelUsage((await entryOf(path)).entry, users));
     })
-    .get('/api/models/info', async (c) => {
+    .get('/api/models/info', query('path'), async (c) => {
       const path = new URL(c.req.url).searchParams.get('path') ?? '';
       if (!path.startsWith('/') || !path.endsWith('.gguf'))
         throw new HttpError(400, 'Absolute path to a .gguf file expected');

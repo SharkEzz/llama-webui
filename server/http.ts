@@ -89,6 +89,22 @@ export const id = (what: string) =>
   });
 
 /**
+ * Declares a route's query keys, for the web's typed client (`query: { path }`). Refuses nothing: a missing key is the
+ * handler's call. `c.req.valid('query')` holds the first value of each key present, decoded by Hono; the handlers
+ * read `new URL(c.req.url).searchParams` instead, which decodes as before the port.
+ */
+export const query = <K extends string>(...keys: K[]) =>
+  validator('query', (q: Record<string, string | string[]>) => {
+    const out: { [k in K]?: string } = {};
+    for (const k of keys) {
+      const v = q[k];
+      const first = Array.isArray(v) ? v[0] : v;
+      if (first !== undefined) out[k] = first;
+    }
+    return out;
+  });
+
+/**
  * JSON body passed through `check`. The body is read with `c.req.json()` whatever the media type, like `req.json()`
  * before (Hono's validator alone gives `{}` to a type outside its list); the guard has already refused a non-JSON one.
  */

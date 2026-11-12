@@ -13,6 +13,7 @@ import {
   json,
   jsonCharset,
   object,
+  query,
   shadowed,
 } from './http';
 
@@ -161,4 +162,16 @@ test('body() validates with zod and keeps the messages of Schema.parse(await jso
     400,
     { error: 'Invalid JSON' },
   ]);
+});
+
+test('query() declares the keys and refuses nothing; the handler still reads searchParams', async () => {
+  const app = new Hono<Env>().get('/api/q', query('path', 'n'), (c) =>
+    c.json({ path: new URL(c.req.url).searchParams.get('path'), valid: c.req.valid('query') }),
+  );
+  const r = await app.request('/api/q?path=a+b%2Bc%23%C3%A9&n=1&n=2');
+  expect(r.status).toBe(200);
+  expect(await r.json()).toEqual({ path: 'a b+c#é', valid: { path: 'a b+c#é', n: '1' } });
+  const none = await app.request('/api/q');
+  expect(none.status).toBe(200);
+  expect(await none.json()).toEqual({ path: null, valid: {} });
 });

@@ -11,7 +11,7 @@ import { benchBinary } from 'llamacpp-js/node';
 import { z } from 'zod';
 import type { BenchRunner } from '../bench/runner';
 import type { SettingsRepo } from '../db/settings';
-import { body, type Env, HttpError, json, object } from '../http';
+import { body, type Env, HttpError, json, object, query } from '../http';
 import type { Monitor } from '../monitor/monitor';
 import type { Runtime } from '../runtime';
 import { binaryPath } from '../supervisor/args';
@@ -77,7 +77,7 @@ export function tuningRoutes({ settings, monitor, benchRunner, runtime }: Tuning
         ]);
         return c.json(planSweep({ model, hw, spec, mmprojBytes: mmproj }));
       })
-      .get('/api/tuning/checks', async (c) => {
+      .get('/api/tuning/checks', query('model'), async (c) => {
         const modelPath = new URL(c.req.url).searchParams.get('model') || null;
         const snap = monitor.latest();
         const gpus = snap?.allGpus ?? [];

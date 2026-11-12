@@ -5,7 +5,7 @@ import type { SettingsRepo } from '../db/settings';
 import type { HfClient } from '../hf/client';
 import type { DownloadQueue } from '../hf/downloader';
 import { describeRepo, downloadInputs } from '../hf/repo';
-import { body, type Env, HttpError, id } from '../http';
+import { body, type Env, HttpError, id, query } from '../http';
 import { expandHome } from '../supervisor/args';
 
 export interface HfRouteDeps {
@@ -22,12 +22,12 @@ export function hfRoutes({ hf, downloads, downloadsRepo, settings }: HfRouteDeps
   return (
     new Hono<Env>()
       .get('/api/hf/status', async (c) => c.json(await hf.status()))
-      .get('/api/hf/search', async (c) => {
+      .get('/api/hf/search', query('q'), async (c) => {
         const q = (new URL(c.req.url).searchParams.get('q') ?? '').trim();
         if (!q || q.length > 200) throw new HttpError(400, 'Search text expected (200 characters at most)');
         return c.json(await hf.search(q, { signal: c.req.raw.signal }));
       })
-      .get('/api/hf/repo', async (c) => {
+      .get('/api/hf/repo', query('id', 'revision'), async (c) => {
         const q = new URL(c.req.url).searchParams;
         const repo = await describeRepo(hf, q.get('id') ?? '', {
           modelsDir: modelsDir(),

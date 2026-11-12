@@ -19,7 +19,7 @@ import { type BenchRunsRepo, MAX_RUNS } from '../db/benchRuns';
 import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
 import type { SweepsRepo } from '../db/sweeps';
-import { type Env, HttpError, id, json, notFound, object } from '../http';
+import { type Env, HttpError, id, json, notFound, object, query } from '../http';
 import { binaryPath, profilePaths } from '../supervisor/args';
 import type { WsHub } from '../ws/hub';
 
@@ -48,7 +48,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
   // Static paths before `/api/bench/:id` (Hono matches in registration order).
   return (
     new Hono<Env>()
-      .get('/api/bench/runs', (c) => {
+      .get('/api/bench/runs', query('kind', 'status', 'sweep', 'limit', 'model'), (c) => {
         const q = new URL(c.req.url).searchParams;
         const kind = q.get('kind');
         const status = q.get('status');
@@ -64,7 +64,7 @@ export function benchRoutes({ benchRuns, benchRunner, settings, profiles, sweeps
         });
         return c.json({ runs, live: benchRunner.live });
       })
-      .delete('/api/bench/runs', (c) => {
+      .delete('/api/bench/runs', query('failed'), (c) => {
         if (new URL(c.req.url).searchParams.get('failed') !== '1') throw new HttpError(400, '?failed=1 expected');
         const ids = benchRuns.deleteFailed();
         if (ids.length > 0) hub.broadcast({ type: 'bench-deleted', payload: { ids } });

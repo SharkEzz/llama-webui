@@ -4,7 +4,7 @@ import { fetchProps, probeUrl } from 'llamacpp-js/client';
 import { LlamaHttpError, LlamaReplyError } from 'llamacpp-js/errors';
 import type { ProfilesRepo } from '../db/profiles';
 import type { SettingsRepo } from '../db/settings';
-import { type Env, HttpError, json, notFound, object } from '../http';
+import { type Env, HttpError, json, notFound, object, query } from '../http';
 import { type Runtime, serverView } from '../runtime';
 import { binaryPath, buildCommand } from '../supervisor/args';
 import { getFlags } from '../supervisor/flags';
@@ -91,7 +91,7 @@ export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerR
       if (!flags) throw new HttpError(503, `llama-server --help failed (${binary})`);
       return c.json({ flags });
     })
-    .get('/api/logs', (c) => {
+    .get('/api/logs', query('since'), (c) => {
       const since = Number(new URL(c.req.url).searchParams.get('since') ?? 0);
       return c.json({
         lines: logs.since(Number.isFinite(since) ? since : 0),
