@@ -19,10 +19,6 @@ jobs:
         with:
           node-version: 26.13
           cache: pnpm
-      # The website's scripts still run with Bun (until N10).
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm check
@@ -31,8 +27,8 @@ jobs:
       # Production build: starts from an empty data directory, serves the production UI and the WebSocket.
       - run: pnpm build
       - run: node scripts/smoke.ts
-      - run: bun run site:build
-      - run: bun run --cwd site check-links
+      - run: pnpm site:build
+      - run: pnpm --dir site check-links
 
   # llamacpp-js still supports Node >= 24, while the workspace needs Node 26: its tests (no dependencies) run on the
   # lowest supported version too.

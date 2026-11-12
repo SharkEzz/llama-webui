@@ -45,8 +45,8 @@ The rules on these pages come from `CLAUDE.md` at the root of the repository: wh
 
 ## Write a docs page
 
-The website lives in `site/`, a package of its own (Vite, React Router with prerendering, Tailwind, MDX) outside the
-Bun workspaces, with its own `package.json` and `bun.lock`. Every `.mdx` file under `site/content/docs/` or
+The website lives in `site/`, a package of the pnpm workspace (Vite, React Router with prerendering, Tailwind, MDX),
+installed by the root `pnpm install` and run on Node.js: its scripts are `node scripts/<name>.ts`. Every `.mdx` file under `site/content/docs/` or
 `site/content/developers/` becomes a prerendered page: `docs/getting-started/installation.mdx` is
 `/docs/getting-started/installation/`, and an `index.mdx` is the page of its folder.
 
@@ -99,11 +99,10 @@ turned into hyphens, punctuation dropped.
   </Step>
   <Step title="Preview it">
 
-Install the site's dependencies once, then run the site from the root of the repository:
+After `pnpm install` at the root (it installs the site too), run the site from the root of the repository:
 
 ```bash title="Terminal"
-cd site && bun install && cd ..
-bun run site:dev
+pnpm site:dev
 ```
 
 `site:dev` serves the site with hot reload on port 5173 on every interface: open `http://<host>:5173/llama-webui/`.
@@ -112,9 +111,9 @@ bun run site:dev
   <Step title="Build and check the links">
 
 ```bash title="Terminal"
-bun run site:build
-bun run --cwd site check-links
-bun run site:preview
+pnpm site:build
+pnpm --dir site check-links
+pnpm site:preview
 ```
 
 `site:build` prerenders every page, then `scripts/postbuild.ts` writes `site/dist/`: the pages, a `404.html`, the
@@ -152,7 +151,7 @@ binaries: the app resolves the binary's real path, so a symbolic link would show
   <Step title="Fill it">
 
 ```bash title="Terminal"
-bun run --cwd site demo-seed setup bench sweep start chat
+pnpm --dir site demo-seed setup bench sweep start chat
 ```
 
 `site/scripts/demo-seed.ts` drives the real API: settings and profiles (`setup`), `llama-bench` and server runs
@@ -163,9 +162,9 @@ the GPUs, so free them first.
   <Step title="Capture">
 
 ```bash title="Terminal"
-bun run --cwd site screenshots            # every screen but the live and manual ones, or: screenshots server logs
-bun run --cwd site demo-seed generate
-bun run --cwd site screenshots --live     # Dashboard, System and Topology, during a generation
+pnpm --dir site screenshots            # every screen but the live and manual ones, or: screenshots server logs
+pnpm --dir site demo-seed generate
+pnpm --dir site screenshots --live     # Dashboard, System and Topology, during a generation
 ```
 
 `site/scripts/screenshots.ts` opens each screen in headless Chromium (`/usr/bin/chromium`), switches the theme through
@@ -176,7 +175,7 @@ when you name it.
   </Step>
   <Step title="Update what depends on them">
 
-After a new Dashboard capture, run `bun run --cwd site og` to render the Open Graph image (`site/public/og.png`). The
+After a new Dashboard capture, run `pnpm --dir site og` to render the Open Graph image (`site/public/og.png`). The
 landing page also redraws some app screens in React with their real values (the hero's live Dashboard, the argument
 editor, the Tuning recommendation, in `site/src/landing/`): update them when those screens change.
 
@@ -228,13 +227,13 @@ bun test
   `site/`.
 - `bun test`: every test file, `web/src/` included ([Run the tests](/developers/contributing/testing/#run-the-tests)).
 
-When the change touches `site/`, including its pages, also run `bun run site:build`, then
-`bun run --cwd site check-links`.
+When the change touches `site/`, including its pages, also run `pnpm site:build`, then
+`pnpm --dir site check-links`.
 
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `master`, on Ubuntu with Node.js 26.13 and
-pnpm, plus Bun 1.4.4 for the site's scripts:
+pnpm:
 
 | Step                                         | Command                                              |
 | -------------------------------------------- | ---------------------------------------------------- |
@@ -244,8 +243,8 @@ pnpm, plus Bun 1.4.4 for the site's scripts:
 | Tests                                        | `pnpm test`                                          |
 | Build the app                                | `pnpm build`                                         |
 | Smoke-test the build (help, version, UI, WebSocket) | `node scripts/smoke.ts`                       |
-| Build the site                               | `bun run site:build`                                 |
-| Check the site's links                       | `bun run --cwd site check-links`                     |
+| Build the site                               | `pnpm site:build`                                    |
+| Check the site's links                       | `pnpm --dir site check-links`                        |
 
 A second job runs the tests of `packages/llamacpp-js/` on Node.js 24, the lowest version it supports, without any
 install. `--frozen-lockfile` fails when the lockfile is out of date: commit `pnpm-lock.yaml` with any dependency

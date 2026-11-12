@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 26.13
-      # Same version as the `bun` peer in pnpm-lock.yaml.
+      # The Bun binaries of the releases so far; this workflow moves to Node in N11.
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4

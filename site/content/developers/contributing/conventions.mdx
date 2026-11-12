@@ -161,8 +161,8 @@ processes, timers, hashes and SQLite go through `node:*`. The few packages it ad
 Directories and file handles go through `node:fs` or `node:fs/promises` (`readdir`, `stat`, `realpath`, `open`,
 `statfs`); tests write files with `writeFileDeep()` (`server/testing/write.ts`), which creates the parent directories.
 There is no Express, `better-sqlite3`, `execa` or `dotenv` (`server/env.ts` parses `.env` with Node's
-`parseEnv()` from `node:util`), and no Jest. Two exceptions: `site/` is built with Vite and React Router, is installed with
-pnpm and its scripts run with Bun; `packages/llamacpp-js/` targets Node 24 or later as well as Bun, so its sources use
+`parseEnv()` from `node:util`), and no Jest. Two exceptions: `site/` is built with Vite and React Router (its scripts, run by
+Node, follow the same rules); `packages/llamacpp-js/` targets Node 24 or later as well as Bun, so its sources use
 only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), never `Bun.*`, and its tests use
 `node:test` with no dependency ([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
 

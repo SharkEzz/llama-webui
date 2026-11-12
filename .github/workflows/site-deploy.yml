@@ -31,12 +31,8 @@ jobs:
         with:
           node-version: 26.13
           cache: pnpm
-      # Same version as the `bun` peer in pnpm-lock.yaml.
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
       - run: pnpm install --frozen-lockfile
-      - run: bun run build
+      - run: pnpm build
         working-directory: site
       - uses: actions/upload-pages-artifact@v4
         with:

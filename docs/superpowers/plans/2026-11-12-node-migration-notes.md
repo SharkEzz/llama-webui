@@ -100,6 +100,11 @@ changes in the plan.
   `node:ffi`, `process.exit()` at 210 ms, process gone at 4 027 ms; Bun exits at 230 ms. A driver fault would make
   Ctrl-C hang with port 7860 bound. The sampler therefore runs in a child process (`fork`, IPC, `SIGKILL` on stop,
   exit on `disconnect`): 116 MiB RSS of its own instead of ~67 MiB inside the server's.
+- N10: the site's scripts port with no behaviour change: `fs.globSync('**/index.html', { cwd })` lists the same 61
+  pages as `Bun.Glob` (root `index.html` included, no warning), and `site/dist/` built by Node is byte-identical to
+  Bun's (308 files, sha256). `serve.ts` needs its own MIME table (Node has no type lookup), copied from the types Bun
+  reported for the site's files; Bun's `content-disposition: filename=…` on binary files is not kept (Pages does not
+  send it). `pnpm <script> --flag` passes the flag through, so `pnpm site:preview --port 4175` works from the root.
 
 ## Refactoring and optimisation backlog (for the R milestones, after the merge)
 
