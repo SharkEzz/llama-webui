@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "bun check --no-script -b && bun run --cwd site typecheck",
+    "check": "tsc -b && pnpm --filter llama-webui-site typecheck",
     "compile": "bun scripts/compile.ts",
     "dev": "bun --hot server/index.ts",
     "format": "biome format --write",

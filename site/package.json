@@ -11,7 +11,7 @@
     "og": "bun scripts/og.ts",
     "preview": "bun scripts/serve.ts",
     "screenshots": "bun scripts/screenshots.ts",
-    "typecheck": "react-router typegen && bun check --no-script"
+    "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
