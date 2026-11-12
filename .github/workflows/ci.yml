@@ -13,16 +13,18 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # tags and history: the executable's version comes from `git describe`
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
+      # pnpm installs (version from `packageManager`), Bun runs the scripts.
+      - uses: pnpm/action-setup@v6
       # The React Router CLI (site build) and the llamacpp-js tests run on Node too.
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
-      - run: bun install --frozen-lockfile
-      - run: bun install --frozen-lockfile
-        working-directory: site
+          node-version: 26.13
+          cache: pnpm
+      # Same version as the `bun` peer of bun-plugin-tailwind in pnpm-lock.yaml, which scripts run first.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - run: pnpm install --frozen-lockfile
       - run: bun run lint
       - run: bun run check
       - run: bun test
@@ -33,3 +35,15 @@ jobs:
       - run: bun scripts/smoke-binary.ts dist/llama-webui
       - run: bun run site:build
       - run: bun run --cwd site check-links
+
+  # llamacpp-js still supports Node >= 24, while the workspace needs Node 26: its tests (no dependencies) run on the
+  # lowest supported version too.
+  llamacpp-js-node24:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node --test 'tests/*.test.ts'
+        working-directory: packages/llamacpp-js
