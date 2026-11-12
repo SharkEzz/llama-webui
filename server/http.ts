@@ -1,8 +1,9 @@
+import { zValidator } from '@hono/zod-validator';
 import type { BunRequest, Server } from 'bun';
 import type { Hono, MiddlewareHandler } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { validator } from 'hono/validator';
-import { ZodError } from 'zod';
+import { ZodError, type z } from 'zod';
 import { guard } from './security';
 
 /** What every API route sees: `c.env.server` is Bun's server (`api.fetch(req, { server })`), absent in tests. */
@@ -122,6 +123,26 @@ export const id = (what: string) =>
  */
 export const json = <T>(check: (body: unknown) => T) =>
   validator('json', async (_value, c) => check(await c.req.json()));
+
+/** Hono's test for a JSON media type (`hono/validator`): only those bodies reach a zod validator. */
+const JSON_MEDIA = /^application\/([\w.-]+\+)?json$/i;
+const isJsonMedia = (type: string | undefined) => JSON_MEDIA.test((type ?? '').split(';')[0]?.trim() ?? '');
+
+/**
+ * JSON body validated by `schema` (`@hono/zod-validator`), with the messages of `Schema.parse(await jsonObject(req))`:
+ * a body that is not a JSON media type, or not JSON, is `Invalid JSON`; with `object`, a non-object is `JSON object
+ * expected` before any schema message; otherwise the `ZodError` (→ `Invalid data: … (path)` + `issues`).
+ */
+export const body = <S extends z.ZodType>(schema: S, o: { object?: boolean } = {}) =>
+  zValidator('json', schema, (r, c) => {
+    if (!isJsonMedia(c.req.header('content-type'))) throw new HttpError(400, 'Invalid JSON');
+    if (r.success) return;
+    if (o.object) object(r.data);
+    throw r.error;
+  });
+
+/** For `json()`: the body as sent, when the handler (or its repo) validates it after a lookup or a 409. */
+export const passthrough = (body: unknown): unknown => body;
 
 export interface RouteEntry {
   method: string;

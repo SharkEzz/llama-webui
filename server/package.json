@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@hono/zod-validator": "^0.9.1",
     "@huggingface/gguf": "^0.4.6",
     "@llama-webui/shared": "workspace:*",
     "hono": "catalog:",

@@ -1,5 +1,6 @@
+import { Hono } from 'hono';
 import { readPciTopology } from '../hardware/pci';
-import { guarded } from '../http';
+import type { Env } from '../http';
 import type { PlacementTracker } from '../monitor/placement';
 
 export interface TopologyRouteDeps {
@@ -7,10 +8,7 @@ export interface TopologyRouteDeps {
 }
 
 /** Hardware graph (re-read on every call: the current link state changes with power states) and model placement. */
-export function topologyRoutes({ placement }: TopologyRouteDeps) {
-  return {
-    '/api/topology': {
-      GET: guarded(async () => Response.json({ graph: await readPciTopology(), placement: placement.current })),
-    },
-  };
-}
+export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
+  new Hono<Env>().get('/api/topology', async (c) =>
+    c.json({ graph: await readPciTopology(), placement: placement.current }),
+  );

@@ -91,13 +91,14 @@ test('GET /api/chat/:id/stream is a 404 for a conversation that does not exist, 
 test('/api/server/props: a reply from llama-server that is not JSON is a 502 (#37)', async () => {
   using llama = Bun.serve({ port: 0, fetch: () => new Response('<html>not json</html>') });
   const state: ServerState = { kind: 'external', pid: null, port: llama.port! };
-  const routes = serverRoutes({
+  const app = serverRoutes({
     runtime: { supervisor: { state, lastCommand: null }, logs: null } as never,
     profiles: null!,
     settings: null!,
     benchBusy: () => false,
   });
-  const r = await call(routes['/api/server/props'].GET, new Request('http://127.0.0.1:7860/api/server/props'));
+  app.onError((err) => errorResponse(err));
+  const r = await app.request('/api/server/props');
   expect(r.status).toBe(502);
   expect(await r.json()).toEqual({ error: 'llama-server /props: the reply is not JSON' });
 });

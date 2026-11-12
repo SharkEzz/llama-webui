@@ -18,12 +18,7 @@ import { benchRoutes } from './routes/bench';
 import { chatRoutes } from './routes/chat';
 import { hfRoutes } from './routes/hf';
 import { modelRoutes } from './routes/models';
-import { monitorRoutes } from './routes/monitor';
-import { profileRoutes } from './routes/profiles';
-import { serverRoutes } from './routes/server';
-import { setupRoutes } from './routes/setup';
 import { sweepRoutes } from './routes/sweeps';
-import { topologyRoutes } from './routes/topology';
 import { tuningRoutes } from './routes/tuning';
 import type { WebRoutes } from './routes/web';
 import type { Runtime } from './runtime';
@@ -62,17 +57,12 @@ export interface AppDeps {
 export function appRoutes(deps: AppDeps) {
   const api = createApi(deps);
   return withMethodNotAllowed({
-    ...profileRoutes(deps),
-    ...serverRoutes({ ...deps, benchBusy: () => deps.benchRunner.busy }),
-    ...monitorRoutes({ monitor: deps.monitor, bootId: deps.runtime.bootId }),
     ...modelRoutes(deps),
     ...hfRoutes(deps),
     ...chatRoutes(deps),
     ...benchRoutes(deps),
     ...sweepRoutes(deps),
     ...tuningRoutes(deps),
-    ...topologyRoutes(deps),
-    ...setupRoutes(deps),
     '/api/*': (req: Request, server: Server<undefined>) => api.fetch(req, { server }),
     '/ws': guarded((req, server) => {
       if (server.upgrade(req)) return undefined;

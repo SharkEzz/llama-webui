@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
 import { expect, test } from 'vitest';
+import { z } from 'zod';
 import {
   allowTable,
   apiRoutes,
+  body,
   type Env,
   errorResponse,
   guardMw,
@@ -116,4 +118,35 @@ test('a static path registered after a parameter that shadows it is reported (#3
       { method: 'GET', path: '/api/a/b' },
     ]),
   ).toEqual([]);
+});
+
+test('body() validates with zod and keeps the messages of Schema.parse(await jsonObject(req))', async () => {
+  const Thing = z.strictObject({ name: z.string().min(1) });
+  const app = new Hono<Env>()
+    .post('/api/loose', body(Thing), (c) => c.json(c.req.valid('json'), 201))
+    .post('/api/object', body(Thing, { object: true }), (c) => c.json(c.req.valid('json'), 201));
+  app.onError((err) => errorResponse(err));
+  const reply = async (path: string, init: RequestInit) => {
+    const r = await app.request(path, init);
+    return [r.status, await r.json()];
+  };
+  expect(await reply('/api/object', post())).toEqual([400, { error: 'Invalid JSON' }]);
+  expect(await reply('/api/object', post('{', 'application/json'))).toEqual([400, { error: 'Invalid JSON' }]);
+  expect(await reply('/api/object', post('[1]', 'application/json'))).toEqual([400, { error: 'JSON object expected' }]);
+  const [status, loose] = await reply('/api/loose', post('[1]', 'application/json'));
+  expect([status, (loose as { error: string }).error]).toEqual([
+    400,
+    'Invalid data: Invalid input: expected object, received array',
+  ]);
+  const [, bad] = await reply('/api/object', post('{"name":""}', 'application/json; charset=utf-8'));
+  expect((bad as { error: string; issues: unknown[] }).error).toBe(
+    'Invalid data: Too small: expected string to have >=1 characters (name)',
+  );
+  expect((bad as { issues: unknown[] }).issues).toHaveLength(1);
+  expect(await reply('/api/object', post('{"name":"a"}', 'application/json'))).toEqual([201, { name: 'a' }]);
+  // A media type outside Hono's JSON list is not read (zValidator would see `{}`).
+  expect(await reply('/api/object', post('{"name":"a"}', 'application/json-seq'))).toEqual([
+    400,
+    { error: 'Invalid JSON' },
+  ]);
 });
