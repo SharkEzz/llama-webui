@@ -1,3 +1,4 @@
+import { Worker } from 'node:worker_threads';
 import type { GpuReading } from '../gpu';
 import type { GpuNeeds } from '../needs';
 import type { NvmlProc, NvmlSnapshot, NvmlSystem } from './read';
@@ -5,23 +6,36 @@ import type { NvmlProc, NvmlSnapshot, NvmlSystem } from './read';
 export interface WorkerLike {
   postMessage(m: unknown): void;
   terminate(): void;
-  unref?(): void;
   onmessage: ((e: { data: unknown }) => void) | null;
   onerror: ((e: unknown) => void) | null;
 }
 
 type WorkerMsg = { type: 'ready' } | { type: 'error'; message: string } | { type: 'sample'; snapshot: NvmlSnapshot };
 
-/** The worker, next to this module. */
-export const workerUrl = (): string => new URL('./worker.ts', import.meta.url).href;
+/**
+ * The worker, next to the module that starts it: `worker.ts` next to this file when Node runs the sources
+ * (development, tests), `nvml-worker.js` next to `main.js` in the production bundle (`vite.config.ts`).
+ */
+export const workerUrl = (moduleUrl = import.meta.url): string =>
+  new URL(moduleUrl.endsWith('.ts') ? './worker.ts' : './nvml-worker.js', moduleUrl).href;
 
+/** A `node:worker_threads` worker behind the `WorkerLike` surface (Bun's web-style `Worker`). */
 const defaultWorker = (): WorkerLike => {
-  const w = new Worker(workerUrl()) as unknown as WorkerLike;
-  w.unref?.(); // Bun-specific: never keep the TUI alive
-  return w;
+  // `node:ffi` is experimental: its warning would print on every start.
+  const w = new Worker(new URL(workerUrl()), { execArgv: ['--disable-warning=ExperimentalWarning'] });
+  w.unref(); // never keep the process alive
+  const like: WorkerLike = {
+    postMessage: (m) => w.postMessage(m),
+    terminate: () => void w.terminate(),
+    onmessage: null,
+    onerror: null,
+  };
+  w.on('message', (data: unknown) => like.onmessage?.({ data }));
+  w.on('error', (err) => like.onerror?.(err));
+  return like;
 };
 
-/** NVIDIA readings from NVML in a Worker; same surface as NvidiaMonitor (gpus/procVram/refreshApps/stop). */
+/** NVIDIA readings from NVML in a worker thread; same surface as NvidiaMonitor (gpus/procVram/refreshApps/stop). */
 export class NvmlMonitor {
   private current: GpuReading[] = [];
   private procs: NvmlProc[] = [];
@@ -48,6 +62,8 @@ export class NvmlMonitor {
     intervalMs: number;
     /** What to read; everything when absent. */
     needs?: GpuNeeds;
+    /** The NVML library to open (`LLAMA_WEBUI_NVML_LIB`); the system's `libnvidia-ml.so.1` when absent. */
+    lib?: string;
     createWorker?: () => WorkerLike;
     readyTimeoutMs?: number;
     now?: () => number;
@@ -86,7 +102,12 @@ export class NvmlMonitor {
           giveUp();
         }
       };
-      worker.postMessage({ type: 'start', intervalMs: o.intervalMs, ...(o.needs ? { needs: o.needs } : {}) });
+      worker.postMessage({
+        type: 'start',
+        intervalMs: o.intervalMs,
+        ...(o.needs ? { needs: o.needs } : {}),
+        ...(o.lib ? { lib: o.lib } : {}),
+      });
     });
   }
 

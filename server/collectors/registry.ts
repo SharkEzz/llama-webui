@@ -32,6 +32,8 @@ export interface DiskSource {
 
 /** nvidia-smi binary for the fallback (LLAMA_WEBUI_NVIDIA_SMI to test it missing). */
 const nvidiaSmiBin = () => process.env.LLAMA_WEBUI_NVIDIA_SMI || 'nvidia-smi';
+/** NVML library for the worker (LLAMA_WEBUI_NVML_LIB to test it missing); the system's when unset. */
+const nvmlLib = () => process.env.LLAMA_WEBUI_NVML_LIB || undefined;
 
 /**
  * Hardware collectors (copied from llama-tui): NVIDIA through NVML in a Worker (nvidia-smi fallback), AMD through sysfs,
@@ -55,7 +57,7 @@ export class Collectors {
   static async start(settings: CollectorSettings): Promise<Collectors> {
     const intervalMs = settings.pollIntervalMs;
     const needs = gpuNeeds(settings.hiddenGpus);
-    const nvml = settings.collectors.nvml ? await NvmlMonitor.start({ intervalMs, needs }) : null;
+    const nvml = settings.collectors.nvml ? await NvmlMonitor.start({ intervalMs, needs, lib: nvmlLib() }) : null;
     const smi = nvml ? null : new NvidiaMonitor({ intervalMs, bin: nvidiaSmiBin() });
     const amdCards = await discoverAmdCards().catch(() => [] as AmdCard[]);
     const c = new Collectors(

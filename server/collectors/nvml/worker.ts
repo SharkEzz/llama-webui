@@ -1,16 +1,22 @@
 /**
- * NVML sampling loop, run off the UI thread: PCIe throughput counters block ~50 ms per GPU.
- * Protocol: main → { type: "start", intervalMs, needs } then { type: "configure", intervalMs, needs } when
+ * NVML sampling loop, run off the main thread (`node:worker_threads`): PCIe throughput counters block ~50 ms per GPU.
+ * Protocol: main → { type: "start", intervalMs, needs, lib? } then { type: "configure", intervalMs, needs } when
  * the settings change; worker → { type: "ready" } | { type: "error", message } | { type: "sample", snapshot }.
+ *
+ * Run as is by Node in development (type stripping: its imports keep their `.ts` extension, and it imports nothing
+ * but types outside this graph), bundled to `dist/server/nvml-worker.js` in production (`vite.config.ts`).
  */
 
-import { type GpuNeeds, MEASURE_ALL } from '../needs';
-import { deviceHandles, readNvml } from './read';
-import { openNvml } from './symbols';
+import { parentPort } from 'node:worker_threads';
+import { type GpuNeeds, MEASURE_ALL } from '../needs.ts';
+import { deviceHandles, readNvml } from './read.ts';
+import { openNvml } from './symbols.ts';
 
-declare const self: Worker;
+/** `lib`: the library to open (`LLAMA_WEBUI_NVML_LIB`), else `libnvidia-ml.so.1`. */
+type Msg = { type?: string; intervalMs?: number; needs?: GpuNeeds; lib?: string };
 
-type Msg = { type?: string; intervalMs?: number; needs?: GpuNeeds };
+const port = parentPort;
+if (!port) throw new Error('the NVML worker runs in a worker thread');
 
 let intervalMs = 1000;
 let needs: GpuNeeds = MEASURE_ALL;
@@ -21,33 +27,32 @@ const apply = (msg: Msg) => {
   needs = msg.needs ?? needs;
 };
 
-self.onmessage = (e: MessageEvent) => {
-  const msg = e.data as Msg;
+port.on('message', (msg: Msg) => {
   if (msg?.type === 'configure') return apply(msg); // read by the next round of the loop
   if (msg?.type !== 'start' || started) return;
   started = true;
   apply(msg);
   let lib: ReturnType<typeof openNvml>;
-  let handles: number[];
+  let handles: bigint[];
   try {
-    lib = openNvml();
+    lib = openNvml(msg.lib);
     const rc = lib.nvmlInit_v2();
     if (rc !== 0) throw new Error(`nvmlInit_v2 returned ${rc}`);
     handles = deviceHandles(lib);
   } catch (err) {
-    postMessage({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+    port.postMessage({ type: 'error', message: err instanceof Error ? err.message : String(err) });
     return;
   }
-  postMessage({ type: 'ready' });
+  port.postMessage({ type: 'ready' });
   const loop = () => {
     const t0 = performance.now();
     try {
-      postMessage({ type: 'sample', snapshot: readNvml(lib, handles, needs) });
+      port.postMessage({ type: 'sample', snapshot: readNvml(lib, handles, needs) });
     } catch (err) {
-      postMessage({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+      port.postMessage({ type: 'error', message: err instanceof Error ? err.message : String(err) });
       return;
     }
     setTimeout(loop, Math.max(0, intervalMs - (performance.now() - t0)));
   };
   loop();
-};
+});
