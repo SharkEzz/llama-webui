@@ -128,7 +128,8 @@ refuses a request by throwing `HttpError(status, message, code?)` or `notFound(w
 route file exports are what the generated `app/server/api.gen.ts` types the client with.
 
 Whatever a handler throws reaches the error handler `app/server/error.ts` (`defineErrorHandler()`), which answers
-`errorResponse(error.cause ?? error)`: h3 wraps the original error in `cause`. `errorResponse()`
+`appError(error)`: the original error when it comes wrapped (its `cause` is an `Error`), never the details object h3
+keeps in the `cause` of its own `HTTPError` (a missing asset stays a `404`). `errorResponse()`
 (`app/server/lib/http.ts`) turns an exception into a JSON response: an `HttpError` keeps its status and returns
 `{ error, code? }`, a `ZodError` becomes a `400` with the zod `issues`, invalid JSON a `400`, an error of h3's own
 below `500` keeps its status and message, and anything else is a `500` with `Internal error`. The
@@ -296,7 +297,10 @@ process dies without running any handler, `setpriv --pdeathsig KILL` makes the k
 `llama-bench` with it. On the next start, the orphan cleanup of the [startup sequence](#startup-sequence) settles
 whatever was left `streaming` or `running`.
 
-A second instance started on a port already taken exits with code 1 and a message that names the port.
+A second instance started on a port already taken exits with code 1 and a message that names the port. The launcher
+checks the address before it imports the server: the runtime starts alongside the listen, and its startup would
+otherwise mark the first instance's streaming reply `stopped` or resume its download, when both share a data
+directory.
 
 ## Development restarts
 

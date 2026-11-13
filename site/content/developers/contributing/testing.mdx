@@ -129,21 +129,25 @@ never sets (srvx installs no signal handler under the first two), waits for `/ap
 
 - `app/server/lifecycle.test.ts`: a `SIGTERM` with the UI's WebSocket open and a chat reply streaming stops the
   process in under 2 seconds, `llama-server` included; a second instance on a taken port exits with code 1 and names
-  the port; pages are revalidated (`cache-control: no-cache`), hashed assets are immutable, and the API sets no cache
+  the port, and leaves alone the streaming reply of a first instance on the same data directory; a missing asset is a
+  `404`, not a `500`; pages are revalidated (`cache-control: no-cache`), hashed assets are immutable, and the API sets no cache
   header.
 - `app/server/build.test.ts` reads the build of the `globalSetup`: the client is split per page, three.js is only in
   the Topology chunks, no client chunk imports a `node:` module, a deep URL finds every file its page references,
   the server imports nothing but Node built-ins (the build is self-contained), `THIRD-PARTY-LICENSES.md` ships next
-  to it, and `nvml-worker.mjs` sits next to the server entry and starts from the bundle.
+  to it, and `nvml-worker.mjs` sits next to the module that names it (where `workerUrl()` looks) and starts from the
+  bundle.
 - `app/server/api.gen.test.ts`: the route map of `app/server/api.gen.ts` is Nitro's own scan (70 routes), the
   `Body` and `Query` types of each file are read, and in development a route file added or deleted updates the map.
 - `app/server/lib/collectors/nvml/monitor.test.ts` starts the real NVML sampler: with a missing library it resolves `null` at
   once (the `nvidia-smi` fallback); on a machine with an NVIDIA driver (`/proc/driver/nvidia/version`; skipped in
   CI) it reads every card; and a sampler stuck in a native call (libc's `sleep()` through `node:ffi`) does not hold
   the exit of the process that stops it.
-- `app/server/dev.test.ts` starts `vite dev` in `app/` on a free port: saving a route file keeps `llama-server` and
-  the `bootId`, saving business code rebuilds the runtime and stops the old `llama-server`, one `SIGINT` (and a quick
-  double one) stops `vite dev` and `llama-server`, and `.env.local` is read in development.
+- `app/server/dev.test.ts` starts `vite dev` on a free port, in a copy of `app/` under the repository's `.cache/`
+  (ignored by git; its own Nitro and Vite caches, `node_modules` linked entry by entry), so the checkout's files and
+  a `pnpm dev` you run meanwhile are left alone: saving a route file keeps `llama-server` and the `bootId`, saving
+  business code rebuilds the runtime and stops the old `llama-server`, one `SIGINT` (and a quick double one) stops
+  `vite dev` and `llama-server`, `.env.local` is read in development, and `.env` wins over it.
 
 ### Tests of llamacpp-js
 

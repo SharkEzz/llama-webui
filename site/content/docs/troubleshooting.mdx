@@ -297,7 +297,7 @@ status stays **Disconnected**, and the API answers `Host not allowed`.
 
 ### llama-webui does not start
 
-**What you see:** `llama-webui` (or `pnpm start` from a clone) stops with `Error: listen EADDRINUSE: address already in use 127.0.0.1:7860`.
+**What you see:** `llama-webui` (or `pnpm start` from a clone) stops with `llama-webui: cannot listen on 127.0.0.1:7860: the port is already in use`.
 
 **Cause:** another program, often a second llama-webui, already listens on that port.
 
