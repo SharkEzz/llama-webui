@@ -85,10 +85,10 @@ export function ArchitectureDiagram() {
 
       <Tier title="llama-webui: one Node.js process, port 7860" accent>
         <div className={cn(BOX, 'mb-2')}>
-          <p className="font-medium">node:http server</p>
+          <p className="font-medium">Nitro server (srvx)</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            UI (Vite middlewares in dev, the vite build output in production), API routes in one Hono app through
-            @hono/node-server (guard, 405 table), WebSocket hub on ws.
+            UI (Vite in dev, the built assets and index.html in production), API file routes behind the guard and 405
+            middlewares, WebSocket hub on crossws.
           </p>
         </div>
         <Boxes nodes={MODULES} className="grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-4" />
@@ -107,8 +107,9 @@ export function ArchitectureDiagram() {
       </Tier>
 
       <figcaption className="mt-4 px-1 text-xs text-muted-foreground">
-        The supervisor, the monitor, the logs and the bench gate live as long as the process: saving a server file under{' '}
-        <code className="font-mono whitespace-nowrap">pnpm dev</code> restarts it, and llama-server with it.
+        The supervisor, the monitor, the logs and the bench gate live as long as the runtime: under{' '}
+        <code className="font-mono whitespace-nowrap">pnpm dev</code>, saving a route keeps it, saving business code
+        rebuilds it, and llama-server with it.
       </figcaption>
     </figure>
   );

@@ -15,14 +15,16 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'server',
-          include: ['server/**/*.test.ts', 'scripts/**/*.test.ts'],
+          include: ['app/server/**/*.test.ts', 'app/build/**/*.test.ts', 'scripts/**/*.test.ts'],
+          // One production build per run, for the suites that start it (contract, lifecycle, build output).
+          globalSetup: ['app/server/lib/testing/build.ts'],
         },
       },
       { extends: true, test: { name: 'shared', include: ['packages/webui-shared/src/**/*.test.ts'] } },
       {
         extends: true,
-        resolve: { alias: { '@': dir('./web/src') } },
-        test: { name: 'web', include: ['web/src/**/*.test.ts'] },
+        resolve: { alias: { '@': dir('./app/src') } },
+        test: { name: 'web', include: ['app/src/**/*.test.ts'] },
       },
       {
         extends: true,

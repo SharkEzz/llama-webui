@@ -5,16 +5,19 @@ description: The threat model of an unauthenticated local API, the request guard
 
 llama-webui has no authentication: whoever can send it a request can do anything the interface can, including run a
 program of their choice (the **Binary** setting). Its protection is where it listens, plus one request guard that keeps
-other websites in the browser away from the API. The guard is `guard()` in `server/security.ts`, applied by
-the `guardMw` middleware of the Hono API (`server/http.ts`, mounted in `server/api.ts`).
+other websites in the browser away from the API. The guard is `guard()` in `app/server/lib/security.ts`, applied by
+the Nitro middleware `app/server/middleware/01.guard.ts` to every API request and by the WebSocket route
+`app/server/routes/ws.ts` to every upgrade.
 
-| File                       | Role                                                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------ |
-| `server/security.ts`       | `guard(req)`: the `Host`, `Origin` and content-type checks.                          |
-| `server/http.ts`           | `guardMw`, `HttpError`, `errorResponse()`, `notFound()`, the `id()`, `body()` and `json()` validators. |
-| `server/security.test.ts`  | Tests of each rule of the guard.                                                     |
-| `server/cli.ts`            | `--host` (default `127.0.0.1`) and `--port` (default `7860`).                          |
-| `server/hf/paths.ts`       | `repoDir()` and `fileDest()`: download paths kept inside the models folder.           |
+| File                                 | Role                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| `app/server/lib/security.ts`         | `guard(req)`: the `Host`, `Origin` and content-type checks.                          |
+| `app/server/middleware/01.guard.ts`  | Runs `guard()` on `/api/*` and `/ws`, then the 405 table and the `404` of an unknown API route. |
+| `app/server/lib/http.ts`             | `HttpError`, `errorResponse()`, `notFound()`, `allowTable()`, the `idParam()`, `readBody()` and `readJson()` validators. |
+| `app/server/error.ts`                | Nitro's error handler: every thrown error answers with `errorResponse()`.            |
+| `app/server/lib/security.test.ts`    | Tests of each rule of the guard.                                                     |
+| `app/server/lib/cli.ts`              | `--host` (default `127.0.0.1`) and `--port` (default `7860`).                        |
+| `app/server/lib/hf/paths.ts`         | `repoDir()` and `fileDest()`: download paths kept inside the models folder.          |
 
 The user-facing version of this page is [Security](/docs/security/).
 
@@ -39,7 +42,7 @@ llama-webui sends no CORS headers (`Access-Control-*`), so the browser never let
 
 ## The guard
 
-```ts title="server/security.ts"
+```ts title="app/server/lib/security.ts"
 /** Safe hostname: localhost or a literal IP address. A domain name can be rebound to 127.0.0.1. */
 function trustedHostname(hostname: string): boolean {
   const h = hostname.replace(/^\[|\]$/g, '').toLowerCase();
@@ -52,7 +55,7 @@ order, and the first that fails answers:
 
 | Rule                                                                                                                | Response                                                                     |
 | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| The request URL and the `Host` header (or the URL's host when there is none) parse as `http://<host>`; over HTTP the adapter refuses such a request first (`400`, no body, which `server/host.ts` does not rewrite), so this rule only answers a caller of `guard()` itself | `400` `{"error":"Invalid host"}` |
+| The request URL and the `Host` header (or the URL's host when there is none) parse as `http://<host>` (`Host: a b` does not) | `400` `{"error":"Invalid host"}` |
 | Its hostname is `localhost`, ends with `.localhost`, or is an IPv4 or IPv6 literal (brackets removed, any case)     | `403` `{"error":"Host not allowed"}`                                         |
 | When an `Origin` header is present, it equals `` `${url.protocol}//${host}` `` exactly                              | `403` `{"error":"Origin not allowed"}`                                       |
 | For `POST`, `PUT`, `PATCH` and `DELETE`: a `Content-Type`, when present, matches `/^application\/json\b/i`, and a request with a body has one | `415` `{"error":"JSON body expected (content-type: application/json)"}` |
@@ -70,37 +73,35 @@ What follows from these rules:
   this setup is not supported; trusting it would need an explicit setting naming the proxy.
 - `application/json; charset=utf-8` passes the content-type rule. A write without a body and without a
   `Content-Type` (for example `POST /api/server/stop`) passes too; with a body, it must be JSON. The guard detects a
-  body from the headers, a `Content-Length` above 0 or a `Transfer-Encoding`, not from the body stream: Node's
-  adapter (`@hono/node-server`) gives every write a body stream, even an empty one. A cross-site
-  `fetch()` that sends `application/json` triggers a CORS preflight, which gets no CORS headers back.
+  body from the headers, a `Content-Length` above 0 or a `Transfer-Encoding`, not from the body stream, which it
+  never reads. A cross-site `fetch()` that sends `application/json` triggers a CORS preflight, which gets no CORS
+  headers back.
 
 ## Where it applies
 
-The Hono API (`createApi()`, `server/api.ts`) runs `guardMw` on every request, before the 405 table and the routes:
+Nitro runs the files of `app/server/middleware/` in the order of their names, before any route. `00.ready.ts` makes
+the API and `/ws` wait for startup (`503` `llama-webui is starting` when the runtime cannot answer), then
+`01.guard.ts` runs the guard on every API request, before the 405 table and the routes:
 
-```ts title="server/http.ts"
-export const guardMw: MiddlewareHandler = async (c, next) => {
-  const refused = guard(c.req.raw);
-  if (refused) return refused;
-  await next();
-};
+```ts title="app/server/middleware/01.guard.ts"
+if (path !== '/api' && !path.startsWith('/api/')) return;
+return guard(event.req) ?? allow(event.req.method, path);
 ```
 
-Whatever a validator or a handler throws afterwards reaches the API's `onError`, which answers with
-`errorResponse()`.
+Whatever a validator or a handler throws afterwards reaches Nitro's error handler (`app/server/error.ts`), which
+answers with `errorResponse()` (h3 wraps the thrown error, the handler passes its `cause`).
 
-- Every `/api/*` request goes through it, routes and the `404` `{"error":"Unknown route"}` alike: it is mounted with
-  `.use()` ahead of every domain file, so a new route is guarded without doing anything.
-- The WebSocket endpoint is guarded too: `mount()` (`server/host.ts`) runs `guard()` on a `/ws` upgrade request
-  before handing it to `upgradeWebSocket()`, so another site cannot open the socket (browsers always send `Origin` on a WebSocket
-  handshake). A request to `/ws` that is not an upgrade gets `426` `WebSocket upgrade expected`. An upgrade the
-  guard refuses is not treated as one: the server's `shouldUpgradeCallback` runs the guard first, so the refusal is
-  an ordinary response (Node writes it and handles a client that resets the connection), sent with
-  `Connection: close` so the server closes the socket even when the client keeps its side open. An accepted client
-  can send messages of 4,096 bytes at most.
-- The web interface itself (the HTML page, its bundles and the SPA fallback, `server/routes/web.ts`) is not guarded:
-  it is static and holds no data. That is why a page opened through a host name loads, then has all its API calls
-  refused with `Host not allowed`.
+- Every `/api/*` request goes through it, routes and the `404` `{"error":"Unknown route"}` alike: the middleware is
+  not tied to a route file, so a new route is guarded without doing anything.
+- The WebSocket endpoint is guarded too: the `upgrade` hook of `app/server/routes/ws.ts` runs `guard()` on a `/ws`
+  upgrade request, so another site cannot open the socket (browsers always send `Origin` on a WebSocket handshake).
+  A refusal is thrown as the guard's response, with `Connection: close` so the server closes the socket even when
+  the client keeps its side open. A request to `/ws` that is not an upgrade goes through the guard in
+  `01.guard.ts`, then gets `426` `WebSocket upgrade expected`. An accepted client can send messages of 4,096 bytes
+  at most: a larger one closes the connection with code `1009`.
+- The web interface itself (the HTML page, its hashed assets and the SPA fallback that Nitro's renderer answers for
+  every other path) is not guarded: it is static and holds no data. That is why a page opened through a host name
+  loads, then has all its API calls refused with `Host not allowed`.
 
 ## Errors and `HttpError`
 
@@ -111,18 +112,22 @@ Every error an `/api` route returns is a JSON object with an `error` string, and
 | `new HttpError(status, message)`       | `status`        | `{ "error": message }`                                           |
 | `new HttpError(status, message, code)` | `status`        | `{ "error": message, "code": code }`                             |
 | A `ZodError`                           | `400`           | `{ "error": "Invalid data: <first issue> (<path>)", "issues": [...] }`, the path only when the issue has one |
-| A `SyntaxError`, or Hono's `Malformed JSON in request body` (body is not JSON) | `400` | `{ "error": "Invalid JSON" }` |
+| A `SyntaxError` (an empty or malformed body read by `readJson()`) | `400` | `{ "error": "Invalid JSON" }` |
+| An h3 `HTTPError` below `500`          | its status      | `{ "error": message }`                                           |
 | Anything else                          | `500`           | `{ "error": "Internal error" }`, and the error is logged         |
 
-The helpers in `server/http.ts` build the common cases: `notFound(what)` is a `404` `<what> not found`, the `id()`
-validator a `404` for an `:id` that is not a positive integer, and `object(body)` (used by `body(Schema, { object:
-true })` and `json(object)`) a `400` `JSON object expected` for a body that is not a JSON object. `code` is the machine-readable reason (`server-running`, `name-taken`, `hf-gated`…): the
+The helpers in `app/server/lib/http.ts` build the common cases: `notFound(what)` is a `404` `<what> not found`,
+`idParam()` a `404` for an `:id` that is not a positive integer, `readBody()` a `400` `Invalid JSON` for a body that
+is not JSON, and `object(body)` (used by `readBody()` before the schema's message and by `readJson(event, object)`) a
+`400` `JSON object expected` for a body that is not a JSON object. `code` is the machine-readable reason (`server-running`, `name-taken`, `hf-gated`…): the
 web app reads it instead of the message text. [API overview](/developers/api/overview/) lists the conventions for
 clients.
 
 ## What `--host` changes
 
-`server/index.ts` passes `--host` (or `LLAMA_WEBUI_HOST`, default `DEFAULT_HOST = '127.0.0.1'`) as the `hostname` the HTTP server listens on.
+The launcher (`app/bin/llama-webui.ts`) passes `--host` (or `LLAMA_WEBUI_HOST`, default `DEFAULT_HOST = '127.0.0.1'`) to
+Nitro's server as `NITRO_HOST`, the address it listens on; `pnpm dev` gives `LLAMA_WEBUI_HOST` to Vite's
+`server.host` (`app/vite.config.ts`).
 That decides who can connect, and nothing else: the guard applies the same rules on every address, and no
 authentication appears. With a non-loopback address, `GET /api/setup` reports `listen.exposed: true` (from
 `isLoopback()`, `packages/webui-shared/src/setup.ts`), and the setup checklist shows a network access reminder.
@@ -134,7 +139,7 @@ profile, else from the `host` and `port` settings, whose defaults are `127.0.0.1
 (`packages/webui-shared/src/settings.ts`): `llama-server` stays local, like llama-webui, unless a user opens it. `GET /api/setup`
 reports `llamaListen: { host, exposed }` for the `host` setting, and the setup checklist, the Settings field and the
 Server page's command card warn when it is not loopback. The benchmark's temporary `llama-server` always gets
-`host: '127.0.0.1'` (`server/bench/execute.ts`). llama-webui talks to `llama-server` on the address it listens on
+`host: '127.0.0.1'` (`app/server/lib/bench/execute.ts`). llama-webui talks to `llama-server` on the address it listens on
 (`probeUrl()`: loopback for a wildcard address).
 
 [How llama-server is exposed](/docs/security/#how-llama-server-is-exposed) gives users the settings to change.
@@ -142,7 +147,7 @@ Server page's command card warn when it is not loopback. The benchmark's tempora
 ## Processes and arguments
 
 Every process llama-webui starts (`llama-server`, `llama-bench`, `nvidia-smi`, `perf`…) goes through `spawnProc`
-(`server/proc.ts`, `node:child_process` without `shell`) with an argument array, never through a shell. A profile
+(`app/server/lib/proc.ts`, `node:child_process` without `shell`) with an argument array, never through a shell. A profile
 argument such as `$(whoami)` reaches `llama-server` as a literal string. `shellQuote()` only builds the displayed command.
 
 That does not make the API safe to expose: the `binary` setting can name any program, and profiles set its arguments
@@ -171,7 +176,7 @@ The API reads files where the user points it, by design: there is no allowlist o
 
 ## Tests
 
-`server/security.test.ts` calls `guard()` on plain `Request` objects:
+`app/server/lib/security.test.ts` calls `guard()` on plain `Request` objects:
 
 - `127.0.0.1`, `localhost`, a LAN IP and `[::1]` are accepted as `Host`, and `evil.example` gets `403`;
 - an `Origin` from another site gets `403`, the same origin passes, and `http://localhost:7860` is refused for a
@@ -179,5 +184,5 @@ The API reads files where the user points it, by design: there is no allowlist o
 - a `PATCH` with `text/plain` and a `POST` with a body and no `Content-Type` get `415`;
   `application/json; charset=utf-8` passes, and so does a `POST` without a body.
 
-`server/hf/hf.test.ts` checks that `repoDir()` and `fileDest()` refuse `..`, absolute and empty paths, and
+`app/server/lib/hf/hf.test.ts` checks that `repoDir()` and `fileDest()` refuse `..`, absolute and empty paths, and
 `packages/webui-shared/src/profile.test.ts` that an import with a reserved flag is rejected.

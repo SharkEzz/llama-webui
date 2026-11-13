@@ -1,0 +1,85 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "root": true,
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/testdata",
+      "!**/data",
+      "!**/dist",
+      "!**/out",
+      "!**/.claude",
+      "!**/.agents",
+      "!site/build",
+      "!site/dist",
+      "!site/.react-router",
+      "!app/server/lib/contract/golden.json",
+      "!app/server/api.gen.ts",
+      "!**/.output",
+      // Disable Biome for shadcn components in order to keep their default code style
+      "!**/src/components/ui"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "linter": {
+    "enabled": true,
+    "domains": {
+      "tailwind": "recommended",
+      "test": "recommended",
+      "project": "recommended",
+      "types": "recommended"
+    },
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noNonNullAssertion": "off"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "quoteProperties": "asNeeded"
+    },
+    "resolver": {
+      "experimentalPnpmCatalogs": true
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on",
+        "useSortedPackageJson": "on"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["app/src/**", "site/**"],
+      "linter": {
+        "domains": {
+          "react": "recommended"
+        }
+      }
+    }
+  ]
+}

@@ -1,21 +1,23 @@
 ---
 title: Web app
-description: How the React app in web/src is organized, how its zustand stores are fed by REST and the WebSocket, and its conventions for errors, numbers and theming.
+description: How the React app in app/src is organized, how its zustand stores are fed by REST and the WebSocket, and its conventions for errors, numbers and theming.
 ---
 
-The web app is a React 19 single-page app in `web/`, served by the Node.js process (see
-[Serving the UI](/developers/architecture/#serving-the-ui)): Vite's middlewares with HMR in development, the output of
-`vite build` (`dist/web`) in production. Its entry is `web/index.html`, which loads
-`web/src/main.tsx`. It imports types, schemas and pure functions from `@llama-webui/shared` and never talks to
+The web app is a React 19 single-page app in `app/src/`, served by the same Nitro server as the API (see
+[Serving the UI](/developers/architecture/#serving-the-ui)): Vite with HMR in development, the output of `vite build`
+(`app/.output/public/`, `index.html` embedded in the server) in production. Its entry is `app/index.html`, which loads
+`app/src/main.tsx`. It imports types, schemas and pure functions from `@llama-webui/shared` and never talks to
 `llama-server` directly: everything goes through the llama-webui API.
 
 ## Structure
 
 <FileTree>
-- `web/`
+- `app/`
   - `index.html` HTML entry; an inline script applies the theme before the first paint
   - `components.json` shadcn configuration (`base-nova` style)
-  - `tsconfig.json` the app and its tests: DOM and Node types, the `@/*` → `src/*` alias
+  - `tsconfig.json` the client and its tests (`src/`, plus `build/` and `vite.config.ts`): DOM and Node types, the `@/*` → `src/*` alias
+  - `vite.config.ts` the client and the Nitro server, one config ([Architecture](/developers/architecture/#serving-the-ui))
+  - `server/` the server, Nitro's `serverDir`: route files, middlewares, and the business code in `lib/`
   - `src/`
     - `main.tsx` starts the store syncs and the WebSocket, renders the router
     - `index.css` Tailwind, theme tokens for light and dark, Shiki colors
@@ -43,7 +45,7 @@ logic) or `components/` (UI). Pure logic that the server also needs goes to the
 
 ### Generated shadcn components
 
-`web/src/components/ui/` holds the shadcn components, built on Base UI (`@base-ui/react`), with `cmdk` for the command
+`app/src/components/ui/` holds the shadcn components, built on Base UI (`@base-ui/react`), with `cmdk` for the command
 menu and `sonner` for toasts. They stay as shadcn generates them, so a later shadcn update can be compared file by
 file, and Biome ignores the folder (no format, no lint, no import sorting). To change a component's behavior, wrap it
 outside `ui/`: `components/Select.tsx` re-exports the shadcn select with the project's tweaks (it opens below its
@@ -53,7 +55,7 @@ trigger, at least as wide as it), and `GlassCard` puts the glass look on the sha
 
 `main.tsx` starts the syncs of the stores every page needs, opens the WebSocket, then renders the router:
 
-```tsx title="web/src/main.tsx"
+```tsx title="app/src/main.tsx"
 startThemeSync();
 startServerSync();
 startMonitorSync();
@@ -68,10 +70,10 @@ The benchmark and tuning stores start their own sync the first time their page m
 
 ## Routing
 
-`app/router.tsx` creates a React Router data router (`createBrowserRouter`) with one layout route, `AppLayout`, and
+`app/src/app/router.tsx` creates a React Router data router (`createBrowserRouter`) with one layout route, `AppLayout`, and
 one child per page. Each child is loaded on its first visit:
 
-```tsx title="web/src/app/router.tsx"
+```tsx title="app/src/app/router.tsx"
 const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) => ({
   lazy: { Component: async () => (await load())[name] },
 });
@@ -91,7 +93,7 @@ The sidebar lists `ROUTES` in order and draws a thin line between two groups of 
 `routes.ts`: `overview`, `run`, `monitor`, `tune`); **Settings** (group `settings`) is pinned at the bottom with the
 **Collapse** button. The line is centered under the icons, so it looks the same collapsed and expanded.
 
-The sidebar collapses to its icons. `web/src/app/sidebarPrefs.ts` holds the choice in a zustand store, saved in the
+The sidebar collapses to its icons. `app/src/app/sidebarPrefs.ts` holds the choice in a zustand store, saved in the
 browser's `localStorage` under `llama-webui:sidebar` (`collapsed` or `expanded`), and `useSidebarLayout()` gives what
 the layout shows: below Tailwind's `md` width the sidebar is collapsed whatever the choice, and its **Collapse**
 button is not rendered. `AppLayout` only changes the width of the sidebar's grid column, with a transition. The rows
@@ -101,14 +103,14 @@ of a row while the sidebar is collapsed.
 
 ## State: zustand stores
 
-Each domain has a module in `web/src/lib/` with a zustand store, its REST calls and, for live data, a `start…Sync()`
+Each domain has a module in `app/src/lib/` with a zustand store, its REST calls and, for live data, a `start…Sync()`
 function. A sync function runs once and does two things:
 
 - it subscribes to the WebSocket messages of its domain with `onWs(type, fn)`;
 - it subscribes to `useWs` and reads the current state over REST every time the status becomes `open`, which covers
   the first connection and every reconnection.
 
-```ts title="web/src/lib/server.ts"
+```ts title="app/src/lib/server.ts"
 export function startServerSync() {
   if (started) return;
   started = true;
@@ -158,7 +160,7 @@ another conversation aborts the fetch, which only unsubscribes: the generation g
 
 ## WebSocket client
 
-`web/src/lib/ws.ts` holds the app's single WebSocket, opened by `connect()` (once) on `ws://` or `wss://` +
+`app/src/lib/ws.ts` holds the app's single WebSocket, opened by `connect()` (once) on `ws://` or `wss://` +
 `location.host` + `/ws`.
 
 - **Reconnection.** After a close, it retries after `BACKOFF_START_MS = 500` ms, doubling the delay after each failed
@@ -174,9 +176,9 @@ another conversation aborts the fetch, which only unsubscribes: the generation g
 
 ### Resynchronizing with bootId
 
-The server sends `hello` with its `bootId` first on every connection. The `bootId` identifies the llama-webui process
-and changes when it restarts (in development, on every save under `server/` or `packages/`), so it tells a
-reconnection apart from a restart:
+The server sends `hello` with its `bootId` first on every connection. The `bootId` identifies the llama-webui runtime
+and changes when it restarts (in development, when a save of business code under `app/server/lib/` or `packages/`
+rebuilds it), so it tells a reconnection apart from a restart:
 
 - `useLogs` ties its lines to the boot (`LogView.bootId`). Log line numbers restart from 0 on every boot, so on a new
   `bootId`, `onBoot()` drops the old lines and the "clear view" marker. The replay on connection asks for
@@ -186,24 +188,24 @@ reconnection apart from a restart:
 
 ## API client and errors
 
-Every API call goes through `client`, Hono's typed client (`hc<AppType>('/').api`, `web/src/lib/api.ts`), whose
-paths, inputs and replies come from the server's routes (see [Typed client](/developers/api/overview/#typed-client)).
-`call()` sends the request and returns the reply's body with the type the route declares:
+Every API call goes through `api()` (`app/src/lib/api.ts`), which takes the route as `'METHOD /api/path'` and returns
+the reply's body with the type the route declares (see [Typed client](/developers/api/overview/#typed-client)):
 
-```ts title="web/src/lib/models.ts"
-export const modelUsage = (path: string) => call(client.models.usage.$get({ query: { path } }));
+```ts title="app/src/lib/models.ts"
+export const modelUsage = (path: string) => api('GET /api/models/usage', { query: { path } });
 ```
 
-`param` takes the route's `:id` as a string (`byId(id)`), `query` the declared keys, `json` the body: the client
-sets `content-type: application/json`, which the server's guard requires on a write with a body, and sends no body
-at all when there is no `json`. Options such as a `signal` go in `{ init: { signal } }`. A route that answers raw
-JSON, like `/api/server/props`, is typed `unknown` and narrowed with guards (`web/src/lib/props.ts`), never with a
-cast.
+The routes, their replies and their inputs come from `Api`, the type map of the generated `app/server/api.gen.ts`, so
+a misspelled route or a missing option does not compile. `params` fills the route's `:id` (a number), `query` takes
+the keys the route file declares, `body` the JSON body: the client sets `content-type: application/json`, which the
+server's guard requires on a write with a body, and sends no body at all when there is no `body`. `signal` aborts the
+request. A route that answers raw JSON, like `/api/server/props`, is typed `unknown` and narrowed with guards
+(`app/src/lib/props.ts`), never with a cast. No code of the web app calls `fetch('/api…')` by hand.
 
-`call()` reads the body as text, parses it when it is JSON (an empty body is `undefined`, as for a `204`) and throws
+`api()` reads the body as text, parses it when it is JSON (an empty body is `undefined`, as for a `204`) and throws
 an `ApiError` for any status outside 2xx, built by `apiError(status, body)`. The chat's SSE requests,
-`openStream()` in `web/src/lib/chat.ts`, go through `client` too and build their errors the same way; the stream
-itself is read by `readSse()`:
+`openStream()` in `app/src/lib/chat.ts`, go through `request()`, the same client returning the raw `Response`, and
+build their errors with `apiError()` too; the stream itself is read by `readSse()`:
 
 | Field | Content |
 | --- | --- |
@@ -212,12 +214,12 @@ itself is read by `readSse()`:
 | `issues` | The zod issues of a `400` (`path` and `message`), used to show errors next to their field. |
 | `code` | The body's machine-readable `code`, or `null`. |
 
-The `code` comes from the server's `HttpError(status, message, code)` (`server/http.ts`). The rule is that the web app
+The `code` comes from the server's `HttpError(status, message, code)` (`app/server/lib/http.ts`). The rule is that the web app
 never compares the text of a server message: it branches on `status`, `code` or a shared helper. For example, when a
 benchmark would stop the running server, the server answers `409` with `code: "server-running"` and the client asks for
 confirmation:
 
-```ts title="web/src/lib/bench.ts"
+```ts title="app/src/lib/bench.ts"
 if (e instanceof ApiError && e.code === 'server-running') return 'confirm';
 ```
 
@@ -235,7 +237,7 @@ fields, and other errors become toasts.
 
 ## Formatting numbers and dates
 
-Every number, date and unit shown in the UI goes through `web/src/lib/format.ts`: no component formats with a locale of
+Every number, date and unit shown in the UI goes through `app/src/lib/format.ts`: no component formats with a locale of
 its own.
 
 | Export | Output |
@@ -261,14 +263,14 @@ The formatters return "—" for `null`, `undefined` or a non-finite number. The 
 
 The theme is `system`, `light` or `dark`, stored in two places:
 
-- In the browser, under the `localStorage` key `llama-webui:theme`. The inline script of `web/index.html` reads it
+- In the browser, under the `localStorage` key `llama-webui:theme`. The inline script of `app/index.html` reads it
   before React loads and sets the `dark` class and `color-scheme` on `<html>`, so the page never flashes the wrong
   theme.
 - In the database, as the `theme` setting. `useTheme().setMode()` applies the mode, stores it locally and sends
   `PATCH /api/settings`. At startup, `startThemeSync()` reads the settings and the database wins, so a choice made in
   another browser applies here too. In `system` mode it follows `prefers-color-scheme` changes.
 
-The colors are CSS variables in `web/src/index.css`: `:root` for light, `.dark` for dark, exposed to Tailwind through
+The colors are CSS variables in `app/src/index.css`: `:root` for light, `.dark` for dark, exposed to Tailwind through
 `@theme inline`. Components only use these semantic classes, never raw colors. The four tones of the glass components
 and the charts are `blue`, `teal`, `amber` and `rose` (`components/glass/tones.ts`).
 
@@ -307,7 +309,7 @@ Colors are mixed by Three in linear space, where a little of a bright tone goes 
 ## Code highlighting
 
 Chat replies render as Markdown with react-markdown and remark-gfm (`features/chat/Markdown.tsx`); raw HTML in a reply
-is shown as text. Code blocks go through `highlight()` in `web/src/lib/highlight.ts`:
+is shown as text. Code blocks go through `highlight()` in `app/src/lib/highlight.ts`:
 
 - The Shiki highlighter is created on first use with `createHighlighterCore` and the JavaScript regex engine, with only
   the grammars it needs (TypeScript, TSX, JavaScript, JSX, JSON, Bash, Python, Rust, Go, C, C++, HTML, CSS, SQL, YAML,

@@ -12,10 +12,9 @@ const ROOT = resolve(import.meta.dirname, '..');
 /** Every package.json carrying the version, relative to the root. */
 export const PACKAGE_FILES = [
   'package.json',
-  'server/package.json',
+  'app/package.json',
   'packages/webui-shared/package.json',
   'packages/llamacpp-js/package.json',
-  'web/package.json',
   'site/package.json',
 ];
 

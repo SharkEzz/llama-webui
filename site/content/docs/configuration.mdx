@@ -8,8 +8,8 @@ its database. Everything else is changed from the [Settings](/docs/settings/) pa
 
 ## Flags and environment variables
 
-Each flag has an environment variable. Pass flags after `llama-webui`, or after `pnpm start` (or `pnpm dev`) from a
-clone:
+Each flag has an environment variable. Pass flags after `llama-webui`, or after `pnpm start` from a clone; `pnpm dev`
+takes no flags and reads the environment variables only:
 
 | Flag                | Environment variable       | Default                                                         | Effect                                                                                    |
 | ------------------- | -------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -27,8 +27,12 @@ LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 llama-webui
 pnpm start --host 0.0.0.0 --port 8080
 ```
 
-Both `--port 8080` and `--port=8080` work. Once listening, llama-webui prints the address to open, followed by its
-version, for example `llama-webui on http://127.0.0.1:7860 (v0.2.1)`.
+Both `--port 8080` and `--port=8080` work. Once started, llama-webui prints its version, then the address to open:
+
+```text
+[llama-webui] ready (v0.3.1)
+➜ Listening on: http://127.0.0.1:7860/
+```
 
 <Callout type="warning" title="Before using --host 0.0.0.0">
 
@@ -45,7 +49,10 @@ For each option, llama-webui takes the first value it finds:
 2. the environment variable (an empty variable counts as unset);
 3. the default.
 
-A `.env` file in the folder llama-webui starts from (the current folder, or the clone with `pnpm start` or `pnpm dev`)
+The address and port are only read from these: a `PORT` or `HOST` variable in the environment, which some tools set,
+never changes where llama-webui listens.
+
+A `.env` file in the folder llama-webui starts from (the current folder, or the root of the clone with `pnpm start`)
 is loaded at startup:
 its variables fill what the environment does not set. With `--env-override`, or `LLAMA_WEBUI_ENV_OVERRIDE=1` (or
 `true`) set in the environment or in the `.env` itself, they also replace the variables the environment already sets.
@@ -53,6 +60,15 @@ A command-line option still wins over both.
 
 Only `.env` is read: a `.env.local` or a per-mode file such as `.env.production` is not. Values are taken as written,
 so a `$VAR` reference is not expanded.
+
+<Callout type="note" title="Development reads more files">
+
+`pnpm dev` runs in the `app/` folder of the clone and reads the files there: `.env`, then `.env.local`,
+`.env.development` and `.env.development.local`. They fill what the environment does not set; a variable already set
+in the environment, or in `.env`, is not replaced by the others. `pnpm start` and an installed `llama-webui` read
+`.env` only.
+
+</Callout>
 
 ### Invalid options
 
@@ -72,8 +88,9 @@ llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Nod
 
 Usage:
   llama-webui [options]   installed package (npm install -g llama-webui-<version>.tgz)
-  pnpm dev [options]      development (Vite HMR, restarts on server edits), from the repository
-  pnpm start [options]    production (builds, then runs dist/server/main.js), from the repository
+  pnpm start [options]    production (builds, then runs app/.output/llama-webui.mjs), from the repository
+  pnpm dev                development (vite dev), from the repository: no options, the LLAMA_WEBUI_* variables
+                          of the environment or of app/.env* instead
 
 Options:
   --host <address>       listen address (default: 127.0.0.1); 0.0.0.0 to open it to the local network
@@ -101,9 +118,11 @@ Hugging Face downloads (Models page):
                          never proxied
 ```
 
-From a clone, `pnpm start` builds the interface, then starts the server. `pnpm dev` is meant for working on
-llama-webui itself: it updates the interface in place when a file of it changes, and restarts the whole server
-(`llama-server` included) when a server file changes. Both take the same options as `llama-webui`.
+From a clone, `pnpm start` builds llama-webui, then starts it, and takes the same options as `llama-webui`.
+`pnpm dev` is meant for working on llama-webui itself: it updates the interface in place when a file of it changes,
+and reloads the server when a server file changes (`llama-server` keeps running unless the change touches the code
+that drives it). It takes its options from the environment variables, for example
+`LLAMA_WEBUI_HOST=0.0.0.0 pnpm dev`.
 
 ### In a systemd service
 
