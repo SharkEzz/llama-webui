@@ -3,15 +3,15 @@
 // reloaded on each save), `vite build` writes `.output/` (`node_server` preset: `.output/server/index.mjs`, client in
 // `.output/public`). Vitest reads the root `vitest.config.ts`, not this file.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { nitro } from 'nitro/vite';
 import { build as rolldown } from 'rolldown';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig } from 'vite';
+import { apiTypes } from './build/apiTypes.ts';
 import { licenses } from './build/licenses.ts';
-import { OUT, ROUTES_DIR, render, scan } from './scripts/gen-api.ts';
 import { loadDotEnv } from './server/lib/env.ts';
 
 const r = (p: string) => resolve(import.meta.dirname, p);
@@ -28,33 +28,14 @@ function version(): string {
   }
 }
 
-/** Keeps `server/api.gen.ts` in step with the file routes: at start, then on every change under `routes/api/`. */
-function apiTypes(): Plugin {
-  const write = () => {
-    const text = render(scan());
-    let current = '';
-    try {
-      current = readFileSync(OUT, 'utf8');
-    } catch {}
-    // Unchanged: not rewritten (the dev worker would reload for nothing).
-    if (text !== current) writeFileSync(OUT, text);
-  };
-  return {
-    name: 'llama-webui:api-types',
-    buildStart: write,
-    configureServer(server) {
-      server.watcher.on('all', (_event, file) => {
-        if (file.startsWith(ROUTES_DIR)) write();
-      });
-    },
-  };
-}
-
+// `server/api.gen.ts` (the route map the web's client is typed by), from Nitro's route scan: at dev start and every
+// build, then on every save under `server/routes/api/`.
+const routeTypes = apiTypes();
 // The licenses of the npm code bundled into the server: collected from Nitro's bundle, written next to it.
 const thirdParty = licenses();
 
 export default defineConfig(({ command }) => ({
-  plugins: [apiTypes(), thirdParty.plugin, react(), tailwindcss(), nitro()],
+  plugins: [routeTypes.plugin, thirdParty.plugin, react(), tailwindcss(), nitro()],
   resolve: { alias: { '@': r('src') } },
   // Build only: `dev` from source keeps its `dev` version.
   define: command === 'build' ? { LLAMA_WEBUI_VERSION: JSON.stringify(version()) } : {},
@@ -72,6 +53,7 @@ export default defineConfig(({ command }) => ({
     // `server/lib/` is business code: not scanned for handlers.
     ignore: ['lib/**'],
     hooks: {
+      ...routeTypes.hooks,
       // Two files of their own next to Nitro's server: the NVML sampler, run in a forked child
       // (`server/lib/collectors/nvml/sampler.ts`, `workerUrl()` resolves it from the chunk `monitor.ts` lands in), and
       // the launcher (`bin/llama-webui.ts`: the CLI, then `server/index.mjs`). Then `THIRD-PARTY-LICENSES.md`.
