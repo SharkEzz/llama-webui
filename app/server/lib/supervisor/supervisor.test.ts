@@ -6,7 +6,7 @@ import { LogBuffer } from '../logs/buffer';
 import type { BuiltCommand } from './args';
 import { Supervisor } from './supervisor';
 
-const FAKE = resolve(import.meta.dirname, '../../testdata/fake/fake-llama-server');
+const FAKE = resolve(import.meta.dirname, '../../../../testdata/fake/fake-llama-server');
 
 async function freePort(): Promise<number> {
   const s = createServer();

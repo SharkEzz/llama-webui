@@ -1,0 +1,47 @@
+// The whole app: the web client (`src/`) and the server (`server/`, Nitro's `serverDir`: `routes/`, `middleware/`,
+// `plugins/`; the business code in `server/lib/`). `vite dev` serves both on one port (the server in Nitro's dev worker,
+// reloaded on each save), `vite build` writes `.output/` (`node_server` preset: `.output/server/index.mjs`, client in
+// `.output/public`). Vitest reads the root `vitest.config.ts`, not this file.
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import { nitro } from 'nitro/vite';
+import { defineConfig } from 'vite';
+import { loadDotEnv } from './server/lib/env.ts';
+
+const r = (p: string) => resolve(import.meta.dirname, p);
+
+// Development reads `.env` like the production launcher does (the environment wins).
+loadDotEnv();
+
+/** Version shown by `/api/health` and the status bar: the tag, else the short hash, else package.json's version. */
+function version(): string {
+  try {
+    return execFileSync('git', ['describe', '--tags', '--always', '--dirty'], { cwd: r('.'), encoding: 'utf8' }).trim();
+  } catch {
+    return (JSON.parse(readFileSync(r('package.json'), 'utf8')) as { version: string }).version;
+  }
+}
+
+export default defineConfig(({ command }) => ({
+  plugins: [react(), tailwindcss(), nitro()],
+  resolve: { alias: { '@': r('src') } },
+  // Build only: `dev` from source keeps its `dev` version.
+  define: command === 'build' ? { LLAMA_WEBUI_VERSION: JSON.stringify(version()) } : {},
+  // Same defaults as the CLI (`server/lib/cli.ts`): local only, port 7860.
+  server: {
+    host: process.env.LLAMA_WEBUI_HOST ?? '127.0.0.1',
+    port: Number(process.env.LLAMA_WEBUI_PORT ?? 7860),
+    strictPort: true,
+  },
+  nitro: {
+    serverDir: './server',
+    preset: 'node_server',
+    features: { websocket: true },
+    errorHandler: './server/error.ts',
+    // `server/lib/` is business code, `server/legacy/` the Hono sources being ported: neither is scanned for handlers.
+    ignore: ['lib/**', 'legacy/**'],
+  },
+}));

@@ -19,7 +19,8 @@
       "!site/build",
       "!site/dist",
       "!site/.react-router",
-      "!server/contract/golden.json"
+      "!app/server/lib/contract/golden.json",
+      "!**/.output"
     ]
   },
   "formatter": {
@@ -59,7 +60,7 @@
   },
   "overrides": [
     {
-      "includes": ["web/**", "site/**"],
+      "includes": ["app/src/**", "site/**"],
       "linter": {
         "domains": {
           "react": "recommended"
@@ -67,7 +68,7 @@
       }
     },
     {
-      "includes": ["web/src/components/ui/**", "site/src/components/ui/**"],
+      "includes": ["app/src/components/ui/**", "site/src/components/ui/**"],
       "linter": {
         "enabled": false
       },

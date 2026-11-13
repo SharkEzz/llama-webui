@@ -15,14 +15,15 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'server',
-          include: ['server/**/*.test.ts', 'scripts/**/*.test.ts'],
+          include: ['app/server/**/*.test.ts', 'scripts/**/*.test.ts'],
+          exclude: ['app/server/legacy/**', '**/node_modules/**'],
         },
       },
       { extends: true, test: { name: 'shared', include: ['packages/webui-shared/src/**/*.test.ts'] } },
       {
         extends: true,
-        resolve: { alias: { '@': dir('./web/src') } },
-        test: { name: 'web', include: ['web/src/**/*.test.ts'] },
+        resolve: { alias: { '@': dir('./app/src') } },
+        test: { name: 'web', include: ['app/src/**/*.test.ts'] },
       },
       {
         extends: true,

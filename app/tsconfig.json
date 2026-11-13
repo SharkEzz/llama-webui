@@ -1,0 +1,16 @@
+{
+  // The whole app: the client (`src/`, DOM) and the server (`server/`, Node), one project since the client imports the
+  // server's route types. `server/legacy/` (the Hono sources being ported) and `probe/` are left out.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src", "server", "vite.config.ts"],
+  "exclude": ["server/legacy", "probe"]
+}
