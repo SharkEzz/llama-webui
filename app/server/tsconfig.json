@@ -1,0 +1,7 @@
+{
+  // The server (Nitro's `serverDir`) and its tests, Node only. `legacy/` holds the Hono sources being ported.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["."],
+  "exclude": ["legacy"]
+}

@@ -1,6 +1,7 @@
 {
-  // The whole app: the client (`src/`, DOM) and the server (`server/`, Node), one project since the client imports the
-  // server's route types. `server/legacy/` (the Hono sources being ported) and `probe/` are left out.
+  // The client (`src/`, DOM). It imports the server's route types (`server/api.gen.ts`), so the server sources it
+  // reaches are checked here too, hence Node's types next to the DOM's. The server has its own project
+  // (`server/tsconfig.json`, Node only), which `typecheck` runs as well.
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
@@ -11,6 +12,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "server", "vite.config.ts"],
-  "exclude": ["server/legacy", "probe"]
+  "include": ["src", "vite.config.ts"]
 }

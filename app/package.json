@@ -7,7 +7,7 @@
     "build": "vite build",
     "dev": "vite dev",
     "preview": "node .output/server/index.mjs",
-    "typecheck": "tsc"
+    "typecheck": "tsc && tsc -p server"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

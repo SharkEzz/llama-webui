@@ -1,4 +1,3 @@
-import type { AppDeps } from './api';
 import { RunExecutor } from './bench/execute';
 import { readHardware } from './bench/hardware';
 import { BenchRunner } from './bench/runner';
@@ -18,6 +17,30 @@ import { activeProfileId, type Runtime } from './runtime';
 import { binaryPath, buildCommand, profilePaths } from './supervisor/args';
 import { WsHub } from './ws/hub';
 
+/** The objects the API is made of. */
+export interface AppDeps {
+  db: Database;
+  hub: WsHub;
+  settings: SettingsRepo;
+  profiles: ProfilesRepo;
+  conversations: ConversationsRepo;
+  chatRuns: ChatRuns;
+  benchRuns: BenchRunsRepo;
+  benchRunner: BenchRunner;
+  sweeps: SweepsRepo;
+  /** Hugging Face Hub client and download queue (Models page). */
+  hf: HfClient;
+  downloads: DownloadQueue;
+  downloadsRepo: DownloadsRepo;
+  activeProfileId: () => number | null;
+  runtime: Runtime;
+  monitor: Monitor;
+  /** Placement of the loaded model (from llama-server logs), for the Topology page. */
+  placement: PlacementTracker;
+  /** The listen address (`--host`): the first-run checks say whether the UI is open to the network. */
+  hostname: string;
+}
+
 export interface DepsOptions {
   db: Database;
   runtime: Runtime;
@@ -30,7 +53,7 @@ export interface DepsOptions {
 /**
  * The objects the app is made of, wired together: repositories, chat runs, the bench runner, the Hugging Face client
  * and download queue, the placement tracker and the WebSocket hub. Constructors only: what starts work or touches
- * existing rows (orphans, resume, subscriptions, signals) is left to the caller, `server/index.ts`.
+ * existing rows (orphans, resume, subscriptions, signals) is left to the caller, `server/lib/boot.ts`.
  */
 export function createDeps(o: DepsOptions): AppDeps {
   const { db, runtime, monitor } = o;
