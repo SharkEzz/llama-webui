@@ -1,4 +1,4 @@
-packages: [packages/*, server, web, site]
+packages: [packages/*, server, web, site, app/probe]
 # Versions that must move together across projects (`catalog:` in their package.json). Not every shared
 # dependency is listed yet: extending the catalog is a refactoring candidate (notes file).
 catalog:
