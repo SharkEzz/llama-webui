@@ -85,3 +85,15 @@ export function deps(): AppDeps {
   if (!booted) throw new Error('llama-webui is not started');
   return booted.deps;
 }
+
+/** Tests of route files: `deps()` answers `d` until the handle is disposed (no runtime is built). */
+export function provideDeps(d: AppDeps): Disposable {
+  const prev = registry.live;
+  const booted: Booted = { deps: d, stack: new AsyncDisposableStack() };
+  registry.live = { owner: OWNER, booting: Promise.resolve(booted), booted };
+  return {
+    [Symbol.dispose]: () => {
+      registry.live = prev;
+    },
+  };
+}

@@ -7,6 +7,7 @@ import { dbPath } from './paths';
 import { createRuntime, serverView, startMonitor } from './runtime';
 import { profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
+import { stubMonitor } from './testing/stubMonitor';
 
 const EXTERNAL_CHECK_MS = 2000;
 
@@ -35,9 +36,17 @@ export async function boot(): Promise<Booted> {
   const runtime = createRuntime();
   const { supervisor, logs, benchGate } = runtime;
   stack.defer(() => supervisor.stop());
-  const monitor = await startMonitor(runtime, new SettingsRepo(db).get());
+  // Test settings of the contract suite, which runs the production build: no collectors, no network.
+  const test = {
+    monitor: process.env.LLAMA_WEBUI_TEST_MONITOR === 'stub',
+    offline: process.env.LLAMA_WEBUI_TEST_OFFLINE === '1',
+  };
+  const monitor = test.monitor ? stubMonitor : await startMonitor(runtime, new SettingsRepo(db).get());
   stack.defer(() => monitor.stop());
-  const deps = createDeps({ db, runtime, monitor, hostname: cli.host });
+  const offline = (async () => {
+    throw new TypeError('fetch failed');
+  }) as unknown as typeof fetch;
+  const deps = createDeps({ db, runtime, monitor, hostname: cli.host, ...(test.offline ? { fetch: offline } : {}) });
   const { hub, settings, conversations, chatRuns, benchRuns, sweeps, benchRunner, profiles, downloads, placement } =
     deps;
   stack.defer(() => placement.dispose());

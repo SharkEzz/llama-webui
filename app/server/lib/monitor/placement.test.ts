@@ -36,7 +36,9 @@ test('parsePlacement: real llama-server start, buffers summed per device, bus id
 });
 
 test('parsePlacement: real MTP + mmproj start, compute per context (last reservation wins), recurrent state with the KV', async () => {
-  const text = (await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-mtp.txt`, 'utf8')).trimEnd();
+  const text = (
+    await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-mtp.txt`, 'utf8')
+  ).trimEnd();
   const p = parsePlacement(lines(text))!;
   expect(p.layers).toEqual({ offloaded: 66, total: 66 });
   const by = new Map(p.buffers.map((b) => [b.device, b]));
@@ -218,7 +220,9 @@ test('PlacementTracker: the launch evicted from the ring keeps the placement of 
 });
 
 test('parsePlacement: -sm tensor spreads the Meta() buffers over its devices by -ts, marked estimated (#17)', async () => {
-  const text = (await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-tensor.txt`, 'utf8')).trimEnd();
+  const text = (
+    await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-tensor.txt`, 'utf8')
+  ).trimEnd();
   const p = parsePlacement(lines(text))!;
   expect(p.layers).toEqual({ offloaded: 66, total: 66 });
   expect(p.buffers.some((b) => b.device.startsWith('Meta'))).toBe(false);
@@ -286,7 +290,9 @@ test('parsePlacement: NCCL (NCCL_DEBUG=INFO) says whether peer-to-peer is really
 });
 
 test('parsePlacement: with -sm tensor, NCCL (NCCL_DEBUG=INFO) gives the PCI address of each CUDA device', async () => {
-  const text = (await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-tensor.txt`, 'utf8')).trimEnd();
+  const text = (
+    await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-tensor.txt`, 'utf8')
+  ).trimEnd();
   const bare = parsePlacement(lines(text))!;
   expect(
     bare.buffers.filter((b) => b.device.startsWith('CUDA') && !b.device.endsWith('Host')).map((b) => b.busId),

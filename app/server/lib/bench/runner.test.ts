@@ -17,13 +17,17 @@ import {
 } from '@llama-webui/shared';
 import { probeHealth } from 'llamacpp-js/client';
 import { afterAll, afterEach, expect, test } from 'vitest';
+import resume from '../../routes/api/sweeps/[id]/resume.post.ts';
+import validate from '../../routes/api/sweeps/[id]/validate.post.ts';
+import { provideDeps } from '../context';
 import { BenchRunsRepo } from '../db/benchRuns';
 import { openDb } from '../db/open';
 import { SweepsRepo } from '../db/sweeps';
-import { errorResponse, HttpError } from '../http';
+import type { AppDeps } from '../deps';
+import { HttpError } from '../http';
 import { LogBuffer } from '../logs/buffer';
-import { sweepRoutes } from '../routes/sweeps';
 import type { BuiltCommand } from '../supervisor/args';
+import { routeApp } from '../testing/routes';
 import { tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';
 import { type ExecutorDeps, RunExecutor } from './execute';
@@ -268,22 +272,25 @@ function sweepOf(repo: BenchRunsRepo, sweeps: SweepsRepo, values: number[]) {
   }));
   return { sweep: sw, runs: repo.enqueue(sw.id, items) };
 }
-/** POSTs a JSON body to the sweep routes over these repositories and this runner. */
-function sweepPost(s: Pick<ReturnType<typeof setup>, 'sweeps' | 'repo' | 'runner'>, path: string, body: unknown) {
-  const app = sweepRoutes({
+/** POSTs a JSON body to the sweep route files, over these repositories and this runner. */
+async function sweepPost(s: Pick<ReturnType<typeof setup>, 'sweeps' | 'repo' | 'runner'>, path: string, body: unknown) {
+  using _ = provideDeps({
     sweeps: s.sweeps,
     benchRuns: s.repo,
     benchRunner: s.runner,
-    settings: null!,
-    monitor: null!,
-    hub: { broadcast() {} } as never,
-  });
-  app.onError((err) => errorResponse(err));
-  return app.request(path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+    hub: { broadcast() {} },
+  } as unknown as AppDeps);
+  const app = routeApp([
+    ['POST', '/api/sweeps/:id/validate', validate],
+    ['POST', '/api/sweeps/:id/resume', resume],
+  ]);
+  return await app.fetch(
+    new Request(`http://localhost${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  );
 }
 
 const sweepEnd = (lives: (SweepLive | null)[]) =>

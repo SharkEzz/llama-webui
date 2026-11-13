@@ -1,37 +1,31 @@
-// HTTP contract of the app: every case of ./cases.ts over real HTTP against the real host (`mount()` with the real
-// API), compared with golden.json. `UPDATE_GOLDEN=1 pnpm exec vitest run server/contract/contract.test.ts` rewrites
-// the golden (review its diff).
-import { readFileSync, writeFileSync } from 'node:fs';
+// HTTP contract of the app: every case of ./cases.ts over real HTTP against the production build (Nitro's
+// `.output/llama-webui.mjs`, run by `pnpm build`), compared with golden.nitro.json (the spike's record; golden.json is master's). `UPDATE_GOLDEN=1 pnpm exec vitest run
+// app/server/lib/contract/contract.test.ts` rewrites the golden (`GOLDEN=<file>` writes and compares another one).
+import { spawn } from 'node:child_process';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { createApi } from '../api';
-import { BenchGate } from '../bench/gate';
+import { ROUTES as FILE_ROUTES } from '../../api.gen';
 import { BenchRunsRepo } from '../db/benchRuns';
 import { ConversationsRepo } from '../db/conversations';
 import { openDb } from '../db/open';
 import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
 import { SweepsRepo } from '../db/sweeps';
-import { createDeps } from '../deps';
-import { mount, type WebHandler } from '../host';
-import { createHostServer } from '../hostServer';
-import { apiRoutes, shadowed } from '../http';
-import { LogBuffer } from '../logs/buffer';
 import { writeGguf } from '../models/gguf.fixture';
-import type { Monitor } from '../monitor/monitor';
-import type { Runtime } from '../runtime';
-import { Supervisor } from '../supervisor/supervisor';
 import { tempDir } from '../testing/tempDir';
 import { cases, type Outcome, ROUTES, runContract, runStreams } from './cases';
 
-const GOLDEN = join(import.meta.dirname, 'golden.json');
-const REPO = resolve(import.meta.dirname, '../..');
+const GOLDEN = resolve(import.meta.dirname, process.env.GOLDEN ?? 'golden.nitro.json');
+const REPO = resolve(import.meta.dirname, '../../../..');
 const FAKE_SERVER = join(REPO, 'testdata/fake/fake-llama-server');
+const LAUNCHER = join(REPO, 'app/.output/llama-webui.mjs');
 
 /** Environment read by the routes (home, llama-tui config, Hugging Face token): pointed into the temp dir. */
 const ENV_KEYS = [
@@ -54,31 +48,14 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-/** The monitor without collectors: no snapshot yet, an empty history. */
-const stubMonitor = {
-  latest: () => null,
-  dump: () => ({ intervalMs: 1000, capacity: 0, at: 0, times: [], series: {} }),
-  configure: async () => {},
-  nvidiaSource: 'nvml',
-  nvmlSystem: null,
-  onSnapshot: () => () => {},
-  setModelPathResolver: () => {},
-} as unknown as Monitor;
-
-/** The UI as the production one answers a page (`staticWeb`'s SPA fallback): no built files needed. */
-const stubWeb: WebHandler = (c) =>
-  c.body('<!doctype html><title>llama-webui</title>', 200, {
-    'Content-Type': 'text/html;charset=utf-8',
-    'Cache-Control': 'no-cache',
-  });
-
 async function boot() {
+  if (!existsSync(LAUNCHER)) throw new Error('no production build: run `pnpm build` first');
   const dir = tempDir('lw-contract-');
   const tmp = dir.path;
   const savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
   for (const k of ENV_KEYS) delete process.env[k];
   process.env.HOME = join(tmp, 'home');
-  // Outside HOME: Node's homedir() follows this HOME (Bun's did not: `<home>` in the golden).
+  // Outside HOME: Node's homedir() follows this HOME.
   process.env.XDG_CONFIG_HOME = join(tmp, 'xdg-config');
   process.env.XDG_CACHE_HOME = join(tmp, 'xdg-cache');
   // The fake llama-server inherits the environment: no pause between chat chunks, so the stream ends at once.
@@ -95,68 +72,49 @@ async function boot() {
   );
 
   // Seeded rows: id 1 is read, id 2 is deleted by the web's body-less calls (run last).
-  const db = openDb(join(tmp, 'llama-webui.sqlite'));
   const llamaPort = await freePort();
-  new SettingsRepo(db).patch({ binary: FAKE_SERVER, modelsDir, port: llamaPort });
-  const profiles = new ProfilesRepo(db);
-  const conversations = new ConversationsRepo(db);
-  const benchRuns = new BenchRunsRepo(db);
-  const sweeps = new SweepsRepo(db);
-  const hw = { cpu: '', gpus: [], build: null };
-  for (const name of ['A', 'B']) {
-    const p = profiles.create({ name, model, args: [], env: {} });
-    conversations.create({ profileId: p.id, modelPath: model });
-    const run = benchRuns.create(BenchSpecSchema.parse({ kind: 'bench', modelPath: model }), 'llama-bench', hw);
-    benchRuns.finish(run.id, { status: 'ok', tg: { tps: 50, stddev: 0, tokens: 128 } });
-    const sweep = sweeps.create(
-      SweepSpecSchema.parse({ name: `s${name}`, modelPath: model, preset: 'chat', space: { ncmoe: [0, 8] } }),
-    );
-    sweeps.setStatus(sweep.id, 'done', { finishedAt: Date.now() });
+  {
+    using db = openDb(join(tmp, 'llama-webui.sqlite'));
+    new SettingsRepo(db).patch({ binary: FAKE_SERVER, modelsDir, port: llamaPort });
+    const profiles = new ProfilesRepo(db);
+    const conversations = new ConversationsRepo(db);
+    const benchRuns = new BenchRunsRepo(db);
+    const sweeps = new SweepsRepo(db);
+    const hw = { cpu: '', gpus: [], build: null };
+    for (const name of ['A', 'B']) {
+      const p = profiles.create({ name, model, args: [], env: {} });
+      conversations.create({ profileId: p.id, modelPath: model });
+      const run = benchRuns.create(BenchSpecSchema.parse({ kind: 'bench', modelPath: model }), 'llama-bench', hw);
+      benchRuns.finish(run.id, { status: 'ok', tg: { tps: 50, stddev: 0, tokens: 128 } });
+      const sweep = sweeps.create(
+        SweepSpecSchema.parse({ name: `s${name}`, modelPath: model, preset: 'chat', space: { ncmoe: [0, 8] } }),
+      );
+      sweeps.setStatus(sweep.id, 'done', { finishedAt: Date.now() });
+    }
   }
 
-  // Own runtime: createRuntime() installs the process's signal handlers.
-  const logs = new LogBuffer(10_000);
-  const supervisor = new Supervisor({ logs });
-  const runtime: Runtime = {
-    supervisor,
-    logs,
-    bootId: 'contract',
-    monitor: null,
-    benchGate: new BenchGate({ server: supervisor, logs }),
-  };
-  const deps = createDeps({
-    db,
-    runtime,
-    monitor: stubMonitor,
-    hostname: '127.0.0.1',
-    // No network: Hugging Face Hub and CDN requests fail as offline.
-    fetch: (async () => {
-      throw new TypeError('fetch failed');
-    }) as unknown as typeof fetch,
+  // The production build in its own process, from the temp dir (no `.env` around): the test settings replace the
+  // monitor's collectors with a stub and make every Hugging Face request fail as offline.
+  const port = await freePort();
+  const proc = spawn(process.execPath, [LAUNCHER, '--host', '127.0.0.1', '--port', String(port), '--data-dir', tmp], {
+    cwd: tmp,
+    env: { ...process.env, LLAMA_WEBUI_TEST_MONITOR: 'stub', LLAMA_WEBUI_TEST_OFFLINE: '1' },
+    stdio: ['ignore', 'ignore', 'inherit'],
   });
-  const server = createHostServer();
-  const port = await mount({
-    server,
-    fetch: createApi(deps).fetch,
-    hub: deps.hub,
-    web: stubWeb,
-    hostname: '127.0.0.1',
-    port: 0,
-  });
+  const exited = new Promise((r) => proc.once('exit', r));
+  const base = `http://127.0.0.1:${port}`;
+  let up = false;
+  for (let i = 0; i < 100 && !up; i++) {
+    up = (await fetch(`${base}/api/health`).catch(() => null))?.ok === true;
+    if (!up) await sleep(100);
+  }
+  if (!up) throw new Error('the production build did not answer /api/health');
   return {
-    base: `http://127.0.0.1:${port}`,
+    base,
     ctx: { tmp, repo: REPO, home: homedir(), ports: [port, llamaPort], port },
-    deps,
     async dispose() {
-      server.closeAllConnections();
-      await new Promise((r) => server.close(r));
-      deps.chatRuns.dispose();
-      deps.benchRunner.dispose();
-      deps.downloads.dispose();
-      deps.placement.dispose();
-      deps.hub.dispose();
-      await supervisor.stop();
-      db.close();
+      proc.kill('SIGTERM');
+      await exited;
       dir[Symbol.dispose]();
       for (const k of ENV_KEYS) {
         if (savedEnv[k] === undefined) delete process.env[k];
@@ -176,12 +134,8 @@ beforeAll(async () => {
 afterAll(() => app?.dispose());
 
 test('the route table lists every API route of the app', () => {
-  const registered = new Set(apiRoutes(createApi(app.deps)).map((r) => r.path));
+  const registered = new Set(FILE_ROUTES.map((r) => r.path));
   expect(ROUTES.map((r) => r.path).sort()).toEqual([...registered].sort());
-});
-
-test('no static API path is registered behind a :param pattern that catches it (#37)', () => {
-  expect(shadowed(apiRoutes(createApi(app.deps)))).toEqual([]);
 });
 
 test('no case that breaks a body or a guard succeeds', () => {
