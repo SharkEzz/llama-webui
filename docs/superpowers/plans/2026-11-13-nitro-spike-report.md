@@ -20,8 +20,9 @@ Nitro, the llama-server lifecycle, the production build and the unchanged CLI. M
 
 **Verdict: conditional go.** Nitro clearly wins the dev loop and keeps behaviour parity, with no status change on the
 498 contract cases. It brings nothing for typing: our own generator replaces `hc` at parity. Lifecycle reliability is
-reached only through about ten lines of workaround that depend on srvx internals. Migrate once Nitro 3 leaves RC, under
-the conditions in [Conclusion](#conclusion).
+reached through about ten lines of workaround that depend on srvx internals; Nitro's next release replaces them with its
+new `shutdown` hook (see [Lifecycle reliability](#lifecycle-reliability)). Migrate on a release that has this hook,
+under the conditions in [Conclusion](#conclusion).
 
 ## Dev loop
 
@@ -120,6 +121,32 @@ The remaining second is srvx's countdown timer. The workaround relies on two srv
 server runs under `TEST`), but nothing catches a slow stop. Production also logs srvx's `Stopping server gracefully
 (5s)...` line on every stop.
 
+### The `shutdown` hook (after the spike)
+
+Nitro's `main` added a runtime hook `shutdown` on 2026-11-10 (PR nitrojs/nitro#5099, "add `shutdown` hook and wait for
+running tasks on shutdown"). It is after the spike's version: `3.0.261103-rc`, still npm's `latest`, declares only
+`close`, `error`, `request` and `response`. The docs on nitro.build already describe it, because they are built from
+`main`. `nitroApp.hooks` is a hookable instance, and hookable's API (`hook`, `hookOnce`, `beforeEach`…) cannot move a
+call earlier: on the RC no hook runs before the HTTP drain, so the workaround stays until a release ships the hook.
+
+On `main`, `setupCloseHooks` wraps `server.close()`. When srvx calls it on a signal, the `shutdown` hooks run at once,
+alongside the HTTP drain, with `waitUntil` and an abort `signal`. `close` hooks run once the drain and the `waitUntil`
+work settle, up to the graceful timeout (`SERVER_SHUTDOWN_TIMEOUT`, 5 s), when `signal` is aborted. This is the
+pre-close step defect 1 needed. The signal handler of the runtime plugin becomes:
+
+```ts
+nitroApp.hooks.hook('shutdown', ({ waitUntil }) => waitUntil(stop()));
+```
+
+`stop()` closes the hub with 1001 and ends the chat streams as "stopped", so the open connections end on their own and
+the drain no longer waits for the timeout. Not measured: the code of `main` has been read, not run. Whether the stop
+still takes srvx's one second is to be measured.
+
+Defect 2 is **left out on purpose**. Without srvx's handler, under `CI` or `TEST`, nobody calls `server.close()` and the
+hook never runs: SIGTERM would hang the process. Users do not run the server with these variables, so the real
+migration drops the `listenerCount` check. Our own tests do run under them (Vitest sets `TEST`, GitHub Actions sets
+`CI`): the contract suite and the SIGTERM test start the built server with both removed from its environment.
+
 ## Behaviour parity
 
 The contract suite (`app/server/lib/contract/contract.test.ts`) now runs the **production build** in its own process.
@@ -185,22 +212,21 @@ Other notes:
 | ------------------ | -------------------------------------------------------------------------------------------- |
 | Dev loop           | **Clear win**: 5 ms / 63 ms vs ~865 ms, llama-server and sockets survive route edits       |
 | Front/back typing  | **Parity**, at the cost of our own generator (Nitro provides none)                          |
-| Lifecycle          | **Parity after three fixes**, one of them a workaround that depends on srvx internals          |
+| Lifecycle          | **Parity after three fixes**; the srvx workaround gives way to Nitro's next `shutdown` hook    |
 | Behaviour parity   | **Reached**: 498/498 statuses, three cosmetic header/body differences                        |
 
 **Conditional go.** The day-to-day gain is real: editing an API route no longer restarts llama-server, so no model
 reload and no lost chat. The tree is also simpler: one package, one Vite, no host server of our own. Nitro brings no
-typing, though, and its shutdown has to be bent into the order we need. Conditions for the real migration:
+typing, though, and on the RC its shutdown has to be bent into the order we need. Conditions for the real migration:
 
-1. **Nitro 3 stable**, not RC. Re-check the shutdown order (`setupCloseHooks`) and srvx's `CI`/`TEST` rule on that
-   version. Keep a test that sends SIGTERM to the built server with a WebSocket and a stream open, and asserts a stop
-   under 2 s.
-2. **Ask upstream** for a pre-close hook, or a `gracefulShutdown` option in Nitro's config. This would remove the
-   workaround.
-3. **Keep the generator** (`gen-api.ts`) and its freshness test as the typing story, unless Nitro ships typed routes.
-4. **Land the `{ ref: false }` fix on master now**: it is independent of Nitro.
+1. **A Nitro release with the `shutdown` hook** (nitrojs/nitro#5099), stable rather than RC if possible. Port the
+   runtime plugin to `hook('shutdown', ({ waitUntil }) => waitUntil(stop()))` and drop the signal handler, `CI`/`TEST`
+   case included. Keep a test that sends SIGTERM to the built server, started without `CI` and `TEST`, with a
+   WebSocket and a stream open, and asserts a stop under 2 s.
+2. **Keep the generator** (`gen-api.ts`) and its freshness test as the typing story, unless Nitro ships typed routes.
+3. **The `{ ref: false }` fix** is on its way to master on its own: PR #77, independent of Nitro.
 
-If Nitro stays RC for long, the lower-risk alternative keeps Hono. It merges `server/` and `web/` into one package and
+If no release ships the hook for long, the lower-risk alternative keeps Hono. It merges `server/` and `web/` into one package and
 takes over two pieces of this spike that do not depend on Nitro:
 
 - the `globalThis` runtime registry, which keeps llama-server alive across route edits under a Vite module runner;
@@ -212,4 +238,4 @@ takes over two pieces of this spike that do not depend on Nitro:
 - **Docs:** CLAUDE.md and ~12 site pages.
 - **Cleanup:** remove `app/probe/`.
 - **Tests:** a dev-loop test replacing `dev.test.ts`, and the SIGTERM test of condition 1.
-- **Re-verification** on the stable Nitro release.
+- **Re-verification** on the Nitro release with the `shutdown` hook.
