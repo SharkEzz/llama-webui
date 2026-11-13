@@ -266,8 +266,13 @@ const VOLATILE_KEYS = new Set(['version', 'uptimeMs', 'pid', 'bootId']);
 const EPOCH_MS = (n: number) => Number.isInteger(n) && n > 1.5e12 && n < 4e12;
 const ISO_TIME = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z/g;
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+/** A built asset's content hash (`/assets/index-DopSxb7D.js`): changes with any change to the client. */
+const ASSET_HASH = /(?<=\/assets\/[\w.-]+?-)[\w-]{8}(?=\.(?:js|css|svg)\b)/g;
 
-/** Replaces what changes between runs (times, ports, temporary paths, ids of the boot) with placeholders. */
+/**
+ * Replaces what changes between runs (times, ports, temporary paths, ids of the boot) or between builds (asset hashes)
+ * with placeholders.
+ */
 export function normalize(v: unknown, ctx: NormalizeCtx): unknown {
   if (typeof v === 'string') {
     // Longest first: one of these paths may contain another.
@@ -279,7 +284,7 @@ export function normalize(v: unknown, ctx: NormalizeCtx): unknown {
     let s = v;
     for (const [path, tag] of paths.sort((a, b) => b[0].length - a[0].length)) s = s.split(path).join(tag);
     for (const p of ctx.ports) s = s.replace(new RegExp(`(?<=[:= ])${p}(?!\\d)`, 'g'), '<port>');
-    return s.replace(ISO_TIME, '<time>').replace(UUID, '<uuid>');
+    return s.replace(ISO_TIME, '<time>').replace(UUID, '<uuid>').replace(ASSET_HASH, '<hash>');
   }
   if (typeof v === 'number') return EPOCH_MS(v) ? '<time>' : ctx.ports.includes(v) ? '<port>' : v;
   if (Array.isArray(v)) return v.map((x) => normalize(x, ctx));
