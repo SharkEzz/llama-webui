@@ -41,12 +41,13 @@ const SHUTDOWN_LISTENER = Symbol.for('llama-webui.workerShutdown');
 
 /**
  * Development: runs `undo` as soon as the Vite process asks the dev worker to shut down, before the worker closes its
- * HTTP server. Nitro 3.0.261103-rc sends that `shutdown` message without a `timeout`: the worker then waits for every
- * connection to end before it runs the `close` hooks, and the upstream socket of a proxied `/ws` (an open page) never
- * ends on its own, so Nitro force-closes the worker after 5 s (“Dev worker did not shut down in time”) without the
- * runtime ever undone. Undone first, the hub closes its sockets (1001, then drops the one that never answers) and the
- * server closes within a second. One listener per worker: the plugin runs again on every dev reload. A failure is
- * reported by the `close` hook, whose `stop()` waits for the same undo.
+ * HTTP server. Nitro 3.0.261103-rc sends that `shutdown` message without a `timeout` (nitrojs/nitro#5133): the worker
+ * then waits for every connection to end before it runs the `close` hooks, and the upstream socket of a proxied `/ws`
+ * (an open page) never ends on its own, so Nitro force-closes the worker after 5 s (“Dev worker did not shut down in
+ * time”) without the runtime ever undone. Undone first, the hub closes its sockets (1001, then drops the one that never
+ * answers) and the server closes within a second. One listener per worker: the plugin runs again on every dev reload. A
+ * failure is reported by the `close` hook, whose `stop()` waits for the same undo. Once a Nitro release fixes #5133,
+ * drop this listener if `dev.test.ts` stays green without it.
  */
 function onWorkerShutdown(undo: () => Promise<void>): void {
   if (!parentPort) return;
