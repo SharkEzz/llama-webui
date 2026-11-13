@@ -4,6 +4,8 @@ node_modules
 # output
 out
 dist
+# Nitro's build (app/.output): ignored here, not in app/, where npm would also leave it out of the package
+.output
 *.tgz
 
 # code coverage

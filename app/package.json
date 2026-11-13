@@ -6,7 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite dev",
-    "preview": "node .output/server/index.mjs",
+    "preview": "node .output/llama-webui.mjs",
     "typecheck": "tsc && tsc -p server"
   },
   "dependencies": {

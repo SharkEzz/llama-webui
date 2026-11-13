@@ -4,11 +4,10 @@
   "private": true,
   "type": "module",
   "bin": {
-    "llama-webui": "dist/server/main.js"
+    "llama-webui": "app/.output/llama-webui.mjs"
   },
   "files": [
-    "dist/server",
-    "dist/web"
+    "app/.output"
   ],
   "scripts": {
     "build": "pnpm --filter @llama-webui/app build",
@@ -22,7 +21,7 @@
     "site:build": "pnpm --filter llama-webui-site build",
     "site:dev": "pnpm --filter llama-webui-site dev",
     "site:preview": "pnpm --filter llama-webui-site preview",
-    "start": "pnpm build && pnpm --filter @llama-webui/app preview",
+    "start": "pnpm build && node app/.output/llama-webui.mjs",
     "test": "pnpm test:unit && pnpm --filter llamacpp-js test",
     "test:unit": "vitest run",
     "typecheck": "tsc -p scripts"
