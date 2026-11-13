@@ -38,7 +38,7 @@ test('guard: write without JSON rejected (simple request CSRF)', () => {
   expect(guard(req('http://127.0.0.1:7860/api/server/stop', { method: 'POST' }))).toBeUndefined(); // no body
 });
 
-/** A write as `@hono/node-server` builds it: a body stream whatever the request carried (fact 9 of the Node plan). */
+/** A write as Node's adapter (srvx) builds it: a body stream whatever the request carried (fact 9 of the Node plan). */
 const streamed = (headers: Record<string, string>) =>
   new Request('http://127.0.0.1:7860/api/server/stop', {
     method: 'POST',

@@ -1,4 +1,4 @@
-/* Theme ported from web/src/index.css (keep tokens aligned with the app), plus site-only utilities at the end. */
+/* Theme ported from app/src/index.css (keep tokens aligned with the app), plus site-only utilities at the end. */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -332,7 +332,7 @@
  * Site-only utilities (not in the app): glass panel, fine grid, halos, headline ink.
  * ==================================================================================================== */
 
-/* Same glass as the app's GLASS class (web/src/components/glass/glass.ts). */
+/* Same glass as the app's GLASS class (app/src/components/glass/glass.ts). */
 @utility glass {
   @apply rounded-lg bg-card shadow-surface inset-shadow-highlight ring-1 ring-surface-border backdrop-blur-(--surface-blur);
 }

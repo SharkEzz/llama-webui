@@ -5,7 +5,8 @@
  * the settings change; worker → { type: "ready" } | { type: "error", message } | { type: "sample", snapshot }.
  *
  * Run as is by Node in development (type stripping: its imports keep their `.ts` extension, and it imports nothing
- * but types outside this graph), bundled to `dist/server/nvml-worker.js` in production (`vite.config.ts`).
+ * but types outside this graph), bundled to `.output/server/nvml-worker.mjs` in production (`compiled` hook of
+ * `vite.config.ts`).
  */
 
 import { type GpuNeeds, MEASURE_ALL } from '../needs.ts';

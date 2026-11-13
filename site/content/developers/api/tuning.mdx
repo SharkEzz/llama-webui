@@ -5,14 +5,14 @@ description: Routes that read the hardware, estimate the best llama-server flags
 
 The tuning routes give the [Tuning](/docs/tuning/) page its recommendation: the hardware the estimator works with, the
 estimate itself, the dry run of a sweep plan, the system checks and the model disk's read speed. They live in
-`server/routes/tuning.ts`; the types and the presets are in `packages/webui-shared/src/tuning.ts`, the estimator and the checks in
-`server/tuning/` (see [Tuning](/developers/server/tuning/)).
+`app/server/routes/api/tuning/`; the types and the presets are in `packages/webui-shared/src/tuning.ts`, the estimator and the checks in
+`app/server/lib/tuning/` (see [Tuning](/developers/server/tuning/)).
 
 The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
 
 ## Model errors
 
-The routes that read a model parse its GGUF with `loadModel()` (`server/tuning/models.ts`), cached while the file's size
+The routes that read a model parse its GGUF with `loadModel()` (`app/server/lib/tuning/models.ts`), cached while the file's size
 and modification time do not change. It answers:
 
 - `400` `Expected an absolute path to a .gguf file`;
@@ -37,7 +37,7 @@ A preset (`PRESETS` in `packages/webui-shared/src/tuning.ts`) sets what the esti
 
 <Endpoint method="GET" path="/api/tuning/hardware" />
 
-What the estimator plans for (`readTuningHardware()` in `server/tuning/hardware.ts`).
+What the estimator plans for (`readTuningHardware()` in `app/server/lib/tuning/hardware.ts`).
 
 **Response**: `200` with a `TuningHardware`.
 
@@ -64,10 +64,10 @@ curl http://127.0.0.1:7860/api/tuning/hardware
 <Endpoint method="POST" path="/api/tuning/estimate" />
 
 Reads the model's GGUF and the hardware, then searches the placement that fits best for the preset
-(`estimate()` in `server/tuning/estimate.ts`). The latest estimate of each model is kept in memory for the
+(`estimate()` in `app/server/lib/tuning/estimate.ts`). The latest estimate of each model is kept in memory for the
 [checks](#run-the-system-checks).
 
-**Body**: `EstimateRequest`, a schema local to `server/routes/tuning.ts`, strict.
+**Body**: `EstimateRequest`, a schema local to `app/server/routes/api/tuning/`, strict.
 
 | Field        | Type           | Required | Description                                                           |
 | ------------ | -------------- | -------- | --------------------------------------------------------------------- |
@@ -147,7 +147,7 @@ warning `dense model: -ncmoe has no effect`.
 least 2 GiB of RAM are left. `--numa distribute` is added on a machine with several NUMA nodes. `--fit off` is always there: what gets
 measured is exactly what gets written.
 
-`Fit` (`fitOf()` in `server/tuning/placement.ts`):
+`Fit` (`fitOf()` in `app/server/lib/tuning/placement.ts`):
 
 | Field               | Type             | Description                                                     |
 | ------------------- | ---------------- | --------------------------------------------------------------- |
@@ -234,7 +234,7 @@ curl -X POST http://127.0.0.1:7860/api/tuning/plan \
 <Endpoint method="GET" path="/api/tuning/checks" />
 
 Checks the drivers, the CPU, the kernel and the `llama-server` build for settings that cost speed (`runChecks()` in
-`server/tuning/checks.ts`). With a model, the checks also use its file, the latest
+`app/server/lib/tuning/checks.ts`). With a model, the checks also use its file, the latest
 [estimate](#estimate-the-flags-for-a-model) of the same model path and its latest
 [disk measurement](#measure-the-model-disks-read-speed); both are kept in memory and lost when llama-webui restarts.
 
@@ -284,7 +284,7 @@ curl 'http://127.0.0.1:7860/api/tuning/checks?model=/home/demo/models/Qwen3-30B-
 
 <Endpoint method="POST" path="/api/tuning/disk-speed" />
 
-Times a sequential read of the model file (`measureDiskSpeed()` in `server/tuning/disk.ts`): up to 1 GiB, from a random
+Times a sequential read of the model file (`measureDiskSpeed()` in `app/server/lib/tuning/disk.ts`): up to 1 GiB, from a random
 offset to avoid the start of the file that is often already cached. The OS page cache can still inflate the result.
 The measurement is kept in memory for the `kernel.disk-speed` check.
 

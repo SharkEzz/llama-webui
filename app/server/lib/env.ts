@@ -13,7 +13,7 @@ const enabled = (v: string | undefined) => v === '1' || v?.toLowerCase() === 'tr
 /**
  * Loads `.env` (in the working directory by default) into `process.env`. Its variables fill what the environment
  * lacks; with `override` (`--env-override`) or `LLAMA_WEBUI_ENV_OVERRIDE` on, they also replace those already set. No file, nothing to do. Called by
- * the entry points (`server/dev.ts`, `server/main.ts`).
+ * the production launcher (`bin/llama-webui.ts`) and `vite.config.ts` (dev).
  */
 export function loadDotEnv(path = '.env', o: { override?: boolean } = {}): void {
   let text: string;

@@ -17,7 +17,7 @@ export interface Runtime {
 
 /**
  * The supervisor, the log ring and the bench gate of the process; the monitor comes later (startMonitor()). Builds
- * only: `start()` (`server/index.ts`) stops them at shutdown.
+ * only: `boot()` (`boot.ts`) registers their stop on its stack.
  */
 export function createRuntime(): Runtime {
   const logs = new LogBuffer(10_000);

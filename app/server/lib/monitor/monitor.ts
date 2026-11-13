@@ -90,7 +90,7 @@ export class Monitor {
     return this.collectors.nvmlSystem;
   }
 
-  /** Absolute model path of a profile (model disk); provided by `server/index.ts`, which reads the profiles. */
+  /** Absolute model path of a profile (model disk); provided by `deps.ts`, which reads the profiles. */
   setModelPathResolver(fn: (profileId: number) => string | null): void {
     this.modelPathFor = fn;
     this.modelDisks.clear();

@@ -3,11 +3,11 @@ title: WebSocket
 description: The /ws channel, from connection and guard to the hello message, bootId and heartbeat, every message type with its payload, and how a client resyncs.
 ---
 
-llama-webui pushes its live events over one WebSocket, `/ws`. The server side is `WsHub` (`server/ws/hub.ts`), the
+llama-webui pushes its live events over one WebSocket, `/ws`. The server side is `WsHub` (`app/server/lib/ws/hub.ts`), the
 message types are the `WsMessage` union (`packages/webui-shared/src/ws.ts`), and the web app's client is `useWs` and `onWs()`
-(`web/src/lib/ws.ts`). The events themselves are wired in `server/index.ts`. `mount()` (`server/host.ts`) accepts the
-upgrade with `upgradeWebSocket()` of `@hono/node-server` (the `ws` library underneath) and hands each socket to the hub
-(`hubEvents()`, `server/ws/attach.ts`).
+(`app/src/lib/ws.ts`). The events themselves are wired in `boot()` (`app/server/lib/boot.ts`). The route,
+`app/server/routes/ws.ts`, is a `defineWebSocketHandler()` of Nitro, on [crossws](https://crossws.h3.dev): it accepts
+the upgrade and hands each connection to the hub.
 
 ## Connect
 
@@ -16,8 +16,10 @@ upgrade with `upgradeWebSocket()` of `@hono/node-server` (the `ws` library under
 The upgrade request goes through the same [request guard](/developers/api/overview/#the-request-guard) as the REST
 routes: its `Host` must be `localhost` or an IP address, and an `Origin`, when present, must be llama-webui's own. A
 browser always sends `Origin` on a WebSocket handshake, so only pages served by llama-webui can connect; most
-non-browser clients send none. A refused upgrade gets the guard's `403` and the connection is closed. A plain
-`GET /ws` without an upgrade gets `426` `WebSocket upgrade expected`.
+non-browser clients send none. A refused upgrade gets the guard's `403` and the connection is closed. An upgrade
+that arrives while llama-webui is still starting gets `503` `llama-webui is starting`, closed the same way. A plain
+`GET /ws` without an upgrade gets `426` `WebSocket upgrade expected` (`app/server/middleware/01.guard.ts`, after the
+guard).
 
 Every frame is a JSON text message `{ "type": "…", "payload": … }` (`ping` and `pong` have no payload). There is no
 subscription: every connected client receives every broadcast message. The server reads only `ping` and `pong` from
@@ -45,9 +47,10 @@ On every new connection, `WsHub.attach()` sends `hello` to that client before an
 { "type": "hello", "payload": { "serverTime": 1794210000000, "bootId": "1b0f6c52-8a7e-4f4e-9d0b-3f2a5c7e9a14" } }
 ```
 
-`bootId` identifies the llama-webui process (`crypto.randomUUID()` in `createRuntime()`, `server/runtime.ts`), created
-once with the supervisor and the log ring. It changes when llama-webui restarts, in development on every save under
-`server/` or `packages/` too. Log line numbers (`seq`) and the monitor history belong to one boot: they start over when
+`bootId` identifies the llama-webui runtime (`crypto.randomUUID()` in `createRuntime()`, `app/server/lib/runtime.ts`),
+created once with the supervisor and the log ring. It changes when llama-webui restarts, and in development when a
+save of business code (`app/server/lib/` or `packages/`) rebuilds the runtime; a save of a route file keeps it (see
+[Development restarts](/developers/architecture/#development-restarts)). Log line numbers (`seq`) and the monitor history belong to one boot: they start over when
 the `bootId` changes. `GET /api/state`, `GET /api/logs` and `GET /api/monitor/history` return the `bootId` too, so a
 client can tell which boot a REST answer comes from.
 
@@ -62,11 +65,12 @@ The heartbeat is made of application messages, not WebSocket protocol pings:
   `heartbeat`, and forgets it. A client that stops answering is dropped between 30 and 45 seconds after its last
   `pong`.
 - A client can send `ping` too: the hub answers `pong` right away.
-- A client message larger than 4,096 bytes closes the socket with code `1009` (`maxPayload` in `server/hostServer.ts`):
-  `ping` and `pong` are all a client sends.
+- A client message larger than 4,096 bytes closes the socket with code `1009` and reason `Message too big`
+  (`MAX_CLIENT_MESSAGE_BYTES` in `app/server/routes/ws.ts`): `ping` and `pong` are all a client sends.
 
-At shutdown, `start()` (`server/index.ts`) disposes of the hub: it closes every client with code `1001` and reason
-`shutdown`. The clients reconnect once llama-webui is back, to a new `bootId`.
+At shutdown, `stop()` (`app/server/lib/context.ts`) disposes of the hub: it closes every client with code `1001` and
+reason `shutdown`. The clients reconnect once llama-webui is back, to a new `bootId`. A development reload of
+business code does the same with the old runtime's hub.
 
 ## Messages
 
@@ -94,7 +98,7 @@ At shutdown, `start()` (`server/index.ts`) disposes of the hub: it closes every 
 | Field        | Type   | Description                                                      |
 | ------------ | ------ | ---------------------------------------------------------------- |
 | `serverTime` | number | The server's clock when the client connected (epoch ms).         |
-| `bootId`     | string | A UUID for this llama-webui process (see [hello and bootId](#hello-and-bootid)). |
+| `bootId`     | string | A UUID for this llama-webui runtime (see [hello and bootId](#hello-and-bootid)). |
 
 ### `ping` and `pong`
 
@@ -102,7 +106,7 @@ No payload: `{ "type": "ping" }` and `{ "type": "pong" }`. See [Heartbeat](#hear
 
 ### `snapshot`
 
-The monitor's state at a tick (`Monitor.tick()`, `server/monitor/monitor.ts`); `GET /api/monitor/snapshot` returns the
+The monitor's state at a tick (`Monitor.tick()`, `app/server/lib/monitor/monitor.ts`); `GET /api/monitor/snapshot` returns the
 latest one. Its main fields:
 
 | Field            | Type                                         | Description                                                                     |
@@ -131,7 +135,7 @@ The nested types are described on [Monitor and system](/developers/api/monitor/)
 ### `log`
 
 A batch of `LogLine` (`packages/webui-shared/src/logs.ts`): every line pushed to the ring in the same microtask
-(`LogBuffer.push()`, `server/logs/buffer.ts`).
+(`LogBuffer.push()`, `app/server/lib/logs/buffer.ts`).
 
 | Field   | Type                                       | Description                                                                            |
 | ------- | ------------------------------------------ | -------------------------------------------------------------------------------------- |
@@ -199,7 +203,7 @@ A whole `Sweep` (`packages/webui-shared/src/sweep.ts`), on every change: `id`, `
 ### `placement`
 
 Where the loaded model sits, read from the `llama-server` startup logs (`PlacementTracker`,
-`server/monitor/placement.ts`). It is sent only when the value changes, and is `null` when no managed server is
+`app/server/lib/monitor/placement.ts`). It is sent only when the value changes, and is `null` when no managed server is
 running or its placement is not known (an external server writes nothing to the ring, so its placement is unknown).
 
 | Field       | Type                              | Description                                                                 |
@@ -214,7 +218,7 @@ See [Topology](/developers/api/topology/).
 ### `download-progress`
 
 The `DownloadLive` of the running download (`packages/webui-shared/src/hf.ts`). While bytes arrive it is emitted at most once every
-`liveEveryMs` (250 ms by default, `DownloadQueue` in `server/hf/downloader.ts`); it is `null` when a download ends
+`liveEveryMs` (250 ms by default, `DownloadQueue` in `app/server/lib/hf/downloader.ts`); it is `null` when a download ends
 (the next one in the queue then sends its own).
 
 | Field        | Type                                          | Description                                                  |
@@ -243,7 +247,7 @@ A whole `DownloadItem` (`packages/webui-shared/src/hf.ts`) on every status chang
 The socket only carries changes, so a client that connects, or reconnects after a drop, first reads the current state
 over REST. The web app does it in each store: when `useWs` goes to `open`, it reloads.
 
-| Store (`web/src/lib/`) | Reloads                                  | Then applies                                                |
+| Store (`app/src/lib/`) | Reloads                                  | Then applies                                                |
 | ---------------------- | ---------------------------------------- | ----------------------------------------------------------- |
 | `server.ts`            | `GET /api/state`                         | `server-state`                                              |
 | `logs.ts`              | `GET /api/logs?since=<next seq>`         | `log`                                                       |
@@ -260,7 +264,7 @@ Then the `bootId` decides what the client keeps:
 
 - **Same `bootId`** (a network drop): the numbering goes on. The logs store asks for the lines
   from its next expected `seq` and merges them by number (`mergeLogs()`, `packages/webui-shared/src/logs.ts`).
-- **Different `bootId`** (llama-webui restarted): the log numbering restarted at 0 and the history is empty. The
+- **Different `bootId`** (llama-webui restarted, or a development reload rebuilt the runtime): the log numbering restarted at 0 and the history is empty. The
   clients drop what they hold: the logs store starts over (`onBoot()`) and reads `GET /api/logs?since=0`, the monitor
   store empties its history and snapshot, and reloads the history.
 

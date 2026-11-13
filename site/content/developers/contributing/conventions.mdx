@@ -3,7 +3,7 @@ title: Conventions
 description: Language, number formatting, Biome rules, React and built-in API idioms, generated shadcn components and the development restarts every change goes through.
 ---
 
-These rules apply to `server/`, `packages/`, `web/` and `site/`. They come from `CLAUDE.md` at the root of the repository
+These rules apply to `app/`, `packages/` and `site/`. They come from `CLAUDE.md` at the root of the repository
 (written in French); `biome.json`, the `tsconfig*.json` files and CI enforce the mechanical ones.
 
 ## Language
@@ -20,7 +20,7 @@ console messages from the server start with `[llama-webui]`.
 
 ### Numbers, dates and units
 
-The web app formats every number, date and unit through `web/src/lib/format.ts`, with the `LOCALE = 'en-US'` of
+The web app formats every number, date and unit through `app/src/lib/format.ts`, with the `LOCALE = 'en-US'` of
 `packages/webui-shared/src/format.ts`. Do not hard-code a locale in a component: use a helper, or add one to that file. A server
 message that shows a number (an error, a log line) uses `fmtInt()` from `packages/webui-shared/src/format.ts` the same way.
 
@@ -43,14 +43,14 @@ Missing values (`null`, `undefined`, not finite) render as “—” in the help
 The web app never branches on the text of a server message. When the UI must react to a specific refusal, the server
 gives it a machine-readable `code`:
 
-```ts title="server/db/profiles.ts"
+```ts title="app/server/lib/db/profiles.ts"
 const conflict = (name: string) => new HttpError(409, `A profile named “${name}” already exists`, 'name-taken');
 ```
 
-`HttpError(status, message, code)` (`server/http.ts`) becomes `{ "error": "…", "code": "name-taken" }`, and the web
-client's `ApiError` (`web/src/lib/api.ts`) exposes it as `code`:
+`HttpError(status, message, code)` (`app/server/lib/http.ts`) becomes `{ "error": "…", "code": "name-taken" }`, and the web
+client's `ApiError` (`app/src/lib/api.ts`) exposes it as `code`:
 
-```ts title="web/src/lib/bench.ts"
+```ts title="app/src/lib/bench.ts"
 if (e instanceof ApiError && e.code === 'server-running') return 'confirm';
 ```
 
@@ -64,7 +64,7 @@ wording of earlier versions (the app used to be in French, and old rows keep the
 
 ## Formatting and lint
 
-[Biome](https://biomejs.dev) formats, lints and sorts imports. It is a pinned devDependency (`@biomejs/biome` 2.6.6)
+[Biome](https://biomejs.dev) formats, lints and sorts imports. It is a pinned devDependency (`@biomejs/biome` 2.6.7)
 configured in `biome.json`.
 
 | Setting       | Value                                                                                     |
@@ -78,7 +78,8 @@ configured in `biome.json`.
 | CSS           | Parsed with Tailwind directives                                                           |
 
 Biome checks TypeScript, JSON and CSS in every package. It skips files ignored by Git, `node_modules`, `testdata`,
-`dist`, the site's build output (`site/build`, `site/dist`, `site/.react-router`), the `.mdx` pages (not supported) and
+`dist`, Nitro's build output (`.output`), the site's build output (`site/build`, `site/dist`, `site/.react-router`), the
+generated files `app/server/api.gen.ts` and `app/server/lib/contract/golden.json`, the `.mdx` pages (not supported) and
 the generated shadcn components (see [Generated shadcn components](#generated-shadcn-components)).
 
 | Command            | Runs                       | Effect                                     |
@@ -95,13 +96,13 @@ Before a commit, a pull request or the end of a milestone, `pnpm lint` must repo
 Do not turn a rule off or lower it to `warn` in `biome.json` to get the lint through. When a rule reports a false
 positive, silence that one line with a `biome-ignore` comment that names the rule and says why:
 
-```tsx title="web/src/features/chat/CodeBlock.tsx"
+```tsx title="app/src/features/chat/CodeBlock.tsx"
 // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML produced by shiki from the text (escaped), not the reply's HTML
 ```
 
 The same works in CSS:
 
-```css title="web/src/index.css"
+```css title="app/src/index.css"
 /* biome-ignore lint/complexity/noImportantStyles: overrides the border set by uPlot */
 ```
 
@@ -112,7 +113,7 @@ The web app uses React 19. Three rules cover most effect-related lint reports:
 - **Trigger dependencies.** `useExhaustiveDependencies` flags a dependency the effect does not read. When the value is a
   deliberate trigger (the effect must run again when it changes), keep it and say so in a `biome-ignore`:
 
-  ```tsx title="web/src/features/chat/Thread.tsx"
+  ```tsx title="app/src/features/chat/Thread.tsx"
   // biome-ignore lint/correctness/useExhaustiveDependencies: current.id is a trigger: re-pin to the bottom on every conversation change
   useLayoutEffect(() => {
     stick.current = true;
@@ -122,7 +123,7 @@ The web app uses React 19. Three rules cover most effect-related lint reports:
 - **Read the latest value without re-running the effect.** Use `useEffectEvent` rather than leaving the value out of
   the dependencies with an ignore:
 
-  ```tsx title="web/src/features/tuning/TuningPage.tsx"
+  ```tsx title="app/src/features/tuning/TuningPage.tsx"
   // Only a change of ?sweep opens one; openId is read fresh without re-running the effect.
   const openWanted = useEffectEvent((id: number) => {
     if (id !== openId) void useTuning.getState().open(id);
@@ -134,7 +135,7 @@ The web app uses React 19. Three rules cover most effect-related lint reports:
 
 - **Reset state when the identity changes.** Put a `key` on the component instead of clearing its state in an effect:
 
-  ```tsx title="web/src/features/chat/SamplingPanel.tsx"
+  ```tsx title="app/src/features/chat/SamplingPanel.tsx"
   // key: switching conversations remounts the form (fields and errors start from scratch).
   return <SamplingForm key={current.id} current={current} props={props} />;
   ```
@@ -146,24 +147,25 @@ processes, timers, hashes and SQLite go through `node:*`. The few packages it ad
 
 | Need                          | Used                                  | Where                                                      |
 | ----------------------------- | ------------------------------------- | ---------------------------------------------------------- |
-| HTTP server                   | `@hono/node-server`, app of `mount()` | `server/hostServer.ts`, `server/host.ts`                   |
-| HTTP routes                   | Hono, through `@hono/node-server`     | `server/api.ts`, `server/routes/*.ts`                      |
-| WebSocket                     | `upgradeWebSocket` on `ws`            | `server/host.ts`, `server/ws/attach.ts`                    |
-| Long requests to llama-server | `llamaFetch` (`node:http`)            | `server/llamaFetch.ts`: chat stream, benchmark requests    |
-| Model downloads               | `downloadFetch` (`node:https`)        | `server/llamaFetch.ts`: Hugging Face downloads (HTTP/1.1)  |
-| SQLite                        | `Database` (`node:sqlite`)            | `server/db/sqlite.ts`: every repository                    |
-| Reading files                 | `readText`, `fileExists`, `fileRange` | `server/proc.ts` (`node:fs`): collectors, hardware readers |
-| Child processes               | `spawnProc`, `which`                  | `server/proc.ts` (`node:child_process`): supervisor, bench |
-| Front end, server bundle      | Vite (`vite build`, dev middlewares)  | `vite.config.ts`, `server/dev.ts`, `server/routes/web.ts`  |
-| NVML                          | `node:ffi` in a child process (`fork`)  | `server/collectors/nvml/`  |
-| Checksums                     | `createHash` (`node:crypto`)          | `server/hf/downloader.ts`                                  |
+| HTTP server                   | [Nitro](https://nitro.build) v3 (`node_server` preset, its server is srvx) | `app/vite.config.ts`, `app/server/plugins/runtime.ts` |
+| HTTP routes                   | Nitro file routes, h3 v2 handlers (`defineHandler`) | `app/server/routes/api/**`, `app/server/middleware/`, `app/server/lib/http.ts` |
+| WebSocket                     | crossws, through Nitro (`features.websocket`, `defineWebSocketHandler`) | `app/server/routes/ws.ts`, `app/server/lib/ws/hub.ts` |
+| Long requests to llama-server | `llamaFetch` (`node:http`)            | `app/server/lib/llamaFetch.ts`: chat stream, benchmark requests    |
+| Model downloads               | `downloadFetch` (`node:https`)        | `app/server/lib/llamaFetch.ts`: Hugging Face downloads (HTTP/1.1)  |
+| SQLite                        | `Database` (`node:sqlite`)            | `app/server/lib/db/sqlite.ts`: every repository                    |
+| Reading files                 | `readText`, `fileExists`, `fileRange` | `app/server/lib/proc.ts` (`node:fs`): collectors, hardware readers |
+| Child processes               | `spawnProc`, `which`                  | `app/server/lib/proc.ts` (`node:child_process`): supervisor, bench |
+| Front end, server bundle      | Vite with Nitro's plugin (`vite dev`, `vite build`), Rolldown for the launcher and the NVML sampler | `app/vite.config.ts`, `app/bin/llama-webui.ts` |
+| NVML                          | `node:ffi` in a child process (`fork`)  | `app/server/lib/collectors/nvml/`  |
+| Checksums                     | `createHash` (`node:crypto`)          | `app/server/lib/hf/downloader.ts`                                  |
 | Pauses                        | `setTimeout` (`node:timers/promises`) | Supervisor, benchmarks, tests                              |
 | Tests                         | Vitest                                | Every `*.test.ts` but those of `packages/llamacpp-js/`     |
 
 Directories and file handles go through `node:fs` or `node:fs/promises` (`readdir`, `stat`, `realpath`, `open`,
-`statfs`); tests write files with `writeFileDeep()` (`server/testing/write.ts`), which creates the parent directories.
-There is no Express, `better-sqlite3`, `execa` or `dotenv` (`server/env.ts` parses `.env` with Node's
-`parseEnv()` from `node:util`), and no Jest. Two exceptions: `site/` is built with Vite and React Router (its scripts, run by
+`statfs`); tests write files with `writeFileDeep()` (`app/server/lib/testing/write.ts`), which creates the parent directories.
+There is no Express, Hono, `better-sqlite3`, `execa` or `dotenv` (`app/server/lib/env.ts` parses `.env` with Node's
+`parseEnv()` from `node:util`), and no Jest. Nitro bundles every package the server imports: the build needs no
+`node_modules` at run time. Two exceptions: `site/` is built with Vite and React Router (its scripts, run by
 Node, follow the same rules); `packages/llamacpp-js/` targets Node 24 or later, so its sources use
 only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), and its tests use
 `node:test` with no dependency ([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
@@ -173,38 +175,51 @@ only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), 
 - **A deadline does not hold the process.** A pause that only bounds a wait (`Promise.race([proc.exited, sleep(ms)])`)
   is `sleep(ms, undefined, { ref: false })`: once the other side wins, the pending timer must not keep Node running.
 - **`packages/webui-shared/` stays portable.** The browser bundle imports it, so its modules import nothing but `zod`,
-  the browser-safe modules of `llamacpp-js` and each other: no Node API. The server and the web import it as `@llama-webui/shared`; inside `web/` and `site/`, `@/` points
-  to their own `src/`.
+  the browser-safe modules of `llamacpp-js` and each other: no Node API. The server and the web import it as
+  `@llama-webui/shared`; inside `app/` and `site/`, `@/` points to their own `src/` (the client's, not the server's).
 - **Cleanup with `using`.** `defer(fn)` (`packages/webui-shared/src/dispose.ts`) returns a `Disposable`, so
   `using _busy = defer(() => (busy = false));` replaces a `try`/`finally`. Tests release temporary directories and
   databases the same way.
 - **Dependencies as arguments.** Server classes and builders take their collaborators (`fetch`, `spawn`, repositories,
   settings getters) as a deps object, which is what lets tests pass fakes (see [Testing](/developers/contributing/testing/)).
-- **Hono's helpers for HTTP.** A handler answers with `c.json()` or `c.body()` rather than `new Response()`, streams
-  SSE with `streamSSE()` (`hono/streaming`), and the WebSocket goes through `upgradeWebSocket()` of `@hono/node-server`
-  (2.x has it built in: no `@hono/node-ws`). `Response.json()` stays where there is no context (`errorResponse()`,
-  the guard) or where `c.json()` cannot type the body (`/api/server/props`, llama-server's own JSON).
+- **The helpers of `app/server/lib/http.ts` for HTTP.** A route file is a `defineHandler()` of `nitro`. It answers
+  with `reply<T>(data, status)` (JSON, typed for the client), `noContent()` (`204`) or `attachment(filename, body)`,
+  and fails by throwing `HttpError(status, message, code?)` or `notFound('Profile')`. It reads its input with the
+  validators, which keep the API's messages and their order: `idParam(event, 'Profile')` (a positive integer `:id`,
+  else `404`, before any body), `readBody(event, Schema)` (zod: `Invalid JSON`, `JSON object expected`, then
+  `Invalid data: …` with `issues`), `readJson(event, check)` (a check of its own, `object` or `passthrough`) and
+  `queryOf(event, 'key', …)` (the first value of each key). A file that reads a body or a query exports its type as
+  `export type Body` or `export type Query`: that is what the generated `app/server/api.gen.ts` types the client
+  with. SSE goes through h3's `createEventStream()` (`app/server/lib/chat/sse.ts`). A plain `Response.json()` stays
+  where the body has no type to give (`/api/server/props`, llama-server's own JSON) and in the middlewares (the
+  guard, the 405 table).
 
 ## Generated shadcn components
 
-`web/src/components/ui/**` and `site/src/components/ui/**` hold stock [shadcn/ui](https://ui.shadcn.com) components
+`app/src/components/ui/**` and `site/src/components/ui/**` hold stock [shadcn/ui](https://ui.shadcn.com) components
 (configured by `components.json` in each package). Biome ignores them entirely (no format, no lint, no import sorting) so
 they stay comparable with shadcn updates. Leave them untouched: put the project's changes in a wrapper outside `ui/`, as
-`web/src/components/Select.tsx` does for the select list.
+`app/src/components/Select.tsx` does for the select list.
 
 ## Development restarts
 
-`pnpm dev` restarts the whole process on every save under `server/` or `packages/` (`node --watch-path`), and Vite
-serves the UI with HMR. Server state lives only as long as its process:
+`pnpm dev` (`vite dev` in `app/`) serves the UI with HMR and runs the server in Nitro's dev worker, which evaluates
+the changed files again on every save. The runtime (the supervisor, the database, the monitor…) is kept on
+`globalThis` by `app/server/lib/context.ts`, so what a save does depends on the file:
 
-- A save stops the managed `llama-server` with the process, as any stop does: a running chat reply is saved as
-  `stopped`, a benchmark run and its sweep as `interrupted` (Resume button), a download resumes from its `.part` at the
-  next start. Edit the server between benchmarks rather than during one.
-- Server modules are evaluated once per process, so module state, classes and `instanceof` checks are those of that
-  process: recognize errors with `instanceof` (`SupervisorError`, `HttpError`). The `Llama*Error` classes of
-  `llamacpp-js` also have a fixed `name`, for callers that load the package twice.
-- What a part of the server starts, it registers on the `AsyncDisposableStack` of `start()` (`server/index.ts`), which
-  undoes everything at shutdown.
-- Vite plugins are declared once, in `vite.config.ts`: development and `pnpm build` both use them.
+- A save of a route file (`app/server/routes/`, `middleware/`, `plugins/`) keeps the runtime: `llama-server`, a
+  running reply and a benchmark go on, with the same `bootId`.
+- A save of business code that `app/server/lib/boot.ts` reaches (under `app/server/lib/`) undoes the old
+  runtime and builds a new one, as any stop does: the managed `llama-server` stops, a running chat reply is saved as
+  `stopped`, a benchmark run and its sweep as `interrupted` (Resume button), a download resumes from its `.part`.
+  Edit the business code between benchmarks rather than during one.
+- State a route needs across requests lives in `lib/` (for example `app/server/lib/tuning/memo.ts`), not in the route
+  file, which a reload evaluates again.
+- A reload evaluates the saved module again, with the modules that import it. Errors are recognized with
+  `instanceof` (`SupervisorError`, `HttpError`); the `Llama*Error` classes of `llamacpp-js` also have a fixed `name`,
+  for callers that load the package twice.
+- What a part of the server starts, it registers on the `AsyncDisposableStack` of `boot()` (`app/server/lib/boot.ts`),
+  which undoes everything at shutdown.
+- Vite plugins are declared once, in `app/vite.config.ts`: development and `pnpm build` both use them.
 
 [Architecture](/developers/architecture/#development-restarts) describes the restart and the shutdown order.

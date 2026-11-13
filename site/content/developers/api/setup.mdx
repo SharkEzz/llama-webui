@@ -3,9 +3,9 @@ title: Setup and launch pad
 description: The first-run setup report and the launch pad cards of the Home page, with every field of SetupReport and LaunchpadEntry.
 ---
 
-Two read-only routes feed the Home page (`server/routes/setup.ts`): the setup report behind the
+Two read-only routes feed the Home page (`app/server/routes/api/setup.get.ts` and `launchpad.get.ts`): the setup report behind the
 [first-run checklist](/docs/getting-started/first-run/), and the cards of the [launch pad](/docs/home/). The work is
-done by `buildSetupReport()` and `buildLaunchpad()` (`server/setup.ts`), the types are `SetupReport` and
+done by `buildSetupReport()` and `buildLaunchpad()` (`app/server/lib/setup.ts`), the types are `SetupReport` and
 `LaunchpadEntry` (`packages/webui-shared/src/setup.ts`). The common rules are on the [API overview](/developers/api/overview/).
 
 ## Setup report

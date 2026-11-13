@@ -1,7 +1,7 @@
 # Nitro spike: report
 
 Go/no-go record of the Nitro v3 spike (branch `spike/nitro`, never merged; plan:
-`~/.claude/plans/on-va-faire-le-floofy-flurry.md`; probe: `app/probe/RESULTS.md`). The spike is a full vertical slice:
+`~/.claude/plans/on-va-faire-le-floofy-flurry.md`; probe: `app/probe/RESULTS.md` at commit `4aa6bb8`, removed since). The spike is a full vertical slice:
 web and server in a single package `app/`, all 70 API routes as H3 file routes, `/ws` on crossws, the UI served by
 Nitro, the llama-server lifecycle, the production build and the unchanged CLI. Measured on 2026-11-13 with
 `nitro@3.0.261103-rc`, Vite 8.3.8 and Node 26.13.0, against `master` at the merge base.

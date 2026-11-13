@@ -18,7 +18,7 @@ function trustedHostname(hostname: string): boolean {
  * Returns an error response, or undefined if the request passes.
  */
 export function guard(req: Pick<Request, 'url' | 'method' | 'headers'>): Response | undefined {
-  // `req.url` is built from the Host header (server/host.ts): a Host that is not an authority (`a b`) makes it unparsable too.
+  // `req.url` is built from the Host header (srvx): a Host that is not an authority (`a b`) makes it unparsable too.
   let url: URL;
   let host: string;
   let hostname: string;
@@ -39,7 +39,7 @@ export function guard(req: Pick<Request, 'url' | 'method' | 'headers'>): Respons
   if (MUTATING.has(req.method)) {
     const type = req.headers.get('content-type');
     const json = type !== null && /^application\/json\b/i.test(type);
-    // From the headers, not `req.body`: Node's adapter (`@hono/node-server`) gives every write a body stream, even
+    // From the headers, not `req.body`: Node's adapter (srvx) gives every write a body stream, even
     // a body-less one. Over HTTP/1.1 a body comes with a content-length or a transfer-encoding.
     const length = req.headers.get('content-length');
     const body = (length !== null && Number(length) > 0) || req.headers.has('transfer-encoding');

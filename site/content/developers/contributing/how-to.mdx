@@ -13,43 +13,44 @@ them.
 <Steps>
   <Step title="Write the page">
 
-Create `web/src/features/<page>/<Name>Page.tsx` and export the component by name. Pages render their own `<h1>` and
-build on the glass components of `web/src/components/glass/` (`GlassCard`) and the shadcn primitives. Keep logic you
+Create `app/src/features/<page>/<Name>Page.tsx` and export the component by name. Pages render their own `<h1>` and
+build on the glass components of `app/src/components/glass/` (`GlassCard`) and the shadcn primitives. Keep logic you
 want to test in a plain module next to it.
 
   </Step>
   <Step title="Add the route">
 
-Add an entry to the router's children in `web/src/app/router.tsx`. `page()` turns it into a lazy route, so the page is
+Add an entry to the router's children in `app/src/app/router.tsx`. `page()` turns it into a lazy route, so the page is
 its own chunk, loaded on first visit:
 
-```tsx title="web/src/app/router.tsx"
+```tsx title="app/src/app/router.tsx"
 { path: 'bench', ...page(() => import('@/features/bench/BenchPage'), 'BenchPage') },
 ```
 
 Keep the `import()` literal: the bundler can only split a chunk it can see. The server answers every path that is not
-an API route with the app (`/*`), so a reload on the new URL works without a server change.
+an API route with the app (Nitro's renderer serves `index.html`), so a reload on the new URL works without a server
+change.
 
   </Step>
   <Step title="Add it to the sidebar">
 
-Add `{ path, label, icon, group }` to `ROUTES` in `web/src/app/routes.ts`, with a [Lucide](https://lucide.dev) icon,
+Add `{ path, label, icon, group }` to `ROUTES` in `app/src/app/routes.ts`, with a [Lucide](https://lucide.dev) icon,
 next to the other entries of its group (`overview`, `run`, `monitor` or `tune`). The sidebar
-(`web/src/app/Sidebar.tsx`) lists `ROUTES` in order, draws a line between two groups (`navGroups()`), and pins
-**Settings** (group `settings`) at the bottom. `web/src/app/routes.test.ts` fails if a group's entries are not
+(`app/src/app/Sidebar.tsx`) lists `ROUTES` in order, draws a line between two groups (`navGroups()`), and pins
+**Settings** (group `settings`) at the bottom. `app/src/app/routes.test.ts` fails if a group's entries are not
 contiguous.
 
   </Step>
   <Step title="Load its data">
 
-Put the API calls and the store of the page's domain in `web/src/lib/<domain>.ts` (a zustand store, `call(client…)` from
-`web/src/lib/api.ts`). If the page follows WebSocket messages that only it needs, start their subscription when it
+Put the API calls and the store of the page's domain in `app/src/lib/<domain>.ts` (a zustand store, `api(…)` from
+`app/src/lib/api.ts`). If the page follows WebSocket messages that only it needs, start their subscription when it
 mounts, as `BenchPage` does with `startBenchSync()`.
 
   </Step>
   <Step title="Check it">
 
-`pnpm dev` picks up the new files. To check the production split, run `pnpm start` (it builds the front end with
+`pnpm dev` picks up the new files. To check the production split, run `pnpm start` (it builds the app with
 `vite build` first) and open the page.
 
   </Step>
@@ -66,7 +67,7 @@ and the [Web app](/developers/frontend/) page for the router and sidebar.
 
 A request body or a response the web app also builds or reads gets a zod schema and its type in
 `packages/webui-shared/src/<domain>.ts` (a new module is re-exported from `packages/webui-shared/src/index.ts`). Validation messages are in English.
-A shape only the route reads can stay in the route file, like `EstimateRequest` in `server/routes/tuning.ts`.
+A shape only the route reads can stay in the route file, like `EstimateRequest` in `app/server/routes/api/tuning/estimate.post.ts`.
 `z.strictObject` rejects unknown fields.
 
 ```ts title="packages/webui-shared/src/hf.ts"
@@ -80,65 +81,79 @@ export type DownloadRequest = z.infer<typeof DownloadRequestSchema>;
 ```
 
   </Step>
-  <Step title="Write the handlers">
+  <Step title="Write the route file">
 
-Each domain has a file in `server/routes/` that exports a function taking its dependencies and returning a chained
-`Hono` app (`new Hono<Env>()`, `Env` from `server/http.ts`). Keep the chain unbroken and the handlers inline: the
-typed client of the web app infers each route from it. The guard, the `405` table and the error responses are
-applied by `createApi()` for every route: there is nothing to wrap.
+Nitro maps each file under `app/server/routes/api/` to a route, one file per method: the path comes from the folders,
+`[id]` is a parameter, and the suffix is the method (`profiles/[id]/index.put.ts` is `PUT /api/profiles/:id`). The
+file's default export is a `defineHandler()` of `nitro`; it reads the app's objects with `deps()`
+(`app/server/lib/context.ts`), which the middleware `00.ready.ts` makes available once startup is done. The guard, the
+`405` table, the `404` of an unknown route and the error responses are applied to every route by
+`app/server/middleware/01.guard.ts` and `app/server/error.ts`: there is nothing to wrap.
 
-```ts title="server/routes/topology.ts"
-export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
-  new Hono<Env>().get('/api/topology', async (c) =>
-    c.json({ graph: await readPciTopology(), placement: placement.current }),
-  );
+```ts title="app/server/routes/api/topology.get.ts"
+export default defineHandler(async () =>
+  reply({ graph: await readPciTopology(), placement: deps().placement.current }),
+);
 ```
 
-Register a static path before a `:param` path of the same method that would match it (`/api/downloads/clear`
-before `/api/downloads/:id`): Hono takes the first match, and the contract suite fails on the wrong order.
+Nitro's router matches a static segment before a `[param]` one, whatever the order of the files:
+`downloads/clear.post.ts` is never taken for `downloads/[id]/`.
 
-The helpers of `server/http.ts` cover the usual cases:
+The helpers of `app/server/lib/http.ts` cover the usual cases:
 
 | Helper                                      | Use                                                                        |
 | ------------------------------------------- | -------------------------------------------------------------------------- |
-| `body(Schema)`                              | Validates the JSON body with a zod schema (`@hono/zod-validator`): `400 Invalid JSON`, `400 JSON object expected`, then the `ZodError` (first issue + `issues`); read it with `c.req.valid('json')` |
-| `json(check)`                               | A JSON body passed through your own check (`json(object)`: any object), for custom messages |
-| `id('Download')`                            | A positive integer `:id`, otherwise `404 Download not found`; put it before the body validator; `c.req.valid('param').id` |
+| `reply<T>(data, status = 200)`              | A JSON response; `T` is what the typed client returns                      |
+| `noContent()`, `attachment(filename, body)` | A `204`, a JSON download                                                   |
+| `readBody(event, Schema)`                   | The JSON body validated by a zod schema: `400 Invalid JSON`, `400 JSON object expected`, then the `ZodError` (`Invalid data: …` + `issues`) |
+| `readJson(event, check)`                    | A JSON body passed through your own check (`object`: any object; `passthrough`: as sent), for custom messages |
+| `idParam(event, 'Download')`                | A positive integer `:id`, otherwise `404 Download not found`; read it before the body |
+| `queryOf(event, 'key', …)`                  | The first value of each query key present (it refuses nothing)             |
 | `notFound('Profile')`                       | `404 Profile not found`                                                    |
 | `new HttpError(409, message, code)`         | Any refusal; add a `code` when the web app must react to it                |
 
-```ts title="server/routes/hf.ts"
-.post('/api/downloads', body(DownloadRequestSchema), async (c) => {
-  const items = await downloads.enqueue(await downloadInputs(hf, c.req.valid('json'), modelsDir()));
-  return c.json({ items }, 202);
-})
+A file that reads a body or a query exports its type, `export type Body` or `export type Query` (`QueryOf<'key'>`):
+that is what the typed client checks a call against.
+
+```ts title="app/server/routes/api/downloads/index.post.ts"
+export type Body = z.input<typeof DownloadRequestSchema>;
+
+export default defineHandler(async (event) => {
+  const { hf, downloads, settings } = deps();
+  const body = await readBody(event, DownloadRequestSchema);
+  const items = await downloads.enqueue(await downloadInputs(hf, body, expandHome(settings.get().modelsDir)));
+  return reply({ items }, 202);
+});
 ```
 
 When the handler must look something up (and answer `404` or `409`) before the body is checked, do not validate the
-body ahead of it: read it in the handler (`object(await c.req.json())`) or pass it as sent (`json(passthrough)`).
+body ahead of it: read it with `readJson(event, object)` after the lookup, or pass it as sent
+(`readJson(event, passthrough)`) to a repository that validates it.
 
   </Step>
-  <Step title="Register the routes">
+  <Step title="Register the route">
 
-Mount the new app in `createApi()` (`server/api.ts`) with `.route('/', xRoutes(deps))`, chained after the others.
-A new dependency goes into `AppDeps` (`server/api.ts`) and is built in `createDeps()` (`server/deps.ts`). Add the
-route to `ROUTES` in `server/contract/cases.ts` (the contract suite fails otherwise), then regenerate the golden
-(see [Testing](/developers/contributing/testing/)).
+There is nothing to mount: Nitro scans the file, and `app/build/apiTypes.ts` writes the route into
+`app/server/api.gen.ts` (the client's types and the `405` table) at the start of `pnpm dev`, on every save under
+`app/server/routes/api/` and at every build. A new dependency goes into `AppDeps` and is built in `createDeps()`
+(`app/server/lib/deps.ts`). Add the route to `ROUTES` in `app/server/lib/contract/cases.ts` (the contract suite fails
+otherwise), then regenerate the golden (see [Testing](/developers/contributing/testing/#http-contract-suite)).
 
   </Step>
   <Step title="Call it from the web app">
 
-The typed client sees the route as soon as it is registered: `call(client.x[':id'].$post({ ...byId(id), json }))`
-(`web/src/lib/api.ts`) returns the type of the handler's `c.json(…)` and throws an `ApiError` with `status`, `issues`
-(zod details on a `400`) and `code`. Branch on `code`, never on the message. Declare the route's query keys with
-`query(…)` and its body with `body(Schema)` (or `accepts<T>()` when the handler reads it itself) so the client checks
-them too (see [Typed client](/developers/api/overview/#typed-client)).
+The typed client sees the route as soon as `api.gen.ts` lists it:
+`api('POST /api/downloads', { body: { repo, revision, keys } })` (`app/src/lib/api.ts`, with `params: { id }` for an
+`:id` and `query` for the query) returns the type of the handler's `reply(…)` and throws an `ApiError` with `status`,
+`issues` (zod details on a `400`) and `code`. Branch on `code`, never on the message. The body and the query of the
+call are checked against the file's `Body` and `Query` (see [Typed client](/developers/api/overview/#typed-client)).
 
   </Step>
   <Step title="Test it">
 
-Test the logic behind the route without HTTP (a builder like `buildSetupReport` in `server/setup.ts`, a repository on
-`openDb(':memory:')`). A handler can also be called directly with a `Request` that carries `params`.
+Test the logic behind the route without HTTP (a builder like `buildSetupReport` in `app/server/lib/setup.ts`, a
+repository on `openDb(':memory:')`). To test the route file itself, mount it with `routeApp()` and give it test doubles
+with `provideDeps()` ([Write a test](/developers/contributing/testing/#write-a-test)).
 
   </Step>
 </Steps>
@@ -161,10 +176,10 @@ Add a variant to the `WsMessage` union in `packages/webui-shared/src/ws.ts`, wit
   </Step>
   <Step title="Broadcast it">
 
-Services do not import the hub: they take callbacks, and `server/index.ts` connects them to `hub.broadcast()`
-(`server/ws/hub.ts`), which sends the message to every client:
+Services do not import the hub: they take callbacks, and `createDeps()` connects them to `hub.broadcast()`
+(`app/server/lib/ws/hub.ts`), which sends the message to every client:
 
-```ts title="server/deps.ts"
+```ts title="app/server/lib/deps.ts"
 const downloads = new DownloadQueue({
   repo: downloadsRepo,
   hf,
@@ -174,19 +189,19 @@ const downloads = new DownloadQueue({
 });
 ```
 
-Events of the runtime (the supervisor, the log ring, the monitor) are forwarded in `start()` (`server/index.ts`), as
-`monitor.onSnapshot((s) => hub.broadcast(…))` does: the subscription lasts as long as the process. Routes that change
-state themselves can broadcast through the `hub` in their dependencies, as `server/routes/bench.ts` does for
-`bench-deleted`.
+Events of the runtime (the supervisor, the log ring, the monitor) are forwarded in `boot()` (`app/server/lib/boot.ts`),
+as `monitor.onSnapshot((s) => hub.broadcast(…))` does: the subscription lasts as long as the runtime. Routes that
+change state themselves can broadcast through `deps().hub`, as the delete routes of `app/server/routes/api/bench/` do
+for `bench-deleted`.
 
   </Step>
   <Step title="Receive it">
 
-In the store's file in `web/src/lib/`, subscribe with `onWs()` inside a `start<Domain>Sync()` function that runs once.
+In the store's file in `app/src/lib/`, subscribe with `onWs()` inside a `start<Domain>Sync()` function that runs once.
 Messages are not replayed after a disconnection, so the same function reloads the state over REST on every
 (re)connection:
 
-```ts title="web/src/lib/downloads.ts"
+```ts title="app/src/lib/downloads.ts"
 onWs('download-progress', (m) => useDownloads.setState({ live: m.payload }));
 // …
 useWs.subscribe((s, prev) => {
@@ -194,7 +209,7 @@ useWs.subscribe((s, prev) => {
 });
 ```
 
-Call it from `web/src/main.tsx` when the whole app needs it (status bar, toasts), or when a page mounts when only that
+Call it from `app/src/main.tsx` when the whole app needs it (status bar, toasts), or when a page mounts when only that
 page does.
 
   </Step>
@@ -208,10 +223,10 @@ page of the screen that shows it.
 <Steps>
   <Step title="Append the SQL">
 
-Add an entry at the end of `MIGRATIONS` in `server/db/migrations.ts`, with a comment that gives its version and
+Add an entry at the end of `MIGRATIONS` in `app/server/lib/db/migrations.ts`, with a comment that gives its version and
 purpose. Never edit, reorder or remove an entry that has shipped:
 
-```ts title="server/db/migrations.ts"
+```ts title="app/server/lib/db/migrations.ts"
 /** One entry per schema version; never change a migration that has shipped, add a new one. */
 export const MIGRATIONS: string[] = [
 ```
@@ -224,7 +239,7 @@ takes several (versions 10 to 14 rebuild `bench_runs` and copy its rows).
   </Step>
   <Step title="Update the repository">
 
-Each table has a repository in `server/db/` (`settings.ts`, `profiles.ts`, `benchRuns.ts`, `downloads.ts`…) that maps
+Each table has a repository in `app/server/lib/db/` (`settings.ts`, `profiles.ts`, `benchRuns.ts`, `downloads.ts`…) that maps
 rows to the types of `packages/webui-shared/`. Change its queries and row mapping, and the shared type if the API exposes the column.
 
   </Step>
@@ -244,7 +259,7 @@ rewrites existing data, also test it on a copy of a real database, as the skippe
 <Steps>
   <Step title="Write the sampler">
 
-Add the reader in `server/collectors/<name>.ts`: a class or function that returns a typed sample, or `null` when the
+Add the reader in `app/server/lib/collectors/<name>.ts`: a class or function that returns a typed sample, or `null` when the
 source is unavailable. Keep parsing in pure functions tested against captured output in `testdata/`, and take the
 `/proc` or `/sys` root, the `spawn` function or the binary path as parameters so tests can replace them.
 
@@ -257,15 +272,15 @@ Declare the sample type in `packages/webui-shared/src/monitor.ts`, as `SystemSam
   </Step>
   <Step title="Register it">
 
-`Collectors` (`server/collectors/registry.ts`) owns every source. Create the new one in `start()` or `configure()` and
+`Collectors` (`app/server/lib/collectors/registry.ts`) owns every source. Create the new one in `start()` or `configure()` and
 expose it through a getter that is `undefined` while its switch is off, as `system` and `disk` are; stop it in `stop()`.
-A GPU source honors the `GpuNeeds` of `server/collectors/needs.ts`: `gpuSkipped(needs, busId)` is true for a hidden
+A GPU source honors the `GpuNeeds` of `app/server/lib/collectors/needs.ts`: `gpuSkipped(needs, busId)` is true for a hidden
 card, which is identified but never read.
 
   </Step>
   <Step title="Sample it on each tick">
 
-In `Monitor.doTick()` (`server/monitor/monitor.ts`), start the read alongside the others and catch its errors as they
+In `Monitor.doTick()` (`app/server/lib/monitor/monitor.ts`), start the read alongside the others and catch its errors as they
 do (`.catch(() => null)`): an exception would drop the whole snapshot of that tick. Put the result in the snapshot and
 feed its series with `push()`, or `known()` when the value can be missing (the series gets a gap).
 
@@ -273,7 +288,7 @@ feed its series with `push()`, or `known()` when the value can be missing (the s
   <Step title="Show it">
 
 Read it in the page with `useMonitor((s) => s.snapshot?.<field>)` and chart a series with `TimeSeriesChart` and its
-`SERIES` key (`web/src/components/charts/`). If it gets an on/off switch, add it to `collectors` in the settings (see
+`SERIES` key (`app/src/components/charts/`). If it gets an on/off switch, add it to `collectors` in the settings (see
 [Add a setting](#add-a-setting)).
 
   </Step>
@@ -296,23 +311,23 @@ historySeconds: z.number().int().min(30, 'Between 30 and 1800 s').max(1800, 'Bet
 ```
 
 No migration is needed: the `settings` table stores one JSON value per key, and `SettingsRepo.get()`
-(`server/db/settings.ts`) starts from the defaults, so a new key gets its default and a stored value that no longer
+(`app/server/lib/db/settings.ts`) starts from the defaults, so a new key gets its default and a stored value that no longer
 validates falls back to it. A switch inside `collectors` goes into both the inner object and the outer `.default({…})`.
 
   </Step>
   <Step title="Use it on the server">
 
 Read it with `settings.get()` when it is used (modules receive a getter such as `settings: () => settings.get()`), so a
-change applies without a restart. `PATCH /api/settings` (`server/routes/settings.ts`) also calls `monitor.configure()`: a setting
+change applies without a restart. `PATCH /api/settings` (`app/server/routes/api/settings.patch.ts`) also calls `monitor.configure()`: a setting
 the monitor or the collectors depend on belongs in `MonitorSettings` and `CollectorSettings`.
 
   </Step>
   <Step title="Add it to the Settings page">
 
-`web/src/features/settings/SettingsPage.tsx` has three tabs (**General**, **Monitoring**, **Appearance**). Add a field
+`app/src/features/settings/SettingsPage.tsx` has three tabs (**General**, **Monitoring**, **Appearance**). Add a field
 from `fields.tsx` (`TextField`, `SwitchRow`) to the right section and save it with `save({ key: value })` from
-`useSettingsEditor()` (`web/src/lib/settings.ts`). When the server refuses the value, `errors.<key>` holds the zod
-message, which `TextField` shows under the field. The first-run checklist (`web/src/features/home/`) shares the editor
+`useSettingsEditor()` (`app/src/lib/settings.ts`). When the server refuses the value, `errors.<key>` holds the zod
+message, which `TextField` shows under the field. The first-run checklist (`app/src/features/home/`) shares the editor
 and the fields.
 
   </Step>

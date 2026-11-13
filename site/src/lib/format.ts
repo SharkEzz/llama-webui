@@ -1,4 +1,4 @@
-/** Number formatting for the site, same locale as the app (web/src/lib/format.ts): never a hard-coded locale. */
+/** Number formatting for the site, same locale as the app (app/src/lib/format.ts): never a hard-coded locale. */
 export const LOCALE = 'en-US';
 
 export const formatInt = (n: number): string => Math.round(n).toLocaleString(LOCALE);

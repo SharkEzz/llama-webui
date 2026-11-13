@@ -3,7 +3,7 @@ import { clock, type HistoryPoint } from '../telemetry';
 
 /**
  * Generation or prompt tok/s over the last minute, styled like the app's uPlot chart
- * (web/src/components/charts/chartTheme.ts): 2 px line, 10 % fill, 0 to max × 1.15, mono axis labels. One chart per
+ * (app/src/components/charts/chartTheme.ts): 2 px line, 10 % fill, 0 to max × 1.15, mono axis labels. One chart per
  * series, as on the app's Dashboard: prompt runs an order of magnitude faster, so each has its own scale.
  * Plain SVG with a stretched viewBox; strokes keep their width (non-scaling-stroke) and labels are HTML.
  */

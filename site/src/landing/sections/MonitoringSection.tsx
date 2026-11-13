@@ -2,7 +2,7 @@ import { Activity, Cpu, Network, ScrollText } from 'lucide-react';
 import { Shot } from '@/components/Shot';
 import { BentoCard, FeatureSection, SHOT_FRAME } from '../Bento';
 
-/** What the Topology page shows (web/src/features/topology/). */
+/** What the Topology page shows (app/src/features/topology/). */
 const HUD = [
   ['Phase', 'loading, prompt or generation, with the current speeds'],
   ['Model split', 'memory per device and offloaded layers, from the startup logs'],

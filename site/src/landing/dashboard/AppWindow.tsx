@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 import { RUN } from '../telemetry';
 import { StateBadge } from './DashboardReplica';
 
-/** Same entries, icons and groups as the app's sidebar (web/src/app/routes.ts); a line separates two groups. */
+/** Same entries, icons and groups as the app's sidebar (app/src/app/routes.ts); a line separates two groups. */
 const NAV: [string, LucideIcon][][] = [
   [
     ['Home', Home],

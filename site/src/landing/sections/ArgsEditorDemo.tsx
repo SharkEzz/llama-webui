@@ -41,7 +41,7 @@ const STEPS: Step[] = [
 const STILL = 3;
 const HOLD_MS = 4000;
 
-/** Syntax colors of the app's editor (web/src/features/profiles/highlight.tsx): known flags blue, unknown amber. */
+/** Syntax colors of the app's editor (app/src/features/profiles/highlight.tsx): known flags blue, unknown amber. */
 function Line({ text }: { text: string }) {
   return text.split(/(\s+)/).map((tok, i) => {
     const key = `${i}-${tok}`;

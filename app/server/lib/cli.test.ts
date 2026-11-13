@@ -50,7 +50,7 @@ test('parseCli: unknown option, missing value, positional, empty value', () => {
 test('helpText: the installed command and the pnpm scripts, one Node.js process', () => {
   const text = helpText();
   expect(text).toContain('llama-webui [options]');
-  expect(text).toContain('pnpm dev [options]');
+  expect(text).toContain('pnpm dev ');
   expect(text).toContain('pnpm start [options]');
   expect(text).toContain('single Node.js process');
   expect(text).not.toMatch(/\bbun\b/i);
@@ -61,4 +61,12 @@ test('helpText: the installed command and the pnpm scripts, one Node.js process'
 
 test('parseCli: --env-override is accepted (read by the entry points before the .env is loaded)', () => {
   expect(parseCli(['--env-override'], {}).kind).toBe('run');
+});
+
+test('--help names how each way of running reads its options', () => {
+  const help = helpText();
+  expect(help).toContain('app/.output/llama-webui.mjs');
+  expect(help).not.toContain('dist/');
+  // The dev worker has no argv: `pnpm dev` takes the environment and `.env*` files, not flags.
+  expect(help).not.toContain('pnpm dev [options]');
 });

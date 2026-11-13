@@ -5,7 +5,7 @@ import { defineHandler } from 'nitro';
 import { deps } from '../../../lib/context.ts';
 import { HttpError } from '../../../lib/http.ts';
 
-/** llama-server's own JSON, passed through untyped (`web/src/lib/props.ts` narrows it). */
+/** llama-server's own JSON, passed through untyped (`src/lib/props.ts` narrows it). */
 export default defineHandler(async (): Promise<Response> => {
   const s = deps().runtime.supervisor.state;
   if (s.kind !== 'ready' && s.kind !== 'external') throw new HttpError(409, 'Server not ready');

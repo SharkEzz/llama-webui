@@ -11,7 +11,7 @@ const check = (body: unknown): Body => {
   return { content };
 };
 
-/** Server-sent events (`web/src/lib/chat.ts` reads them). */
+/** Server-sent events (`src/lib/chat.ts` reads them). */
 export default defineHandler(async (event) => {
   const id = idParam(event, 'Conversation');
   const { content } = await readJson(event, check);

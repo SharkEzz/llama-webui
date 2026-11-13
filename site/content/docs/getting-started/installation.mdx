@@ -120,8 +120,8 @@ sha256sum -c SHA256SUMS
 npm install -g "./llama-webui-$VERSION.tgz"
 ```
 
-npm copies the package, so you can delete the two files afterwards. It also installs the three libraries llama-webui
-uses for HTTP and WebSocket, at the exact versions the release was tested with; everything else is bundled.
+npm copies the package, so you can delete the two files afterwards. The package has no dependencies to install:
+everything llama-webui uses is bundled into it, at the versions the release was tested with.
 
   </Tab>
   <Tab title="From source">
@@ -159,7 +159,7 @@ pnpm start
   </Tab>
 </Tabs>
 
-When it prints `llama-webui on http://127.0.0.1:7860`, open that address in your browser.
+When it prints `Listening on: http://127.0.0.1:7860/`, open that address in your browser.
 
   </Step>
 </Steps>
@@ -218,7 +218,7 @@ The `ExecStart` line then reads, for example,
 version manager, install llama-webui again with it and write the unit again.
 
 From source, build once with `pnpm build`, point `WorkingDirectory` at the clone (`%h/llama-webui`) and start the
-built server: `ExecStart=/usr/bin/node %h/llama-webui/dist/server/main.js`, with the path of your `node`.
+built launcher: `ExecStart=/usr/bin/node %h/llama-webui/app/.output/llama-webui.mjs`, with the path of your `node`.
 
 ```bash title="Terminal"
 systemctl --user daemon-reload
