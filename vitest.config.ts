@@ -16,7 +16,6 @@ export default defineConfig({
         test: {
           name: 'server',
           include: ['app/server/**/*.test.ts', 'scripts/**/*.test.ts'],
-          exclude: ['app/server/legacy/**', '**/node_modules/**'],
         },
       },
       { extends: true, test: { name: 'shared', include: ['packages/webui-shared/src/**/*.test.ts'] } },

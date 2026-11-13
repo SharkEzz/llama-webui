@@ -22,7 +22,8 @@ interface Registry {
 
 const g = globalThis as { [k: symbol]: Registry | undefined };
 const KEY = Symbol.for('llama-webui.runtime');
-const registry: Registry = (g[KEY] ??= {});
+g[KEY] ??= {};
+const registry: Registry = g[KEY];
 const OWNER = {};
 
 async function undo(live: Live | undefined): Promise<void> {

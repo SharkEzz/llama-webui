@@ -20,6 +20,7 @@
       "!site/dist",
       "!site/.react-router",
       "!app/server/lib/contract/golden.json",
+      "!app/server/api.gen.ts",
       "!**/.output"
     ]
   },

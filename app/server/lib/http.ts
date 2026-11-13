@@ -35,11 +35,33 @@ export function errorResponse(err: unknown): Response {
   // `req.json()` on an empty or malformed body.
   if (err instanceof SyntaxError) return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   // h3's own errors (a status it chose: 404 of a route it does not know…).
-  if (HTTPError.isError(err) && err.status < 500)
-    return Response.json({ error: err.message }, { status: err.status });
+  if (HTTPError.isError(err) && err.status < 500) return Response.json({ error: err.message }, { status: err.status });
   console.error(err);
   return Response.json({ error: 'Internal error' }, { status: 500 });
 }
+
+declare const JSON_BODY: unique symbol;
+
+/**
+ * A JSON response whose body is `T`, for the web's typed client (`server/api.gen.ts` reads `T` off each handler's
+ * return type). The brand is a type only: at run time it is a plain `Response`.
+ */
+export type JsonResponse<T> = Response & { readonly [JSON_BODY]?: T };
+
+/** `T` as JSON, `content-type: application/json` exactly (h3's own serialization adds `;charset=UTF-8`). */
+export const reply = <T>(data: T, status = 200): JsonResponse<T> => Response.json(data, { status });
+
+/** 204: the client's call gives `undefined`. */
+export const noContent = (): JsonResponse<undefined> => new Response(null, { status: 204 });
+
+/** A JSON download, indented for a person to read. */
+export const attachment = <T>(filename: string, body: T): JsonResponse<T> =>
+  new Response(`${JSON.stringify(body, null, 2)}\n`, {
+    headers: {
+      'content-type': 'application/json',
+      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    },
+  });
 
 /** A JSON object, otherwise 400. */
 export function object(body: unknown): Record<string, unknown> {

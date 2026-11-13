@@ -41,7 +41,7 @@ export default defineConfig(({ command }) => ({
     preset: 'node_server',
     features: { websocket: true },
     errorHandler: './server/error.ts',
-    // `server/lib/` is business code, `server/legacy/` the Hono sources being ported: neither is scanned for handlers.
-    ignore: ['lib/**', 'legacy/**'],
+    // `server/lib/` is business code: not scanned for handlers.
+    ignore: ['lib/**'],
   },
 }));
