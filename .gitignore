@@ -42,3 +42,6 @@ data/
 
 # Cache Superdesign (maquettes, contexte de design)
 .superdesign/
+
+.agents/
+.claude/
