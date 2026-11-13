@@ -20,7 +20,7 @@ export function loadDotEnv(path = '.env', o: { override?: boolean } = {}): void 
   try {
     text = readFileSync(path, 'utf8');
   } catch (err) {
-    if (Error.isError(err) && (err as NodeJS.ErrnoException)?.code === 'ENOENT') return;
+    if (Error.isError(err) && (err as NodeJS.ErrnoException).code === 'ENOENT') return;
     throw err;
   }
   const vars = parseEnv(text);
