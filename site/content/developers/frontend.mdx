@@ -169,13 +169,14 @@ another conversation aborts the fetch, which only unsubscribes: the generation g
   connection that missed two (see [WebSocket](/developers/api/websocket/)).
 - **Dispatch.** `onWs(type, fn)` registers a typed listener for one message type and returns its unsubscribe
   function. Messages are dispatched by `type`; a message that is not valid JSON is ignored.
-- **Hot reload.** In development, `import.meta.hot.dispose` closes the socket and clears the retry timer, so HMR does
-  not leave ghost sockets behind.
+- **HMR.** In development, `import.meta.hot.dispose` closes the socket and clears the retry timer, so a hot update
+  of the client does not leave ghost sockets behind.
 
 ### Resynchronizing with bootId
 
-The server sends `hello` with its `bootId` first on every connection. The `bootId` is stable across development
-reloads and changes only when llama-webui restarts, so it tells a reconnection apart from a restart:
+The server sends `hello` with its `bootId` first on every connection. The `bootId` identifies the llama-webui process
+and changes when it restarts (in development, on every save under `server/` or `packages/`), so it tells a
+reconnection apart from a restart:
 
 - `useLogs` ties its lines to the boot (`LogView.bootId`). Log line numbers restart from 0 on every boot, so on a new
   `bootId`, `onBoot()` drops the old lines and the "clear view" marker. The replay on connection asks for

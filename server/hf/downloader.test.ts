@@ -13,7 +13,7 @@ import { fileExists } from '../proc';
 import { type TempDir, tempDir } from '../testing/tempDir';
 import { writeFileDeep } from '../testing/write';
 import { HfClient } from './client';
-import { DownloadQueue, type Handover } from './downloader';
+import { DownloadQueue } from './downloader';
 
 const ENDPOINT = 'https://hf.test';
 const SHA = 'a'.repeat(40);
@@ -113,7 +113,7 @@ afterEach(() => {
   for (const d of dirs.splice(0)) d[Symbol.dispose]();
 });
 
-function setup(files: Record<string, Uint8Array>, o: { free?: number; dbPath?: string; handover?: Handover } = {}) {
+function setup(files: Record<string, Uint8Array>, o: { free?: number; dbPath?: string } = {}) {
   const tmp = tempDir('lw-dl-');
   dirs.push(tmp);
   const repoDir = join(tmp.path, 'o', 'r');
@@ -134,7 +134,6 @@ function setup(files: Record<string, Uint8Array>, o: { free?: number; dbPath?: s
       sleep: async () => {},
       liveEveryMs: 0,
       marginBytes: 0,
-      handover: o.handover ?? { idle: Promise.resolve() },
     });
     return { repo, queue, onItem, onLive, onDeleted };
   };
@@ -375,21 +374,21 @@ describe('DownloadQueue', () => {
     expect(await s.file('m.gguf').exists()).toBe(true);
   });
 
-  test('after a restart (or a reload), the next queue resumes the item from its .part', async () => {
+  test('after a restart, the next queue resumes the item from its .part', async () => {
     const body = data(6000);
-    const handover: Handover = { idle: Promise.resolve() };
     const tmpDb = tempDir('lw-dl-db-');
     dirs.push(tmpDb);
-    const s = setup({ 'm.gguf': body }, { dbPath: join(tmpDb.path, 'db.sqlite'), handover });
+    const s = setup({ 'm.gguf': body }, { dbPath: join(tmpDb.path, 'db.sqlite') });
     s.hub.script((c) => cut(body.slice(0, 2500), c.signal, { hang: true }));
     const first = s.make();
     const [item] = await first.queue.enqueue([s.input('m.gguf')]);
     await until(async () => s.file('m.gguf.part').size === 2500);
+    // Shutdown: the transfer stops and the file is closed before the process exits.
     first.queue.dispose();
+    await first.queue.idle();
     const second = s.make();
     expect(second.repo.get(item!.id)!.status).toBe('downloading');
     second.queue.resume();
-    await first.queue.idle();
     await second.queue.idle();
     expect(second.repo.get(item!.id)!.status).toBe('done');
     expect(s.hub.cdnCalls().map((c) => c.range)).toEqual([null, 'bytes=2500-']);

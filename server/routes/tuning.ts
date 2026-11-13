@@ -39,7 +39,7 @@ const EstimateRequest = z.strictObject({
   ctx: z.number().int().min(512).max(10_000_000).optional(),
 });
 
-/** Latest disk measurements and estimates, per model (in memory: lost on reload, which is harmless). */
+/** Latest disk measurements and estimates, per model (in memory: lost on restart, which is harmless). */
 const DiskSpeedRequest = z.strictObject({ modelPath: z.string().min(1) });
 
 const diskSpeeds = new Map<string, DiskSpeed>();

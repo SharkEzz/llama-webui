@@ -124,7 +124,7 @@ export const useChat = create<ChatState>((set, get) => {
     try {
       const res = await request(ctl.signal);
       if (res) await readSse(res, onEvent);
-      // Stream ended without “done” (server reloaded or cut off), or nothing running (204): reread the saved state.
+      // Stream ended without “done” (server restarted or cut off), or nothing running (204): reread the saved state.
       if (!ended && !ctl.signal.aborted) {
         if (get().streaming?.conversationId === conversationId) set({ streaming: null });
         if (get().current?.id === conversationId) {

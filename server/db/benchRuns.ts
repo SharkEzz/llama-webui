@@ -152,7 +152,7 @@ export class BenchRunsRepo {
     return row ? toRun(row) : null;
   }
 
-  /** Puts an item back in the queue (the app reloaded while it was running: it will be replayed). */
+  /** Puts an item back in the queue, results cleared: it will be replayed. */
   requeue(id: number): void {
     this.db.run(
       "UPDATE bench_runs SET status = 'queued', error = NULL, stats_json = NULL, pp_tps = NULL, tg_tps = NULL, vram_mib_json = '[]', log_excerpt = '', duration_ms = NULL WHERE id = ?",

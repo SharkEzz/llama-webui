@@ -29,9 +29,8 @@ A sweep's items are benchmark runs (`bench_runs` rows with a `sweepId`), so they
 4. **Validate** (optional): `POST /api/sweeps/:id/validate` queues the best configurations again as `server` items,
    measured with a real `llama-server`, and runs the sweep again.
 
-A sweep survives a development reload: the item in progress goes back to the queue and the new module replays it,
-with the gate still held. When llama-webui stops, the sweep and its running item become `interrupted`, and
-`POST /api/sweeps/:id/resume` picks them up.
+When llama-webui stops (in development, on a save under `server/` or `packages/` too), the sweep and its running
+item become `interrupted`, and `POST /api/sweeps/:id/resume` picks them up.
 
 Progress goes over the [WebSocket](/developers/api/websocket/), next to the `bench-run` and `bench-progress` messages
 of each item:

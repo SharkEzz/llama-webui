@@ -107,8 +107,8 @@ export function ArchitectureDiagram() {
       </Tier>
 
       <figcaption className="mt-4 px-1 text-xs text-muted-foreground">
-        The supervisor, the monitor, the logs and the bench gate live on globalThis, so they survive the reloads of{' '}
-        <code className="font-mono whitespace-nowrap">pnpm dev</code>.
+        The supervisor, the monitor, the logs and the bench gate live as long as the process: saving a server file under{' '}
+        <code className="font-mono whitespace-nowrap">pnpm dev</code> restarts it, and llama-server with it.
       </figcaption>
     </figure>
   );

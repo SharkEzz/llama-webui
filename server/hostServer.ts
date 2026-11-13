@@ -1,17 +1,17 @@
-// The HTTP server of the app, from Hono's Node adapter: requests and WebSocket upgrades go to the app that the last
-// `mount()` put on it (`server/host.ts`). Long-lived: in development `server/dev.ts` creates it once, before Vite (its
-// HMR listens on it), and every reload mounts the new app on it. Run by plain `node` from `server/dev.ts` (erasable
-// TS, imports only node:*, `@hono/node-server` and `ws`).
+// The HTTP server of the app, from Hono's Node adapter: requests and WebSocket upgrades go to the app that `mount()`
+// put on it (`server/host.ts`). In development `server/dev.ts` creates it before Vite (its HMR listens on it), and the
+// server entry mounts the app on it. Run by plain `node` from `server/dev.ts` (erasable TS, imports only node:*,
+// `@hono/node-server` and `ws`).
 import { IncomingMessage, Server } from 'node:http';
 import { createAdaptorServer, type Http2Bindings, type HttpBindings } from '@hono/node-server';
 import { WebSocketServer } from 'ws';
 
-/** What the app of a `mount()` answers: the adapter's bindings are Node's request and response. */
+/** What the app of `mount()` answers: the adapter's bindings are Node's request and response. */
 export type HostFetch = (req: Request, env: HttpBindings) => Response | Promise<Response>;
 
 /**
- * The app of the last `mount()`, kept on the server under a registry symbol: a development reload evaluates
- * `server/host.ts` again, and its new app must replace the one the old module mounted.
+ * The app `mount()` put on the server, kept under a registry symbol: in development this module is loaded twice, by
+ * Node from `server/dev.ts` and by Vite's module runner from `server/host.ts`, and both must name the same key.
  */
 export const HOST_APP = Symbol.for('llama-webui.host.app');
 export type HostServer = Server & { [HOST_APP]?: HostFetch };

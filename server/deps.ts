@@ -87,7 +87,7 @@ export function createDeps(o: DepsOptions): AppDeps {
     onLive: (l) => hub.broadcast({ type: 'download-progress', payload: l }),
     onDeleted: (ids) => hub.broadcast({ type: 'download-deleted', payload: { ids } }),
   });
-  // Model placement (startup logs): recreated on every reload, it replays the surviving ring.
+  // Model placement (startup logs): it replays the ring, then follows it.
   const placement = new PlacementTracker({ logs, supervisor });
   return {
     db,

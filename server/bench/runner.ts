@@ -23,7 +23,7 @@ export type { ServerControl } from './gate';
 export interface BenchRunnerDeps {
   repo: BenchRunsRepo;
   sweeps: SweepsRepo;
-  /** The server gate, in the runtime (survives reloads). */
+  /** The server gate, in the runtime. */
   gate: BenchGate;
   executor: RunExecutor;
   hardware(): Promise<BenchHardware>;
@@ -48,12 +48,11 @@ interface Current {
   finished: boolean;
 }
 
-const INTERRUPTED = 'interrupted (llama-webui reloaded or stopped)';
+const INTERRUPTED = 'interrupted (llama-webui stopped)';
 
 /**
  * The benchmarks: one-off runs and sweeps, one at a time. The gate stops the managed server once and restarts it
- * once; the executor runs each run. Recreated on every development reload: dispose() hands over and the
- * new runner resumes a running sweep (resume).
+ * once; the executor runs each run.
  */
 export class BenchRunner {
   private current: Current | null = null;
@@ -211,32 +210,16 @@ export class BenchRunner {
     return this.begin(id);
   }
 
-  private begin(id: number, after: Promise<void> | null = null): Sweep {
+  private begin(id: number): Sweep {
     this.sweep = { id, cancelled: false };
     const sw = this.deps.sweeps.setStatus(id, 'running', { finishedAt: null });
     this.deps.onSweep(sw);
-    void this.loop(id, after);
+    void this.loop(id);
     return sw;
   }
 
-  /**
-   * New module (reload): resumes the running sweep with the gate left by the old one, once the process it killed has
-   * exited (otherwise the replayed item shares the cards with it: skewed starting VRAM, possible OOM).
-   */
-  async resume(): Promise<void> {
-    const sw = this.deps.sweeps.running();
-    if (!sw || this.claimed || this.current || this.sweep) return;
-    const after = this.deps.gate.adopt();
-    if (after) return void this.begin(sw.id, after);
-    // Gate still held but no longer up for grabs (the old module is already releasing it: reload longer than the grace period),
-    // so index.ts did not clean up the orphans: nobody will run this sweep, it becomes “interrupted” (Resume button).
-    this.deps.repo.stopOrphans();
-    this.deps.onSweep(this.deps.sweeps.setStatus(sw.id, 'interrupted'));
-  }
-
-  private async loop(id: number, after: Promise<void> | null = null): Promise<void> {
+  private async loop(id: number): Promise<void> {
     const state = this.sweep!;
-    if (after) await after;
     let lastRun: number | null = null;
     while (!this.disposed && !state.cancelled) {
       const next = this.deps.repo.nextQueued(id);
@@ -330,31 +313,26 @@ export class BenchRunner {
   }
 
   /**
-   * Reload (`restart: true`) or shutdown. The child is killed. A one-off run is “interrupted”; a sweep item goes
-   * back to the queue on reload (the new runner replays it) and the sweep stays “running”. The gate is handed back
-   * later: the new module takes it over, otherwise it restarts the server.
+   * Shutdown: the child is killed, the current run (a sweep item too) is saved as “interrupted”, and so is its sweep
+   * (Resume button). The gate is not released: llama-webui is stopping, and llama-server with it.
    */
-  dispose(o: { restart: boolean }): void {
+  dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     const cur = this.current;
     const sweep = this.sweep;
     this.current = null;
     this.sweep = null;
-    const killed = this.deps.executor.killNow();
+    void this.deps.executor.killNow();
     const { repo } = this.deps;
     try {
-      if (cur && !cur.finished) {
-        if (cur.sweepId !== null && o.restart) repo.requeue(cur.run.id);
-        else
-          repo.finish(cur.run.id, {
-            status: 'interrupted',
-            error: INTERRUPTED,
-            durationMs: this.now() - cur.live.startedAt,
-          });
-      }
-      if (sweep && !o.restart) this.deps.sweeps.setStatus(sweep.id, 'interrupted');
+      if (cur && !cur.finished)
+        repo.finish(cur.run.id, {
+          status: 'interrupted',
+          error: INTERRUPTED,
+          durationMs: this.now() - cur.live.startedAt,
+        });
+      if (sweep) this.deps.sweeps.setStatus(sweep.id, 'interrupted');
     } catch {}
-    if (o.restart) this.deps.gate.releaseLater(killed);
   }
 }

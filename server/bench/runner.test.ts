@@ -53,13 +53,8 @@ afterEach(() => {
 });
 
 /** A fake managed server (ready, profile A) that records stops and restarts. */
-function setup(
-  port = 8080,
-  patch?: (s: ServerControl) => void,
-  deps?: Partial<ExecutorDeps>,
-  shared?: { gate: BenchGate; repo: BenchRunsRepo; sweeps: SweepsRepo; calls: string[] },
-) {
-  const calls: string[] = shared?.calls ?? [];
+function setup(port = 8080, patch?: (s: ServerControl) => void, deps?: Partial<ExecutorDeps>) {
+  const calls: string[] = [];
   let state: ServerState = {
     kind: 'ready',
     profile: 'A',
@@ -90,11 +85,11 @@ function setup(
   const sweepEvents: Sweep[] = [];
   let ended!: () => void;
   const end = new Promise<void>((r) => (ended = r));
-  const db = shared ? null : openDb(':memory:');
-  const repo = shared?.repo ?? new BenchRunsRepo(db!);
-  const sweeps = shared?.sweeps ?? new SweepsRepo(db!);
+  const db = openDb(':memory:');
+  const repo = new BenchRunsRepo(db);
+  const sweeps = new SweepsRepo(db);
   const logs = new LogBuffer(100);
-  const gate = shared?.gate ?? new BenchGate({ server, logs, adoptGraceMs: 0 });
+  const gate = new BenchGate({ server, logs });
   const executor = new RunExecutor({
     settings: () => ({ ...DEFAULT_SETTINGS, binary: FAKE, port }),
     logs,
@@ -197,28 +192,18 @@ test('a failed restart is recorded on the run', async () => {
   expect(last.error).toContain('could not restart llama-server: port in use');
 });
 
-test('a reload while the server is stopping restarts it once the stop is over', async () => {
-  // Like the supervisor: start is refused while another operation (the stop) is in progress.
-  let stopping = false;
-  let release!: () => void;
-  const { runner, calls, repo } = setup(8080, (s) => {
-    s.stop = async () => {
-      stopping = true;
-      calls.push('stop');
-      await new Promise<void>((r) => (release = r));
-      stopping = false;
-    };
-    s.start = async (cmd) => {
-      if (stopping) throw new Error('operation in progress, try again');
-      calls.push(`start:${cmd.display}`);
-    };
-  });
-  const run = await runner.start(spec, { stopServer: true });
-  runner.dispose({ restart: true });
-  release();
-  await sleep(50);
-  expect(calls).toEqual(['stop', 'start:cmdA']);
-  expect(repo.get(run.id)!.status).toBe('interrupted');
+test('dispose (shutdown) saves the running sweep item and its sweep as interrupted', async () => {
+  process.env.FAKE_BENCH_STEP_MS = '200';
+  const { runner, repo, sweeps, runs } = setup();
+  const { sweep } = sweepOf(repo, sweeps, [1, 2]);
+  await runner.startSweep(sweep.id, { stopServer: true });
+  while (!runs.some((r) => r.status === 'running')) await sleep(10);
+  runner.dispose();
+  expect(repo.list({ sweepId: sweep.id }).map((r) => [r.status, r.error])).toEqual([
+    ['interrupted', 'interrupted (llama-webui stopped)'],
+    ['queued', null],
+  ]);
+  expect(sweeps.get(sweep.id)!.status).toBe('interrupted');
 });
 
 test("a bench run gets its profile's environment", async () => {
@@ -344,73 +329,6 @@ test('cancelSweep cancels the queue and releases the gate', async () => {
   expect(sweeps.get(sweep.id)!.status).toBe('cancelled');
   expect(calls).toEqual(['stop', 'start:cmdA']);
   expect(gate.held).toBe(false);
-});
-
-test('after a reload the interrupted item is replayed only once the killed process has exited', async () => {
-  Object.assign(process.env, { FAKE_BENCH_STEP_MS: '60' });
-  const first = setup();
-  const { sweep } = sweepOf(first.repo, first.sweeps, [1, 2]);
-  await first.runner.startSweep(sweep.id, { stopServer: true });
-  while (!first.runs.some((r) => r.status === 'running')) await sleep(10);
-  await sleep(80);
-  // A killed process that is slow to exit (the driver frees its VRAM): replaying before that means two llama-bench on the same cards.
-  const kill = first.executor.killNow.bind(first.executor);
-  let exitedAt = 0;
-  first.executor.killNow = async () => {
-    await kill();
-    await sleep(300);
-    exitedAt = Date.now();
-  };
-  first.runner.dispose({ restart: true });
-  const second = setup(8080, undefined, undefined, {
-    gate: first.gate,
-    repo: first.repo,
-    sweeps: first.sweeps,
-    calls: first.calls,
-  });
-  await second.runner.resume();
-  while (!second.runs.some((r) => r.status === 'running')) await sleep(5);
-  expect(exitedAt).toBeGreaterThan(0);
-  await sweepEnd(second.sweepLives);
-  expect(first.repo.list({ sweepId: sweep.id }).map((r) => r.status)).toEqual(['ok', 'ok']);
-  expect(first.calls).toEqual(['stop', 'start:cmdA']);
-}, 20_000);
-
-test('a reload hands the held gate to the next runner, which replays the interrupted item', async () => {
-  Object.assign(process.env, { FAKE_BENCH_STEP_MS: '60' });
-  const first = setup();
-  const { sweep } = sweepOf(first.repo, first.sweeps, [1, 2, 3]);
-  await first.runner.startSweep(sweep.id, { stopServer: true });
-  // During item 2.
-  while (first.repo.list({ sweepId: sweep.id }).filter((r) => r.status === 'ok').length < 1) await sleep(10);
-  await sleep(80);
-  first.runner.dispose({ restart: true });
-  const second = setup(8080, undefined, undefined, {
-    gate: first.gate,
-    repo: first.repo,
-    sweeps: first.sweeps,
-    calls: first.calls,
-  });
-  await second.runner.resume();
-  await sweepEnd(second.sweepLives);
-  expect(first.calls).toEqual(['stop', 'start:cmdA']);
-  expect(first.repo.list({ sweepId: sweep.id }).map((r) => r.status)).toEqual(['ok', 'ok', 'ok']);
-  expect(first.sweeps.get(sweep.id)!.status).toBe('done');
-  expect(first.gate.held).toBe(false);
-}, 20_000);
-
-test('a reload that finds the gate already being released marks the orphan sweep interrupted instead of leaving it running', async () => {
-  // The reload took longer than the grace period: the old gate restarts the server (slowly) when the new module starts.
-  const { runner, gate, repo, sweeps, sweepEvents } = setup(8080, (s) => {
-    s.start = () => new Promise(() => {});
-  });
-  await gate.acquire({ stopServer: true });
-  void gate.release();
-  const { sweep } = sweepOf(repo, sweeps, [1, 2]);
-  expect(gate.held).toBe(true); // so index.ts does not run stopOrphans()
-  await runner.resume();
-  expect(sweeps.get(sweep.id)!.status).toBe('interrupted');
-  expect(sweepEvents.at(-1)?.status).toBe('interrupted');
 });
 
 test('validating an interrupted sweep also finishes its interrupted items', async () => {

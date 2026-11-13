@@ -55,9 +55,9 @@ export function openDb(path: string): Database {
 - `foreign_keys = ON`: SQLite does not enforce foreign keys without it, and the schema relies on `ON DELETE CASCADE`
   and `ON DELETE SET NULL` (see [Tables](#tables)).
 
-The database handle is not kept in the runtime. `server/index.ts` opens it on each evaluation and closes it in its
-dispose function, so a development reload closes the old handle and opens a new one, which also runs any new
-migration. Tests open a migrated database in memory with `openDb(':memory:')`.
+The database handle is not kept in the runtime. `start()` (`server/index.ts`) opens it first and registers it on its
+shutdown stack (`stack.use(db)`, through `Symbol.dispose`), so it is closed last, after everything that writes to it
+has stopped ([Architecture](/developers/architecture/#shutdown)). Tests open a migrated database in memory with `openDb(':memory:')`.
 
 ## The `Database` wrapper
 
@@ -120,7 +120,7 @@ already broken. `runMigrations(db, upTo)` stops at version `upTo`: tests use it 
    other tables reference the one rebuilt (entries 10 to 14, for `bench_runs`, predate it).
 4. Update the repository that owns the table, and its tests.
 
-The migration runs at the next start, or at the next reload in development (`pnpm dev`).
+The migration runs at the next start. In development (`pnpm dev`), saving the file restarts the process, which runs it.
 
 ## Tables
 
@@ -160,7 +160,7 @@ Indexes: `messages_by_conversation` on `messages(conversation_id, id)`, `bench_r
 ## Repositories
 
 Each repository takes the `Database` and, except `SettingsRepo`, an optional `now` function (default `Date.now`)
-for tests. `server/index.ts` creates them on each evaluation; `ModelCacheRepo` is created by the models and setup
+for tests. `createDeps()` (`server/deps.ts`) creates them once, at startup; `ModelCacheRepo` is created by the models and setup
 routes. They convert rows to the shared types (`Profile`, `Conversation`, `ChatMessage`, `BenchRun`, `Sweep`,
 `DownloadItem`) and back, and some validate their input:
 
@@ -170,7 +170,7 @@ routes. They convert rows to the shared types (`Profile`, `Conversation`, `ChatM
 - `ConversationsRepo.patch()` parses `ConversationPatchSchema`. `addMessage()` and `updateMessage()` also refresh the
   conversation's `updated_at`; `deleteFrom()` deletes a message and every later one (regeneration).
 - `BenchRunsRepo` covers both one-off runs and sweep items: `enqueue()` adds a sweep's items as `queued`, `begin()`
-  freezes the command and hardware of an item when it starts, `requeue()` puts an item back after a reload, and
+  freezes the command and hardware of an item when it starts, `requeue()` puts an item back in the queue with its results cleared (`requeueInterrupted()`, for a resumed sweep), and
   `list()` returns one-off runs by default (`sweepId: 'none'`), 200 at most.
 - `SweepsRepo` computes each sweep's item counts and best run from `bench_runs` when it reads it.
 - `DownloadsRepo.next()` returns an item left `downloading` (interrupted) before the oldest `queued` one.
@@ -184,8 +184,7 @@ A row can be left in a running state if llama-webui was killed. On startup `serv
   `interrupted (llama-webui stopped)` unless they had one.
 - `SweepsRepo.stopOrphans()`: sweeps left `running` become `interrupted` (the Sweeps page offers to resume them).
 
-The bench and sweep resets are skipped when the bench gate is still held, which only happens on a development reload:
-the sweep then continues in the new module (see [Benchmarks and sweeps](/developers/server/bench/)). Downloads left
+An interrupted sweep is resumed from the UI (see [Benchmarks and sweeps](/developers/server/bench/)). Downloads left
 `downloading` are resumed by the download queue rather than reset.
 
 ## Settings

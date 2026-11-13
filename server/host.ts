@@ -16,7 +16,7 @@ export type HostEnv = { Bindings: HttpBindings };
 export type WebHandler = (c: Context<HostEnv>) => Response | Promise<Response>;
 
 export interface MountOptions {
-  /** From `createHostServer()`. Long-lived: in development it survives reloads, each evaluation mounts on it again. */
+  /** From `createHostServer()`, not listening yet: in development `server/dev.ts` creates it, before Vite. */
   server: HostServer;
   /** The API (`createApi(deps).fetch`): `/api/*`. */
   fetch: (req: Request, env: object) => Response | Promise<Response>;
@@ -54,8 +54,8 @@ const wsGuard: MiddlewareHandler<HostEnv> = async (c, next) => {
 };
 
 /**
- * The app of one evaluation: `/api/*` → the API, `/ws` → the WebSocket hub (`upgradeWebSocket` of the Node adapter,
- * 426 without an upgrade), anything else → the UI.
+ * The app: `/api/*` → the API, `/ws` → the WebSocket hub (`upgradeWebSocket` of the Node adapter, 426 without an
+ * upgrade), anything else → the UI.
  */
 function hostApp(o: MountOptions) {
   const app = new Hono<HostEnv>()
@@ -79,10 +79,7 @@ function hostApp(o: MountOptions) {
   return app;
 }
 
-/**
- * Mounts one evaluation of the app on `server`: replaces the app a previous `mount()` put there (a development
- * reload), listens on the first call only, and resolves the bound port.
- */
+/** Mounts the app on `server`, makes it listen and resolves the bound port. */
 export function mount(o: MountOptions): Promise<number> {
   const { server } = o;
   server[HOST_APP] = hostApp(o).fetch;
@@ -93,13 +90,11 @@ export function mount(o: MountOptions): Promise<number> {
   (server as { shouldUpgradeCallback?: (req: IncomingMessage) => boolean }).shouldUpgradeCallback = (req) =>
     req.headers.upgrade?.toLowerCase() === 'websocket' && (pathOf(req) !== '/ws' || !guard(head(req)));
 
-  const bound = () => (server.address() as AddressInfo).port;
-  if (server.listening) return Promise.resolve(bound());
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(o.port, o.hostname, () => {
       server.off('error', reject);
-      resolve(bound());
+      resolve((server.address() as AddressInfo).port);
     });
   });
 }

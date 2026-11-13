@@ -45,9 +45,9 @@ On every new connection, `WsHub.attach()` sends `hello` to that client before an
 { "type": "hello", "payload": { "serverTime": 1794210000000, "bootId": "1b0f6c52-8a7e-4f4e-9d0b-3f2a5c7e9a14" } }
 ```
 
-`bootId` identifies the llama-webui process (`crypto.randomUUID()` in `getRuntime()`, `server/runtime.ts`). It lives
-on `globalThis` with the supervisor and the log ring, so it is the same after a development reload, and changes only
-when llama-webui restarts. Log line numbers (`seq`) and the monitor history belong to one boot: they start over when
+`bootId` identifies the llama-webui process (`crypto.randomUUID()` in `createRuntime()`, `server/runtime.ts`), created
+once with the supervisor and the log ring. It changes when llama-webui restarts, in development on every save under
+`server/` or `packages/` too. Log line numbers (`seq`) and the monitor history belong to one boot: they start over when
 the `bootId` changes. `GET /api/state`, `GET /api/logs` and `GET /api/monitor/history` return the `bootId` too, so a
 client can tell which boot a REST answer comes from.
 
@@ -65,8 +65,8 @@ The heartbeat is made of application messages, not WebSocket protocol pings:
 - A client message larger than 4,096 bytes closes the socket with code `1009` (`maxPayload` in `server/hostServer.ts`):
   `ping` and `pong` are all a client sends.
 
-On a development reload, `server/index.ts` disposes of the old hub: it closes every client with code `1001`
-and reason `shutdown`, and the clients reconnect to the new one (same `bootId`).
+At shutdown, `start()` (`server/index.ts`) disposes of the hub: it closes every client with code `1001` and reason
+`shutdown`. The clients reconnect once llama-webui is back, to a new `bootId`.
 
 ## Messages
 
@@ -258,7 +258,7 @@ a progress bar comes back without waiting for the next `*-progress` message.
 
 Then the `bootId` decides what the client keeps:
 
-- **Same `bootId`** (a network drop, a development reload): the numbering goes on. The logs store asks for the lines
+- **Same `bootId`** (a network drop): the numbering goes on. The logs store asks for the lines
   from its next expected `seq` and merges them by number (`mergeLogs()`, `packages/webui-shared/src/logs.ts`).
 - **Different `bootId`** (llama-webui restarted): the log numbering restarted at 0 and the history is empty. The
   clients drop what they hold: the logs store starts over (`onBoot()`) and reads `GET /api/logs?since=0`, the monitor

@@ -34,7 +34,7 @@ It runs two suites one after the other, and is the command CI runs:
 | `pnpm exec vitest run -t 'sweep'`                  | Tests whose name matches the regular expression      |
 | `pnpm exec vitest`                                 | Watch mode: reruns the tests a change affects        |
 
-A test has 5 seconds by default. Tests that spawn processes, reload or build the app pass a longer timeout as the
+A test has 5 seconds by default. Tests that spawn processes, start Vite or build the app pass a longer timeout as the
 third argument of `test()` or `beforeAll()` (`}, 20_000);` in `server/bench/runner.test.ts`, `120_000` for the build of
 `server/build.test.ts`).
 
@@ -119,8 +119,7 @@ around the API, under Vitest like the others:
 - `server/host.test.ts` mounts the host (`mount()`, `server/host.ts`) on a real server (`createHostServer()`): `/api/*` to the
   API and any other path to the web handler, a body-less `POST` through the guard, an invalid `Host`, `/ws` with and
   without an upgrade, a refused upgrade whose client resets the connection or never closes it, an oversized
-  frame, an upgrade on another path (refused, or left to another `upgrade` listener), and a second mount on the same
-  server.
+  frame, and an upgrade on another path (refused, or left to another `upgrade` listener).
 - `server/hostServer.test.ts` checks the server itself (`createHostServer()`): it speaks HTTP/1 only (an HTTP/2
   client gets a protocol error, the app is never called), and HTTP/2 bindings handed to its listener get `505`.
 - `server/build.test.ts` runs one real `vite build` into a temporary directory: the client is split per page,
@@ -133,8 +132,9 @@ around the API, under Vitest like the others:
   CI) it reads every card; and a sampler stuck in a native call (libc's `sleep()` through `node:ffi`) does not hold
   the exit of the process that stops it.
 - `server/dev.test.ts` starts the development loop (`startDev()`, `server/dev.ts`) on a small entry in a temporary
-  directory: an edit evaluates the entry again, a syntax error then its fix and a missing import then its creation
-  recover, and of two quick writes the last one wins.
+  directory: the entry is evaluated once and its `start()` gets the dev host (the HTTP server and Vite's
+  middlewares), an edit does not evaluate it again (`node --watch-path` restarts the process instead), and a `start()`
+  that throws rejects `startDev()` with Vite closed.
 
 ### Tests of llamacpp-js
 

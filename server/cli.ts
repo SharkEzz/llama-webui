@@ -14,7 +14,7 @@ export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = 7860;
 
 const USAGE = `  llama-webui [options]   installed package (npm install -g llama-webui-<version>.tgz)
-  pnpm dev [options]      development (Vite, HMR), from the repository
+  pnpm dev [options]      development (Vite HMR, restarts on server edits), from the repository
   pnpm start [options]    production (builds, then runs dist/server/main.js), from the repository`;
 
 /** `--help`. */

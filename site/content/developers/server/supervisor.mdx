@@ -1,6 +1,6 @@
 ---
 title: Supervisor
-description: How llama-webui starts, watches and stops llama-server, the state machine behind it, external server detection, and how it survives a development reload.
+description: How llama-webui starts, watches and stops llama-server, the state machine behind it, external server detection, and how the process stops it on shutdown.
 ---
 
 The supervisor owns the one `llama-server` process llama-webui manages: it builds the command line, spawns it, follows
@@ -13,7 +13,7 @@ single instance lives in the runtime (`server/runtime.ts`).
 | `server/supervisor/args.ts`       | `buildCommand()`, `profilePaths()`, `expandHome()`: from a profile to a `BuiltCommand`.    |
 | `server/supervisor/external.ts`   | `externalWatcher()`: detects a `llama-server` llama-webui did not start.                   |
 | `server/supervisor/flags.ts`      | `getFlags()`: the flag catalog of a binary, cached per path.                              |
-| `server/runtime.ts`               | `getRuntime()`: the supervisor, the log ring and the bench gate on `globalThis`; shutdown. |
+| `server/runtime.ts`               | `createRuntime()`: the supervisor, the log ring and the bench gate of the process.         |
 | `packages/webui-shared/src/server.ts`            | `ServerState` and `ServerView`, shared with the web app.                                   |
 
 What talks to `llama-server` itself comes from [llamacpp-js](/developers/llamacpp-js/): `probeHealth()`,
@@ -192,12 +192,15 @@ sends `SIGTERM`, and waits for the process to exit for up to `killTimeoutMs` (5,
 
 ### When llama-webui exits
 
-`getRuntime()` installs the process handlers once:
+`start()` (`server/index.ts`) registers `supervisor.stop()` on its shutdown stack right after `createRuntime()`, and
+installs the process handlers:
 
-- On `SIGINT` or `SIGTERM`, it logs `[llama-webui] <signal>: stopping llama-server…` when a managed process runs,
-  stops the monitor, awaits `supervisor.stop()`, then calls `process.exit(0)`. `server/index.ts` prepends its own
-  handler, which saves running chat replies first (see [Chat runs](/developers/server/chat/)).
-- On `exit`, it calls `killNow()`, a synchronous `SIGKILL` as a last resort.
+- On `SIGINT` or `SIGTERM`, one handler logs `[llama-webui] <signal>: stopping llama-server…` when a managed process
+  runs, then undoes the stack: running chat replies, the benchmark and the download are saved first, then the WebSocket
+  hub, the placement tracker and the monitor stop, then `supervisor.stop()` is awaited, and the database closes last.
+  Then it calls `process.exit(0)`. A second signal during the stop is ignored. The order is in
+  [Architecture](/developers/architecture/#shutdown).
+- On `exit`, it calls `killNow()`, a synchronous `SIGKILL` as a last resort (an uncaught error exits without the stack).
 - If llama-webui is killed outright, `setpriv`'s parent-death signal takes care of `llama-server`.
 
 ## One operation at a time
@@ -210,8 +213,7 @@ operation in progress (`op`):
 - `stop()` does not reject: it waits for the running operation to settle, then runs its own.
 
 Errors raised by the supervisor are `SupervisorError` instances (`name = 'SupervisorError'`). `server/routes/server.ts`
-turns them into `409` responses by checking `e.name`, not `instanceof`, for the reason given in
-[Surviving a development reload](#surviving-a-development-reload).
+turns them into `409` responses (`e instanceof SupervisorError`).
 
 ## External servers
 
@@ -269,10 +271,9 @@ to find the server to talk to, the bench gate, the external watcher, and the rou
 - `activeProfileId(supervisor)`: the profile of the managed server while it is `starting`, `ready` or `stopping`, else
   `null`. The profile routes use it to refuse deleting the running profile.
 
-## Surviving a development reload
+## The runtime
 
-`pnpm dev` re-evaluates the server modules on every save (`server/dev.ts`), and a code reload must neither kill nor orphan
-`llama-server`. So `getRuntime()` keeps one `Runtime` on `globalThis.__llamaWebuiRuntime`:
+`createRuntime()` (`server/runtime.ts`) builds the long-lived objects of the process once, called by `start()`:
 
 ```ts title="server/runtime.ts"
 export interface Runtime {
@@ -284,24 +285,13 @@ export interface Runtime {
 }
 ```
 
-The first call creates it, with a fresh `bootId` (`crypto.randomUUID()`) and the signal handlers; later calls return
-it as is. Consequences:
+`bootId` is a fresh `crypto.randomUUID()`: every start of the process gets a new one, and the client ties its log
+numbering to it. `monitor` is filled by `startMonitor()`. `createRuntime()` only builds: stopping these objects is left to
+the shutdown stack of `start()`.
 
-- The supervisor, the log ring, the monitor and the bench gate are instances of the **first** version of their
-  modules. Changes to `server/supervisor/supervisor.ts`, `server/logs/buffer.ts`, `server/bench/gate.ts`,
-  `server/runtime.ts`, `server/monitor/**` (except `placement.ts`) or `server/collectors/**` only apply after stopping
-  `pnpm dev` and running it again.
-- A `SupervisorError` thrown by the surviving instance is the old module's class, which fails `instanceof` against the
-  new import. Compare `name` instead, as `errorResponse()` does for `HttpError` (`isHttpError()`).
-- Each evaluation of `server/index.ts` subscribes again, so once it has mounted the new instance it calls
-  `globalThis.__llamaWebuiDispose()`, left by the previous evaluation, which unsubscribes the old listeners, clears
-  its timers and closes its database handle.
-
-The other files of `server/supervisor/` hold plain functions. `args.ts`, `external.ts` and `flags.ts` are called from
-the routes and `server/index.ts`, so a reload picks up their changes. `supervisor.ts` also imports `llamacpp-js/client`
-and `llamacpp-js/node` (`packages/llamacpp-js/src/`): the surviving instance keeps calling the versions it was loaded
-with.
-[Architecture](/developers/architecture/) describes the reload model of the whole process.
+In development, a save under `server/` or `packages/` restarts the whole process (`node --watch-path`), so it stops
+`llama-server` like any other shutdown. [Architecture](/developers/architecture/#development-restarts) describes the
+development loop.
 
 ## Benchmarks and the gate
 
@@ -316,10 +306,9 @@ spawns its own `llama-server` (on `127.0.0.1` and the settings port), and `serve
   `stopServer`, it records `supervisor.lastCommand` and calls `supervisor.stop()`.
 - `release(rebuild)` restarts the stopped server with `supervisor.start()` and frees the gate. `rebuild` (given by
   the `BenchRunner`, `rebuild` in `server/index.ts`) builds the command again from the profile as it is now, so edits
-  saved during the benchmark apply; the recorded command is used when the profile is gone or no `rebuild` is given (the
-  deferred release of a reload). A failed restart is logged as `[bench] could not restart llama-server: …`.
+  saved during the benchmark apply; the recorded command is used when the profile is gone or no `rebuild` is given. A failed restart is logged as `[bench] could not restart llama-server: …`.
 - While a benchmark runs, the server routes refuse every lifecycle call with `409 A benchmark is running`, and the
   external watcher is paused: the benchmark's own `llama-server` on the settings port is not an external server.
 
-The gate survives a development reload so that a sweep continues in the new module without a restart of the server in between.
-[Benchmarks and sweeps](/developers/server/bench/) covers the runner and the reload hand-over.
+The gate lives in the runtime, next to the supervisor it stops and restarts.
+[Benchmarks and sweeps](/developers/server/bench/) covers the runner.

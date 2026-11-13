@@ -210,24 +210,13 @@ function spreadMeta(
   return out;
 }
 
-/** Last placement read, with the PID of the server that wrote it. */
-export interface PlacementMemory {
-  last: { pid: number; placement: ModelPlacement } | null;
-}
-
-const g = globalThis as { __llamaWebuiPlacement?: PlacementMemory };
-/** Survives a development reload, like the ring: a reload after the launch was evicted keeps the known placement. */
-g.__llamaWebuiPlacement ??= { last: null };
-const sharedMemory = g.__llamaWebuiPlacement;
-
 export interface PlacementTrackerDeps {
   logs: LogBuffer;
   supervisor: { readonly state: ServerState; subscribe(fn: (s: ServerState) => void): () => void };
-  memory?: PlacementMemory;
 }
 
 /**
- * Tracks the managed server's placement. Recreated on every development reload: it replays the ring (which does survive). The
+ * Tracks the managed server's placement, from the ring (replayed at construction, then followed). The
  * ring only keeps the latest lines: once the launch is evicted (request logs, -lv 4), the last placement read stays
  * valid as long as the tracked server has the same PID. An external server writes nothing to the ring: its
  * placement is unknown even if the ring still holds an old launch.
@@ -237,6 +226,8 @@ export class PlacementTracker {
   private serialized = 'null';
   private listeners = new Set<(p: ModelPlacement | null) => void>();
   private unsubs: (() => void)[] = [];
+  /** Last placement read, with the PID of the server that wrote it. */
+  private last: { pid: number; placement: ModelPlacement } | null = null;
 
   constructor(private readonly deps: PlacementTrackerDeps) {
     this.recompute();
@@ -265,18 +256,17 @@ export class PlacementTracker {
 
   private placement(): ModelPlacement | null {
     const state = this.deps.supervisor.state;
-    const memory = this.deps.memory ?? sharedMemory;
     // Only starting, ready and stopping track a managed server (idle, crashed: none; external: no logs).
     if (state.kind !== 'starting' && state.kind !== 'ready' && state.kind !== 'stopping') {
-      memory.last = null;
+      this.last = null;
       return null;
     }
     const parsed = parsePlacement(this.deps.logs.since(0));
     if (parsed) {
-      memory.last = { pid: state.pid, placement: parsed };
+      this.last = { pid: state.pid, placement: parsed };
       return parsed;
     }
-    return memory.last?.pid === state.pid ? memory.last.placement : null;
+    return this.last?.pid === state.pid ? this.last.placement : null;
   }
 
   private recompute(): void {

@@ -72,7 +72,7 @@ llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Nod
 
 Usage:
   llama-webui [options]   installed package (npm install -g llama-webui-<version>.tgz)
-  pnpm dev [options]      development (Vite, HMR), from the repository
+  pnpm dev [options]      development (Vite HMR, restarts on server edits), from the repository
   pnpm start [options]    production (builds, then runs dist/server/main.js), from the repository
 
 Options:
@@ -101,8 +101,9 @@ Hugging Face downloads (Models page):
                          never proxied
 ```
 
-From a clone, `pnpm start` builds the interface, then starts the server. `pnpm dev` reloads the code when a file
-changes and is meant for working on llama-webui itself; both take the same options as `llama-webui`.
+From a clone, `pnpm start` builds the interface, then starts the server. `pnpm dev` is meant for working on
+llama-webui itself: it updates the interface in place when a file of it changes, and restarts the whole server
+(`llama-server` included) when a server file changes. Both take the same options as `llama-webui`.
 
 ### In a systemd service
 

@@ -8,6 +8,7 @@ import { type Env, HttpError, json, notFound, object, query } from '../http';
 import { type Runtime, serverView } from '../runtime';
 import { binaryPath, buildCommand } from '../supervisor/args';
 import { getFlags } from '../supervisor/flags';
+import { SupervisorError } from '../supervisor/supervisor';
 
 export interface ServerRouteDeps {
   runtime: Runtime;
@@ -19,16 +20,13 @@ export interface ServerRouteDeps {
 
 export function serverRoutes({ runtime, profiles, settings, benchBusy }: ServerRouteDeps) {
   const { supervisor, logs } = runtime;
-  /**
-   * Supervisor refusals (port in use, operation in progress…) become 409s. Compared by name rather than with
-   * instanceof: the supervisor survives a development reload and throws the class from the old version of the module.
-   */
+  /** Supervisor refusals (port in use, operation in progress…) become 409s. */
   const lifecycle = async (fn: () => Promise<void>) => {
     try {
       if (benchBusy()) throw new HttpError(409, 'A benchmark is running');
       await fn();
     } catch (e) {
-      if (e instanceof Error && e.name === 'SupervisorError') throw new HttpError(409, e.message);
+      if (e instanceof SupervisorError) throw new HttpError(409, e.message);
       throw e;
     }
   };

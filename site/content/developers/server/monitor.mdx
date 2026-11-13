@@ -33,8 +33,8 @@ The user-facing pages are the [Dashboard](/docs/dashboard/), [System](/docs/syst
 
 `startMonitor(runtime, settings)` (`server/runtime.ts`) creates the monitor once per process with
 `Monitor.start()`, which starts the collectors, runs a first tick at once, then one every `pollIntervalMs`
-(1,000 ms by default, at least 250 ms). The `Monitor` lives in the runtime, so it survives a development reload: a
-change to `server/monitor/**` (except `placement.ts`) or `server/collectors/**` needs a restart of `pnpm dev`.
+(1,000 ms by default, at least 250 ms). The `Monitor` lives in the runtime; `start()` (`server/index.ts`) stops it at
+shutdown, after the WebSocket hub and before `llama-server` ([Architecture](/developers/architecture/#shutdown)).
 
 A tick that is still running when the next one is due makes that one skip (`inFlight`), so a slow source never
 stacks ticks. `tick()` catches everything: an error is logged as `[llama-webui] monitoring tick:` and the next tick
@@ -105,8 +105,7 @@ export const historyPoints = (historySeconds: number, intervalMs: number) =>
 
 With the defaults (`historySeconds = 300`, `pollIntervalMs = 1000`) a series holds 300 points. The settings schema
 bounds `historySeconds` to 30 to 1,800 and `pollIntervalMs` to at least 250, so a series holds at most 7,200 points.
-The history is only in memory: it survives a development reload with the monitor, and is lost when
-llama-webui stops.
+The history is only in memory: it is lost when llama-webui stops, a development restart included.
 
 The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`):
 
@@ -242,7 +241,7 @@ The disk that holds the model is found by `resolveModelDisk(path)`: it maps the 
 `/sys/dev/block/<major>:<minor>`, and from a partition to its parent disk. It returns `null` when the disk is unknown
 (tmpfs, btrfs, NFS, missing file). The monitor runs that lookup in the background, once per profile, and retries a
 failed one every 30 seconds (`MODEL_DISK_RETRY_MS`): a `stat` on a dead network mount must never block a tick. The
-model path comes from a resolver that `server/index.ts` sets on every evaluation (`setModelPathResolver()`).
+model path comes from a resolver that `server/index.ts` sets at startup (`setModelPathResolver()`).
 
 ### DRAM bandwidth (perf)
 
@@ -303,9 +302,9 @@ context, after the lines of a draft model):
   give the address of `CUDA<N>` as hex digits (`3000` is `0000:03:00.0`). An address from a `using device` line wins;
   with `-sm tensor`, which only logs the `Meta()` device, this is the only one.
 
-Unlike the rest of `server/monitor/`, the tracker is recreated on every reload by `server/index.ts`: it replays the log
-ring, which survives, and keeps the last placement on `globalThis.__llamaWebuiPlacement`, so a reload after the
-launch lines left the ring still knows the placement of the same PID. It subscribes to new log lines (only those that
+`createDeps()` (`server/deps.ts`) creates the tracker: it replays the log ring at construction, and keeps the last
+placement it read with the PID of its server, so once the launch lines have left the ring it still knows the placement
+of the same PID. It subscribes to new log lines (only those that
 can change the result) and to the supervisor, and `server/index.ts` broadcasts each change as a `placement` message.
 An external server has no placement: it writes nothing to the ring.
 
@@ -320,7 +319,7 @@ An external server has no placement: it writes nothing to the ring.
    `collectors` (`packages/webui-shared/src/settings.ts`) controls it.
 4. Call it from `Monitor.doTick()` or `sampleMachine()`, push its series with `push()` or `known()`, and put its value
    in the snapshot.
-5. Stop `pnpm dev` and run it again: the monitor does not reload.
+5. Save: `pnpm dev` restarts the process, and the new collector runs from the first tick.
 
 The pages that show the new figure ([System](/docs/system/), [Dashboard](/docs/dashboard/)) change in the same pull
 request, with this page. See also [How-to guides](/developers/contributing/how-to/).

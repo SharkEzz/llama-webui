@@ -110,7 +110,6 @@ Every error an `/api` route returns is a JSON object with an `error` string, and
 | -------------------------------------- | --------------- | ---------------------------------------------------------------- |
 | `new HttpError(status, message)`       | `status`        | `{ "error": message }`                                           |
 | `new HttpError(status, message, code)` | `status`        | `{ "error": message, "code": code }`                             |
-| An `HttpError` of an older module (development reload) | `status` | the same: `isHttpError()` checks `name === 'HttpError'` and a numeric `status`, not `instanceof` |
 | A `ZodError`                           | `400`           | `{ "error": "Invalid data: <first issue> (<path>)", "issues": [...] }`, the path only when the issue has one |
 | A `SyntaxError`, or Hono's `Malformed JSON in request body` (body is not JSON) | `400` | `{ "error": "Invalid JSON" }` |
 | Anything else                          | `500`           | `{ "error": "Internal error" }`, and the error is logged         |

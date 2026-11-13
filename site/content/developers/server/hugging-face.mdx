@@ -4,7 +4,7 @@ description: The Hub client, how repository files become variants, and the persi
 ---
 
 The Hugging Face module searches the Hub, lists a repository's GGUF files as downloadable variants, and downloads them
-into the models folder through a persistent queue that survives restarts and reloads. It lives in `server/hf/`, with
+into the models folder through a persistent queue that survives restarts. It lives in `server/hf/`, with
 its routes in `server/routes/hf.ts`, its table in `server/db/downloads.ts` and its types in `packages/webui-shared/src/hf.ts`. For
 what users see, read [Hugging Face downloads](/docs/hugging-face/).
 
@@ -13,7 +13,7 @@ what users see, read [Hugging Face downloads](/docs/hugging-face/).
 | `server/hf/client.ts`       | `HfClient`: search, repository files at a revision, token account; `hfHttpError()`       |
 | `server/hf/repo.ts`         | `describeRepo()` for the download sheet, `downloadInputs()` for the queue                |
 | `server/hf/variants.ts`     | `groupRepoFiles()`: files grouped into variants and projectors                           |
-| `server/hf/downloader.ts`   | `DownloadQueue`, `freeBytesOf()`, the reload handover                                    |
+| `server/hf/downloader.ts`   | `DownloadQueue`, `freeBytesOf()`                                                         |
 | `server/hf/paths.ts`        | `repoDir()`, `fileDest()`, `partPath()`, `sizeOf()`                                      |
 | `server/hf/token.ts`        | `resolveHfToken()`, `hfTokenPath()`, `hfEndpoint()`                                      |
 | `server/db/downloads.ts`    | `DownloadsRepo`: the `downloads` table                                                   |
@@ -130,26 +130,21 @@ of two concurrent requests see each other's rows. `enqueue()`:
 
 ### Processing a file
 
-The loop takes `DownloadsRepo.next()`: an item left `downloading` first (interrupted by a restart or a reload), then
+The loop takes `DownloadsRepo.next()`: an item left `downloading` first (interrupted by a restart), then
 the oldest queued one. For each file not yet done, an attempt:
 
 <Steps>
-  <Step title="Wait for the previous writer">
-
-After a reload, the old module may still be writing this `.part`: the attempt waits for the
-[handover](#reloads-and-restarts) first.
-
-  </Step>
   <Step title="Look at the disk">
 
-A destination file with the expected size counts as done. Otherwise the offset is the size of the `.part`; a `.part`
+A destination file with the expected size counts as done (renamed into place just before a stop, before the row
+recorded it). Otherwise the offset is the size of the `.part`; a `.part`
 larger than the file cannot be this file and is deleted.
 
   </Step>
   <Step title="Prepare the checksum">
 
 The sha256 of the bytes already in the `.part` is needed to finish the computation. It is kept in memory between the
-attempts of an item; after a restart, a reload, or a write that failed half-way, the `.part` is read back from disk
+attempts of an item; after a restart, or a write that failed half-way, the `.part` is read back from disk
 (the `verifying` phase).
 
   </Step>
@@ -227,22 +222,17 @@ A status (`DownloadStatus`) is `queued`, `downloading`, `done`, `error` or `canc
 the first two. `bytes_done` only counts the files already renamed into place: the bytes of the file in progress are in
 the live state.
 
-## Reloads and restarts
+## Shutdown and restarts
 
 | Event                          | What happens                                                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| Shutdown (`SIGINT`, `SIGTERM`) | `dispose()` aborts the transfer and keeps the `.part` and the row, still `downloading`                       |
+| Shutdown (`SIGINT`, `SIGTERM`) | `downloads.dispose()`, an early step of the shutdown stack, aborts the transfer and keeps the `.part` and the row, still `downloading` |
 | llama-webui killed             | Same state on disk: the `.part` and a `downloading` row                                                       |
 | Next start                     | `downloads.resume()` in `server/index.ts` starts the loop, which takes the `downloading` item first and resumes it from its `.part` |
-| Development reload             | The old queue's `dispose()` aborts the transfer, the new queue resumes it once the old writer has let go     |
 
-There is no orphan cleanup for downloads: an interrupted item carries on where it stopped.
-
-On a reload, the old and the new module could write the same `.part` at the same time. The **handover** prevents it: a
-`Handover` object on `globalThis` (`__llamaWebuiDownloadHandover`, from `globalHandover()`) holds a promise chain. Each
-attempt chains its own promise behind the previous holder's and waits for it before touching the file; the old
-module's attempt releases its link only after it has closed the `.part`. The new queue's loop also waits for the chain
-before it starts.
+There is no orphan cleanup for downloads: an interrupted item carries on where it stopped. In development, a save under
+`server/` or `packages/` restarts the process: a shutdown, then a next start. One queue runs one attempt at a time, so a
+`.part` has a single writer.
 
 ## Token and endpoint
 

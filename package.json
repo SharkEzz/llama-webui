@@ -13,7 +13,7 @@
   "scripts": {
     "build": "vite build",
     "check": "pnpm -r --parallel --include-workspace-root typecheck",
-    "dev": "node server/dev.ts",
+    "dev": "node --watch-path=server --watch-path=packages --watch-preserve-output server/dev.ts",
     "format": "biome format --write",
     "lint": "biome check",
     "lint:fix": "biome check --write",

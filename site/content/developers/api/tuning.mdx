@@ -236,7 +236,7 @@ curl -X POST http://127.0.0.1:7860/api/tuning/plan \
 Checks the drivers, the CPU, the kernel and the `llama-server` build for settings that cost speed (`runChecks()` in
 `server/tuning/checks.ts`). With a model, the checks also use its file, the latest
 [estimate](#estimate-the-flags-for-a-model) of the same model path and its latest
-[disk measurement](#measure-the-model-disks-read-speed); both are kept in memory and lost when llama-webui reloads.
+[disk measurement](#measure-the-model-disks-read-speed); both are kept in memory and lost when llama-webui restarts.
 
 **Query parameters**
 

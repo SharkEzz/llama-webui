@@ -1,6 +1,6 @@
 // One config for the app: the web client (`web/` → `dist/web`), the server (`server/main.ts` → `dist/server/main.js`)
 // and its NVML worker (→ `dist/server/nvml-worker.js`). `pnpm build` builds them all (`builder`); `server/dev.ts`
-// serves the client and evaluates the server through the ssr environment's module runner. Vitest reads
+// serves the client and evaluates the server once through the ssr environment's module runner. Vitest reads
 // `vitest.config.ts`, not this file.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
