@@ -3,7 +3,7 @@
  * answers with the build's version, the UI and every file it references are served (from a deep URL), React is its
  * production build, and the WebSocket says hello. Exits 1 on the first failure, the server stopped.
  *
- *   node scripts/smoke.ts [dist/server/main.js]   the build, run by this Node
+ *   node scripts/smoke.ts [app/.output/llama-webui.mjs]   the build (Nitro's launcher), run by this Node
  *   node scripts/smoke.ts --tarball [file.tgz]    the package as a user installs it: `pnpm pack` (or the given
  *                                                 tarball), `npm install` into an empty prefix, then the same checks
  *                                                 through its `node_modules/.bin/llama-webui`
@@ -83,7 +83,7 @@ function installTarball(given: string | undefined): string {
 // The command that runs the app, and how it is named in the report.
 const [cmd, ...cmdArgs] = values.tarball
   ? [installTarball(positionals[0])]
-  : [process.execPath, resolve(positionals[0] ?? 'dist/server/main.js')];
+  : [process.execPath, resolve(positionals[0] ?? 'app/.output/llama-webui.mjs')];
 const main = cmdArgs[0] ?? cmd;
 
 const help = spawnSync(cmd, [...cmdArgs, '--help']);
@@ -97,7 +97,7 @@ const { port } = probe.address() as AddressInfo;
 await new Promise((done) => probe.close(done));
 
 const dataDir = temp('lw-smoke-');
-// Run from the data directory: no .env or config of the repository around (dependencies resolve from main.js).
+// Run from the data directory: no .env or config of the repository around (Nitro's output carries its dependencies).
 const proc = spawn(cmd, [...cmdArgs, '--data-dir', dataDir, '--port', String(port)], {
   cwd: dataDir,
   stdio: ['ignore', 'pipe', 'inherit'],

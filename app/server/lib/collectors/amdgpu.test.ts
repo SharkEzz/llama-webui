@@ -16,7 +16,7 @@ import {
   suspendedAmdReading,
 } from './amdgpu';
 
-const fx = (n: string) => readFile(`${import.meta.dirname}/../../testdata/${n}`, 'utf8');
+const fx = (n: string) => readFile(`${import.meta.dirname}/../../../../testdata/${n}`, 'utf8');
 
 const dirs = new DisposableStack();
 afterAll(() => dirs.dispose());

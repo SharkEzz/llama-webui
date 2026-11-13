@@ -7,10 +7,10 @@ type WorkerMsg = { type: 'ready' } | { type: 'error'; message: string } | { type
 
 /**
  * The worker, next to the module that starts it: `worker.ts` next to this file when Node runs the sources
- * (development, tests), `nvml-worker.js` next to `main.js` in the production bundle (`vite.config.ts`).
+ * (development, tests), `nvml-worker.mjs` next to `index.mjs` in Nitro's output (`compiled` hook of `vite.config.ts`).
  */
 export const workerUrl = (moduleUrl = import.meta.url): string =>
-  new URL(moduleUrl.endsWith('.ts') ? './worker.ts' : './nvml-worker.js', moduleUrl).href;
+  new URL(moduleUrl.endsWith('.ts') ? './worker.ts' : './nvml-worker.mjs', moduleUrl).href;
 
 const defaultWorker = (): WorkerLike => sampler(workerUrl());
 

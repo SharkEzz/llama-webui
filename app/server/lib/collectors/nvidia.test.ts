@@ -8,7 +8,7 @@ import { writeFileDeep } from '../testing/write';
 import { type GpuSample, normalizeBusId, selectUsedGpus } from './gpu';
 import { NvidiaMonitor, parseComputeApps, parseNvidiaGpuLine } from './nvidia';
 
-const fx = (n: string) => readFile(`${import.meta.dirname}/../../testdata/${n}`, 'utf8');
+const fx = (n: string) => readFile(`${import.meta.dirname}/../../../../testdata/${n}`, 'utf8');
 const gpuCsv = await fx('nvidia-gpu.csv');
 const LINE =
   '0, GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28, NVIDIA GeForce RTX 5070 Ti, 0, 5895, 16303, 38, 49.86, 00000000:01:00.0';

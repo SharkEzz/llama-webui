@@ -60,9 +60,9 @@ test('lowering the interval keeps the last sample fresh until the worker samples
   expect(mon.gpus()).toEqual([]);
 });
 
-test('workerUrl: worker.ts next to the module in development, nvml-worker.js next to the bundle', () => {
+test('workerUrl: worker.ts next to the module in development, nvml-worker.mjs next to the bundle', () => {
   expect(workerUrl('file:///x/server/collectors/nvml/monitor.ts')).toBe('file:///x/server/collectors/nvml/worker.ts');
-  expect(workerUrl('file:///x/dist/server/main.js')).toBe('file:///x/dist/server/nvml-worker.js');
+  expect(workerUrl('file:///x/dist/server/index.mjs')).toBe('file:///x/dist/server/nvml-worker.mjs');
   expect(workerUrl()).toBe(new URL('./worker.ts', import.meta.url).href);
   expect(existsSync(fileURLToPath(workerUrl()))).toBe(true);
 });

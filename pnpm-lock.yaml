@@ -329,6 +329,9 @@ importers:
       nitro:
         specifier: 3.0.261103-rc
         version: 3.0.261103-rc
+      rolldown:
+        specifier: 1.2.18
+        version: 1.2.18
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

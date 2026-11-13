@@ -4,10 +4,11 @@
 // `.output/public`). Vitest reads the root `vitest.config.ts`, not this file.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { nitro } from 'nitro/vite';
+import { build as rolldown } from 'rolldown';
 import { defineConfig, type Plugin } from 'vite';
 import { OUT, ROUTES_DIR, render, scan } from './scripts/gen-api.ts';
 import { loadDotEnv } from './server/lib/env.ts';
@@ -66,5 +67,19 @@ export default defineConfig(({ command }) => ({
     errorHandler: './server/error.ts',
     // `server/lib/` is business code: not scanned for handlers.
     ignore: ['lib/**'],
+    hooks: {
+      // Two files of their own next to Nitro's server: the NVML sampler, run in a forked child
+      // (`server/lib/collectors/nvml/sampler.ts`, `workerUrl()` resolves it from the chunk `monitor.ts` lands in), and
+      // the launcher (`bin/llama-webui.ts`: the CLI, then `server/index.mjs`).
+      async compiled(nitro) {
+        const { dir, serverDir } = nitro.options.output;
+        const files = [
+          ['./server/lib/collectors/nvml/worker.ts', join(serverDir, 'nvml-worker.mjs')],
+          ['./bin/llama-webui.ts', join(dir, 'llama-webui.mjs')],
+        ];
+        for (const [input, file] of files)
+          await rolldown({ input, platform: 'node', write: true, output: { file, codeSplitting: false } });
+      },
+    },
   },
 }));

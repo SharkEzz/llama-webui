@@ -11,7 +11,7 @@ const ALLOW: { path: string; line?: RegExp; reason: string }[] = [
   { path: '.agents/skills/', reason: 'vendored skills, not ours to edit' },
   { path: 'scripts/no-bun.test.ts', reason: 'this test' },
   {
-    path: 'server/contract/',
+    path: 'app/server/lib/contract/',
     line: /homedir|HOME/,
     reason: 'the golden was recorded under Bun, whose homedir() ignored a HOME set at run time',
   },

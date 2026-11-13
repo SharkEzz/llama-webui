@@ -31,7 +31,7 @@ import { BenchGate, type ServerControl } from './gate';
 import { BenchRunner } from './runner';
 import { WARMUP_PROMPT } from './server';
 
-const FAKE = resolve(import.meta.dirname, '../../testdata/fake/fake-llama-server');
+const FAKE = resolve(import.meta.dirname, '../../../../testdata/fake/fake-llama-server');
 const modelDir = tempDir('lw-bench-');
 afterAll(() => modelDir[Symbol.dispose]());
 const MODEL = join(modelDir.path, 'a.gguf');

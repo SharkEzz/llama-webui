@@ -6,7 +6,7 @@ import { PlacementTracker, parsePlacement } from './placement';
 
 const MiB = 1024 ** 2;
 const fixture = async () =>
-  (await readFile(`${import.meta.dirname}/../../testdata/llama-server-load.txt`, 'utf8')).trimEnd();
+  (await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load.txt`, 'utf8')).trimEnd();
 const lines = (text: string, from = 0): LogLine[] =>
   text.split('\n').map((t, i) => ({ seq: from + i, text: t, level: 'info', kind: 'other' }));
 
@@ -36,7 +36,7 @@ test('parsePlacement: real llama-server start, buffers summed per device, bus id
 });
 
 test('parsePlacement: real MTP + mmproj start, compute per context (last reservation wins), recurrent state with the KV', async () => {
-  const text = (await readFile(`${import.meta.dirname}/../../testdata/llama-server-load-mtp.txt`, 'utf8')).trimEnd();
+  const text = (await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-mtp.txt`, 'utf8')).trimEnd();
   const p = parsePlacement(lines(text))!;
   expect(p.layers).toEqual({ offloaded: 66, total: 66 });
   const by = new Map(p.buffers.map((b) => [b.device, b]));
@@ -55,7 +55,7 @@ test('parsePlacement: real MTP + mmproj start, compute per context (last reserva
 
 test('parsePlacement: at -lv 5 the -fit probes (no-alloc loads, 0 MiB buffers, own contexts) are left out', async () => {
   const text = (
-    await readFile(`${import.meta.dirname}/../../testdata/llama-server-load-mtp-lv5.txt`, 'utf8')
+    await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-mtp-lv5.txt`, 'utf8')
   ).trimEnd();
   // The probes print their “offloaded” lines and 0 MiB model buffers before the real load.
   expect(text.split('\n').filter((l) => /offloaded \d+\/\d+ layers/.test(l))).toHaveLength(3);
@@ -218,7 +218,7 @@ test('PlacementTracker: the launch evicted from the ring keeps the placement of 
 });
 
 test('parsePlacement: -sm tensor spreads the Meta() buffers over its devices by -ts, marked estimated (#17)', async () => {
-  const text = (await readFile(`${import.meta.dirname}/../../testdata/llama-server-load-tensor.txt`, 'utf8')).trimEnd();
+  const text = (await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-tensor.txt`, 'utf8')).trimEnd();
   const p = parsePlacement(lines(text))!;
   expect(p.layers).toEqual({ offloaded: 66, total: 66 });
   expect(p.buffers.some((b) => b.device.startsWith('Meta'))).toBe(false);
@@ -239,7 +239,7 @@ test('parsePlacement: -sm tensor spreads the Meta() buffers over its devices by 
 });
 
 test('parsePlacement: -sm tensor without -ts gives each device an equal part (#17)', async () => {
-  const text = (await readFile(`${import.meta.dirname}/../../testdata/llama-server-load-tensor.txt`, 'utf8'))
+  const text = (await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-tensor.txt`, 'utf8'))
     .trimEnd()
     .replace(' -ts 51,58', '');
   const p = parsePlacement(lines(text))!;
@@ -286,7 +286,7 @@ test('parsePlacement: NCCL (NCCL_DEBUG=INFO) says whether peer-to-peer is really
 });
 
 test('parsePlacement: with -sm tensor, NCCL (NCCL_DEBUG=INFO) gives the PCI address of each CUDA device', async () => {
-  const text = (await readFile(`${import.meta.dirname}/../../testdata/llama-server-load-tensor.txt`, 'utf8')).trimEnd();
+  const text = (await readFile(`${import.meta.dirname}/../../../../testdata/llama-server-load-tensor.txt`, 'utf8')).trimEnd();
   const bare = parsePlacement(lines(text))!;
   expect(
     bare.buffers.filter((b) => b.device.startsWith('CUDA') && !b.device.endsWith('Host')).map((b) => b.busId),
