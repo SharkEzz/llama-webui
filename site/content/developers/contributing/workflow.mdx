@@ -223,7 +223,7 @@ pnpm test
 ```
 
 - `pnpm lint`: Biome with zero errors and zero warnings (format, lint, sorted imports).
-- `pnpm check`: the type checks of every project (`tsc -b`: `packages/*`, `server/`, `scripts/`, `web/`), then
+- `pnpm check`: the type checks of every project (`tsc`: `packages/*`, `server/`, `scripts/`, `web/`), and
   `site/`.
 - `pnpm test`: every Vitest project, `web/src/` and `site/` included, then the `llamacpp-js` tests on `node --test`
   ([Run the tests](/developers/contributing/testing/#run-the-tests)).

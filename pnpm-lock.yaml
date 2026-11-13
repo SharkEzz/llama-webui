@@ -257,6 +257,9 @@ importers:
       rolldown:
         specifier: 1.2.18
         version: 1.2.18
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   packages/webui-shared:
     dependencies:
@@ -266,6 +269,10 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.7
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   server:
     dependencies:
@@ -297,6 +304,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.2
         version: 8.18.2
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
   site:
     dependencies:

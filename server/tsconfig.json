@@ -1,6 +1,5 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": { "types": ["node"] },
-  "include": ["."],
-  "references": [{ "path": "../packages/llamacpp-js" }, { "path": "../packages/webui-shared" }]
+  "include": ["."]
 }

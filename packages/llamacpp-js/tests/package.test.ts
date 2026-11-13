@@ -1,5 +1,5 @@
 // The package's contract as a future npm library: no dependency on the app, tree-shakeable. Node APIs only: its
-// project (tsconfig.json) has Node's types alone, so `tsc -b` refuses anything else.
+// project (tsconfig.json) has Node's types alone, so the type check refuses anything else.
 import assert from 'node:assert/strict';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

@@ -6,8 +6,8 @@ import { ZodError, type z } from 'zod';
 import { guard } from './security';
 
 /**
- * What every API route sees. The Node adapter passes its `incoming`/`outgoing` as bindings: no route reads them, and
- * typing them would bring Node's types into the API's declarations (and the web's typed client).
+ * What every API route sees. The Node adapter passes its `incoming`/`outgoing` as bindings: no route reads them, so
+ * they are left untyped.
  */
 export type Env = { Bindings: object };
 
