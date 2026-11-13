@@ -12,6 +12,9 @@ const PING_MS = 15_000;
  */
 export function sse(event: H3Event, run: ChatRun) {
   const stream = createEventStream(event);
+  // Not kept alive once the stream ends: at shutdown srvx closes the server while the stream still runs, then waits
+  // for every connection, and a browser keeps an idle one open well past the 5 s grace delay.
+  event.res.headers.set('connection', 'close');
   const ping = setInterval(() => void stream.pushComment('ping'), PING_MS);
   const leave = run.subscribe((e) => {
     const sent = stream.push({ event: e.type, data: JSON.stringify(e) });

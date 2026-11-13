@@ -1,13 +1,7 @@
-// HTTP contract of the app: every case of ./cases.ts over real HTTP against the production build (Nitro's
-// `.output/llama-webui.mjs`, run by `pnpm build`), compared with golden.nitro.json (the spike's record; golden.json is master's). `UPDATE_GOLDEN=1 pnpm exec vitest run
-// app/server/lib/contract/contract.test.ts` rewrites the golden (`GOLDEN=<file>` writes and compares another one).
-import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { setTimeout as sleep } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
 import { afterAll, beforeAll, expect, test } from 'vitest';
@@ -19,13 +13,13 @@ import { ProfilesRepo } from '../db/profiles';
 import { SettingsRepo } from '../db/settings';
 import { SweepsRepo } from '../db/sweeps';
 import { writeGguf } from '../models/gguf.fixture';
+import { freePort, launch } from '../testing/launch';
 import { tempDir } from '../testing/tempDir';
 import { cases, type Outcome, ROUTES, runContract, runStreams } from './cases';
 
 const GOLDEN = resolve(import.meta.dirname, process.env.GOLDEN ?? 'golden.nitro.json');
 const REPO = resolve(import.meta.dirname, '../../../..');
 const FAKE_SERVER = join(REPO, 'testdata/fake/fake-llama-server');
-const LAUNCHER = join(REPO, 'app/.output/llama-webui.mjs');
 
 /** Environment read by the routes (home, llama-tui config, Hugging Face token): pointed into the temp dir. */
 const ENV_KEYS = [
@@ -40,16 +34,7 @@ const ENV_KEYS = [
   'FAKE_CHAT_DELAY_MS',
 ] as const;
 
-async function freePort(): Promise<number> {
-  const s = createServer();
-  await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
-  const port = (s.address() as { port: number }).port;
-  await new Promise((r) => s.close(r));
-  return port;
-}
-
 async function boot() {
-  if (!existsSync(LAUNCHER)) throw new Error('no production build: run `pnpm build` first');
   const dir = tempDir('lw-contract-');
   const tmp = dir.path;
   const savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
@@ -93,28 +78,18 @@ async function boot() {
     }
   }
 
-  // The production build in its own process, from the temp dir (no `.env` around): the test settings replace the
-  // monitor's collectors with a stub and make every Hugging Face request fail as offline.
-  const port = await freePort();
-  const proc = spawn(process.execPath, [LAUNCHER, '--host', '127.0.0.1', '--port', String(port), '--data-dir', tmp], {
-    cwd: tmp,
-    env: { ...process.env, LLAMA_WEBUI_TEST_MONITOR: 'stub', LLAMA_WEBUI_TEST_OFFLINE: '1' },
-    stdio: ['ignore', 'ignore', 'inherit'],
+  // The production build in its own process (`launch()`): the test settings replace the monitor's collectors with a
+  // stub and make every Hugging Face request fail as offline.
+  const app = await launch({
+    dataDir: tmp,
+    env: { LLAMA_WEBUI_TEST_MONITOR: 'stub', LLAMA_WEBUI_TEST_OFFLINE: '1' },
   });
-  const exited = new Promise((r) => proc.once('exit', r));
-  const base = `http://127.0.0.1:${port}`;
-  let up = false;
-  for (let i = 0; i < 100 && !up; i++) {
-    up = (await fetch(`${base}/api/health`).catch(() => null))?.ok === true;
-    if (!up) await sleep(100);
-  }
-  if (!up) throw new Error('the production build did not answer /api/health');
+  const { base, port } = app;
   return {
     base,
     ctx: { tmp, repo: REPO, home: homedir(), ports: [port, llamaPort], port },
     async dispose() {
-      proc.kill('SIGTERM');
-      await exited;
+      await app[Symbol.asyncDispose]();
       dir[Symbol.dispose]();
       for (const k of ENV_KEYS) {
         if (savedEnv[k] === undefined) delete process.env[k];

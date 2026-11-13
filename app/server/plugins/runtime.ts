@@ -26,12 +26,8 @@ export default definePlugin((nitroApp) => {
     // ended. An open UI (WebSocket) or a streaming reply would hold it for the whole grace delay (5 s), then be cut
     // off. The runtime is undone first, as before Nitro: sockets close 1001, replies end “stopped”, then the server
     // closes at once. Registered before srvx's handler (plugins run before `serve()`), which stays for a second signal.
-    // srvx installs none when `CI` or `TEST` is set: the process then ends here, as before Nitro.
-    for (const signal of ['SIGINT', 'SIGTERM'] as const)
-      process.once(signal, async () => {
-        const srvx = process.listenerCount(signal) > 0;
-        await stop();
-        if (!srvx) process.exit(0);
-      });
+    // srvx installs none when `CI` or `TEST` is set: users never run the server so, and the tests start it without them
+    // (`lib/testing/launch.ts`).
+    for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => void stop());
   }
 });

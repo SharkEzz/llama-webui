@@ -16,6 +16,8 @@ export default defineConfig({
         test: {
           name: 'server',
           include: ['app/server/**/*.test.ts', 'scripts/**/*.test.ts'],
+          // One production build per run, for the suites that start it (contract, lifecycle, build output).
+          globalSetup: ['app/server/lib/testing/build.ts'],
         },
       },
       { extends: true, test: { name: 'shared', include: ['packages/webui-shared/src/**/*.test.ts'] } },
