@@ -105,7 +105,7 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
     exited = true;
   });
   const exitError = async () => {
-    await Promise.race([piped, sleep(200)]);
+    await Promise.race([piped, sleep(200, undefined, { ref: false })]);
     const exit = proc.exitCode ?? proc.signalCode ?? '-';
     return new Error(benchFailure([...errors, ...tail], exit, 'llama-server').message);
   };
@@ -177,7 +177,7 @@ export async function runServerTrial(o: ServerTrialOptions): Promise<ServerTrial
     if (e instanceof TrialCancelled || o.signal.aborted) throw new TrialCancelled();
     // A server that dies during a request (CUDA out of memory) closes the socket before its output is seen:
     // give it a moment, to show its own error line rather than the closed connection.
-    if (!exited) await Promise.race([proc.exited, sleep(EXIT_GRACE_MS)]);
+    if (!exited) await Promise.race([proc.exited, sleep(EXIT_GRACE_MS, undefined, { ref: false })]);
     if (exited || proc.exitCode !== null || proc.signalCode !== null) throw await exitError();
     throw e;
   }
@@ -197,7 +197,10 @@ async function stop(proc: Child, killTimeoutMs: number, onLine: (l: string) => v
     try {
       proc.kill('SIGTERM');
     } catch {}
-    const done = await Promise.race([proc.exited.then(() => true), sleep(killTimeoutMs).then(() => false)]);
+    const done = await Promise.race([
+      proc.exited.then(() => true),
+      sleep(killTimeoutMs, undefined, { ref: false }).then(() => false),
+    ]);
     if (!done) {
       onLine(`not stopped after ${killTimeoutMs} ms, SIGKILL`);
       try {

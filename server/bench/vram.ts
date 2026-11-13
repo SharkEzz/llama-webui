@@ -83,7 +83,7 @@ export class VramProbe implements VramPeaks {
       try {
         this.smi.kill('SIGTERM');
       } catch {}
-      await Promise.race([this.smiDone, sleep(500)]);
+      await Promise.race([this.smiDone, sleep(500, undefined, { ref: false })]);
     }
   }
 }

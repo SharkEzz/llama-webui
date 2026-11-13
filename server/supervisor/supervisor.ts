@@ -246,7 +246,10 @@ export class Supervisor {
     try {
       proc.kill('SIGTERM');
     } catch {}
-    const exited = await Promise.race([proc.exited.then(() => true), sleep(this.killTimeoutMs).then(() => false)]);
+    const exited = await Promise.race([
+      proc.exited.then(() => true),
+      sleep(this.killTimeoutMs, undefined, { ref: false }).then(() => false),
+    ]);
     if (!exited) {
       this.logs.push(`[llama-webui] not stopped after ${this.killTimeoutMs} ms, SIGKILL`);
       try {
