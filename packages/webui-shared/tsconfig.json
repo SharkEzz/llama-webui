@@ -3,6 +3,5 @@
   // a browser-only API fails here.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "types": ["node"] },
-  "include": ["src"],
-  "references": [{ "path": "../llamacpp-js" }]
+  "include": ["src"]
 }

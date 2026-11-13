@@ -1,8 +1,0 @@
-{
-  // The tests run on `node --test`: same options as the library, Node types only.
-  "extends": "./tsconfig.json",
-  // Never emitted: no import rewriting (it would refuse paths into the library project).
-  "compilerOptions": { "outDir": "${configDir}/.tsbuild/tests", "rewriteRelativeImportExtensions": false },
-  "include": ["tests"],
-  "references": [{ "path": "." }]
-}

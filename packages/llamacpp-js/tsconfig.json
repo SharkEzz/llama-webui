@@ -1,26 +1,13 @@
 {
-  // The library alone, as a Node user sees it: Node types only (no DOM), syntax Node can strip.
-  // The tests (tests/, node:test) have their own project with the same options: tsconfig.test.json.
+  // The library and its tests (tests/, node:test), as a Node user sees them: Node types only (no DOM), Node's own
+  // module resolution, syntax Node can strip.
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ESNext"],
-    "target": "ESNext",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "moduleDetection": "force",
     "types": ["node"],
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
-    "verbatimModuleSyntax": true,
     "erasableSyntaxOnly": true,
-    "emitDeclarationOnly": true,
-    "outDir": "${configDir}/.tsbuild",
-    "composite": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }

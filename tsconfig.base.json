@@ -1,5 +1,6 @@
 {
-  // Options every project shares. Each project (see the references of tsconfig.json) adds its own types and files.
+  // Options every project shares. Each code base has its own tsconfig.json, which extends this one and adds its types
+  // and files; `pnpm check` runs `tsc -p` on each.
   "compilerOptions": {
     "lib": ["ESNext"],
     "target": "ESNext",
@@ -12,10 +13,7 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    // A referenced project may not set noEmit: `tsc -b` writes declarations to .tsbuild/ (ignored by git).
-    "emitDeclarationOnly": true,
-    "outDir": "${configDir}/.tsbuild",
-    "composite": true,
+    "noEmit": true,
 
     "strict": true,
     "skipLibCheck": true,

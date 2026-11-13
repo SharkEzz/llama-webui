@@ -1,29 +1,15 @@
 {
-  // The web app: DOM only, no Node types (src/lib/no-node-types.ts fails otherwise). It sees the server
-  // through its declarations, for the typed API client (`@llama-webui/server/api`). Tests: tsconfig.test.json.
+  // The web app and its tests. The typed API client (`@llama-webui/server/api`) brings the server's sources into this
+  // project, hence Node's types next to the DOM's.
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ESNext",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "module": "Preserve",
-    "moduleDetection": "force",
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "emitDeclarationOnly": true,
-    "outDir": "${configDir}/.tsbuild",
-    "composite": true,
-    "jsx": "react-jsx",
-    "types": [],
-    "skipLibCheck": true,
-    "strict": true,
+    "types": ["node"],
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
-  "references": [{ "path": "../server" }, { "path": "../packages/webui-shared" }]
+  "include": ["src"]
 }

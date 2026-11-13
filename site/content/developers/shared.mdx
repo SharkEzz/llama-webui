@@ -11,8 +11,7 @@ formats.
 ## The package
 
 `packages/webui-shared/package.json` exports its TypeScript sources directly (`"exports": { ".": "./src/index.ts" }`). `server` and
-`web` depend on it as `workspace:*` and resolve it through their `node_modules`; their `tsconfig.json` references
-`packages/webui-shared/tsconfig.json`. `index.ts` re-exports every module, so both sides import from the package root and never from a
+`web` depend on it as `workspace:*` and resolve it through their `node_modules`. `index.ts` re-exports every module, so both sides import from the package root and never from a
 file path:
 
 ```ts title="web/src/lib/logs.ts"
@@ -123,5 +122,5 @@ reached into the server would drag server code into the UI, and one that needed 
 Inputs that depend on the environment are passed in instead of read: `profileModelPath()` takes the home directory as
 an argument and expands `~` itself, without `node:os` or `node:path`.
 
-Its project (`packages/webui-shared/tsconfig.json`, checked by `tsc -b`) compiles it with `lib: ["ESNext"]`, the
+Its project (`packages/webui-shared/tsconfig.json`) compiles it with `lib: ["ESNext"]`, the
 Node types (for its tests) and no DOM types, so a DOM API in a shared module fails there.

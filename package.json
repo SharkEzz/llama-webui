@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "vite build",
-    "check": "tsc -b && pnpm --filter llama-webui-site typecheck",
+    "check": "pnpm -r --parallel --include-workspace-root typecheck",
     "dev": "node server/dev.ts",
     "format": "biome format --write",
     "lint": "biome check",
@@ -24,7 +24,8 @@
     "site:preview": "pnpm --filter llama-webui-site preview",
     "start": "pnpm build && node dist/server/main.js",
     "test": "pnpm test:unit && pnpm --filter llamacpp-js test",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "typecheck": "tsc -p scripts"
   },
   "dependencies": {
     "@hono/node-server": "catalog:",

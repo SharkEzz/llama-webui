@@ -1,6 +1,6 @@
 ---
 title: Testing
-description: Run the tests (Vitest, node:test) and the type check (tsc -b), write a test, and use the captured outputs, fake llama-server and llama-bench, fixtures and site checks.
+description: Run the tests (Vitest, node:test) and the type check (tsc), write a test, and use the captured outputs, fake llama-server and llama-bench, fixtures and site checks.
 ---
 
 Tests run on Node with [Vitest](https://vitest.dev) and sit next to the code they test, except those of
@@ -160,8 +160,8 @@ describe('parseSlots', () => {
 ```
 
 - They use web and `node:*` APIs only: a local server comes from `serve(handler)` (`node:http`), a file from
-  `fixture()`, the directory from `import.meta.dirname`. Their project (`tsconfig.test.json`) has the Node types only,
-  so any other runtime's API does not type check.
+  `fixture()`, the directory from `import.meta.dirname`. The package's project (`tsconfig.json`, sources and tests)
+  has the Node types only, so any other runtime's API does not type check.
 - `tests/helpers.ts` adds the two assertions `node:assert` lacks: `closeTo(actual, expected, digits)` and
   `matchObject(actual, expected)` (the properties of `expected`, deeply equal).
 - The bundling checks of `tests/package.test.ts` bundle an import of the package with Rolldown (a devDependency of
@@ -365,41 +365,35 @@ existing data.
 pnpm check
 ```
 
-The `check` script runs two type checks with TypeScript's `tsc`: `tsc -b`, then the site's `typecheck` script
-(`react-router typegen && tsc`).
+The `check` script is `pnpm -r --parallel --include-workspace-root typecheck`: it runs the `typecheck` script of
+every workspace package at the same time. That script is `tsc` in `packages/*`, `server/` and `web/`,
+`tsc -p scripts` in the root package and `react-router typegen && tsc` in `site/`. One package alone:
+`pnpm --filter <name> typecheck`.
 
-The root `tsconfig.json` is a solution file: it has no files of its own, only TypeScript project references, and
-`tsc -b` checks every referenced project with its own options, in dependency order. The
-shared options are in `tsconfig.base.json`, which the projects extend.
+There is no root `tsconfig.json` and no TypeScript project reference: each code base has its own `tsconfig.json`,
+which extends `tsconfig.base.json` (the shared options, `noEmit` among them) and adds its types and its files.
 
-| Project                                  | Covers                                     | Types                                       |
-| ---------------------------------------- | ------------------------------------------ | ------------------------------------------- |
-| `packages/llamacpp-js/tsconfig.json`      | The library's sources, as a Node user compiles them: `erasableSyntaxOnly`, NodeNext resolution | Node only (no DOM): a browser-only API fails here |
-| `packages/llamacpp-js/tsconfig.test.json` | The library's tests (`tests/`), with the same options | Node only, like the sources      |
-| `packages/webui-shared/tsconfig.json`     | `@llama-webui/shared` and its tests        | Node, no DOM: a browser-only API fails here |
-| `server/tsconfig.json`                    | `server/`, tests included                  | Node                                        |
-| `scripts/tsconfig.json`                   | `scripts/`                                 | Node                                        |
-| `web/tsconfig.json`                       | `web/src/`, tests left out; references `server/` for the API's types | DOM only (`types: []`): a Node API fails here |
-| `web/tsconfig.test.json`                  | `web/src/` with its tests                  | DOM and Node (the tests run under Vitest on Node) |
-| `site/tsconfig.json` (separate step)      | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types | DOM |
+| Project                               | Covers                                     | Types                                       |
+| ------------------------------------- | ------------------------------------------ | ------------------------------------------- |
+| `packages/llamacpp-js/tsconfig.json`  | The library's sources and its tests (`tests/`), as a Node user compiles them: `erasableSyntaxOnly`, `exactOptionalPropertyTypes`, NodeNext resolution | Node only (no DOM): a browser-only API fails here |
+| `packages/webui-shared/tsconfig.json` | `@llama-webui/shared` and its tests        | Node, no DOM: a browser-only API fails here |
+| `server/tsconfig.json`                | `server/`, tests included                  | Node                                        |
+| `scripts/tsconfig.json`               | `scripts/`                                 | Node                                        |
+| `web/tsconfig.json`                   | `web/src/`, tests included                 | DOM and Node                                |
+| `site/tsconfig.json`                  | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types | DOM and Node |
 
-A project only sees another one it lists in its `references` (the server references `llamacpp-js` and
-`webui-shared`, which references `llamacpp-js`; `web` references `server` and `webui-shared`, for types only: the
-web never imports server code at runtime). The web app project lists no `types`, and
-`web/src/lib/no-node-types.ts` fails to compile if Node's global types reach it: `ReturnType<typeof setTimeout>` is
-then not a `number`. A type the API's declaration imports from `node:*` would not load them: with `skipLibCheck` it
-silently becomes `any` in the web. `server/rpc.test.ts` therefore rebuilds `server/.tsbuild/rpc.d.ts` and lists what
-it imports, following its relative imports (`declarationImports()`, `server/testing/declarations.ts`): only `hono`,
-`zod`, `@llama-webui/shared` and `llamacpp-js/metrics` are allowed. The production build test
-(`server/build.test.ts`) also checks that no chunk of the bundle imports a `node:` module. A referenced project may not set `noEmit`, so the base sets
-`emitDeclarationOnly` with `outDir: .tsbuild/`: `tsc -b` writes the declarations and its build info there (ignored by
-git), and skips a project that has not changed since. The projects do not enable the same options:
+A project that imports another package checks the sources it reaches with its own options: the server those of
+`llamacpp-js` and `webui-shared`, `scripts/` those of the server, and `web` those of the server, through the typed API
+client (`import type` only: the web never imports server code at runtime). That is why the web project has Node's
+types next to the DOM's, so a Node API type checks in the web's code. The production build test
+(`server/build.test.ts`) checks that no chunk of the client bundle imports a `node:` module. The projects do not
+enable the same options:
 
 | Option                                                          | `tsconfig.base.json` (packages, `server/`, `scripts/`) | `web/` | `site/` |
 | --------------------------------------------------------------- | --------------------------- | ------ | ------- |
 | `strict`, `verbatimModuleSyntax`, `noFallthroughCasesInSwitch`  | yes                         | yes    | yes     |
-| `noUncheckedIndexedAccess`                                      | yes                         | no     | yes     |
-| `noImplicitOverride`                                            | yes                         | no     | no      |
+| `noUncheckedIndexedAccess`                                      | yes                         | yes    | yes     |
+| `noImplicitOverride`                                            | yes                         | yes    | no      |
 | `noUnusedLocals`, `noUnusedParameters`                          | no                          | yes    | yes     |
 
 With `verbatimModuleSyntax`, type-only imports must use `import type`.

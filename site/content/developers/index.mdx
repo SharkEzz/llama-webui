@@ -36,7 +36,7 @@ website, which imports no code of the app.
 | State | [zustand](https://zustand.docs.pmnd.rs) 5, one store per domain | `web/src/lib/` |
 | Charts and 3D | [uPlot](https://github.com/leeoniya/uPlot) time series, [react-three-fiber](https://r3f.docs.pmnd.rs) and three.js for the Topology page | `web/src/components/charts/`, `web/src/features/topology/` |
 | Text | react-markdown and remark-gfm for chat replies, [Shiki](https://shiki.style) for code blocks | `web/src/features/chat/`, `web/src/lib/highlight.ts` |
-| Quality | TypeScript 7 (`tsc -b`), [Biome](https://biomejs.dev) 2 (format, lint, imports), [Vitest](https://vitest.dev) and `node:test` | `biome.json`, `tsconfig.json`, `vitest.config.ts` |
+| Quality | TypeScript 7 (`tsc`), [Biome](https://biomejs.dev) 2 (format, lint, imports), [Vitest](https://vitest.dev) and `node:test` | `biome.json`, `tsconfig.base.json`, `vitest.config.ts` |
 
 The website uses its own stack (Vite, React Router in framework mode with prerendering, MDX), and its scripts run
 on Node.js like the app's.

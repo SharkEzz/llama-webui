@@ -109,7 +109,8 @@ The root `package.json` defines the app's scripts; the website has its own, in `
 | `pnpm start` | `pnpm build && node dist/server/main.js` | Builds, then runs the production server. |
 | `pnpm test` | `pnpm test:unit && pnpm --filter llamacpp-js test` | Every Vitest project (`server` with `scripts/`, `shared`, `web`, `site`), then the `llamacpp-js` tests on `node --test`. |
 | `pnpm test:unit` | `vitest run` | The Vitest projects only. |
-| `pnpm check` | `tsc -b && pnpm --filter llama-webui-site typecheck` | Type checks every project the root `tsconfig.json` references (`packages/*`, `server/`, `scripts/`, `web/`, each with its own options: [Type checking](/developers/contributing/testing/#type-checking)), then the website. |
+| `pnpm check` | `pnpm -r --parallel --include-workspace-root typecheck` | Runs the `typecheck` script of every workspace package at once (`packages/*`, `server/`, `web/`, `site/`, and the root for `scripts/`), each with its own `tsconfig.json`: [Type checking](/developers/contributing/testing/#type-checking). |
+| `pnpm typecheck` | `tsc -p scripts` | The root package's share of `pnpm check`: type checks `scripts/`. |
 | `pnpm lint` | `biome check` | Format, lint and import order, read-only. |
 | `pnpm lint:fix` | `biome check --write` | Applies Biome's safe fixes. |
 | `pnpm format` | `biome format --write` | Formats only. |
@@ -155,11 +156,11 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
   - `db/` `node:sqlite` wrapper, connection, migrations, one repository per table
   - `logs/` the log ring buffer and line splitter
   - `ws/` the WebSocket hub
-  - `testing/` test helpers (`tempDir`, `writeFileDeep`, `listen`, `declarationImports`)
+  - `testing/` test helpers (`tempDir`, `writeFileDeep`, `listen`)
   - `contract/` the HTTP contract suite: raw HTTP client, cases, golden record
 - `web/` the React app (workspace `@llama-webui/web`)
   - `index.html` HTML entry, applies the theme before the first paint
-  - `tsconfig.json` the app (DOM types only), `tsconfig.test.json` its tests (Node types)
+  - `tsconfig.json` the app and its tests (DOM and Node types)
   - `src/`
     - `main.tsx` starts the stores and the WebSocket, renders the router
     - `app/` router, layout, sidebar, status bar
@@ -186,7 +187,7 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
 - `package.json` the published package (`bin`, `files`) and the scripts
 - `pnpm-workspace.yaml` the workspace, its `catalog:` and pnpm's settings
 - `vite.config.ts` the client and server builds; `vitest.config.ts` one Vitest project per code base
-- `tsconfig.json` the project references type checked by `tsc -b`; `tsconfig.base.json` their shared options
+- `tsconfig.base.json` the options every project's `tsconfig.json` extends
 - `biome.json` format and lint rules
 </FileTree>
 

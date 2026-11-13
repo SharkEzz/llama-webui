@@ -6,8 +6,14 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "scripts": {
+    "typecheck": "tsc"
+  },
   "dependencies": {
     "llamacpp-js": "workspace:*",
     "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
   }
 }

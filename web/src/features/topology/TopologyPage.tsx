@@ -112,13 +112,13 @@ export function TopologyPage() {
 
 /** WebGL unavailable (driver, remote browser without acceleration): the page stays readable, the HUD cards too. */
 class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
+  override state = { failed: false };
 
   static getDerivedStateFromError() {
     return { failed: true };
   }
 
-  render() {
+  override render() {
     if (!this.state.failed) return this.props.children;
     return (
       <p className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">

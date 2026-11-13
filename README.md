@@ -247,7 +247,7 @@ directory, along with profiles, conversations, benchmark runs and sweeps.
 pnpm install       # the whole workspace (site/ included), one pnpm-lock.yaml
 pnpm dev           # one Node.js process: Vite middlewares with HMR, server modules reloaded in place
 pnpm start         # vite build, then node dist/server/main.js
-pnpm check         # type check every project (tsc -b), then the website
+pnpm check         # type check every package (tsc), in parallel
 pnpm test          # Vitest, then the llamacpp-js tests (node --test)
 pnpm lint          # Biome: format + lint + import order (read-only)
 pnpm lint:fix      # apply Biome's safe fixes
