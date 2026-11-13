@@ -171,6 +171,28 @@ test('one SIGINT stops vite dev and llama-server', async () => {
   expect(isAlive(pid)).toBe(false);
 }, 30_000);
 
+test('one SIGINT with a page open (/ws) undoes the runtime at once, without the dev worker force-closed', async () => {
+  await startDev({ LLAMA_WEBUI_DATA_DIR: dir.path });
+  const pid = await startLlama(base, profileId);
+  const ws = new WebSocket(`${base.replace('http', 'ws')}/ws`);
+  await new Promise((open, fail) => {
+    ws.onopen = open;
+    ws.onerror = fail;
+  });
+  try {
+    const t0 = performance.now();
+    dev.kill('SIGINT');
+    expect(await Promise.race([exited, sleep(10_000, 'timeout', { ref: false })])).toBe(130);
+    // Nitro force-closes the worker after 5 s when its HTTP server is held open: the runtime was not undone then.
+    expect(performance.now() - t0).toBeLessThan(3000);
+    expect(output).not.toContain('did not shut down in time');
+    expect(output).toContain('[llama-webui] stopping llama-server');
+    expect(isAlive(pid)).toBe(false);
+  } finally {
+    if (isAlive(pid)) process.kill(pid, 'SIGKILL');
+  }
+}, 90_000);
+
 test('two quick SIGINTs (a double Ctrl+C) still stop llama-server', async () => {
   await startDev({ LLAMA_WEBUI_DATA_DIR: dir.path });
   const pid = await startLlama(base, profileId);

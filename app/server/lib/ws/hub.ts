@@ -4,10 +4,14 @@ import type { WsMessage } from '@llama-webui/shared';
 export interface WsLike {
   send(data: string): void;
   close(code?: number, reason?: string): void;
+  /** Drops the connection without a closing handshake (crossws's `Peer.terminate()`). */
+  terminate?(): void;
 }
 
 const PING_INTERVAL_MS = 15_000;
 const MAX_MISSED_PINGS = 2;
+/** How long `dispose()` waits for a client to answer its close (1001) before dropping the connection. */
+const CLOSE_GRACE_MS = 500;
 
 /** WS client registry: broadcast and heartbeat (ping every 15 s, close after 2 pings without a pong). */
 export class WsHub {
@@ -55,10 +59,20 @@ export class WsHub {
     return this.clients.size;
   }
 
+  /**
+   * Closes every client (1001), then drops those that have not answered within `CLOSE_GRACE_MS`: a peer that never
+   * answers (the upstream socket of a proxied `/ws` in dev, whose browser is already gone) would otherwise hold the
+   * HTTP server open until `ws`'s own close timeout (30 s). Not holding the process for that.
+   */
   dispose(): void {
     clearInterval(this.timer);
-    for (const ws of this.clients.keys()) ws.close(1001, 'shutdown');
+    const open = [...this.clients.keys()];
     this.clients.clear();
+    for (const ws of open) ws.close(1001, 'shutdown');
+    if (open.length > 0)
+      setTimeout(() => {
+        for (const ws of open) ws.terminate?.();
+      }, CLOSE_GRACE_MS).unref();
   }
 
   private send(ws: WsLike, msg: WsMessage): void {

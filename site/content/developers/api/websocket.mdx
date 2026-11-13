@@ -69,7 +69,7 @@ The heartbeat is made of application messages, not WebSocket protocol pings:
   (`MAX_CLIENT_MESSAGE_BYTES` in `app/server/routes/ws.ts`): `ping` and `pong` are all a client sends.
 
 At shutdown, `stop()` (`app/server/lib/context.ts`) disposes of the hub: it closes every client with code `1001` and
-reason `shutdown`. The clients reconnect once llama-webui is back, to a new `bootId`. A development reload of
+reason `shutdown`, then drops, 500 ms later, a connection that has not answered that close (`terminate()`). The clients reconnect once llama-webui is back, to a new `bootId`. A development reload of
 business code does the same with the old runtime's hub.
 
 ## Messages

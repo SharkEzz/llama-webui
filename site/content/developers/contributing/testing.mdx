@@ -147,7 +147,7 @@ never sets (srvx installs no signal handler under the first two), waits for `/ap
   (ignored by git; its own Nitro and Vite caches, `node_modules` linked entry by entry), so the checkout's files and
   a `pnpm dev` you run meanwhile are left alone: saving a route file keeps `llama-server` and the `bootId`, saving
   business code rebuilds the runtime and stops the old `llama-server`, one `SIGINT` (and a quick double one) stops
-  `vite dev` and `llama-server`, `.env.local` is read in development, and `.env` wins over it.
+  `vite dev` and `llama-server`, with a page open (`/ws`) too and without the worker force-closed after 5 seconds, `.env.local` is read in development, and `.env` wins over it.
 
 ### Tests of llamacpp-js
 

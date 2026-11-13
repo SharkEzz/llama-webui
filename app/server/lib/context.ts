@@ -17,6 +17,8 @@ interface Live {
 
 interface Registry {
   live?: Live;
+  /** The undo `stop()` started, for its later calls. */
+  stopping?: Promise<void>;
   exitHook?: true;
 }
 
@@ -64,12 +66,17 @@ export function start(): Promise<Booted> {
   return live.booting;
 }
 
-/** Shutdown (`close` hook): undoes the live runtime, once. */
-export async function stop(): Promise<void> {
+/**
+ * Shutdown (`shutdown` and `close` hooks, the dev worker's `shutdown` message): undoes the live runtime, once. A later
+ * call waits for the same undo: the `close` hook must not let the worker exit while the first one still runs.
+ */
+export function stop(): Promise<void> {
   const live = registry.live;
+  if (!live) return registry.stopping ?? Promise.resolve();
   registry.live = undefined;
-  if (live?.booted?.deps.runtime.supervisor.managedPid != null) console.log('[llama-webui] stopping llama-server…');
-  await undo(live);
+  if (live.booted?.deps.runtime.supervisor.managedPid != null) console.log('[llama-webui] stopping llama-server…');
+  registry.stopping = undo(live);
+  return registry.stopping;
 }
 
 /** The runtime once started (`middleware/00.ready.ts` waits for it); rejects when startup failed. */

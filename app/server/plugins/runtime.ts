@@ -1,4 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises';
+import { parentPort } from 'node:worker_threads';
 import { definePlugin } from 'nitro';
 import { start, stop } from '../lib/context.ts';
 
@@ -17,8 +18,9 @@ export default definePlugin((nitroApp) => {
   // Production: undone as the server starts closing, while connections drain: sockets close 1001, replies end
   // “stopped”, so the server closes without waiting for its grace delay (5 s).
   nitroApp.hooks.hook('shutdown', ({ waitUntil }) => waitUntil(stop()));
-  // Development (the Vite process stops the worker), and the second call of production's: a no-op.
+  // Development (the Vite process stops the worker), and the second call of production's: waits for the same undo.
   nitroApp.hooks.hook('close', () => stop());
+  if (import.meta.dev) onWorkerShutdown(() => stop());
   if (!import.meta.dev) {
     // Until Nitro calls `shutdown` (it calls `close` only once every connection has ended): emitted on the signal that
     // srvx closes the server for, as Nitro will, its work awaited up to the same 5 s. Registered before srvx's handler
@@ -34,6 +36,29 @@ export default definePlugin((nitroApp) => {
     for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => void emitShutdown());
   }
 });
+
+const SHUTDOWN_LISTENER = Symbol.for('llama-webui.workerShutdown');
+
+/**
+ * Development: runs `undo` as soon as the Vite process asks the dev worker to shut down, before the worker closes its
+ * HTTP server. Nitro 3.0.261103-rc sends that `shutdown` message without a `timeout`: the worker then waits for every
+ * connection to end before it runs the `close` hooks, and the upstream socket of a proxied `/ws` (an open page) never
+ * ends on its own, so Nitro force-closes the worker after 5 s (“Dev worker did not shut down in time”) without the
+ * runtime ever undone. Undone first, the hub closes its sockets (1001, then drops the one that never answers) and the
+ * server closes within a second. One listener per worker: the plugin runs again on every dev reload. A failure is
+ * reported by the `close` hook, whose `stop()` waits for the same undo.
+ */
+function onWorkerShutdown(undo: () => Promise<void>): void {
+  if (!parentPort) return;
+  const g = globalThis as { [SHUTDOWN_LISTENER]?: (message: unknown) => void };
+  const previous = g[SHUTDOWN_LISTENER];
+  if (previous) parentPort.off('message', previous);
+  const listener = (message: unknown) => {
+    if ((message as { event?: unknown } | null)?.event === 'shutdown') undo().catch(() => {});
+  };
+  g[SHUTDOWN_LISTENER] = listener;
+  parentPort.on('message', listener);
+}
 
 declare module 'nitro/types' {
   interface NitroRuntimeHooks {

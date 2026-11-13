@@ -275,7 +275,8 @@ development, `vite dev` takes the variables, from the environment or the `.env` 
 3. `benchRunner.dispose()` kills the running benchmark and marks it (and its sweep) `interrupted`, with the error
    `interrupted (llama-webui stopped)`. The gate is not released: `llama-server` stops right after.
 4. `downloads.dispose()` stops the running download, keeping its `.part` file and its row for the next start.
-5. `hub.dispose()` closes every WebSocket with code `1001`, and `placement.dispose()` unsubscribes the tracker.
+5. `hub.dispose()` closes every WebSocket with code `1001` (a client that has not answered within 500 ms is dropped),
+   and `placement.dispose()` unsubscribes the tracker.
 6. `monitor.stop()` stops the sampling and its collectors.
 7. `supervisor.stop()` stops the managed `llama-server` (`SIGTERM`, then `SIGKILL` after 5 seconds).
 8. The database is closed, and the original `fetch` is restored.
@@ -283,8 +284,9 @@ development, `vite dev` takes the variables, from the environment or the `.env` 
 The replies, the benchmark and the download come first, while `llama-server` still runs: a reply would otherwise see
 the disconnection and end as an error.
 
-`stop()` prints `[llama-webui] stopping llama-server…` when a managed server runs. The plugin calls it from two Nitro
-hooks. In production, `shutdown` runs as the server starts closing, while connections drain: the runtime is undone
+`stop()` prints `[llama-webui] stopping llama-server…` when a managed server runs. It undoes the runtime once: a later
+call waits for the same undo. The plugin calls it from two Nitro hooks, and in development on the dev worker's
+`shutdown` message. In production, `shutdown` runs as the server starts closing, while connections drain: the runtime is undone
 there (WebSockets closed with `1001`, a streaming reply saved as `stopped`, `llama-server` stopped), so srvx, Nitro's
 HTTP server, closes at once. Nitro runs `close` only once every connection has ended: an open tab or a streaming reply
 would otherwise hold srvx's graceful close for its whole grace delay (5 seconds); with `shutdown`, the process stops in
@@ -292,8 +294,13 @@ under 2 seconds. Nitro 3.0.261103-rc does not call `shutdown` yet (nitrojs/nitro
 does, the plugin declares the hook and emits it from its own `SIGINT` and `SIGTERM` handlers, registered before those
 of srvx, waiting for its work up to 5 seconds as Nitro will. A second signal forces srvx's close, and the `close`
 hook's call of `stop()` is then a no-op. In
-development, Ctrl+C stops `vite dev`: Nitro closes Vite, the `close` hook stops `llama-server`, and the process exits
-with code 130; a double Ctrl+C stops `llama-server` too.
+development, Ctrl+C stops `vite dev`: Nitro closes Vite and sends the dev worker a `shutdown` message, and the process
+exits with code 130; a double Ctrl+C stops `llama-server` too. Nitro 3.0.261103-rc sends that message without a
+timeout: the worker waits for every connection to end before it runs the `close` hooks, and the upstream socket of an
+open page's `/ws` (proxied by the Vite process, whose browser side is already gone) never ends on its own, so Nitro
+would force-close the worker after 5 seconds (`Dev worker did not shut down in time`) without the runtime undone. The
+plugin therefore listens for that message itself (`parentPort`, one listener per worker) and calls `stop()` right
+away; the hub drops the socket that does not answer its close, and the worker exits within a second.
 
 The `process.on('exit')` handler kills the managed server with `SIGKILL` as a last resort (`killNow()`). If the
 process dies without running any handler, `setpriv --pdeathsig KILL` makes the kernel kill `llama-server` and
