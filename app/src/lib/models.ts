@@ -1,6 +1,6 @@
 import { defer, type ModelEntry, type ModelList, type ModelSummary } from '@llama-webui/shared';
 import { create } from 'zustand';
-import { call, client } from './api';
+import { api } from './api';
 
 interface ModelsState {
   list: ModelList | null;
@@ -19,7 +19,7 @@ export const useModels = create<ModelsState>((set, get) => ({
     set({ loading: true });
     using _loading = defer(() => set({ loading: false }));
     try {
-      set({ list: await call(client.models.$get()), error: null });
+      set({ list: await api('GET /api/models'), error: null });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) });
     }
@@ -58,8 +58,8 @@ export function matchingProjector(modelPath: string, models: ModelEntry[]): stri
 }
 
 /** What deleting the model at `path` removes (files, profiles using it) and why it is refused, if it is. */
-export const modelUsage = (path: string) => call(client.models.usage.$get({ query: { path } }));
+export const modelUsage = (path: string) => api('GET /api/models/usage', { query: { path } });
 
 /** Deletes the model's files, and the profiles using it when `deleteProfiles` is set. */
 export const deleteModel = (path: string, deleteProfiles: boolean) =>
-  call(client.models.$delete({ json: { path, deleteProfiles } }));
+  api('DELETE /api/models', { body: { path, deleteProfiles } });

@@ -1,6 +1,6 @@
 import type { ModelPlacement, TopologyGraph } from '@llama-webui/shared';
 import { create } from 'zustand';
-import { call, client } from './api';
+import { api } from './api';
 import { onWs, useWs } from './ws';
 
 interface TopologyState {
@@ -23,7 +23,7 @@ export async function refreshTopology(): Promise<void> {
   const req = ++requestSeq;
   const seenPlacement = placementSeq;
   try {
-    const r = await call(client.topology.$get());
+    const r = await api('GET /api/topology');
     if (req !== requestSeq) return; // a newer reread is in flight: it wins
     useTopology.setState(
       placementSeq === seenPlacement

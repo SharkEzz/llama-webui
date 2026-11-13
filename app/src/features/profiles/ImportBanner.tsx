@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { Button } from '@/components/ui/button';
-import { call, client } from '@/lib/api';
+import { api } from '@/lib/api';
 import { plural } from '@/lib/format';
 import { importLlamaTui, importSummary, type LlamaTuiStatus, llamaTuiStatus } from '@/lib/profiles';
 
@@ -42,7 +42,7 @@ export function ImportBanner({ profileCount, onImported }: { profileCount: numbe
         <Button
           variant="ghost"
           onClick={() =>
-            call(client.settings.$patch({ json: { llamaTuiImportDismissed: true } })).then(
+            api('PATCH /api/settings', { body: { llamaTuiImportDismissed: true } }).then(
               () => setStatus({ ...status, dismissed: true }),
               (e: Error) => toast.error(e.message),
             )

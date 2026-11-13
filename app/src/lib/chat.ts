@@ -7,10 +7,9 @@ import {
   defer,
   SseParser,
 } from '@llama-webui/shared';
-import type { ClientResponse } from 'hono/client';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { ApiError, apiError, byId, call, client } from './api';
+import { ApiError, api, apiError, request } from './api';
 
 /** Reply being written in the open conversation. */
 export interface Streaming {
@@ -54,7 +53,7 @@ export async function readSse(
 /** Stream followed for the open conversation; aborting it does not stop generation on the server. */
 let follow: AbortController | null = null;
 
-type StreamReply = ClientResponse<unknown, number, string>;
+type StreamReply = Response;
 
 /** A stream request's reply: null for 204 (nothing running), otherwise read with `readSse`. */
 async function openStream(req: Promise<StreamReply>): Promise<StreamReply | null> {
@@ -149,7 +148,7 @@ export const useChat = create<ChatState>((set, get) => {
 
     loadList: async () => {
       try {
-        set({ list: await call(client.chat.$get()) });
+        set({ list: await api('GET /api/chat') });
       } catch (e) {
         toast.error((e as Error).message);
       }
@@ -165,10 +164,10 @@ export const useChat = create<ChatState>((set, get) => {
       follow?.abort();
       set({ streaming: null });
       try {
-        const c = await call(client.chat[':id'].$get(byId(id)));
+        const c = await api('GET /api/chat/:id', { params: { id: id } });
         set({ current: c });
         if (c.live)
-          void consume(id, (signal) => openStream(client.chat[':id'].stream.$get(byId(id), { init: { signal } })));
+          void consume(id, (signal) => openStream(request('GET /api/chat/:id/stream', { params: { id: id }, signal })));
       } catch (e) {
         set({ current: null });
         toast.error((e as Error).message);
@@ -176,7 +175,7 @@ export const useChat = create<ChatState>((set, get) => {
     },
 
     create: async () => {
-      const c = await call(client.chat.$post({ json: {} }));
+      const c = await api('POST /api/chat', { body: {} });
       follow?.abort();
       set({ current: c, streaming: null });
       void get().loadList();
@@ -186,14 +185,14 @@ export const useChat = create<ChatState>((set, get) => {
     patch: async (p) => {
       const cur = get().current;
       if (!cur) return;
-      const c = await call(client.chat[':id'].$patch({ ...byId(cur.id), json: p }));
+      const c = await api('PATCH /api/chat/:id', { params: { id: cur.id }, body: p });
       if (get().current?.id === c.id) set({ current: { ...get().current!, ...c, messages: get().current!.messages } });
       if (p.title) void get().loadList();
     },
 
     rename: async (id, title) => {
       try {
-        const c = await call(client.chat[':id'].$patch({ ...byId(id), json: { title } }));
+        const c = await api('PATCH /api/chat/:id', { params: { id: id }, body: { title } });
         const cur = get().current;
         if (cur?.id === id) set({ current: { ...cur, title: c.title } });
         await get().loadList();
@@ -203,7 +202,7 @@ export const useChat = create<ChatState>((set, get) => {
     },
 
     remove: async (id) => {
-      await call(client.chat[':id'].$delete(byId(id)));
+      await api('DELETE /api/chat/:id', { params: { id: id } });
       if (get().current?.id === id) {
         follow?.abort();
         set({ current: null, streaming: null });
@@ -215,9 +214,7 @@ export const useChat = create<ChatState>((set, get) => {
       const cur = get().current;
       if (!cur) return;
       await consume(cur.id, (signal) =>
-        openStream(
-          client.chat[':id'].messages.$post({ ...byId(cur.id), json: { content: text } }, { init: { signal } }),
-        ),
+        openStream(request('POST /api/chat/:id/messages', { params: { id: cur.id }, body: { content: text }, signal })),
       );
     },
 
@@ -225,14 +222,14 @@ export const useChat = create<ChatState>((set, get) => {
       const cur = get().current;
       if (!cur) return;
       await consume(cur.id, (signal) =>
-        openStream(client.chat[':id'].regenerate.$post(byId(cur.id), { init: { signal } })),
+        openStream(request('POST /api/chat/:id/regenerate', { params: { id: cur.id }, signal })),
       );
     },
 
     stop: async () => {
       const cur = get().current;
       if (!cur) return;
-      await call(client.chat[':id'].stop.$post(byId(cur.id))).catch((e: Error) => toast.error(e.message));
+      await api('POST /api/chat/:id/stop', { params: { id: cur.id } }).catch((e: Error) => toast.error(e.message));
     },
   };
 });

@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
-import { byId, call, client } from '@/lib/api';
+import { api } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatBps, plural } from '@/lib/format';
 import { readable, useModels } from '@/lib/models';
@@ -67,7 +67,7 @@ export function ChecksCard() {
       if (first) setModel(first);
       return;
     }
-    void call(client.bench['from-profile'][':id'].$get(byId(profileId))).then(
+    void api('GET /api/bench/from-profile/:id', { params: { id: profileId } }).then(
       (d) => !gone && setModel(d.modelPath),
       () => !gone && first && setModel(first),
     );

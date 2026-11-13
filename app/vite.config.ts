@@ -3,12 +3,13 @@
 // reloaded on each save), `vite build` writes `.output/` (`node_server` preset: `.output/server/index.mjs`, client in
 // `.output/public`). Vitest reads the root `vitest.config.ts`, not this file.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { nitro } from 'nitro/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import { OUT, ROUTES_DIR, render, scan } from './scripts/gen-api.ts';
 import { loadDotEnv } from './server/lib/env.ts';
 
 const r = (p: string) => resolve(import.meta.dirname, p);
@@ -25,8 +26,30 @@ function version(): string {
   }
 }
 
+/** Keeps `server/api.gen.ts` in step with the file routes: at start, then on every change under `routes/api/`. */
+function apiTypes(): Plugin {
+  const write = () => {
+    const text = render(scan());
+    let current = '';
+    try {
+      current = readFileSync(OUT, 'utf8');
+    } catch {}
+    // Unchanged: not rewritten (the dev worker would reload for nothing).
+    if (text !== current) writeFileSync(OUT, text);
+  };
+  return {
+    name: 'llama-webui:api-types',
+    buildStart: write,
+    configureServer(server) {
+      server.watcher.on('all', (_event, file) => {
+        if (file.startsWith(ROUTES_DIR)) write();
+      });
+    },
+  };
+}
+
 export default defineConfig(({ command }) => ({
-  plugins: [react(), tailwindcss(), nitro()],
+  plugins: [apiTypes(), react(), tailwindcss(), nitro()],
   resolve: { alias: { '@': r('src') } },
   // Build only: `dev` from source keeps its `dev` version.
   define: command === 'build' ? { LLAMA_WEBUI_VERSION: JSON.stringify(version()) } : {},

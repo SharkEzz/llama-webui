@@ -12,7 +12,7 @@ import { join, relative, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
 const APP = join(import.meta.dirname, '..');
-const ROUTES_DIR = join(APP, 'server/routes/api');
+export const ROUTES_DIR = join(APP, 'server/routes/api');
 export const OUT = join(APP, 'server/api.gen.ts');
 
 const METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;

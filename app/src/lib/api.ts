@@ -1,6 +1,5 @@
-import type { AppType } from '@llama-webui/server/api';
-import { type ClientResponse, hc } from 'hono/client';
-import type { SuccessStatusCode } from 'hono/utils/http-status';
+import type { Api } from '../../server/api.gen';
+import type { ParamsOf } from '../../server/lib/apiTypes';
 
 export interface ApiIssue {
   path: (string | number)[];
@@ -22,47 +21,88 @@ export class ApiError extends Error {
   }
 }
 
-/** The API's typed client (`hc`), on the server's route types; `fetch` is replaced in tests. */
-export const makeClient = (f?: typeof fetch) => hc<AppType>('/', f ? { fetch: f } : {}).api;
-export const client = makeClient();
+/** A route of the API: `'GET /api/profiles/:id'` (`server/api.gen.ts`, generated from the file routes). */
+export type ApiRoute = keyof Api;
 
-/** The `:id` of a route, as the client takes it. */
-export const byId = (id: number) => ({ param: { id: String(id) } });
+type PathOf<K> = K extends `${string} ${infer P}` ? P : never;
 
-/** What a 2xx reply of `R` holds: its JSON output, `undefined` for a 204. */
-export type Ok<R> =
-  R extends ClientResponse<infer T, infer S, infer _F>
-    ? S extends SuccessStatusCode
-      ? S extends 204
-        ? undefined
-        : T
-      : never
-    : never;
+/** What a call of `K` takes: `:id` params, the query, the JSON body, an abort signal. */
+export type ApiOptions<K extends ApiRoute> = { signal?: AbortSignal } & (unknown extends ParamsOf<PathOf<K>>
+  ? { params?: never }
+  : { params: ParamsOf<PathOf<K>> }) &
+  ([Api[K]['body']] extends [never] ? { body?: never } : { body: Api[K]['body'] }) &
+  ([Api[K]['query']] extends [never] ? { query?: never } : { query?: Api[K]['query'] });
+
+type IsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never;
 
 /**
- * Awaits a call of `client` (`call(client.profiles.$get())`) and returns its body; throws `ApiError` if the response
- * is not 2xx (its `error`, `issues` and `code`), or if the server cannot be reached.
+ * The options of `K`, optional when it needs none. A route that is not in `Api` leaves `K` the union of every route:
+ * the options are then optional, so that `tsc` reports the route itself, not a missing argument.
  */
-export async function call<R extends ClientResponse<unknown, number, string>>(req: Promise<R>): Promise<Ok<R>> {
-  let res: ClientResponse<unknown, number, string>;
-  try {
-    res = await req;
-  } catch {
-    throw new ApiError(0, 'llama-webui server unreachable');
+type Args<K extends ApiRoute> =
+  true extends IsUnion<K>
+    ? [options?: ApiOptions<K>]
+    : object extends ApiOptions<K>
+      ? [options?: ApiOptions<K>]
+      : [options: ApiOptions<K>];
+
+/** What a 2xx reply of `K` holds: its JSON body, `undefined` for a 204. */
+export type ApiReply<K extends ApiRoute> = Api[K]['res'];
+
+/** The request of `route`: method and path, `:id` filled in, query string, JSON body. */
+function build(route: string, o: ApiOptions<ApiRoute> | undefined): [string, RequestInit] {
+  const [method, template] = route.split(' ') as [string, string];
+  const params = (o?.params ?? {}) as Record<string, unknown>;
+  let url = template.replace(/:(\w+)/g, (_, k: string) => encodeURIComponent(String(params[k])));
+  const query = new URLSearchParams();
+  for (const [k, v] of Object.entries((o?.query ?? {}) as Record<string, string | undefined>))
+    if (v !== undefined) query.set(k, v);
+  if (query.size > 0) url += `?${query}`;
+  const init: RequestInit = { method };
+  if (o?.signal) init.signal = o.signal;
+  if (o && 'body' in o) {
+    init.body = JSON.stringify(o.body);
+    init.headers = { 'content-type': 'application/json' };
   }
-  const text = await res.text();
-  let body: unknown;
-  if (text) {
-    try {
-      body = JSON.parse(text);
-    } catch {
-      body = text;
-    }
-  }
-  if (!res.ok) throw apiError(res.status, body);
-  // The one place the body meets its type: the server's route declares it (`c.json(…)`).
-  return body as Ok<R>;
+  return [url, init];
 }
+
+/** The API's client on `f` (`fetch` by default; replaced in tests). */
+export function makeApi(f?: typeof fetch) {
+  const fetchImpl = f ?? ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
+
+  /** The raw response of a route (the chat's server-sent events). */
+  const request = <K extends ApiRoute>(route: K, ...[o]: Args<K>): Promise<Response> =>
+    fetchImpl(...build(route, o as ApiOptions<ApiRoute> | undefined));
+
+  /**
+   * Calls a route (`api('GET /api/profiles/:id', { params: { id } })`) and returns its body; throws `ApiError` if the
+   * response is not 2xx (its `error`, `issues` and `code`), or if the server cannot be reached.
+   */
+  const api = async <K extends ApiRoute>(route: K, ...args: Args<K>): Promise<ApiReply<K>> => {
+    let res: Response;
+    try {
+      res = await request(route, ...args);
+    } catch {
+      throw new ApiError(0, 'llama-webui server unreachable');
+    }
+    const text = await res.text();
+    let body: unknown;
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+    }
+    if (!res.ok) throw apiError(res.status, body);
+    // The one place the body meets its type: the server's handler declares it (`reply<T>()`).
+    return body as ApiReply<K>;
+  };
+  return { api, request };
+}
+
+export const { api, request } = makeApi();
 
 /** The `ApiError` of an error response: its `error` message, `issues` (validation) and `code`, when present. */
 export function apiError(status: number, body: unknown): ApiError {
@@ -79,4 +119,4 @@ export interface Health {
   uptimeMs: number;
 }
 
-export const getHealth = () => call(client.health.$get());
+export const getHealth = () => api('GET /api/health');

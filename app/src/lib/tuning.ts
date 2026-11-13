@@ -20,7 +20,7 @@ import {
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { ApiError, byId, call, client } from './api';
+import { ApiError, api } from './api';
 import { formatShortDate } from './format';
 import { onWs, useWs } from './ws';
 
@@ -157,7 +157,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       if (seq === estimateSeq) set({ estimating: false });
     });
     try {
-      const estimate = await call(client.tuning.estimate.$post({ json: { modelPath, mmprojPath, preset, pinned } }));
+      const estimate = await api('POST /api/tuning/estimate', { body: { modelPath, mmprojPath, preset, pinned } });
       if (seq === estimateSeq) set({ estimate, estimateError: null });
     } catch (e) {
       if (seq === estimateSeq) set({ estimate: null, estimateError: e instanceof Error ? e.message : String(e) });
@@ -195,7 +195,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       if (seq === planSeq) set({ planning: false });
     });
     try {
-      const plan = await call(client.tuning.plan.$post({ json: { spec: specBody() } }));
+      const plan = await api('POST /api/tuning/plan', { body: { spec: specBody() } });
       if (seq === planSeq) set({ plan, planError: null });
     } catch (e) {
       if (seq === planSeq) set({ plan: null, planError: e instanceof Error ? e.message : String(e) });
@@ -239,7 +239,7 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     async loadHardware() {
       try {
-        set({ hardware: await call(client.tuning.hardware.$get()) });
+        set({ hardware: await api('GET /api/tuning/hardware') });
       } catch (e) {
         fail(e);
       }
@@ -253,7 +253,7 @@ export const useTuning = create<TuningState>()((set, get) => {
     async fromProfile(id) {
       if (id === null) return set({ profileId: null, serverArgs: [], profileParams: {} });
       try {
-        const d = await call(client.bench['from-profile'][':id'].$get(byId(id)));
+        const d = await api('GET /api/bench/from-profile/:id', { params: { id: id } });
         set({
           profileId: id,
           modelPath: d.modelPath,
@@ -321,7 +321,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       set({ launching: true });
       using _launching = defer(() => set({ launching: false }));
       return await guarded(async () => {
-        const r = await call(client.sweeps.$post({ json: { spec: specBody(), stopServer } }));
+        const r = await api('POST /api/sweeps', { body: { spec: specBody(), stopServer } });
         set({ run: { ...get().run, name: '' } });
         await get().open(r.sweep.id);
       });
@@ -329,7 +329,7 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     async loadSweeps() {
       try {
-        const { sweeps, live } = await call(client.sweeps.$get());
+        const { sweeps, live } = await api('GET /api/sweeps');
         set({ sweeps, sweepLive: live, sweepsLoaded: true });
         const cur = get().current;
         if (cur) await get().open(cur.sweep.id);
@@ -341,7 +341,7 @@ export const useTuning = create<TuningState>()((set, get) => {
     async open(id) {
       if (id === null) return set({ current: null });
       try {
-        set({ current: await call(client.sweeps[':id'].$get(byId(id))) });
+        set({ current: await api('GET /api/sweeps/:id', { params: { id: id } }) });
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) set({ current: null });
         else fail(e);
@@ -350,21 +350,21 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     async cancelSweep(id) {
       try {
-        await call(client.sweeps[':id'].cancel.$post(byId(id)));
+        await api('POST /api/sweeps/:id/cancel', { params: { id: id } });
       } catch (e) {
         fail(e);
       }
     },
 
     resume: (id, stopServer = false) =>
-      guarded(() => call(client.sweeps[':id'].resume.$post({ ...byId(id), json: { stopServer } }))),
+      guarded(() => api('POST /api/sweeps/:id/resume', { params: { id: id }, body: { stopServer } })),
 
     validate: (id, n, stopServer = false) =>
-      guarded(() => call(client.sweeps[':id'].validate.$post({ ...byId(id), json: { n, stopServer } }))),
+      guarded(() => api('POST /api/sweeps/:id/validate', { params: { id: id }, body: { n, stopServer } })),
 
     async removeSweep(id) {
       try {
-        await call(client.sweeps[':id'].$delete(byId(id)));
+        await api('DELETE /api/sweeps/:id', { params: { id: id } });
         dropSweep(id);
       } catch (e) {
         fail(e);
@@ -373,7 +373,7 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     async toProfile(runId) {
       try {
-        const p = await call(client.bench[':id']['to-profile'].$post(byId(runId)));
+        const p = await api('POST /api/bench/:id/to-profile', { params: { id: runId } });
         toast.success(`Profile “${p.name}” created`);
         return p;
       } catch (e) {
@@ -386,7 +386,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       set({ checksLoading: true, checksModel: modelPath });
       using _loading = defer(() => set({ checksLoading: false }));
       try {
-        const checks = await call(client.tuning.checks.$get({ query: modelPath ? { model: modelPath } : {} }));
+        const checks = await api('GET /api/tuning/checks', { query: modelPath ? { model: modelPath } : {} });
         if (get().checksModel === modelPath) set({ checks });
       } catch (e) {
         fail(e);
@@ -397,7 +397,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       set({ measuring: true });
       using _measuring = defer(() => set({ measuring: false }));
       try {
-        const diskSpeed = await call(client.tuning['disk-speed'].$post({ json: { modelPath } }));
+        const diskSpeed = await api('POST /api/tuning/disk-speed', { body: { modelPath } });
         set({ diskSpeed });
         await get().loadChecks(modelPath);
       } catch (e) {

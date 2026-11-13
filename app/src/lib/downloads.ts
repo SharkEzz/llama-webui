@@ -1,15 +1,13 @@
 import { type DownloadItem, type DownloadLive, isDownloadActive } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { byId, call, client } from './api';
+import { api } from './api';
 import { useModels } from './models';
 import { onWs, useWs } from './ws';
 
-export const getHfStatus = () => call(client.hf.status.$get());
-export const searchHf = (q: string, signal?: AbortSignal) =>
-  call(client.hf.search.$get({ query: { q } }, { init: { signal } }));
-export const getHfRepo = (id: string, signal?: AbortSignal) =>
-  call(client.hf.repo.$get({ query: { id } }, { init: { signal } }));
+export const getHfStatus = () => api('GET /api/hf/status');
+export const searchHf = (q: string, signal?: AbortSignal) => api('GET /api/hf/search', { query: { q }, signal });
+export const getHfRepo = (id: string, signal?: AbortSignal) => api('GET /api/hf/repo', { query: { id }, signal });
 
 /**
  * Absolute path of a downloaded item's model (its first shard): what the models list and the detail dialog use.
@@ -37,7 +35,7 @@ export const useDownloads = create<DownloadsState>((set) => ({
 
   async load() {
     try {
-      const { items, live } = await call(client.downloads.$get());
+      const { items, live } = await api('GET /api/downloads');
       set({ items, live });
     } catch {
       // Offline: the WS reconnection reloads.
@@ -46,7 +44,7 @@ export const useDownloads = create<DownloadsState>((set) => ({
 
   async enqueue(repo, revision, keys) {
     try {
-      const { items } = await call(client.downloads.$post({ json: { repo, revision, keys } }));
+      const { items } = await api('POST /api/downloads', { body: { repo, revision, keys } });
       if (items.length === 0) toast.info('Already downloaded');
       return true;
     } catch (e) {
@@ -56,19 +54,19 @@ export const useDownloads = create<DownloadsState>((set) => ({
   },
 
   async cancel(id) {
-    await call(client.downloads[':id'].$delete(byId(id))).catch(fail);
+    await api('DELETE /api/downloads/:id', { params: { id: id } }).catch(fail);
   },
 
   async retry(id) {
-    await call(client.downloads[':id'].retry.$post(byId(id))).catch(fail);
+    await api('POST /api/downloads/:id/retry', { params: { id: id } }).catch(fail);
   },
 
   async remove(id) {
-    await call(client.downloads[':id'].$delete(byId(id))).catch(fail);
+    await api('DELETE /api/downloads/:id', { params: { id: id } }).catch(fail);
   },
 
   async clearFinished() {
-    await call(client.downloads.clear.$post()).catch(fail);
+    await api('POST /api/downloads/clear').catch(fail);
   },
 }));
 

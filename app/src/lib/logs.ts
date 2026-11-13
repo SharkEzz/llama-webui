@@ -1,6 +1,6 @@
 import { EMPTY_LOG_VIEW, type LogView, mergeLogs, onBoot } from '@llama-webui/shared';
 import { create } from 'zustand';
-import { call, client } from './api';
+import { api } from './api';
 import { onWs, useWs } from './ws';
 
 const MAX_LINES = 10_000;
@@ -14,12 +14,12 @@ export const hideCurrentLogs = () => useLogs.setState((s) => ({ hiddenBefore: s.
 async function replay() {
   const asked = useLogs.getState();
   try {
-    const r = await call(client.logs.$get({ query: { since: String(asked.seq) } }));
+    const r = await api('GET /api/logs', { query: { since: String(asked.seq) } });
     const now = useLogs.getState();
     if (r.bootId !== asked.bootId && asked.bootId !== null) {
       // Different boot than the one of the requested lines: start over and reread everything.
       useLogs.setState(onBoot(now, r.bootId));
-      const all = await call(client.logs.$get({ query: { since: '0' } }));
+      const all = await api('GET /api/logs', { query: { since: '0' } });
       useLogs.setState((s) => mergeLogs(onBoot(s, all.bootId), all.lines, MAX_LINES));
     } else useLogs.setState(mergeLogs(onBoot(now, r.bootId), r.lines, MAX_LINES));
   } catch {
