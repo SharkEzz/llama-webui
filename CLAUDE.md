@@ -4,7 +4,7 @@ L'app tourne sur Node (≥ 26.13, un seul processus) ; pnpm installe et lance le
 - Tests : Vitest (`pnpm test`, voir « Testing ») ; type check : `pnpm check` (le `typecheck` de chaque package, en parallèle) ; build : `pnpm build` (`vite build`).
 - Install : `pnpm install` (voir « Installation (pnpm) ») ; un outil ponctuel : `pnpm dlx`.
 - `.env` du dossier courant : chargé par les points d'entrée (`server/env.ts`, `parseEnv` de `node:util` : l'environnement l'emporte, sauf avec `--env-override` ou `LLAMA_WEBUI_ENV_OVERRIDE=1` dans l'environnement ou le `.env`) ; pas de `dotenv`, seul `.env` est lu (ni `.env.local` ni fichier par mode, pas d'expansion de `$VAR`). `useEnvProxy()` (même fichier, après le `.env`) fait passer `fetch` par `HTTP_PROXY`/`HTTPS_PROXY` s'il y en a un (`http.setGlobalProxyFromEnv`, loopback toujours en direct) : le `fetch` de Node les ignore sinon.
-- Le dépôt ne tourne que sur Node : aucune API ni commande Bun ; `scripts/no-bun.test.ts` échoue sur toute mention de Bun hors de son allowlist (l'historique `docs/superpowers/`, les skills vendorisés, quelques lignes motivées, chacune par son texte).
+- Le dépôt ne tourne que sur Node : aucune API ni commande Bun.
 
 ## Installation (pnpm)
 
