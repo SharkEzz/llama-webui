@@ -1,11 +1,12 @@
 // The H3 helpers of `http.ts`, on small apps built the way the route files use them. Not ported from master's Hono
 // version: `shadowed()` (the radix router matches a static path before a `:param`, whatever the order) and `accepts()`
 // (a route file declares its body type with `export type Body`, which reads nothing).
-import { createEventStream, defineHandler } from 'nitro/h3';
+import { createEventStream, defineHandler, HTTPError } from 'nitro/h3';
 import { expect, test } from 'vitest';
 import { z } from 'zod';
 import {
   allowTable,
+  appError,
   errorResponse,
   HttpError,
   idParam,
@@ -17,6 +18,15 @@ import {
   reply,
 } from './http';
 import { routeApp } from './testing/routes';
+
+test('appError: h3’s own HTTPError keeps its status; a wrapped error answers as the original', async () => {
+  expect(appError(new HTTPError({ status: 404, headers: { 'cache-control': 'no-store' } })).status).toBe(404);
+  const wrapped = new Error('wrapped', { cause: new HttpError(409, 'A server is running', 'server-running') });
+  const r = appError(wrapped);
+  expect(r.status).toBe(409);
+  expect(await r.json()).toEqual({ error: 'A server is running', code: 'server-running' });
+  expect(appError(new HttpError(404, 'Profile not found')).status).toBe(404);
+});
 
 test('errorResponse: an HttpError keeps its status and code, any other error is a 500', async () => {
   const r = errorResponse(new HttpError(409, 'A server is running', 'server-running'));

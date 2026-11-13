@@ -1,8 +1,19 @@
 // The dev loop (`vite dev` in app/): Nitro's worker reloads on each save. A saved route keeps the runtime and
 // llama-server (`lib/context.ts`); saved business code undoes the runtime and builds it anew; one SIGINT stops it all.
-// Run in order, one dev server at a time: two in app/ share Nitro's and Vite's caches.
+// On a copy of app/ (its own Nitro and Vite caches): the checkout's files stay as they are, and a `pnpm dev` the
+// developer runs meanwhile is left alone. Run in order, one dev server at a time: they share the copy's caches.
 import { type ChildProcessByStdio, spawn } from 'node:child_process';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -11,7 +22,28 @@ import { freePort } from './lib/testing/launch';
 import { bootId, isAlive, seedDataDir, startLlama } from './lib/testing/seed';
 import { tempDir } from './lib/testing/tempDir';
 
-const APP = resolve(import.meta.dirname, '..');
+const SOURCE = resolve(import.meta.dirname, '..');
+// In the repository's `.cache/` (ignored by git, outside app/'s watcher): Vite loads Nitro's dev entry, in the
+// workspace's `node_modules`, only for a root within the workspace, and watches nothing under a `node_modules/`.
+const work = tempDir('lw-dev-app-', join(SOURCE, '../.cache'));
+/** The copy of app/ the dev server runs in. */
+const APP = join(work.path, 'app');
+/** The dev caches, left out of the copy's `node_modules` (each other entry links to app/'s own). */
+const CACHES = new Set(['.nitro', '.vite', '.vite-temp']);
+
+/** app/ without its output, dependencies and `.env*`; `node_modules` linked entry by entry; `tsconfig.base.json`. */
+function copyApp(): void {
+  cpSync(SOURCE, APP, {
+    recursive: true,
+    // A developer's own `.env*` stays out: the tests write theirs.
+    filter: (src) => !/^\/(?:node_modules|\.output|\.env[^/]*)(?:\/|$)/.test(src.slice(SOURCE.length)),
+  });
+  mkdirSync(join(APP, 'node_modules'));
+  for (const entry of readdirSync(join(SOURCE, 'node_modules')))
+    if (!CACHES.has(entry)) symlinkSync(join(SOURCE, 'node_modules', entry), join(APP, 'node_modules', entry));
+  copyFileSync(join(SOURCE, '../tsconfig.base.json'), join(work.path, 'tsconfig.base.json'));
+}
+
 const dir = tempDir('lw-dev-');
 const envDirs = tempDir('lw-dev-env-');
 let dev: ChildProcessByStdio<null, Readable, Readable>;
@@ -83,6 +115,7 @@ async function startDev(env: Record<string, string | undefined>): Promise<void> 
 }
 
 beforeAll(async () => {
+  copyApp();
   ({ profileId } = await seedDataDir(dir.path));
   await startDev({ LLAMA_WEBUI_DATA_DIR: dir.path });
 }, 90_000);
@@ -95,6 +128,7 @@ afterAll(async () => {
   }
   dir[Symbol.dispose]();
   envDirs[Symbol.dispose]();
+  work[Symbol.dispose]();
 });
 
 test('saving a route file keeps llama-server and the boot', async () => {
@@ -157,7 +191,6 @@ test("dev reads .env.local too: Nitro's Vite plugin loads it (the production lau
   const xdg = join(envDirs.path, 'xdg');
   const fromEnvLocal = join(envDirs.path, 'from-env-local');
   const file = join(APP, '.env.local');
-  if (existsSync(file)) throw new Error(`${file} exists: not overwritten`);
   writeFileSync(file, `LLAMA_WEBUI_DATA_DIR=${fromEnvLocal}\n`);
   try {
     await startDev({ LLAMA_WEBUI_DATA_DIR: undefined, XDG_DATA_HOME: xdg });
@@ -165,6 +198,23 @@ test("dev reads .env.local too: Nitro's Vite plugin loads it (the production lau
     expect(existsSync(xdg)).toBe(false);
   } finally {
     rmSync(file, { force: true });
+    dev.kill('SIGINT');
+    await Promise.race([exited, sleep(10_000, null, { ref: false })]);
+  }
+}, 90_000);
+
+test('in dev, .env wins over .env.local: vite.config.ts loads .env first, and Nitro never replaces a variable', async () => {
+  const fromEnv = join(envDirs.path, 'from-env');
+  const fromEnvLocal = join(envDirs.path, 'local-loses');
+  writeFileSync(join(APP, '.env'), `LLAMA_WEBUI_DATA_DIR=${fromEnv}\n`);
+  writeFileSync(join(APP, '.env.local'), `LLAMA_WEBUI_DATA_DIR=${fromEnvLocal}\n`);
+  try {
+    await startDev({ LLAMA_WEBUI_DATA_DIR: undefined, XDG_DATA_HOME: join(envDirs.path, 'xdg2') });
+    expect(existsSync(join(fromEnv, 'llama-webui.sqlite'))).toBe(true);
+    expect(existsSync(fromEnvLocal)).toBe(false);
+  } finally {
+    rmSync(join(APP, '.env'), { force: true });
+    rmSync(join(APP, '.env.local'), { force: true });
     dev.kill('SIGINT');
     await Promise.race([exited, sleep(10_000, null, { ref: false })]);
   }

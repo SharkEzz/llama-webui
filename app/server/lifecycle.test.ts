@@ -86,6 +86,42 @@ test('a second instance on a taken port exits 1', async () => {
   }
 }, 30_000);
 
+test("a second instance on the same port and data dir leaves the first one's data alone", async () => {
+  const { dataDir, profileId } = await seeded();
+  // The stub monitor starts at once: without a port check first, the second instance's startup would run before its
+  // listen fails, and mark the first one's streaming reply "stopped".
+  const env = { FAKE_CHAT_DELAY_MS: '2000', LLAMA_WEBUI_TEST_MONITOR: 'stub' };
+  await using first = await launch({ dataDir, env });
+  await startLlama(first.base, profileId);
+  const post = (path: string, body: unknown) =>
+    fetch(`${first.base}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const conversation = (await (await post('/api/chat', { profileId })).json()) as { id: number };
+  const stream = await post(`/api/chat/${conversation.id}/messages`, { content: 'hi' });
+  const reader = (stream.body as ReadableStream<Uint8Array>).getReader();
+  await reader.read(); // the reply has started
+  const full: Record<string, string | undefined> = { ...process.env, ...env };
+  for (const k of ['CI', 'TEST', 'NODE_ENV']) delete full[k];
+  const second = spawn(process.execPath, [LAUNCHER, '--port', String(first.port), '--data-dir', dataDir], {
+    cwd: dataDir,
+    env: full,
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  let stderr = '';
+  second.stderr.on('data', (c) => {
+    stderr += c;
+  });
+  const code = await new Promise<number | null>((done) => second.once('exit', done));
+  using db = openDb(join(dataDir, 'llama-webui.sqlite'));
+  expect(new ConversationsRepo(db).messages(conversation.id).at(-1)?.status).toBe('streaming');
+  expect(code).toBe(1);
+  expect(stderr).not.toContain('[llama-webui] ready');
+  await reader.cancel();
+}, 30_000);
+
 describe('HTTP cache', () => {
   test('pages are revalidated, hashed assets are immutable, the API sets no cache header', async () => {
     await using app = await launch({ dataDir: (await seeded()).dataDir });
@@ -97,5 +133,11 @@ describe('HTTP cache', () => {
     expect((await get('/chat/12')).headers.get('cache-control')).toBe('no-cache');
     expect((await get(asset as string)).headers.get('cache-control')).toMatch(/immutable/);
     expect((await get('/api/health')).headers.get('cache-control')).toBeNull();
+  }, 30_000);
+  test("a missing asset is h3's own 404, not a 500 (a stale tab after an upgrade)", async () => {
+    await using app = await launch({ dataDir: (await seeded()).dataDir });
+    const res = await fetch(`${app.base}/assets/missing-abcd1234.js`);
+    expect(res.status).toBe(404);
+    expect(app.stderr()).not.toMatch(/status: 404/);
   }, 30_000);
 });

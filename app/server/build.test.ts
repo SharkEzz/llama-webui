@@ -77,6 +77,22 @@ test('the licenses of the bundled code ship with the server', () => {
   for (const name of ['h3', 'srvx', 'crossws', 'zod']) expect(text).toMatch(new RegExp(`^## ${name} `, 'm'));
 });
 
+/** The built modules (paths relative to `dir`) whose code names `nvml-worker.mjs`, the sampler itself left out. */
+function samplerReferrers(dir: string): string[] {
+  return (readdirSync(dir, { recursive: true }) as string[])
+    .filter((f) => f.endsWith('.mjs') && f !== 'nvml-worker.mjs')
+    .filter((f) => readFileSync(join(dir, f), 'utf8').includes('nvml-worker.mjs'))
+    .sort();
+}
+
+test('the server finds the NVML sampler: the module that names it sits next to it', () => {
+  // `workerUrl()` resolves `./nvml-worker.mjs` against its own module: in a chunk under `_chunks/`, it would look there,
+  // and the monitor would fall back to nvidia-smi without a word.
+  const referrers = samplerReferrers(server);
+  expect(referrers.length).toBeGreaterThan(0);
+  for (const f of referrers) expect(f).not.toContain('/');
+});
+
 test('the NVML sampler ships next to the server entry and starts from the bundle', async () => {
   const file = join(server, 'nvml-worker.mjs');
   expect(specifiers(readFileSync(file, 'utf8')).filter((s) => !isBuiltin(s))).toEqual([]);

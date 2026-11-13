@@ -18,7 +18,15 @@ export class HttpError extends Error {
 
 export const notFound = (what: string) => new HttpError(404, `${what} not found`);
 
-/** The API's error body: `server/error.ts` answers every thrown error with it (h3 passes the original as `cause`). */
+/**
+ * What `server/error.ts` answers to a thrown error: the original when it comes wrapped (its `cause` is an Error). Not
+ * h3's own `HTTPError`, whose `cause` holds its details (`{ status, headers }`): a 404 of a missing asset stays a 404.
+ */
+export function appError(error: unknown): Response {
+  return errorResponse(error instanceof Error && error.cause instanceof Error ? error.cause : error);
+}
+
+/** The API's error body for an error (`appError()` unwraps it first). */
 export function errorResponse(err: unknown): Response {
   if (err instanceof HttpError)
     return Response.json(err.code ? { error: err.message, code: err.code } : { error: err.message }, {
