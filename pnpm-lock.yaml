@@ -339,15 +339,6 @@ importers:
         specifier: 'catalog:'
         version: 8.3.8(@types/node@26.6.6)(jiti@2.7.0)(yaml@2.9.1)
 
-  app/probe:
-    devDependencies:
-      nitro:
-        specifier: 3.0.261103-rc
-        version: 3.0.261103-rc
-      vite:
-        specifier: 'catalog:'
-        version: 8.3.8(@types/node@26.6.6)(jiti@2.7.0)(yaml@2.9.1)
-
   packages/llamacpp-js:
     devDependencies:
       '@types/node':

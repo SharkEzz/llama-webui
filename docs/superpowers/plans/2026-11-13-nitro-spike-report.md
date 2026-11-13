@@ -6,17 +6,17 @@ web and server in a single package `app/`, all 70 API routes as H3 file routes, 
 Nitro, the llama-server lifecycle, the production build and the unchanged CLI. Measured on 2026-11-13 with
 `nitro@3.0.261103-rc`, Vite 8.3.8 and Node 26.13.0, against `master` at the merge base.
 
-| Commit    | Milestone                                                                   |
-| --------- | --------------------------------------------------------------------------- |
-| `16423da` | S0 probe of the six unknowns                                                |
-| `066be7a` | S1 `app/` package skeleton                                                  |
-| `6d00955` | S2 runtime and lifecycle                                                    |
-| `7ea4180` | S3 H3 HTTP layer and the 70 routes                                          |
-| `539ed5a` | S4 `/ws` on crossws                                                         |
-| `1f36865` | S5 typed client on the generated route map                                  |
-| `1961f91` | S6 production build, launcher and shutdown                                  |
-| `830960d` | S7 contract suite against the production build                              |
-| `89239f0` | S7 master's route and HTTP helper tests                                     |
+| Commit    | Milestone                                      |
+| --------- | ---------------------------------------------- |
+| `16423da` | S0 probe of the six unknowns                   |
+| `066be7a` | S1 `app/` package skeleton                     |
+| `6d00955` | S2 runtime and lifecycle                       |
+| `7ea4180` | S3 H3 HTTP layer and the 70 routes             |
+| `539ed5a` | S4 `/ws` on crossws                            |
+| `1f36865` | S5 typed client on the generated route map     |
+| `1961f91` | S6 production build, launcher and shutdown     |
+| `830960d` | S7 contract suite against the production build |
+| `89239f0` | S7 master's route and HTTP helper tests        |
 
 **Verdict: conditional go.** Nitro clearly wins the dev loop and keeps behaviour parity, with no status change on the
 498 contract cases. It brings nothing for typing: our own generator replaces `hc` at parity. Lifecycle reliability is
@@ -26,15 +26,15 @@ under the conditions in [Conclusion](#conclusion).
 
 ## Dev loop
 
-| Measure (median of 5)                                     | master (`node --watch`) | Nitro (`vite dev`)    |
-| --------------------------------------------------------- | ----------------------- | --------------------- |
-| Save of a route file → `/api/health` answers the new code | 865 ms                  | **5 ms**              |
-| Save of business code → `/api/health` answers it          | 867 ms                  | **63 ms**             |
-| llama-server on a route save                              | stopped (restart)       | **kept** (same pid)   |
-| llama-server on a business code save                      | stopped                 | stopped               |
-| Open WebSockets on a route save                           | closed, reconnect       | **kept**              |
+| Measure (median of 5)                                     | master (`node --watch`) | Nitro (`vite dev`)     |
+| --------------------------------------------------------- | ----------------------- | ---------------------- |
+| Save of a route file → `/api/health` answers the new code | 865 ms                  | **5 ms**               |
+| Save of business code → `/api/health` answers it          | 867 ms                  | **63 ms**              |
+| llama-server on a route save                              | stopped (restart)       | **kept** (same pid)    |
+| llama-server on a business code save                      | stopped                 | stopped                |
+| Open WebSockets on a route save                           | closed, reconnect       | **kept**               |
 | Open WebSockets on a business code save                   | closed, reconnect       | closed 1001, reconnect |
-| UI edits                                                  | Vite HMR                | Vite HMR (unchanged)  |
+| UI edits                                                  | Vite HMR                | Vite HMR (unchanged)   |
 
 Method: `measure.mjs` rewrites the file with a marker and polls `/api/health` every 20 ms until the marker shows; the
 round starts at the write. Route = `server/routes/api/health.get.ts` (master: `server/api.ts`); business code =
@@ -73,11 +73,11 @@ gives the raw `Response` for the chat's SSE. 77 call sites were rewritten mechan
 
 Three breaks were injected one at a time, and `tsc` was run on the web project:
 
-| Break                                                     | `hc` (master)                                                     | Generated map                                                               |
-| --------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Response field renamed (`GET /api/downloads`, `items`)     | 1 error at the use                                                | 1 error at the use                                                          |
-| Body field made required (`POST …/resume`, `force`)        | 1 error at the call                                               | 1 error at the call                                                         |
-| Path renamed (`hf/status` → `hf/state`)                    | 1 error: `Property 'status' does not exist on type` + a type dump | 2 errors: `'"GET /api/hf/status"' is not assignable to 'keyof Api'` + its use |
+| Break                                                  | `hc` (master)                                                     | Generated map                                                                 |
+| ------------------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Response field renamed (`GET /api/downloads`, `items`) | 1 error at the use                                                | 1 error at the use                                                            |
+| Body field made required (`POST …/resume`, `force`)    | 1 error at the call                                               | 1 error at the call                                                           |
+| Path renamed (`hf/status` → `hf/state`)                | 1 error: `Property 'status' does not exist on type` + a type dump | 2 errors: `'"GET /api/hf/status"' is not assignable to 'keyof Api'` + its use |
 
 Result: **parity**. The map names the missing route itself; `hc` buries it in a multi-kilobyte type. Route keys
 (`'POST /api/sweeps/:id/resume'`) can be grepped across the client and the server. Costs:
@@ -94,14 +94,14 @@ across two packages.
 Measured on the production build (`.output/llama-webui.mjs`), with the fake llama-server running, one WebSocket open
 and a chat reply streaming (`FAKE_CHAT_DELAY_MS=2000`):
 
-| Scenario                                         | master             | Nitro, first build                    | Nitro, after fixes                       |
-| ------------------------------------------------ | ------------------ | ------------------------------------- | ---------------------------------------- |
-| SIGINT, nothing open                             | exit 0             | 5.0 s, then exit code 1               | **1.0 s**, exit 0                        |
-| SIGINT/SIGTERM, UI open + reply streaming        | WS 1001, "stopped" | 5.0 s grace, then sockets cut         | **1.0 s**, WS 1001, SSE ends cleanly     |
-| Reply status after restart                       | stopped            | stopped                               | stopped                                  |
-| Second SIGINT while llama-server takes 3 s       | ignored            | —                                     | ignored, exit after 3.0 s, code 0        |
-| SIGTERM with `CI` or `TEST` set                  | exit 0             | **hangs forever** (found by S7)       | exit 0                                   |
-| Orphans (llama-server, NVML sampler, perf)       | none               | none                                  | none                                     |
+| Scenario                                   | master             | Nitro, first build              | Nitro, after fixes                   |
+| ------------------------------------------ | ------------------ | ------------------------------- | ------------------------------------ |
+| SIGINT, nothing open                       | exit 0             | 5.0 s, then exit code 1         | **1.0 s**, exit 0                    |
+| SIGINT/SIGTERM, UI open + reply streaming  | WS 1001, "stopped" | 5.0 s grace, then sockets cut   | **1.0 s**, WS 1001, SSE ends cleanly |
+| Reply status after restart                 | stopped            | stopped                         | stopped                              |
+| Second SIGINT while llama-server takes 3 s | ignored            | —                               | ignored, exit after 3.0 s, code 0    |
+| SIGTERM with `CI` or `TEST` set            | exit 0             | **hangs forever** (found by S7) | exit 0                               |
+| Orphans (llama-server, NVML sampler, perf) | none               | none                            | none                                 |
 
 There were three defects, all fixed on the branch:
 
@@ -155,11 +155,11 @@ It seeds a temp data dir and sets two test settings that `boot()` reads: `LLAMA_
 
 **498/498 cases, no status difference.** Remaining differences from master's `golden.json`:
 
-| Case(s)                                        | master                                | Nitro                                                                 | Severity                        |
-| ---------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------- | ------------------------------- |
-| `GET /api/health (Host a b)`                   | 400, no body (Node's parser answered) | 400 JSON `Invalid host` (our guard)                                   | none: more consistent           |
-| `/`, `/chat/12`, foreign `Host` on a page      | `text/html;charset=utf-8`, stub body  | `text/html; charset=utf-8`, real `index.html` (the suite uses the build) | none                            |
-| `POST /api/chat/1/messages (SSE)`              | `cache-control: no-cache`             | `private, no-cache, no-store, no-transform, must-revalidate, max-age=0` | none: stricter                  |
+| Case(s)                                   | master                                | Nitro                                                                    | Severity              |
+| ----------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------ | --------------------- |
+| `GET /api/health (Host a b)`              | 400, no body (Node's parser answered) | 400 JSON `Invalid host` (our guard)                                      | none: more consistent |
+| `/`, `/chat/12`, foreign `Host` on a page | `text/html;charset=utf-8`, stub body  | `text/html; charset=utf-8`, real `index.html` (the suite uses the build) | none                  |
+| `POST /api/chat/1/messages (SSE)`         | `cache-control: no-cache`             | `private, no-cache, no-store, no-transform, must-revalidate, max-age=0`  | none: stricter        |
 
 Found and fixed on the way:
 
@@ -208,12 +208,12 @@ Other notes:
 
 ## Conclusion
 
-| Criterion          | Result                                                                                       |
-| ------------------ | -------------------------------------------------------------------------------------------- |
-| Dev loop           | **Clear win**: 5 ms / 63 ms vs ~865 ms, llama-server and sockets survive route edits       |
-| Front/back typing  | **Parity**, at the cost of our own generator (Nitro provides none)                          |
-| Lifecycle          | **Parity after three fixes**; the srvx workaround gives way to Nitro's next `shutdown` hook    |
-| Behaviour parity   | **Reached**: 498/498 statuses, three cosmetic header/body differences                        |
+| Criterion         | Result                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| Dev loop          | **Clear win**: 5 ms / 63 ms vs ~865 ms, llama-server and sockets survive route edits        |
+| Front/back typing | **Parity**, at the cost of our own generator (Nitro provides none)                          |
+| Lifecycle         | **Parity after three fixes**; the srvx workaround gives way to Nitro's next `shutdown` hook |
+| Behaviour parity  | **Reached**: 498/498 statuses, three cosmetic header/body differences                       |
 
 **Conditional go.** The day-to-day gain is real: editing an API route no longer restarts llama-server, so no model
 reload and no lost chat. The tree is also simpler: one package, one Vite, no host server of our own. Nitro brings no
