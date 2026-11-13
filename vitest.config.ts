@@ -15,7 +15,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'server',
-          include: ['app/server/**/*.test.ts', 'scripts/**/*.test.ts'],
+          include: ['app/server/**/*.test.ts', 'app/build/**/*.test.ts', 'scripts/**/*.test.ts'],
           // One production build per run, for the suites that start it (contract, lifecycle, build output).
           globalSetup: ['app/server/lib/testing/build.ts'],
         },

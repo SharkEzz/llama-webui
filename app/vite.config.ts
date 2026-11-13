@@ -10,6 +10,7 @@ import react from '@vitejs/plugin-react';
 import { nitro } from 'nitro/vite';
 import { build as rolldown } from 'rolldown';
 import { defineConfig, type Plugin } from 'vite';
+import { licenses } from './build/licenses.ts';
 import { OUT, ROUTES_DIR, render, scan } from './scripts/gen-api.ts';
 import { loadDotEnv } from './server/lib/env.ts';
 
@@ -49,8 +50,11 @@ function apiTypes(): Plugin {
   };
 }
 
+// The licenses of the npm code bundled into the server: collected from Nitro's bundle, written next to it.
+const thirdParty = licenses();
+
 export default defineConfig(({ command }) => ({
-  plugins: [apiTypes(), react(), tailwindcss(), nitro()],
+  plugins: [apiTypes(), thirdParty.plugin, react(), tailwindcss(), nitro()],
   resolve: { alias: { '@': r('src') } },
   // Build only: `dev` from source keeps its `dev` version.
   define: command === 'build' ? { LLAMA_WEBUI_VERSION: JSON.stringify(version()) } : {},
@@ -70,7 +74,7 @@ export default defineConfig(({ command }) => ({
     hooks: {
       // Two files of their own next to Nitro's server: the NVML sampler, run in a forked child
       // (`server/lib/collectors/nvml/sampler.ts`, `workerUrl()` resolves it from the chunk `monitor.ts` lands in), and
-      // the launcher (`bin/llama-webui.ts`: the CLI, then `server/index.mjs`).
+      // the launcher (`bin/llama-webui.ts`: the CLI, then `server/index.mjs`). Then `THIRD-PARTY-LICENSES.md`.
       async compiled(nitro) {
         const { dir, serverDir } = nitro.options.output;
         const files = [
@@ -79,6 +83,7 @@ export default defineConfig(({ command }) => ({
         ];
         for (const [input, file] of files)
           await rolldown({ input, platform: 'node', write: true, output: { file, codeSplitting: false } });
+        thirdParty.write(serverDir);
       },
     },
   },
