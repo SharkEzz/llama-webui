@@ -16,8 +16,9 @@ soon as a change forgets it.
 | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `app/server/routes/api/<domain>/`, `app/server/middleware/`, `app/server/error.ts`, zod schemas in `packages/webui-shared/src/`   | `/developers/api/<domain>/` (`health.get.ts` and `settings.*.ts` are [Health and settings](/developers/api/app/)) and the user page of the feature    |
 | `packages/webui-shared/src/ws.ts`, `app/server/lib/ws/`, `app/server/routes/ws.ts`                  | [WebSocket](/developers/api/websocket/)                                                                                          |
-| `app/server/lib/cli.ts`, `app/server/lib/paths.ts`, `app/bin/llama-webui.ts`, environment variables | [Launch options](/docs/configuration/), [Architecture](/developers/architecture/)                                                |
+| `app/server/lib/cli.ts`, `app/server/lib/paths.ts`, `app/server/lib/env.ts`, `app/bin/llama-webui.ts`, environment variables | [Launch options](/docs/configuration/), [Architecture](/developers/architecture/)                                                |
 | `app/server/lib/security.ts`, `app/server/lib/http.ts`                                       | [Security](/docs/security/) (user), [Security](/developers/server/security/) (server), [API overview](/developers/api/overview/) |
+| `app/server/lib/proc.ts`                                                             | [Conventions](/developers/contributing/conventions/), [Supervisor](/developers/server/supervisor/)                               |
 | `app/server/lib/supervisor/**`                                                       | [Supervisor](/developers/server/supervisor/), [Server](/docs/server/)                                                            |
 | `app/server/lib/logs/**`                                                             | [Supervisor](/developers/server/supervisor/), [Server, state and logs](/developers/api/server/), [Logs](/docs/logs/)             |
 | `app/server/lib/monitor/**`, `app/server/lib/collectors/**`                                  | [Monitor and collectors](/developers/server/monitor/), [Dashboard](/docs/dashboard/), [System](/docs/system/), [Topology](/docs/topology/) |
@@ -33,15 +34,17 @@ soon as a change forgets it.
 | `app/src/features/home/setup/**`                                             | [First run](/docs/getting-started/first-run/)                                                                                    |
 | `app/src/features/<page>/**`                                                 | `/docs/<page>/` and its screenshots (`bench` is [Benchmark](/docs/benchmark/), the Hugging Face part of `models` is [Hugging Face downloads](/docs/hugging-face/)) |
 | `app/src/app/**`, `app/src/lib/**`, `app/src/components/**`                  | [Web app](/developers/frontend/)                                                                                                 |
+| `packages/llamacpp-js/**` (a module, an export, an error, a rule of the package) | [llamacpp-js](/developers/llamacpp-js/) and the server page that uses it ([Supervisor](/developers/server/supervisor/), [Monitor and collectors](/developers/server/monitor/), [Chat runs](/developers/server/chat/), [Benchmarks and sweeps](/developers/server/bench/)) |
 | `packages/webui-shared/src/**` (a new module, the role of a module)                         | [Shared package](/developers/shared/)                                                                                            |
 | `packages/webui-shared/src/settings.ts`, the Settings page                                  | [Settings](/docs/settings/), [Health and settings](/developers/api/app/)                                                         |
-| `app/server/lib/boot.ts`, `app/server/lib/context.ts`, `app/server/lib/deps.ts`, `app/server/lib/runtime.ts`, `app/server/plugins/`, `app/vite.config.ts`, shutdown, dev reloads | [Architecture](/developers/architecture/)                                                                                        |
+| `app/server/lib/boot.ts`, `app/server/lib/context.ts`, `app/server/lib/deps.ts`, `app/server/lib/runtime.ts`, `app/server/plugins/`, `app/vite.config.ts`, `app/build/**`, shutdown, dev reloads | [Architecture](/developers/architecture/)                                                                                        |
 | `package.json` scripts, repository layout                                    | [Development setup](/developers/getting-started/)                                                                                |
 | `app/server/lib/testing/**`, `app/server/lib/contract/**`, `testdata/**` (fakes, fixtures, the contract suite) | [Testing](/developers/contributing/testing/) (and `/developers/api/*` when the golden changes)                                   |
 | Requirements, installation (README)                                          | [Requirements](/docs/getting-started/requirements/), [Installation](/docs/getting-started/installation/)                         |
 | Project conventions (Biome, language, tests, docs)                           | These Contributing pages                                                                                                         |
 
-The rules on these pages come from `CLAUDE.md` at the root of the repository: when a convention changes, update both.
+This table is the only copy: `CLAUDE.md` points to it. The other rules on these pages come from `CLAUDE.md` at the root
+of the repository: when a convention changes, update both.
 
 ## Write a docs page
 
