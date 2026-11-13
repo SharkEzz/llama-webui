@@ -13,12 +13,6 @@ export default definePlugin((nitroApp) => {
   });
   // h3 logs every error it did not create, 4xx included (`HttpError`, `ZodError`): `errorResponse` logs the 500s.
   if (nitroApp.h3) nitroApp.h3.config.silent = true;
-  // The SPA's page is revalidated on every load: a new build's `index.html` names new hashed assets (Nitro sets only
-  // the assets' own `immutable` cache).
-  nitroApp.hooks.hook('response', (res) => {
-    if (res.headers.get('content-type')?.startsWith('text/html') && !res.headers.has('cache-control'))
-      res.headers.set('cache-control', 'no-cache');
-  });
   // Shutdown in development (the Vite process stops the worker), and the second call of production's: a no-op.
   nitroApp.hooks.hook('close', () => stop());
   if (!import.meta.dev) {

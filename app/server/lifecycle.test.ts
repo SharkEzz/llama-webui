@@ -1,9 +1,9 @@
 // The production build's lifecycle (`app/.output`, built once by the server project's globalSetup): how it stops on a
-// signal with the UI open and a reply streaming, and how it fails when its port is taken.
+// signal with the UI open and a reply streaming, how it fails when its port is taken, and its HTTP cache headers.
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { afterAll, expect, test } from 'vitest';
+import { afterAll, describe, expect, test } from 'vitest';
 import { ConversationsRepo } from './lib/db/conversations';
 import { openDb } from './lib/db/open';
 import { LAUNCHER, launch } from './lib/testing/launch';
@@ -85,3 +85,17 @@ test('a second instance on a taken port exits 1', async () => {
     await first[Symbol.asyncDispose]();
   }
 }, 30_000);
+
+describe('HTTP cache', () => {
+  test('pages are revalidated, hashed assets are immutable, the API sets no cache header', async () => {
+    await using app = await launch({ dataDir: (await seeded()).dataDir });
+    const get = (path: string) => fetch(`${app.base}${path}`);
+    const page = await get('/');
+    expect(page.headers.get('cache-control')).toBe('no-cache');
+    const asset = (await page.text()).match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
+    expect(asset).toBeDefined();
+    expect((await get('/chat/12')).headers.get('cache-control')).toBe('no-cache');
+    expect((await get(asset as string)).headers.get('cache-control')).toMatch(/immutable/);
+    expect((await get('/api/health')).headers.get('cache-control')).toBeNull();
+  }, 30_000);
+});
