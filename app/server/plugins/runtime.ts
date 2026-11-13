@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { definePlugin } from 'nitro';
 import { start, stop } from '../lib/context.ts';
 
@@ -13,15 +14,30 @@ export default definePlugin((nitroApp) => {
   });
   // h3 logs every error it did not create, 4xx included (`HttpError`, `ZodError`): `errorResponse` logs the 500s.
   if (nitroApp.h3) nitroApp.h3.config.silent = true;
-  // Shutdown in development (the Vite process stops the worker), and the second call of production's: a no-op.
+  // Production: undone as the server starts closing, while connections drain: sockets close 1001, replies end
+  // “stopped”, so the server closes without waiting for its grace delay (5 s).
+  nitroApp.hooks.hook('shutdown', ({ waitUntil }) => waitUntil(stop()));
+  // Development (the Vite process stops the worker), and the second call of production's: a no-op.
   nitroApp.hooks.hook('close', () => stop());
   if (!import.meta.dev) {
-    // Production: srvx closes the HTTP server on SIGINT/SIGTERM and Nitro runs `close` only once every connection has
-    // ended. An open UI (WebSocket) or a streaming reply would hold it for the whole grace delay (5 s), then be cut
-    // off. The runtime is undone first, as before Nitro: sockets close 1001, replies end “stopped”, then the server
-    // closes at once. Registered before srvx's handler (plugins run before `serve()`), which stays for a second signal.
-    // srvx installs none when `CI` or `TEST` is set: users never run the server so, and the tests start it without them
-    // (`lib/testing/launch.ts`).
-    for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => void stop());
+    // Until Nitro calls `shutdown` (it calls `close` only once every connection has ended): emitted on the signal that
+    // srvx closes the server for, as Nitro will, its work awaited up to the same 5 s. Registered before srvx's handler
+    // (plugins run before `serve()`), which stays for a second signal. srvx installs none when `CI` or `TEST` is set:
+    // users never run the server so, and the tests start it without them (`lib/testing/launch.ts`).
+    const emitShutdown = async () => {
+      const pending: Promise<unknown>[] = [];
+      const controller = new AbortController();
+      await nitroApp.hooks.callHook('shutdown', { waitUntil: (p) => pending.push(p), signal: controller.signal });
+      await Promise.race([Promise.allSettled(pending), sleep(5000, null, { ref: false })]);
+      controller.abort();
+    };
+    for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => void emitShutdown());
   }
 });
+
+declare module 'nitro/types' {
+  interface NitroRuntimeHooks {
+    /** Nitro's `shutdown` hook (nitrojs/nitro#5099), unreleased in 3.0.261103-rc: emitted by this plugin until then. */
+    shutdown: (ctx: { waitUntil: (promise: Promise<unknown>) => void; signal: AbortSignal }) => void | Promise<void>;
+  }
+}
