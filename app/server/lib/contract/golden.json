@@ -912,9 +912,7 @@
     "headers": {
       "content-type": "application/json"
     },
-    "fields": [
-      "flags"
-    ]
+    "fields": ["flags"]
   },
   "POST /api/logs": {
     "status": 405,
@@ -1137,11 +1135,7 @@
     "headers": {
       "content-type": "application/json"
     },
-    "fields": [
-      "cpu",
-      "gpus",
-      "nvidiaSource"
-    ]
+    "fields": ["cpu", "gpus", "nvidiaSource"]
   },
   "POST /api/models": {
     "status": 405,
@@ -1194,9 +1188,7 @@
           "ok": true,
           "path": "<tmp>/models/m.gguf",
           "relPath": "m.gguf",
-          "files": [
-            "<tmp>/models/m.gguf"
-          ],
+          "files": ["<tmp>/models/m.gguf"],
           "fileBytes": 288,
           "kind": "model",
           "arch": "llama",
@@ -1271,9 +1263,7 @@
     },
     "body": {
       "path": "<tmp>/models/m.gguf",
-      "files": [
-        "<tmp>/models/m.gguf"
-      ],
+      "files": ["<tmp>/models/m.gguf"],
       "fileBytes": 288,
       "profiles": [
         {
@@ -1344,9 +1334,7 @@
     "body": {
       "path": "<tmp>/models/m.gguf",
       "relPath": "m.gguf",
-      "files": [
-        "<tmp>/models/m.gguf"
-      ],
+      "files": ["<tmp>/models/m.gguf"],
       "fileBytes": 288,
       "kind": "model",
       "arch": "llama",
@@ -2507,10 +2495,7 @@
             "preset": "chat",
             "base": {},
             "space": {
-              "ncmoe": [
-                0,
-                8
-              ]
+              "ncmoe": [0, 8]
             },
             "serverArgs": [],
             "includeUnfit": false
@@ -2544,10 +2529,7 @@
             "preset": "chat",
             "base": {},
             "space": {
-              "ncmoe": [
-                0,
-                8
-              ]
+              "ncmoe": [0, 8]
             },
             "serverArgs": [],
             "includeUnfit": false
@@ -2627,10 +2609,7 @@
           "preset": "chat",
           "base": {},
           "space": {
-            "ncmoe": [
-              0,
-              8
-            ]
+            "ncmoe": [0, 8]
           },
           "serverArgs": [],
           "includeUnfit": false
@@ -2844,13 +2823,7 @@
     "headers": {
       "content-type": "application/json"
     },
-    "fields": [
-      "cpu",
-      "devices",
-      "devicesError",
-      "ramAvailableBytes",
-      "ramTotalBytes"
-    ]
+    "fields": ["cpu", "devices", "devicesError", "ramAvailableBytes", "ramTotalBytes"]
   },
   "GET /api/tuning/estimate": {
     "status": 405,
@@ -2997,11 +2970,7 @@
     "headers": {
       "content-type": "application/json"
     },
-    "fields": [
-      "at",
-      "checks",
-      "summary"
-    ]
+    "fields": ["at", "checks", "summary"]
   },
   "GET /api/tuning/disk-speed": {
     "status": 405,
@@ -3101,10 +3070,7 @@
     "headers": {
       "content-type": "application/json"
     },
-    "fields": [
-      "graph",
-      "placement"
-    ]
+    "fields": ["graph", "placement"]
   },
   "POST /api/setup": {
     "status": 405,
@@ -3157,15 +3123,7 @@
     "headers": {
       "content-type": "application/json"
     },
-    "fields": [
-      "bench",
-      "binary",
-      "listen",
-      "llamaListen",
-      "models",
-      "ready",
-      "telemetry"
-    ]
+    "fields": ["bench", "binary", "listen", "llamaListen", "models", "ready", "telemetry"]
   },
   "POST /api/launchpad": {
     "status": 405,
@@ -3692,9 +3650,7 @@
           "code": "too_small",
           "minimum": 250,
           "inclusive": true,
-          "path": [
-            "pollIntervalMs"
-          ],
+          "path": ["pollIntervalMs"],
           "message": "Between 250 and 60000 ms"
         }
       ]
@@ -3766,17 +3722,13 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": [
-            "name"
-          ],
+          "path": ["name"],
           "message": "cannot be empty"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "model"
-          ],
+          "path": ["model"],
           "message": "required"
         }
       ]
@@ -3914,17 +3866,13 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": [
-            "name"
-          ],
+          "path": ["name"],
           "message": "cannot be empty"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "model"
-          ],
+          "path": ["model"],
           "message": "required"
         }
       ]
@@ -4096,9 +4044,7 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": [
-            "path"
-          ],
+          "path": ["path"],
           "message": "path required"
         }
       ]
@@ -4162,25 +4108,19 @@
           "code": "invalid_format",
           "format": "regex",
           "pattern": "/^\\w(?:[\\w.-]*\\w)?\\/\\w(?:[\\w.-]*\\w)?$/",
-          "path": [
-            "repo"
-          ],
+          "path": ["repo"],
           "message": "Repository id expected (org/name)"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "revision"
-          ],
+          "path": ["revision"],
           "message": "Invalid input: expected string, received undefined"
         },
         {
           "expected": "array",
           "code": "invalid_type",
-          "path": [
-            "keys"
-          ],
+          "path": ["keys"],
           "message": "Invalid input: expected array, received undefined"
         }
       ]
@@ -4296,9 +4236,7 @@
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "title"
-          ],
+          "path": ["title"],
           "message": "Invalid input: expected string, received number"
         }
       ]
@@ -4413,21 +4351,14 @@
       "issues": [
         {
           "code": "invalid_value",
-          "values": [
-            "bench",
-            "server"
-          ],
-          "path": [
-            "kind"
-          ],
+          "values": ["bench", "server"],
+          "path": ["kind"],
           "message": "“bench” or “server”"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "modelPath"
-          ],
+          "path": ["modelPath"],
           "message": "required"
         }
       ]
@@ -4489,31 +4420,19 @@
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "name"
-          ],
+          "path": ["name"],
           "message": "required"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "modelPath"
-          ],
+          "path": ["modelPath"],
           "message": "required"
         },
         {
           "code": "invalid_value",
-          "values": [
-            "chat",
-            "agent",
-            "context",
-            "fit",
-            "big"
-          ],
-          "path": [
-            "preset"
-          ],
+          "values": ["chat", "agent", "context", "fit", "big"],
+          "path": ["preset"],
           "message": "unknown preset"
         }
       ]
@@ -4631,9 +4550,7 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": [
-            "n"
-          ],
+          "path": ["n"],
           "message": "Too small: expected number to be >=1"
         }
       ]
@@ -4695,23 +4612,13 @@
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "modelPath"
-          ],
+          "path": ["modelPath"],
           "message": "Invalid input: expected string, received undefined"
         },
         {
           "code": "invalid_value",
-          "values": [
-            "chat",
-            "agent",
-            "context",
-            "fit",
-            "big"
-          ],
-          "path": [
-            "preset"
-          ],
+          "values": ["chat", "agent", "context", "fit", "big"],
+          "path": ["preset"],
           "message": "Invalid option: expected one of \"chat\"|\"agent\"|\"context\"|\"fit\"|\"big\""
         }
       ]
@@ -4773,31 +4680,19 @@
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "name"
-          ],
+          "path": ["name"],
           "message": "required"
         },
         {
           "expected": "string",
           "code": "invalid_type",
-          "path": [
-            "modelPath"
-          ],
+          "path": ["modelPath"],
           "message": "required"
         },
         {
           "code": "invalid_value",
-          "values": [
-            "chat",
-            "agent",
-            "context",
-            "fit",
-            "big"
-          ],
-          "path": [
-            "preset"
-          ],
+          "values": ["chat", "agent", "context", "fit", "big"],
+          "path": ["preset"],
           "message": "unknown preset"
         }
       ]
@@ -4861,9 +4756,7 @@
           "code": "too_small",
           "minimum": 1,
           "inclusive": true,
-          "path": [
-            "modelPath"
-          ],
+          "path": ["modelPath"],
           "message": "Too small: expected string to have >=1 characters"
         }
       ]
@@ -4900,7 +4793,12 @@
   },
   "GET /api/health (Host a b)": {
     "status": 400,
-    "headers": {}
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "error": "Invalid host"
+    }
   },
   "GET /api/health (Host localhost)": {
     "status": 200,
@@ -4925,10 +4823,10 @@
   "GET /chat/12 (Host evil.example)": {
     "status": 200,
     "headers": {
-      "content-type": "text/html;charset=utf-8",
+      "content-type": "text/html; charset=utf-8",
       "cache-control": "no-cache"
     },
-    "body": "<!doctype html><title>llama-webui</title>"
+    "body": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon-<hash>.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>llama-webui</title>\n    <script>\n      // Theme applied before rendering (no flash); same key as web/src/lib/theme.ts.\n      try {\n        const m = localStorage.getItem('llama-webui:theme');\n        const dark = m === 'dark' || (m !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);\n        document.documentElement.classList.toggle('dark', dark);\n        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';\n      } catch {\n        // localStorage unavailable: default theme\n      }\n    </script>\n    <script type=\"module\" crossorigin src=\"/assets/index-<hash>.js\"></script>\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/createLucideIcon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/button-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/hooks-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/lib-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/ws-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/activity-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/boxes-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/cpu-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/wand-sparkles-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usingCtx-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/check-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/preload-helper-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/models-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useOpenInteractionType-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/safePolygon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usePopupHandleStore-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useFocus-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/CompositeList-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/getPseudoElementBounds-<hash>.js\">\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-<hash>.css\">\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>\n"
   },
   "GET /api/nope": {
     "status": 404,
@@ -4951,18 +4849,18 @@
   "GET /chat/12 (deep SPA URL)": {
     "status": 200,
     "headers": {
-      "content-type": "text/html;charset=utf-8",
+      "content-type": "text/html; charset=utf-8",
       "cache-control": "no-cache"
     },
-    "body": "<!doctype html><title>llama-webui</title>"
+    "body": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon-<hash>.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>llama-webui</title>\n    <script>\n      // Theme applied before rendering (no flash); same key as web/src/lib/theme.ts.\n      try {\n        const m = localStorage.getItem('llama-webui:theme');\n        const dark = m === 'dark' || (m !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);\n        document.documentElement.classList.toggle('dark', dark);\n        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';\n      } catch {\n        // localStorage unavailable: default theme\n      }\n    </script>\n    <script type=\"module\" crossorigin src=\"/assets/index-<hash>.js\"></script>\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/createLucideIcon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/button-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/hooks-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/lib-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/ws-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/activity-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/boxes-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/cpu-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/wand-sparkles-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usingCtx-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/check-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/preload-helper-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/models-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useOpenInteractionType-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/safePolygon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usePopupHandleStore-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useFocus-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/CompositeList-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/getPseudoElementBounds-<hash>.js\">\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-<hash>.css\">\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>\n"
   },
   "GET / (the app)": {
     "status": 200,
     "headers": {
-      "content-type": "text/html;charset=utf-8",
+      "content-type": "text/html; charset=utf-8",
       "cache-control": "no-cache"
     },
-    "body": "<!doctype html><title>llama-webui</title>"
+    "body": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon-<hash>.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>llama-webui</title>\n    <script>\n      // Theme applied before rendering (no flash); same key as web/src/lib/theme.ts.\n      try {\n        const m = localStorage.getItem('llama-webui:theme');\n        const dark = m === 'dark' || (m !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);\n        document.documentElement.classList.toggle('dark', dark);\n        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';\n      } catch {\n        // localStorage unavailable: default theme\n      }\n    </script>\n    <script type=\"module\" crossorigin src=\"/assets/index-<hash>.js\"></script>\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/createLucideIcon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/button-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/hooks-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/lib-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/ws-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/activity-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/boxes-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/cpu-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/wand-sparkles-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usingCtx-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/check-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/preload-helper-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/models-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useOpenInteractionType-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/safePolygon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usePopupHandleStore-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useFocus-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/CompositeList-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/getPseudoElementBounds-<hash>.js\">\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-<hash>.css\">\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>\n"
   },
   "GET /ws (no upgrade)": {
     "status": 426,
@@ -5229,7 +5127,7 @@
     "status": 200,
     "headers": {
       "content-type": "text/event-stream",
-      "cache-control": "no-cache"
+      "cache-control": "private, no-cache, no-store, no-transform, must-revalidate, max-age=0"
     },
     "body": {
       "first": {

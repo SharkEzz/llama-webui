@@ -1,3 +1,8 @@
+// HTTP contract of the app: every case of ./cases.ts over real HTTP against the production build (Nitro's
+// `.output/llama-webui.mjs`, built by the server project's globalSetup), compared with golden.json.
+// `UPDATE_GOLDEN=1 pnpm exec vitest run app/server/lib/contract/contract.test.ts` rewrites it (`GOLDEN=<file>` writes
+// and compares another one). Three replies differ from the Hono server's on purpose: `Host a b` gets a JSON 400, the
+// pages are the real `index.html` (`text/html; charset=utf-8`), and h3 sets the SSE streams' own `cache-control`.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -17,7 +22,7 @@ import { freePort, launch } from '../testing/launch';
 import { tempDir } from '../testing/tempDir';
 import { cases, type Outcome, ROUTES, runContract, runStreams } from './cases';
 
-const GOLDEN = resolve(import.meta.dirname, process.env.GOLDEN ?? 'golden.nitro.json');
+const GOLDEN = resolve(import.meta.dirname, process.env.GOLDEN ?? 'golden.json');
 const REPO = resolve(import.meta.dirname, '../../../..');
 const FAKE_SERVER = join(REPO, 'testdata/fake/fake-llama-server');
 
