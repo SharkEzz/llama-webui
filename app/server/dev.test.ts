@@ -1,7 +1,8 @@
 // The dev loop (`vite dev` in app/): Nitro's worker reloads on each save. A saved route keeps the runtime and
 // llama-server (`lib/context.ts`); saved business code undoes the runtime and builds it anew; one SIGINT stops it all.
+// Run in order, one dev server at a time: two in app/ share Nitro's and Vite's caches.
 import { type ChildProcessByStdio, spawn } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -12,6 +13,7 @@ import { tempDir } from './lib/testing/tempDir';
 
 const APP = resolve(import.meta.dirname, '..');
 const dir = tempDir('lw-dev-');
+const envDirs = tempDir('lw-dev-env-');
 let dev: ChildProcessByStdio<null, Readable, Readable>;
 let exited: Promise<number | null>;
 let base = '';
@@ -48,33 +50,41 @@ async function serverPid(): Promise<number | null> {
   return state.pid ?? null;
 }
 
-beforeAll(async () => {
-  ({ profileId } = await seedDataDir(dir.path));
+/** Starts `vite dev` in app/ on a free port with `env` over the test's environment (`CI`, `TEST`, `NODE_ENV` left out). */
+async function startDev(env: Record<string, string | undefined>): Promise<void> {
   const port = await freePort();
-  const env: Record<string, string | undefined> = {
+  const full: Record<string, string | undefined> = {
     ...process.env,
     LLAMA_WEBUI_HOST: '127.0.0.1',
     LLAMA_WEBUI_PORT: String(port),
-    LLAMA_WEBUI_DATA_DIR: dir.path,
     LLAMA_WEBUI_TEST_MONITOR: 'stub',
     LLAMA_WEBUI_TEST_OFFLINE: '1',
+    ...env,
   };
-  for (const k of ['CI', 'TEST', 'NODE_ENV']) delete env[k];
-  // Vite itself, not `pnpm dev`: the signal of the last test goes to the process that handles it.
-  dev = spawn(process.execPath, [join(APP, 'node_modules/vite/bin/vite.js'), 'dev'], {
+  for (const k of ['CI', 'TEST', 'NODE_ENV']) delete full[k];
+  for (const [k, v] of Object.entries(full)) if (v === undefined) delete full[k];
+  output = '';
+  // Vite itself, not `pnpm dev`: a signal goes to the process that handles it.
+  const proc = spawn(process.execPath, [join(APP, 'node_modules/vite/bin/vite.js'), 'dev'], {
     cwd: APP,
-    env,
+    env: full,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  dev.stdout.on('data', (c) => {
+  proc.stdout.on('data', (c) => {
     output += c;
   });
-  dev.stderr.on('data', (c) => {
+  proc.stderr.on('data', (c) => {
     output += c;
   });
-  exited = new Promise((done) => dev.once('exit', (code) => done(code)));
+  dev = proc;
+  exited = new Promise((done) => proc.once('exit', (code) => done(code)));
   base = `http://127.0.0.1:${port}`;
   await until('vite dev answers /api/health', async () => (await health()).includes('"ok":true'), 60_000);
+}
+
+beforeAll(async () => {
+  ({ profileId } = await seedDataDir(dir.path));
+  await startDev({ LLAMA_WEBUI_DATA_DIR: dir.path });
 }, 90_000);
 
 afterAll(async () => {
@@ -84,6 +94,7 @@ afterAll(async () => {
     if (dev.exitCode === null) dev.kill('SIGKILL');
   }
   dir[Symbol.dispose]();
+  envDirs[Symbol.dispose]();
 });
 
 test('saving a route file keeps llama-server and the boot', async () => {
@@ -125,3 +136,36 @@ test('one SIGINT stops vite dev and llama-server', async () => {
   expect(await Promise.race([exited, sleep(10_000, 'timeout', { ref: false })])).toBe(130);
   expect(isAlive(pid)).toBe(false);
 }, 30_000);
+
+test('two quick SIGINTs (a double Ctrl+C) still stop llama-server', async () => {
+  await startDev({ LLAMA_WEBUI_DATA_DIR: dir.path });
+  const pid = await startLlama(base, profileId);
+  try {
+    dev.kill('SIGINT');
+    await sleep(20);
+    dev.kill('SIGINT');
+    await Promise.race([exited, sleep(10_000, null, { ref: false })]);
+    await until('llama-server exits', async () => !isAlive(pid), 5000);
+  } finally {
+    if (isAlive(pid)) process.kill(pid, 'SIGKILL');
+  }
+}, 90_000);
+
+test("dev reads .env.local too: Nitro's Vite plugin loads it (the production launcher reads .env only)", async () => {
+  // No LLAMA_WEBUI_DATA_DIR in the environment: without .env.local the data dir would be $XDG_DATA_HOME/llama-webui.
+  // nitro/vite hard-codes `.env`, `.env.local`, `.env.<mode>`, `.env.<mode>.local`; no option changes the list.
+  const xdg = join(envDirs.path, 'xdg');
+  const fromEnvLocal = join(envDirs.path, 'from-env-local');
+  const file = join(APP, '.env.local');
+  if (existsSync(file)) throw new Error(`${file} exists: not overwritten`);
+  writeFileSync(file, `LLAMA_WEBUI_DATA_DIR=${fromEnvLocal}\n`);
+  try {
+    await startDev({ LLAMA_WEBUI_DATA_DIR: undefined, XDG_DATA_HOME: xdg });
+    expect(existsSync(join(fromEnvLocal, 'llama-webui.sqlite'))).toBe(true);
+    expect(existsSync(xdg)).toBe(false);
+  } finally {
+    rmSync(file, { force: true });
+    dev.kill('SIGINT');
+    await Promise.race([exited, sleep(10_000, null, { ref: false })]);
+  }
+}, 90_000);
