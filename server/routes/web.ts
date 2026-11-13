@@ -5,7 +5,7 @@ import { RESPONSE_ALREADY_SENT } from '@hono/node-server/utils/response';
 import type { WebHandler } from '../host';
 
 /*
- * Web UI: in development, Vite's middlewares (HMR, `server/dev.ts`); in production, the files `vite build` wrote to
+ * Web UI: in development, Vite's middlewares (HMR of the client, `server/dev.ts`); in production, the files `vite build` wrote to
  * `dist/web`, split per page (each page loads its own chunks: the Topology page's three.js stays out of the others).
  */
 

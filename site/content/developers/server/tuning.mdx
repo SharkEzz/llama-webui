@@ -390,7 +390,7 @@ links train down to save power (ASPM), so only a link read under load says somet
 `GET /api/tuning/checks?model=<path>` builds the context from the Monitor's latest snapshot (`allGpus`), the cards the
 last estimate runs on as `retainedBusIds` (`retainedBusIds()` in `server/tuning/match.ts`: its `-dev`, or every
 dedicated card without one, matched to the monitored cards; every card when there is no device list), the hardware, the parsed model, the log ring, the last estimate computed for that model and
-its last disk measurement. Both are kept in memory in `server/routes/tuning.ts`, so a reload forgets them.
+its last disk measurement. Both are kept in memory in `server/routes/tuning.ts`, so a restart forgets them.
 
 The first-run checklist on the Home page only shows the checks for which `isSetupCheck(id)` is true: it drops those that
 need a model or a running server (`cpu.memlock`, `cpu.swappiness`, `kernel.disk`, `kernel.disk-speed`,

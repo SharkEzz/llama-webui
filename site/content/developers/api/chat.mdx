@@ -277,7 +277,8 @@ Closing the stream never stops the reply. To get it back, the web app (`web/src/
 3. If the stream answers `204` (the reply ended in between) or ends without a `done` event, read
    `GET /api/chat/:id` again.
 
-A stream can end without `done` when llama-webui reloads (in development) or stops: `ChatRuns.dispose()` saves each running reply as `stopped`
+A stream can end without `done` when llama-webui stops (in development, on a save under `server/` or `packages/`
+too): `ChatRuns.dispose()` saves each running reply as `stopped`
 and sends `done` to its subscribers first, but a killed process sends nothing. On the next start, a reply left
 `streaming` is marked `stopped` (`stopOrphans()`).
 

@@ -164,7 +164,7 @@ Add a variant to the `WsMessage` union in `packages/webui-shared/src/ws.ts`, wit
 Services do not import the hub: they take callbacks, and `server/index.ts` connects them to `hub.broadcast()`
 (`server/ws/hub.ts`), which sends the message to every client:
 
-```ts title="server/index.ts"
+```ts title="server/deps.ts"
 const downloads = new DownloadQueue({
   repo: downloadsRepo,
   hf,
@@ -174,11 +174,10 @@ const downloads = new DownloadQueue({
 });
 ```
 
-A subscription to an object that survives a development reload (the supervisor, the log ring, the monitor) must be undone on
-the next one: push what it returns onto `undo` in `server/index.ts`, as `undo.push(monitor.onSnapshot(…))` does (the
-dispose function left in `__llamaWebuiDispose` runs that list). The module runs again on every
-reload. Routes that change state themselves can broadcast through the `hub` in their dependencies, as
-`server/routes/bench.ts` does for `bench-deleted`.
+Events of the runtime (the supervisor, the log ring, the monitor) are forwarded in `start()` (`server/index.ts`), as
+`monitor.onSnapshot((s) => hub.broadcast(…))` does: the subscription lasts as long as the process. Routes that change
+state themselves can broadcast through the `hub` in their dependencies, as `server/routes/bench.ts` does for
+`bench-deleted`.
 
   </Step>
   <Step title="Receive it">
@@ -276,12 +275,6 @@ feed its series with `push()`, or `known()` when the value can be missing (the s
 Read it in the page with `useMonitor((s) => s.snapshot?.<field>)` and chart a series with `TimeSeriesChart` and its
 `SERIES` key (`web/src/components/charts/`). If it gets an on/off switch, add it to `collectors` in the settings (see
 [Add a setting](#add-a-setting)).
-
-  </Step>
-  <Step title="Restart pnpm dev">
-
-`server/collectors/**` and `server/monitor/**` live in the runtime and are not hot reloaded: stop `pnpm dev` and run
-it again to try the change.
 
   </Step>
 </Steps>

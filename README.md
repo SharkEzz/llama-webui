@@ -245,7 +245,7 @@ directory, along with profiles, conversations, benchmark runs and sweeps.
 
 ```bash
 pnpm install       # the whole workspace (site/ included), one pnpm-lock.yaml
-pnpm dev           # one Node.js process: Vite middlewares with HMR, server modules reloaded in place
+pnpm dev           # one Node.js process: Vite middlewares with HMR, restarted on every server-side save
 pnpm start         # vite build, then node dist/server/main.js
 pnpm check         # type check every package (tsc), in parallel
 pnpm test          # Vitest, then the llamacpp-js tests (node --test)
@@ -304,7 +304,8 @@ Every `/api/*` route goes through the middlewares of `createApi()` (`server/api.
 ### Dev vs production
 
 - `pnpm dev` (`server/dev.ts`) runs Vite in middleware mode on the app's own HTTP server: HMR for the UI, and its
-  module runner evaluates `server/index.ts` again on every save under `server/` or `packages/`, in the same process.
+  module runner evaluates `server/index.ts` once. Node's watch mode restarts the whole process on every save under
+  `server/` or `packages/`.
 - `pnpm build` (`vite build`) writes the UI, split per page, to `dist/web`, and the server, bundled into one file, to
   `dist/server/main.js` (all dependencies inside except `hono`, `@hono/node-server` and `ws`), with the NVML sampler
   next to it. `pnpm start` builds, then runs it; it reports `git describe` as its version (`dev` in development).
@@ -314,12 +315,9 @@ Every `/api/*` route goes through the middlewares of `createApi()` (`server/api.
   (`pnpm release <version>`, merged first).
 
 > [!IMPORTANT]
-> **Hot reload and long-lived state.** The supervisor, the log ring, the monitor and the bench gate live on
-> `globalThis` (`server/runtime.ts`) so that saving a file does not kill the loaded model. Changes to
-> `server/supervisor/supervisor.ts`, `server/logs/buffer.ts`, `server/bench/gate.ts`, `server/monitor/**` (except `placement.ts`),
-> `server/collectors/**`, `server/proc.ts`, `packages/llamacpp-js/src/**` or `server/runtime.ts` are therefore **not**
-> picked up by a reload: stop and restart `pnpm dev`. For the same reason, test supervisor errors by `name`, not with
-> `instanceof`.
+> **Development restarts.** A save under `server/` or `packages/` restarts `pnpm dev`, and stops `llama-server` with
+> it, as any shutdown does: a running sweep becomes interrupted (Resume continues it) and a chat reply is saved as
+> stopped. A start that fails waits for the next save.
 
 ### Conventions
 

@@ -49,7 +49,7 @@ class Run implements ChatRun {
   private final: ChatMessage | null = null;
   private readonly abort = new AbortController();
   private stopped = false;
-  /** DB closed (development reload): no more writes. */
+  /** Detached at shutdown, before the DB closes: no more writes. */
   private detached = false;
   readonly done: Promise<void>;
 
@@ -87,7 +87,7 @@ class Run implements ChatRun {
 
   /**
    * Immediate stop before the DB closes: the reply is saved as “stopped” right away and subscribers receive
-   * `done` (their SSE streams close; otherwise they would stay open after a development reload).
+   * `done` (their SSE streams close instead of staying open until the process exits).
    */
   detach(): void {
     this.stop();

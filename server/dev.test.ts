@@ -1,95 +1,70 @@
-// The dev loop (`server/dev.ts`) on a small graph: `entry.ts` → `slow.ts` (300 ms at evaluation) → `label.ts`. The
-// entry pushes its label on a global: one push per evaluation. Each edit is an atomic replace (write then rename),
-// as an editor's safe write or `git checkout` does it.
+// The dev loop (`server/dev.ts`) on a small entry: its `start()` records the dev host it receives on a global. A
+// server-side edit restarts the process (`node --watch-path`), so the module runner evaluates the entry only once.
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import type { Plugin } from 'vite';
+import { afterEach, expect, test } from 'vitest';
 import { startDev } from './dev';
 import { tempDir } from './testing/tempDir';
 import { writeFileAtomic } from './testing/write';
 
-const dir = tempDir('lw-dev-');
-const src = join(dir.path, 'src');
-const g = globalThis as { __devLabels?: string[]; __llamaWebuiDevHost?: unknown };
-let dev: Awaited<ReturnType<typeof startDev>>;
+const g = globalThis as { __devStarts?: { label: string; host: unknown }[] };
+const cleanup: (() => Promise<void> | void)[] = [];
+afterEach(async () => {
+  for (const c of cleanup.splice(0).reverse()) await c();
+  delete g.__devStarts;
+});
 
-const write = (name: string, text: string) => writeFileAtomic(join(src, name), text);
-const label = (l: string) => write('label.ts', `export const label = '${l}';\n`);
-const labels = () => g.__devLabels ?? [];
-const quiet = () => sleep(1000);
-
-/** Waits for `want` as the last evaluation, then for the graph to settle; the evaluations since `from`. */
-async function evaluationsUntil(want: string, from: number): Promise<string[]> {
-  await vi.waitFor(() => expect(labels().at(-1)).toBe(want), { timeout: 8000, interval: 20 });
-  await quiet();
-  return labels().slice(from);
-}
-
-beforeAll(async () => {
+/** A project whose entry imports `label.ts` and exports `start()` (`body` replaces its default body). */
+function project(body = 'g.__devStarts ??= []; g.__devStarts.push({ label, host });') {
+  const dir = tempDir('lw-dev-');
+  cleanup.push(() => dir[Symbol.dispose]());
+  const src = join(dir.path, 'src');
   mkdirSync(src);
-  label('a');
-  write('slow.ts', "await new Promise((r) => setTimeout(r, 300));\nexport { label } from './label';\n");
+  const write = (name: string, text: string) => writeFileAtomic(join(src, name), text);
+  write('label.ts', "export const label = 'a';\n");
   write(
     'entry.ts',
-    "import { label } from './slow';\n(globalThis as { __devLabels?: string[] }).__devLabels ??= [];\n" +
-      '(globalThis as { __devLabels: string[] }).__devLabels.push(label);\n',
+    "import { label } from './label';\n" +
+      'const g = globalThis as { __devStarts?: { label: string; host: unknown }[] };\n' +
+      `export async function start(host: unknown) { ${body} }\n`,
   );
-  dev = await startDev({
-    entry: join(src, 'entry.ts'),
-    watch: [src],
-    config: { configFile: false, root: dir.path, logLevel: 'silent' },
-  });
-}, 30_000);
-afterAll(async () => {
-  await dev?.vite.close();
-  delete g.__devLabels;
-  delete g.__llamaWebuiDevHost;
-  dir[Symbol.dispose]();
-});
+  let closed = false;
+  const closing: Plugin = {
+    name: 'closing',
+    closeBundle() {
+      closed = true;
+    },
+  };
+  const start = () =>
+    startDev({
+      entry: join(src, 'entry.ts'),
+      config: { configFile: false, root: dir.path, logLevel: 'silent', plugins: [closing] },
+    });
+  return { write, start, closed: () => closed };
+}
 
-test('startDev evaluates the entry and publishes the dev host (its http server and the Vite middlewares)', () => {
-  expect(labels()).toEqual(['a']);
-  expect(g.__llamaWebuiDevHost).toEqual({ http: dev.http, web: dev.vite.middlewares });
+test('startDev evaluates the entry once and calls its start() with the dev host', async () => {
+  const p = project();
+  const dev = await p.start();
+  cleanup.push(() => dev.vite.close());
+  expect(g.__devStarts).toEqual([{ label: 'a', host: { http: dev.http, web: dev.vite.middlewares } }]);
   expect(dev.http.listening).toBe(false);
-});
-
-test('a plain edit evaluates the entry once, with the new content', async () => {
-  const from = labels().length;
-  label('b');
-  expect(await evaluationsUntil('b', from)).toEqual(['b']);
-}, 15_000);
-
-test('a syntax error, then its fix: one evaluation, with the fixed content', async () => {
-  const from = labels().length;
-  write('label.ts', "export const label = 'c\n");
-  await quiet();
-  expect(labels().length).toBe(from);
-  label('c');
-  expect(await evaluationsUntil('c', from)).toEqual(['c']);
-}, 15_000);
-
-test('an import of a missing file, then its creation: evaluated', async () => {
-  const from = labels().length;
-  write('label.ts', "export { label } from './later';\n");
-  await quiet();
-  write('later.ts', "export const label = 'd';\n");
-  expect(await evaluationsUntil('d', from)).toEqual(['d']);
-}, 15_000);
-
-test('two writes 5 ms then 100 ms apart: the last content wins', async () => {
-  for (const gap of [5, 100]) {
-    const from = labels().length;
-    label(`e${gap}`);
-    await sleep(gap);
-    label(`f${gap}`);
-    const seen = await evaluationsUntil(`f${gap}`, from);
-    expect(seen.at(-1)).toBe(`f${gap}`);
-  }
 }, 20_000);
 
-test('an edit after those bursts still reloads', async () => {
-  const from = labels().length;
-  label('g');
-  expect(await evaluationsUntil('g', from)).toEqual(['g']);
-}, 15_000);
+test('an edit of a server file does not evaluate the entry again (the process restarts instead)', async () => {
+  const p = project();
+  const dev = await p.start();
+  cleanup.push(() => dev.vite.close());
+  p.write('label.ts', "export const label = 'b';\n");
+  p.write('entry.ts', "export async function start() { throw new Error('evaluated again'); }\n");
+  await sleep(1000);
+  expect(g.__devStarts?.map((s) => s.label)).toEqual(['a']);
+}, 20_000);
+
+test('an entry whose start() throws rejects startDev, with Vite closed', async () => {
+  const p = project("throw new Error('half-edited');");
+  await expect(p.start()).rejects.toThrow('half-edited');
+  expect(p.closed()).toBe(true);
+}, 20_000);

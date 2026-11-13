@@ -44,13 +44,14 @@ a version there, not in a `package.json`. A dependency change commits its `pnpm-
 pnpm dev
 ```
 
-`pnpm dev` is `node server/dev.ts`: one Node.js process, one port. Vite runs in middleware mode on the app's HTTP
-server and serves the UI with hot module replacement; its server-side module runner evaluates `server/index.ts`, and
-saving a file under `server/` or `packages/` evaluates it again in the same process, without restarting
-`llama-server`. It prints:
+`pnpm dev` runs `server/dev.ts` under `node --watch-path=server --watch-path=packages`: one Node.js process, one
+port. Vite runs in middleware mode on the app's HTTP server and serves the UI with hot module replacement; its
+server-side module runner evaluates `server/index.ts` once. Saving a file under `server/` or `packages/` restarts the
+whole process, `llama-server` included ([Development restarts](/developers/architecture/#development-restarts)). It
+prints:
 
 ```text
-llama-webui on http://127.0.0.1:7860 (dev, HMR)
+llama-webui on http://127.0.0.1:7860 (dev)
 ```
 
   </Tab>
@@ -62,7 +63,7 @@ pnpm start
 
 `pnpm start` is `pnpm build && node dist/server/main.js`. `vite build` writes the UI, split per page, to `dist/web`
 and the server, bundled into one file, to `dist/server/main.js`; the server reads `dist/web` into memory at startup
-and has no HMR and no reload. Without `dist/web`, every page answers `503` and the API and the WebSocket still work.
+and has no HMR and no file watching. Without `dist/web`, every page answers `503` and the API and the WebSocket still work.
 It prints its version, `git describe --tags --always --dirty` at build time:
 
 ```text
@@ -80,9 +81,8 @@ Two habits keep development away from your everyday instance:
   development database inside the clone.
 - Use another port if an instance already runs on 7860: `pnpm dev --port 7861`.
 
-`pnpm dev` keeps some state alive across reloads, and changes to those files need a full restart. Read
-[the development reload pitfall](/developers/architecture/#the-development-reload-pitfall) before changing the supervisor, the monitor,
-the collectors, the log ring or the bench gate.
+A save under `server/` or `packages/` stops the `llama-server` that `pnpm dev` manages, and a running sweep ends as
+`interrupted` (Resume button). Edit the server between benchmarks rather than during one.
 
 ### The package
 
@@ -104,7 +104,7 @@ The root `package.json` defines the app's scripts; the website has its own, in `
 
 | Script | Runs | What it does |
 | --- | --- | --- |
-| `pnpm dev` | `node server/dev.ts` | Development server: Vite middlewares with HMR, server modules reloaded in place. |
+| `pnpm dev` | `node --watch-path=server --watch-path=packages --watch-preserve-output server/dev.ts` | Development server: Vite middlewares with HMR for the UI; a save under `server/` or `packages/` restarts the process. |
 | `pnpm build` | `vite build` | The UI in `dist/web`, the server in `dist/server/main.js`, the NVML sampler in `dist/server/nvml-worker.js`. |
 | `pnpm start` | `pnpm build && node dist/server/main.js` | Builds, then runs the production server. |
 | `pnpm test` | `pnpm test:unit && pnpm --filter llamacpp-js test` | Every Vitest project (`server` with `scripts/`, `shared`, `web`, `site`), then the `llamacpp-js` tests on `node --test`. |
@@ -128,13 +128,13 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
 <FileTree>
 - `server/` the Node.js process (workspace `@llama-webui/server`)
   - `main.ts` production entry, bundled to `dist/server/main.js`
-  - `dev.ts` `pnpm dev`: Vite in middleware mode, the entry reloaded on every save
-  - `index.ts` builds an instance: opens the database, builds the services, mounts them, wires their events to the WebSocket
+  - `dev.ts` `pnpm dev`: Vite in middleware mode, the entry evaluated once and its `start()` called
+  - `index.ts` `start()`: opens the database, builds the services, mounts them, wires their events to the WebSocket, stops them on SIGINT and SIGTERM
   - `deps.ts` `createDeps()`: constructs the services and wires them together, without starting any work
   - `host.ts` `mount()`: the `node:http` server's routing (`/api/*` to Hono, `/ws` to `ws`, the UI)
   - `api.ts` `createApi()`: the Hono app of every `/api` route (health included)
   - `rpc.ts` `AppType`, the API's route types for the web's typed client (`@llama-webui/server/api`, types only)
-  - `runtime.ts` state that survives a development reload (supervisor, log ring, monitor, bench gate)
+  - `runtime.ts` `createRuntime()`: the process's supervisor, log ring, monitor and bench gate
   - `cli.ts` launch options and `--help`; `env.ts` the `.env` file and the proxy variables
   - `paths.ts` data directory and database path; `version.ts` the version the build sets
   - `http.ts` `HttpError`, JSON error responses, the API's middlewares (guard, `405` table) and validators

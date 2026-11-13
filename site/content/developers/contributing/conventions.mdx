@@ -1,6 +1,6 @@
 ---
 title: Conventions
-description: Language, number formatting, Biome rules, React and built-in API idioms, generated shadcn components and the hot-reload rules every change follows.
+description: Language, number formatting, Biome rules, React and built-in API idioms, generated shadcn components and the development restarts every change goes through.
 ---
 
 These rules apply to `server/`, `packages/`, `web/` and `site/`. They come from `CLAUDE.md` at the root of the repository
@@ -189,18 +189,19 @@ only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), 
 they stay comparable with shadcn updates. Leave them untouched: put the project's changes in a wrapper outside `ui/`, as
 `web/src/components/Select.tsx` does for the select list.
 
-## Hot reload
+## Development restarts
 
-`pnpm dev` evaluates the server entry again on every save under `server/` or `packages/` (`server/dev.ts`), in the
-same process, and some modules deliberately survive a reload:
+`pnpm dev` restarts the whole process on every save under `server/` or `packages/` (`node --watch-path`), and Vite
+serves the UI with HMR. Server state lives only as long as its process:
 
-- The supervisor, the log ring, the monitor and the bench gate live on `globalThis` (`server/runtime.ts`) so that saving
-  a file does not kill the loaded model. A change to `server/supervisor/supervisor.ts`, `server/logs/buffer.ts`,
-  `server/bench/gate.ts`, `server/monitor/**` (except `placement.ts`), `server/collectors/**` or `server/runtime.ts` is
-  not picked up: stop `pnpm dev` with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run it again.
-- For the same reason, recognize supervisor errors by `name` (`e.name === 'SupervisorError'`), never with `instanceof`:
-  the surviving supervisor throws the class from the old version of the module.
+- A save stops the managed `llama-server` with the process, as any stop does: a running chat reply is saved as
+  `stopped`, a benchmark run and its sweep as `interrupted` (Resume button), a download resumes from its `.part` at the
+  next start. Edit the server between benchmarks rather than during one.
+- Server modules are evaluated once per process, so module state, classes and `instanceof` checks are those of that
+  process: recognize errors with `instanceof` (`SupervisorError`, `HttpError`). The `Llama*Error` classes of
+  `llamacpp-js` also have a fixed `name`, for callers that load the package twice.
+- What a part of the server starts, it registers on the `AsyncDisposableStack` of `start()` (`server/index.ts`), which
+  undoes everything at shutdown.
 - Vite plugins are declared once, in `vite.config.ts`: development and `pnpm build` both use them.
 
-[Architecture](/developers/architecture/) explains which modules are recreated on a reload and what happens to a
-generation, a benchmark or a sweep in progress.
+[Architecture](/developers/architecture/#development-restarts) describes the restart and the shutdown order.

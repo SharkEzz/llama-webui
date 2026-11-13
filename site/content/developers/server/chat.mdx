@@ -25,12 +25,11 @@ The routes are documented in [Chat](/developers/api/chat/), the user-facing beha
 that started it:
 
 - It goes on when its client disconnects. Closing the SSE stream only unsubscribes that client.
-- It is saved to the database while it streams, so a reload or another browser finds the text written so far.
+- It is saved to the database while it streams, so a page reload or another browser finds the text written so far.
 - Any client can attach to it later with `GET /api/chat/:id/stream`, and several clients can follow it at once.
 - There is at most one run per conversation.
 
-A run ends when `llama-server` finishes the reply, when someone stops it, when it fails, or when llama-webui stops or
-reloads.
+A run ends when `llama-server` finishes the reply, when someone stops it, when it fails, or when llama-webui stops.
 
 ## Run lifecycle
 
@@ -193,18 +192,17 @@ How a run ends decides its status and error:
 In every case the text received so far is kept. `POST /api/chat/:id/stop` answers `409` `No reply in progress` when
 the conversation has no run.
 
-## Shutdown and reload
+## Shutdown
 
 The database must not be written after it is closed, so every running reply is settled first. `ChatRuns.dispose()`
 calls `detach()` on each run: it aborts the request, saves the reply right away with status `stopped`, emits `done` so
 that the SSE streams close, and blocks any later write from that run.
 
-- **llama-webui stops** (`SIGINT`, `SIGTERM`): `server/index.ts` prepends a handler that disposes the chat runs (and
-  the benchmark runner and the download queue) before the runtime's handler stops `llama-server`. Without that order,
-  the replies would see `llama-server` disconnect and end as `error`.
-- **Development reload**: `ChatRuns` is created by `server/index.ts`, not kept in the runtime, so it does not survive.
-  The previous module's dispose function calls `chatRuns.dispose()` before closing its database handle: a reply in
-  progress ends as `stopped`, and the new module starts with no run.
+- **llama-webui stops** (`SIGINT`, `SIGTERM`, or a development restart after a save under `server/` or `packages/`):
+  `chatRuns.dispose()` is the first step of the shutdown stack of `start()` (`server/index.ts`), before the benchmark
+  runner and the download queue, and well before `llama-server` stops and the database closes
+  ([Architecture](/developers/architecture/#shutdown)). Without that order, the replies would see `llama-server`
+  disconnect and end as `error`.
 - **llama-webui killed** (`SIGKILL`, crash): nothing runs. At the next start, `conversations.stopOrphans()` turns every message
   left `streaming` into `stopped`.
 

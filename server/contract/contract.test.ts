@@ -114,7 +114,7 @@ async function boot() {
     sweeps.setStatus(sweep.id, 'done', { finishedAt: Date.now() });
   }
 
-  // Own runtime: getRuntime() is a global and installs signal handlers.
+  // Own runtime: createRuntime() installs the process's signal handlers.
   const logs = new LogBuffer(10_000);
   const supervisor = new Supervisor({ logs });
   const runtime: Runtime = {
@@ -151,7 +151,7 @@ async function boot() {
       server.closeAllConnections();
       await new Promise((r) => server.close(r));
       deps.chatRuns.dispose();
-      deps.benchRunner.dispose({ restart: false });
+      deps.benchRunner.dispose();
       deps.downloads.dispose();
       deps.placement.dispose();
       deps.hub.dispose();

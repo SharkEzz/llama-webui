@@ -28,16 +28,8 @@ export class HttpError extends Error {
 
 export const notFound = (what: string) => new HttpError(404, `${what} not found`);
 
-/**
- * An `HttpError`, recognized by its shape rather than `instanceof`: the bench gate lives on `globalThis` and survives
- * a development reload, so it throws the class of the first `server/http.ts`, not the current one (#34).
- */
-export function isHttpError(err: unknown): err is HttpError {
-  return err instanceof Error && err.name === 'HttpError' && typeof (err as HttpError).status === 'number';
-}
-
 export function errorResponse(err: unknown): Response {
-  if (isHttpError(err))
+  if (err instanceof HttpError)
     return Response.json(err.code ? { error: err.message, code: err.code } : { error: err.message }, {
       status: err.status,
     });

@@ -42,8 +42,7 @@ const isActive = (s: ServerState) =>
 
 /**
  * Permanent sampling (llama-tui's Poller): one tick every `pollIntervalMs`, whether tabs are open or not. Each tick
- * produces a Snapshot (broadcast to subscribers) and adds a point to every history series.
- * Lives in the runtime (survives a development reload).
+ * produces a Snapshot (broadcast to subscribers) and adds a point to every history series. Lives in the runtime.
  */
 export class Monitor {
   private history: History;
@@ -91,7 +90,7 @@ export class Monitor {
     return this.collectors.nvmlSystem;
   }
 
-  /** Absolute model path of a profile (model disk); provided by the server module, which is hot-reloaded. */
+  /** Absolute model path of a profile (model disk); provided by `server/index.ts`, which reads the profiles. */
   setModelPathResolver(fn: (profileId: number) => string | null): void {
     this.modelPathFor = fn;
     this.modelDisks.clear();

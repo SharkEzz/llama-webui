@@ -9,116 +9,104 @@ import { mount, type WebHandler } from './host';
 import { createHostServer } from './hostServer';
 import { dbPath } from './paths';
 import { nodeWeb, staticWeb, unavailableWeb } from './routes/web';
-import { getRuntime, serverView, startMonitor } from './runtime';
+import { createRuntime, serverView, startMonitor } from './runtime';
 import { profilePaths } from './supervisor/args';
 import { externalWatcher } from './supervisor/external';
 import { APP_VERSION } from './version';
 
-// Flags, else env, else defaults (`--help`). Listens locally by default; --host 0.0.0.0 (or LLAMA_WEBUI_HOST) opens
-// it to the local network (no authentication). Re-read on every development reload: same arguments.
-const cli = cliOptionsOrExit();
-const HOSTNAME = cli.host;
-const PORT = cli.port;
 const EXTERNAL_CHECK_MS = 2000;
 
-// In development (`server/dev.ts`) this module is re-evaluated on every server-side save, on the same HTTP server.
-// The new instance is built and mounted first, then the previous one is released (timers, db, subscriptions): a
-// reload that fails to build leaves the old one serving, and one that fails after the mount has already registered
-// what the next reload releases. The supervisor and the logs (runtime) survive the reload.
-const g = globalThis as { __llamaWebuiDispose?: () => void; __llamaWebuiDevHost?: DevHost };
-const devHost = g.__llamaWebuiDevHost;
+/**
+ * Starts llama-webui for the life of the process: the app is built and listening, then the effects start (orphans,
+ * downloads, broadcasts, external server watch), and SIGINT or SIGTERM stops it. Production: `server/main.ts`.
+ * Development: `server/dev.ts`, with its HTTP server and Vite's middlewares (`dev`).
+ *
+ * Each part registers what undoes it on `stack` as it is created; the stack undoes them in reverse order. Until the
+ * end of `start()` it belongs to `await using`: a failure on the way (port taken…) undoes what was already built.
+ */
+export async function start(dev?: DevHost): Promise<void> {
+  await using stack = new AsyncDisposableStack();
+  // Flags, else env, else defaults (`--help`). Listens locally by default; --host 0.0.0.0 (or LLAMA_WEBUI_HOST) opens
+  // it to the local network (no authentication).
+  const cli = cliOptionsOrExit();
+  const db = stack.use(openDb(dbPath(cli.dataDir)));
+  const runtime = createRuntime();
+  const { supervisor, logs, benchGate } = runtime;
+  stack.defer(() => supervisor.stop());
+  // Last resort, synchronous: the process exits without the stack (an uncaught error).
+  process.on('exit', () => supervisor.killNow());
+  // Development: Vite's middlewares (HMR). Production: the files of `pnpm build`, next to this bundle
+  // (`dist/server/main.js` → `dist/web`); without them the API and llama-server control still work.
+  const web: WebHandler = dev
+    ? nodeWeb(dev.web)
+    : await staticWeb(fileURLToPath(new URL('../web/', import.meta.url))).catch((err: unknown) => {
+        console.error('[llama-webui] web UI unavailable (run `pnpm build`):', err);
+        return unavailableWeb(err);
+      });
+  const monitor = await startMonitor(runtime, new SettingsRepo(db).get());
+  stack.defer(() => monitor.stop());
+  const deps = createDeps({ db, runtime, monitor, hostname: cli.host });
+  const { hub, settings, conversations, chatRuns, benchRuns, sweeps, benchRunner, profiles, downloads, placement } =
+    deps;
+  stack.defer(() => placement.dispose());
+  // Open WebSockets are closed (1001).
+  stack.defer(() => hub.dispose());
+  // Undone first: running replies, the benchmark and the download are saved as “stopped”, “interrupted” or resumable
+  // while llama-server still runs (a reply would otherwise see the disconnect and end as “error”).
+  stack.defer(() => downloads.dispose());
+  stack.defer(() => benchRunner.dispose());
+  stack.defer(() => chatRuns.dispose());
+  const port = await mount({
+    server: dev?.http ?? createHostServer(),
+    fetch: createApi(deps).fetch,
+    hub,
+    web,
+    hostname: cli.host,
+    port: cli.port,
+  });
 
-const db = openDb(dbPath(cli.dataDir));
-const runtime = getRuntime();
-const { supervisor, logs } = runtime;
-// Development: Vite's middlewares (HMR). Production: the files of `pnpm build`, next to this bundle
-// (`dist/server/main.js` → `dist/web`); without them the API and llama-server control still work.
-const web: WebHandler = devHost
-  ? nodeWeb(devHost.web)
-  : await staticWeb(fileURLToPath(new URL('../web/', import.meta.url))).catch((err: unknown) => {
-      console.error('[llama-webui] web UI unavailable (run `pnpm build`):', err);
-      return unavailableWeb(err);
-    });
-const deps = createDeps({
-  db,
-  runtime,
-  monitor: await startMonitor(runtime, new SettingsRepo(db).get()),
-  hostname: HOSTNAME,
-});
-const server = devHost?.http ?? createHostServer();
-const port = await mount({
-  server,
-  fetch: createApi(deps).fetch,
-  hub: deps.hub,
-  web,
-  hostname: HOSTNAME,
-  port: PORT,
-});
-g.__llamaWebuiDispose?.();
-
-const { hub, settings, conversations, chatRuns, benchRuns, sweeps, benchRunner, profiles, downloads, monitor } = deps;
-const { placement } = deps;
-// Registered before the effects below start: if one of them throws (a reload of a broken file), this instance is
-// mounted all the same, and the next reload must find it to release it. `undo` grows with each effect.
-const undo: (() => void)[] = [];
-g.__llamaWebuiDispose = () => {
-  for (const fn of undo) fn();
-  placement.dispose();
-  monitor.setModelPathResolver(() => null);
-  hub.dispose();
-  chatRuns.dispose();
-  // Reload: a one-off run is interrupted, the sweep item is queued again; the gate (runtime) is handed to the
-  // new module, or restarts the server if nobody takes it over.
-  benchRunner.dispose({ restart: true });
-  // The running download stops; its `.part` and its row stay for the new module.
-  downloads.dispose();
-  db.close();
-};
-
-// A reply left “streaming” after the process was killed is marked interrupted.
-conversations.stopOrphans();
-const benchGate = runtime.benchGate;
-// Cold start: a run left “running” (process killed) is marked interrupted, and so is its sweep (Resume button).
-// On reload the gate is still held: the old module has already settled its run and the new one resumes the sweep.
-if (!benchGate.held) {
+  // A reply left “streaming” when the last process stopped is marked “stopped”.
+  conversations.stopOrphans();
+  // A benchmark run left “running” is marked “interrupted”, and so is its sweep (Resume button).
   benchRuns.stopOrphans();
   sweeps.stopOrphans();
+  monitor.setModelPathResolver((id) => {
+    const p = profiles.get(id);
+    return p ? profilePaths(p).model : null;
+  });
+  // Hugging Face downloads: the item left downloading resumes from its `.part`.
+  downloads.resume();
+
+  supervisor.subscribe(() => hub.broadcast({ type: 'server-state', payload: serverView(supervisor) }));
+  logs.onLines((lines) => hub.broadcast({ type: 'log', payload: lines }));
+  monitor.onSnapshot((s) => hub.broadcast({ type: 'snapshot', payload: s }));
+  placement.onChange((p) => hub.broadcast({ type: 'placement', payload: p }));
+
+  // External server: detected at startup then watched (leaves the “external” state when it stops).
+  const checkExternal = externalWatcher({
+    supervisor,
+    ports: () => [settings.get().port, supervisor.lastCommand?.port],
+    paused: () => benchGate.held || benchRunner.busy,
+  });
+  void checkExternal();
+  setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS);
+
+  // Started: the stack now lives until a signal undoes it. A second signal is ignored while the first one stops.
+  const live = stack.move();
+  let stopping = false;
+  const shutdown = async (signal: NodeJS.Signals) => {
+    if (stopping) return;
+    stopping = true;
+    if (supervisor.managedPid !== null) console.log(`[llama-webui] ${signal}: stopping llama-server…`);
+    try {
+      await live.disposeAsync();
+    } catch (err) {
+      console.error('[llama-webui] shutdown:', err);
+    }
+    process.exit(0);
+  };
+  process.on('SIGINT', (signal) => void shutdown(signal));
+  process.on('SIGTERM', (signal) => void shutdown(signal));
+
+  console.log(`llama-webui on http://${cli.host}:${port}${dev ? ' (dev)' : ` (${APP_VERSION})`}`);
 }
-void benchRunner.resume();
-monitor.setModelPathResolver((id) => {
-  const p = profiles.get(id);
-  return p ? profilePaths(p).model : null;
-});
-// Hugging Face downloads: recreated on every reload, the new queue resumes the `.part` the old one let go of.
-downloads.resume();
-
-undo.push(supervisor.subscribe(() => hub.broadcast({ type: 'server-state', payload: serverView(supervisor) })));
-undo.push(logs.onLines((lines) => hub.broadcast({ type: 'log', payload: lines })));
-undo.push(monitor.onSnapshot((s) => hub.broadcast({ type: 'snapshot', payload: s })));
-undo.push(placement.onChange((p) => hub.broadcast({ type: 'placement', payload: p })));
-
-// Shutdown: running replies are saved as “interrupted” before the runtime stops llama-server
-// (otherwise they would see the disconnect and end as “error”). First in line, ahead of the runtime's handler.
-const stopChats = () => {
-  chatRuns.dispose();
-  benchRunner.dispose({ restart: false });
-  downloads.dispose();
-};
-process.prependListener('SIGINT', stopChats);
-process.prependListener('SIGTERM', stopChats);
-undo.push(() => {
-  process.off('SIGINT', stopChats);
-  process.off('SIGTERM', stopChats);
-});
-
-// External server: detected at startup then watched (leaves the “external” state when it stops).
-const checkExternal = externalWatcher({
-  supervisor,
-  ports: () => [settings.get().port, supervisor.lastCommand?.port],
-  paused: () => benchGate.held || benchRunner.busy,
-});
-void checkExternal();
-const externalTimer = setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS);
-undo.push(() => clearInterval(externalTimer));
-
-console.log(`llama-webui on http://${HOSTNAME}:${port}${devHost ? ' (dev, HMR)' : ` (${APP_VERSION})`}`);

@@ -15,8 +15,6 @@ export interface ServerControl {
 export interface GateDeps {
   server: ServerControl;
   logs: LogBuffer;
-  /** Time left to the new module to take over the gate after a reload (3 s). */
-  adoptGraceMs?: number;
   /** Maximum wait for a stop already in progress before taking the gate (60 s). */
   stoppingTimeoutMs?: number;
 }
@@ -25,9 +23,7 @@ const POLL_MS = 100;
 
 /**
  * The server gate during benchmarks: a single holder (one-off run or sweep), the managed server stopped once on
- * acquire and restarted once on release, the external server detector paused while it is held.
- * Lives in the runtime (survives a development reload): the runner is recreated on every reload, the gate is not, so a
- * sweep resumes in the new module without restarting the server in between. Changing this file requires restarting `pnpm dev`.
+ * acquire and restarted once on release, the external server detector paused while it is held. Lives in the runtime.
  */
 export class BenchGate {
   private holding = false;
@@ -35,7 +31,6 @@ export class BenchGate {
   private stopped: BuiltCommand | null = null;
   private stopping: Promise<void> | null = null;
   private releasing: Promise<void> | null = null;
-  private pending: { cancelled: boolean; settled: Promise<void> } | null = null;
 
   constructor(private readonly deps: GateDeps) {}
 
@@ -112,7 +107,6 @@ export class BenchGate {
   release(rebuild?: (stopped: BuiltCommand) => BuiltCommand | null): Promise<void> {
     if (!this.holding) return Promise.resolve();
     if (this.releasing) return this.releasing;
-    this.pending = null;
     this.releasing = (async () => {
       await this.stopping?.catch(() => {});
       const stopped = this.stopped;
@@ -136,32 +130,5 @@ export class BenchGate {
       }
     })();
     return this.releasing;
-  }
-
-  /** Reload of the old module: releases once `after` settles and the delay has elapsed, unless adopt() comes first. */
-  releaseLater(after: Promise<unknown>): void {
-    if (!this.holding || this.releasing) return;
-    const settled = Promise.allSettled([after]).then(() => {});
-    const token = { cancelled: false, settled };
-    this.pending = token;
-    void settled
-      .then(() => sleep(this.deps.adoptGraceMs ?? 3000))
-      .then(() => {
-        if (token.cancelled || this.pending !== token) return;
-        this.pending = null;
-        this.release().catch(() => {});
-      });
-  }
-
-  /**
-   * New module: takes over a gate left by the old one (cancels the deferred release). Returns the promise of the old
-   * process finishing (to await before restarting anything on the cards), null if there is nothing to take over.
-   */
-  adopt(): Promise<void> | null {
-    if (!this.holding || !this.pending || this.releasing) return null;
-    const { settled } = this.pending;
-    this.pending.cancelled = true;
-    this.pending = null;
-    return settled;
   }
 }

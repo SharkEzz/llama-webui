@@ -188,7 +188,7 @@ export class RunExecutor {
     return true;
   }
 
-  /** Reload or shutdown: immediate SIGKILL, resolved when the child exits. */
+  /** Shutdown: immediate SIGKILL, resolved when the child exits. */
   async killNow(): Promise<void> {
     const ex = this.cur;
     if (!ex) return;

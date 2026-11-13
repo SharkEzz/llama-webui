@@ -1,6 +1,6 @@
 ---
 title: Architecture
-description: The single Node.js process behind llama-webui, its startup and shutdown, the REST, WebSocket and SSE channels, UI serving, and the development reload pitfall.
+description: The single Node.js process behind llama-webui, its startup and shutdown, the REST, WebSocket and SSE channels, UI serving, and how development restarts it.
 ---
 
 llama-webui is one Node.js process (Node 26.13 or later). `server/index.ts` builds every service and `mount()`
@@ -12,46 +12,46 @@ runs benchmarks and relays chat generations.
 
 ## Startup sequence
 
-`server/index.ts` is the composition root of both `pnpm dev` and `pnpm start`. In development, `server/dev.ts`
-evaluates it again on every server-side save, inside the same process, so it is written to run more than once. In
-production, `server/main.ts` (bundled to `dist/server/main.js`) sets `NODE_ENV` to `production` if it is unset and
-imports it. Both entry points first load `.env` from the working directory (`loadDotEnv()`, `server/env.ts`): its
-variables fill what the environment lacks, and replace it too with `--env-override`
-(read from the arguments before they are parsed) or `LLAMA_WEBUI_ENV_OVERRIDE=1`. Only that file is read (no
-`.env.local`, no per-mode file), and `parseEnv()` does not expand `$VAR` references. They then call `useEnvProxy()`
-(same file): with `HTTP_PROXY` or `HTTPS_PROXY` set, `fetch` goes through that proxy, loopback excepted (see
-[Hugging Face](/developers/server/hugging-face/)). In order, `server/index.ts`:
+`server/index.ts` is the composition root of both `pnpm dev` and `pnpm start`: it exports `start()`, which runs once
+per process. In development, `server/dev.ts` evaluates it and calls `start()` with its HTTP server and Vite's
+middlewares. In production, `server/main.ts` (bundled to `dist/server/main.js`) sets `NODE_ENV` to `production` if it
+is unset, imports it and calls `start()`. Both entry points first load `.env` from the working directory
+(`loadDotEnv()`, `server/env.ts`): its variables fill what the environment lacks, and replace it too with
+`--env-override` (read from the arguments before they are parsed) or `LLAMA_WEBUI_ENV_OVERRIDE=1`. Only that file is
+read (no `.env.local`, no per-mode file), and `parseEnv()` does not expand `$VAR` references. They then call
+`useEnvProxy()` (same file): with `HTTP_PROXY` or `HTTPS_PROXY` set, `fetch` goes through that proxy, loopback excepted
+(see [Hugging Face](/developers/server/hugging-face/)). In order, `start()`:
 
-1. Reads the launch options with `cliOptionsOrExit()` (see [Launch options](#launch-options)).
-2. Opens the database with `openDb(dbPath(cli.dataDir))`: creates the data directory, opens
+1. Opens an `AsyncDisposableStack` with `await using`. Each step below registers what undoes it on that stack as soon
+   as it has built it (see [Shutdown](#shutdown)).
+2. Reads the launch options with `cliOptionsOrExit()` (see [Launch options](#launch-options)).
+3. Opens the database with `openDb(dbPath(cli.dataDir))`: creates the data directory, opens
    `llama-webui.sqlite` with `node:sqlite`, sets `journal_mode = WAL` and `foreign_keys = ON`, and runs the migrations.
-3. Gets the runtime with `getRuntime()` (`server/runtime.ts`): the supervisor, the log ring, the boot id and the bench
-   gate, created on the first call and kept on `globalThis` afterwards.
-4. Prepares the web handler: Vite's middlewares in development, the files of `pnpm build` in production (see
+4. Creates the runtime with `createRuntime()` (`server/runtime.ts`): the supervisor, the log ring of 10,000 lines, the
+   boot id (`crypto.randomUUID()`) and the bench gate. It only builds them; `start()` also installs the
+   `process.on('exit')` last resort that kills the managed server.
+5. Prepares the web handler: Vite's middlewares in development, the files of `pnpm build` in production (see
    [Serving the UI](#serving-the-ui)).
-5. Starts the monitor with `startMonitor()`, once per process: later calls return the running one.
-6. Calls `createDeps()` (`server/deps.ts`), which only constructs and wires the services, without starting any work:
+6. Starts the monitor with `startMonitor()`.
+7. Calls `createDeps()` (`server/deps.ts`), which only constructs and wires the services, without starting any work:
    the `WsHub` with the runtime's `bootId`; the settings, profiles, conversations, bench run, sweep and download
    repositories; `ChatRuns`, whose `target()` sends generations to the managed server when it is `ready`, or to an
    external server; the `RunExecutor` and the `BenchRunner`; the Hugging Face client and the `DownloadQueue`; and the
    `PlacementTracker`, which replays the log ring to find the loaded model's placement.
-7. Calls `mount()` with the API (`createApi(deps).fetch`), the hub and the web handler, on the development host's
-   HTTP server or on a new one (see [Routes](#routes)). The first mount listens on the port; a later one replaces the
-   app of the previous evaluation.
-8. Calls `globalThis.__llamaWebuiDispose()` if a previous evaluation left one, to release that instance (see
-   [What a reload recreates](#what-a-reload-recreates)). It comes after the new instance is built and mounted, so a
-   reload that fails before this point leaves the old one serving.
-9. Stores its own dispose function in `globalThis.__llamaWebuiDispose`, before the steps below: this instance is
-   mounted, so if one of them throws (a reload of a broken file), the next reload still finds it to release.
-10. Marks the chat replies left `streaming` by a killed process as `stopped` (`conversations.stopOrphans()`).
-11. Marks the runs and sweeps left `running` as `interrupted` on a cold start (bench gate not held), and calls
-   `benchRunner.resume()` in every case.
-12. Gives the monitor the profile → model path resolver it uses for the model's disk.
-13. Calls `downloads.resume()` to pick up the items left queued or downloading.
-14. Subscribes the WebSocket hub to the services (table below), installs its shutdown handler and starts the external
-    server watcher; each adds what undoes it to the `undo` list the dispose function runs.
+8. Calls `mount()` with the API (`createApi(deps).fetch`), the hub and the web handler, on the development host's
+   HTTP server or on a new one, and listens on the port (see [Routes](#routes)).
+9. Marks the chat replies left `streaming` by the previous process as `stopped` (`conversations.stopOrphans()`), and
+   the runs and sweeps it left `running` as `interrupted`.
+10. Gives the monitor the profile → model path resolver it uses for the model's disk.
+11. Calls `downloads.resume()` to pick up the items left queued or downloading.
+12. Subscribes the WebSocket hub to the services (table below) and starts the external server watcher.
+13. Takes the stack out of the `await using` (`stack.move()`) and installs the shutdown handler on `SIGINT` and
+    `SIGTERM`.
 
-It finally prints `llama-webui on http://<host>:<port>`, followed by `(dev, HMR)` in development or by the version
+If a step throws before the last one (the port is taken, for instance), the `await using` undoes what was already
+built and the error ends the process.
+
+It finally prints `llama-webui on http://<host>:<port>`, followed by `(dev)` in development or by the version
 in production.
 
 The services do not know about the WebSocket: `index.ts` passes them callbacks or subscribes to them, and broadcasts
@@ -76,8 +76,8 @@ The external server watcher (`externalWatcher()` in `server/supervisor/external.
 
 The HTTP server comes from `createHostServer()` (`server/hostServer.ts`): `createAdaptorServer()` of
 `@hono/node-server`, the Hono adapter for Node, with the `WebSocketServer({ noServer: true })` of the `ws` library
-for its WebSocket upgrades. Requests and upgrades alike go to the Hono app the last `mount()` (`server/host.ts`) put
-on the server, which routes them by path:
+for its WebSocket upgrades. Requests and upgrades alike go to the Hono app `mount()` (`server/host.ts`) put on the
+server, which routes them by path:
 
 - `/api/*`, handed to the [Hono](https://hono.dev) app built by `createApi()` (`server/api.ts`). `/api` alone is not an
   API path;
@@ -92,8 +92,7 @@ Only a WebSocket upgrade takes the upgrade route: `mount()` sets the server's `s
 another `Upgrade` header (`h2c`, which `curl --http2` sends) is a plain request. An upgrade on another path is refused
 with a `404`, unless another `upgrade` listener is there: in development, Vite's HMR WebSocket takes its own. A `Host`
 header that is not an authority never reaches the app: the HTTP adapter cannot build the request and answers `400`
-without a body. A second `mount()` on the same server (a development reload) replaces the app of the previous one,
-and only the first one listens.
+without a body.
 
 `createApi()` mounts the request guard and the `405` table, defines `/api/health`, then
 mounts the routes of each domain from `server/routes/<domain>.ts` with `.route('/', …)`: `settingsRoutes`,
@@ -155,12 +154,13 @@ handler `mount()` sends every other path to.
 
 ### Development
 
-`pnpm dev` runs `node server/dev.ts`. `startDev()` creates the HTTP server (`createHostServer()`) and a Vite server in middleware mode
-(`appType: 'spa'`), whose HMR WebSocket shares that HTTP server, then publishes both on
-`globalThis.__llamaWebuiDevHost = { http, web }`. The web handler is Vite's middlewares, which answer on Node's own
-response (`nodeWeb()`, `server/routes/web.ts`, then `RESPONSE_ALREADY_SENT`): the UI is transformed on request, with
-hot module replacement. The server entry, `server/index.ts`, is evaluated by the module runner of
-Vite's `ssr` environment (see [The development reload pitfall](#the-development-reload-pitfall)).
+`pnpm dev` runs `node --watch-path=server --watch-path=packages --watch-preserve-output server/dev.ts`. `startDev()`
+creates the HTTP server (`createHostServer()`) and a Vite server in middleware mode (`appType: 'spa'`), whose HMR
+WebSocket shares that HTTP server. The web handler is Vite's middlewares, which answer on Node's own response
+(`nodeWeb()`, `server/routes/web.ts`, then `RESPONSE_ALREADY_SENT`): the UI is transformed on request, with hot module
+replacement. The server entry, `server/index.ts`, is evaluated once by a module runner of Vite's `ssr` environment
+(`createServerModuleRunner(ssr, { hmr: false })`), and `startDev()` calls its `start({ http, web })`. A change to the
+server restarts the whole process (see [Development restarts](#development-restarts)).
 
 ### Production
 
@@ -228,120 +228,45 @@ variable counts as unset.
 
 `parseCli()` is pure: it takes the arguments and the environment and returns `run`, `help` or `error`, which keeps it
 testable. `cliOptionsOrExit()` prints `HELP_TEXT` and exits with code 0 for `-h`/`--help`, or prints the error and the
-help and exits with code 2. The options are read again on every development reload, with the same arguments. User-facing
+help and exits with code 2. User-facing
 details are on [Launch options](/docs/configuration/).
 
 ## Shutdown
 
-Two handlers run on `SIGINT` and `SIGTERM`:
+`start()` builds everything on one `AsyncDisposableStack`: each part registers what undoes it (`stack.use(db)`,
+`stack.defer(…)`) right after it is created, and the stack undoes them in reverse order. The order of construction
+therefore sets the order of the shutdown:
 
-1. The one `server/index.ts` installs with `process.prependListener`, so it runs first: `chatRuns.dispose()` saves each
-   running reply as `stopped` and closes its SSE streams, `benchRunner.dispose({ restart: false })` kills the running
-   benchmark and marks it (and its sweep) `interrupted`, and `downloads.dispose()` stops the running download, keeping
-   its `.part` file. It runs before the runtime's handler stops `llama-server`, otherwise the replies would see the
-   disconnection and end as errors.
-2. The runtime's handler, installed once by `getRuntime()`: it stops the monitor, stops the managed `llama-server`
-   (`SIGTERM`, then `SIGKILL` after 5 seconds), and exits with code 0. A second signal during this stop is ignored.
+1. `chatRuns.dispose()` saves each running reply as `stopped` and closes its SSE streams.
+2. `benchRunner.dispose()` kills the running benchmark and marks it (and its sweep) `interrupted`, with the error
+   `interrupted (llama-webui stopped)`. The gate is not released: `llama-server` stops with the process.
+3. `downloads.dispose()` stops the running download, keeping its `.part` file and its row for the next start.
+4. `hub.dispose()` closes every WebSocket with code `1001`, and `placement.dispose()` unsubscribes the tracker.
+5. `monitor.stop()` stops the sampling and its collectors.
+6. `supervisor.stop()` stops the managed `llama-server` (`SIGTERM`, then `SIGKILL` after 5 seconds).
+7. The database is closed.
+
+The replies, the benchmark and the download come first, while `llama-server` still runs: a reply would otherwise see
+the disconnection and end as an error.
+
+Once everything is started, `start()` moves the stack out of its `await using` (`stack.move()`) and installs one
+handler on `SIGINT` and `SIGTERM`. It prints `[llama-webui] SIGINT: stopping llama-server…` when a managed server
+runs, awaits `disposeAsync()` (an error, a `SuppressedError` included, is logged without stopping the exit), and exits
+with code 0. A second signal during this stop is ignored.
 
 A `process.on('exit')` handler also kills the managed server with `SIGKILL` as a last resort. If the process dies without
 running any handler, `setpriv --pdeathsig KILL` makes the kernel kill `llama-server` and `llama-bench` with it. On the
 next start, the orphan cleanup of the [startup sequence](#startup-sequence) settles whatever was left `streaming` or
 `running`.
 
-## The development reload pitfall
+## Development restarts
 
-`pnpm dev` watches `server/` and `packages/`. On every save there, the module runner of `server/dev.ts` evaluates
-`server/index.ts` and the modules it imports again, inside the same process: `globalThis` survives, module-level
-state does not. Without care, each save would create a new supervisor that has lost track of the running
-`llama-server`, and kill or orphan the loaded model.
+`pnpm dev` evaluates the server once. Node's watch mode (`--watch-path=server --watch-path=packages`) restarts the
+whole process on every save under `server/` or `packages/`: it sends `SIGTERM`, so the [shutdown](#shutdown) runs as
+at any stop, then starts `server/dev.ts` again. `llama-server` is stopped with it, a running sweep becomes
+`interrupted` (the Resume button continues it), a chat reply is saved as `stopped`, and a download resumes from its
+`.part` file. The new process has a new `bootId`: open tabs reconnect, see it in `hello`, and read the state again.
+A save under `web/` is a hot module replacement and keeps the process.
 
-A reload that fails (a syntax error, an import of a missing file) leaves the previous instance serving, and the next
-save that fixes it reloads again. A first evaluation that fails (`pnpm dev` started while a file is broken) waits the
-same way, with nothing listening yet; only a listen error (port taken) ends `pnpm dev`. `server/dev.ts` also replays a change its file watcher drops, a second write less
-than 50 ms after the first (a format on save), so the reload always runs the last content.
-
-### What survives a reload
-
-`getRuntime()` keeps one `Runtime` object on `globalThis.__llamaWebuiRuntime`:
-
-```ts title="server/runtime.ts"
-export interface Runtime {
-  supervisor: Supervisor;
-  logs: LogBuffer;
-  /** ID of this llama-webui boot (stable across development reloads): the client ties log numbering to it. */
-  bootId: string;
-  /** Always-on monitoring, started once by startMonitor() (also survives development reloads). */
-  monitor: Promise<Monitor> | null;
-  /** Server gate during benchmarks: held across a reload, so a sweep resumes without a restart. */
-  benchGate: BenchGate;
-}
-```
-
-- `supervisor`: the managed `llama-server`, its state and its child process.
-- `logs`: the `LogBuffer` ring of 10,000 lines.
-- `bootId`: `crypto.randomUUID()`, generated once per process. The client compares it to detect a real restart.
-- `monitor`: the `Monitor`, with its collectors and the NVML sampler process, started once by `startMonitor()`.
-- `benchGate` (`server/bench/gate.ts`): the gate that stops the managed server for a benchmark and restarts it
-  afterwards. It is held across a reload so that a sweep continues in the new module without restarting the server in
-  between.
-
-The shutdown signal handlers are installed once, with the runtime. The development host
-(`globalThis.__llamaWebuiDevHost`: the HTTP server and Vite's middlewares) belongs to `server/dev.ts` and is never
-re-evaluated: every evaluation of `server/index.ts` mounts on it again.
-
-### Files that need a full restart
-
-These objects were built from the first evaluation of their modules. After a reload the new code is loaded, but the
-live objects keep running the old one, along with the modules they imported at startup. A change to these files
-therefore has no effect until the process restarts:
-
-- `server/supervisor/supervisor.ts`, and what it imports: `llamacpp-js/client` (`probeHealth()`), `llamacpp-js/node`
-  (`findLlamaServerPid()`) and `server/logs/lines.ts` (`LineSplitter`)
-- `server/logs/buffer.ts`
-- `server/bench/gate.ts`
-- `server/monitor/**`, except `server/monitor/placement.ts` (the `PlacementTracker` is recreated on every reload)
-- `server/collectors/**`
-- `packages/llamacpp-js/src/**`, imported by the supervisor and the monitor (`fetchLlama()`, the `/metrics` math)
-- `server/proc.ts`, imported by the supervisor and the collectors (`spawnProc()`, `readText()`)
-- `server/runtime.ts`
-- `server/hostServer.ts` and `server/dev.ts`, which create the development host once
-
-After changing any of them, stop `pnpm dev` with <Kbd>Ctrl</Kbd> + <Kbd>C</Kbd> and run it again.
-
-### What a reload recreates
-
-Everything else `server/index.ts` and `createDeps()` build is created again: the database connection, the WebSocket hub, the repositories,
-`ChatRuns`, `RunExecutor`, `BenchRunner`, the Hugging Face client, the `DownloadQueue`, the `PlacementTracker` and the
-app `mount()` puts on the HTTP server. Once it has mounted them, the new evaluation calls the dispose function
-the previous one left on `globalThis`, then stores its own before it starts any work: an evaluation that throws
-after its mount is released by the next reload like any other.
-It clears the external server timer, unsubscribes from the supervisor, the logs, the monitor and the placement,
-removes its signal handlers, disposes the hub (every socket is closed with code `1001`), `ChatRuns`, the bench runner
-and the download queue, and closes the database.
-
-Work in progress at that moment ends differently depending on its kind:
-
-| In progress | During a reload |
-| --- | --- |
-| A chat generation | Interrupted. The partial reply is saved as `stopped` and its SSE streams receive `done`. `llama-server` keeps running. |
-| A one-off benchmark run | Interrupted. Its child process is killed and the run is saved as `interrupted`. If the gate had stopped `llama-server` for it, the gate restarts it once the child has exited and a grace period of 3 seconds (`adoptGraceMs`) has passed without a new module taking the gate over. |
-| A sweep | Continues. The running item goes back to the queue and the sweep stays `running`. The new runner takes the gate over (`benchGate.adopt()`), waits for the killed child to exit so the replayed item does not share the GPUs with it, and replays the item. The server is only restarted at the end of the sweep. If the reload took longer than the grace period, the sweep is marked `interrupted` and can be resumed from the UI. |
-| A download | Stops. Its `.part` file and its database row stay, and the new queue resumes it. |
-| Open tabs | Their WebSocket is closed. They reconnect to the new hub, receive `hello` with the same `bootId`, and read the state again over REST. |
-
-### Errors are compared by name
-
-A class defined in a module is a different class after a reload. The supervisor is created once, so it throws the
-`SupervisorError` of the first evaluation, while the reloaded `server/routes/server.ts` imports the new class:
-`instanceof` would be `false`. The route compares the error's `name` instead:
-
-```ts title="server/routes/server.ts"
-if (e instanceof Error && e.name === 'SupervisorError') throw new HttpError(409, e.message);
-```
-
-`SupervisorError` sets `override name = 'SupervisorError'` for this. Apply the same rule to any error thrown by an
-object that lives in the runtime.
-
-`HttpError` does the same (`override name = 'HttpError'`): the bench gate lives in the runtime and throws the class
-of the first evaluation of `server/http.ts`, so `errorResponse()` recognizes it with `isHttpError()` (its `name` and a
-numeric `status`) rather than `instanceof`. Its refusals keep their `409` and `code: "server-running"` after a reload.
+A start that fails (a syntax error, an import of a missing file, the port taken) prints the error and exits with code
+1; Node then waits for the next save to start again.

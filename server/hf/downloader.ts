@@ -15,15 +15,6 @@ import { fmtBytes, GiB } from '../tuning/memory';
 import { type HfClient, hfHttpError } from './client';
 import { fileDest, partPath, sizeOf } from './paths';
 
-export interface Handover {
-  /** Settles once the writer of the previous module instance has let go of its `.part` (development reload). */
-  idle: Promise<void>;
-}
-
-const g = globalThis as { __llamaWebuiDownloadHandover?: Handover };
-/** Survives a development reload: the new queue waits for the old one to close its file before resuming it. */
-export const globalHandover = (): Handover => (g.__llamaWebuiDownloadHandover ??= { idle: Promise.resolve() });
-
 export interface DownloadQueueDeps {
   repo: DownloadsRepo;
   hf: Pick<HfClient, 'auth' | 'endpoint' | 'headers'>;
@@ -43,7 +34,6 @@ export interface DownloadQueueDeps {
   liveEveryMs?: number;
   /** Space left free on top of the downloads (1 GiB). */
   marginBytes?: number;
-  handover?: Handover;
 }
 
 /** Transient failure (network, 5xx, 408, 429, stall, truncated file): the attempt is retried. */
@@ -100,9 +90,8 @@ export async function freeBytesOf(dir: string): Promise<number | null> {
 
 /**
  * The Hugging Face download queue, one item at a time. Each file goes to `<file>.part` (resumed with a Range
- * request after an error, a restart or a reload), is checked against its sha256 then renamed into place.
- * Recreated on every development reload: dispose() stops the transfer without touching the `.part` or the database
- * row, and the new queue resumes it.
+ * request after an error or a restart), is checked against its sha256 then renamed into place. dispose() stops the
+ * transfer without touching the `.part` or the database row: the next start resumes it.
  */
 export class DownloadQueue {
   private current: Current | null = null;
@@ -120,7 +109,6 @@ export class DownloadQueue {
   private readonly stallMs: number;
   private readonly liveEveryMs: number;
   private readonly marginBytes: number;
-  private readonly handover: Handover;
 
   constructor(private readonly deps: DownloadQueueDeps) {
     this.fetch = deps.fetch ?? fetch;
@@ -131,7 +119,6 @@ export class DownloadQueue {
     this.stallMs = deps.stallMs ?? 60_000;
     this.liveEveryMs = deps.liveEveryMs ?? 250;
     this.marginBytes = deps.marginBytes ?? GiB;
-    this.handover = deps.handover ?? globalHandover();
   }
 
   get live(): DownloadLive | null {
@@ -143,7 +130,7 @@ export class DownloadQueue {
     while (this.loopP) await this.loopP;
   }
 
-  /** Resumes the items left queued or downloading (startup, reload). */
+  /** Resumes the items left queued or downloading (startup). */
   resume(): void {
     this.kick();
   }
@@ -232,7 +219,7 @@ export class DownloadQueue {
     return ids;
   }
 
-  /** Reload or shutdown: stops the transfer, keeps the `.part` and the row (“downloading”) for the next start. */
+  /** Shutdown: stops the transfer, keeps the `.part` and the row (“downloading”) for the next start. */
   dispose(): void {
     this.disposed = true;
     this.current?.ac.abort(new Error('disposed'));
@@ -289,7 +276,6 @@ export class DownloadQueue {
   }
 
   private async loop(): Promise<void> {
-    await this.handover.idle;
     while (!this.disposed) {
       this.dirty = false;
       const next = this.deps.repo.next();
@@ -411,49 +397,36 @@ export class DownloadQueue {
   private async fetchFile(cur: Current, item: DownloadItem, file: DownloadFile, base: number): Promise<void> {
     const dest = fileDest(item.dir, file.path);
     const part = partPath(dest);
-    // The previous module instance may still be writing this `.part` (development reload): wait for every holder before us.
-    // Chained, so that two waiters never get in together.
-    const prev = this.handover.idle;
-    let release!: () => void;
-    const mine = new Promise<void>((r) => {
-      release = r;
-    });
-    this.handover.idle = prev.then(() => mine);
-    try {
-      await prev;
-      if (cur.ac.signal.aborted) throw cur.ac.signal.reason;
-      // Put in place in the meantime (e.g. by the previous module instance, just before a reload).
-      if ((await sizeOf(dest)) === file.size) return;
-      await mkdir(dirname(dest), { recursive: true });
-      let offset = (await sizeOf(part)) ?? 0;
-      if (offset > file.size) {
-        await rm(part, { force: true });
-        offset = 0;
-      }
-      this.setLive(cur, { phase: 'downloading', file: file.path, bytesDone: base + offset, retryAt: null });
-      const hash = file.sha256 ? await this.hashOf(cur, file.path, part, offset) : null;
-      if (offset < file.size) await this.transfer(cur, item, file, part, offset, hash, base);
-
-      const size = (await sizeOf(part)) ?? 0;
-      if (size !== file.size) {
-        // Short (the body ended early): kept and resumed. Too long: it cannot be this file.
-        if (size > file.size) await rm(part, { force: true });
-        throw new Retryable(`${file.path}: got ${size} of ${file.size} bytes`);
-      }
-      cur.hash = null;
-      if (hash && hash.hasher.digest('hex') !== file.sha256) {
-        await rm(part, { force: true });
-        throw new HttpError(422, `Checksum mismatch for ${file.path}: the file was deleted`, 'checksum-mismatch');
-      }
-      await rename(part, dest);
-    } finally {
-      release();
+    if (cur.ac.signal.aborted) throw cur.ac.signal.reason;
+    // Already in place: a stop between the rename and the database write that records it.
+    if ((await sizeOf(dest)) === file.size) return;
+    await mkdir(dirname(dest), { recursive: true });
+    let offset = (await sizeOf(part)) ?? 0;
+    if (offset > file.size) {
+      await rm(part, { force: true });
+      offset = 0;
     }
+    this.setLive(cur, { phase: 'downloading', file: file.path, bytesDone: base + offset, retryAt: null });
+    const hash = file.sha256 ? await this.hashOf(cur, file.path, part, offset) : null;
+    if (offset < file.size) await this.transfer(cur, item, file, part, offset, hash, base);
+
+    const size = (await sizeOf(part)) ?? 0;
+    if (size !== file.size) {
+      // Short (the body ended early): kept and resumed. Too long: it cannot be this file.
+      if (size > file.size) await rm(part, { force: true });
+      throw new Retryable(`${file.path}: got ${size} of ${file.size} bytes`);
+    }
+    cur.hash = null;
+    if (hash && hash.hasher.digest('hex') !== file.sha256) {
+      await rm(part, { force: true });
+      throw new HttpError(422, `Checksum mismatch for ${file.path}: the file was deleted`, 'checksum-mismatch');
+    }
+    await rename(part, dest);
   }
 
   /**
    * The sha256 state of the first `offset` bytes of the `.part`: the one of the previous attempt if it covers exactly
-   * them, else read again from the disk (after a restart, a reload, or a write that failed half-way).
+   * them, else read again from the disk (after a restart, or a write that failed half-way).
    */
   private async hashOf(cur: Current, path: string, part: string, offset: number): Promise<HashState> {
     const kept = cur.hash;
