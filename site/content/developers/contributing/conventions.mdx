@@ -170,6 +170,8 @@ only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), 
 
 ### Code idioms
 
+- **A deadline does not hold the process.** A pause that only bounds a wait (`Promise.race([proc.exited, sleep(ms)])`)
+  is `sleep(ms, undefined, { ref: false })`: once the other side wins, the pending timer must not keep Node running.
 - **`packages/webui-shared/` stays portable.** The browser bundle imports it, so its modules import nothing but `zod`,
   the browser-safe modules of `llamacpp-js` and each other: no Node API. The server and the web import it as `@llama-webui/shared`; inside `web/` and `site/`, `@/` points
   to their own `src/`.
