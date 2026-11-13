@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "root": true,
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -21,7 +22,9 @@
       "!site/.react-router",
       "!app/server/lib/contract/golden.json",
       "!app/server/api.gen.ts",
-      "!**/.output"
+      "!**/.output",
+      // Disable Biome for shadcn components in order to keep their default code style
+      "!**/src/components/ui"
     ]
   },
   "formatter": {
@@ -32,6 +35,12 @@
   },
   "linter": {
     "enabled": true,
+    "domains": {
+      "tailwind": "recommended",
+      "test": "recommended",
+      "project": "recommended",
+      "types": "recommended"
+    },
     "rules": {
       "preset": "recommended",
       "style": {
@@ -42,7 +51,11 @@
   "javascript": {
     "formatter": {
       "quoteStyle": "single",
-      "semicolons": "always"
+      "semicolons": "always",
+      "quoteProperties": "asNeeded"
+    },
+    "resolver": {
+      "experimentalPnpmCatalogs": true
     }
   },
   "css": {
@@ -66,18 +79,6 @@
         "domains": {
           "react": "recommended"
         }
-      }
-    },
-    {
-      "includes": ["app/src/components/ui/**", "site/src/components/ui/**"],
-      "linter": {
-        "enabled": false
-      },
-      "formatter": {
-        "enabled": false
-      },
-      "assist": {
-        "enabled": false
       }
     }
   ]

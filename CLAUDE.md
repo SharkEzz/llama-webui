@@ -14,7 +14,7 @@ L'app, ses tests et son build tournent sur Node ; pnpm installe et lance les scr
 - Le `catalog:` de `pnpm-workspace.yaml` fixe les versions qui doivent bouger ensemble (`"react": "catalog:"`) : pour une de ses entrées, changer la version là, pas dans les `package.json`. D'autres dépendances partagées (`@types/react`, `lucide-react`, `shadcn`…) ont encore leur version dans chaque `package.json` : candidat de refactoring (backlog de `docs/superpowers/plans/2026-11-12-node-migration-notes.md`), à ne pas migrer au passage.
 - `allowBuilds` (absent tant qu'aucun paquet n'en a besoin) liste les scripts d'installation autorisés ; un paquet non listé qui en a un fait échouer l'installation : décider `true` (une fonctionnalité en a besoin) ou `false`. Garder les entrées `minimumReleaseAgeExclude` que pnpm ajoute.
 - `nitro` est épinglé en version exacte (une RC) dans `app/package.json` : une montée de version se fait seule, suites vertes.
-- Biome ne détecte pas React depuis une version `catalog:` : le domaine `react` est activé explicitement pour `app/src/**` et `site/**` dans `biome.json`.
+- Biome ne détecte pas React depuis une version `catalog:` (même avec `javascript.resolver.experimentalPnpmCatalogs`) : le domaine `react` est activé explicitement pour `app/src/**` et `site/**` dans `biome.jsonc`.
 
 ## APIs
 
@@ -48,7 +48,7 @@ test('hello world', () => {
 
 ## Format et lint (Biome)
 
-Biome (devDependency épinglée, config dans `biome.json`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`app/`, `packages/`, `scripts/`). `app/src/components/ui/**` (shadcn généré) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn ; `app/server/api.gen.ts` et `golden.json` (générés) aussi.
+Biome (devDependency épinglée, config dans `biome.jsonc`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`app/`, `packages/`, `scripts/`). Règles : preset `recommended` et domaines `tailwind`, `test`, `project` (graphe de modules) et `types` (inférence de types) en `recommended`, plus `react` pour `app/src/**` et `site/**`. `**/src/components/ui` (shadcn généré, app et site) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn ; `app/server/api.gen.ts` et `golden.json` (générés) aussi. Ces exclusions s'écrivent `!` dans `files.includes` (le fichier reste indexé pour les domaines `project` et `types`), pas `!!` (réservé aux sorties de build).
 
 - `pnpm lint` : vérifie format + lint + imports (lecture seule) ; `pnpm lint:fix` applique les corrections sûres.
 - **Avant de clore un jalon / milestone / lot de travail** (et avant de commiter ou d'ouvrir une PR), tout doit être vert : `pnpm lint`, `pnpm check`, `pnpm test`. Zéro erreur et zéro warning Biome.

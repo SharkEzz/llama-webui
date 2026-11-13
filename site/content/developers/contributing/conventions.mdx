@@ -4,7 +4,7 @@ description: Language, number formatting, Biome rules, React and built-in API id
 ---
 
 These rules apply to `app/`, `packages/` and `site/`. They come from `CLAUDE.md` at the root of the repository
-(written in French); `biome.json`, the `tsconfig*.json` files and CI enforce the mechanical ones.
+(written in French); `biome.jsonc`, the `tsconfig*.json` files and CI enforce the mechanical ones.
 
 ## Language
 
@@ -65,7 +65,7 @@ wording of earlier versions (the app used to be in French, and old rows keep the
 ## Formatting and lint
 
 [Biome](https://biomejs.dev) formats, lints and sorts imports. It is a pinned devDependency (`@biomejs/biome` 2.6.7)
-configured in `biome.json`.
+configured in `biome.jsonc`.
 
 | Setting       | Value                                                                                     |
 | ------------- | ----------------------------------------------------------------------------------------- |
@@ -74,6 +74,8 @@ configured in `biome.json`.
 | Quotes        | Single quotes in TypeScript, double quotes in JSX attributes                              |
 | Semicolons    | Always                                                                                    |
 | Lint rules    | The `recommended` preset, with `style/noNonNullAssertion` turned off (`x!` is allowed)     |
+| Domains       | `tailwind`, `test`, `project` (module graph) and `types` (type inference), `recommended`  |
+| React         | The `react` domain, turned on for `app/src/**` and `site/**` (not detected from `catalog:`) |
 | Assists       | `organizeImports` (sorted imports) and `useSortedPackageJson` (sorted `package.json` keys) |
 | CSS           | Parsed with Tailwind directives                                                           |
 
@@ -93,7 +95,7 @@ Before a commit, a pull request or the end of a milestone, `pnpm lint` must repo
 
 ### Never disable a rule
 
-Do not turn a rule off or lower it to `warn` in `biome.json` to get the lint through. When a rule reports a false
+Do not turn a rule off or lower it to `warn` in `biome.jsonc` to get the lint through. When a rule reports a false
 positive, silence that one line with a `biome-ignore` comment that names the rule and says why:
 
 ```tsx title="app/src/features/chat/CodeBlock.tsx"
@@ -198,7 +200,8 @@ only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), 
 
 `app/src/components/ui/**` and `site/src/components/ui/**` hold stock [shadcn/ui](https://ui.shadcn.com) components
 (configured by `components.json` in each package). Biome ignores them entirely (no format, no lint, no import sorting) so
-they stay comparable with shadcn updates. Leave them untouched: put the project's changes in a wrapper outside `ui/`, as
+they stay comparable with shadcn updates. The exclusion is a single `!` in `files.includes`, not `!!`: the files stay
+indexed, so the `project` and `types` rules still resolve the imports of `@/components/ui/…` from the rest of the code. Leave them untouched: put the project's changes in a wrapper outside `ui/`, as
 `app/src/components/Select.tsx` does for the select list.
 
 ## Development restarts

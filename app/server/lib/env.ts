@@ -20,13 +20,16 @@ export function loadDotEnv(path = '.env', o: { override?: boolean } = {}): void 
   try {
     text = readFileSync(path, 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+    if (Error.isError(err) && (err as NodeJS.ErrnoException)?.code === 'ENOENT') return;
     throw err;
   }
   const vars = parseEnv(text);
   const override = o.override || enabled(process.env[ENV_OVERRIDE] ?? vars[ENV_OVERRIDE]);
-  for (const [key, value] of Object.entries(vars))
-    if (override || process.env[key] === undefined) process.env[key] = value;
+  for (const [key, value] of Object.entries(vars)) {
+    if (override || process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
 }
 
 const PROXY_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy'] as const;
