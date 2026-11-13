@@ -167,6 +167,10 @@ is marked done.
 When every file is done, the item becomes `done`. The `.part` is opened with `node:fs` in append mode, and the
 checksum is a `node:crypto` sha256 hash.
 
+The transfer goes through `downloadFetch()` (`server/llamaFetch.ts`), a `node:https` request with the signature and
+errors of `fetch`, not through Node's own `fetch`: that one speaks HTTP/2 with the Hub and its CDN, and its
+flow-control window caps one stream at about 22 MiB/s, where an HTTP/1.1 request goes at the speed of the link.
+
 ### Range resume
 
 `request()` asks for `<endpoint>/<repo>/resolve/<revision>/<path>`, with `range: bytes=<offset>-` when the offset is
@@ -251,10 +255,11 @@ never stored by llama-webui; `HfStatus.token` only says where it came from (`env
 and the start of the repository page link (`HfRepo.url`). See
 [Launch options](/docs/configuration/#hugging-face) for how users set these variables.
 
-The client and the downloader call Node's `fetch`, which ignores `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` unless
-Node is started with `--use-env-proxy`. The entry points call `useEnvProxy()` (`server/env.ts`) instead, after `.env`
-is loaded: when a proxy variable is set, `http.setGlobalProxyFromEnv()` routes `fetch` through it, with `localhost`,
-`127.0.0.1` and `::1` added to `NO_PROXY` so the requests to `llama-server` stay direct.
+The client calls Node's `fetch` and the downloader `downloadFetch()`, which both ignore `HTTP_PROXY`, `HTTPS_PROXY`
+and `NO_PROXY` unless Node is started with `--use-env-proxy`. The entry points call `useEnvProxy()` (`server/env.ts`)
+instead, after `.env` is loaded: when a proxy variable is set, `http.setGlobalProxyFromEnv()` routes `fetch` and
+`node:http`/`node:https`'s global agents (those of `downloadFetch()`) through it, with `localhost`, `127.0.0.1` and
+`::1` added to `NO_PROXY` so the requests to `llama-server` stay direct.
 
 ## WebSocket messages
 

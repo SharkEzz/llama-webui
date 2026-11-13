@@ -139,7 +139,8 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
   - `paths.ts` data directory and database path; `version.ts` the version the build sets
   - `http.ts` `HttpError`, JSON error responses, the API's middlewares (guard, `405` table) and validators
   - `proc.ts` child processes and file reads on `node:*` (`spawnProc`, `readText`, `fileExists`, `fileRange`, `which`)
-  - `llamaFetch.ts` `fetch` over `node:http` for the requests to llama-server that outlast `fetch`'s 300 s limits
+  - `llamaFetch.ts` `fetch` over `node:http(s)`: `llamaFetch` for the requests to llama-server that outlast `fetch`'s
+    300 s limits, `downloadFetch` for the model downloads (HTTP/1.1, not `fetch`'s capped HTTP/2)
   - `security.ts` the request guard (Host, Origin, JSON-only writes)
   - `setup.ts` first-run report and launch pad
   - `llamatui.ts` llama-tui config import

@@ -10,6 +10,7 @@ import {
 } from '@llama-webui/shared';
 import type { DownloadInput, DownloadsRepo } from '../db/downloads';
 import { HttpError, notFound } from '../http';
+import { downloadFetch } from '../llamaFetch';
 import { fileRange } from '../proc';
 import { fmtBytes, GiB } from '../tuning/memory';
 import { type HfClient, hfHttpError } from './client';
@@ -111,7 +112,8 @@ export class DownloadQueue {
   private readonly marginBytes: number;
 
   constructor(private readonly deps: DownloadQueueDeps) {
-    this.fetch = deps.fetch ?? fetch;
+    // Not Node's `fetch`: its HTTP/2 caps a download at about 22 MiB/s (see `downloadFetch`).
+    this.fetch = deps.fetch ?? downloadFetch;
     this.now = deps.now ?? Date.now;
     this.sleep = deps.sleep ?? abortableSleep;
     this.freeBytes = deps.freeBytes ?? freeBytesOf;
