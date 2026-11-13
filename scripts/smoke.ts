@@ -102,10 +102,15 @@ const port = await freePort();
 const decoy = await freePort();
 
 const dataDir = temp('lw-smoke-');
+// As a user runs it: without `CI` or `TEST` (GitHub Actions sets `CI`), under which srvx installs no signal handler and
+// the server never stops on SIGTERM (`app/server/plugins/runtime.ts`).
+const env: Record<string, string | undefined> = { ...process.env, PORT: String(decoy) };
+delete env.CI;
+delete env.TEST;
 // Run from the data directory: no .env or config of the repository around (Nitro's output carries its dependencies).
 const proc = spawn(cmd, [...cmdArgs, '--data-dir', dataDir, '--port', String(port)], {
   cwd: dataDir,
-  env: { ...process.env, PORT: String(decoy) },
+  env,
   stdio: ['ignore', 'pipe', 'inherit'],
 });
 const exited = new Promise((done) => proc.once('exit', done));
