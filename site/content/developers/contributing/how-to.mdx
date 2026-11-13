@@ -246,8 +246,8 @@ rows to the types of `packages/webui-shared/`. Change its queries and row mappin
   <Step title="Test it">
 
 `openDb(':memory:')` applies every migration, so the repository tests exercise the new schema. When the migration
-rewrites existing data, also test it on a copy of a real database, as the skipped J5 test does
-([Skipped tests](/developers/contributing/testing/#skipped-tests)).
+rewrites existing data, also test it from the schema it starts from, filled with rows
+([Migrations on old data](/developers/contributing/testing/#migrations-on-old-data)).
 
   </Step>
 </Steps>

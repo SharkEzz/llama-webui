@@ -364,19 +364,27 @@ The golden pins no Hugging Face success (the suite has no network) and no value 
 those screens in the running app after a change of framework or runtime.
 </Callout>
 
-## Skipped tests
+## Migrations on old data
 
-One test is skipped unless a local file exists:
+A migration that rewrites existing data gets a test on a database at the schema it starts from, built in the test: no
+local file, so it runs in CI and on a fresh clone. `runMigrations(db, n)` stops at version `n`; the test fills that
+old schema, then `openDb()` applies the rest, as on a user's machine:
 
 ```ts title="app/server/lib/db/sweeps.test.ts"
-const J5_DB = '/tmp/lw-j5/llama-webui.sqlite';
-test.skipIf(!existsSync(J5_DB))('the migration keeps every J5 run', async () => {
+test('the migration keeps every run of a J5 database: ids, values and the next id', () => {
+  using dir = tempDir('lw-mig-');
+  const file = join(dir.path, 'db.sqlite');
+  {
+    using j5 = new Database(file);
+    runMigrations(j5, 8); // before sweeps (9) and the AUTOINCREMENT rebuild of bench_runs (10 to 14)
+    // … insert runs, delete one to leave a gap in the ids
+  }
+  using db = openDb(file);
+  // … the same ids and values, the schema version, and the next id after the highest
+});
 ```
 
-It needs a database from an early version of the app, before migrations 10 to 14 rebuilt the `bench_runs` table. The
-test migrates a copy and checks that the run count, the highest id and the schema version are right, and that the next
-run gets the next id. It never runs in CI or on a fresh clone. Follow the same pattern when a migration rewrites
-existing data.
+`migrations.test.ts` does the same for the rebuild of `profiles` (version 16), with the links that point to them.
 
 ## Type checking
 

@@ -1,11 +1,9 @@
-import { existsSync } from 'node:fs';
-import { copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type BenchSpec, BenchSpecSchema, SweepSpecSchema } from '@llama-webui/shared';
 import { expect, test } from 'vitest';
 import { tempDir } from '../testing/tempDir';
 import { BenchRunsRepo } from './benchRuns';
-import { MIGRATIONS } from './migrations';
+import { MIGRATIONS, runMigrations } from './migrations';
 import { openDb } from './open';
 import { Database } from './sqlite';
 import { SweepsRepo } from './sweeps';
@@ -33,24 +31,49 @@ test("a deleted run's id is never handed out again", () => {
   expect(repo.create(spec, 'c', hw).id).toBeGreaterThan(b.id);
 });
 
-const J5_DB = '/tmp/lw-j5/llama-webui.sqlite';
-test.skipIf(!existsSync(J5_DB))('the migration keeps every J5 run', async () => {
+test('the migration keeps every run of a J5 database: ids, values and the next id', () => {
   using dir = tempDir('lw-mig-');
-  const copy = join(dir.path, 'db.sqlite');
-  await copyFile(J5_DB, copy);
-  const before = (() => {
-    using ro = new Database(copy, { readonly: true });
-    return ro.query<{ n: number; max: number }, []>('SELECT count(*) n, max(id) max FROM bench_runs').get()!;
-  })();
-  using db = openDb(copy);
-  const after = db.query<{ n: number; max: number }, []>('SELECT count(*) n, max(id) max FROM bench_runs').get()!;
-  expect(after).toEqual(before);
+  const file = join(dir.path, 'db.sqlite');
+  // A J5 database: the schema up to `bench_runs` and its index (8), before sweeps (9) and the AUTOINCREMENT rebuild.
+  {
+    using j5 = new Database(file);
+    runMigrations(j5, 8);
+    for (const [id, pp] of [
+      [1, 100.5],
+      [2, 200.5],
+      [3, 300.5],
+      [4, null],
+    ] as const)
+      j5.run(
+        `INSERT INTO bench_runs(id, kind, status, model_path, args_json, command, hardware_json, pp_tps, vram_mib_json, created_at)
+         VALUES (?, 'bench', ?, '/m/a.gguf', ?, 'cmd', ?, ?, '[]', ?)`,
+        [id, pp === null ? 'failed' : 'ok', JSON.stringify(spec), JSON.stringify(hw), pp, id],
+      );
+    // A gap: the migration copies the ids, it does not renumber them.
+    j5.run('DELETE FROM bench_runs WHERE id = 2');
+  }
+
+  using db = openDb(file);
   expect(db.query<{ version: number }, []>('SELECT version FROM schema_version').get()!.version).toBe(
     MIGRATIONS.length,
   );
+  expect(db.query('SELECT id, status, pp_tps FROM bench_runs ORDER BY id').all()).toEqual([
+    { id: 1, status: 'ok', pp_tps: 100.5 },
+    { id: 3, status: 'ok', pp_tps: 300.5 },
+    { id: 4, status: 'failed', pp_tps: null },
+  ]);
   const repo = new BenchRunsRepo(db);
-  expect(repo.list({ sweepId: 'all', limit: 1000 })).toHaveLength(before.n);
-  expect(repo.create(spec, 'x', hw).id).toBe(before.max + 1);
+  expect(
+    repo
+      .list({ sweepId: 'all', limit: 1000 })
+      .map((r) => r.id)
+      .sort((a, b) => a - b),
+  ).toEqual([1, 3, 4]);
+  // Ids now come from AUTOINCREMENT, seeded by the copied rows: a deleted id is never handed out again.
+  const next = repo.create(spec, 'x', hw);
+  expect(next.id).toBe(5);
+  repo.delete(next.id);
+  expect(repo.create(spec, 'y', hw).id).toBe(6);
 });
 
 test('a sweep counts its queued items, cascades on delete and forgets a deleted best run', () => {
