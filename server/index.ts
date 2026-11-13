@@ -89,7 +89,7 @@ export async function start(dev?: DevHost): Promise<void> {
     paused: () => benchGate.held || benchRunner.busy,
   });
   void checkExternal();
-  setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS);
+  stack.use(setInterval(() => void checkExternal(), EXTERNAL_CHECK_MS));
 
   // Started: the stack now lives until a signal undoes it. A second signal is ignored while the first one stops.
   const live = stack.move();
@@ -105,8 +105,7 @@ export async function start(dev?: DevHost): Promise<void> {
     }
     process.exit(0);
   };
-  process.on('SIGINT', (signal) => void shutdown(signal));
-  process.on('SIGTERM', (signal) => void shutdown(signal));
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, (s) => void shutdown(s));
 
   console.log(`llama-webui on http://${cli.host}:${port}${dev ? ' (dev)' : ` (${APP_VERSION})`}`);
 }

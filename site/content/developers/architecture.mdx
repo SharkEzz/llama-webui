@@ -237,14 +237,15 @@ details are on [Launch options](/docs/configuration/).
 `stack.defer(…)`) right after it is created, and the stack undoes them in reverse order. The order of construction
 therefore sets the order of the shutdown:
 
-1. `chatRuns.dispose()` saves each running reply as `stopped` and closes its SSE streams.
-2. `benchRunner.dispose()` kills the running benchmark and marks it (and its sweep) `interrupted`, with the error
+1. The external server watcher's interval is cleared, so no check runs while the rest stops.
+2. `chatRuns.dispose()` saves each running reply as `stopped` and closes its SSE streams.
+3. `benchRunner.dispose()` kills the running benchmark and marks it (and its sweep) `interrupted`, with the error
    `interrupted (llama-webui stopped)`. The gate is not released: `llama-server` stops with the process.
-3. `downloads.dispose()` stops the running download, keeping its `.part` file and its row for the next start.
-4. `hub.dispose()` closes every WebSocket with code `1001`, and `placement.dispose()` unsubscribes the tracker.
-5. `monitor.stop()` stops the sampling and its collectors.
-6. `supervisor.stop()` stops the managed `llama-server` (`SIGTERM`, then `SIGKILL` after 5 seconds).
-7. The database is closed.
+4. `downloads.dispose()` stops the running download, keeping its `.part` file and its row for the next start.
+5. `hub.dispose()` closes every WebSocket with code `1001`, and `placement.dispose()` unsubscribes the tracker.
+6. `monitor.stop()` stops the sampling and its collectors.
+7. `supervisor.stop()` stops the managed `llama-server` (`SIGTERM`, then `SIGKILL` after 5 seconds).
+8. The database is closed.
 
 The replies, the benchmark and the download come first, while `llama-server` still runs: a reply would otherwise see
 the disconnection and end as an error.
