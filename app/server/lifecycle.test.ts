@@ -1,6 +1,7 @@
 // The production build as a process: how it starts, refuses to start, and reads its options.
 import { type ChildProcessByStdio, spawn } from 'node:child_process';
-import { readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import type { Readable } from 'node:stream';
@@ -8,6 +9,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, expect, test } from 'vitest';
 import { freePort, LAUNCHER, launch, userEnv } from './testing/launch.ts';
 import { tempDir } from './testing/tempDir.ts';
+import { openWs } from './testing/ws.ts';
 
 const dir = tempDir('lw-lifecycle-');
 afterAll(() => dir[Symbol.dispose]());
@@ -134,5 +136,52 @@ test('--env-override lets .env win over the environment', async () => {
     expect(await answers(app, fromFile)).toBe(true);
   } finally {
     expect(await stop(app)).toBe(0);
+  }
+}, 30_000);
+
+test('SIGTERM with the UI open stops in under 2 s', async () => {
+  await using app = await launch({ dataDir: dataDir() });
+  const client = await openWs(`${app.base.replace('http', 'ws')}/ws`);
+  await client.next();
+  const t0 = performance.now();
+  app.proc.kill('SIGTERM');
+  const code = await app.exited;
+  expect(performance.now() - t0).toBeLessThan(2000);
+  expect(code).toBe(0);
+  expect((await client.closed).code).toBe(1001);
+}, 30_000);
+
+test('a data directory of the Nitro server opens untouched', async () => {
+  const data = dataDir();
+  copyFileSync(join(import.meta.dirname, 'db/fixtures/legacy-v17.sqlite'), join(data, 'llama-webui.sqlite'));
+  await using app = await launch({ dataDir: data });
+  const settings = (await (await fetch(`${app.base}/api/settings`)).json()) as { port: number; hiddenGpus: string[] };
+  expect(settings.port).toBe(8123);
+  expect(settings.hiddenGpus).toEqual(['GPU-1']);
+}, 30_000);
+
+test('the build never connects to the Effect DevTools', async () => {
+  let connections = 0;
+  let upgrades = 0;
+  const devtools = createHttpServer();
+  devtools.on('connection', () => {
+    connections += 1;
+  });
+  devtools.on('upgrade', (_req, socket) => {
+    upgrades += 1;
+    socket.destroy();
+  });
+  const port = await freePort();
+  await new Promise<void>((listening) => devtools.listen(port, '127.0.0.1', listening));
+  try {
+    await using _app = await launch({
+      dataDir: dataDir(),
+      env: { LLAMA_WEBUI_DEVTOOLS_URL: `ws://127.0.0.1:${port}` },
+    });
+    // Longer than the DevTools client waits for its first connection (1 s): it would have connected by now.
+    await sleep(1500);
+    expect({ upgrades, connections }).toEqual({ upgrades: 0, connections: 0 });
+  } finally {
+    devtools.close();
   }
 }, 30_000);

@@ -3,7 +3,7 @@
  * answers with the build's version, the UI and every file it references are served (from a deep URL), React is its
  * production build, and the WebSocket says hello. Exits 1 on the first failure, the server stopped.
  *
- *   node scripts/smoke.ts [app/.output/llama-webui.mjs]   the build (Nitro's launcher), run by this Node
+ *   node scripts/smoke.ts [app/.output/llama-webui.mjs]   the build's launcher, run by this Node
  *   node scripts/smoke.ts --tarball [file.tgz]    the package as a user installs it: `pnpm pack` (or the given
  *                                                 tarball), `npm install` into an empty prefix, then the same checks
  *                                                 through its `node_modules/.bin/llama-webui`
@@ -63,7 +63,7 @@ function installTarball(given: string | undefined): string {
   const prefix = join(work, 'prefix');
   run('npm', ['install', '--prefix', prefix, '--no-audit', '--no-fund', tgz], work);
 
-  // Nothing but the package: Nitro's output bundles every dependency (scripts/package.test.ts).
+  // Nothing but the package: the build bundles every dependency (scripts/package.test.ts).
   const modules = join(prefix, 'node_modules');
   const pkg = JSON.parse(readFileSync(join(modules, 'llama-webui/package.json'), 'utf8'));
   const wanted: Record<string, string> = { 'llama-webui': pkg.version, ...pkg.dependencies };
@@ -98,16 +98,15 @@ async function freePort(): Promise<number> {
   return port;
 }
 const port = await freePort();
-// A `PORT` in the environment (common on servers) must not win over `--port`: Nitro reads `PORT` too.
+// A `PORT` in the environment (common on servers) must not win over `--port`.
 const decoy = await freePort();
 
 const dataDir = temp('lw-smoke-');
-// As a user runs it: without `CI` or `TEST` (GitHub Actions sets `CI`), under which srvx installs no signal handler and
-// the server never stops on SIGTERM (`app/server/plugins/runtime.ts`).
+// As a user runs it: without `CI` or `TEST` (GitHub Actions sets `CI`), which a user never sets.
 const env: Record<string, string | undefined> = { ...process.env, PORT: String(decoy) };
 delete env.CI;
 delete env.TEST;
-// Run from the data directory: no .env or config of the repository around (Nitro's output carries its dependencies).
+// Run from the data directory: no .env or config of the repository around (the build carries its dependencies).
 const proc = spawn(cmd, [...cmdArgs, '--data-dir', dataDir, '--port', String(port)], {
   cwd: dataDir,
   env,
