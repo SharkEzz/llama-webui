@@ -347,12 +347,12 @@ git commit -m "chore(poc): List every test the Effect rewrite has to account for
   - `### Not covered by a test`: behaviours found in the code or in `CLAUDE.md` that no entry of
     `test-inventory.json` exercises.
 
-Endpoints by milestone (69, from `ROUTES` of `app/server/api.gen.ts`; `/ws` belongs to E1):
+Endpoints by milestone (70, from `ROUTES` of `app/server/api.gen.ts`; `/ws` belongs to E1):
 
 | Milestone | Endpoints                                                                                            |
 | --------- | ---------------------------------------------------------------------------------------------------- |
 | E1        | `GET /api/health`, `GET /api/settings`, `PATCH /api/settings`                                        |
-| E2        | every `/api/profiles…` (10), `GET /api/flags`                                                        |
+| E2        | every `/api/profiles…` (11), `GET /api/flags`                                                        |
 | E3        | every `/api/server/…` (6), `GET /api/state`, `GET /api/logs`, `GET /api/launchpad`                   |
 | E4        | `GET /api/monitor/history`, `GET /api/monitor/snapshot`, `GET /api/system/info`, `GET /api/topology` |
 | E5        | every `/api/chat…` (9)                                                                               |
@@ -385,7 +385,7 @@ grep -oE "'(GET|POST|PUT|PATCH|DELETE) /api[^']*'" app/server/api.gen.ts | sort 
 grep -cE '^- \[ \] `(GET|POST|PUT|PATCH|DELETE) /api' docs/superpowers/poc-effect/behaviours.md
 ```
 
-Expected: both print 69. Every message type of `ws.ts` appears in a `### WebSocket messages` subsection
+Expected: both print 70. Every message type of `ws.ts` appears in a `### WebSocket messages` subsection
 (`grep -c` of each type name is at least 1).
 
 - [ ] **Step 4: Check and commit**
