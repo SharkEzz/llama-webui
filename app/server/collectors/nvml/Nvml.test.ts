@@ -21,8 +21,8 @@ import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 import { isAlive } from '../../llama/procScan.ts';
 import { CLOSE_BOUND } from '../../process/followed.ts';
 import { stuckRelease } from '../../testing/stuckRelease.ts';
-import { MEASURE_ALL } from '../gpu.ts';
-import { isFresh, type NvmlState, onConfigure, onSample, procVramOf, startNvml, workerPath } from './Nvml.ts';
+import { MEASURE_ALL, procVramOf } from '../gpu.ts';
+import { isFresh, type NvmlState, onConfigure, onSample, startNvml, workerPath } from './Nvml.ts';
 import { type NvmlSnapshot, ToSampler } from './protocol.ts';
 
 const GiB = 1024 ** 3;

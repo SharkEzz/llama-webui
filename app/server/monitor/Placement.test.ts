@@ -227,6 +227,9 @@ layer(NodeServices.layer, { excludeTestServices: true })('Placement', (it) => {
           Effect.andThen(supervisor.state),
           when((state) => state.kind === 'idle'),
         );
+        // Gone once Node has reaped it.
+        yield* isAlive(outside.pid).pipe(when((alive) => !alive));
+        yield* assertGone(outside.pid);
         yield* startFake({ FAKE_EXIT_LINES: Arr.join(load, '|') });
         const crashed = yield* stateWhen((state) => state.kind === 'crashed');
         assert.deepInclude(crashed, { kind: 'crashed', exitCode: 1 });
@@ -236,6 +239,16 @@ layer(NodeServices.layer, { excludeTestServices: true })('Placement', (it) => {
         assert.isNotNull(seen[0]);
         const afterCrash = yield* placement.current;
         assert.isNull(afterCrash);
+        // The crashed server is gone: its pid from the state it started in.
+        const published = yield* Published;
+        const messages = yield* Ref.get(published);
+        const starting = Arr.findLast(
+          messages,
+          (m) => m.type === 'server-state' && m.payload.state.kind === 'starting',
+        );
+        const started = Option.getOrThrow(starting);
+        assert(started.type === 'server-state');
+        yield* assertGone(pidOf(started.payload.state));
       }),
     ),
   );

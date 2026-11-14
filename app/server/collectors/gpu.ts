@@ -1,5 +1,5 @@
 import type { GpuReading, GpuSample } from '@llama-webui/shared';
-import { Array as Arr, type Effect, Order, String as Str } from 'effect';
+import { Array as Arr, type Effect, Option, Order, String as Str } from 'effect';
 import { dual, pipe } from 'effect/Function';
 
 /**
@@ -65,6 +65,42 @@ export const selectUsedGpus = (gpus: ReadonlyArray<GpuSample>): ReadonlyArray<Gp
     Arr.filter((g) => g.procVramBytes > USED_GPU_THRESHOLD_BYTES),
     Arr.sort(Order.mapInput(Order.String, (g: GpuSample) => g.busId)),
   );
+
+/** A process on a card (`key`), as an NVIDIA reader reports it: its VRAM there, null when the driver cannot tell. */
+export interface CardProcess {
+  readonly pid: number;
+  readonly key: string;
+  readonly usedBytes: number | null;
+}
+
+/**
+ * The VRAM `pid` holds on each card of `readings`. A process whose VRAM the driver cannot report (NVML's
+ * `NVML_VALUE_NOT_AVAILABLE`, nvidia-smi's `[N/A]`) counts the card's VRAM in use (an upper bound), so the card still
+ * shows as used by it.
+ */
+export const procVramOf: {
+  (pid: number): (readings: CardReadings) => ReadonlyMap<string, number>;
+  (readings: CardReadings, pid: number): ReadonlyMap<string, number>;
+} = dual(2, (readings: CardReadings, pid: number): ReadonlyMap<string, number> => {
+  const vram = new Map<string, number>();
+  const unknown = new Set<string>();
+  for (const p of readings.procs) {
+    if (p.pid !== pid) continue;
+    if (p.usedBytes === null) unknown.add(p.key);
+    else vram.set(p.key, (vram.get(p.key) ?? 0) + p.usedBytes);
+  }
+  for (const key of unknown) {
+    const card = Arr.findFirst(readings.gpus, (g) => g.key === key);
+    vram.set(key, Option.isSome(card) ? card.value.vramUsedBytes : (vram.get(key) ?? 0));
+  }
+  return vram;
+});
+
+/** The cards and the processes on them, as one reading of an NVIDIA reader. */
+export interface CardReadings {
+  readonly gpus: ReadonlyArray<GpuReading>;
+  readonly procs: ReadonlyArray<CardProcess>;
+}
 
 /** What every NVIDIA reader (NVML, `nvidia-smi`) gives the collector. */
 export interface NvidiaReader {

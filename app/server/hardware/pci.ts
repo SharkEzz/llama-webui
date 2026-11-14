@@ -2,8 +2,9 @@ import type { TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/sha
 import { Array as Arr, Clock, Effect, FileSystem, HashSet, Option, Order, Path, String as Str } from 'effect';
 import { dual, pipe } from 'effect/Function';
 import { physicalDisks } from '../collectors/disk.ts';
+import { readTrimmed } from '../collectors/read.ts';
 import { readCpuInfo } from './cpu.ts';
-import { PciIds } from './PciIds.ts';
+import { displayName, PciIds } from './PciIds.ts';
 
 /*
  * The machine's PCIe topology, read from sysfs (never lspci: it wakes up suspended cards). Shared with the
@@ -12,21 +13,11 @@ import { PciIds } from './PciIds.ts';
 
 export { findPciIdsEntry } from './PciIds.ts';
 
-/** The trimmed text of a file, null when it cannot be read. */
-export const readText = (file: string): Effect.Effect<string | null, never, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    return yield* fs.readFileString(file).pipe(
-      Effect.map(Str.trim),
-      Effect.orElseSucceed(() => null),
-    );
-  });
-
 /** The number a file holds, null when it cannot be read or is not one. */
 export const readNum = (file: string | null): Effect.Effect<number | null, never, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     if (file === null) return null;
-    const text = yield* readText(file);
+    const text = yield* readTrimmed(file);
     const n = text === null ? Number.NaN : Number(text);
     return Number.isFinite(n) ? n : null;
   });
@@ -56,7 +47,7 @@ export const minKnown: {
 const isBridge = (dir: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
-    const cls = yield* readText(path.join(dir, 'class'));
+    const cls = yield* readTrimmed(path.join(dir, 'class'));
     return Str.startsWith('0x0604')(cls ?? '');
   });
 
@@ -79,7 +70,7 @@ export const slotLink = Effect.fn('pci.slotLink')(function* (options: {
   for (let i = 0; i < 8; i++) {
     const parent = path.dirname(link);
     if (parent === link || isHostBridge(path.dirname(parent))) break;
-    if ((yield* readText(path.join(parent, 'vendor'))) !== vendor || !(yield* isBridge(parent))) break;
+    if ((yield* readTrimmed(path.join(parent, 'vendor'))) !== vendor || !(yield* isBridge(parent))) break;
     link = parent;
   }
   const port = path.dirname(link);
@@ -88,16 +79,13 @@ export const slotLink = Effect.fn('pci.slotLink')(function* (options: {
     : { linkPath: link, portPath: port };
 });
 
-/** The name in brackets (“GB203 [GeForce RTX 5070 Ti]”) is preferred over the chip name. */
-const displayName = (entry: string): string => /\[([^\]]+)\]/.exec(entry)?.[1] ?? entry;
-
 /** The `vendor` and `device` ids of a device directory (cached attributes, read without waking the card up). */
 const idsOf = (dir: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const [vendor, device] = yield* Effect.all([
-      readText(path.join(dir, 'vendor')),
-      readText(path.join(dir, 'device')),
+      readTrimmed(path.join(dir, 'vendor')),
+      readTrimmed(path.join(dir, 'device')),
     ]);
     return vendor === null || device === null ? Option.none() : Option.some({ vendor, device });
   });
@@ -132,9 +120,9 @@ const isChipset = (up: string, root: string, entry: Option.Option<string>) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
     const [upVendor, rootVendor, removable] = yield* Effect.all([
-      readText(path.join(up, 'vendor')),
-      readText(path.join(root, 'vendor')),
-      readText(path.join(up, 'removable')),
+      readTrimmed(path.join(up, 'vendor')),
+      readTrimmed(path.join(root, 'vendor')),
+      readTrimmed(path.join(up, 'removable')),
     ]);
     if (upVendor === null || upVendor !== rootVendor) return false;
     return removable !== 'removable' && !/thunderbolt|usb4/i.test(Option.getOrElse(entry, () => ''));
@@ -179,7 +167,7 @@ const pcieLink = (id: string, from: string, to: string, linkPath: string, portPa
     const path = yield* Path.Path;
     const speed = (dir: string | null, file: string) =>
       Effect.gen(function* () {
-        const text = dir === null ? null : yield* readText(path.join(dir, file));
+        const text = dir === null ? null : yield* readTrimmed(path.join(dir, file));
         return text === null ? null : parseLinkSpeed(text);
       });
     const width = (dir: string | null, file: string) => readNum(dir === null ? null : path.join(dir, file));
@@ -228,7 +216,7 @@ const blockDevices = (sysRoot: string) =>
         return Option.some({
           block,
           ctrlPath: ctrlPath.value,
-          model: yield* readText(path.join(ctrlPath.value, 'model')),
+          model: yield* readTrimmed(path.join(ctrlPath.value, 'model')),
           sizeBytes: sectors === null ? null : sectors * 512,
         });
       }),
@@ -240,13 +228,13 @@ const ramNode = (sysRoot: string, procRoot: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const mem = yield* readText(path.join(procRoot, 'meminfo'));
+    const mem = yield* readTrimmed(path.join(procRoot, 'meminfo'));
     const kb = Number(/^MemTotal:\s+(\d+)\s*kB/m.exec(mem ?? '')?.[1]);
     const hwmon = path.join(sysRoot, 'class', 'hwmon');
     const entries = yield* fs.readDirectory(hwmon).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
     const readings = yield* Effect.forEach(entries, (entry) =>
       Effect.gen(function* () {
-        if ((yield* readText(path.join(hwmon, entry, 'name'))) !== 'spd5118') return null;
+        if ((yield* readTrimmed(path.join(hwmon, entry, 'name'))) !== 'spd5118') return null;
         const t = yield* readNum(path.join(hwmon, entry, 'temp1_input'));
         return t === null ? null : t / 1000;
       }),
@@ -311,13 +299,13 @@ export const readPciTopology = Effect.fn('pci.readPciTopology')(function* (
   let chipsets = HashSet.empty<string>();
 
   for (const busId of busIds) {
-    const cls = (yield* readText(path.join(devicesDir, busId, 'class'))) ?? '';
+    const cls = (yield* readTrimmed(path.join(devicesDir, busId, 'class'))) ?? '';
     const kind = Str.startsWith('0x03')(cls) ? 'gpu' : Str.startsWith('0x0108')(cls) ? 'nvme' : null;
     if (kind === null) continue;
     const real = yield* fs.realPath(path.join(devicesDir, busId)).pipe(Effect.option);
     if (Option.isNone(real)) continue;
     const devicePath = real.value;
-    const vendorId = yield* readText(path.join(devicePath, 'vendor'));
+    const vendorId = yield* readTrimmed(path.join(devicePath, 'vendor'));
 
     // Bridges from the root port down to the device's parent.
     const chain: Array<string> = [];

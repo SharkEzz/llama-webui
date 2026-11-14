@@ -127,6 +127,8 @@ export class Collectors extends Context.Service<
       Collectors,
       Effect.gen(function* () {
         const scope = yield* Effect.scope;
+        // The programs (the NVML sampler or nvidia-smi, perf): at the end of the layer, they all stop at once.
+        const programs = yield* Scope.fork(scope, 'parallel');
         const context = yield* Effect.context<
           ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
         >();
@@ -139,7 +141,7 @@ export class Collectors extends Context.Service<
               lib: options.nvmlLib,
               command: options.nvmlCommand,
               readyTimeout: options.readyTimeout,
-            })
+            }).pipe(Scope.provide(programs))
           : Option.none();
         // nvidia-smi only when NVML did not come up.
         const { nvidia, smi } = yield* Option.match(nvml, {
@@ -149,7 +151,10 @@ export class Collectors extends Context.Service<
               bin: options.nvidiaSmi,
               intervalMs: initial.pollIntervalMs,
               appsTimeout: options.appsTimeout,
-            }).pipe(Effect.map((reader) => ({ nvidia: reader as NvidiaReader, smi: Option.some(reader) }))),
+            }).pipe(
+              Scope.provide(programs),
+              Effect.map((reader) => ({ nvidia: reader as NvidiaReader, smi: Option.some(reader) })),
+            ),
         });
 
         const cards = yield* discoverAmdCards();
@@ -157,17 +162,20 @@ export class Collectors extends Context.Service<
         const held = yield* Ref.make<Held>({ system: Option.none(), disk: Option.none() });
         const lock = yield* Semaphore.make(1);
 
-        /** The system collector on: its perf in a scope of its own, forked from the layer's. */
+        /** The system collector on: its perf in a scope of its own, forked from the programs'. */
         const systemOn = (intervalMs: number) =>
           Effect.gen(function* () {
             const sampler = yield* makeSystemSampler();
-            // Last: nothing can fail once perf runs.
-            const own = yield* Scope.fork(scope);
+            // Last: nothing can fail once perf runs. A start that dies stops what it started.
+            const own = yield* Scope.fork(programs);
             const memBw = yield* makeMemBandwidth({
               bin: options.perfBin,
               intervalMs,
               retryAfter: options.perfRetryAfter,
-            }).pipe(Scope.provide(own));
+            }).pipe(
+              Scope.provide(own),
+              Effect.onError(() => Scope.close(own, Exit.void)),
+            );
             return { sample: Effect.provideContext(sampler.sample, context), memBw, scope: own } satisfies SystemOn;
           });
 

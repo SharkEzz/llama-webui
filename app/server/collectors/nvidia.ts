@@ -13,7 +13,7 @@ import {
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 import { linesOf } from '../logs/lines.ts';
 import { closeWithin, FORCE_KILL_AFTER, type Followed, followProgram } from '../process/followed.ts';
-import { type NvidiaReader, normalizeBusId } from './gpu.ts';
+import { type NvidiaReader, normalizeBusId, procVramOf } from './gpu.ts';
 
 /*
  * The NVIDIA fallback when NVML cannot be loaded: one long-lived `nvidia-smi -lms` stream for the cards, and a
@@ -270,20 +270,8 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
 
   const procVram = Effect.fn('NvidiaSmi.procVram')(function* (pid: number) {
     const h = yield* SynchronizedRef.get(held);
-    const m = new Map<string, number>();
-    const unknown = new Set<string>();
-    for (const a of h.apps) {
-      if (a.pid !== pid) continue;
-      const k = `nvidia:${a.uuid}`;
-      if (a.usedBytes === null) unknown.add(k);
-      else m.set(k, (m.get(k) ?? 0) + a.usedBytes);
-    }
-    // Share unknown: count the card's VRAM in use (an upper bound) so the card still shows as used.
-    for (const k of unknown) {
-      const card = Arr.findFirst(gpusOf(h), (g) => g.key === k);
-      m.set(k, Option.isSome(card) ? card.value.vramUsedBytes : (m.get(k) ?? 0));
-    }
-    return m as ReadonlyMap<string, number>;
+    const procs = Arr.map(h.apps, (a) => ({ pid: a.pid, key: `nvidia:${a.uuid}`, usedBytes: a.usedBytes }));
+    return procVramOf({ gpus: gpusOf(h), procs }, pid);
   });
 
   return {

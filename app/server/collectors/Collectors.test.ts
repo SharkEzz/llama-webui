@@ -9,11 +9,12 @@ import {
   Layer,
   Option,
   Path,
+  Ref,
   Schedule,
   type Scope,
   String as Str,
 } from 'effect';
-import type { ChildProcessSpawner } from 'effect/process';
+import { ChildProcessSpawner } from 'effect/process';
 import * as Db from '../db/Db.ts';
 import { PciIds } from '../hardware/PciIds.ts';
 import { isAlive } from '../llama/procScan.ts';
@@ -69,6 +70,23 @@ const workspace = Effect.gen(function* () {
 });
 
 type Workspace = Effect.Success<typeof workspace>;
+
+/** The children of this process that run the real NVML sampler (`nvml/worker.ts`): the pids, from `/proc`. */
+const realSamplers = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const entries = yield* fs.readDirectory('/proc');
+  const pids = Arr.filter(entries, (entry) => /^\d+$/.test(entry));
+  const found = yield* Effect.forEach(pids, (pid) =>
+    Effect.gen(function* () {
+      const stat = yield* fs.readFileString(`/proc/${pid}/stat`);
+      // `pid (comm) state ppid …`: the comm may hold spaces and parentheses, the fields after it do not.
+      const ppid = Number(/\) \S+ (\d+) [^)]*$/.exec(stat)?.[1]);
+      const cmdline = yield* fs.readFileString(`/proc/${pid}/cmdline`);
+      return ppid === process.pid && Str.includes('nvml/worker.ts')(cmdline) ? [Number(pid)] : [];
+    }).pipe(Effect.orElseSucceed((): ReadonlyArray<number> => [])),
+  );
+  return Arr.flatten(found);
+}).pipe(Effect.orDie);
 
 /** `effect` again every 20 ms until `ok` holds, 3 s at most. */
 const eventually = <A, E, R>(effect: Effect.Effect<A, E, R>, ok: (a: A) => boolean) =>
@@ -139,6 +157,10 @@ layer(Platform, { excludeTestServices: true })('Collectors', (it) => {
           const starts = yield* ws.callsOf('nvidia-smi', '-lms');
           assert.lengthOf(starts, 1);
         }),
+    ).pipe(
+      // The real sampler was started (with a missing library), and is gone.
+      Effect.andThen(realSamplers),
+      Effect.map((alive) => assert.deepStrictEqual(alive, [])),
     ),
   );
 
@@ -289,6 +311,41 @@ layer(Platform, { excludeTestServices: true })('Collectors', (it) => {
     }),
   );
 
+  it.effect('a system collector whose start dies stops what it started', () =>
+    Effect.gen(function* () {
+      const platform = yield* ChildProcessSpawner.ChildProcessSpawner;
+      // perf's spawn leaves a mark in the scope it is given, then dies.
+      const released = yield* Ref.make(false);
+      const dying = ChildProcessSpawner.make((command) =>
+        command._tag === 'StandardCommand' && command.command === 'perf-that-dies'
+          ? Effect.andThen(
+              Effect.addFinalizer(() => Ref.set(released, true)),
+              Effect.die(new Error('perf could not be spawned')),
+            )
+          : platform.spawn(command),
+      );
+      yield* withCollectors(
+        () =>
+          Effect.succeed({
+            initial: settingsOf({ nvml: false, system: false }),
+            nvmlLib: Option.none(),
+            nvidiaSmi: MISSING,
+            perfBin: 'perf-that-dies',
+          }),
+        (collectors) =>
+          Effect.gen(function* () {
+            const error = yield* Effect.flip(collectors.configure(settingsOf({ nvml: false })));
+            assert.strictEqual(error.message, 'perf could not be spawned');
+            // Stopped at once, not at the end of the layer.
+            const stopped = yield* Ref.get(released);
+            assert.isTrue(stopped);
+            const system = yield* collectors.system;
+            assert.isTrue(Option.isNone(system));
+          }),
+      ).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, dying));
+    }),
+  );
+
   it.effect('layer reads the settings, LLAMA_WEBUI_NVML_LIB and LLAMA_WEBUI_NVIDIA_SMI', () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -312,6 +369,9 @@ layer(Platform, { excludeTestServices: true })('Collectors', (it) => {
           Effect.scoped,
         );
         yield* ws.assertAllDead;
+        // The real sampler, tried with the missing library, is gone too.
+        const samplers = yield* realSamplers;
+        assert.deepStrictEqual(samplers, []);
       }),
     ),
   );

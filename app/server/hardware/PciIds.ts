@@ -36,7 +36,7 @@ export const findPciIdsEntry: {
 });
 
 /** The name in brackets (“GB203 [GeForce RTX 5070 Ti]”) is preferred over the chip name. */
-const displayName = (entry: string): string => /\[([^\]]+)\]/.exec(entry)?.[1] ?? entry;
+export const displayName = (entry: string): string => /\[([^\]]+)\]/.exec(entry)?.[1] ?? entry;
 
 /** A PCI id as pci.ids writes it: four lowercase hex digits, without `0x`. */
 const idOf = (id: string): string => pipe(id, Str.toLowerCase, Str.replace(/^0x/, ''));

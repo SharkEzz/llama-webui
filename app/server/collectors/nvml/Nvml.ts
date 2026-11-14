@@ -1,23 +1,10 @@
 import type { GpuReading } from '@llama-webui/shared';
-import {
-  Array as Arr,
-  Cause,
-  Clock,
-  Deferred,
-  type Duration,
-  Effect,
-  Exit,
-  Option,
-  Queue,
-  Ref,
-  String as Str,
-  Stream,
-} from 'effect';
+import { Cause, Clock, Deferred, type Duration, Effect, Exit, Option, Queue, Ref, String as Str, Stream } from 'effect';
 import { Ndjson } from 'effect/encoding';
 import { dual } from 'effect/Function';
 import { ChildProcess, type ChildProcessSpawner } from 'effect/process';
 import { followProgram } from '../../process/followed.ts';
-import type { GpuNeeds, NvidiaReader } from '../gpu.ts';
+import { type GpuNeeds, type NvidiaReader, procVramOf } from '../gpu.ts';
 import { FromSampler, type NvmlProc, type NvmlSnapshot, type NvmlSystem, ToSampler } from './protocol.ts';
 
 /*
@@ -89,28 +76,6 @@ export const isFresh: {
   2,
   (state: NvmlState, now: number): boolean => !state.dead && now - state.lastSampleAt <= 3 * state.freshIntervalMs,
 );
-
-/**
- * The VRAM `pid` holds on each card. A process NVML cannot report counts the card's VRAM in use (an upper bound), so
- * the card still shows as used by it.
- */
-export const procVramOf: {
-  (pid: number): (state: NvmlState) => ReadonlyMap<string, number>;
-  (state: NvmlState, pid: number): ReadonlyMap<string, number>;
-} = dual(2, (state: NvmlState, pid: number): ReadonlyMap<string, number> => {
-  const vram = new Map<string, number>();
-  const unknown = new Set<string>();
-  for (const p of state.procs) {
-    if (p.pid !== pid) continue;
-    if (p.usedBytes === null) unknown.add(p.key);
-    else vram.set(p.key, (vram.get(p.key) ?? 0) + p.usedBytes);
-  }
-  for (const key of unknown) {
-    const card = Arr.findFirst(state.gpus, (g) => g.key === key);
-    vram.set(key, Option.isSome(card) ? card.value.vramUsedBytes : (vram.get(key) ?? 0));
-  }
-  return vram;
-});
 
 /**
  * The sampler next to the module that starts it: `worker.ts` next to a `.ts` module (development, tests),

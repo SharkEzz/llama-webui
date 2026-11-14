@@ -1,8 +1,9 @@
 import type { GpuReading } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Option, Path, String as Str } from 'effect';
 import { PciIds } from '../hardware/PciIds.ts';
-import { minKnown, parseLinkSpeed, readNum, readText, slotLink } from '../hardware/pci.ts';
+import { minKnown, parseLinkSpeed, readNum, slotLink } from '../hardware/pci.ts';
 import { identityReading } from './gpu.ts';
+import { readTrimmed } from './read.ts';
 
 /*
  * The AMD cards, read from sysfs, hwmon and `/proc/<pid>/fdinfo`: no library, no `rocm-smi`. A failed read is an
@@ -98,7 +99,7 @@ export const discoverAmdCards = Effect.fn('amdgpu.discoverAmdCards')(function* (
   const found: Array<AmdCard> = [];
   for (const card of Arr.filter(sorted, (e) => /^card\d+$/.test(e))) {
     const devLink = path.join(drmRoot, card, 'device');
-    if ((yield* readText(path.join(devLink, 'vendor'))) !== '0x1002') continue;
+    if ((yield* readTrimmed(path.join(devLink, 'vendor'))) !== '0x1002') continue;
     const real = yield* fs.realPath(devLink).pipe(Effect.option);
     if (Option.isNone(real)) continue;
     const devicePath = real.value;
@@ -114,7 +115,7 @@ export const discoverAmdCards = Effect.fn('amdgpu.discoverAmdCards')(function* (
         Effect.orElseSucceed(() => false),
       ),
     );
-    const device = yield* readText(path.join(devicePath, 'device'));
+    const device = yield* readTrimmed(path.join(devicePath, 'device'));
     const named = device === null ? Option.none<string>() : yield* ids.name('0x1002', device);
     found.push({
       card,
@@ -132,7 +133,7 @@ export const discoverAmdCards = Effect.fn('amdgpu.discoverAmdCards')(function* (
 const readWith = <T>(file: string | null, parse: (text: string) => T) =>
   Effect.gen(function* () {
     if (file === null) return null;
-    const text = yield* readText(file);
+    const text = yield* readTrimmed(file);
     return text === null ? null : parse(text);
   });
 
@@ -187,7 +188,7 @@ const ratioPct = (v: number | null, max: number | null): number | null =>
 export const isRuntimeSuspended = (card: AmdCard): Effect.Effect<boolean, never, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
-    return (yield* readText(path.join(card.devicePath, 'power', 'runtime_status'))) === 'suspended';
+    return (yield* readTrimmed(path.join(card.devicePath, 'power', 'runtime_status'))) === 'suspended';
   });
 
 /** Identity of a card with every metric unknown. */
