@@ -106,7 +106,7 @@ export const hubError: {
  * …`), else the cause's code (a connection tried on several addresses fails with an `AggregateError` without a
  * message).
  */
-const reasonOf = (error: HttpClientError.HttpClientError): string => {
+export const reasonOf = (error: HttpClientError.HttpClientError): string => {
   const { reason } = error;
   if (Predicate.isString(reason.description) && Str.isNonEmpty(reason.description)) return reason.description;
   const cause: unknown = reason.cause;

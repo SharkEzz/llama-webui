@@ -18,10 +18,4 @@ export class ActiveWrites extends Context.Service<
       return ActiveWrites.of({ active: repo.active });
     }),
   );
-
-  /** No download queue: nothing is ever written. */
-  static readonly layerNone: Layer.Layer<ActiveWrites> = Layer.succeed(
-    ActiveWrites,
-    ActiveWrites.of({ active: Effect.succeed([]) }),
-  );
 }

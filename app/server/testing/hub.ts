@@ -43,14 +43,21 @@ export type HubRoute = 'search' | 'repo' | 'whoami' | 'resolve' | 'cdn';
 
 /**
  * What a request gets instead of its answer: a status (headers and body as given); `silence`, no answer at all (until
- * the client leaves); `cut`, the headers and the first `cut` bytes of the body, then the connection broken; `stall`,
- * the headers and the first `stall` bytes, then nothing more.
+ * the client leaves); `drop`, the connection broken at once, before any answer; `cut`, the headers and the first `cut`
+ * bytes of the body, then the connection broken; `stall`, the headers and the first `stall` bytes, then nothing more;
+ * `pass`, its answer (so that a later request of the route can be the one that fails).
  */
 export type HubFault =
-  | { readonly status: number; readonly headers?: Readonly<Record<string, string>>; readonly body?: string }
+  | {
+      readonly status: number;
+      readonly headers?: Readonly<Record<string, string>>;
+      readonly body?: string | Uint8Array;
+    }
   | { readonly silence: true }
+  | { readonly drop: true }
   | { readonly cut: number }
-  | { readonly stall: number };
+  | { readonly stall: number }
+  | { readonly pass: true };
 
 /** A request the fake saw. */
 export interface HubRequest {
@@ -165,7 +172,7 @@ export async function startHub(options: HubOptions = {}): Promise<FakeHub & { re
     fault: HubFault | undefined,
     answer: { status: number; headers: Record<string, string>; body: Buffer | string | undefined },
   ) => {
-    if (fault === undefined) {
+    if (fault === undefined || 'pass' in fault) {
       res.writeHead(answer.status, answer.headers).end(answer.body);
       return;
     }
@@ -174,6 +181,10 @@ export async function startHub(options: HubOptions = {}): Promise<FakeHub & { re
       return;
     }
     if ('silence' in fault) return;
+    if ('drop' in fault) {
+      res.destroy();
+      return;
+    }
     const after = 'cut' in fault ? fault.cut : fault.stall;
     res.writeHead(answer.status, answer.headers);
     res.write(Buffer.from(answer.body ?? '').subarray(0, after));

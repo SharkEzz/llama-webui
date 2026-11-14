@@ -23,8 +23,9 @@ import { SqlClient } from 'effect/sql';
 import type { NewDownload } from '../hf/repo.ts';
 import { ServicesTest } from '../testing/services.ts';
 import { WsHub } from '../ws/WsHub.ts';
-import { Downloads, type Transfer, type TransferFailure } from './Downloads.ts';
+import { Downloads } from './Downloads.ts';
 import { DownloadsRepo } from './DownloadsRepo.ts';
+import type { Transfer, TransferFailed } from './transfer.ts';
 
 const GiB = 1024 * 1024 * 1024;
 const SHA = Str.repeat(40)('a');
@@ -45,7 +46,7 @@ class Free extends Context.Service<Free, Ref.Ref<number | null>>()(
 /** What a transfer of the test does once it is released. */
 type Step = (
   item: DownloadItem,
-) => Effect.Effect<void, TransferFailure, FileSystem.FileSystem | Path.Path | DownloadsRepo | SqlClient.SqlClient>;
+) => Effect.Effect<void, TransferFailed, FileSystem.FileSystem | Path.Path | DownloadsRepo | SqlClient.SqlClient>;
 
 /** Writes every file not done at its size, as the real transfer puts it in place, and marks it done. */
 const place: Step = (item) =>

@@ -35,43 +35,13 @@ import { Shutdown } from '../runtime/Shutdown.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { DownloadsRepo } from './DownloadsRepo.ts';
 import { freeBytesOf } from './freeSpace.ts';
+import { type Transfer, type TransferFailed, type TransferProgress, transferWith } from './transfer.ts';
 
 const MiB = 1024 * 1024;
 const GiB = 1024 * MiB;
 
 /** A size as the disk space refusal writes it: GiB with one decimal from 1 GiB, whole MiB below. */
 const fmtBytes = (n: number): string => (n >= GiB ? `${(n / GiB).toFixed(1)} GiB` : `${Math.round(n / MiB)} MiB`);
-
-/** What a transfer tells of its progress: the phase, the file it is on, the bytes of the item written so far. */
-export interface TransferProgress {
-  readonly phase: DownloadLive['phase'];
-  /** The file being written (its path in the repository). */
-  readonly file: string;
-  /** The bytes of the item written so far, the files done included. */
-  readonly bytesDone: number;
-  /** When the next attempt starts (`retrying`); null otherwise. */
-  readonly retryAt: number | null;
-}
-
-/** Why a transfer gave up: the item is saved `error` with them. */
-export interface TransferFailure {
-  readonly message: string;
-  readonly code: string;
-}
-
-/**
- * Writes the files of an item not done yet, each marked done (`DownloadsRepo.fileDone`) once in place, and tells its
- * progress through `report`. The queue interrupts it when the item is canceled or the app stops: it keeps the `.part`
- * of the file it was on (the queue deletes it on a cancel; the next start resumes it after a stop).
- */
-export type Transfer = (
-  item: DownloadItem,
-  report: (progress: TransferProgress) => Effect.Effect<void>,
-) => Effect.Effect<void, TransferFailure, HfHttp | FileSystem.FileSystem | Path.Path | DownloadsRepo>;
-
-/** Until the transfer of Task 7: every item fails at once. */
-const noTransfer: Transfer = () =>
-  Effect.fail({ message: 'The transfer of a file is not implemented yet', code: 'download-failed' });
 
 /** The item the queue runs now. */
 interface Running {
@@ -103,7 +73,7 @@ type Outcome =
       readonly defect: Option.Option<Cause.Cause<unknown>>;
     };
 
-const outcomeOf = (exit: Exit.Exit<void, TransferFailure>): Outcome => {
+const outcomeOf = (exit: Exit.Exit<void, TransferFailed>): Outcome => {
   if (Exit.isSuccess(exit)) return { _tag: 'done' };
   const failure = Cause.findErrorOption(exit.cause);
   if (Option.isSome(failure)) {
@@ -117,6 +87,10 @@ const outcomeOf = (exit: Exit.Exit<void, TransferFailure>): Outcome => {
 /** The size of the files done. */
 const doneBytes = (files: ReadonlyArray<DownloadFile>) =>
   Arr.reduce(files, 0, (sum, file) => (file.done ? sum + file.size : sum));
+
+/** The pauses between the attempts at a file, and the time without data after which an attempt starts again. */
+const RETRY_DELAYS: ReadonlyArray<Duration.Input> = ['2 seconds', '4 seconds', '8 seconds', '16 seconds', '30 seconds'];
+const STALL: Duration.Input = '60 seconds';
 
 const alreadyQueued = (name: string) => AlreadyQueued.make({ message: `${name} is already in the download queue` });
 
@@ -155,9 +129,10 @@ export class Downloads extends Context.Service<
    * The queue: `freeBytes` tells the free space of a folder's disk (null: unknown, not checked), `marginBytes` is
    * left free on top of the downloads; `retryDelays` and `stall` are the transfer's (the pauses between attempts after
    * a network error, the time without data after which an attempt starts again), `liveEvery` the interval of the
-   * progress messages. The loop runs in the layer's scope, started by the build (the items left from the last run),
-   * `enqueue` and `retry`. Its shutdown step stops the transfer and writes nothing: the item stays `downloading`, its
-   * `.part` kept, and the next start resumes it.
+   * progress messages; `transfer` replaces the real one (`transferWith`, on `retryDelays` and `stall`). The loop runs
+   * in the layer's scope, started by the build (the items left from the last run), `enqueue` and `retry`. Its shutdown
+   * step stops the transfer and writes nothing: the item stays `downloading`, its `.part` kept, and the next start
+   * resumes it.
    */
   static readonly layerWith = (options: {
     readonly freeBytes?: (dir: string) => Effect.Effect<number | null>;
@@ -181,7 +156,9 @@ export class Downloads extends Context.Service<
           options.freeBytes ?? ((dir: string) => freeBytesOf(dir).pipe(Effect.provideService(Path.Path, path)));
         const margin = options.marginBytes ?? GiB;
         const liveEveryMs = Duration.toMillis(Duration.fromInputUnsafe(options.liveEvery ?? '250 millis'));
-        const transfer = options.transfer ?? noTransfer;
+        const transfer =
+          options.transfer ??
+          transferWith({ retryDelays: options.retryDelays ?? RETRY_DELAYS, stall: options.stall ?? STALL });
 
         const state = yield* SynchronizedRef.make<State>({ loop: Option.none(), running: Option.none() });
         /** Work was added since the loop last looked at the queue: a loop that stops on a failure starts again. */
@@ -319,10 +296,8 @@ export class Downloads extends Context.Service<
                 if (Option.isNone(s.running) || s.running.value.id !== id || (yield* Ref.get(closing))) return s;
                 const run = s.running.value;
                 const now = yield* Clock.currentTimeMillis;
-                const steady =
-                  progress.phase === 'downloading' &&
-                  run.live.phase === 'downloading' &&
-                  progress.file === run.live.file;
+                // A chunk's progress; an attempt or an answer that starts, `verifying` and `retrying` go out at once.
+                const steady = progress.throttled;
                 const elapsed = now - run.lastEmit;
                 if (steady && elapsed < liveEveryMs) return s;
                 const instant = steady && elapsed > 0 ? ((progress.bytesDone - run.lastBytes) * 1000) / elapsed : 0;
@@ -333,7 +308,14 @@ export class Downloads extends Context.Service<
                   : run.live.bps > 0
                     ? 0.7 * run.live.bps + 0.3 * instant
                     : instant;
-                const live: DownloadLive = { ...run.live, ...progress, bps };
+                const live: DownloadLive = {
+                  ...run.live,
+                  phase: progress.phase,
+                  file: progress.file,
+                  bytesDone: progress.bytesDone,
+                  retryAt: progress.retryAt,
+                  bps,
+                };
                 yield* hub.publish({ type: 'download-progress', payload: live });
                 const next: Running = { ...run, live, lastEmit: now, lastBytes: progress.bytesDone };
                 return { ...s, running: Option.some(next) };
@@ -527,9 +509,5 @@ export class Downloads extends Context.Service<
     );
 
   /** The queue on the disk's free space, a 1 GiB margin; attempts after 2, 4, 8, 16 and 30 s, restarted after 60 s without data. */
-  static readonly layer = Downloads.layerWith({
-    retryDelays: ['2 seconds', '4 seconds', '8 seconds', '16 seconds', '30 seconds'],
-    stall: '60 seconds',
-    liveEvery: '250 millis',
-  });
+  static readonly layer = Downloads.layerWith({ retryDelays: RETRY_DELAYS, stall: STALL, liveEvery: '250 millis' });
 }
