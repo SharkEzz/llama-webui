@@ -32,10 +32,16 @@ beforeAll(async () => {
   dir = tempDir('lw-contract-');
   const home = join(dir.path, 'home');
   mkdirSync(home);
-  // A home and XDG folders of the run's own: nothing of the user's shows in a reply.
+  // A home and XDG folders of the run's own: nothing of the user's shows in a reply. The stub monitor: no program
+  // runs, no snapshot comes, the history stays empty.
   app = await launch({
     dataDir: dir.path,
-    env: { HOME: home, XDG_DATA_HOME: join(home, 'data'), XDG_CONFIG_HOME: join(home, 'config') },
+    env: {
+      HOME: home,
+      XDG_DATA_HOME: join(home, 'data'),
+      XDG_CONFIG_HOME: join(home, 'config'),
+      LLAMA_WEBUI_TEST_MONITOR: 'stub',
+    },
   });
   ctx = { tmp: dir.path, repo: REPO, home, ports: app.watchPort === null ? [app.port] : [app.port, app.watchPort] };
   binaries = {

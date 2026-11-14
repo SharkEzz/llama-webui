@@ -5,9 +5,12 @@ import { AppConfig } from './config/AppConfig.ts';
 import { AppInfo } from './config/AppInfo.ts';
 import * as Db from './db/Db.ts';
 import { Flags } from './flags/Flags.ts';
+import { PciIds } from './hardware/PciIds.ts';
 import { HttpLive } from './http/HttpLive.ts';
 import { LlamaHttp } from './llama/LlamaHttp.ts';
 import { LogRing } from './logs/LogRing.ts';
+import { Monitor } from './monitor/Monitor.ts';
+import { Placement } from './monitor/Placement.ts';
 import { ProfilesRepo } from './profiles/ProfilesRepo.ts';
 import { Shutdown } from './runtime/Shutdown.ts';
 import { SettingsRepo } from './settings/SettingsRepo.ts';
@@ -18,13 +21,15 @@ import { WsHub } from './ws/WsHub.ts';
 /**
  * The services the routes use, built before the HTTP server opens its port and undone after it closed: the database
  * is opened (and brought up to date) first. The watch of a server started by hand is built last and undone first: no
- * look runs while the rest stops. The supervisor is under it: its end stops llama-server while the ring and the hub
- * it writes to are still up. Later tasks add theirs, each on `Shutdown.layer`.
+ * look runs while the rest stops. The monitor and the placement are under it: they end, the collectors' programs
+ * with the monitor, before the supervisor stops llama-server, while the ring and the hub it writes to are still up.
+ * Later tasks add theirs, each on `Shutdown.layer`.
  */
 const Services = ExternalWatch.layer.pipe(
+  Layer.provideMerge(Layer.merge(Monitor.layer, Placement.layer)),
   Layer.provideMerge(Supervisor.layer),
   Layer.provideMerge(Flags.layer),
-  Layer.provideMerge(Layer.merge(LogRing.layer, LlamaHttp.layer)),
+  Layer.provideMerge(Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer)),
   Layer.provideMerge(Layer.mergeAll(WsHub.layer, SettingsRepo.layer, ProfilesRepo.layer)),
   Layer.provideMerge(AppInfo.layer),
   Layer.provideMerge(Db.layer),

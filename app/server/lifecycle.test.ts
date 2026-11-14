@@ -1,6 +1,6 @@
 // The production build as a process: how it starts, refuses to start, and reads its options.
 import { type ChildProcessByStdio, spawn } from 'node:child_process';
-import { copyFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
@@ -10,7 +10,7 @@ import { afterAll, expect, test } from 'vitest';
 import { freePort, LAUNCHER, launch, userEnv } from './testing/launch.ts';
 import { startFakeThrough } from './testing/llama.ts';
 import { tempDir } from './testing/tempDir.ts';
-import { openWs } from './testing/ws.ts';
+import { ofType, openWs } from './testing/ws.ts';
 
 const dir = tempDir('lw-lifecycle-');
 afterAll(() => dir[Symbol.dispose]());
@@ -171,6 +171,44 @@ test('SIGTERM with llama-server running stops it and exits 0 in under 2 s', asyn
   await using again = await launch({ dataDir: data });
   const profiles = (await (await fetch(`${again.base}/api/profiles`)).json()) as unknown[];
   expect(profiles).toHaveLength(1);
+}, 30_000);
+
+test("SIGTERM with the monitor's programs running leaves none of them", async () => {
+  const data = dataDir();
+  // A fake nvidia-smi, one process as the real one is: each run records its pid, the stream prints one card every
+  // 100 ms, a query prints nothing. (A shell loop would fork a `sleep` per line: once killed, its zombie is reaped
+  // by this machine's init process only after a second or two, and the spawner waits for the whole group.)
+  const smi = join(data, 'nvidia-smi');
+  const pids = join(data, 'smi-pids');
+  writeFileSync(
+    smi,
+    `#!${process.execPath}
+const { appendFileSync } = require('node:fs');
+appendFileSync(${JSON.stringify(pids)}, process.pid + '\\n');
+if (!process.argv.includes('-lms')) process.exit(0);
+const line = '0, GPU-00000000-0000-0000-0000-000000000001, Fake GPU, 5, 1024, 8192, 40, 50.00, 00000000:01:00.0';
+setInterval(() => process.stdout.write(line + '\\n'), 100);
+`,
+    { mode: 0o755 },
+  );
+  await using app = await launch({
+    dataDir: data,
+    // NVML cannot load: the collectors fall back to the nvidia-smi named by the variable.
+    env: { LLAMA_WEBUI_NVML_LIB: join(data, 'no-such-libnvidia-ml.so'), LLAMA_WEBUI_NVIDIA_SMI: smi },
+  });
+  const client = await openWs(`${app.base.replace('http', 'ws')}/ws`);
+  const withCard = (message: unknown) =>
+    ofType('snapshot')(message) && JSON.stringify(message).includes('nvidia:GPU-00000000-0000-0000-0000-000000000001');
+  await client.next(withCard, 10_000);
+  const recorded = readFileSync(pids, 'utf8').trim().split('\n').map(Number);
+  expect(recorded.length).toBeGreaterThan(0);
+  const t0 = performance.now();
+  app.proc.kill('SIGTERM');
+  const code = await app.exited;
+  expect(performance.now() - t0).toBeLessThan(2000);
+  expect(code).toBe(0);
+  expect((await client.closed).code).toBe(1001);
+  expect(recorded.filter(alive)).toEqual([]);
 }, 30_000);
 
 test('a data directory of the Nitro server opens untouched', async () => {

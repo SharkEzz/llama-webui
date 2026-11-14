@@ -120,9 +120,8 @@ test('the server finds the NVML sampler: the module that names it sits next to i
     (f) => f !== join(server, 'nvml-worker.mjs') && readFileSync(f, 'utf8').includes('nvml-worker.mjs'),
   );
   for (const f of referrers) expect(dirname(f)).toBe(server);
-  // Once the server reaches the NVML reader (its span `startNvml`), the name of the sampler comes with it.
-  if (/["']startNvml["']/.test(readFileSync(join(server, 'index.mjs'), 'utf8')))
-    expect(referrers).toEqual([join(server, 'index.mjs')]);
+  // The server reaches the NVML reader (the monitor's collectors): the name of the sampler comes with it.
+  expect(referrers).toEqual([join(server, 'index.mjs')]);
 });
 
 test('the NVML sampler ships next to the server entry and starts from the bundle', async () => {

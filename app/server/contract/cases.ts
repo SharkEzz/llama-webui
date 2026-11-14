@@ -20,6 +20,8 @@ export interface Case {
   req: WireRequest;
   /** Records the status and the headers only: the body is a built file of the client. */
   headOnly?: boolean;
+  /** A success depends on the machine (its CPU, its PCI devices): records the names of its fields, not the body. */
+  machine?: boolean;
 }
 
 /** Each endpoint of the API definition, as `METHOD /path`. */
@@ -77,8 +79,8 @@ export interface Binaries {
  */
 export function cases(ctx: { asset: string } & Binaries): Case[] {
   const out: Case[] = [];
-  const add = (kind: CaseKind, name: string, req: WireRequest, headOnly = false) =>
-    out.push({ kind, name, req, ...(headOnly ? { headOnly } : {}) });
+  const add = (kind: CaseKind, name: string, req: WireRequest, flags: { headOnly?: true; machine?: true } = {}) =>
+    out.push({ kind, name, req, ...flags });
 
   add('read', 'GET /api/health', bare('GET', '/api/health'));
   add('read', 'GET /api/settings', bare('GET', '/api/settings'));
@@ -101,6 +103,12 @@ export function cases(ctx: { asset: string } & Binaries): Case[] {
     json('POST', '/api/server/start', '{"profileId":"1"}'),
   );
 
+  // The monitoring, on the stub monitor (`LLAMA_WEBUI_TEST_MONITOR=stub`): the machine's own parts by their fields.
+  add('read', 'GET /api/monitor/history', bare('GET', '/api/monitor/history'));
+  add('read', 'GET /api/monitor/snapshot', bare('GET', '/api/monitor/snapshot'));
+  add('read', 'GET /api/system/info', bare('GET', '/api/system/info'), { machine: true });
+  add('read', 'GET /api/topology', bare('GET', '/api/topology'), { machine: true });
+
   // The guard: DNS rebinding (a domain as Host) and another site's page.
   add('guard', 'GET /api/health (foreign Origin)', bare('GET', '/api/health', { Origin: 'http://evil.example' }));
   add('guard', 'GET /api/health (Host evil.example)', bare('GET', '/api/health', { Host: 'evil.example' }));
@@ -116,7 +124,7 @@ export function cases(ctx: { asset: string } & Binaries): Case[] {
   // The UI: the app, a deep URL of it, a hashed file and one that is not there (a stale tab after an upgrade).
   add('web', 'GET / (the app)', bare('GET', '/'));
   add('web', 'GET /chat/12 (deep URL)', bare('GET', '/chat/12'));
-  add('web', 'GET /assets/index-<hash>.js (hashed asset)', bare('GET', ctx.asset), true);
+  add('web', 'GET /assets/index-<hash>.js (hashed asset)', bare('GET', ctx.asset), { headOnly: true });
   add('web', 'GET /assets/index-00000000.js (missing asset)', bare('GET', '/assets/index-00000000.js'));
 
   // Writes, last: what a broken payload gets, then a patch that applies.
@@ -186,8 +194,10 @@ export function cases(ctx: { asset: string } & Binaries): Case[] {
 export interface Outcome {
   status: number;
   headers: Record<string, string>;
-  /** Parsed JSON, else text; absent for an empty body or a `headOnly` case. */
+  /** Parsed JSON, else text; absent for an empty body, a `headOnly` case or the success of a `machine` case. */
   body?: unknown;
+  /** The success of a `machine` case: the sorted names of its fields (`[]` for an array, `null` for a scalar). */
+  fields?: string[] | null;
 }
 
 /** The headers the contract keeps (others, such as `date` or `content-length`, are framing). */
@@ -239,11 +249,21 @@ export function normalize(v: unknown, ctx: NormalizeCtx): unknown {
   return v;
 }
 
-export function record(res: WireResponse, ctx: NormalizeCtx, headOnly = false): Outcome {
+/** The names of the fields of a value, sorted: `[]` for an array, `null` for a scalar. */
+function fieldsOf(v: unknown): string[] | null {
+  if (Array.isArray(v)) return [];
+  return v && typeof v === 'object' ? Object.keys(v).sort() : null;
+}
+
+export function record(
+  res: WireResponse,
+  ctx: NormalizeCtx,
+  flags: { headOnly?: boolean; machine?: boolean } = {},
+): Outcome {
   const headers: Record<string, string> = {};
   for (const h of KEPT_HEADERS) if (res.headers[h] !== undefined) headers[h] = normalize(res.headers[h], ctx) as string;
   const out: Outcome = { status: res.status, headers };
-  if (res.body === '' || headOnly) return out;
+  if (res.body === '' || flags.headOnly) return out;
   let body: unknown = res.body;
   if (/json/.test(res.headers['content-type'] ?? '')) {
     try {
@@ -252,7 +272,8 @@ export function record(res: WireResponse, ctx: NormalizeCtx, headOnly = false): 
       // kept as text: the contract records what was sent
     }
   }
-  out.body = normalize(body, ctx);
+  if (flags.machine && res.status < 400) out.fields = fieldsOf(body);
+  else out.body = normalize(body, ctx);
   return out;
 }
 
@@ -272,6 +293,6 @@ export async function runContract(
 ): Promise<Record<string, Outcome>> {
   const out: Record<string, Outcome> = {};
   for (const c of cases({ asset: await assetOf(base), ...binaries }))
-    out[c.name] = record(await request(base, c.req), ctx, c.headOnly);
+    out[c.name] = record(await request(base, c.req), ctx, c);
   return out;
 }

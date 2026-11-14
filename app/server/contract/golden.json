@@ -194,6 +194,48 @@
       ]
     }
   },
+  "GET /api/monitor/history": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "intervalMs": 1000,
+      "capacity": 0,
+      "at": 0,
+      "times": [],
+      "series": {},
+      "bootId": "<bootId>"
+    }
+  },
+  "GET /api/monitor/snapshot": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": null
+  },
+  "GET /api/system/info": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "cpu",
+      "gpus",
+      "nvidiaSource"
+    ]
+  },
+  "GET /api/topology": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "graph",
+      "placement"
+    ]
+  },
   "GET /api/health (foreign Origin)": {
     "status": 403,
     "headers": {
