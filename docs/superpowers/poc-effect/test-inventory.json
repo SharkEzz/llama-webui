@@ -1939,19 +1939,13 @@
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads [start, end)",
-    "milestone": "E6",
-    "status": "rewritten",
-    "to": "app/server/downloads/transfer.test.ts > the verifying re-read hashes exactly the .part, in 1 MiB chunks",
-    "reason": "fileRange of lib/proc.ts was used only by the verifying re-read of the downloader; the re-read now reads the .part through FileSystem.stream in 1 MiB chunks, proven by the transfer test"
+    "milestone": "E8"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads in 1 MiB chunks, so the disk speed check is not held back by the stream",
-    "milestone": "E6",
-    "status": "rewritten",
-    "to": "app/server/downloads/transfer.test.ts > the verifying re-read hashes exactly the .part, in 1 MiB chunks",
-    "reason": "fileRange of lib/proc.ts was used only by the verifying re-read of the downloader; the re-read now reads the .part through FileSystem.stream in 1 MiB chunks, proven by the transfer test"
+    "milestone": "E8"
   },
   {
     "project": "server",

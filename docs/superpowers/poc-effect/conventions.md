@@ -38,11 +38,13 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 - Two directives are allowed, each with its reason on the line. A directive that suppresses nothing fails `tsc`.
   - `processEnv:off` at the one write of `.env` into the environment (not needed: `applyDotEnv(process.env, …)` in
     `config/DotEnv.ts` is not flagged).
-  - `// @effect-diagnostics-next-line nodeBuiltinImport:off <reason>`, three today (`node:ffi` is not flagged and
+  - `// @effect-diagnostics-next-line nodeBuiltinImport:off <reason>`, four today (`node:ffi` is not flagged and
     needs none): `node:http` in `app/server/http/HttpLive.ts` (`NodeHttpServer.layer` takes the server factory of
     `node:http`); `node:crypto` in `app/server/downloads/hash.ts` (`Digest` of effect is one-shot over one
     `Uint8Array`, and a file of several GiB is hashed as it streams); `node:fs/promises` in
-    `app/server/downloads/freeSpace.ts` (`FileSystem` has no `statfs`).
+    `app/server/downloads/freeSpace.ts` (`FileSystem` has no `statfs`) and in `app/server/models/usage.ts`
+    (`FileSystem` has no `rmdir`: an empty folder is removed in one step that the system refuses for a folder a
+    download filled meanwhile, where a check then a recursive `remove` could delete the new file).
 - A Schema class takes the brand the rule asks for (`TaggedError<X, { readonly X: unique symbol }>()`) and is built
   with `X.make(…)`, never `new X(…)`.
 - A service is a `Context.Service` class keyed `@llama-webui/app/server/<path>/<Name>`
@@ -286,8 +288,10 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
 ## Caches and file system errors
 
 - **A cache checked against a stamp** (the parsed GGUFs, `app/server/models/GgufReader.ts`) is `Cache.makeWith(load, {
-  capacity, timeToLive })` keyed by the path and the stamp of every part (`<mtime ms>:<size>`), so a changed file is a
-  new key and the old entry ages out; `timeToLive` keeps a success forever and a failure for no time
+  capacity, timeToLive })` keyed by the path only; the loaded entry holds the stamp of every part (`<mtime ms>:<size>`),
+  and a lookup reads the current stamp first and drops the entry when it differs
+  (`Cache.invalidateWhen(cache, path, (entry) => entry.stamp !== current)`), so a changed file is loaded again;
+  `timeToLive` keeps a success forever and a failure for no time
   (`Exit.isSuccess(exit) ? Duration.infinity : Duration.zero`). It is an LRU: a hit refreshes the entry.
 - **The errno of a `FileSystem` call** (`ENOENT`, `ENOTDIR`, `EACCES`, `ENOSPC`) is not in its `PlatformError`'s
   `reason` tag: read it from `error.reason.cause`, `Predicate.hasProperty(cause, 'code') && cause.code === 'ENOSPC'`

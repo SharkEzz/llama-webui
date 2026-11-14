@@ -428,9 +428,46 @@ Found while porting E6, accepted with its result:
   download is id `999`.
 - The web: a reply only adds the items the list does not have yet (`addMissing`), and the server publishes an item
   before it answers, so a reply that arrives after the queue moved on does not undo a `/ws` message (found by the look
-  of Task 9). `main.tsx` starts the downloads' sync again (`startDownloadsSync()`), as before E1. Rolldown's
-  `INEFFECTIVE_DYNAMIC_IMPORT` warning (`src/app/router.tsx` imported lazily by `downloads.ts`, statically by
-  `main.tsx`, as in the Nitro web) is inherited, left for a later fix.
+  of Task 9). `main.tsx` starts the downloads' sync again, as before E1. Rolldown's `INEFFECTIVE_DYNAMIC_IMPORT`
+  warning (`src/app/router.tsx` imported lazily by `downloads.ts`, statically by `main.tsx`, as in the Nitro web),
+  inherited, is gone with the final review's fixes (below).
+
+Decided (controller, the final review of E6):
+
+- An enqueue accepted while the server is closing writes and publishes its rows; they are not started (the queue no
+  longer starts its loop once closing) and the next start resumes them. Cost if wrong: a user who queues in the last
+  second of a shutdown sees the download start only at the next launch.
+- A cancel that lands just as a transfer completes discards the finished files: the cancel wins, as in the Nitro
+  queue (the loop reads the cancel before it saves the outcome). Cost if wrong: a file that was complete is downloaded
+  again.
+
+Found by the final review of E6, fixed with it:
+
+- A body longer than the file counted as progress: the `.part` was deleted and the retry budget started over, so a
+  server that always oversends downloaded again forever. An oversize no longer counts as progress, and the item fails
+  once the retries are spent (`downloads/transfer.test.ts`: a body longer than the file does not reset the retry
+  budget: a server that always oversends fails the item).
+- The Hub's commit `sha` (`RepoInfo`) was any string, and the queue pins the download to it (a path segment of the
+  resolve URL): it must be 40 lowercase hex digits (`HF_COMMIT_RE` of `@llama-webui/shared`, also the rule of the
+  request's `revision`), else the answer is an invalid response (`hf/HfClient.test.ts`: a commit sha that is not 40
+  hex is an invalid response).
+- A whoami that died left its `Deferred` completed with no account and the entry kept, so the token's status read
+  unchecked until the next restart. Any end but a success now forgets the entry (`hf/HfClient.test.ts`: a whoami that
+  dies is not cached: the next status asks again).
+- The web's `load()` replaced the list and the live progress whole: a `/ws` message that arrived while the list was
+  read was undone; and an enqueue (or retry) reply that arrived after the item's `download-deleted` brought it back.
+  The store now records what the messages change while a request is in flight and keeps it over the reply
+  (`app/src/lib/downloads.test.ts`: a message that arrives while the queue is read is kept: the list read before it
+  does not undo it; an enqueue or retry reply that comes after its item was cleared does not bring it back).
+- The removal of the folders left empty (a model deleted, a download canceled) checked that a folder was empty, then
+  removed it recursively: a file a download wrote in between went with it. It is now `rmdir` of `node:fs/promises` (a
+  `nodeBuiltinImport:off` directive), which the system refuses for a folder that is not empty.
+- `enqueue` writes its rows in one transaction (`DownloadsRepo.createAll`: every row or none,
+  `downloads/DownloadsRepo.test.ts`); a cancel whose deletion fails is logged (a warning naming the item's folder,
+  with the cause) instead of ignored.
+- The web's downloads store no longer imports the router lazily (the `INEFFECTIVE_DYNAMIC_IMPORT` warning of the
+  build): `startDownloadsSync({ navigate })` takes the router's navigation from `main.tsx`, which a finished
+  download's Details uses.
 
 ## Measures (`e<N>.json`)
 
