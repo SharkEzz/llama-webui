@@ -108,6 +108,18 @@ const workspace = Effect.gen(function* () {
       return Arr.filter(Str.split(text, '\n'), Str.isNonEmpty);
     }).pipe(Effect.orDie);
   const command = (behaviour: string) => ({ cmd: process.execPath, args: [fake, behaviour, dir] });
+  /** The real sampler, its pid recorded as the fake's (`exec` keeps it). */
+  const realWorker = {
+    cmd: '/bin/sh',
+    args: [
+      '-c',
+      'echo $$ >> "$1/pids"; exec "$2" --disable-warning=ExperimentalWarning "$3"',
+      'sh',
+      dir,
+      process.execPath,
+      workerPath(import.meta.url),
+    ],
+  };
   const pids = lines('pids').pipe(Effect.map(Arr.map(Number)));
   const received = lines('received');
   /** Every sampler the test started is gone. */
@@ -116,7 +128,7 @@ const workspace = Effect.gen(function* () {
     const alive = yield* Effect.filter(all, isAlive);
     assert.deepStrictEqual(alive, []);
   });
-  return { dir, command, pids, received, assertAllDead };
+  return { dir, command, realWorker, pids, received, assertAllDead };
 });
 
 type Workspace = Effect.Success<typeof workspace>;
@@ -328,30 +340,83 @@ layer(NodeServices.layer, { excludeTestServices: true })('the NVML reader', (it)
   );
 
   it.effect('a real worker with a missing NVML library resolves null (the nvidia-smi fallback)', () =>
-    Effect.gen(function* () {
-      const [elapsed, found] = yield* startNvml({
-        intervalMs: 1000,
-        needs: MEASURE_ALL,
-        lib: Option.some('/no/such/libnvidia-ml.so'),
-      }).pipe(Effect.timed, Effect.scoped);
-      assert.isTrue(Option.isNone(found));
-      // The worker's `error` message, not the 3 s ready timeout.
-      assert.isBelow(Duration.toMillis(elapsed), 2000);
-    }),
+    withFakes((ws) =>
+      Effect.gen(function* () {
+        const [elapsed, found] = yield* startNvml({
+          intervalMs: 1000,
+          needs: MEASURE_ALL,
+          lib: Option.some('/no/such/libnvidia-ml.so'),
+          command: ws.realWorker,
+        }).pipe(Effect.timed);
+        assert.isTrue(Option.isNone(found));
+        // The worker's `error` message, not the 3 s ready timeout.
+        assert.isBelow(Duration.toMillis(elapsed), 2000);
+        const pids = yield* ws.pids;
+        assert.strictEqual(pids.length, 1);
+      }),
+    ),
   );
 
   it.effect.skipIf(!nvmlHere)('a real worker reads NVML when the library is here', () =>
-    Effect.gen(function* () {
-      const found = yield* startNvml({ intervalMs: 200, needs: MEASURE_ALL, lib: Option.none() });
-      const nvml = Option.getOrThrow(found);
-      const gpus = yield* eventually(nvml.gpus, (g) => g.length > 0);
-      for (const g of gpus) {
-        assert.match(g.key, /^nvidia:GPU-/);
-        assert.match(g.busId, /^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f]$/);
-      }
-      const system = yield* nvml.system;
-      assert.isTrue(Predicate.isString(system?.driver));
-    }).pipe(Effect.scoped),
+    withFakes((ws) =>
+      Effect.gen(function* () {
+        const found = yield* startNvml({
+          intervalMs: 200,
+          needs: MEASURE_ALL,
+          lib: Option.none(),
+          command: ws.realWorker,
+        });
+        const nvml = Option.getOrThrow(found);
+        const gpus = yield* eventually(nvml.gpus, (g) => g.length > 0);
+        for (const g of gpus) {
+          assert.match(g.key, /^nvidia:GPU-/);
+          assert.match(g.busId, /^[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f]$/);
+        }
+        const system = yield* nvml.system;
+        assert.isTrue(Predicate.isString(system?.driver));
+      }),
+    ),
+  );
+
+  it.effect('a sampler that writes a line that is not a message before ready gives none at once', () =>
+    withFakes((ws) =>
+      Effect.gen(function* () {
+        const [elapsed, found] = yield* startNvml({
+          intervalMs: 1000,
+          needs: MEASURE_ALL,
+          lib: Option.none(),
+          command: ws.command('garbage-before-ready'),
+        }).pipe(Effect.timed);
+        assert.isTrue(Option.isNone(found));
+        // Not the 3 s ready timeout.
+        assert.isBelow(Duration.toMillis(elapsed), 2000);
+      }),
+    ),
+  );
+
+  it.effect('a sampler that writes a line that is not a message is dead for good, and killed', () =>
+    withFakes((ws) =>
+      Effect.gen(function* () {
+        const found = yield* startNvml({
+          // Fresh for a minute: only the death clears the readings.
+          intervalMs: 60_000,
+          needs: MEASURE_ALL,
+          lib: Option.none(),
+          command: ws.command('garbage-after-ready'),
+        });
+        const nvml = Option.getOrThrow(found);
+        yield* eventually(nvml.gpus, (g) => g.length === 1);
+        yield* eventually(nvml.gpus, (g) => g.length === 0);
+        // Killed while the reader's scope is still open: the fake stays up on its own.
+        const pids = yield* ws.pids;
+        const alive = yield* eventually(isAlive(pids[0] ?? 0), (a) => !a);
+        assert.isFalse(alive);
+        // A configure after the death reaches nothing and changes nothing.
+        yield* nvml.configure({ intervalMs: 1000, needs: MEASURE_ALL });
+        const gpus = yield* nvml.gpus;
+        assert.deepStrictEqual(gpus, []);
+      }),
+    ),
   );
 
   it.effect('a sampler stuck in a native call does not hold the process when it exits', () =>

@@ -133,7 +133,13 @@ test('the NVML sampler ships next to the server entry and starts from the bundle
   });
   try {
     const lines = createInterface({ input: child.stdout });
-    const first = new Promise<string>((resolve) => lines.once('line', resolve));
+    const first = new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('the bundled NVML sampler wrote no line within 5 s')), 5000);
+      lines.once('line', (line) => {
+        clearTimeout(timer);
+        resolve(line);
+      });
+    });
     const start = { type: 'start', intervalMs: 1000, needs: { gpus: true, pcie: true, skipGpus: [] } };
     child.stdin.write(`${JSON.stringify({ ...start, lib: '/no/such/libnvidia-ml.so' })}\n`);
     expect(JSON.parse(await first)).toMatchObject({ type: 'error', message: expect.stringContaining('/no/such/') });

@@ -1,7 +1,7 @@
 import type { GpuReading } from '@llama-webui/shared';
 import {
   Array as Arr,
-  type Cause,
+  Cause,
   Clock,
   Deferred,
   type Duration,
@@ -185,24 +185,44 @@ export const startNvml = Effect.fn('startNvml')(function* (options: {
   });
   /** true on `ready`, false on an `error` or an exit before it. */
   const ready = yield* Deferred.make<boolean>();
-  const die = Ref.update(state, onDeath).pipe(Effect.andThen(Deferred.succeed(ready, false)));
+  /** Dead for good: no reading, and no command any more (the end of the queue ends its stdin). */
+  const die = Ref.update(state, onDeath).pipe(
+    Effect.andThen(Queue.end(outbox)),
+    Effect.andThen(Deferred.succeed(ready, false)),
+  );
+  /** Dead, and killed at once, from a fiber of the caller's scope: the reader that calls it is in the sampler's. */
+  const abandon = die.pipe(
+    Effect.andThen(handle.kill({ killSignal: 'SIGKILL' }).pipe(Effect.ignore, Effect.forkIn(scope))),
+    Effect.asVoid,
+  );
 
   const onMessage = (message: FromSampler) =>
     Effect.gen(function* () {
       if (message.type === 'ready') return yield* Deferred.succeed(ready, true);
-      if (message.type === 'error') {
-        yield* die;
-        // Gone for good: the end of its stdin would end it, the kill does it at once.
-        return yield* handle.kill({ killSignal: 'SIGKILL' }).pipe(Effect.ignore, Effect.forkIn(scope));
-      }
+      // Gone for good: the end of its stdin would end it, the kill does it at once.
+      if (message.type === 'error') return yield* abandon;
       const now = yield* Clock.currentTimeMillis;
       return yield* Ref.update(state, onSample(message.snapshot, now));
     });
 
+  /*
+   * The reader. Its stdout ended, or a line is not a message (a stray print, a native library writing to fd 1): the
+   * sampler is abandoned, since nothing reads its stdout any more and it would freeze on a full pipe. Only the close of
+   * its scope (an interruption) ends the reader quietly.
+   */
   const drained = yield* Deferred.make<void>();
   yield* handle.stdout.pipe(
     Stream.pipeThroughChannel(Ndjson.decodeSchema(FromSampler)({ ignoreEmptyLines: true })),
     Stream.runForEach(onMessage),
+    Effect.onExit((exit) =>
+      Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)
+        ? Effect.void
+        : Effect.gen(function* () {
+            if (Exit.isFailure(exit))
+              yield* Effect.logWarning('the NVML sampler wrote what is not a message: it is stopped', exit.cause);
+            yield* abandon;
+          }),
+    ),
     Effect.ignore,
     Effect.ensuring(Deferred.succeed(drained, undefined)),
     Effect.forkIn(own),

@@ -6,6 +6,9 @@
 // - `error`: answers `start` with an `error`; exits 0 once its stdin ends.
 // - `silent`: never answers, and stays up once its stdin ends: only a kill ends it.
 // - `exit-after-ready`: answers `ready`, sends one sample, then exits 0 after 300 ms.
+// - `garbage-before-ready`: answers `start` with a line that is not a message, then stays up: only a kill ends it.
+// - `garbage-after-ready`: answers `ready` and one sample, then a line that is not a message, then samples every
+//   `intervalMs` and stays up: only a kill ends it.
 // - `busy`: answers `ready`, then spins in a busy loop, as a sampler stuck in a native call: only SIGKILL ends it.
 import { appendFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -61,6 +64,16 @@ lines.on('line', (line) => {
     send({ type: 'sample', snapshot: SNAPSHOT });
     setTimeout(() => process.exit(0), 300);
   }
+  if (behaviour === 'garbage-before-ready') {
+    setInterval(() => {}, 60_000);
+    process.stdout.write('not a message\n');
+  }
+  if (behaviour === 'garbage-after-ready') {
+    setInterval(() => send({ type: 'sample', snapshot: SNAPSHOT }), command.intervalMs);
+    send({ type: 'ready' });
+    send({ type: 'sample', snapshot: SNAPSHOT });
+    setTimeout(() => process.stdout.write('Stray output of a native library\n'), 300);
+  }
   if (behaviour === 'busy') {
     // A handler as the real sampler's runtime installs: blocked in the loop, it never runs, and SIGTERM ends nothing.
     process.on('SIGTERM', () => process.exit(0));
@@ -72,5 +85,5 @@ lines.on('line', (line) => {
   }
 });
 lines.on('close', () => {
-  if (behaviour !== 'silent' && behaviour !== 'exit-after-ready' && behaviour !== 'busy') process.exit(0);
+  if (['ready-then-sample', 'sample-once', 'error'].includes(behaviour)) process.exit(0);
 });
