@@ -1,5 +1,5 @@
 import { DownloadFile, type DownloadItem, DownloadStatus, ModelKind } from '@llama-webui/shared';
-import { Array as Arr, Clock, Context, Effect, Layer, Option, Schema } from 'effect';
+import { Array as Arr, Clock, Context, Effect, Layer, Option, Order, Schema } from 'effect';
 import { SqlClient, SqlSchema } from 'effect/sql';
 import type { NewDownload } from '../hf/repo.ts';
 
@@ -59,6 +59,8 @@ export class DownloadsRepo extends Context.Service<
   {
     /** A new `queued` item of `input`, none of its files done. */
     readonly create: (input: NewDownload) => Effect.Effect<DownloadItem>;
+    /** `create` of each of `inputs`, in one transaction: every row is written, or none. */
+    readonly createAll: (inputs: ReadonlyArray<NewDownload>) => Effect.Effect<ReadonlyArray<DownloadItem>>;
     readonly get: (id: number) => Effect.Effect<Option.Option<DownloadItem>>;
     /** Every item, oldest first. */
     readonly list: Effect.Effect<ReadonlyArray<DownloadItem>>;
@@ -154,6 +156,14 @@ export class DownloadsRepo extends Context.Service<
         Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
       );
 
+      const createAll = Effect.fn('DownloadsRepo.createAll')(
+        function* (inputs: ReadonlyArray<NewDownload>) {
+          return yield* Effect.forEach(inputs, create);
+        },
+        sql.withTransaction,
+        Effect.catchTags({ SqlError: Effect.die }),
+      );
+
       const get = Effect.fn('DownloadsRepo.get')(
         function* (id: number) {
           const row = yield* findById(id);
@@ -229,14 +239,26 @@ export class DownloadsRepo extends Context.Service<
         Effect.map((rows) =>
           Arr.sort(
             Arr.map(rows, (row) => row.id),
-            (a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0),
+            Order.Number,
           ),
         ),
         Effect.orDie,
         Effect.withSpan('DownloadsRepo.clearFinished'),
       );
 
-      return DownloadsRepo.of({ create, get, list, active, next, setStatus, fileDone, requeue, remove, clearFinished });
+      return DownloadsRepo.of({
+        create,
+        createAll,
+        get,
+        list,
+        active,
+        next,
+        setStatus,
+        fileDone,
+        requeue,
+        remove,
+        clearFinished,
+      });
     }),
   );
 }

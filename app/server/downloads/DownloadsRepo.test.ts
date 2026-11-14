@@ -1,5 +1,5 @@
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, Effect, Layer, Option, String as Str } from 'effect';
+import { Array as Arr, Effect, Exit, Layer, Option, String as Str } from 'effect';
 import { SqlClient } from 'effect/sql';
 import { TestClock } from 'effect/testing';
 import * as Db from '../db/Db.ts';
@@ -73,6 +73,27 @@ describe('DownloadsRepo', () => {
           ],
         );
         assert.isTrue(a.id < b.id);
+      }),
+    ),
+  );
+
+  it.effect('createAll writes every row in one transaction: one that cannot be written leaves none', () =>
+    fresh(
+      Effect.gen(function* () {
+        const repo = yield* DownloadsRepo;
+        const made = yield* repo.createAll([input('a.gguf'), input('b.gguf')]);
+        assert.deepStrictEqual(
+          Arr.map(made, (item) => item.key),
+          ['a.gguf', 'b.gguf'],
+        );
+        // The second row's files do not encode (a size that is not an integer): the first is rolled back with it.
+        const exit = yield* Effect.exit(repo.createAll([input('c.gguf'), input('d.gguf', ['d.gguf'], 1.5)]));
+        assert.isTrue(Exit.hasDies(exit));
+        const list = yield* repo.list;
+        assert.deepStrictEqual(
+          Arr.map(list, (item) => item.key),
+          ['a.gguf', 'b.gguf'],
+        );
       }),
     ),
   );

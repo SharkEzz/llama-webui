@@ -1,3 +1,5 @@
+// @effect-diagnostics-next-line nodeBuiltinImport:off FileSystem of effect has no rmdir: an empty folder goes in one step
+import { rmdir } from 'node:fs/promises';
 import {
   activeProfileId,
   type ModelDeleted,
@@ -120,23 +122,18 @@ const foldersUnder = (paths: Path.Path, root: string, files: ReadonlyArray<strin
 /**
  * Removes the folders between each of `files` (gone by now) and `root` that are left empty, deepest first: shard
  * subfolders, a repository's, its organization's. A folder that still holds something (or can no longer be read) is
- * kept; `root` (the models folder) never goes.
+ * kept; `root` (the models folder) never goes. The removal is `rmdir`, which the system refuses for a folder that is
+ * not empty: one a download fills in the meantime is kept, with what it holds (a check then a recursive removal could
+ * delete a file written in between).
  */
 export const removeEmptyFolders = Effect.fn('models.removeEmptyFolders')(function* (
   root: string,
   files: ReadonlyArray<string>,
 ) {
-  const fs = yield* FileSystem.FileSystem;
   const paths = yield* Path.Path;
   yield* Effect.forEach(
     foldersUnder(paths, root, files),
-    (dir) =>
-      fs.readDirectory(dir).pipe(
-        Effect.flatMap((names) =>
-          Arr.isReadonlyArrayEmpty(names) ? fs.remove(dir, { recursive: true }) : Effect.void,
-        ),
-        Effect.ignore,
-      ),
+    (dir) => Effect.promise(() => rmdir(dir).catch(() => undefined)),
     { discard: true },
   );
 });

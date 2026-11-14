@@ -35,7 +35,14 @@ import { Shutdown } from '../runtime/Shutdown.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { DownloadsRepo } from './DownloadsRepo.ts';
 import { freeBytesOf } from './freeSpace.ts';
-import { type Transfer, type TransferFailed, type TransferProgress, transferWith } from './transfer.ts';
+import {
+  RETRY_DELAYS,
+  STALL,
+  type Transfer,
+  type TransferFailed,
+  type TransferProgress,
+  transferWith,
+} from './transfer.ts';
 
 const MiB = 1024 * 1024;
 const GiB = 1024 * MiB;
@@ -87,10 +94,6 @@ const outcomeOf = (exit: Exit.Exit<void, TransferFailed>): Outcome => {
 /** The size of the files done. */
 const doneBytes = (files: ReadonlyArray<DownloadFile>) =>
   Arr.reduce(files, 0, (sum, file) => (file.done ? sum + file.size : sum));
-
-/** The pauses between the attempts at a file, and the time without data after which an attempt starts again. */
-const RETRY_DELAYS: ReadonlyArray<Duration.Input> = ['2 seconds', '4 seconds', '8 seconds', '16 seconds', '30 seconds'];
-const STALL: Duration.Input = '60 seconds';
 
 const alreadyQueued = (name: string) => AlreadyQueued.make({ message: `${name} is already in the download queue` });
 
@@ -357,7 +360,16 @@ export class Downloads extends Context.Service<
               // Canceled, even when the transfer ended first: the cancel came before this look.
               const wasCanceled = yield* Deferred.isDone(canceled);
               const saved = yield* wasCanceled
-                ? discard(item).pipe(Effect.ignore, Effect.andThen(repo.setStatus(id, 'canceled')))
+                ? discard(item).pipe(
+                    // Canceled all the same; what is left on disk is named in the log.
+                    Effect.catch((error) =>
+                      Effect.logWarning(
+                        `[llama-webui] download ${item.repo}/${item.key} canceled, but what it wrote in ${item.dir} could not all be deleted:`,
+                        error,
+                      ),
+                    ),
+                    Effect.andThen(repo.setStatus(id, 'canceled')),
+                  )
                 : outcome._tag === 'error'
                   ? failed(item, outcome)
                   : repo.setStatus(id, 'done');
@@ -424,10 +436,11 @@ export class Downloads extends Context.Service<
               const [first] = todo;
               if (first === undefined) return [];
               yield* checkSpace(first.dir, need);
-              // The rows, their messages and the loop's start in one step: a cancel or a list sees all or none.
+              // The rows (one transaction), their messages and the loop's start in one step: a cancel or a list
+              // sees all or none.
               return yield* SynchronizedRef.modifyEffect(state, (s) =>
                 Effect.gen(function* () {
-                  const items = yield* Effect.forEach(todo, (input) => repo.create(input));
+                  const items = yield* repo.createAll(todo);
                   yield* Effect.forEach(items, published, { discard: true });
                   return [items, yield* kicked(s)] as const;
                 }),

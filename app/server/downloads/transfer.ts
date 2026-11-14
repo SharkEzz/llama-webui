@@ -1,4 +1,4 @@
-import type { DownloadFile, DownloadItem, DownloadLive } from '@llama-webui/shared';
+import type { DownloadFile, DownloadItem, DownloadLive, HfRateLimited } from '@llama-webui/shared';
 import {
   Array as Arr,
   Clock,
@@ -25,6 +25,16 @@ import { DownloadsRepo } from './DownloadsRepo.ts';
 import { type Sha256, sha256 } from './hash.ts';
 
 const MiB = 1024 * 1024;
+
+/** The pauses between the attempts at a file (after a transient failure), and the time without data after which an attempt starts again. */
+export const RETRY_DELAYS: ReadonlyArray<Duration.Input> = [
+  '2 seconds',
+  '4 seconds',
+  '8 seconds',
+  '16 seconds',
+  '30 seconds',
+];
+export const STALL: Duration.Input = '60 seconds';
 
 /** How many redirects an attempt follows (the Hub's `resolve` answers one, to the CDN): the next one fails it. */
 const MAX_REDIRECTS = 6;
@@ -90,8 +100,8 @@ const writeFailure = (error: PlatformError.PlatformError): TransferFailed | Retr
 
 const unreachable = (reason: string): Retryable => Retryable.make({ message: `Hugging Face unreachable: ${reason}` });
 
-/** The Hub's refusal of a download, with the code the item is saved with. */
-const refused = (error: HubError): TransferFailed => {
+/** The Hub's refusal of a download, with the code the item is saved with (a 429 is retried, never refused). */
+const refused = (error: Exclude<HubError, HfRateLimited>): TransferFailed => {
   switch (error._tag) {
     case 'HfGated':
       return TransferFailed.make({ message: error.message, code: 'hf-gated', status: 403 });
@@ -99,8 +109,6 @@ const refused = (error: HubError): TransferFailed => {
       return TransferFailed.make({ message: error.message, code: 'hf-not-found', status: 404 });
     case 'HfUnauthorized':
       return TransferFailed.make({ message: error.message, code: 'hf-unauthorized', status: 401 });
-    case 'HfRateLimited':
-      return TransferFailed.make({ message: error.message, code: 'hf-rate-limited', status: 429 });
     case 'HfUnreachable':
       return TransferFailed.make({ message: error.message, code: 'hf-unreachable', status: 502 });
   }
@@ -216,7 +224,8 @@ export const transferWith = (options: {
               return yield* Retryable.make({ message: `${file.path}: range not satisfiable` });
             }
             const error = hubError(response, { repo: item.repo, hasToken: token !== null });
-            if (response.status === 408 || response.status === 429 || response.status >= 500) {
+            // A 429 is the Hub's `HfRateLimited`.
+            if (error._tag === 'HfRateLimited' || response.status === 408 || response.status >= 500) {
               return yield* Retryable.make({ message: error.message });
             }
             return yield* refused(error);
@@ -295,8 +304,12 @@ export const transferWith = (options: {
           const got = yield* sizeAt(part);
           const size = Option.getOrElse(got, () => 0);
           if (size !== file.size) {
-            // Short (the body ended early): kept and resumed. Too long: it cannot be this file.
-            if (size > file.size) yield* remove(part);
+            // Short (the body ended early): kept and resumed. Too long: it cannot be this file, and what it sent is no
+            // progress (a server that always sends too much would reset the budget forever).
+            if (size > file.size) {
+              yield* remove(part);
+              yield* Ref.set(progressed, false);
+            }
             return yield* Retryable.make({ message: `${file.path}: got ${size} of ${file.size} bytes` });
           }
           yield* Ref.set(kept, Option.none());
@@ -363,10 +376,4 @@ export const transferWith = (options: {
 export const transferItem: {
   (report: (progress: TransferProgress) => Effect.Effect<void>): (item: DownloadItem) => ReturnType<Transfer>;
   (item: DownloadItem, report: (progress: TransferProgress) => Effect.Effect<void>): ReturnType<Transfer>;
-} = dual(
-  2,
-  transferWith({
-    retryDelays: ['2 seconds', '4 seconds', '8 seconds', '16 seconds', '30 seconds'],
-    stall: '60 seconds',
-  }),
-);
+} = dual(2, transferWith({ retryDelays: RETRY_DELAYS, stall: STALL }));

@@ -582,6 +582,10 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('transfer', (it) 
         assert.strictEqual(item.status, 'done');
         yield* expectPlaced('m.gguf', body);
         yield* expectEqual(Effect.map(requestsOf('resolve'), Arr.length), 6);
+        // The relative redirects stay on the endpoint's origin: each hop carries the token.
+        for (const request of yield* requestsOf('resolve')) {
+          assert.strictEqual(request.headers.authorization, 'Bearer hf_secret');
+        }
         const fs = yield* FileSystem.FileSystem;
         yield* destOf('m.gguf').pipe(
           Effect.flatMap((dest) => fs.remove(dest)),
@@ -785,6 +789,30 @@ layer(Base, { buildPerTest: true })('transfer on the TestClock', (it) => {
       }),
       { appTiming: true },
     ),
+  );
+
+  it.effect(
+    'a body longer than the file does not reset the retry budget: a server that always oversends fails the item',
+    () =>
+      withQueue(
+        Effect.gen(function* () {
+          const { input: m } = yield* single(1000);
+          yield* failOn('cdn', { status: 200, body: data(2000, 4) }, 6);
+          const item = yield* enqueue(m);
+          let n = 0;
+          for (const ms of [2000, 4000, 8000, 16000, 30000]) {
+            n++;
+            yield* pause(n, ms);
+          }
+          yield* eventuallyLive(isFinished(item.id));
+          const failed = yield* itemOf(item.id);
+          assert.strictEqual(failed.status, 'error');
+          assert.strictEqual(failed.code, 'hf-unreachable');
+          assert.strictEqual(failed.error, 'm.gguf: got 2000 of 1000 bytes');
+          yield* expectEqual(Effect.map(requestsOf('cdn'), Arr.length), 6);
+        }),
+        { appTiming: true },
+      ),
   );
 
   it.effect('no data for 60 s is retried as no data for 60 s', () =>
