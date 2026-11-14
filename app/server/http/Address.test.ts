@@ -4,7 +4,8 @@ import { Effect } from 'effect';
 import { AppConfig } from '../config/AppConfig.ts';
 import { AddressInUse, assertFree } from './Address.ts';
 
-const config = (port: number) => AppConfig.of({ host: '127.0.0.1', port, dataDir: '/nonexistent', dev: false });
+const config = (port: number) =>
+  AppConfig.of({ host: '127.0.0.1', port, dataDir: '/nonexistent', dev: false, devToolsUrl: '' });
 
 it.effect('a taken port fails with a message that names the address', () =>
   Effect.gen(function* () {

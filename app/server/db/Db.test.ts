@@ -155,7 +155,7 @@ layer(NodeServices.layer)('Db', (it) => {
       const root = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-db-' });
       // A data directory that does not exist yet: opening creates it.
       const dataDir = path.join(root, 'a', 'llama-webui');
-      const config = Layer.succeed(AppConfig, { host: '127.0.0.1', port: 1, dataDir, dev: false });
+      const config = Layer.succeed(AppConfig, { host: '127.0.0.1', port: 1, dataDir, dev: false, devToolsUrl: '' });
       yield* using(Db.layer.pipe(Layer.provide(config)), () => Effect.void);
       const version = yield* withRaw(
         path.join(dataDir, 'llama-webui.sqlite'),

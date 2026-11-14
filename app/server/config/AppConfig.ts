@@ -22,6 +22,8 @@ export class AppConfig extends Context.Service<
     readonly dataDir: string;
     /** `LLAMA_WEBUI_DEV=1`: the server runs from source under `pnpm dev`. */
     readonly dev: boolean;
+    /** Where the Effect DevTools listen, in dev only: `LLAMA_WEBUI_DEVTOOLS_URL`, else `ws://localhost:34437`. */
+    readonly devToolsUrl: string;
   }
 >()('@llama-webui/app/server/config/AppConfig') {
   /** A flag wins over its variable, a variable over the default (an empty variable counts as unset). */
@@ -43,6 +45,7 @@ export class AppConfig extends Context.Service<
             ),
           ),
           dev: Config.Boolean('LLAMA_WEBUI_DEV').pipe(Config.withDefault(false)),
+          devToolsUrl: Config.String('LLAMA_WEBUI_DEVTOOLS_URL').pipe(Config.withDefault('ws://localhost:34437')),
         });
       }),
     ).pipe(Layer.provide(Path.layer));
