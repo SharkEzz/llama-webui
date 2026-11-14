@@ -248,7 +248,6 @@ export class Downloads extends Context.Service<
           }
           // Up to the models folder, `<models>/<org>/<name>` being the item's.
           yield* removeEmptyFolders(path.dirname(path.dirname(item.dir)), dests).pipe(
-            Effect.provideService(FileSystem.FileSystem, fs),
             Effect.provideService(Path.Path, path),
           );
         });
@@ -364,7 +363,8 @@ export class Downloads extends Context.Service<
                     // Canceled all the same; what is left on disk is named in the log.
                     Effect.catch((error) =>
                       Effect.logWarning(
-                        `[llama-webui] download ${item.repo}/${item.key} canceled, but what it wrote in ${item.dir} could not all be deleted:`,
+                        `[llama-webui] download ${item.repo}/${item.key} canceled, ` +
+                          `but what it wrote in ${item.dir} could not all be deleted:`,
                         error,
                       ),
                     ),

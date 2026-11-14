@@ -26,7 +26,10 @@ import { type Sha256, sha256 } from './hash.ts';
 
 const MiB = 1024 * 1024;
 
-/** The pauses between the attempts at a file (after a transient failure), and the time without data after which an attempt starts again. */
+/**
+ * The pauses between the attempts at a file (after a transient failure), and the time without data after which an
+ * attempt starts again.
+ */
 export const RETRY_DELAYS: ReadonlyArray<Duration.Input> = [
   '2 seconds',
   '4 seconds',

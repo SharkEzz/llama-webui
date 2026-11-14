@@ -58,8 +58,8 @@ trigger, at least as wide as it), and `GlassCard` puts the glass look on the sha
 ```tsx title="app/src/main.tsx"
 startThemeSync();
 startServerSync();
-startMonitorSync();
 startLogsSync();
+startMonitorSync();
 startTopologySync();
 startDownloadsSync({ navigate: (to) => void router.navigate(to) });
 useWs.getState().connect();
