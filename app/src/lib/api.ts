@@ -1,5 +1,5 @@
 import { Api, requestInvalid } from '@llama-webui/shared';
-import { Cause, Effect, Exit, ManagedRuntime, Schema, Stream } from 'effect';
+import { Cause, Effect, Exit, ManagedRuntime, Predicate, Schema, Stream } from 'effect';
 import { FetchHttpClient, type HttpClient, HttpClientError } from 'effect/http';
 import { type HttpApi, HttpApiClient, type HttpApiGroup } from 'effect/http-api';
 
@@ -11,6 +11,29 @@ export class ApiUnreachable extends Error {
     this.name = 'ApiUnreachable';
   }
 }
+
+/** A reply the page cannot read: an event of a stream that does not decode. The cause is logged. */
+export class ApiReplyInvalid extends Error {
+  readonly _tag = 'ApiReplyInvalid';
+  constructor(options?: { cause?: unknown }) {
+    super('llama-webui server sent a reply the page cannot read', options);
+    this.name = 'ApiReplyInvalid';
+  }
+}
+
+/**
+ * What a stream's failure means to a page: a broken body (the server went away, the connection was cut) is
+ * `ApiUnreachable`; an event that does not decode (its schema, the SSE framing, a retry directive) is
+ * `ApiReplyInvalid`, logged, since reading it again would fail again; the endpoint's own stream errors stay as they are.
+ */
+const streamFailure = <E>(e: E) => {
+  if (HttpClientError.isHttpClientError(e)) return new ApiUnreachable({ cause: e });
+  if (Schema.isSchemaError(e) || Predicate.isTagged(e, 'SseError') || Predicate.isTagged(e, 'Retry')) {
+    console.error('llama-webui: an event of the reply does not decode', e);
+    return new ApiReplyInvalid({ cause: e });
+  }
+  return e;
+};
 
 /** The one runtime of the web's calls: Effect's HTTP client on `fetch`. */
 const runtime = ManagedRuntime.make(FetchHttpClient.layer);
@@ -70,8 +93,9 @@ export function makeCall<Id extends string, Groups extends HttpApiGroup.Constrai
 
 /**
  * One call of an endpoint that answers a stream (server-sent events): `onEvent` gets each event in order, and the
- * promise resolves when the stream ends. It rejects as `call` does, and with `ApiUnreachable` when the stream breaks
- * off (the server went away, the body was cut). An abort of `signal` ends it without an error, the request aborted.
+ * promise resolves when the stream ends. It rejects as `call` does, then as `streamFailure` says: `ApiUnreachable` when
+ * the stream breaks off, `ApiReplyInvalid` when an event does not decode. An abort of `signal` (before the response or
+ * during the stream) ends it without an error, the request aborted.
  */
 export function makeCallStream<Id extends string, Groups extends HttpApiGroup.Constraint>(
   api: HttpApi.HttpApi<Id, Groups>,
@@ -85,7 +109,7 @@ export function makeCallStream<Id extends string, Groups extends HttpApiGroup.Co
     const follow = Effect.flatMap(request(api, f), (stream) =>
       stream.pipe(
         Stream.runForEach((a) => Effect.sync(() => onEvent(a))),
-        Effect.mapError((e) => new ApiUnreachable({ cause: e })),
+        Effect.mapError(streamFailure),
       ),
     );
     const exit = await run(follow, fetchImpl, options?.signal);

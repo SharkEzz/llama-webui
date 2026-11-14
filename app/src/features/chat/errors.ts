@@ -1,20 +1,11 @@
-import { describeIssue, RequestInvalid, type Sampling } from '@llama-webui/shared';
+import { describeIssue, RequestInvalid } from '@llama-webui/shared';
 import { errorTag } from '@/lib/api';
+import { SAMPLING_FIELDS } from './fields';
 
-const FIELDS = [
-  'temperature',
-  'top_p',
-  'top_k',
-  'min_p',
-  'presence_penalty',
-  'repeat_penalty',
-  'max_tokens',
-  'seed',
-  'systemPrompt',
-] as const satisfies ReadonlyArray<keyof Sampling | 'systemPrompt'>;
+/** A field of the conversation settings that shows an error: a sampling field of the panel, or the system prompt. */
+export type Field = (typeof SAMPLING_FIELDS)[number]['key'] | 'systemPrompt';
 
-/** A field of the conversation settings that shows an error. */
-export type Field = (typeof FIELDS)[number];
+const FIELDS: ReadonlyArray<Field> = [...SAMPLING_FIELDS.map((f) => f.key), 'systemPrompt'];
 
 export type FieldErrors = Partial<Record<Field, string>>;
 

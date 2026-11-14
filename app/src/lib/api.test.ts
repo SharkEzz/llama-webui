@@ -194,3 +194,32 @@ test('an abort ends callStream() without an error and aborts its request', async
   await expect(pending).resolves.toBeUndefined();
   expect(seen[0]?.init?.signal?.aborted).toBe(true);
 });
+
+test('an event that does not decode rejects callStream() as an invalid reply, not as an unreachable server', async () => {
+  const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const { callStream } = stub(sse(body([item(1), 'event: item\ndata: {"id":"two"}\n\n', item(3)])));
+  const seen: unknown[] = [];
+  const error = await callStream(
+    (api) => api.t.events({ params: { id: 7 } }),
+    (e) => seen.push(e.data),
+  ).catch((e: unknown) => e);
+  expect(errorTag(error)).toBe('ApiReplyInvalid');
+  expect(seen).toEqual([{ id: 1, name: 'n1' }]);
+  expect(logged).toHaveBeenCalledTimes(1);
+  logged.mockRestore();
+});
+
+test('an abort before the response headers ends callStream() without an error and aborts its request', async () => {
+  const { callStream, seen } = stub(
+    ({ init }) =>
+      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))),
+  );
+  const controller = new AbortController();
+  const onEvent = vi.fn();
+  const pending = callStream((api) => api.t.events({ params: { id: 7 } }), onEvent, { signal: controller.signal });
+  await vi.waitFor(() => expect(seen).toHaveLength(1));
+  controller.abort();
+  await expect(pending).resolves.toBeUndefined();
+  expect(seen[0]?.init?.signal?.aborted).toBe(true);
+  expect(onEvent).not.toHaveBeenCalled();
+});
