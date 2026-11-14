@@ -1,7 +1,8 @@
 {
   // Runs in Node and in the browser bundle. Node types for its tests and for the globals both have (URL…); no DOM, so
-  // a browser-only API fails here. Node runs the sources as they are (type stripping): erasable syntax only.
-  "extends": "../../tsconfig.base.json",
+  // a browser-only API fails here. Node runs the sources as they are (type stripping): erasable syntax only. The
+  // Effect diagnostics come from the root `tsconfig.effect.json` (its overrides keep the pure logic plain TypeScript).
+  "extends": "../../tsconfig.effect.json",
   "compilerOptions": { "types": ["node"], "erasableSyntaxOnly": true },
   "include": ["src"]
 }

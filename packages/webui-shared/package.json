@@ -10,6 +10,7 @@
     "typecheck": "tsc"
   },
   "dependencies": {
+    "effect": "catalog:",
     "llamacpp-js": "workspace:*",
     "zod": "catalog:"
   },

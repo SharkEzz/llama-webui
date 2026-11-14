@@ -19,6 +19,8 @@ If you need to learn more about particular Effect apis and concepts that the gui
 
 # llama-webui
 
+> **Sur `poc/effect` :** le serveur est le serveur Effect de `app/server/` (point d'entrée `app/server/main.ts`, build par `app/build/server.ts`). Les sections ci-dessous qui décrivent Nitro, `lib/`, `routes/` et `api.gen.ts` décrivent `app/server-legacy/`, une référence en lecture seule (ni importée, ni lue par Biome, ni éditée) ; là où elles divergent du plan du jalon en cours, le plan l'emporte. Les autres sections sont réécrites à E10.
+
 L'app tourne sur Node (≥ 26.13, un seul processus) ; pnpm installe et lance les scripts. Elle est construite sur **Nitro v3** (h3 v2, srvx, crossws), dans un seul package `app/` : le client React (`app/src/`) et le serveur (`app/server/`, le `serverDir` de Nitro).
 
 - Lancer : `pnpm dev` (`vite dev` dans `app/` : HMR de l'UI, serveur dans le worker de dev de Nitro, réévalué à chaque sauvegarde), `pnpm start` (build puis production) ; un fichier TS se lance par `node <fichier>` (syntaxe effaçable).

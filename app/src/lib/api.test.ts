@@ -1,71 +1,96 @@
-import { expect, test } from 'vitest';
-import { ApiError, makeApi } from './api';
+import { Schema } from 'effect';
+import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { errorTag, makeCall } from './api';
 
-type Reply = { status: number; body?: string; type?: string };
+class TestNotFound extends Schema.TaggedError<TestNotFound>()(
+  'TestNotFound',
+  { message: Schema.String },
+  { httpApiStatus: 404 },
+) {}
 
-/** A client whose fetch answers `reply` and records what it was given. */
-function fake(reply: Reply | Error) {
-  const seen: { url: string; init: RequestInit | undefined }[] = [];
-  const f = (async (url: string, init?: RequestInit) => {
-    seen.push({ url, init });
-    if (reply instanceof Error) throw reply;
-    const headers = reply.type ? { 'content-type': reply.type } : undefined;
-    return new Response(reply.body ?? null, { status: reply.status, headers });
-  }) as typeof fetch;
-  return { api: makeApi(f).api, seen };
+const Item = Schema.Struct({ id: Schema.Int, name: Schema.String });
+
+class TestApi extends HttpApi.make('test').add(
+  HttpApiGroup.make('t').add(
+    HttpApiEndpoint.get('get', '/t/:id', {
+      params: { id: Schema.NumberFromString },
+      query: { q: Schema.optional(Schema.String) },
+      success: Item,
+      error: TestNotFound,
+    }),
+    HttpApiEndpoint.post('create', '/t', { payload: Item, success: Item }),
+  ),
+) {}
+
+// The browser resolves the client's relative URLs against the page; Vitest's node environment has no page.
+beforeEach(() => {
+  vi.stubGlobal('location', new URL('http://llama-webui.test/'));
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+interface Seen {
+  url: string;
+  init: RequestInit | undefined;
 }
-const json = (status: number, body: unknown): Reply => ({
-  status,
-  body: JSON.stringify(body),
-  type: 'application/json',
+
+/** A `fetch` that answers `reply` (or rejects with it) and records what it was given. */
+function stub(reply: (seen: Seen) => Promise<Response>) {
+  const seen: Seen[] = [];
+  const fetchImpl = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const s = { url: String(input), init };
+    seen.push(s);
+    return reply(s);
+  }) as typeof fetch;
+  return { call: makeCall(TestApi, fetchImpl), seen };
+}
+
+const json = (status: number, body: unknown) => () =>
+  Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
+
+test('call() resolves with the decoded reply of the endpoint', async () => {
+  const { call } = stub(json(200, { id: 7, name: 'seven' }));
+  expect(await call((api) => api.t.get({ params: { id: 7 }, query: {} }))).toEqual({ id: 7, name: 'seven' });
 });
 
-test('api() returns the JSON body of a 2xx reply', async () => {
-  const { api, seen } = fake(json(200, { ok: true, version: 'dev', uptimeMs: 5 }));
-  expect(await api('GET /api/health')).toEqual({ ok: true, version: 'dev', uptimeMs: 5 });
-  expect(seen[0]?.url).toBe('/api/health');
+test('call() fills in the path, the query and the JSON payload', async () => {
+  const { call, seen } = stub(json(200, { id: 7, name: 'seven' }));
+  await call((api) => api.t.get({ params: { id: 7 }, query: { q: 'a' } }));
+  await call((api) => api.t.create({ payload: { id: 7, name: 'seven' } }));
+  const [get, post] = seen;
+  expect(new URL(get?.url ?? '').pathname + new URL(get?.url ?? '').search).toBe('/t/7?q=a');
+  expect(get?.init?.method).toBe('GET');
+  expect(new URL(post?.url ?? '').pathname).toBe('/t');
+  expect(post?.init?.method).toBe('POST');
+  expect(new Headers(post?.init?.headers).get('content-type')).toBe('application/json');
+  expect(JSON.parse(new TextDecoder().decode(post?.init?.body as Uint8Array))).toEqual({ id: 7, name: 'seven' });
 });
 
-test('api() gives undefined for an empty 2xx reply (204)', async () => {
-  const { api } = fake({ status: 204 });
-  expect(await api('DELETE /api/profiles/:id', { params: { id: 1 } })).toBeUndefined();
+test('call() rejects with the tagged error of the endpoint', async () => {
+  const { call } = stub(json(404, { _tag: 'TestNotFound', message: 'No item 7' }));
+  const error = await call((api) => api.t.get({ params: { id: 7 }, query: {} })).catch((e: unknown) => e);
+  expect(errorTag(error)).toBe('TestNotFound');
+  expect((error as Error).message).toBe('No item 7');
 });
 
-test('api() throws the ApiError of an error reply, with issues and code', async () => {
-  const issues = [{ path: ['name'], message: 'cannot be empty' }];
-  const bad = fake(json(400, { error: 'Invalid data: cannot be empty (name)', issues }));
-  const e400 = await bad.api('GET /api/health').catch((e: unknown) => e);
-  expect(e400).toBeInstanceOf(ApiError);
-  expect(e400).toMatchObject({ status: 400, message: 'Invalid data: cannot be empty (name)', issues, code: null });
-  const busy = fake(json(409, { error: 'A server is running', code: 'server-running' }));
-  await expect(busy.api('GET /api/health')).rejects.toMatchObject({ status: 409, code: 'server-running' });
+test('call() rejects with ApiUnreachable when fetch rejects', async () => {
+  const { call } = stub(() => Promise.reject(new TypeError('fetch failed')));
+  const error = await call((api) => api.t.get({ params: { id: 7 }, query: {} })).catch((e: unknown) => e);
+  expect(errorTag(error)).toBe('ApiUnreachable');
+  expect((error as Error).message).toBe('llama-webui server unreachable');
 });
 
-test('api() falls back to the status for an error reply that is not JSON', async () => {
-  const { api } = fake({ status: 500, body: 'Internal Server Error', type: 'text/plain' });
-  await expect(api('GET /api/health')).rejects.toMatchObject({ status: 500, message: 'HTTP error 500' });
-});
-
-test('api() maps a fetch that rejects to an unreachable server', async () => {
-  const { api } = fake(new TypeError('fetch failed'));
-  await expect(api('GET /api/health')).rejects.toMatchObject({
-    status: 0,
-    message: 'llama-webui server unreachable',
-  });
-});
-
-test('api() passes the request options (signal) through to fetch', async () => {
-  const { api, seen } = fake(json(200, { ok: true, version: 'dev', uptimeMs: 0 }));
-  const signal = new AbortController().signal;
-  await api('GET /api/health', { signal });
-  expect(seen[0]?.init?.signal).toBe(signal);
-});
-
-test('api() fills in :id, the query and the JSON body', async () => {
-  const { api, seen } = fake(json(200, {}));
-  await api('PUT /api/profiles/:id', { params: { id: 7 }, body: { name: 'x' } });
-  await api('GET /api/hf/repo', { query: { id: 'a/b c', revision: undefined } });
-  expect(seen[0]).toMatchObject({ url: '/api/profiles/7', init: { method: 'PUT', body: '{"name":"x"}' } });
-  expect(seen[0]?.init?.headers).toEqual({ 'content-type': 'application/json' });
-  expect(seen[1]?.url).toBe('/api/hf/repo?id=a%2Fb+c');
+test('call() passes its signal: an abort reaches fetch and rejects the call', async () => {
+  const { call, seen } = stub(
+    ({ init }) =>
+      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))),
+  );
+  const controller = new AbortController();
+  const pending = call((api) => api.t.get({ params: { id: 7 }, query: {} }), { signal: controller.signal });
+  await vi.waitFor(() => expect(seen).toHaveLength(1));
+  controller.abort();
+  await expect(pending).rejects.toBeDefined();
+  expect(seen[0]?.init?.signal?.aborted).toBe(true);
 });

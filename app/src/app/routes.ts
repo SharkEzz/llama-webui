@@ -46,5 +46,18 @@ export function navGroups<R extends { group: string }>(routes: readonly R[]): R[
   return groups;
 }
 
-/** Milestone that will deliver each still-empty page. */
-export const MILESTONE_BY_PATH: Record<string, string> = {};
+/** The milestone of the Effect server rewrite that brings each page back; until then, it shows a waiting page. */
+export const MILESTONE_BY_PATH: Record<string, string> = {
+  '/': 'E3',
+  '/dashboard': 'E4',
+  '/models': 'E6',
+  '/profiles': 'E2',
+  '/server': 'E3',
+  '/chat': 'E5',
+  '/system': 'E4',
+  '/topology': 'E4',
+  '/logs': 'E3',
+  '/bench': 'E7',
+  '/tuning': 'E8',
+  '/settings': 'E1',
+};
