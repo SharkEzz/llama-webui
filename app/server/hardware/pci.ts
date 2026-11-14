@@ -1,6 +1,7 @@
 import type { TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/shared';
 import { Array as Arr, Clock, Effect, FileSystem, HashSet, Option, Order, Path, String as Str } from 'effect';
 import { dual, pipe } from 'effect/Function';
+import { physicalDisks } from '../collectors/disk.ts';
 import { readCpuInfo } from './cpu.ts';
 import { PciIds } from './PciIds.ts';
 
@@ -203,19 +204,6 @@ const pcieLink = (id: string, from: string, to: string, linkPath: string, portPa
       genCur,
       widthCur: sane(widthCur),
     } satisfies TopologyLink;
-  });
-
-/** Whole physical disks: `/sys/block` entries backed by a device, minus loop/ram/zram. */
-const physicalDisks = (blockRoot: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const entries = yield* fs.readDirectory(blockRoot).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
-    const real = Arr.filter(entries, (entry) => !/^(loop|ram|zram)\d/.test(entry));
-    const backed = yield* Effect.filter(real, (entry) =>
-      fs.stat(path.join(blockRoot, entry, 'device')).pipe(Effect.isSuccess),
-    );
-    return Arr.sort(backed, Order.String);
   });
 
 interface BlockDev {
