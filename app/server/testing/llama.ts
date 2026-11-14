@@ -62,6 +62,89 @@ export const httpStub = (
       }),
   ).pipe(Effect.map(({ stub }) => stub));
 
+/** A llama-server whose streamed chat replies the test writes, chunk by chunk. */
+export interface ChatStub extends Stub {
+  /** The bodies of the chat requests received so far, parsed. */
+  readonly bodies: () => ReadonlyArray<unknown>;
+  /** Waits until `n` chat requests have arrived (their headers answered). */
+  readonly requested: (n: number) => Effect.Effect<void>;
+  /** Writes one chunk event, `{"choices":[{"index":0,"delta":…}],…extra}`, to the latest reply. */
+  readonly chunk: (
+    delta: Readonly<Record<string, unknown>>,
+    extra?: Readonly<Record<string, unknown>>,
+  ) => Effect.Effect<void>;
+  /** Writes `text` as it is to the latest reply. */
+  readonly write: (text: string) => Effect.Effect<void>;
+  /** Writes `[DONE]` and ends the latest reply. */
+  readonly done: Effect.Effect<void>;
+  /** Ends the latest reply without `[DONE]`. */
+  readonly end: Effect.Effect<void>;
+  /** Breaks the connection of the latest reply. */
+  readonly cut: Effect.Effect<void>;
+  /** How many replies their client left before they ended (the request aborted). */
+  readonly aborted: () => number;
+}
+
+/**
+ * A llama-server on loopback for the chat, for the life of the scope: `/health` answers `{"status":"ok"}`, each
+ * `POST /v1/chat/completions` gets the headers of an event stream at once, then what the test writes to it.
+ */
+export const chatStub: Effect.Effect<ChatStub, never, Scope.Scope> = Effect.gen(function* () {
+  const bodies: Array<unknown> = [];
+  const replies: Array<ServerResponse> = [];
+  const cut = new Set<ServerResponse>();
+  let aborted = 0;
+  const stub = yield* httpStub((req, res) => {
+    if (req.url === '/health') {
+      res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+      return;
+    }
+    if (req.url !== '/v1/chat/completions' || req.method !== 'POST') {
+      res.writeHead(404).end();
+      return;
+    }
+    const chunks: Array<Buffer> = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      bodies.push(JSON.parse(Buffer.concat(chunks).toString()));
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.flushHeaders();
+      res.on('close', () => {
+        if (!res.writableEnded && !cut.has(res)) aborted++;
+      });
+      replies.push(res);
+    });
+  });
+  const latest = () => {
+    const res = replies.at(-1);
+    if (res === undefined) throw new Error('no chat request yet');
+    return res;
+  };
+  const write = (text: string) =>
+    Effect.sync(() => {
+      latest().write(text);
+    });
+  return {
+    ...stub,
+    bodies: () => bodies,
+    requested: (n) => until(() => replies.length >= n),
+    chunk: (delta, extra = {}) => write(`data: ${JSON.stringify({ choices: [{ index: 0, delta }], ...extra })}\n\n`),
+    write,
+    done: Effect.sync(() => {
+      latest().end('data: [DONE]\n\n');
+    }),
+    end: Effect.sync(() => {
+      latest().end();
+    }),
+    cut: Effect.sync(() => {
+      const res = latest();
+      cut.add(res);
+      res.destroy();
+    }),
+    aborted: () => aborted,
+  };
+});
+
 /** Waits, every 10 ms, until `ok` holds: a test waits on a condition, never on a fixed sleep. */
 export const until = (ok: () => boolean): Effect.Effect<void> =>
   Effect.promise(async () => {
