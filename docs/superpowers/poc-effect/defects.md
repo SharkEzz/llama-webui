@@ -75,9 +75,17 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 - `amd.rocm-gfx` is always `unknown`. `unverified`
 - A plan body without `spec` is never replayed by the contract suite. `unverified`
 
-## Changed by the Effect server on purpose (not defects)
+## Changed by the Effect server (not defects)
 
-Listed where they are recorded, the E1 section of `behaviours.md`: a wrong method on a known `/api` path and `HEAD`
-answer 404 `RouteNotFound` (was 405 with `Allow`, and HEAD as GET); a body that is not a JSON object answers a bare 400
-(was `Invalid JSON` / `JSON object expected`); a trailing slash matches the route (`/api/settings/` was 404); a usage
-error of the command line exits 1 with the help (was 2).
+Recorded in the E1 section of `behaviours.md`.
+
+Decided (the E1 plan, or accepted with its result):
+
+- A wrong method on a known `/api` path and `HEAD` answer 404 `RouteNotFound` (was 405 with `Allow`, and HEAD as GET).
+- A body that is not a JSON object answers a bare 400 (was `Invalid JSON` / `JSON object expected`).
+- A usage error of the command line exits 1 with the help (was 2).
+
+Open, to settle before E2 adds `:id` routes:
+
+- A trailing slash matches the route: `GET /api/settings/` answers as `GET /api/settings` (was 404). It comes from the
+  router of `effect/http`, nobody chose it.
