@@ -19,17 +19,40 @@ Rolldown 1.2.18, Vite, Vitest 5, Biome.
 **Spec:** `docs/superpowers/specs/2026-11-14-effect-server-design.md`. Acceptance list:
 `docs/superpowers/poc-effect/behaviours.md`, section E1 (written by E0).
 
+**Calls made by this plan** (the author's, listed for the user's review; each is recorded in `behaviours.md` by
+Task 11):
+
+- `GET /api/state` returns with E3 (its content is the supervisor's); `/api/health` carries `bootId` meanwhile.
+- One signal handler of our own remains: a second signal forces the exit (`NodeRuntime.runMain` only re-interrupts).
+- Dropped with the Nitro server: the 405 with `Allow`, the 503 while starting, `.env.local` in dev, the route save
+  that kept llama-server. A usage error of the launcher exits 1 (was 2); `--version` is new.
+- Unported web code stays where it is, kept out of the type check by not being reachable (Task 3).
+- `llama-webui.mjs` becomes a one-line launcher of `server/index.mjs`, which holds the CLI.
+- `schema_version` is kept up to date, so the Nitro server still opens a database the Effect server opened.
+
 ## Global Constraints
 
 - Branch `poc/effect`, after E0 (`docs/superpowers/poc-effect/` exists).
 - **Before writing any Effect code, read `repos/effect/LLMS.md` completely**, then the reference files of the task.
   `repos/effect` is the installed version (4.1.4): read it, not `node_modules`, and never edit it.
+- `CLAUDE.md` describes the Nitro server until Task 3 adds its note: where it contradicts this plan about the server,
+  this plan wins. `site/` is not touched in this milestone: the spec syncs the documentation at E10, so the "docs in
+  sync" rule of `CLAUDE.md` does not apply here.
 - Idiomatic Effect only: services are `Context.Service` classes with a `static readonly layer`, methods are
   `Effect.fn('Service.method')` (the name is the span the DevTools show), errors are `Schema.TaggedError` classes,
   resources are scoped (`Effect.acquireRelease`, `Layer`), time comes from `Clock`/`DateTime`, configuration from
-  `Config`. Promise code wrapped in `Effect.promise` does not count as ported.
-- The Effect language service (`tsc` output, `effect(<rule>)`) is the style guide: fix what it reports with its own
-  suggestion. Never lower a rule or add a `@effect-diagnostics` comment except where this plan names it.
+  `Config`, output from `Effect.log*`. Promise code wrapped in `Effect.promise` does not count as ported.
+- **Effect diagnostics are blocking from Task 3 on (user):** `pnpm check` prints no `effect(<rule>)` line, warnings
+  included. Fix what a rule reports with its own suggestion. The only exceptions, all set up by Task 3:
+  - code that drives the build from outside (the override of `app/server/tsconfig.json`);
+  - `// @effect-diagnostics-next-line nodeBuiltinImport:off` where an Effect API takes the Node builtin itself
+    (`createServer` for `NodeHttpServer.layer`) or Effect has no equivalent (`parseEnv`, `isBuiltin`), with the reason
+    on the line;
+  - `// @effect-diagnostics-next-line processEnv:off` at the one place that writes `.env` into `process.env` (Task 4).
+
+  Any other rule that seems wrong for a piece of code: stop and report, do not lower it. Consequences to know before
+  writing: a Schema class takes the brand the rule asks for and is built with `X.make(…)`, not `new X(…)`; a service
+  key is `@llama-webui/app/server/<path>/<Name>`.
 - `app/server-legacy/` (created by Task 3) is a read-only reference, like `repos/`: port its behaviour, not its
   structure. No bridge code between the two servers, in either direction.
 - Server and shared code runs under Node as it is: relative imports end in `.ts`, erasable syntax only (no `enum`, no
@@ -58,6 +81,9 @@ Run on Effect 4.1.4 before this plan was written (throwaway probes, not in the t
   `utf-8-validate`, which must resolve to a stub that throws (`ws` then uses its JavaScript fallback).
 - **Client:** `HttpApiClient` + `FetchHttpClient` for a small `HttpApi` bundle to about 195 KiB minified (61 KiB
   gzip). `effect` contains the text `getBuiltinModule?.("node:async_hooks")`: a runtime probe, not an import.
+- **Web without the old client:** with `app/server/` moved and `app/src/lib/api.ts` reduced to the new exports,
+  `pnpm lint` stays clean on the untouched web files and every existing web and shared test still passes (they test
+  pure helpers). Only `app/src/lib/api.ts` imports from the server folder.
 - **WebSocket upgrade:** the handshake answer is sent when the socket's reader is acquired, so acquire it before the
   first write:
 
@@ -71,31 +97,46 @@ yield* write(hello);
 
 - **Shutdown:** when the scope of `HttpRouter.serve` closes, `NodeHttpServer` sends close code 1001 to every WebSocket
   itself, then waits `gracefulShutdownTimeout` (20 s by default) for open connections. Finalizers run in reverse
-  build order, so the services the routes use are undone _after_ the server closed. A step that must run while
-  clients are still connected goes through a registry whose runner is the outermost layer:
+  build order, so the services the routes use are undone after the server closed. A step that must run while clients
+  are still connected goes through a registry whose runner is the outermost layer (measured with a stream and a `/ws`
+  open at SIGTERM: last stream event and clean end, then 1001, then the service finalizers, exit in 62 ms):
 
 ```ts
 // Built last, so undone first: its finalizer runs the registered steps before the HTTP server stops serving.
 const App = Shutdown.layerRunner.pipe(Layer.provide(Http), Layer.provide(Shutdown.layer));
 ```
 
-Measured with a stream and a `/ws` open at SIGTERM: last stream event and clean end, then 1001, then the service
-finalizers, exit in 62 ms.
-
 - **Exit code:** `NodeRuntime.runMain` exits 130 on a signal and only re-interrupts on a second one. Exit code 0 and
   the forced exit are ours:
 
 ```ts
-NodeRuntime.runMain(Layer.launch(App), {
+NodeRuntime.runMain(program, {
   teardown: (exit, onExit) => onExit(Exit.isSuccess(exit) || Cause.hasInterruptsOnly(exit.cause) ? 0 : 1),
 });
 ```
 
 - **Payload errors:** when a request payload does not decode, `HttpApi` answers a bare 400 with no detail. An
   endpoint whose page shows field errors takes a loose payload and validates in its service (Task 7).
-- **Migrator:** `effect/sql/Migrator` runs every pending migration in one transaction and records them in
+- **SQLite:** `SqliteClient` keeps one connection, enables WAL, and leaves foreign keys **on** (the default of
+  `node:sqlite`): a `PRAGMA foreign_keys` set outside a transaction holds for the following queries.
+  `SqliteMigrator.run` runs every pending migration in one transaction and records them in
   `effect_sql_migrations (migration_id integer PRIMARY KEY NOT NULL, created_at datetime NOT NULL DEFAULT
-  current_timestamp, name VARCHAR(255) NOT NULL)`. `SqliteClient` enables WAL and sets no `foreign_keys` pragma.
+  current_timestamp, name VARCHAR(255) NOT NULL)`; the key `0001_init` gives id 1, name `init`. A JavaScript number
+  is always bound as REAL (`3` arrives as `3.0`; a column declared INTEGER stores it as an integer, an untyped column
+  or a JSON function keeps the real); a boolean is bound as integer 1 or 0.
+- **CLI (`effect/cli`):** `--opt=val` is accepted; an unknown flag, a missing value and a positional argument are
+  refused (`Unrecognized flag: --nope in command llama-webui`, `Missing value for flag --host. Expected: string`,
+  `Unexpected positional argument: "extra"`): the help then the error are printed and the run fails (exit 1).
+  `Flag.Int('port')` with `Flag.withSchema` refuses `abc` and `70000`. An empty value (`--host ""`, `--data-dir=`) is
+  accepted unless the flag has `Flag.withSchema(Schema.NonEmptyString)`. `Flag.Boolean` is required unless it has
+  `Flag.withDefault(false)`. The built-in flags are `--help`/`-h`, `--version`, `--wizard`, `--completions` and
+  `--log-level` (`CliConfig.layer({ builtIns })` chooses them).
+- **Config:** the constructors are capitalised (`Config.String`, `Config.Port`, `Config.Boolean`). With
+  `Config.withDefault`, a variable that is set but empty gives the default; `LLAMA_WEBUI_PORT=abc` fails with an error
+  naming the variable.
+- **Language service:** diagnostics are reported on the files of the server project only, not on the shared sources
+  it imports. The per-file `overrides` option works with globs of the form `**/testing/**/*.ts`. `node:http` for
+  `createServer` is reported by `nodeBuiltinImport`; `apiStabilityLeak` fires on nearly every exported layer.
 
 ## Reference files
 
@@ -105,12 +146,13 @@ NodeRuntime.runMain(Layer.launch(App), {
 | Handler tests without a server           | `ai-docs/src/51_http-server/20_testing.ts`                                                                       |
 | Entry point                              | `ai-docs/src/01_effect/06_running/20_layer-launch.ts`                                                            |
 | SQL client, migrator, repository         | `ai-docs/src/40_sql/10_basics.ts`, `packages/effect/src/sql/Migrator.ts`                                         |
-| CLI                                      | `ai-docs/src/70_cli/10_basics.ts`                                                                                |
+| CLI                                      | `ai-docs/src/70_cli/10_basics.ts`, `packages/effect/src/cli/Command.ts` (`runWith`, its test layer)              |
 | HTTP server on Node, shutdown, upgrade   | `packages/platform/node/src/NodeHttpServer.ts`                                                                   |
 | Static files                             | `packages/effect/src/http/HttpStaticServer.ts`                                                                   |
 | WebSocket handler, event stream response | `packages/platform/node/test/GraphQLProtocol.test.ts`                                                            |
 | Server-sent events                       | `packages/effect/src/encoding/Sse.ts`                                                                            |
 | DevTools                                 | `packages/effect/src/devtools/DevTools.ts`                                                                       |
+| Language service options                 | `node_modules/@effect/tsgo/README.md`                                                                            |
 
 ## Review Focus
 
@@ -197,14 +239,14 @@ The old code must write them while it still runs in the tree.
   - Each file is one self-contained database: `PRAGMA wal_checkpoint(TRUNCATE)` then close, no `-wal` or `-shm` next
     to it.
 
-- [ ] **Step 1: Write `fixtures.gen.test.ts`**, one test per file that writes the fixture as described.
+- [ ] **Step 1: Write `fixtures.gen.test.ts`**, one test per file that writes the fixture as described and ends by
+      reopening it read-only to assert `SELECT version FROM schema_version` (17, then 16).
 
 - [ ] **Step 2: Run it**
 
 Run: `LLAMA_WEBUI_TEST_BUILD=0 pnpm exec vitest run app/server/lib/db/fixtures.gen.test.ts`
-Expected: 2 passed; `sqlite3 app/server/db/fixtures/legacy-v17.sqlite 'SELECT version FROM schema_version'` prints
-`17`, the same on the other file prints `16`; `git check-ignore app/server/db/fixtures/legacy-v17.sqlite` prints
-nothing.
+Expected: 2 passed; `ls app/server/db/fixtures` lists the two `.sqlite` files and nothing ending in `-wal` or `-shm`;
+`git check-ignore app/server/db/fixtures/legacy-v17.sqlite` prints nothing.
 
 - [ ] **Step 3: Delete `fixtures.gen.test.ts`, write the README, check and commit**
 
@@ -229,8 +271,9 @@ derived client and shows a waiting page for what is not ported. Until Task 9, `p
 - Modify: `biome.jsonc` (`"!!app/server-legacy"` next to `"!!repos"`; drop the entries of the generated files that
   left), `vitest.config.ts` (`globalSetup: ['app/server/testing/build.ts']`), `app/package.json` (remove `nitro`;
   `"build": "vite build && node build/server.ts"`), `packages/webui-shared/package.json` (`"effect": "catalog:"`),
-  `pnpm-lock.yaml`, `app/vite.config.ts` (no Nitro, `build.outDir: '.output/public'`), `app/build/licenses.ts`
-- Create: `app/server/tsconfig.json` (the one of `app/server-legacy/`, plus `"erasableSyntaxOnly": true`)
+  `pnpm-lock.yaml`, `app/vite.config.ts` (no Nitro, `build.outDir: '.output/public'`), `app/build/licenses.ts`,
+  `CLAUDE.md`
+- Create: `app/server/tsconfig.json`
 - Create: `packages/webui-shared/src/api/HealthApi.ts`, `packages/webui-shared/src/api/Api.ts` (exported by
   `index.ts`)
 - Create: `app/server/main.ts`, `app/server/App.ts`, `app/server/config/AppConfig.ts`,
@@ -246,6 +289,52 @@ derived client and shows a waiting page for what is not ported. Until Task 9, `p
   `app/build/licenses.test.ts` (kept)
 
 **Interfaces:**
+
+- `app/server/tsconfig.json`: the one of `app/server-legacy/`, with these changes to the plugin options and
+  `"erasableSyntaxOnly": true`:
+
+```jsonc
+// removed: "ignoreEffectWarningsInTscExitCode" and its comment
+"diagnosticSeverity": {
+  // …the existing map, with one change: nearly every Effect module beyond the core is unstable (see unstableApiUsage)
+  "apiStabilityLeak": "off"
+},
+"overrides": [
+  {
+    // Code that drives the build from outside (child process, fetch, timers): the platform is its subject.
+    "include": [
+      "**/testing/**/*.ts",
+      "**/contract/**/*.ts",
+      "**/lifecycle.test.ts",
+      "**/build.test.ts",
+      "**/dev.test.ts",
+      "**/runApp.test.ts"
+    ],
+    "options": {
+      "diagnosticSeverity": {
+        "nodeBuiltinImport": "off",
+        "asyncFunction": "off",
+        "newPromise": "off",
+        "globalFetch": "off",
+        "globalTimers": "off",
+        "globalDate": "off",
+        "globalConsole": "off",
+        "globalJson": "off",
+        "globalRandom": "off",
+        "processEnv": "off",
+        "cryptoRandomUUID": "off"
+      }
+    }
+  }
+]
+```
+
+No other file is added to that list without asking.
+
+- `CLAUDE.md`, under the `# llama-webui` title, a note: on `poc/effect` the server is the Effect server of
+  `app/server/`; the sections below that describe Nitro, `lib/`, `routes/` and `api.gen.ts` describe
+  `app/server-legacy/`, a read-only reference; the plan of the current milestone wins where they disagree. The other
+  sections are rewritten at E10.
 
 - Produces, shared:
 
@@ -271,13 +360,16 @@ sentence shown to the user (the web switches on `_tag`, never on the text).
 - Produces, server:
 
 ```ts
-/** Where the app listens and keeps its data. Until Task 4: from LLAMA_WEBUI_HOST, _PORT, _DATA_DIR, _DEV alone. */
+/** Where the app listens and keeps its data. */
 export class AppConfig extends Context.Service<AppConfig, {
-  readonly host: string; // default '127.0.0.1'
-  readonly port: number; // default 7860
-  readonly dataDir: string; // default: as `dataDir()` of app/server-legacy/lib/paths.ts
+  readonly host: string; // LLAMA_WEBUI_HOST, default '127.0.0.1'
+  readonly port: number; // LLAMA_WEBUI_PORT, default 7860
+  readonly dataDir: string; // LLAMA_WEBUI_DATA_DIR, default: as `dataDir()` of app/server-legacy/lib/paths.ts
   readonly dev: boolean; // LLAMA_WEBUI_DEV=1, set by `pnpm dev` only
-}>()(/* key */) { static readonly layer: Layer.Layer<AppConfig, Config.ConfigError>; }
+}>()(/* key */) {
+  /** From the environment and the defaults. */
+  static readonly layer: Layer.Layer<AppConfig, Config.ConfigError>;
+}
 
 /** What this process is: read by /api/health and the hello of /ws. */
 export class AppInfo extends Context.Service<AppInfo, {
@@ -286,11 +378,14 @@ export class AppInfo extends Context.Service<AppInfo, {
   readonly uptimeMs: Effect.Effect<number>;
 }>()(/* key */) { static readonly layer: Layer.Layer<AppInfo>; }
 
-// App.ts: the whole application; later tasks add their layers here.
-export const App: Layer.Layer<never, unknown>;
+// App.ts: the whole application but its configuration; later tasks add their layers here.
+export const App: Layer.Layer<never, unknown, AppConfig>;
 // http/HttpLive.ts: routes + NodeHttpServer. Options: disableLogger, disableListenLog,
-// gracefulShutdownTimeout '500 millis'. The services are built before the port is opened.
+// gracefulShutdownTimeout '500 millis'. The services are built before the port is opened. Once it listens, one
+// log line: `ready (<version>) on http://<host>:<port>`.
 // http/Static.ts: the UI of `<folder of the server bundle>/../public`, index.html for any other GET; nothing in dev.
+// main.ts, until Task 4: runMain(Layer.launch(App.pipe(Layer.provide(AppConfig.layer)))), with the teardown of
+// "Facts verified".
 ```
 
 - Produces, tests (`app/server/testing/launch.ts`, same contract as the old helper):
@@ -329,13 +424,18 @@ export function errorTag(error: unknown): string | undefined;
 
 One `ManagedRuntime` (`FetchHttpClient.layer`) runs the calls. No `fetch('/api…')` elsewhere in the web.
 
-- Web parking rule: `app/tsconfig.json` checks what the app loads: `"include"` becomes `["src/main.tsx",
-  "src/env.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "build", "vite.config.ts"]`, and `"exclude"` lists the test
-  files that import a module still calling the old client. A page comes back by being routed again; its milestone
-  then fixes what `tsc` reaches. The files stay where they are and their tests keep running.
+- Web parking rule. The unported pages and stores stay where they are, untouched, importing names `api.ts` no longer
+  exports: nothing reaches them once the router shows the waiting page, Biome does not report them and their tests
+  keep passing (verified). `app/tsconfig.json` checks what the app loads: `"include"` becomes `["src/main.tsx",
+  "src/*.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "build", "vite.config.ts"]`, and `"exclude"` lists each test
+  file through which `tsc` reaches a module that still calls the old client (expected: `src/lib/bench.test.ts`,
+  `src/lib/props.test.ts`, `src/lib/tuning.test.ts`, and `src/features/profiles/draft.test.ts` if `tsc` reports
+  through it). Vitest still runs those tests. A page comes back by being routed again at its milestone, which removes
+  its tests from `"exclude"`.
 
-- [ ] **Step 1: Move the old server and cut it loose.** `git mv`, the config changes of the list above, `pnpm install`.
-      `pnpm lint` passes without reading `app/server-legacy/`.
+- [ ] **Step 1: Move the old server and cut it loose.** `git mv`, the config changes of the list above (the new
+      `tsconfig.json` and the `CLAUDE.md` note included), `pnpm install`. `pnpm lint` passes without reading
+      `app/server-legacy/`.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -348,12 +448,12 @@ One `ManagedRuntime` (`FetchHttpClient.layer`) runs the calls. No `fetch('/api�
 |                                                                                                                                               | `call() rejects with the tagged error of the endpoint`                  | `errorTag(e) === 'TestNotFound'`, `e.message` as sent                                                                                                       |
 |                                                                                                                                               | `call() rejects with ApiUnreachable when fetch rejects`                 | `errorTag(e) === 'ApiUnreachable'`, message `llama-webui server unreachable`                                                                                |
 |                                                                                                                                               | `call() passes its signal: an abort reaches fetch and rejects the call` | the stub's `init.signal.aborted === true`                                                                                                                   |
-| `build.test.ts` (needs the build)                                                                                                             | `the launcher starts from an empty folder outside the repository`       | `.output` copied to a temp dir, started there with a temp cwd: `/api/health` is 200 and `version !== 'dev'`                                                 |
+| `build.test.ts` (needs the build)                                                                                                             | `the launcher starts from an empty folder outside the repository`       | `.output` copied to a temp dir, started there with a temp cwd: `/api/health` is 200, `version !== 'dev'`, stdout holds `ready (`                            |
 |                                                                                                                                               | `the server requires nothing but Node builtins`                         | every `import`/`require`/`import()` specifier of `llama-webui.mjs` and `server/*.mjs` is `isBuiltin()` (`node:module`) or a relative path to a shipped file |
 |                                                                                                                                               | `the client imports no node:* module`                                   | no import specifier starting with `node:` under `public/assets`                                                                                             |
 |                                                                                                                                               | `each page is a chunk of its own`                                       | the entry chunk named by `index.html` does not contain the text of `PlaceholderPage`                                                                        |
 |                                                                                                                                               | `a deep URL gets the shell`                                             | `GET /settings` is 200, `text/html`, and every `/assets/…` it names is 200                                                                                  |
-|                                                                                                                                               | `the licenses of the bundled code ship with the server`                 | `THIRD-PARTY-LICENSES.md` has a `## effect - 4.1.4` and a `## @effect/platform-node - 4.1.4` heading, each followed by text                                 |
+|                                                                                                                                               | `the licenses of the bundled code ship with the server`                 | `THIRD-PARTY-LICENSES.md` has a heading starting `## effect - 4.1.4` and one starting `## @effect/platform-node - 4.1.4`, each followed by text             |
 
 - [ ] **Step 3: Run them to make sure they fail**
 
@@ -361,14 +461,13 @@ Run: `pnpm exec vitest run app/server app/src/lib/api.test.ts`
 Expected: FAIL (no server, no build script).
 
 - [ ] **Step 4: Shared and server.** `HealthApi`, `Api`; `AppConfig`, `AppInfo`, the health handlers
-      (`HttpApiBuilder.group(Api, 'health', …)`), `Static`, `HttpLive`, `App`, `main.ts` (the `runMain` call of "Facts
-      verified").
+      (`HttpApiBuilder.group(Api, 'health', …)`), `Static`, `HttpLive`, `App`, `main.ts`.
 
 - [ ] **Step 5: Build.** `app/build/server.ts`: after `vite build`, bundles `server/main.ts` into
       `.output/server/index.mjs` and `bin/llama-webui.ts` into `.output/llama-webui.mjs` (executable), with
       `LLAMA_WEBUI_VERSION` defined as today, `bufferutil` and `utf-8-validate` resolved to a stub that throws, then writes
-      `THIRD-PARTY-LICENSES.md` from the modules Rolldown bundled (`licenses.ts` keeps `packageRoot` and `render`, and
-      their two tests).
+      `THIRD-PARTY-LICENSES.md` from the modules Rolldown bundled (`licenses.ts` keeps `packageRoot`, `render`, the
+      heading format `## <name> - <version> (<license>)` and their two tests).
 
 - [ ] **Step 6: Web.**
   - `api.ts`, `health.ts` on `call`.
@@ -385,8 +484,9 @@ Expected: FAIL (no server, no build script).
 
 - [ ] **Step 7: Run everything**
 
-Run: `pnpm lint && pnpm check && pnpm test`
-Expected: green. If Biome reports a parked web file, stop and report: do not edit the rule.
+Run: `pnpm lint && pnpm check && pnpm test`, then `pnpm check 2>&1 | grep -c 'effect('`
+Expected: green, and `0`. If Biome or `tsc` reports a parked web file that the parking rule does not cover, stop and
+report.
 
 - [ ] **Step 8: Commit**
 
@@ -401,8 +501,9 @@ git commit -m "feat(server)!: Start the server from one Effect entry point, park
 
 **Files:**
 
-- Create: `app/server/config/Cli.ts`, `app/server/config/DotEnv.ts`, `app/server/runtime/Shutdown.ts`,
-  `app/server/runtime/runApp.ts`, `app/server/runtime/fixtures/slowStop.ts`, `app/server/runtime/fixtures/fails.ts`
+- Create: `app/server/config/Cli.ts`, `app/server/config/DotEnv.ts`, `app/server/http/Address.ts`,
+  `app/server/runtime/Shutdown.ts`, `app/server/runtime/runApp.ts`, `app/server/testing/fixtures/slowStop.ts`,
+  `app/server/testing/fixtures/fails.ts`
 - Modify: `app/server/main.ts`, `app/server/config/AppConfig.ts`, `app/server/App.ts`, `app/server/testing/launch.ts`
   (passes `--host`, `--port`, `--data-dir`)
 - Test: `app/server/config/Cli.test.ts`, `app/server/config/DotEnv.test.ts`, `app/server/runtime/Shutdown.test.ts`,
@@ -410,48 +511,92 @@ git commit -m "feat(server)!: Start the server from one Effect entry point, park
 
 **Interfaces:**
 
-- Port from: `app/server-legacy/lib/cli.ts`, `lib/env.ts` (`loadDotEnv` only), `lib/paths.ts`,
-  `app/server-legacy/plugins/runtime.ts` and `app/bin/llama-webui.ts` at `6327201a3` (signals, port check).
+- Port from: `app/server-legacy/lib/cli.ts` (options, messages, the content of `helpText()`), `lib/env.ts`
+  (`loadDotEnv` only), `lib/paths.ts`, `app/server-legacy/plugins/runtime.ts` and `app/bin/llama-webui.ts` at
+  `6327201a3` (signals, port check and its message).
 - Produces:
 
 ```ts
+// config/Cli.ts
+export interface CliFlags {
+  readonly host: Option.Option<string>; // non-empty
+  readonly port: Option.Option<number>; // integer from 1 to 65535
+  readonly dataDir: Option.Option<string>; // non-empty
+  readonly envOverride: boolean;
+}
+/** The `llama-webui` command on the arguments of the process: parses them, then runs `start` with the flags.
+ * `--help`/`-h` and `--version` print and end; a usage error prints the help, then the error, and fails. */
+export const cli: <E, R>(
+  start: (flags: CliFlags) => Effect.Effect<void, E, R>,
+) => Effect.Effect<void, E | CliError.CliError, R | Command.Environment>;
+/** The same on given arguments (tests). */
+export const cliWith: <E, R>(
+  start: (flags: CliFlags) => Effect.Effect<void, E, R>,
+) => (args: ReadonlyArray<string>) => Effect.Effect<void, E | CliError.CliError, R | Command.Environment>;
+
+// config/AppConfig.ts, added
+/** A flag wins over its variable, a variable over the default. */
+static readonly layerWith: (flags: CliFlags) => Layer.Layer<AppConfig, Config.ConfigError>;
+
+// config/DotEnv.ts
 /** `.env` text applied to `env`: fills what is missing; with override (the option, or LLAMA_WEBUI_ENV_OVERRIDE=1|true
  * in `env` or in the file) the file wins. `parseEnv` of `node:util`: no `$VAR` expansion. */
 export function applyDotEnv(env: NodeJS.ProcessEnv, text: string, options?: { override?: boolean }): void;
+/** Applies `.env` of the current folder to the environment of the process; no file, nothing to do. */
+export const loadDotEnv: (options: { readonly override: boolean }) => Effect.Effect<void, PlatformError, FileSystem.FileSystem>;
 
+// http/Address.ts
+export class AddressInUse extends Schema.TaggedError<…>()('AddressInUse', { message: Schema.String }) {}
+/** Fails when nothing can listen on the configured address. `message`: `cannot listen on <host>:<port>: the port
+ * is already in use` (or the system's reason). */
+export const assertFree: Effect.Effect<void, AddressInUse, AppConfig>;
+
+// runtime/Shutdown.ts
 /** Steps that must run while clients are still connected. */
-export class Shutdown extends Context.Service<
-  Shutdown,
-  {
-    /** Registers a step: it runs when the app stops, before the HTTP server stops serving; last registered, first run. */
-    readonly before: (step: Effect.Effect<void>) => Effect.Effect<void>;
-  }
->()(/* key */) {
+export class Shutdown extends Context.Service<Shutdown, {
+  /** Registers a step: it runs when the app stops, before the HTTP server stops serving; last registered, first run. */
+  readonly before: (step: Effect.Effect<void>) => Effect.Effect<void>;
+}>()(/* key */) {
   static readonly layer: Layer.Layer<Shutdown>;
   /** The outermost layer of `App`: its finalizer runs the steps. */
   static readonly layerRunner: Layer.Layer<never, never, Shutdown>;
 }
 
-/** Runs an application layer as the process: exit 0 on SIGINT/SIGTERM once undone, 1 on a failure (its cause on
- * stderr); a second signal while stopping exits at once, as the Nitro server did. */
-export function runApp(app: Layer.Layer<never, unknown>): void;
+// runtime/runApp.ts
+/** Runs a program as the process: exit 0 when it ends or on SIGINT/SIGTERM once undone; exit 1 on a failure, with
+ * `llama-webui: <message>` on stderr for a tagged error that has a message, the pretty cause otherwise; a second
+ * signal while stopping exits at once, as the Nitro server did. */
+export function runApp(program: Effect.Effect<void, unknown>): void;
 ```
 
-- Order in `main.ts`: parse the flags (`effect/cli`); apply `.env` of the current folder to `process.env` (the one
-  place that writes it, so child processes inherit: `// @effect-diagnostics-next-line processEnv:off` with that
-  reason); resolve each option as flag, then environment, then default; check the address is free; `runApp(App)`.
-- The address check comes before anything touches the data directory: a taken port prints a message naming
-  `host:port` on stderr and exits 1.
+- `main.ts`, the order is the point (the address is checked before anything touches the data directory, `.env` is
+  applied before the configuration is read):
+
+```ts
+const start = (flags: CliFlags) =>
+  loadDotEnv({ override: flags.envOverride }).pipe(
+    Effect.andThen(Effect.andThen(assertFree, Layer.launch(App)).pipe(Effect.provide(AppConfig.layerWith(flags)))),
+  );
+runApp(cli(start).pipe(Effect.provide(NodeServices.layer)));
+```
+
+- The built-in flags are reduced to help and version (`CliConfig.layer({ builtIns: [GlobalFlag.Help,
+  GlobalFlag.Version] })`). The help keeps what `helpText()` says, in the layout of `effect/cli`: each flag names its
+  variable (`env: LLAMA_WEBUI_HOST`…), the description keeps the three ways of running and the Hugging Face and proxy
+  variables.
 
 - [ ] **Step 1: Write the failing tests**
 
-| File                                             | Tests                                                                                                                                                                                                                                                                                                                                                                              |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DotEnv.test.ts`                                 | the six `loadDotEnv: …` tests of `app/server-legacy/lib/env.test.ts`, same names with `applyDotEnv`, same values                                                                                                                                                                                                                                                                   |
-| `Cli.test.ts`                                    | the ten tests of `app/server-legacy/lib/cli.test.ts`, same cases: defaults; environment; a flag over the environment and `--opt=val`; an empty variable ignored; `--help` and `-h` (exit 0, names the four options and the three variables); invalid port (flag or environment) refused; unknown option, missing value, positional, empty value refused; `--env-override` accepted |
-| `Shutdown.test.ts` (`it.effect`)                 | `steps run when the scope closes, last registered first`; `a step that fails does not stop the next ones`                                                                                                                                                                                                                                                                          |
-| `runApp.test.ts` (runs the fixtures with `node`) | `SIGTERM undoes the app and exits 0` (`slowStop.ts` with a 100 ms finalizer prints `undone`); `a second signal while stopping exits at once` (`slowStop.ts` with a 10 s finalizer: two SIGTERM 200 ms apart, exit in under 1 s); `a layer that fails exits 1 with its cause` (`fails.ts`: stderr holds the message)                                                                |
-| `lifecycle.test.ts` (needs the build)            | `a second instance on a taken port exits 1 and names it`; `a second instance on the same port and data dir leaves the first one` (both from `app/server-legacy/lifecycle.test.ts`); `a variable of .env sets the port, the environment wins over it`                                                                                                                               |
+`Cli.test.ts` runs `cliWith(start)(args)` where `start` resolves `AppConfig.layerWith(flags)` under
+`ConfigProvider.fromEnv({ env })` and keeps the result; output goes to a test `Stdio`.
+
+| File                                             | Tests                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DotEnv.test.ts`                                 | the six `loadDotEnv: …` tests of `app/server-legacy/lib/env.test.ts`, same names with `applyDotEnv`, same values                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `Cli.test.ts`                                    | `defaults without flag or env` (`127.0.0.1`, 7860); `environment variables`; `a flag overrides the env, --opt=val form accepted`; `an empty variable is ignored`; `--help and -h print the help and start nothing`; `invalid port, flag or env` (`0`, `70000`, `abc`, `1.5` each refused, `start` not run or failed); `unknown option, missing value, positional, empty value are refused` (`--nope`, `--host`, `extra`, `--host ""`, `--data-dir=`); `--env-override is accepted and reaches start`; `the help names the installed command and the pnpm scripts`; `the help names each option with its variable` (the four flags, `LLAMA_WEBUI_HOST`, `LLAMA_WEBUI_PORT`, `LLAMA_WEBUI_DATA_DIR`, `LLAMA_WEBUI_ENV_OVERRIDE`); `the built-in flags are help and version only` (`--wizard` refused) |
+| `Shutdown.test.ts` (`it.effect`)                 | `steps run when the scope closes, last registered first`; `a step that fails does not stop the next ones`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `runApp.test.ts` (runs the fixtures with `node`) | `SIGTERM undoes the app and exits 0` (`slowStop.ts` with a 100 ms finalizer prints `undone`); `a second signal while stopping exits at once` (`slowStop.ts` with a 10 s finalizer: two SIGTERM 200 ms apart, exit in under 1 s); `a failure exits 1 with its message` (`fails.ts` fails with a tagged error: stderr holds `llama-webui: ` and the message)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `lifecycle.test.ts` (needs the build)            | `a second instance on a taken port exits 1 and names it` (stderr holds `cannot listen on 127.0.0.1:<port>: the port is already in use`); `a second instance on the same port and data dir leaves the first one` (both from `app/server-legacy/lifecycle.test.ts`); `a variable of .env sets the port, the environment wins over it`; `--env-override lets .env win over the environment`                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 - [ ] **Step 2: Run them to make sure they fail**
 
@@ -516,7 +661,7 @@ export function sseResponse<E, R>(
 
 - Behaviour:
   - Any `/api/*` request that no endpoint matches answers 404 with `RouteNotFound` (`message: 'Unknown route'`) as
-    JSON. The 405 with `Allow` of the Nitro server is dropped: record it in `behaviours.md` (Task 11).
+    JSON.
   - `/assets/*` is served from `public/assets` with the immutable cache header of the Nitro server; a missing file
     is a 404. Any other `GET` is a file of `public/` when there is one, else `index.html`, both `no-cache`. API replies
     carry no cache header.
@@ -572,15 +717,17 @@ export const layer: Layer.Layer<SqlClient.SqlClient, /* errors */, AppConfig>;
 export const layerAt: (filename: string) => Layer.Layer<SqlClient.SqlClient, /* errors */>;
 ```
 
-- What opening does, in this order:
+- What opening does, in this order (our own layer around `SqliteClient.layer` and `SqliteMigrator.run`, so the order
+  is ours):
   1. Create the data directory, open the file (WAL).
-  2. Bridge: when `schema_version` exists and `effect_sql_migrations` does not, create that table (the DDL of "Facts
+  2. `PRAGMA foreign_keys = OFF`: the client leaves them on, migration 17 rebuilds `profiles`, and the pragma does
+     nothing inside the migrator's transaction.
+  3. Bridge: when `schema_version` exists and `effect_sql_migrations` does not, create that table (the DDL of "Facts
      verified") and record migrations 1 to `schema_version.version` as already run.
-  3. Run the migrator. Foreign keys are off on this connection until step 4: migration 17 rebuilds `profiles`, and
-     the migrator's single transaction cannot switch them. Migration 17 keeps the check of `runRebuild`: only a
-     foreign key violation that was not there before aborts it.
-  4. `PRAGMA foreign_keys = ON`.
-  5. Write the last migration id into `schema_version` (created if missing): the database still opens with the Nitro
+  4. Run the migrator. Migration 17 keeps the check of `runRebuild`: only a foreign key violation that was not there
+     before aborts it.
+  5. `PRAGMA foreign_keys = ON`.
+  6. Write the last migration id into `schema_version` (created if missing): the database still opens with the Nitro
      server.
 
 - [ ] **Step 1: Write the failing tests** (`it.effect`; each copies a fixture to a temp folder before opening it)
@@ -591,17 +738,17 @@ export const layerAt: (filename: string) => Layer.Layer<SqlClient.SqlClient, /* 
 | `a database of the Nitro server is recognised: nothing is replayed and its rows are intact`     | on `legacy-v17.sqlite`: 17 rows in `effect_sql_migrations`; the rows of `settings`, `profiles`, `conversations` and `messages` equal those read before opening |
 | `an older database is brought up to date: profiles keep their ids and every link to them (#38)` | on `legacy-v16.sqlite`: the assertions of the old test of that name                                                                                            |
 | the other test of `app/server-legacy/lib/db/migrations.test.ts`, same name                      | its assertions                                                                                                                                                 |
-| `foreign keys are on once the database is open`                                                 | `PRAGMA foreign_keys` is 1                                                                                                                                     |
+| `foreign keys are on once the database is open`                                                 | `PRAGMA foreign_keys` is 1, and an insert that breaks a link fails                                                                                             |
 | `the database still opens with the Nitro server`                                                | new database: `SELECT version FROM schema_version` is 17                                                                                                       |
 | `opening twice runs nothing the second time`                                                    | same file opened again: row counts of `effect_sql_migrations` and `sqlite_schema` unchanged                                                                    |
-| `an integral number is stored as an integer, a boolean as 1 or 0`                               | insert `3`, `true` through `SqlClient` into untyped columns: `typeof()` gives `integer`, `integer`                                                             |
+| `a number bound to an INTEGER column is stored as an integer, a boolean as 1 or 0`              | a temp table `(n INTEGER, b INTEGER, u)`: `3`, `true`, `3` inserted through `SqlClient` give `typeof()` `integer`, `integer`, `real`                           |
 
 - [ ] **Step 2: Run them to make sure they fail**
 
 Run: `LLAMA_WEBUI_TEST_BUILD=0 pnpm exec vitest run app/server/db`
 
-- [ ] **Step 3: Implement.** If the last test shows `SqlClient` binds differently, do not wrap the client: report it in
-      the task summary (the repositories of later milestones bind explicitly).
+- [ ] **Step 3: Implement.** Do not wrap the client to change how it binds: a repository that feeds a number to a
+      JSON function or an untyped column writes `CAST(… AS INTEGER)` in its SQL (a rule for `conventions.md`, Task 11).
 
 - [ ] **Step 4: Run the tests, then** `pnpm lint && pnpm check && pnpm test`.
 
@@ -662,7 +809,8 @@ export class SettingsRepo extends Context.Service<SettingsRepo, {
 }>()(/* key */) { static readonly layer: Layer.Layer<SettingsRepo, never, SqlClient.SqlClient>; }
 ```
 
-The monitor's `warning` of the old `PATCH` reply returns with E4.
+The monitor's `warning` of the old `PATCH` reply returns with E4. Other shared modules that still import zod keep
+it until their milestone.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -801,15 +949,15 @@ git commit -m "feat(ws): Serve /ws from a PubSub hub"
 
 - [ ] **Step 1: Write the failing tests** (on a copy of `app/`, free ports)
 
-| Test                                                        | Asserts                                                                                                      |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `saving a server file restarts the server`                  | `bootId` of `/api/health` through Vite's port changes after a comment is appended to `server/health/http.ts` |
-| `saving a web file keeps the server`                        | same `bootId` after a comment is appended to `src/main.tsx`                                                  |
-| `one SIGINT stops vite dev and the server`                  | both pids gone, in under 5 s                                                                                 |
-| `one SIGINT with a page open (/ws) stops at once`           | a client connected through Vite's port: closed, both pids gone in under 2 s                                  |
-| `two quick SIGINTs still stop the server`                   |                                                                                                              |
-| `dev reads .env, the environment wins over it`              | `.env` sets `LLAMA_WEBUI_PORT`: Vite listens there; set in the environment too: the environment's port       |
-| `in dev the server connects to the Effect DevTools address` | a WebSocket server on a free port, `LLAMA_WEBUI_DEVTOOLS_URL` pointing to it: one connection within 5 s      |
+| Test                                                        | Asserts                                                                                                                                |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `saving a server file restarts the server`                  | `bootId` of `/api/health` through Vite's port changes after a comment is appended to `server/health/http.ts`                           |
+| `saving a web file keeps the server`                        | same `bootId` after a comment is appended to `src/main.tsx`                                                                            |
+| `one SIGINT stops vite dev and the server`                  | both pids gone, in under 5 s                                                                                                           |
+| `one SIGINT with a page open (/ws) stops at once`           | a client connected through Vite's port: closed, both pids gone in under 2 s                                                            |
+| `two quick SIGINTs still stop the server`                   |                                                                                                                                        |
+| `dev reads .env, the environment wins over it`              | `.env` sets `LLAMA_WEBUI_PORT`: Vite listens there; set in the environment too: the environment's port                                 |
+| `in dev the server connects to the Effect DevTools address` | a `node:http` server on a free port that counts `upgrade` requests, `LLAMA_WEBUI_DEVTOOLS_URL` pointing to it: at least one within 5 s |
 
 - [ ] **Step 2: Run them to make sure they fail**
 
@@ -856,7 +1004,7 @@ git commit -m "feat(dev): Run the Effect server under vite dev, with the DevTool
 |                     | `every reply matches the golden record`                |                                                                                                                                  |
 | `lifecycle.test.ts` | `SIGTERM with the UI open stops in under 2 s`          | a `/ws` client connected: exit code 0, elapsed < 2000 ms, close code 1001                                                        |
 |                     | `a data directory of the Nitro server opens untouched` | `legacy-v17.sqlite` copied as `<dataDir>/llama-webui.sqlite`: `GET /api/settings` gives `port: 8123` and `hiddenGpus: ['GPU-1']` |
-|                     | `the build never connects to the Effect DevTools`      | a WebSocket server on a free port named by `LLAMA_WEBUI_DEVTOOLS_URL`: no connection within 1.5 s                                |
+|                     | `the build never connects to the Effect DevTools`      | a `node:http` server on a free port that counts `upgrade` requests, named by `LLAMA_WEBUI_DEVTOOLS_URL`: none within 1.5 s       |
 
 - [ ] **Step 2: Run them to make sure they fail**
 
@@ -885,62 +1033,55 @@ git commit -m "test(server): Record the contract and the lifecycle of the Effect
 
 **Files:**
 
-- Modify: `app/server/tsconfig.json`, `docs/superpowers/poc-effect/test-inventory.json`,
-  `docs/superpowers/poc-effect/behaviours.md`, `CLAUDE.md`
+- Modify: `docs/superpowers/poc-effect/test-inventory.json`, `docs/superpowers/poc-effect/behaviours.md`, `CLAUDE.md`
 - Create: `docs/superpowers/poc-effect/conventions.md`, `docs/superpowers/poc-effect/e1.json`
 
-- [ ] **Step 1: Effect warnings at zero.** In `app/server/tsconfig.json`, remove `ignoreEffectWarningsInTscExitCode`
-      and its comment, and set `"apiStabilityLeak": "off"` (same reason as `unstableApiUsage`: nearly every Effect module
-      beyond the core is unstable). Then fix every `effect(<rule>)` line `pnpm check` prints, with the rule's own
-      suggestion. Allowed without asking: `// @effect-diagnostics-next-line nodeBuiltinImport:off` where an Effect API
-      takes the Node builtin itself (`createServer` for `NodeHttpServer.layer`) or Effect has no equivalent, with the
-      reason on the line. Any other rule that seems wrong for this code: stop and report, do not lower it.
-
-Run: `pnpm check 2>&1 | grep -c 'effect('`
-Expected: `0`, exit code 0.
-
-- [ ] **Step 2: Account for the tests.** In `test-inventory.json`, every entry whose `milestone` is `E1` gets a
-      `status`: `ported` or `rewritten` with `to` (the new test file), or `dropped` with a `reason`. Re-assigned instead
-      (their `milestone` changes, no status): the entries of `app/server/lib/proc.test.ts` to `E3`; the two
-      `useEnvProxy: …` tests to `E6`; the two NVML tests of `app/server/build.test.ts` to `E4`; the reply half of
-      `SIGTERM with the UI open and a reply streaming stops in under 2 s` is noted in its `reason` as back in `E5`.
-      Expected drops, each with its reason: the three tests of `api.gen.test.ts` (generator replaced by the `HttpApi`
-      definition), the tests of `lib/db/sqlite.test.ts` whose behaviour belonged to the removed wrapper, the h3 helper
-      tests of `lib/http.test.ts`, `dev reads .env.local too` (a Nitro behaviour).
+- [ ] **Step 1: Account for the tests.** In `test-inventory.json` (an array of entries), every entry whose
+      `milestone` is `E1` gets a `status`: `ported` or `rewritten` with `to` (the new test file), or `dropped` with a
+      `reason`. Re-assigned instead (their `milestone` changes, no status): the entries of
+      `app/server/lib/proc.test.ts` to `E3`; the two `useEnvProxy: …` tests to `E6`; the two NVML tests of
+      `app/server/build.test.ts` to `E4`; the reply half of `SIGTERM with the UI open and a reply streaming stops in under
+  2 s` is noted in its `reason` as back in `E5`. Expected drops, each with its reason: the three tests of
+      `api.gen.test.ts` (generator replaced by the `HttpApi` definition), the tests of `lib/db/sqlite.test.ts` whose
+      behaviour belonged to the removed wrapper, the h3 helper tests of `lib/http.test.ts`, `dev reads .env.local too`
+      (a Nitro behaviour).
 
 Run: `node -e "const a=require('./docs/superpowers/poc-effect/test-inventory.json');console.log(a.filter(e=>e.milestone==='E1'&&!e.status).length)"`
 Expected: `0`.
 
-- [ ] **Step 3: Account for the behaviours.** In `behaviours.md`, section E1: every line is ticked, or struck with
+- [ ] **Step 2: Account for the behaviours.** In `behaviours.md`, section E1: every line is ticked, or struck with
       `dropped: <reason>` (the 405 with `Allow`, the 503 while starting, `.env.local` in dev, the route reload that kept
-      llama-server), or moved under its milestone with a note (the monitor warning of `PATCH /api/settings`: E4;
-      `GET /api/state`: E3; the smoke checks removed in Task 10).
+      llama-server, exit code 2 on a usage error), or moved under its milestone with a note (the monitor warning of
+      `PATCH /api/settings`: E4; `GET /api/state`: E3; the smoke checks removed in Task 10). Add what is new: `--version`,
+      `bootId` in `/api/health`, the second-signal handler.
 
-- [ ] **Step 4: Write `conventions.md`** for the milestones that follow, from the code as it is: where a domain's
-      schemas, API group, errors, service, handlers and tests go, with one real file as the example of each; how a
-      service registers a `Shutdown.before` step; how a `/ws` message and a contract case are added; how a web page comes
-      back (routing, `MILESTONE_BY_PATH`, `app/tsconfig.json`); the commands (one test file, the golden record, dev).
-      One page.
+- [ ] **Step 3: Write `conventions.md`** for the milestones that follow, from the code as it is: where a domain's
+      schemas, API group, errors, service, handlers and tests go, with one real file as the example of each; the Effect
+      diagnostics regime (what the override covers, the two allowed directives, `X.make`, the brand, the service keys);
+      SQL (`CAST(… AS INTEGER)` where a number meets JSON or an untyped column); how a service registers a
+      `Shutdown.before` step; how a `/ws` message and a contract case are added; how a web page comes back (routing,
+      `MILESTONE_BY_PATH`, `"exclude"` of `app/tsconfig.json`); the commands (one test file, the golden record, dev). One
+      page.
 
-- [ ] **Step 5: `CLAUDE.md`.** Under the `# llama-webui` title, add a note: on `poc/effect` the server is the Effect
-      server of `app/server/`; the sections that describe Nitro describe `app/server-legacy/` (read-only); the rules of
-      the new server are in `docs/superpowers/poc-effect/conventions.md`. Do not rewrite the other sections (E10).
+- [ ] **Step 4: `CLAUDE.md`.** Extend the note of Task 3 with a pointer to `conventions.md` as the rules of the new
+      server. Do not rewrite the other sections (E10).
 
-- [ ] **Step 6: Measure.**
+- [ ] **Step 5: Measure.**
 
 Run: `node scripts/poc/measure.ts --out docs/superpowers/poc-effect/e1.json`, then
 `pnpm exec biome format --write docs/superpowers/poc-effect/e1.json`.
 
-- [ ] **Step 7: Run everything, commit**
+- [ ] **Step 6: Run everything, commit**
 
-Run: `pnpm lint && pnpm check && pnpm test && pnpm build && node scripts/smoke.ts`
+Run: `pnpm lint && pnpm check && pnpm test && pnpm build && node scripts/smoke.ts`, then
+`pnpm check 2>&1 | grep -c 'effect('` (expected: `0`).
 
 ```bash
 git add -A
 git commit -m "chore(poc): Close E1, the foundation of the Effect server"
 ```
 
-- [ ] **Step 8: Hand over for validation.** Report: the parts of the Settings page that wait for E4, every dropped test
-      and behaviour with its reason, the binding result of Task 6, the numbers of `e1.json` next to `baseline.json`
-      (server lines, bundle sizes, startup and shutdown medians), and how to try it:
+- [ ] **Step 7: Hand over for validation.** Report: the parts of the Settings page that wait for E4, every dropped test
+      and behaviour with its reason, every `@effect-diagnostics` directive written and why, the numbers of `e1.json` next
+      to `baseline.json` (server lines, bundle sizes, startup and shutdown medians), and how to try it:
       `pnpm start --host 0.0.0.0 --port <a free port, not 7860 or 7861>` then `http://192.168.0.20:<port>/`.
