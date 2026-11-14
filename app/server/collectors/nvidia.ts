@@ -4,7 +4,6 @@ import {
   Deferred,
   Duration,
   Effect,
-  Exit,
   Option,
   Scope,
   String as Str,
@@ -13,6 +12,7 @@ import {
 } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 import { linesOf } from '../logs/lines.ts';
+import { closeWithin, FORCE_KILL_AFTER, type Followed, followProgram } from '../process/followed.ts';
 import { type NvidiaReader, normalizeBusId } from './gpu.ts';
 
 /*
@@ -22,12 +22,6 @@ import { type NvidiaReader, normalizeBusId } from './gpu.ts';
 
 const MiB = 1024 ** 2;
 const QUERY = 'index,uuid,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,pci.bus_id';
-
-/** How long the end of the stream waits for its reader: its last lines are not lost. */
-const DRAIN_TIMEOUT = '1 second';
-
-/** The backstop of a stream scope closed on a live nvidia-smi: SIGKILL that long after its SIGTERM. */
-const FORCE_KILL_AFTER = '1 second';
 
 /** How long a caller of the compute-apps query waits past its timeout for the program to be gone. */
 const KILL_GRACE = Duration.seconds(1);
@@ -86,10 +80,8 @@ export interface NvidiaSmi extends NvidiaReader {
   readonly start: Effect.Effect<void>;
 }
 
-/** A launched stream: what its reader and its watcher compare to know it is still the current one. */
-interface SmiStream {
-  readonly scope: Scope.Closeable;
-}
+/** A launched stream: what its reader compares to know it is still the current one. */
+type SmiStream = Followed;
 
 interface Held {
   readonly intervalMs: number;
@@ -129,6 +121,7 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
   readonly appsTimeout?: Duration.Input;
 }) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const context = yield* Effect.context<ChildProcessSpawner.ChildProcessSpawner>();
   const appsTimeout = Duration.fromInputUnsafe(options.appsTimeout ?? '3 seconds');
   // The streams and their watchers live in a scope the end of the caller's scope closes.
   const scope = yield* Effect.scope;
@@ -162,40 +155,25 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
 
   /** Launches the stream at `h.intervalMs`; a launch that fails makes nvidia-smi unavailable. */
   const launch = (h: Held): Effect.Effect<Held> =>
-    Effect.gen(function* () {
-      const streamScope = yield* Scope.fork(ops);
-      const spawned = yield* spawner
-        .spawn(
-          ChildProcess.make(
-            options.bin,
-            [`--query-gpu=${QUERY}`, '--format=csv,noheader,nounits', '-lms', String(h.intervalMs)],
-            { stdin: 'ignore', stderr: 'ignore', forceKillAfter: FORCE_KILL_AFTER },
-          ),
-        )
-        .pipe(Scope.provide(streamScope), Effect.result);
-      if (spawned._tag === 'Failure') {
-        yield* Scope.close(streamScope, Exit.void);
-        return { ...h, stream: Option.none(), available: false };
-      }
-      const handle = spawned.success;
-      const stream: SmiStream = { scope: streamScope };
-      const drained = yield* Deferred.make<void>();
-      yield* read(stream, handle.stdout).pipe(
-        Effect.ensuring(Deferred.succeed(drained, undefined)),
-        Effect.forkIn(streamScope),
-      );
-      // Once it exits, its reader is joined (1 s at most), then its scope is closed.
-      yield* handle.exitCode.pipe(
-        Effect.ignore,
-        Effect.andThen(Deferred.await(drained).pipe(Effect.interruptible, Effect.timeoutOption(DRAIN_TIMEOUT))),
-        Effect.andThen(Scope.close(streamScope, Exit.void)),
-        Effect.forkIn(ops),
-      );
-      return { ...h, stream: Option.some(stream), pending: [] };
-    });
+    followProgram({
+      command: ChildProcess.make(
+        options.bin,
+        [`--query-gpu=${QUERY}`, '--format=csv,noheader,nounits', '-lms', String(h.intervalMs)],
+        { stdin: 'ignore', stderr: 'ignore', forceKillAfter: FORCE_KILL_AFTER },
+      ),
+      parent: ops,
+      name: 'nvidia-smi',
+      read: (stream) => read(stream, stream.handle.stdout),
+    }).pipe(
+      Effect.match({
+        onFailure: (): Held => ({ ...h, stream: Option.none(), available: false }),
+        onSuccess: (stream): Held => ({ ...h, stream: Option.some(stream), pending: [] }),
+      }),
+      Effect.provideContext(context),
+    );
 
   /** Stops a stream without waiting for it: its reader no longer counts once the state names another one. */
-  const stop = (stream: SmiStream) => Effect.forkIn(Scope.close(stream.scope, Exit.void), ops).pipe(Effect.asVoid);
+  const stop = (stream: SmiStream) => Effect.forkIn(stream.stop, ops).pipe(Effect.asVoid);
 
   /** A change of the state that may launch a stream: uninterruptible, so no stream runs that the state does not name. */
   const changeStream = (f: (h: Held) => Effect.Effect<Held>) =>
@@ -220,40 +198,58 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
     });
   });
 
-  /** The compute-apps query; none on a timeout (the program killed), a failure or a non-zero exit. */
-  const queryApps = Effect.gen(function* () {
-    const spawned = yield* spawner
-      .spawn(
-        ChildProcess.make(
-          options.bin,
-          ['--query-compute-apps=pid,gpu_uuid,used_memory', '--format=csv,noheader,nounits'],
-          {
-            stdin: 'ignore',
-            stderr: 'ignore',
-            // A hung nvidia-smi (a driver fault) is not asked to stop.
-            killSignal: 'SIGKILL',
-          },
-        ),
-      )
-      .pipe(Effect.result);
-    if (spawned._tag === 'Failure') {
-      yield* SynchronizedRef.update(held, (h) => ({ ...h, available: false }));
-      return Option.none();
-    }
-    const handle = spawned.success;
-    return yield* Effect.all([Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode], {
-      concurrency: 2,
-    }).pipe(
-      Effect.timeoutOption(appsTimeout),
-      Effect.map(Option.flatMap(([text, code]) => (code === 0 ? Option.some(text) : Option.none()))),
-      Effect.orElseSucceed(() => Option.none<string>()),
+  /**
+   * The compute-apps query, its mapping kept when it gives one (not on a timeout, which kills it, a failure or a
+   * non-zero exit). Its program runs in a scope of its own, closed within the bound of `closeWithin`; `gone` completes
+   * once the program really is gone, a hung one (stuck in the driver) included.
+   */
+  const queryApps = (gone: Deferred.Deferred<void>) =>
+    Effect.acquireUseRelease(
+      Scope.make(),
+      (own) =>
+        Effect.gen(function* () {
+          const spawned = yield* spawner
+            .spawn(
+              ChildProcess.make(
+                options.bin,
+                ['--query-compute-apps=pid,gpu_uuid,used_memory', '--format=csv,noheader,nounits'],
+                {
+                  stdin: 'ignore',
+                  stderr: 'ignore',
+                  // A hung nvidia-smi (a driver fault) is not asked to stop.
+                  killSignal: 'SIGKILL',
+                },
+              ),
+            )
+            .pipe(Scope.provide(own), Effect.result);
+          if (spawned._tag === 'Failure') {
+            yield* SynchronizedRef.update(held, (h) => ({ ...h, available: false }));
+            return;
+          }
+          const handle = spawned.success;
+          const text = yield* Effect.all([Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode], {
+            concurrency: 2,
+          }).pipe(
+            Effect.timeoutOption(appsTimeout),
+            Effect.map(Option.flatMap(([out, code]) => (code === 0 ? Option.some(out) : Option.none()))),
+            Effect.orElseSucceed(() => Option.none<string>()),
+          );
+          if (Option.isSome(text))
+            yield* SynchronizedRef.update(held, (h) => ({ ...h, apps: parseComputeApps(text.value) }));
+        }),
+      (own) =>
+        closeWithin({
+          scope: own,
+          name: 'nvidia-smi --query-compute-apps',
+          onClosed: Deferred.succeed(gone, undefined),
+        }),
     );
-  }).pipe(Effect.scoped);
 
   /**
    * One query at a time: a call while one runs waits for that same query. The query runs in a fiber of its own, so a
    * caller waits `appsTimeout` and the kill's grace at most, even for a program the kill cannot end yet (stuck in the
-   * driver); the next query starts once it is gone. The previous mapping stays when the query gives none.
+   * driver); the next query starts once it is gone, so stuck queries do not pile up. The previous mapping stays when
+   * the query gives none.
    */
   const refreshApps = Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
@@ -263,18 +259,9 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
         Effect.gen(function* () {
           if (Option.isSome(running) && !(yield* Deferred.isDone(running.value)))
             return [running.value, running] as const;
-          const ended = yield* Deferred.make<void>();
-          yield* queryApps.pipe(
-            Effect.flatMap(
-              Option.match({
-                onNone: () => Effect.void,
-                onSome: (text) => SynchronizedRef.update(held, (h) => ({ ...h, apps: parseComputeApps(text) })),
-              }),
-            ),
-            Effect.ensuring(Deferred.succeed(ended, undefined)),
-            Effect.forkIn(ops),
-          );
-          return [ended, Option.some(ended)] as const;
+          const gone = yield* Deferred.make<void>();
+          yield* Effect.forkIn(queryApps(gone), ops);
+          return [gone, Option.some(gone)] as const;
         }),
       );
       yield* restore(Deferred.await(done).pipe(Effect.timeoutOption(Duration.sum(appsTimeout, KILL_GRACE))));

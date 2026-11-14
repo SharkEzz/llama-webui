@@ -1,19 +1,10 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, layer } from '@effect/vitest';
-import {
-  Array as Arr,
-  Duration,
-  Effect,
-  Exit,
-  FileSystem,
-  Option,
-  Path,
-  Schedule,
-  type Scope,
-  String as Str,
-} from 'effect';
-import type { ChildProcessSpawner } from 'effect/process';
+import { Array as Arr, Duration, Effect, Exit, FileSystem, Option, Path, Schedule, Scope, String as Str } from 'effect';
+import { ChildProcessSpawner } from 'effect/process';
 import { isAlive } from '../llama/procScan.ts';
+import { CLOSE_BOUND } from '../process/followed.ts';
+import { stuckRelease } from '../testing/stuckRelease.ts';
 import { MEASURE_ALL } from './gpu.ts';
 import { makeNvidiaSmi, parseComputeApps, parseNvidiaGpuLine } from './nvidia.ts';
 
@@ -260,6 +251,30 @@ layer(NodeServices.layer, { excludeTestServices: true })('nvidia-smi', (it) => {
         yield* Effect.sleep('50 millis');
         const alive = yield* isAlive(calls[0]?.pid ?? 0);
         assert.isFalse(alive);
+      }),
+    ),
+  );
+
+  it.effect('a hung query and a stream killed but stuck in the kernel hold neither the caller nor the end', () =>
+    withFakes((ws) =>
+      Effect.gen(function* () {
+        const stuck = yield* stuckRelease;
+        const bin = yield* fakeSmi(ws, `echo '${LINE}'; exec sleep 60`, 'exec sleep 30');
+        const scope = yield* Scope.make();
+        const smi = yield* makeNvidiaSmi({ bin, intervalMs: 1000, appsTimeout: '300 millis' }).pipe(
+          Scope.provide(scope),
+          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, stuck.spawner),
+        );
+        yield* smi.start;
+        yield* eventually(smi.gpus, (g) => g.length === 1);
+        // The query is killed on its timeout; its close does not come back.
+        const [first] = yield* Effect.timed(smi.refreshApps);
+        assert.isBelow(Duration.toMillis(first), 300 + 1000 + 500);
+        const [elapsed] = yield* Effect.timed(Scope.close(scope, Exit.void));
+        assert.isBelow(Duration.toMillis(elapsed), Duration.toMillis(CLOSE_BOUND) + 500);
+        const calls = yield* ws.calls;
+        assert.strictEqual(calls.length, 2);
+        yield* stuck.unstick;
       }),
     ),
   );
