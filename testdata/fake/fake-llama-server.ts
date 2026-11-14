@@ -59,7 +59,9 @@ if (args.includes("--version")) {
   process.stderr.write("version: 0.0.0-fake (build 1, commit fake)\n");
   await exit(0);
 }
-const port = Number(args[args.indexOf("--port") + 1] ?? 8080);
+const valueOf = (flag: string) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined);
+const port = Number(valueOf("--port") ?? 8080);
+const host = valueOf("--host") ?? "127.0.0.1";
 const slow = process.env.FAKE_SLOW_ARG !== undefined && args.includes(process.env.FAKE_SLOW_ARG);
 const loadMs = slow ? Number(process.env.FAKE_SLOW_MS ?? 5000) : Number(process.env.FAKE_LOAD_MS ?? 300);
 const t0 = Date.now();
@@ -68,15 +70,21 @@ const log = (s: string) => process.stderr.write(`0.00.000.000 I ${s}\n`);
 
 log("srv  main: loading model");
 log(`srv  main: cwd ${process.cwd()}`);
+// FAKE_ECHO_ENV=A,B: one line per variable, its value as the fake sees it.
+for (const name of (process.env.FAKE_ECHO_ENV ?? "").split(",").filter(Boolean)) {
+  log(`srv  main: env ${name}=${process.env[name] ?? "(unset)"}`);
+}
 if (process.env.FAKE_EXIT_LINES !== undefined) {
   for (const l of process.env.FAKE_EXIT_LINES.split("|")) log(l);
   await exit(1);
 }
 if (process.env.FAKE_FAIL_ARG !== undefined && args.includes(process.env.FAKE_FAIL_ARG)) {
   log("ggml_cuda: out of memory");
+  // FAKE_TAIL: a last line written without its newline.
+  if (process.env.FAKE_TAIL !== undefined) process.stderr.write(process.env.FAKE_TAIL);
   await exit(1);
 }
-const server = serve(port, "127.0.0.1", async (req) => {
+const server = serve(port, host, async (req) => {
   const path = new URL(req.url).pathname;
   const loading = Date.now() - t0 < loadMs;
   if (path === "/health") return loading ? new Response('{"error":"loading"}', { status: 503 }) : Response.json({ status: "ok" });
@@ -180,7 +188,7 @@ async function chat(req: Request): Promise<Response> {
   );
 }
 
-setTimeout(() => log("srv  main: server is listening on http://127.0.0.1:" + port), loadMs);
+setTimeout(() => log(`srv  main: server is listening on http://${host}:${port}`), loadMs);
 
 process.on("SIGTERM", () => {
   if (process.env.FAKE_IGNORE_TERM === "1") {

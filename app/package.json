@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node build/server.ts",
     "dev": "vite dev",
     "preview": "node .output/llama-webui.mjs",
     "typecheck": "tsc && tsc -p server"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
+    "@effect/platform-node": "catalog:",
+    "@effect/sql-sqlite-node": "catalog:",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@huggingface/gguf": "^0.4.6",
@@ -21,6 +23,7 @@
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "cn": "^0.5.2",
+    "effect": "catalog:",
     "llamacpp-js": "workspace:*",
     "lucide-react": "^1.72.0",
     "react": "catalog:",
@@ -39,13 +42,13 @@
     "zustand": "^5.1.0"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.187.0",
     "@vitejs/plugin-react": "^6.3.0",
-    "nitro": "3.0.261103-rc",
     "rolldown": "1.2.18",
     "typescript": "catalog:",
     "vite": "catalog:"

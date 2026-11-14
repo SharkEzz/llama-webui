@@ -12,8 +12,8 @@ import {
   SPLIT_MODES,
   serverArgs,
   serverArgsField,
-} from './bench';
-import { NOISE, PRESET_IDS, type PresetId, presetOf } from './tuning';
+} from './bench.ts';
+import { NOISE, PRESET_IDS, type PresetId, presetOf } from './tuning.ts';
 
 const values = <T extends z.ZodType>(t: T) => z.array(t).min(1, 'at least one value').optional();
 const p = BenchParamsSchema.shape;

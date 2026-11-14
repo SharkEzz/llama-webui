@@ -8,7 +8,7 @@ import {
   OOM_ERROR,
   paramsFromServerArgs,
   serverArgs,
-} from './bench';
+} from './bench.ts';
 
 test('paramsFromServerArgs splits a real profile into fields and the rest', () => {
   expect(

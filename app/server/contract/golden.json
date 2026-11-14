@@ -1,0 +1,1071 @@
+{
+  "GET /api/health": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "ok": true,
+      "version": "<version>",
+      "uptimeMs": "<uptimeMs>",
+      "bootId": "<bootId>"
+    }
+  },
+  "GET /api/settings": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "binary": "llama-server",
+      "host": "127.0.0.1",
+      "port": "<port>",
+      "modelsDir": "~/models",
+      "pollIntervalMs": 1000,
+      "historySeconds": 300,
+      "hiddenGpus": [],
+      "defaultProfileId": null,
+      "onboardingDone": false,
+      "collectors": {
+        "nvml": true,
+        "system": true,
+        "disk": true
+      },
+      "theme": "system",
+      "env": {}
+    }
+  },
+  "GET /api/logs": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "lines": [],
+      "seq": 0,
+      "bootId": "<bootId>"
+    }
+  },
+  "GET /api/logs?since=0": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "lines": [],
+      "seq": 0,
+      "bootId": "<bootId>"
+    }
+  },
+  "GET /api/logs?since=abc (not a line number)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a string matching the RegExp ^\\d+$ (since)",
+      "issues": [
+        {
+          "path": [
+            "since"
+          ],
+          "message": "Expected a string matching the RegExp ^\\d+$"
+        }
+      ]
+    }
+  },
+  "GET /api/server/state": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "state": {
+        "kind": "idle"
+      },
+      "command": null,
+      "profileId": null
+    }
+  },
+  "GET /api/state": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "server": {
+        "state": {
+          "kind": "idle"
+        },
+        "command": null,
+        "profileId": null
+      },
+      "logSeq": 0,
+      "bootId": "<bootId>"
+    }
+  },
+  "POST /api/server/stop (nothing runs)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "state": {
+        "kind": "idle"
+      },
+      "command": null,
+      "profileId": null
+    }
+  },
+  "POST /api/server/start (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "POST /api/server/switch (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "POST /api/server/restart (nothing launched)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "NoProfileToRestart",
+      "message": "No profile to restart"
+    }
+  },
+  "GET /api/server/props (not ready)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ServerNotReady",
+      "message": "Server not ready"
+    }
+  },
+  "POST /api/server/start (no profileId)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Missing key (profileId)",
+      "issues": [
+        {
+          "path": [
+            "profileId"
+          ],
+          "message": "Missing key"
+        }
+      ]
+    }
+  },
+  "POST /api/server/start (profileId a string)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected number (profileId)",
+      "issues": [
+        {
+          "path": [
+            "profileId"
+          ],
+          "message": "Expected number"
+        }
+      ]
+    }
+  },
+  "GET /api/monitor/history": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "intervalMs": 1000,
+      "capacity": 0,
+      "at": 0,
+      "times": [],
+      "series": {},
+      "bootId": "<bootId>"
+    }
+  },
+  "GET /api/monitor/snapshot": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": null
+  },
+  "GET /api/system/info": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "cpu",
+      "gpus",
+      "nvidiaSource"
+    ]
+  },
+  "GET /api/topology": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "graph",
+      "placement"
+    ]
+  },
+  "GET /api/health (foreign Origin)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Origin not allowed"
+    }
+  },
+  "GET /api/health (Host evil.example)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Host not allowed"
+    }
+  },
+  "GET /api/nope": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/settings/ (trailing slash)": {
+    "status": 308,
+    "headers": {
+      "location": "/api/settings"
+    }
+  },
+  "GET /api/settings/?x=1 (trailing slash, query)": {
+    "status": 308,
+    "headers": {
+      "location": "/api/settings?x=1"
+    }
+  },
+  "DELETE /api/health (a method the path lacks)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/health": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "GET /ws (no upgrade)": {
+    "status": 426,
+    "headers": {
+      "content-type": "text/plain;charset=utf-8"
+    },
+    "body": "WebSocket upgrade expected"
+  },
+  "GET / (the app)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-cache"
+    },
+    "body": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon-<hash>.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>llama-webui</title>\n    <script>\n      // Theme applied before rendering (no flash); same key as src/lib/theme.ts.\n      try {\n        const m = localStorage.getItem('llama-webui:theme');\n        const dark = m === 'dark' || (m !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);\n        document.documentElement.classList.toggle('dark', dark);\n        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';\n      } catch {\n        // localStorage unavailable: default theme\n      }\n    </script>\n    <script type=\"module\" crossorigin src=\"/assets/index-<hash>.js\"></script>\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/createLucideIcon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/hooks-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/button-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/ws-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usingCtx-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/FloatingRootStore-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usePositioner-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useOpenInteractionType-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/getPseudoElementBounds-<hash>.js\">\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-<hash>.css\">\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>\n"
+  },
+  "GET /chat/12 (deep URL)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-cache"
+    },
+    "body": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon-<hash>.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>llama-webui</title>\n    <script>\n      // Theme applied before rendering (no flash); same key as src/lib/theme.ts.\n      try {\n        const m = localStorage.getItem('llama-webui:theme');\n        const dark = m === 'dark' || (m !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);\n        document.documentElement.classList.toggle('dark', dark);\n        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';\n      } catch {\n        // localStorage unavailable: default theme\n      }\n    </script>\n    <script type=\"module\" crossorigin src=\"/assets/index-<hash>.js\"></script>\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/createLucideIcon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/hooks-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/button-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/ws-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usingCtx-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/FloatingRootStore-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usePositioner-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useOpenInteractionType-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/getPseudoElementBounds-<hash>.js\">\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-<hash>.css\">\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>\n"
+  },
+  "GET /assets/index-<hash>.js (hashed asset)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/javascript; charset=utf-8",
+      "cache-control": "public, max-age=31536000, immutable"
+    }
+  },
+  "GET /assets/index-00000000.js (missing asset)": {
+    "status": 404,
+    "headers": {}
+  },
+  "PATCH /api/settings (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "PATCH /api/settings (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "PATCH /api/settings (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SettingsInvalid",
+      "message": "Invalid settings",
+      "issues": [
+        {
+          "path": [
+            "pollIntervalMs"
+          ],
+          "message": "Between 250 and 60000 ms"
+        }
+      ]
+    }
+  },
+  "PATCH /api/settings": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "binary": "llama-server",
+      "host": "127.0.0.1",
+      "port": "<port>",
+      "modelsDir": "~/models",
+      "pollIntervalMs": 2000,
+      "historySeconds": 300,
+      "hiddenGpus": [],
+      "defaultProfileId": null,
+      "onboardingDone": false,
+      "collectors": {
+        "nvml": true,
+        "system": true,
+        "disk": true
+      },
+      "theme": "system",
+      "env": {}
+    }
+  },
+  "GET /api/profiles (none yet)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": []
+  },
+  "POST /api/profiles": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "name": "Alpha",
+      "model": "/models/a.gguf",
+      "port": 8081,
+      "args": [
+        "-c",
+        "4096"
+      ],
+      "env": {
+        "A": "1"
+      },
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "POST /api/profiles (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: unknown key (extra)",
+      "issues": [
+        {
+          "path": [
+            "extra"
+          ],
+          "message": "unknown key"
+        },
+        {
+          "path": [
+            "name"
+          ],
+          "message": "cannot be empty"
+        },
+        {
+          "path": [
+            "port"
+          ],
+          "message": "port between 1 and 65535"
+        },
+        {
+          "path": [
+            "args",
+            "0"
+          ],
+          "message": "--port is managed by llama-webui (use the profile fields)"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (name taken)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNameTaken",
+      "message": "A profile named “Alpha” already exists"
+    }
+  },
+  "GET /api/profiles/1": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "name": "Alpha",
+      "model": "/models/a.gguf",
+      "port": 8081,
+      "args": [
+        "-c",
+        "4096"
+      ],
+      "env": {
+        "A": "1"
+      },
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "GET /api/profiles/999 (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "GET /api/profiles/abc (id that is not a number)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/profiles/1": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "name": "Alpha 2",
+      "model": "/models/a.gguf",
+      "args": [],
+      "env": {},
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "POST /api/profiles/1/duplicate": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 2,
+      "name": "Alpha 2 (copy)",
+      "model": "/models/a.gguf",
+      "args": [],
+      "env": {},
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "GET /api/profiles/1/export": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "content-disposition": "attachment; filename*=UTF-8''Alpha%202.json"
+    },
+    "body": {
+      "name": "Alpha 2",
+      "model": "/models/a.gguf",
+      "args": [],
+      "env": {}
+    }
+  },
+  "GET /api/profiles/export": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "content-disposition": "attachment; filename*=UTF-8''llama-webui-profiles.json"
+    },
+    "body": {
+      "profiles": [
+        {
+          "name": "Alpha 2",
+          "model": "/models/a.gguf",
+          "args": [],
+          "env": {}
+        },
+        {
+          "name": "Alpha 2 (copy)",
+          "model": "/models/a.gguf",
+          "args": [],
+          "env": {}
+        }
+      ]
+    }
+  },
+  "POST /api/profiles/import": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "imported": [
+        {
+          "id": 3,
+          "name": "Beta",
+          "model": "/models/b.gguf",
+          "args": [],
+          "env": {},
+          "source": "import",
+          "createdAt": "<time>",
+          "updatedAt": "<time>"
+        }
+      ],
+      "skipped": [
+        {
+          "name": "bad",
+          "reason": "required (model)"
+        },
+        {
+          "name": "Beta",
+          "reason": "duplicate name in the file"
+        },
+        {
+          "name": "Alpha 2",
+          "reason": "already exists"
+        }
+      ]
+    }
+  },
+  "DELETE /api/profiles/2": {
+    "status": 204,
+    "headers": {}
+  },
+  "DELETE /api/profiles/999 (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "GET /api/profiles (after the writes)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": [
+      {
+        "id": 1,
+        "name": "Alpha 2",
+        "model": "/models/a.gguf",
+        "args": [],
+        "env": {},
+        "source": "ui",
+        "createdAt": "<time>",
+        "updatedAt": "<time>"
+      },
+      {
+        "id": 3,
+        "name": "Beta",
+        "model": "/models/b.gguf",
+        "args": [],
+        "env": {},
+        "source": "import",
+        "createdAt": "<time>",
+        "updatedAt": "<time>"
+      }
+    ]
+  },
+  "PATCH /api/settings (binary: the fake llama-server)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "binary": "<repo>/testdata/fake/fake-llama-server",
+      "host": "127.0.0.1",
+      "port": "<port>",
+      "modelsDir": "~/models",
+      "pollIntervalMs": 2000,
+      "historySeconds": 300,
+      "hiddenGpus": [],
+      "defaultProfileId": null,
+      "onboardingDone": false,
+      "collectors": {
+        "nvml": true,
+        "system": true,
+        "disk": true
+      },
+      "theme": "system",
+      "env": {}
+    }
+  },
+  "GET /api/flags": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "flags": [
+        {
+          "names": [
+            "-c",
+            "--ctx-size"
+          ],
+          "value": "N",
+          "help": "size of the prompt context",
+          "section": "common params"
+        }
+      ]
+    }
+  },
+  "PATCH /api/settings (binary: a program that is not there)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "binary": "<tmp>/no-such-llama-server",
+      "host": "127.0.0.1",
+      "port": "<port>",
+      "modelsDir": "~/models",
+      "pollIntervalMs": 2000,
+      "historySeconds": 300,
+      "hiddenGpus": [],
+      "defaultProfileId": null,
+      "onboardingDone": false,
+      "collectors": {
+        "nvml": true,
+        "system": true,
+        "disk": true
+      },
+      "theme": "system",
+      "env": {}
+    }
+  },
+  "GET /api/flags (--help fails)": {
+    "status": 503,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "FlagsUnavailable",
+      "message": "llama-server --help failed (<tmp>/no-such-llama-server)"
+    }
+  },
+  "GET /api/chat (none yet)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": []
+  },
+  "POST /api/chat (no profile: none runs)": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "title": "New conversation",
+      "profileId": null,
+      "modelPath": null,
+      "systemPrompt": "",
+      "sampling": {},
+      "thinking": true,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "POST /api/chat (profile 1)": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 2,
+      "title": "New conversation",
+      "profileId": 1,
+      "modelPath": "/models/a.gguf",
+      "systemPrompt": "",
+      "sampling": {},
+      "thinking": true,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "POST /api/chat (profileId a string)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected number | null (profileId)",
+      "issues": [
+        {
+          "path": [
+            "profileId"
+          ],
+          "message": "Expected number | null"
+        }
+      ]
+    }
+  },
+  "POST /api/chat (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/chat (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "GET /api/chat/1": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "title": "New conversation",
+      "profileId": null,
+      "modelPath": null,
+      "systemPrompt": "",
+      "sampling": {},
+      "thinking": true,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "GET /api/chat/999 (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "PATCH /api/chat/1": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "title": "Renamed",
+      "profileId": null,
+      "modelPath": null,
+      "systemPrompt": "Be brief.",
+      "sampling": {
+        "temperature": 0.5
+      },
+      "thinking": false,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "PATCH /api/chat/1 (unknown key)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: unknown key (nope)",
+      "issues": [
+        {
+          "path": [
+            "nope"
+          ],
+          "message": "unknown key"
+        }
+      ]
+    }
+  },
+  "PATCH /api/chat/1 (title a number)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected string (title)",
+      "issues": [
+        {
+          "path": [
+            "title"
+          ],
+          "message": "Expected string"
+        }
+      ]
+    }
+  },
+  "PATCH /api/chat/999 (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "GET /api/chat/1/stream (no reply in progress)": {
+    "status": 204,
+    "headers": {}
+  },
+  "GET /api/chat/999/stream (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "POST /api/chat/1/messages (llama-server not ready)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ServerNotReady",
+      "message": "llama-server is not ready"
+    }
+  },
+  "POST /api/chat/1/messages (blank)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "EmptyMessage",
+      "message": "Empty message"
+    }
+  },
+  "POST /api/chat/1/messages (content a number)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected string (content)",
+      "issues": [
+        {
+          "path": [
+            "content"
+          ],
+          "message": "Expected string"
+        }
+      ]
+    }
+  },
+  "POST /api/chat/999/messages (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "POST /api/chat/1/regenerate (llama-server not ready)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ServerNotReady",
+      "message": "llama-server is not ready"
+    }
+  },
+  "POST /api/chat/999/regenerate (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "POST /api/chat/1/stop (no reply in progress)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "NoReplyInProgress",
+      "message": "No reply in progress"
+    }
+  },
+  "POST /api/chat/999/stop (no such conversation: no reply in progress)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "NoReplyInProgress",
+      "message": "No reply in progress"
+    }
+  },
+  "DELETE /api/chat/2": {
+    "status": 204,
+    "headers": {}
+  },
+  "DELETE /api/chat/999 (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "GET /api/chat (after the writes)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": [
+      {
+        "id": 1,
+        "title": "Renamed",
+        "updatedAt": "<time>",
+        "messageCount": 0,
+        "modelPath": null,
+        "live": false
+      }
+    ]
+  }
+}

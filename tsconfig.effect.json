@@ -1,0 +1,234 @@
+{
+  "$schema": "./node_modules/@effect/tsgo/schema.json",
+  // The Effect language service (`@effect/tsgo`, patched into `tsc` by the root `prepare` script) for the projects that
+  // hold Effect code: the server (`app/server/tsconfig.json`) and the shared package
+  // (`packages/webui-shared/tsconfig.json`) extend this file and declare no plugin of their own. Its diagnostics are
+  // blocking, warnings included: `pnpm check` prints no `effect(<rule>)` line.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnosticSeverity": {
+          "abortControllerInEffect": "error",
+          "acquireReleaseDisposable": "error",
+          "allOfMapToForEach": "error",
+          "anyUnknownInErrorContext": "warning",
+          // Off for the reason unstableApiUsage is: nearly every Effect module beyond the core is unstable
+          "apiStabilityLeak": "off",
+          "asyncFunction": "warning",
+          "catchAllTagDispatchToCatchTag": "error",
+          "catchAllToMapError": "error",
+          "catchChainToFirstSuccessOf": "error",
+          "catchConditionalRefailToCatchIf": "error",
+          "catchDieToOrDie": "error",
+          "catchIfTagToCatchTag": "error",
+          "catchRefailToTapError": "error",
+          "catchTagToCatchReason": "error",
+          "catchToIgnore": "error",
+          "catchToOrElseSucceed": "error",
+          "catchUnfailableEffect": "error",
+          "cryptoRandomUUID": "warning",
+          "cryptoRandomUUIDInEffect": "warning",
+          "deterministicKeys": "warning",
+          "duplicatePackage": "error",
+          "effectDoNotation": "warning",
+          "effectFnIife": "error",
+          "effectFnOpportunity": "error",
+          "effectGenUsesAdapter": "error",
+          "effectInFailure": "error",
+          "effectInVoidSuccess": "error",
+          "effectMapFlatten": "error",
+          "effectMapVoid": "error",
+          "effectSleepZeroToYieldNow": "error",
+          "effectSucceedWithUndefined": "error",
+          "effectSucceedWithVoid": "error",
+          "effectTryWithoutCatch": "warning",
+          "errorPayloadShadowsName": "error",
+          "experimentalApiUsage": "error",
+          "extendsNativeError": "warning",
+          "failCauseToConstructor": "error",
+          "flatMapConditionalToFilterOrFail": "error",
+          "flatMapIdentityToFlatten": "error",
+          "flatMapIgnoredParamToAndThen": "error",
+          "flatMapToMap": "error",
+          "flatMapToTap": "error",
+          "genericEffectServices": "error",
+          "globalConsole": "warning",
+          "globalConsoleInEffect": "warning",
+          "globalDate": "warning",
+          "globalDateInEffect": "warning",
+          "globalErrorInEffectCatch": "error",
+          "globalErrorInEffectFailure": "error",
+          "globalFetch": "warning",
+          "globalFetchInEffect": "warning",
+          "globalJson": "warning",
+          "globalJsonInEffect": "warning",
+          "globalRandom": "warning",
+          "globalRandomInEffect": "warning",
+          "globalTimers": "warning",
+          "globalTimersInEffect": "warning",
+          "instanceOfSchema": "warning",
+          "layerMergeAllWithDependencies": "error",
+          "lazyEffect": "error",
+          "lazyPromiseInEffectSync": "error",
+          "leakingRequirements": "error",
+          "manualMetricTapToTrack": "error",
+          "mapConstToAs": "error",
+          "mapMapErrorToMapBoth": "warning",
+          "mapSomeCatchNoSuchElement": "error",
+          "mapSomeToAsSome": "error",
+          "matchBooleanToIsSuccess": "error",
+          "matchEffectToMapBoth": "error",
+          "matchEffectToMatch": "error",
+          "matchToResultOrOption": "error",
+          "missedPipeableOpportunity": "warning",
+          "missingEffectServiceDependency": "warning",
+          "missingPipeableSignature": "warning",
+          "multipleCatchTag": "error",
+          "multipleEffectProvide": "error",
+          "nestedEffectGenYield": "warning",
+          "newPromise": "warning",
+          "newSchemaClass": "warning",
+          "nodeBuiltinImport": "warning",
+          "obsoleteMatchImport": "error",
+          "obsoleteSchemaImport": "error",
+          "onExitFailureToOnError": "error",
+          "optionMatchToFromOption": "error",
+          "outdatedApi": "error",
+          "preferBarrelImport": "warning",
+          "preferEffectArray": "warning",
+          "preferEffectRecord": "warning",
+          "preferEffectString": "warning",
+          "preferNamespaceImport": "warning",
+          "preferSchemaTaggedError": "warning",
+          "preferSchemaTypeProperty": "warning",
+          "preferSucceedSomeOrNone": "error",
+          "preferTypedSchemaDecoder": "error",
+          "preferUnsafeConstructor": "error",
+          "processEnv": "warning",
+          "processEnvInEffect": "warning",
+          "promiseInEffectSuccess": "error",
+          "provideLayerSucceedToProvideService": "error",
+          "provideMergeAllToArray": "warning",
+          "raceFirstWithSleepToTimeout": "error",
+          "redundantMapError": "error",
+          "redundantOrDie": "error",
+          "redundantSchemaTagIdentifier": "error",
+          "resultMatchToFromResult": "error",
+          "returnEffectInGen": "error",
+          "runEffectInsideEffect": "error",
+          "runOfExitToRunExit": "error",
+          // POC: a warning until the server is migrated (the examples of `repos/effect/LLMS.md` have no brand)
+          "schemaClassMissingBrand": "warning",
+          "schemaClassObjectLiteral": "error",
+          "schemaNumber": "error",
+          "schemaStructWithTag": "error",
+          "schemaSync": "warning",
+          "schemaSyncInEffect": "error",
+          "schemaUnionOfLiterals": "warning",
+          "scopeInLayerEffect": "error",
+          "serviceNotAsClass": "warning",
+          "strictBooleanExpressions": "warning",
+          "strictEffectProvide": "warning",
+          "suspendFailToFailSync": "error",
+          "syncToSucceed": "error",
+          "timeoutCatchTagToTimeoutOrElse": "error",
+          "tryCatchInEffectGen": "error",
+          "typeUnionToSchemaUnion": "warning",
+          "unknownInEffectCatch": "error",
+          "unnecessaryArrowBlock": "warning",
+          "unnecessaryEffectGen": "error",
+          "unnecessaryFailYieldableError": "error",
+          "unnecessaryPipe": "error",
+          "unnecessaryPipeChain": "error",
+          "unnecessaryTypeofType": "error",
+          "unsafeEffectTypeAssertion": "warning",
+          // Allowed: most of Effect beyond the core (http, sql, platform…) is still tagged `@stability unstable`
+          "unstableApiUsage": "off",
+          "yieldInCallArgument": "warning"
+        },
+        // Globs are relative to this file; a later entry wins over an earlier one.
+        "overrides": [
+          {
+            // Code that drives the build from outside (child process, fetch, timers): the platform is its subject.
+            "include": [
+              "**/testing/**/*.ts",
+              "**/contract/**/*.ts",
+              "**/lifecycle.test.ts",
+              "**/build.test.ts",
+              "**/dev.test.ts",
+              "**/runApp.test.ts"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "nodeBuiltinImport": "off",
+                "asyncFunction": "off",
+                "newPromise": "off",
+                "globalFetch": "off",
+                "globalTimers": "off",
+                "globalDate": "off",
+                "globalConsole": "off",
+                "globalJson": "off",
+                "globalRandom": "off",
+                "processEnv": "off",
+                "cryptoRandomUUID": "off",
+                // Plain JavaScript there: no Effect helper asked for a regex over a bundle or a list of files.
+                "preferEffectArray": "off",
+                "preferEffectString": "off",
+                "preferEffectRecord": "off",
+                "missingPipeableSignature": "off",
+                "missedPipeableOpportunity": "off",
+                "strictBooleanExpressions": "off"
+              }
+            }
+          },
+          {
+            // The shared package's pure logic stays plain TypeScript (spec): not asked to be written with Effect.
+            "include": ["packages/webui-shared/src/**/*.ts"],
+            "options": {
+              "diagnosticSeverity": {
+                "strictBooleanExpressions": "off",
+                "preferEffectArray": "off",
+                "preferEffectString": "off",
+                "preferEffectRecord": "off",
+                "missingPipeableSignature": "off",
+                "missedPipeableOpportunity": "off",
+                "nodeBuiltinImport": "off",
+                "asyncFunction": "off",
+                "globalJson": "off"
+              }
+            }
+          },
+          {
+            // Its Effect modules follow the server's rules. Each milestone adds the modules it moves to Schema.
+            "include": [
+              "packages/webui-shared/src/api/**/*.ts",
+              "packages/webui-shared/src/chat.ts",
+              "packages/webui-shared/src/logs.ts",
+              "packages/webui-shared/src/monitor.ts",
+              "packages/webui-shared/src/profile.ts",
+              "packages/webui-shared/src/server.ts",
+              "packages/webui-shared/src/settings.ts",
+              "packages/webui-shared/src/topology.ts",
+              "packages/webui-shared/src/ws.ts"
+            ],
+            "options": {
+              "diagnosticSeverity": {
+                "strictBooleanExpressions": "warning",
+                "preferEffectArray": "warning",
+                "preferEffectString": "warning",
+                "preferEffectRecord": "warning",
+                "missingPipeableSignature": "warning",
+                "missedPipeableOpportunity": "warning",
+                "nodeBuiltinImport": "warning",
+                "asyncFunction": "warning",
+                "globalJson": "warning"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

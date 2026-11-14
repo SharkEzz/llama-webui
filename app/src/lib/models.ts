@@ -1,6 +1,7 @@
 import { defer, type ModelEntry, type ModelList, type ModelSummary } from '@llama-webui/shared';
 import { create } from 'zustand';
 import { api } from './api';
+import { stem } from './stem';
 
 interface ModelsState {
   list: ModelList | null;
@@ -27,9 +28,6 @@ export const useModels = create<ModelsState>((set, get) => ({
 }));
 
 export const readable = (e: ModelEntry): e is { ok: true } & ModelSummary => e.ok;
-
-/** File name without folder or extension. */
-export const stem = (path: string) => path.replace(/^.*\//, '').replace(/(-\d{5}-of-\d{5})?\.gguf$/, '');
 
 const QUANT = /^(b?f\d+|q\d\w*|iq\d\w*|mxfp\d+)$/i;
 

@@ -1,3 +1,32 @@
+<!-- repository-context-instructions -->
+## Vendored Repositories
+
+This project vendors external repositories under repos/
+
+- Use vendored repositories as read-only reference material when working with related libraries
+- Prefer examples and patterns from the vendored source code over generated guesses or web search results
+- Do not edit files under repos/ unless explicitly asked
+- Do not import from repos/ - application code should continue importing from normal package dependencies
+<!-- /repository-context-instructions -->
+
+# Learning more about Effect
+
+This repository uses the Effect Typescript library (POC on the `poc/effect` branch: the server moves from Nitro to Effect).
+
+Before writing any Effect code, first read `repos/effect/LLMS.md` **completely**, and follow the links in the file when required (they are relative to `repos/effect/`).
+
+If you need to learn more about particular Effect apis and concepts that the guide doesn't cover, search through the source code in `repos/effect/packages/effect/src` (`repos/effect/packages/` for the `@effect/*` packages). `repos/effect` is the same version as the installed packages: read it rather than `node_modules`.
+
+Sur `poc/effect`, les règles du nouveau serveur (`app/server/`, `packages/webui-shared/src/api/`) sont dans `docs/superpowers/poc-effect/conventions.md` : où va chaque partie d'un domaine, le régime des diagnostics Effect, le SQL, l'ajout d'un groupe, d'un service, d'une étape d'arrêt, d'un message `/ws`, d'un cas de contrat ou d'une page, et les commandes. Le lire avant d'écrire du code du serveur ; les sections ci-dessous décrivent encore le serveur Nitro (`app/server-legacy/`) jusqu'à E10.
+
+Depuis E4, deux règles des sections ci-dessous changent sur `poc/effect`. L'échantillonneur NVML n'est plus un `fork` : c'est un programme Effect (`app/server/collectors/nvml/worker.ts`, `node:ffi` sans directive) lancé par `effect/process` (`node --disable-warning=ExperimentalWarning`), à qui le serveur parle en NDJSON sur stdin et stdout (schémas de `protocol.ts`, les mêmes des deux côtés) ; il sort à la fin de son stdin, la fin de son scope le tue par SIGKILL, et il tourne tel quel en dev, `.output/server/nvml-worker.mjs` (Rolldown, `app/build/server.ts`, à côté de `index.mjs`) en production ; un faux échantillonneur de test est `app/server/testing/fixtures/fakeNvml.ts`. `LLAMA_WEBUI_TEST_MONITOR=stub` (valeur exacte, lue par `Monitor.layer`) donne `Monitor.layerStub` (ni collecteurs, ni snapshot, historique vide) : le `launch()` de la suite de contrat le pose ; `LLAMA_WEBUI_NVML_LIB` et `LLAMA_WEBUI_NVIDIA_SMI` sont lus par `Collectors.layer`.
+
+Depuis E5, deux autres règles changent sur `poc/effect`. Le flux du chat ne passe plus par `llamaFetch` : toute requête à llama-server passe par `LlamaHttp` (`app/server/llama/chatStream.ts` pour le chat ; `app/server-legacy/lib/llamaFetch.ts` reste la référence du bench, E7, et de `downloadFetch`, E6). Le SSE du chat n'est plus `createEventStream` de h3 : un endpoint qui répond un flux déclare `HttpApiSchema.StreamSse` et son handler (`handle`, jamais `handleRaw`, qui ne décode pas le corps) répond `sseResponse` de `app/server/http/Sse.ts` (en-têtes de Nitro, `: ping` toutes les 15 s) ; le web le lit par `callStream` de `app/src/lib/api.ts` (voir « Replies » de `conventions.md`).
+
+# llama-webui
+
+> **Sur `poc/effect` :** le serveur est le serveur Effect de `app/server/` (point d'entrée `app/server/main.ts`, build par `app/build/server.ts`). Les sections ci-dessous qui décrivent Nitro, `lib/`, `routes/` et `api.gen.ts` décrivent `app/server-legacy/`, une référence en lecture seule (ni importée, ni lue par Biome, ni éditée) ; là où elles divergent du plan du jalon en cours, le plan l'emporte. Les autres sections sont réécrites à E10.
+
 L'app tourne sur Node (≥ 26.13, un seul processus) ; pnpm installe et lance les scripts. Elle est construite sur **Nitro v3** (h3 v2, srvx, crossws), dans un seul package `app/` : le client React (`app/src/`) et le serveur (`app/server/`, le `serverDir` de Nitro).
 
 - Lancer : `pnpm dev` (`vite dev` dans `app/` : HMR de l'UI, serveur dans le worker de dev de Nitro, réévalué à chaque sauvegarde), `pnpm start` (build puis production) ; un fichier TS se lance par `node <fichier>` (syntaxe effaçable).
@@ -13,6 +42,7 @@ L'app, ses tests et son build tournent sur Node ; pnpm installe et lance les scr
 - `pnpm install` à la racine installe tout le dépôt, `site/` compris : un seul `pnpm-lock.yaml` (à commiter avec tout changement de dépendance ; la CI fait `pnpm install --frozen-lockfile`). Workspaces (`packages/*`, `app`, `site`), catalogue et réglages pnpm dans `pnpm-workspace.yaml` (pas de champ `workspaces` dans `package.json`, pas de réglage dans `.npmrc`).
 - Le `catalog:` de `pnpm-workspace.yaml` fixe les versions qui doivent bouger ensemble (`"react": "catalog:"`) : pour une de ses entrées, changer la version là, pas dans les `package.json`. D'autres dépendances partagées (`@types/react`, `lucide-react`, `shadcn`…) ont encore leur version dans chaque `package.json` : candidat de refactoring (backlog de `docs/superpowers/plans/2026-11-12-node-migration-notes.md`), à ne pas migrer au passage.
 - `allowBuilds` (absent tant qu'aucun paquet n'en a besoin) liste les scripts d'installation autorisés ; un paquet non listé qui en a un fait échouer l'installation : décider `true` (une fonctionnalité en a besoin) ou `false`. Garder les entrées `minimumReleaseAgeExclude` que pnpm ajoute.
+- `effect` et les `@effect/*` (`platform-node`, `sql-sqlite-node`, `vitest`) sont épinglés à la même version exacte dans le `catalog:`, celle de la copie de référence `repos/effect` (git subtree) : une montée de version change les deux ensemble. Le script `prepare` racine (`effect-tsgo patch`) installe le language service d'Effect dans le `tsc` de `node_modules` à chaque `pnpm install`.
 - `nitro` est épinglé en version exacte (une RC) dans `app/package.json` : une montée de version se fait seule, suites vertes.
 - Biome ne détecte pas React depuis une version `catalog:` (même avec `javascript.resolver.experimentalPnpmCatalogs`) : le domaine `react` est activé explicitement pour `app/src/**` et `site/**` dans `biome.jsonc`.
 
@@ -42,13 +72,13 @@ test('hello world', () => {
 
 ## Type checking
 
-`pnpm check` = `pnpm -r --parallel --include-workspace-root typecheck` : le script `typecheck` de chaque package du workspace, tous en même temps (`tsc` ; racine : `tsc -p scripts` ; `app` : `tsc && tsc -p server` ; `site` : `react-router typegen && tsc`). TypeScript 7 (`tsc` natif), version dans le `catalog:`.
+`pnpm check` = `pnpm -r --parallel --include-workspace-root typecheck` : le script `typecheck` de chaque package du workspace, tous en même temps (`tsc` ; racine : `tsc -p scripts` ; `app` : `tsc && tsc -p server` ; `site` : `react-router typegen && tsc`). TypeScript 7 (`tsc` natif), version dans le `catalog:`. Le projet du serveur (`app/server/tsconfig.json`) active le language service d'Effect (`@effect/tsgo`, plugin `@effect/language-service`) : ses diagnostics sortent dans `tsc` (`effect(<règle>)`), sévérités dans `diagnosticSeverity`. Pendant le POC, les warnings ne font pas échouer `tsc` (`ignoreEffectWarningsInTscExitCode` : le serveur pas encore migré en émet ~2 700, la liste de migration), les erreurs si. `unstableApiUsage` est coupée (`off`) : presque tout Effect hors du cœur est `@stability unstable` (`effect/http`, `effect/sql`, `effect/FileSystem`, les `@effect/*`…), d'où la version exacte dans le `catalog:` et une montée de version faite seule, suites vertes.
 
 **Dans ce projet :** pas de `tsconfig.json` racine ni de project references : chaque base de code a son `tsconfig.json` (`packages/llamacpp-js` en types Node seuls et résolution NodeNext, tests compris, `packages/webui-shared`, `scripts`, et deux pour `app/` : `app/tsconfig.json` pour `src/`, `build/` et `vite.config.ts` (DOM + Node), `app/server/tsconfig.json` pour le serveur et ses tests (Node seul)), qui étend `tsconfig.base.json` (options communes, `noEmit`) et n'ajoute que ses types et ses fichiers. Un projet qui importe un autre package ou dossier en vérifie les sources avec ses propres options (le client celles du serveur, par `api.gen.ts`). Nouveau package → un `tsconfig.json` qui étend la base, un script `typecheck` (`tsc`) et `typescript` (`catalog:`) en devDependency ; pas de `paths` vers des sources d'un autre package.
 
 ## Format et lint (Biome)
 
-Biome (devDependency épinglée, config dans `biome.jsonc`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`app/`, `packages/`, `scripts/`). Règles : preset `recommended` et domaines `tailwind`, `test`, `project` (graphe de modules) et `types` (inférence de types) en `recommended`, plus `react` pour `app/src/**` et `site/**`. `**/src/components/ui` (shadcn généré, app et site) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn ; `app/server/api.gen.ts` et `golden.json` (générés) aussi. Ces exclusions s'écrivent `!` dans `files.includes` (le fichier reste indexé pour les domaines `project` et `types`), pas `!!` (réservé aux sorties de build).
+Biome (devDependency épinglée, config dans `biome.jsonc`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`app/`, `packages/`, `scripts/`). Règles : preset `recommended` et domaines `tailwind`, `test`, `project` (graphe de modules) et `types` (inférence de types) en `recommended`, plus `react` pour `app/src/**` et `site/**`. `correctness/useYield` est coupée pour `app/server/**` : un générateur d'Effect (`Effect.gen`, `Effect.fn`) n'a pas toujours de `yield`. `**/src/components/ui` (shadcn généré, app et site) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn ; `app/server/api.gen.ts` et `golden.json` (générés) aussi. Ces exclusions s'écrivent `!` dans `files.includes` (le fichier reste indexé pour les domaines `project` et `types`), pas `!!` (réservé aux sorties de build et à `repos/`, les dépôts de référence, jamais importés : pas même indexés).
 
 - `pnpm lint` : vérifie format + lint + imports (lecture seule) ; `pnpm lint:fix` applique les corrections sûres.
 - **Avant de clore un jalon / milestone / lot de travail** (et avant de commiter ou d'ouvrir une PR), tout doit être vert : `pnpm lint`, `pnpm check`, `pnpm test`. Zéro erreur et zéro warning Biome.

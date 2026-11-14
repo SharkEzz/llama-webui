@@ -1,12 +1,4 @@
-import {
-  DEFAULT_SETTINGS,
-  defer,
-  type ModelKind,
-  type Profile,
-  profileModelPath,
-  reservedFlag,
-  type Settings,
-} from '@llama-webui/shared';
+import { DEFAULT_SETTINGS, defer, type Profile, reservedFlag, type Settings } from '@llama-webui/shared';
 import { Copy, Download, Play, Save, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -14,16 +6,13 @@ import { CodeTextarea } from '@/components/CodeTextarea';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
-import { ModelPicker } from '@/features/models/ModelPicker';
-import { ApiError } from '@/lib/api';
-import { useModels } from '@/lib/models';
-import { createProfile, deleteProfile, duplicateProfile, updateProfile } from '@/lib/profiles';
+import { createProfile, deleteProfile, duplicateProfile, type NewProfile, updateProfile } from '@/lib/profiles';
 import { isRunning, restartServer, startProfile, useServer } from '@/lib/server';
 import { ArgsEditor } from './ArgsEditor';
 import { parseArgs, parseEnv } from './argsText';
 import { commandChanged, type Draft, draftOf } from './draft';
+import { type FieldErrors, fieldErrors } from './errors';
 import { highlightEnv } from './highlight';
 
 interface ProfileFormProps {
@@ -37,8 +26,7 @@ interface ProfileFormProps {
 
 export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: ProfileFormProps) {
   const [draft, setDraft] = useState(() => draftOf(profile, initial));
-  const models = useModels((s) => s.list);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
   const [restartAsk, setRestartAsk] = useState(false);
   const view = useServer((s) => s.view);
@@ -55,13 +43,18 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
   const save = async () => {
     if (blocked || !Array.isArray(args) || 'error' in env) return;
     const port = draft.port.trim();
-    const input = {
+    // An empty optional field is left out: the profile then takes the value of the settings.
+    const optional = (key: 'mmproj' | 'cwd' | 'host') => {
+      const value = draft[key].trim();
+      return value ? { [key]: value } : {};
+    };
+    const input: NewProfile = {
       name: draft.name.trim(),
       model: draft.model.trim(),
-      mmproj: draft.mmproj.trim() || undefined,
-      cwd: draft.cwd.trim() || undefined,
-      host: draft.host.trim() || undefined,
-      port: port ? Number(port) : undefined,
+      ...optional('mmproj'),
+      ...optional('cwd'),
+      ...optional('host'),
+      ...(port ? { port: Number(port) } : {}),
       args,
       env,
     };
@@ -75,42 +68,10 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
       if (profile && isActive && commandChanged(profile, saved)) setRestartAsk(true);
       onSaved(saved);
     } catch (e) {
-      if (e instanceof ApiError && e.issues.length > 0) {
-        const byField: Record<string, string> = {};
-        for (const i of e.issues) byField[String(i.path[0] ?? '')] ??= i.message;
-        setErrors(byField);
-      } else if (e instanceof ApiError && e.status === 409) setErrors({ name: e.message });
+      setErrors(fieldErrors(e));
       toast.error(e instanceof Error ? e.message : String(e));
     }
   };
-
-  /** File chosen in the picker: fills the working directory if empty, relative path when possible. */
-  const pick = (k: 'model' | 'mmproj') => (abs: string) => {
-    const modelsDir = models?.setting ?? settings?.modelsDir ?? '~/models';
-    const { cwd, model } = profileModelPath(abs, { cwd: draft.cwd, modelsDir, home: models?.home ?? '' });
-    setDraft((d) => ({ ...d, cwd: cwd ?? d.cwd, [k]: model }));
-  };
-
-  const fileField = (k: 'model' | 'mmproj', kind: ModelKind, label: string, placeholder: string) => (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={`pf-${k}`}>{label}</Label>
-      <InputGroup>
-        <InputGroupInput
-          id={`pf-${k}`}
-          value={draft[k]}
-          onChange={set(k)}
-          placeholder={placeholder}
-          aria-invalid={!!errors[k]}
-          className="font-mono text-xs"
-          spellCheck={false}
-        />
-        <InputGroupAddon align="inline-end">
-          <ModelPicker kind={kind} onSelect={pick(k)} />
-        </InputGroupAddon>
-      </InputGroup>
-      {errors[k] && <p className="text-sm text-destructive">{errors[k]}</p>}
-    </div>
-  );
 
   const field = (k: keyof Draft, label: string, opts: { placeholder?: string; hint?: string; mono?: boolean } = {}) => (
     <div className="flex flex-col gap-1.5">
@@ -147,8 +108,8 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
           hint: 'Relative model paths start from here.',
           mono: true,
         })}
-        {fileField('model', 'model', 'Model (GGUF)', 'Qwen3.8-27B-IQ3_S.gguf')}
-        {fileField('mmproj', 'mmproj', 'Multimodal projector', 'optional')}
+        {field('model', 'Model (GGUF)', { placeholder: 'Qwen3.8-27B-IQ3_S.gguf', mono: true })}
+        {field('mmproj', 'Multimodal projector', { placeholder: 'optional', mono: true })}
         {field('host', 'Host', {
           placeholder: settings?.host ?? DEFAULT_SETTINGS.host,
           hint: 'Empty: value from settings.',
@@ -195,6 +156,8 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
         confirmLabel="Restart"
         onConfirm={restartServer}
       />
+
+      {errors.form && <p className="text-sm text-destructive">{errors.form}</p>}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-5">
         <Button type="submit" disabled={saving || !dirty || blocked}>

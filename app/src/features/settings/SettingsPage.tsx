@@ -1,4 +1,4 @@
-import { isLoopback, type Settings, type ThemeMode } from '@llama-webui/shared';
+import { isLoopback, type Settings, type SystemInfo, type ThemeMode } from '@llama-webui/shared';
 import { ListChecks } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
@@ -10,8 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { SystemInfo } from '@/features/system/SystemPage';
-import { api } from '@/lib/api';
+import { call } from '@/lib/api';
 import { formatDuration } from '@/lib/format';
 import { type SettingsErrors, useSettingsEditor } from '@/lib/settings';
 import { useTheme } from '@/lib/theme';
@@ -138,7 +137,7 @@ function Monitoring({ settings, save }: SectionProps) {
   const [history, setHistory] = useState(settings.historySeconds);
   useEffect(() => setHistory(settings.historySeconds), [settings.historySeconds]);
   useEffect(() => {
-    void api('GET /api/system/info').then(setInfo, () => {});
+    void call((api) => api.monitor.systemInfo()).then(setInfo, () => {});
   }, []);
   const c = settings.collectors;
 

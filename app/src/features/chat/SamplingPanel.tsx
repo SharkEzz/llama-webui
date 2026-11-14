@@ -4,22 +4,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ApiError } from '@/lib/api';
 import { useChat } from '@/lib/chat';
+import { type FieldErrors, fieldErrors } from './errors';
+import { SAMPLING_FIELDS } from './fields';
 import type { ServerProps } from './useServerProps';
 
 type Key = keyof Sampling;
-
-const FIELDS: { key: Key; label: string; server: string; step?: string }[] = [
-  { key: 'temperature', label: 'Temperature', server: 'temperature', step: '0.05' },
-  { key: 'top_p', label: 'Top-p', server: 'top_p', step: '0.01' },
-  { key: 'top_k', label: 'Top-k', server: 'top_k' },
-  { key: 'min_p', label: 'Min-p', server: 'min_p', step: '0.01' },
-  { key: 'presence_penalty', label: 'Presence penalty', server: 'presence_penalty', step: '0.1' },
-  { key: 'repeat_penalty', label: 'Repeat penalty', server: 'repeat_penalty', step: '0.05' },
-  { key: 'max_tokens', label: 'Max tokens', server: 'n_predict' },
-  { key: 'seed', label: 'Seed', server: 'seed' },
-];
 
 /** Server default shown as a placeholder (empty field = this value). */
 function serverDefault(key: Key, v: unknown): string {
@@ -39,7 +29,7 @@ export function SamplingPanel({ props }: { props: ServerProps | null }) {
 
 function SamplingForm({ current, props }: { current: ConversationDetail; props: ServerProps | null }) {
   const patch = useChat((s) => s.patch);
-  const [errors, setErrors] = useState<Partial<Record<Key | 'systemPrompt', string>>>({});
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [system, setSystem] = useState(current.systemPrompt);
   // The prompt changes in the store (save, another tab): the field follows it during render rather than in an effect,
   // unless it holds unsaved input (which wins and will be saved on blur).
@@ -55,8 +45,7 @@ function SamplingForm({ current, props }: { current: ConversationDetail; props: 
       await patch(p);
       setErrors((e) => ({ ...e, [field]: undefined }));
     } catch (e) {
-      const msg = e instanceof ApiError ? (e.issues[0]?.message ?? e.message) : String(e);
-      setErrors((old) => ({ ...old, [field]: msg }));
+      setErrors((old) => ({ ...old, ...fieldErrors(e, field) }));
     }
   };
 
@@ -86,7 +75,7 @@ function SamplingForm({ current, props }: { current: ConversationDetail; props: 
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        {FIELDS.map((f) => (
+        {SAMPLING_FIELDS.map((f) => (
           <NumberField
             key={f.key}
             id={`s-${f.key}`}

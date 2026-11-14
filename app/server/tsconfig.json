@@ -1,6 +1,6 @@
 {
-  // The server (Nitro's `serverDir`) and its tests, Node only.
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "types": ["node"] },
+  // The Effect server and its tests (Node only). The Effect diagnostics come from the root `tsconfig.effect.json`.
+  "extends": "../../tsconfig.effect.json",
+  "compilerOptions": { "types": ["node"], "erasableSyntaxOnly": true },
   "include": ["."]
 }

@@ -5,8 +5,8 @@
  */
 import { statSync } from 'node:fs';
 
-// The launcher (`bin`), Nitro's server entry and the NVML sampler emitted beside it.
-const FILES = ['app/.output/llama-webui.mjs', 'app/.output/server/index.mjs', 'app/.output/server/nvml-worker.mjs'];
+// The launcher (`bin`) and the server bundle it imports.
+const FILES = ['app/.output/llama-webui.mjs', 'app/.output/server/index.mjs'];
 
 const missing = FILES.filter((file) => !statSync(file, { throwIfNoEntry: false })?.isFile());
 if (missing.length > 0) {

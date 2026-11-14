@@ -1,92 +1,151 @@
-// Serializable monitoring types (copied from llama-tui, without Map), shared by the server and the UI.
+// The monitoring data, shared by the server and the UI: what a tick reads (GPUs, system, disks, llama-server) and the
+// history it appends to. Every number is finite (a reading that is not is sent as null, else as 0): a snapshot with a
+// NaN does not encode, and the hub drops a message that does not.
 
-import type { Health, RequestRecord, RequestStats, SlotView, SpecStats } from 'llamacpp-js/metrics';
+import { Schema, Struct } from 'effect';
 
-export interface GpuSample {
-  key: string; // "nvidia:<uuid>" | "amd:<pdev>"
-  vendor: 'nvidia' | 'amd';
-  name: string;
-  busId: string; // "0000:01:00.0"
-  utilPct: number | null;
-  vramUsedBytes: number;
-  vramTotalBytes: number;
-  tempC: number | null;
-  powerW: number | null;
-  procVramBytes: number;
-  // Detailed fields: missing or null = unknown (not provided by this vendor or card).
-  memUtilPct?: number | null;
-  fanPct?: number | null;
-  powerLimitW?: number | null;
+/** `/health` of llama-server: 200 → `ok`, 503 → `loading`, another status → `error`, no answer → `down`. */
+export const Health = Schema.Literals(['ok', 'loading', 'error', 'down']);
+export type Health = typeof Health.Type;
+
+/** One slot of llama-server's `/slots` (the `SlotView` of `llamacpp-js/metrics`). */
+export const SlotView = Schema.Struct({
+  id: Schema.Int,
+  nCtx: Schema.Int,
+  processing: Schema.Boolean,
+  idTask: Schema.NullOr(Schema.Int),
+  nPromptTokens: Schema.Int,
+  nPromptProcessed: Schema.Int,
+  nDecoded: Schema.Int,
+  nRemain: Schema.NullOr(Schema.Int),
+});
+export type SlotView = typeof SlotView.Type;
+
+/** The rates of the last request, from the `/metrics` counters (the `RequestStats` of `llamacpp-js/metrics`). */
+export const RequestStats = Schema.Struct({
+  genTps: Schema.NullOr(Schema.Finite),
+  ppTps: Schema.NullOr(Schema.Finite),
+  specAccept: Schema.NullOr(Schema.Finite),
+});
+export type RequestStats = typeof RequestStats.Type;
+
+/** Speculative decoding since the start (the `SpecStats` of `llamacpp-js/metrics`). */
+export const SpecStats = Schema.Struct({
+  acceptCum: Schema.NullOr(Schema.Finite),
+  drafts: Schema.Finite,
+  draftTokens: Schema.Finite,
+  accepted: Schema.Finite,
+  meanAcceptedPerDraft: Schema.NullOr(Schema.Finite),
+  /** Acceptance rate per draft position. */
+  perPos: Schema.Array(Schema.Finite),
+});
+export type SpecStats = typeof SpecStats.Type;
+
+/** One tick's worth of `/metrics` counter deltas (the `RequestRecord` of `llamacpp-js/metrics`). */
+export const RequestRecord = Schema.Struct({
+  at: Schema.Int,
+  promptTokens: Schema.Finite,
+  cachedTokens: Schema.Finite,
+  genTokens: Schema.Finite,
+  promptSec: Schema.NullOr(Schema.Finite),
+  genSec: Schema.NullOr(Schema.Finite),
+  ppTps: Schema.NullOr(Schema.Finite),
+  genTps: Schema.NullOr(Schema.Finite),
+  specAccept: Schema.NullOr(Schema.Finite),
+});
+export type RequestRecord = typeof RequestRecord.Type;
+
+export { slotContextTokens } from 'llamacpp-js/metrics';
+
+/** A detailed reading: missing or null = unknown (not provided by this vendor or card). */
+const Detail = Schema.optionalKey(Schema.NullOr(Schema.Finite));
+
+/** One GPU on one tick. */
+export const GpuSample = Schema.Struct({
+  /** `nvidia:<uuid>` | `amd:<pdev>`. */
+  key: Schema.String,
+  vendor: Schema.Literals(['nvidia', 'amd']),
+  name: Schema.String,
+  /** `0000:01:00.0`. */
+  busId: Schema.String,
+  utilPct: Schema.NullOr(Schema.Finite),
+  vramUsedBytes: Schema.Finite,
+  vramTotalBytes: Schema.Finite,
+  tempC: Schema.NullOr(Schema.Finite),
+  powerW: Schema.NullOr(Schema.Finite),
+  /** VRAM held by llama-server on this GPU. */
+  procVramBytes: Schema.Finite,
+  memUtilPct: Detail,
+  fanPct: Detail,
+  powerLimitW: Detail,
   /** Factory power limit (NVIDIA); differs from `powerLimitW` if the user lowered it. */
-  powerDefaultLimitW?: number | null;
-  persistence?: boolean | null;
-  clockGrMhz?: number | null;
-  clockGrMaxMhz?: number | null;
-  clockMemMhz?: number | null;
-  pcieGen?: number | null;
-  pcieWidth?: number | null;
-  pcieGenMax?: number | null;
-  pcieWidthMax?: number | null;
-  pcieRxBps?: number | null;
-  pcieTxBps?: number | null;
+  powerDefaultLimitW: Detail,
+  persistence: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
+  clockGrMhz: Detail,
+  clockGrMaxMhz: Detail,
+  clockMemMhz: Detail,
+  pcieGen: Detail,
+  pcieWidth: Detail,
+  pcieGenMax: Detail,
+  pcieWidthMax: Detail,
+  pcieRxBps: Detail,
+  pcieTxBps: Detail,
   /** Sleeping card (runtime-suspended), deliberately not read: any read would wake it up. */
-  suspended?: boolean;
+  suspended: Schema.optionalKey(Schema.Boolean),
   /** Hidden card (hiddenGpus setting): listed but not read. */
-  hidden?: boolean;
-}
+  hidden: Schema.optionalKey(Schema.Boolean),
+});
+export type GpuSample = typeof GpuSample.Type;
 
-export interface MemInfo {
-  totalBytes: number;
-  availableBytes: number;
-  cachedBytes: number;
-  swapTotalBytes: number;
-  swapUsedBytes: number;
-}
+/** What a GPU collector reads: a sample before the VRAM of llama-server's processes is added. */
+export const GpuReading = GpuSample.mapFields(Struct.omit(['procVramBytes']));
+export type GpuReading = typeof GpuReading.Type;
+
+export const MemInfo = Schema.Struct({
+  totalBytes: Schema.Finite,
+  availableBytes: Schema.Finite,
+  cachedBytes: Schema.Finite,
+  swapTotalBytes: Schema.Finite,
+  swapUsedBytes: Schema.Finite,
+});
+export type MemInfo = typeof MemInfo.Type;
 
 /** The machine's DRAM bandwidth (memory controller, via perf): everything that touches RAM, CPU, GPU and NVMe included. */
-export interface MemBandwidth {
-  readBps: number;
-  writeBps: number;
-}
+export const MemBandwidth = Schema.Struct({ readBps: Schema.Finite, writeBps: Schema.Finite });
+export type MemBandwidth = typeof MemBandwidth.Type;
 
-export interface SystemSample {
-  cpuPct: number;
-  corePct: number[];
-  freqMhz: number | null;
-  tempC: number | null;
-  load: [number, number, number] | null;
-  mem: MemInfo | null;
+export const SystemSample = Schema.Struct({
+  cpuPct: Schema.Finite,
+  corePct: Schema.Array(Schema.Finite),
+  freqMhz: Schema.NullOr(Schema.Finite),
+  tempC: Schema.NullOr(Schema.Finite),
+  /** Load average over 1, 5 and 15 minutes. */
+  load: Schema.NullOr(Schema.Tuple([Schema.Finite, Schema.Finite, Schema.Finite])),
+  mem: Schema.NullOr(MemInfo),
   /** Missing or null: not measurable (no perf, unknown PMU, permissions). */
-  memBw?: MemBandwidth | null;
-}
+  memBw: Schema.optionalKey(Schema.NullOr(MemBandwidth)),
+});
+export type SystemSample = typeof SystemSample.Type;
 
-export interface DiskRates {
-  readBps: number;
-  writeBps: number;
-}
+export const DiskRates = Schema.Struct({ readBps: Schema.Finite, writeBps: Schema.Finite });
+export type DiskRates = typeof DiskRates.Type;
 
 /** The machine's physical disks: their total, each one (by block name, `nvme0n1`) and the model's. */
-export interface DiskSample extends DiskRates {
-  perDisk: Record<string, DiskRates>;
-  model: { disk: string; readBps: number } | null;
-}
+export const DiskSample = Schema.Struct({
+  ...DiskRates.fields,
+  perDisk: Schema.Record(Schema.String, DiskRates),
+  model: Schema.NullOr(Schema.Struct({ disk: Schema.String, readBps: Schema.Finite })),
+});
+export type DiskSample = typeof DiskSample.Type;
 
-export {
-  type Health,
-  type RequestRecord,
-  type RequestStats,
-  type SlotView,
-  type SpecStats,
-  slotContextTokens,
-} from 'llamacpp-js/metrics';
-
-export interface CpuInfo {
-  model: string;
-  physicalCores: number;
-  logicalThreads: number;
-  flags: string[];
-  numaNodes: number;
-}
+export const CpuInfo = Schema.Struct({
+  model: Schema.String,
+  physicalCores: Schema.Int,
+  logicalThreads: Schema.Int,
+  flags: Schema.Array(Schema.String),
+  numaNodes: Schema.Int,
+});
+export type CpuInfo = typeof CpuInfo.Type;
 
 /** Keys of the history series. */
 export const SERIES = {
@@ -116,40 +175,61 @@ export const SERIES = {
 } as const;
 
 /** Monitoring state pushed on every tick over the WebSocket. */
-export interface Snapshot {
-  at: number;
-  tick: number;
+export const Snapshot = Schema.Struct({
+  at: Schema.Int,
+  tick: Schema.Int,
   /** null: no active server. */
-  health: Health | null;
-  rates: { genTps: number; ppTps: number };
-  slots: SlotView[] | null;
-  kv: { usedTokens: number; totalTokens: number } | null;
-  queue: { processing: number; deferred: number; busySlots: number } | null;
-  lastRequest: RequestStats | null;
-  spec: SpecStats | null;
+  health: Schema.NullOr(Health),
+  rates: Schema.Struct({ genTps: Schema.Finite, ppTps: Schema.Finite }),
+  slots: Schema.NullOr(Schema.Array(SlotView)),
+  kv: Schema.NullOr(Schema.Struct({ usedTokens: Schema.Int, totalTokens: Schema.Int })),
+  /** `busySlots`: busy slots per llama_decode() call, an average (`llamacpp:n_busy_slots_per_decode`), so fractional. */
+  queue: Schema.NullOr(Schema.Struct({ processing: Schema.Int, deferred: Schema.Int, busySlots: Schema.Finite })),
+  lastRequest: Schema.NullOr(RequestStats),
+  spec: Schema.NullOr(SpecStats),
   /** Most recent first. */
-  recentRequests: RequestRecord[];
+  recentRequests: Schema.Array(RequestRecord),
   /** GPUs used by the server (VRAM > 64 MiB). */
-  gpus: GpuSample[];
+  gpus: Schema.Array(GpuSample),
   /** All GPUs, sorted by busId, hidden and sleeping ones included (not read). */
-  allGpus: GpuSample[];
-  /** `dramBps`: bytes/s fetched from DRAM by llama-server (perf, core event); null = unknown. */
-  proc: { cpuPct: number; rssBytes: number; dramBps?: number | null } | null;
-  system: SystemSample | null;
-  disk: DiskSample | null;
-  /** Values appended to the history on this tick (NaN → null). */
-  points: Record<string, number | null>;
+  allGpus: Schema.Array(GpuSample),
+  /** `dramBps`: bytes/s fetched from DRAM by llama-server (perf, core event); missing or null = unknown. */
+  proc: Schema.NullOr(
+    Schema.Struct({
+      cpuPct: Schema.Finite,
+      rssBytes: Schema.Finite,
+      dramBps: Schema.optionalKey(Schema.NullOr(Schema.Finite)),
+    }),
+  ),
+  system: Schema.NullOr(SystemSample),
+  disk: Schema.NullOr(DiskSample),
+  /** Values appended to the history on this tick, by `SERIES` key (null = gap). */
+  points: Schema.Record(Schema.String, Schema.NullOr(Schema.Finite)),
   /** Shape of the history: a change (settings) invalidates the client's copy. */
-  history: { intervalMs: number; capacity: number };
-}
+  history: Schema.Struct({ intervalMs: Schema.Int, capacity: Schema.Int }),
+});
+export type Snapshot = typeof Snapshot.Type;
 
 /** Full history: one value per tick, oldest first, `null` = gap. */
-export interface HistoryDump {
-  intervalMs: number;
-  capacity: number;
+export const HistoryDump = Schema.Struct({
+  intervalMs: Schema.Int,
+  capacity: Schema.Int,
   /** Time of the last point. */
-  at: number;
+  at: Schema.Int,
   /** Time of each point (ms), same length as each series. */
-  times: number[];
-  series: Record<string, (number | null)[]>;
-}
+  times: Schema.Array(Schema.Int),
+  series: Schema.Record(Schema.String, Schema.Array(Schema.NullOr(Schema.Finite))),
+});
+export type HistoryDump = typeof HistoryDump.Type;
+
+/** Where the NVIDIA GPUs are read from: the NVML library, else the `nvidia-smi` program. */
+export const NvidiaSource = Schema.Literals(['nvml', 'nvidia-smi']);
+export type NvidiaSource = typeof NvidiaSource.Type;
+
+/** The machine as the System page shows it: its CPU, every GPU (hidden and sleeping ones included), the NVIDIA source. */
+export const SystemInfo = Schema.Struct({
+  cpu: CpuInfo,
+  gpus: Schema.Array(GpuSample.mapFields(Struct.pick(['key', 'name', 'vendor', 'busId', 'vramTotalBytes']))),
+  nvidiaSource: NvidiaSource,
+});
+export type SystemInfo = typeof SystemInfo.Type;

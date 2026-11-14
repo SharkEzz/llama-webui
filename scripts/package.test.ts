@@ -28,11 +28,7 @@ test('packing without a build fails instead of shipping a package with no comman
     const refused = spawnSync(process.execPath, [script], { cwd: empty, encoding: 'utf8' });
     expect(refused.status).toBe(1);
     expect(refused.stderr).toContain('pnpm build');
-    for (const file of [
-      'app/.output/llama-webui.mjs',
-      'app/.output/server/index.mjs',
-      'app/.output/server/nvml-worker.mjs',
-    ]) {
+    for (const file of ['app/.output/llama-webui.mjs', 'app/.output/server/index.mjs']) {
       mkdirSync(dirname(join(empty, file)), { recursive: true });
       writeFileSync(join(empty, file), '');
     }

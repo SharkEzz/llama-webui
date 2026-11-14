@@ -1,143 +1,337 @@
-// The production build's lifecycle (`app/.output`, built once by the server project's globalSetup): how it stops on a
-// signal with the UI open and a reply streaming, how it fails when its port is taken, and its HTTP cache headers.
-import { spawn } from 'node:child_process';
+// The production build as a process: how it starts, refuses to start, and reads its options.
+import { type ChildProcessByStdio, spawn } from 'node:child_process';
+import { copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
+import type { Readable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { afterAll, describe, expect, test } from 'vitest';
-import { ConversationsRepo } from './lib/db/conversations';
-import { openDb } from './lib/db/open';
-import { LAUNCHER, launch } from './lib/testing/launch';
-import { isAlive, seedDataDir, startLlama } from './lib/testing/seed';
-import { tempDir } from './lib/testing/tempDir';
+import { type SseEvent, SseParser } from '@llama-webui/shared';
+import { afterAll, expect, test } from 'vitest';
+import { freePort, LAUNCHER, launch, userEnv } from './testing/launch.ts';
+import { startFakeThrough } from './testing/llama.ts';
+import { tempDir } from './testing/tempDir.ts';
+import { ofType, openWs } from './testing/ws.ts';
 
-const dirs: { [Symbol.dispose](): void }[] = [];
-afterAll(() => {
-  for (const d of dirs) d[Symbol.dispose]();
-});
+const dir = tempDir('lw-lifecycle-');
+afterAll(() => dir[Symbol.dispose]());
+let dirs = 0;
+const dataDir = () => {
+  const path = join(dir.path, `data-${++dirs}`);
+  return tempDir('d-', path).path;
+};
 
-async function seeded(): Promise<{ dataDir: string; profileId: number }> {
-  const dir = tempDir('lw-lifecycle-');
-  dirs.push(dir);
-  return { dataDir: dir.path, ...(await seedDataDir(dir.path)) };
+/** The launcher with `args`, from `cwd`: its stdout and stderr so far, and its exit code. */
+function run(args: string[], cwd: string, env: Record<string, string | undefined> = userEnv()) {
+  const proc: ChildProcessByStdio<null, Readable, Readable> = spawn(process.execPath, [LAUNCHER, ...args], {
+    cwd,
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = '';
+  let stderr = '';
+  proc.stdout.on('data', (c) => {
+    stdout += c;
+  });
+  proc.stderr.on('data', (c) => {
+    stderr += c;
+  });
+  const exited = new Promise<number | null>((done) => proc.once('exit', done));
+  return { proc, exited, stdout: () => stdout, stderr: () => stderr };
 }
 
-test('SIGTERM with the UI open and a reply streaming stops in under 2 s', async () => {
-  const { dataDir, profileId } = await seeded();
-  // The fake llama-server inherits the environment: 2 s between chat chunks, the reply still streams at SIGTERM.
-  const app = await launch({ dataDir, env: { FAKE_CHAT_DELAY_MS: '2000' } });
-  const json = { 'content-type': 'application/json' };
-  const post = (path: string, body: unknown) =>
-    fetch(`${app.base}${path}`, { method: 'POST', headers: json, body: JSON.stringify(body) });
+/** The exit code within 5 s, else the process is killed and the test fails. */
+async function exitCode(app: ReturnType<typeof run>) {
+  const code = await Promise.race([app.exited, sleep(5000, 'timeout' as const, { ref: false })]);
+  if (code === 'timeout') app.proc.kill('SIGKILL');
+  return code;
+}
 
-  const llamaPid = await startLlama(app.base, profileId);
+/** Whether `/api/health` answers on `port` before the process exits (5 s at most). */
+async function answers(app: ReturnType<typeof run>, port: number) {
+  for (let i = 0; i < 50 && app.proc.exitCode === null; i++) {
+    const ok = (await fetch(`http://127.0.0.1:${port}/api/health`).catch(() => null))?.ok === true;
+    if (ok) return true;
+    await sleep(100);
+  }
+  return false;
+}
 
-  const ws = new WebSocket(`${app.base.replace('http', 'ws')}/ws`);
-  const wsClosed = new Promise<number>((done) => ws.addEventListener('close', (e) => done(e.code)));
-  await new Promise((done) => ws.addEventListener('message', done, { once: true }));
+/** Stops the launcher (SIGTERM) and awaits its exit. */
+async function stop(app: ReturnType<typeof run>) {
+  if (app.proc.exitCode === null && app.proc.signalCode === null) app.proc.kill('SIGTERM');
+  return app.exited;
+}
 
-  const conversation = (await (await post('/api/chat', { profileId })).json()) as { id: number };
-  const stream = await post(`/api/chat/${conversation.id}/messages`, { content: 'hi' });
-  expect(stream.headers.get('content-type')).toContain('text/event-stream');
-  const reader = (stream.body as ReadableStream<Uint8Array>).getReader();
-  await reader.read(); // the first event: the reply has started
-  const sseEnded = (async () => {
-    try {
-      while (!(await reader.read()).done);
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-
-  const t0 = performance.now();
-  app.proc.kill('SIGTERM');
-  const exitCode = await app.exited;
-  const elapsedMs = performance.now() - t0;
-
-  expect(elapsedMs).toBeLessThan(2000);
-  expect(exitCode).toBe(0);
-  expect(await wsClosed).toBe(1001);
-  expect(await sseEnded).toBe(true);
-  expect(isAlive(llamaPid)).toBe(false);
-  using db = openDb(join(dataDir, 'llama-webui.sqlite'));
-  const messages = new ConversationsRepo(db).messages(conversation.id);
-  expect(messages.at(-1)?.status).toBe('stopped');
+test('a second instance on a taken port exits 1 and names it', async () => {
+  await using first = await launch({ dataDir: dataDir() });
+  const data = dataDir();
+  const second = run(['--host', '127.0.0.1', '--port', String(first.port), '--data-dir', data], data);
+  expect(await exitCode(second)).toBe(1);
+  expect(second.stderr()).toContain(`cannot listen on 127.0.0.1:${first.port}: the port is already in use`);
+  expect(second.stdout()).not.toContain('ready (');
 }, 30_000);
 
-test('a second instance on a taken port exits 1', async () => {
-  const first = await launch({ dataDir: (await seeded()).dataDir });
+test('a port taken by another process exits 1 the same way', async () => {
+  const other = createServer();
+  const port = await freePort();
+  await new Promise<void>((r) => other.listen(port, '127.0.0.1', r));
   try {
-    const { dataDir } = await seeded();
-    const second = spawn(process.execPath, [LAUNCHER, '--port', String(first.port), '--data-dir', dataDir], {
-      cwd: dataDir,
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-    let stderr = '';
-    second.stderr.on('data', (c) => {
-      stderr += c;
-    });
-    const exited = new Promise<number | null>((done) => second.once('exit', done));
-    const code = await Promise.race([exited, sleep(5000, 'timeout', { ref: false })]);
-    if (code === 'timeout') second.kill('SIGKILL');
-    expect(code).toBe(1);
-    expect(stderr).toMatch(new RegExp(`${first.port}|EADDRINUSE`));
+    const data = dataDir();
+    const app = run(['--host', '127.0.0.1', '--port', String(port), '--data-dir', data], data);
+    expect(await exitCode(app)).toBe(1);
+    expect(app.stderr()).toBe(`llama-webui: cannot listen on 127.0.0.1:${port}: the port is already in use\n`);
   } finally {
-    await first[Symbol.asyncDispose]();
+    await new Promise((r) => other.close(r));
   }
 }, 30_000);
 
-test("a second instance on the same port and data dir leaves the first one's data alone", async () => {
-  const { dataDir, profileId } = await seeded();
-  // The stub monitor starts at once: without a port check first, the second instance's startup would run before its
-  // listen fails, and mark the first one's streaming reply "stopped".
-  const env = { FAKE_CHAT_DELAY_MS: '2000', LLAMA_WEBUI_TEST_MONITOR: 'stub' };
-  await using first = await launch({ dataDir, env });
-  await startLlama(first.base, profileId);
+test('a second instance on the same port and data dir leaves the first one', async () => {
+  const data = dataDir();
+  await using first = await launch({ dataDir: data });
+  const health = async () => (await (await fetch(`${first.base}/api/health`)).json()) as { bootId: string };
+  const { bootId } = await health();
+  const files = readdirSync(data).sort();
+  const second = run(['--host', '127.0.0.1', '--port', String(first.port), '--data-dir', data], data);
+  expect(await exitCode(second)).toBe(1);
+  expect(second.stdout()).not.toContain('ready (');
+  expect((await health()).bootId).toBe(bootId);
+  expect(readdirSync(data).sort()).toEqual(files);
+}, 30_000);
+
+/**
+ * The environment of a user with no `LLAMA_WEBUI_*` variable and a home of its own: should `.env` be missed, the
+ * defaults stay inside `home` and the port the test expects goes unanswered (the default port is never asked for).
+ */
+const bare = (home: string, extra: Record<string, string> = {}) => {
+  const env = userEnv();
+  for (const k of Object.keys(env)) if (k.startsWith('LLAMA_WEBUI_')) delete env[k];
+  return { ...env, HOME: home, XDG_DATA_HOME: home, ...extra };
+};
+
+test('a variable of .env sets the port, the environment wins over it', async () => {
+  const data = dataDir();
+  const fromFile = await freePort();
+  writeFileSync(join(data, '.env'), `LLAMA_WEBUI_PORT=${fromFile}\nLLAMA_WEBUI_HOST=127.0.0.1\n`);
+  const app = run(['--data-dir', data], data, bare(data));
+  try {
+    expect(await answers(app, fromFile)).toBe(true);
+  } finally {
+    expect(await stop(app)).toBe(0);
+  }
+  const fromEnv = await freePort();
+  const env = run(['--data-dir', data], data, bare(data, { LLAMA_WEBUI_PORT: String(fromEnv) }));
+  try {
+    expect(await answers(env, fromEnv)).toBe(true);
+  } finally {
+    expect(await stop(env)).toBe(0);
+  }
+}, 30_000);
+
+test('--env-override lets .env win over the environment', async () => {
+  const data = dataDir();
+  const fromFile = await freePort();
+  writeFileSync(join(data, '.env'), `LLAMA_WEBUI_PORT=${fromFile}\nLLAMA_WEBUI_HOST=127.0.0.1\n`);
+  const fromEnv = await freePort();
+  const app = run(['--env-override', '--data-dir', data], data, bare(data, { LLAMA_WEBUI_PORT: String(fromEnv) }));
+  try {
+    expect(await answers(app, fromFile)).toBe(true);
+  } finally {
+    expect(await stop(app)).toBe(0);
+  }
+}, 30_000);
+
+test('SIGTERM with the UI open stops in under 2 s', async () => {
+  await using app = await launch({ dataDir: dataDir() });
+  const client = await openWs(`${app.base.replace('http', 'ws')}/ws`);
+  await client.next();
+  const t0 = performance.now();
+  app.proc.kill('SIGTERM');
+  const code = await app.exited;
+  expect(performance.now() - t0).toBeLessThan(2000);
+  expect(code).toBe(0);
+  expect((await client.closed).code).toBe(1001);
+}, 30_000);
+
+test('SIGTERM with llama-server running stops it and exits 0 in under 2 s', async () => {
+  const data = dataDir();
+  {
+    await using app = await launch({ dataDir: data });
+    const pid = await startFakeThrough(app.base);
+    const client = await openWs(`${app.base.replace('http', 'ws')}/ws`);
+    await client.next();
+    const t0 = performance.now();
+    app.proc.kill('SIGTERM');
+    const code = await app.exited;
+    expect(performance.now() - t0).toBeLessThan(2000);
+    expect(code).toBe(0);
+    expect((await client.closed).code).toBe(1001);
+    expect(alive(pid)).toBe(false);
+  }
+  // The data folder opens again, the profile in it.
+  await using again = await launch({ dataDir: data });
+  const profiles = (await (await fetch(`${again.base}/api/profiles`)).json()) as unknown[];
+  expect(profiles).toHaveLength(1);
+}, 30_000);
+
+test('SIGTERM with the UI open and a reply streaming stops in under 2 s, ends the stream with done and saves the reply stopped', async () => {
+  const data = dataDir();
+  await using app = await launch({ dataDir: data });
+  // One chunk, then ten seconds of silence: the reply is still being written when the app stops.
+  const pid = await startFakeThrough(app.base, { FAKE_CHAT_DELAY_MS: '10000' });
+  const client = await openWs(`${app.base.replace('http', 'ws')}/ws`);
+  await client.next();
   const post = (path: string, body: unknown) =>
-    fetch(`${first.base}${path}`, {
+    fetch(`${app.base}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
-  const conversation = (await (await post('/api/chat', { profileId })).json()) as { id: number };
-  const stream = await post(`/api/chat/${conversation.id}/messages`, { content: 'hi' });
-  const reader = (stream.body as ReadableStream<Uint8Array>).getReader();
-  await reader.read(); // the reply has started
-  const full: Record<string, string | undefined> = { ...process.env, ...env };
-  for (const k of ['CI', 'TEST', 'NODE_ENV']) delete full[k];
-  const second = spawn(process.execPath, [LAUNCHER, '--port', String(first.port), '--data-dir', dataDir], {
-    cwd: dataDir,
-    env: full,
-    stdio: ['ignore', 'ignore', 'pipe'],
-  });
-  let stderr = '';
-  second.stderr.on('data', (c) => {
-    stderr += c;
-  });
-  const code = await new Promise<number | null>((done) => second.once('exit', done));
-  using db = openDb(join(dataDir, 'llama-webui.sqlite'));
-  expect(new ConversationsRepo(db).messages(conversation.id).at(-1)?.status).toBe('streaming');
-  expect(code).toBe(1);
-  expect(stderr).not.toContain('[llama-webui] ready');
-  await reader.cancel();
+  const { id } = (await (await post('/api/chat', {})).json()) as { id: number };
+  const res = await post(`/api/chat/${id}/messages`, { content: 'Hi' });
+  expect(res.status).toBe(200);
+  const reader = res.body?.getReader();
+  if (reader === undefined) throw new Error('the reply has no body');
+  const parser = new SseParser();
+  const decoder = new TextDecoder();
+  const events: SseEvent[] = [];
+  /** Reads until `until` holds for the events read so far, or the stream ends (or breaks). */
+  const readUntil = async (until: () => boolean) => {
+    while (!until()) {
+      const chunk = await reader.read().catch(() => ({ done: true as const, value: undefined }));
+      if (chunk.done) return;
+      events.push(...parser.push(decoder.decode(chunk.value, { stream: true })));
+    }
+  };
+  await readUntil(() => events.some((e) => e.event === 'delta'));
+  const delta = JSON.parse(events.find((e) => e.event === 'delta')?.data ?? '{}') as { reasoning?: string };
+  const t0 = performance.now();
+  app.proc.kill('SIGTERM');
+  await readUntil(() => false);
+  const code = await app.exited;
+  expect(performance.now() - t0).toBeLessThan(2000);
+  expect(code).toBe(0);
+  expect((await client.closed).code).toBe(1001);
+  const last = events.at(-1);
+  expect(last?.event).toBe('done');
+  const done = JSON.parse(last?.data ?? '{}') as { message: { status: string; reasoning: string } };
+  expect(done.message.status).toBe('stopped');
+  expect(done.message.reasoning).toBe(delta.reasoning);
+  const db = new DatabaseSync(join(data, 'llama-webui.sqlite'), { readOnly: true });
+  try {
+    expect(db.prepare("SELECT status, reasoning FROM messages WHERE role = 'assistant'").all()).toEqual([
+      { status: 'stopped', reasoning: delta.reasoning },
+    ]);
+  } finally {
+    db.close();
+  }
+  expect(alive(pid)).toBe(false);
 }, 30_000);
 
-describe('HTTP cache', () => {
-  test('pages are revalidated, hashed assets are immutable, the API sets no cache header', async () => {
-    await using app = await launch({ dataDir: (await seeded()).dataDir });
-    const get = (path: string) => fetch(`${app.base}${path}`);
-    const page = await get('/');
-    expect(page.headers.get('cache-control')).toBe('no-cache');
-    const asset = (await page.text()).match(/src="(\/assets\/[^"]+\.js)"/)?.[1];
-    expect(asset).toBeDefined();
-    expect((await get('/chat/12')).headers.get('cache-control')).toBe('no-cache');
-    expect((await get(asset as string)).headers.get('cache-control')).toMatch(/immutable/);
-    expect((await get('/api/health')).headers.get('cache-control')).toBeNull();
-  }, 30_000);
-  test("a missing asset is h3's own 404, not a 500 (a stale tab after an upgrade)", async () => {
-    await using app = await launch({ dataDir: (await seeded()).dataDir });
-    const res = await fetch(`${app.base}/assets/missing-abcd1234.js`);
-    expect(res.status).toBe(404);
-    expect(app.stderr()).not.toMatch(/status: 404/);
-  }, 30_000);
-});
+test("SIGTERM with the monitor's programs running leaves none of them", async () => {
+  const data = dataDir();
+  // A fake nvidia-smi, one process as the real one is: each run records its pid, the stream prints one card every
+  // 100 ms, a query prints nothing. (A shell loop would fork a `sleep` per line: once killed, its zombie is reaped
+  // by this machine's init process only after a second or two, and the spawner waits for the whole group.)
+  const smi = join(data, 'nvidia-smi');
+  const pids = join(data, 'smi-pids');
+  writeFileSync(
+    smi,
+    `#!${process.execPath}
+const { appendFileSync } = require('node:fs');
+appendFileSync(${JSON.stringify(pids)}, process.pid + '\\n');
+if (!process.argv.includes('-lms')) process.exit(0);
+const line = '0, GPU-00000000-0000-0000-0000-000000000001, Fake GPU, 5, 1024, 8192, 40, 50.00, 00000000:01:00.0';
+setInterval(() => process.stdout.write(line + '\\n'), 100);
+`,
+    { mode: 0o755 },
+  );
+  await using app = await launch({
+    dataDir: data,
+    // NVML cannot load: the collectors fall back to the nvidia-smi named by the variable.
+    env: { LLAMA_WEBUI_NVML_LIB: join(data, 'no-such-libnvidia-ml.so'), LLAMA_WEBUI_NVIDIA_SMI: smi },
+  });
+  const client = await openWs(`${app.base.replace('http', 'ws')}/ws`);
+  const withCard = (message: unknown) =>
+    ofType('snapshot')(message) && JSON.stringify(message).includes('nvidia:GPU-00000000-0000-0000-0000-000000000001');
+  await client.next(withCard, 10_000);
+  const recorded = () => readFileSync(pids, 'utf8').trim().split('\n').map(Number);
+  expect(recorded().length).toBeGreaterThan(0);
+  const t0 = performance.now();
+  app.proc.kill('SIGTERM');
+  const code = await app.exited;
+  expect(performance.now() - t0).toBeLessThan(2000);
+  expect(code).toBe(0);
+  expect((await client.closed).code).toBe(1001);
+  // Read again: a run started during the stop is checked too.
+  expect(recorded().filter(alive)).toEqual([]);
+}, 30_000);
+
+test('a data directory of the Nitro server opens untouched', async () => {
+  const data = dataDir();
+  copyFileSync(join(import.meta.dirname, 'db/fixtures/legacy-v17.sqlite'), join(data, 'llama-webui.sqlite'));
+  await using app = await launch({ dataDir: data });
+  const settings = (await (await fetch(`${app.base}/api/settings`)).json()) as { port: number; hiddenGpus: string[] };
+  expect(settings.port).toBe(8123);
+  expect(settings.hiddenGpus).toEqual(['GPU-1']);
+}, 30_000);
+
+test('the build never connects to the Effect DevTools', async () => {
+  let connections = 0;
+  let upgrades = 0;
+  const devtools = createHttpServer();
+  devtools.on('connection', () => {
+    connections += 1;
+  });
+  devtools.on('upgrade', (_req, socket) => {
+    upgrades += 1;
+    socket.destroy();
+  });
+  const port = await freePort();
+  await new Promise<void>((listening) => devtools.listen(port, '127.0.0.1', listening));
+  try {
+    await using _app = await launch({
+      dataDir: dataDir(),
+      env: { LLAMA_WEBUI_DEVTOOLS_URL: `ws://127.0.0.1:${port}` },
+    });
+    // Longer than the DevTools client waits for its first connection (1 s): it would have connected by now.
+    await sleep(1500);
+    expect({ upgrades, connections }).toEqual({ upgrades: 0, connections: 0 });
+  } finally {
+    devtools.close();
+  }
+}, 30_000);
+
+/** Whether a process with this pid exists (signal 0). */
+function alive(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test('an exit without its finalizers leaves no llama-server', async () => {
+  const fixture = join(import.meta.dirname, 'testing/fixtures/exitWithServer.ts');
+  const proc = spawn(process.execPath, [fixture], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  proc.stdout.on('data', (c) => {
+    stdout += c;
+  });
+  proc.stderr.on('data', (c) => {
+    stderr += c;
+  });
+  const exited = new Promise<number | null>((done) => proc.once('exit', done));
+  const code = await Promise.race([exited, sleep(10_000, 'timeout' as const, { ref: false })]);
+  if (code === 'timeout') proc.kill('SIGKILL');
+  expect(code, stderr).toBe(1);
+  const pid = Number(stdout.trim());
+  expect(pid, stdout).toBeGreaterThan(0);
+  // The supervisor's `exit` handler sends SIGKILL; the kernel's pdeathsig (setpriv) and the spawner's own `exit`
+  // handler would kill it too: this proves the outcome, not which of them did it.
+  for (let i = 0; i < 100 && alive(pid); i++) await sleep(20);
+  expect(alive(pid)).toBe(false);
+}, 30_000);

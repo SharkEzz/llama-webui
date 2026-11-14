@@ -14,8 +14,9 @@ import {
 } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatBytes, plural } from '@/lib/format';
-import { deleteModel, modelUsage, stem, useModels } from '@/lib/models';
+import { deleteModel, modelUsage, useModels } from '@/lib/models';
 import { useProfiles } from '@/lib/profiles';
+import { stem } from '@/lib/stem';
 
 /**
  * Delete button of a model, confirmed in a popover that lists the files and the profiles using it: the user chooses

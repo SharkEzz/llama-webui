@@ -1,11 +1,9 @@
 /**
- * `THIRD-PARTY-LICENSES.md` next to Nitro's server: the license of every npm package bundled into it. Vite's own
- * `build.license` does not reach Nitro's output (its asset is dropped), so a plugin on Nitro's environment collects
- * the bundled modules and the `compiled` hook writes the file.
+ * `THIRD-PARTY-LICENSES.md` next to the server bundle: the license of every npm package bundled into it, from the
+ * modules Rolldown reports (`build/server.ts`).
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Plugin } from 'vite';
 
 interface Package {
   name: string;
@@ -46,29 +44,15 @@ export function render(packages: Package[]): string {
   return `# Licenses\n\nThe server bundles these packages, under these licenses:\n\n${sections.join('\n\n')}\n`;
 }
 
-export function licenses(): { plugin: Plugin; write(serverDir: string): void } {
-  const roots = new Set<string>();
-  return {
-    plugin: {
-      name: 'llama-webui:licenses',
-      applyToEnvironment: (env) => env.name === 'nitro',
-      generateBundle(_options, bundle) {
-        for (const out of Object.values(bundle))
-          if (out.type === 'chunk')
-            for (const id of out.moduleIds) {
-              const root = packageRoot(id.replace(/^\0/, '').split('?')[0] as string);
-              if (root) roots.add(root);
-            }
-      },
-    },
-    write(serverDir) {
-      // One entry per package and version: two copies of the same version are one license.
-      const seen = new Map<string, Package>();
-      for (const root of roots) {
-        const p = read(root);
-        seen.set(`${p.name}@${p.version}`, p);
-      }
-      writeFileSync(join(serverDir, 'THIRD-PARTY-LICENSES.md'), render([...seen.values()]));
-    },
-  };
+/** Writes `file`: the license of every npm package among `moduleIds` (the modules Rolldown bundled). */
+export function writeLicenses(moduleIds: Iterable<string>, file: string): void {
+  // One entry per package and version: two copies of the same version are one license.
+  const seen = new Map<string, Package>();
+  for (const id of moduleIds) {
+    const root = packageRoot(id.replace(/^\0/, '').split('?')[0] as string);
+    if (!root) continue;
+    const p = read(root);
+    seen.set(`${p.name}@${p.version}`, p);
+  }
+  writeFileSync(file, render([...seen.values()]));
 }

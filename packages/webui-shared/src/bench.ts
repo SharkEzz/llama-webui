@@ -1,7 +1,7 @@
 import type { BenchMeasure, BenchDevice as LlamaBenchDevice } from 'llamacpp-js/bench';
 import { z } from 'zod';
-import { reservedFlag, reservedFlagMessage } from './profile';
-import type { FitVerdict } from './tuning';
+import { reservedFlag, reservedFlagMessage } from './profile.ts';
+import type { FitVerdict } from './tuning.ts';
 
 export const CACHE_TYPES = ['f32', 'f16', 'bf16', 'f8_e4m3', 'q8_0', 'q4_0', 'q4_1', 'iq4_nl', 'q5_0', 'q5_1'] as const;
 export type CacheType = (typeof CACHE_TYPES)[number];

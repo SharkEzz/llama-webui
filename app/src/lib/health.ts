@@ -1,5 +1,10 @@
 import { create } from 'zustand';
-import { getHealth, type Health } from './api';
+import { call } from './api';
+
+/** The reply of `GET /api/health`. */
+export type Health = Awaited<ReturnType<typeof getHealth>>;
+
+const getHealth = () => call((api) => api.health.get());
 
 interface HealthState {
   health?: Health;

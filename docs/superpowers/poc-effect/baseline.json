@@ -1,0 +1,77 @@
+{
+  "commit": "13068280e",
+  "date": "2026-11-14T02:13:09.001Z",
+  "node": "v26.13.1",
+  "code": {
+    "server": {
+      "files": 166,
+      "lines": 12300
+    },
+    "serverTests": {
+      "files": 59,
+      "lines": 7256
+    },
+    "shared": {
+      "files": 18,
+      "lines": 1835
+    },
+    "sharedTests": {
+      "files": 11,
+      "lines": 608
+    },
+    "web": {
+      "files": 128,
+      "lines": 14325
+    },
+    "webTests": {
+      "files": 12,
+      "lines": 1031
+    },
+    "build": {
+      "files": 5,
+      "lines": 321
+    }
+  },
+  "webClientLayer": {
+    "files": 2,
+    "lines": 225
+  },
+  "dependencies": {
+    "app": {
+      "dependencies": 30,
+      "devDependencies": 11
+    },
+    "bundledIntoServer": ["@huggingface/gguf", "@huggingface/tasks", "crossws", "h3", "nitro", "rou3", "srvx", "zod"]
+  },
+  "output": {
+    "totalBytes": 6049147,
+    "serverBytes": 1150561,
+    "clientBytes": 4891907,
+    "clientGzipBytes": 993568
+  },
+  "startupMs": {
+    "runs": [106, 101, 101, 100, 98, 101, 98],
+    "median": 101
+  },
+  "shutdownMs": {
+    "runs": [1007, 1004, 1005, 1006, 1006, 1005, 1006],
+    "median": 1006
+  },
+  "durationsMs": {
+    "build": 701,
+    "check": 1170,
+    "test": 11270
+  },
+  "workarounds": [
+    {
+      "file": "app/server/plugins/runtime.ts",
+      "line": 44,
+      "ref": "nitrojs/nitro#5133"
+    },
+    {
+      "file": "app/server/plugins/runtime.ts",
+      "line": 66,
+      "ref": "nitrojs/nitro#5099"
+    }
+  ]
+}

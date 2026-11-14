@@ -1,243 +1,316 @@
-// The dev loop (`vite dev` in app/): Nitro's worker reloads on each save. A saved route keeps the runtime and
-// llama-server (`lib/context.ts`); saved business code undoes the runtime and builds it anew; one SIGINT stops it all.
-// On a copy of app/ (its own Nitro and Vite caches): the checkout's files stay as they are, and a `pnpm dev` the
-// developer runs meanwhile is left alone. Run in order, one dev server at a time: they share the copy's caches.
+// The dev loop (`vite dev` in app/): Vite serves the UI and proxies `/api` and `/ws` to the server, which runs from
+// source under `node --watch`. On a copy of app/ (`devCopy`) and free ports: the checkout's files stay as they are, and
+// a `pnpm dev` the developer runs meanwhile is left alone. One dev server at a time: they share the copy.
 import { type ChildProcessByStdio, spawn } from 'node:child_process';
-import {
-  copyFileSync,
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { afterAll, beforeAll, expect, test } from 'vitest';
-import { freePort } from './lib/testing/launch';
-import { bootId, isAlive, seedDataDir, startLlama } from './lib/testing/seed';
-import { tempDir } from './lib/testing/tempDir';
+import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
+import { devCopy } from './testing/devCopy.ts';
+import { freePort, userEnv } from './testing/launch.ts';
+import { startFakeThrough } from './testing/llama.ts';
+import { seedWatchPort } from './testing/seed.ts';
+import { tempDir } from './testing/tempDir.ts';
+import { openWs } from './testing/ws.ts';
 
-const SOURCE = resolve(import.meta.dirname, '..');
-// In the repository's `.cache/` (ignored by git, outside app/'s watcher): Vite loads Nitro's dev entry, in the
-// workspace's `node_modules`, only for a root within the workspace, and watches nothing under a `node_modules/`.
-const work = tempDir('lw-dev-app-', join(SOURCE, '../.cache'));
-/** The copy of app/ the dev server runs in. */
-const APP = join(work.path, 'app');
-/** The dev caches, left out of the copy's `node_modules` (each other entry links to app/'s own). */
-const CACHES = new Set(['.nitro', '.vite', '.vite-temp']);
+const copy = devCopy();
+const APP = copy.app;
+const dirs = tempDir('lw-dev-');
+let runs = 0;
 
-/** app/ without its output, dependencies and `.env*`; `node_modules` linked entry by entry; `tsconfig.base.json`. */
-function copyApp(): void {
-  cpSync(SOURCE, APP, {
-    recursive: true,
-    // A developer's own `.env*` stays out: the tests write theirs.
-    filter: (src) => !/^\/(?:node_modules|\.output|\.env[^/]*)(?:\/|$)/.test(src.slice(SOURCE.length)),
-  });
-  mkdirSync(join(APP, 'node_modules'));
-  for (const entry of readdirSync(join(SOURCE, 'node_modules')))
-    if (!CACHES.has(entry)) symlinkSync(join(SOURCE, 'node_modules', entry), join(APP, 'node_modules', entry));
-  copyFileSync(join(SOURCE, '../tsconfig.base.json'), join(work.path, 'tsconfig.base.json'));
+interface Dev {
+  readonly proc: ChildProcessByStdio<null, Readable, Readable>;
+  readonly exited: Promise<number | null>;
+  readonly base: string;
+  output(): string;
+  /** Each chunk of its output, with the time (`performance.now()`) it arrived. */
+  readonly chunks: ReadonlyArray<{ readonly at: number; readonly text: string }>;
 }
 
-const dir = tempDir('lw-dev-');
-const envDirs = tempDir('lw-dev-env-');
-let dev: ChildProcessByStdio<null, Readable, Readable>;
-let exited: Promise<number | null>;
-let base = '';
-let profileId = 0;
-let output = '';
+/** Every dev server a test started, stopped after it if it still runs. */
+const started = new Set<Dev>();
 
 /** Polls `check` every 50 ms until it holds, up to `ms`. */
-async function until(what: string, check: () => Promise<boolean>, ms = 30_000): Promise<void> {
+async function until(what: string, check: () => Promise<boolean> | boolean, ms: number, dev?: Dev): Promise<void> {
   const t0 = performance.now();
-  while (!(await check().catch(() => false))) {
-    if (performance.now() - t0 > ms) throw new Error(`${what}: not within ${ms} ms\n${output}`);
+  while (!(await Promise.resolve(check()).catch(() => false))) {
+    if (performance.now() - t0 > ms) throw new Error(`${what}: not within ${ms} ms\n${dev?.output() ?? ''}`);
     await sleep(50);
   }
 }
 
-/** Runs `body` with `file` edited (`edit` of its text), then restores it. */
-async function edited(file: string, edit: (text: string) => string, body: () => Promise<void>): Promise<void> {
-  const original = readFileSync(file, 'utf8');
-  writeFileSync(file, edit(original));
+/** Whether `pid` runs (a zombie, exited and not reaped yet, does not). */
+function isAlive(pid: number): boolean {
   try {
-    await body();
-  } finally {
-    // Not within a few ms of the edit: Vite's file watcher (chokidar) drops a second change that close.
-    await sleep(200);
-    writeFileSync(file, original);
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    // `pid (comm) state …`: the state follows the last parenthesis.
+    return stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3) !== 'Z';
+  } catch {
+    return false;
   }
 }
 
-const health = () => fetch(`${base}/api/health`).then((r) => r.text());
-
-/** The pid of the managed llama-server, if one runs. */
-async function serverPid(): Promise<number | null> {
-  const { state } = (await (await fetch(`${base}/api/server/state`)).json()) as { state: { pid?: number } };
-  return state.pid ?? null;
+/** `pid` and every process under it: Vite, `node --watch`, the server it runs. */
+function tree(pid: number): number[] {
+  let children: number[] = [];
+  try {
+    children = readFileSync(`/proc/${pid}/task/${pid}/children`, 'utf8')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(Number);
+  } catch {
+    // Gone already.
+  }
+  return [pid, ...children.flatMap(tree)];
 }
 
-/** Starts `vite dev` in app/ on a free port with `env` over the test's environment (`CI`, `TEST`, `NODE_ENV` left out). */
-async function startDev(env: Record<string, string | undefined>): Promise<void> {
-  const port = await freePort();
-  const full: Record<string, string | undefined> = {
-    ...process.env,
+const health = async (base: string) => (await fetch(`${base}/api/health`)).json() as Promise<{ bootId: string }>;
+const bootId = async (base: string) => (await health(base)).bootId;
+const serverKind = async (base: string) =>
+  ((await (await fetch(`${base}/api/server/state`)).json()) as { state: { kind: string } }).state.kind;
+
+/**
+ * Starts `vite dev` in the copy on a free port (or the `.env`'s, with `LLAMA_WEBUI_PORT: undefined`), with `env` over
+ * the user's environment: a fresh data dir, `XDG_DATA_HOME` in it (the developer's database is never touched), and the
+ * DevTools address on a closed port. Resolves once `/api/health` answers through Vite's port.
+ */
+async function startDev(env: Record<string, string | undefined> = {}, port?: number): Promise<Dev> {
+  const data = join(dirs.path, `run-${++runs}`);
+  const full: Record<string, string | undefined> = userEnv({
     LLAMA_WEBUI_HOST: '127.0.0.1',
-    LLAMA_WEBUI_PORT: String(port),
-    LLAMA_WEBUI_TEST_MONITOR: 'stub',
-    LLAMA_WEBUI_TEST_OFFLINE: '1',
-    ...env,
-  };
-  for (const k of ['CI', 'TEST', 'NODE_ENV']) delete full[k];
-  for (const [k, v] of Object.entries(full)) if (v === undefined) delete full[k];
-  output = '';
+    LLAMA_WEBUI_PORT: String(await freePort()),
+    LLAMA_WEBUI_DATA_DIR: join(data, 'data'),
+    XDG_DATA_HOME: join(data, 'xdg'),
+    LLAMA_WEBUI_DEVTOOLS_URL: `ws://127.0.0.1:${await freePort()}`,
+  });
+  for (const [k, v] of Object.entries(env)) {
+    if (v === undefined) delete full[k];
+    else full[k] = v;
+  }
+  // The watch of a server started by hand looks at the `port` setting: never at 8080, the user's own llama-server's.
+  const dataDir = full.LLAMA_WEBUI_DATA_DIR;
+  if (dataDir !== undefined) await seedWatchPort(dataDir, await freePort());
+  let output = '';
+  const chunks: Array<{ at: number; text: string }> = [];
   // Vite itself, not `pnpm dev`: a signal goes to the process that handles it.
   const proc = spawn(process.execPath, [join(APP, 'node_modules/vite/bin/vite.js'), 'dev'], {
     cwd: APP,
     env: full,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  proc.stdout.on('data', (c) => {
+  const collect = (c: Buffer) => {
     output += c;
-  });
-  proc.stderr.on('data', (c) => {
-    output += c;
-  });
-  dev = proc;
-  exited = new Promise((done) => proc.once('exit', (code) => done(code)));
-  base = `http://127.0.0.1:${port}`;
-  await until('vite dev answers /api/health', async () => (await health()).includes('"ok":true'), 60_000);
+    chunks.push({ at: performance.now(), text: String(c) });
+  };
+  proc.stdout.on('data', collect);
+  proc.stderr.on('data', collect);
+  const exited = new Promise<number | null>((done) => proc.once('exit', (code) => done(code)));
+  // The port Vite listens on: the environment's, else the `.env`'s, given as `port`.
+  const listens = port ?? Number(full.LLAMA_WEBUI_PORT);
+  const dev: Dev = { proc, exited, base: `http://127.0.0.1:${listens}`, output: () => output, chunks };
+  started.add(dev);
+  await until('vite dev answers /api/health', async () => (await health(dev.base)).bootId !== undefined, 60_000, dev);
+  return dev;
 }
 
-beforeAll(async () => {
-  copyApp();
-  ({ profileId } = await seedDataDir(dir.path));
-  await startDev({ LLAMA_WEBUI_DATA_DIR: dir.path });
-}, 90_000);
+/** Stops `dev` with SIGINT and waits for every process of its tree to be gone; the time it took. */
+async function stopped(dev: Dev, pids: number[], ms: number): Promise<number> {
+  const t0 = performance.now();
+  await until('vite dev and the server are gone', () => pids.every((pid) => !isAlive(pid)), ms, dev);
+  return performance.now() - t0;
+}
 
-afterAll(async () => {
-  if (dev.exitCode === null && dev.signalCode === null) {
-    dev.kill('SIGINT');
-    await Promise.race([exited, sleep(10_000, null, { ref: false })]);
-    if (dev.exitCode === null) dev.kill('SIGKILL');
+/** Runs `body` with `file` of the copy edited (a comment appended), then restores it. */
+async function edited(file: string, body: () => Promise<void>): Promise<void> {
+  const path = join(APP, file);
+  const original = readFileSync(path, 'utf8');
+  writeFileSync(path, `${original}// dev.test.ts\n`);
+  try {
+    await body();
+  } finally {
+    // Not within a few ms of the edit: a watcher may drop a second change that close.
+    await sleep(200);
+    writeFileSync(path, original);
   }
-  dir[Symbol.dispose]();
-  envDirs[Symbol.dispose]();
-  work[Symbol.dispose]();
+}
+
+/** Stops every dev server still running (SIGINT, then SIGKILL to what is left of its tree). */
+async function stopAll(): Promise<void> {
+  for (const dev of started) {
+    if (dev.proc.exitCode === null && dev.proc.signalCode === null) {
+      const pids = tree(dev.proc.pid ?? 0);
+      dev.proc.kill('SIGINT');
+      await Promise.race([dev.exited, sleep(10_000, null, { ref: false })]);
+      for (const pid of pids) if (isAlive(pid)) process.kill(pid, 'SIGKILL');
+    }
+  }
+  started.clear();
+}
+
+afterEach(async () => {
+  await stopAll();
+  rmSync(join(APP, '.env'), { force: true });
 });
 
-test('saving a route file keeps llama-server and the boot', async () => {
-  const before = { pid: await startLlama(base, profileId), bootId: await bootId(base) };
-  await edited(
-    join(APP, 'server/routes/api/health.get.ts'),
-    (t) => t.replace('reply({ ok: true,', "reply({ ok: true, marker: 'dev-test',"),
-    () => until('the edited route answers', async () => (await health()).includes('dev-test')),
-  );
-  await until('the restored route answers', async () => !(await health()).includes('dev-test'));
-  const after = { pid: (await serverPid()) ?? 0, bootId: await bootId(base) };
-  expect(after.bootId).toBe(before.bootId);
-  expect(after.pid).toBe(before.pid);
-  expect(isAlive(before.pid)).toBe(true);
-}, 60_000);
+afterAll(async () => {
+  if (shared !== undefined) started.add(shared);
+  await stopAll();
+  copy[Symbol.dispose]();
+  dirs[Symbol.dispose]();
+});
 
-test('saving business code rebuilds the runtime and stops the old llama-server', async () => {
-  const before = { pid: (await serverPid()) ?? (await startLlama(base, profileId)), bootId: await bootId(base) };
-  // A comment only: the module changes, its value does not (`version.test.ts` may run meanwhile).
-  let booted = '';
-  await edited(
-    join(APP, 'server/lib/version.ts'),
-    (t) => `${t}// dev.test.ts\n`,
-    () =>
-      until('a new boot', async () => {
-        booted = await bootId(base);
-        return booted !== before.bootId;
-      }),
-  );
-  await until('the old llama-server exits', async () => !isAlive(before.pid), 10_000);
-  // Restoring the file is a second save, which boots again (within ~60 ms): settled before the next test.
-  await until('the boot after the restore', async () => (await bootId(base)) !== booted);
+let shared: Dev | undefined;
+beforeAll(async () => {
+  shared = await startDev();
+  started.delete(shared);
 }, 90_000);
 
-test('one SIGINT stops vite dev and llama-server', async () => {
-  const pid = await startLlama(base, profileId);
-  dev.kill('SIGINT');
-  // Nitro's dev server closes Vite (our `close` hook stops llama-server), then exits 130, as a shell does on Ctrl+C.
-  expect(await Promise.race([exited, sleep(10_000, 'timeout', { ref: false })])).toBe(130);
+/** The dev server the first tests share, started once. */
+function sharedDev(): Dev {
+  if (shared === undefined) throw new Error('the shared dev server did not start');
+  return shared;
+}
+
+test('saving a server file restarts the server', async () => {
+  const dev = sharedDev();
+  const pid = await startFakeThrough(dev.base);
+  const before = await bootId(dev.base);
+  let booted = '';
+  await edited('server/health/http.ts', () =>
+    until(
+      'a new boot',
+      async () => {
+        booted = await bootId(dev.base);
+        return booted !== before;
+      },
+      30_000,
+      dev,
+    ),
+  );
+  // The old server stopped its llama-server; the new one runs none.
   expect(isAlive(pid)).toBe(false);
+  expect(await serverKind(dev.base)).toBe('idle');
+  // Restoring the file is a second save, a second restart: settled before the next test.
+  await until('the boot after the restore', async () => (await bootId(dev.base)) !== booted, 30_000, dev);
+}, 90_000);
+
+test('saving a web file keeps the server', async () => {
+  const dev = sharedDev();
+  const before = await bootId(dev.base);
+  await edited('src/main.tsx', async () => {
+    // Longer than a restart takes: a restart would show by now.
+    await sleep(3000);
+    expect(await bootId(dev.base)).toBe(before);
+  });
+  await sleep(3000);
+  expect(await bootId(dev.base)).toBe(before);
 }, 30_000);
 
-test('one SIGINT with a page open (/ws) undoes the runtime at once, without the dev worker force-closed', async () => {
-  await startDev({ LLAMA_WEBUI_DATA_DIR: dir.path });
-  const pid = await startLlama(base, profileId);
-  const ws = new WebSocket(`${base.replace('http', 'ws')}/ws`);
-  await new Promise((open, fail) => {
-    ws.onopen = open;
-    ws.onerror = fail;
+test('in dev, without Effect DevTools, a restart does not wait for them', async () => {
+  const dev = sharedDev();
+  // `startDev` points the DevTools address at a closed port.
+  expect(dev.output()).toMatch(/no Effect DevTools at ws:\/\/127\.0\.0\.1:\d+: start them, then save a server file/);
+  const before = await bootId(dev.base);
+  const from = dev.chunks.length;
+  let booted = '';
+  let bootedAt = 0;
+  await edited('server/health/http.ts', () =>
+    until(
+      'a new boot',
+      async () => {
+        booted = await bootId(dev.base);
+        bootedAt = performance.now();
+        return booted !== before;
+      },
+      30_000,
+      dev,
+    ),
+  );
+  // From the line `node --watch` prints when it restarts the server to the first answer of the new one.
+  const restarting = dev.chunks.slice(from).find((chunk) => chunk.text.includes('Restarting'));
+  if (restarting === undefined) throw new Error(`no Restarting line\n${dev.output()}`);
+  expect(bootedAt - restarting.at).toBeLessThan(1000);
+  await until('the boot after the restore', async () => (await bootId(dev.base)) !== booted, 30_000, dev);
+}, 90_000);
+
+test('one SIGINT stops vite dev and the server', async () => {
+  const dev = sharedDev();
+  started.add(dev);
+  const llama = await startFakeThrough(dev.base);
+  const pids = tree(dev.proc.pid ?? 0);
+  // Vite, `node --watch`, the server and its llama-server.
+  expect(pids.length).toBeGreaterThanOrEqual(4);
+  expect(pids).toContain(llama);
+  dev.proc.kill('SIGINT');
+  expect(await stopped(dev, pids, 5000)).toBeLessThan(5000);
+}, 30_000);
+
+test('one SIGINT with a page open (/ws) stops at once', async () => {
+  const dev = await startDev();
+  const pids = tree(dev.proc.pid ?? 0);
+  const client = await openWs(`${dev.base.replace('http', 'ws')}/ws`);
+  await client.next();
+  const t0 = performance.now();
+  dev.proc.kill('SIGINT');
+  const closed = await Promise.race([client.closed, sleep(2000, null, { ref: false })]);
+  // The server's own 1001, through Vite: it stopped (a server killed instead would leave the page a 1006).
+  expect(closed?.code).toBe(1001);
+  await stopped(dev, pids, 2000);
+  expect(performance.now() - t0).toBeLessThan(2000);
+}, 90_000);
+
+test('two quick SIGINTs still stop the server', async () => {
+  const dev = await startDev();
+  const llama = await startFakeThrough(dev.base);
+  const pids = tree(dev.proc.pid ?? 0);
+  // No llama-server left either.
+  expect(pids).toContain(llama);
+  dev.proc.kill('SIGINT');
+  await sleep(20);
+  dev.proc.kill('SIGINT');
+  await stopped(dev, pids, 5000);
+}, 90_000);
+
+test('a SIGHUP (the terminal closed) stops vite dev and the server', async () => {
+  const dev = await startDev();
+  const pids = tree(dev.proc.pid ?? 0);
+  dev.proc.kill('SIGHUP');
+  await stopped(dev, pids, 5000);
+  expect(await dev.exited).toBe(129);
+}, 90_000);
+
+test('dev reads .env, the environment wins over it', async () => {
+  const fromFile = await freePort();
+  writeFileSync(join(APP, '.env'), `LLAMA_WEBUI_PORT=${fromFile}\n`);
+  const fromDotEnv = await startDev({ LLAMA_WEBUI_PORT: undefined }, fromFile);
+  expect((await health(fromDotEnv.base)).bootId).toBeTypeOf('string');
+  const pids = tree(fromDotEnv.proc.pid ?? 0);
+  fromDotEnv.proc.kill('SIGINT');
+  await stopped(fromDotEnv, pids, 5000);
+
+  const fromEnv = await freePort();
+  const dev = await startDev({ LLAMA_WEBUI_PORT: String(fromEnv) });
+  expect(dev.base).toBe(`http://127.0.0.1:${fromEnv}`);
+  await expect(fetch(`http://127.0.0.1:${fromFile}/api/health`)).rejects.toThrow();
+}, 90_000);
+
+test('in dev the server connects to the Effect DevTools address', async () => {
+  let upgrades = 0;
+  const devtools = createServer();
+  devtools.on('upgrade', (_req, socket) => {
+    upgrades += 1;
+    socket.destroy();
   });
+  const port = await freePort();
+  await new Promise<void>((listening) => devtools.listen(port, '127.0.0.1', listening));
   try {
-    const t0 = performance.now();
-    dev.kill('SIGINT');
-    expect(await Promise.race([exited, sleep(10_000, 'timeout', { ref: false })])).toBe(130);
-    // Nitro force-closes the worker after 5 s when its HTTP server is held open: the runtime was not undone then.
-    expect(performance.now() - t0).toBeLessThan(3000);
-    expect(output).not.toContain('did not shut down in time');
-    expect(output).toContain('[llama-webui] stopping llama-server');
-    expect(isAlive(pid)).toBe(false);
+    const dev = await startDev({ LLAMA_WEBUI_DEVTOOLS_URL: `ws://127.0.0.1:${port}` });
+    await until('an upgrade request to the DevTools address', () => upgrades > 0, 5000, dev);
+    expect(dev.output()).toContain(`Effect DevTools connected (ws://127.0.0.1:${port})`);
   } finally {
-    if (isAlive(pid)) process.kill(pid, 'SIGKILL');
-  }
-}, 90_000);
-
-test('two quick SIGINTs (a double Ctrl+C) still stop llama-server', async () => {
-  await startDev({ LLAMA_WEBUI_DATA_DIR: dir.path });
-  const pid = await startLlama(base, profileId);
-  try {
-    dev.kill('SIGINT');
-    await sleep(20);
-    dev.kill('SIGINT');
-    await Promise.race([exited, sleep(10_000, null, { ref: false })]);
-    await until('llama-server exits', async () => !isAlive(pid), 5000);
-  } finally {
-    if (isAlive(pid)) process.kill(pid, 'SIGKILL');
-  }
-}, 90_000);
-
-test("dev reads .env.local too: Nitro's Vite plugin loads it (the production launcher reads .env only)", async () => {
-  // No LLAMA_WEBUI_DATA_DIR in the environment: without .env.local the data dir would be $XDG_DATA_HOME/llama-webui.
-  // nitro/vite hard-codes `.env`, `.env.local`, `.env.<mode>`, `.env.<mode>.local`; no option changes the list.
-  const xdg = join(envDirs.path, 'xdg');
-  const fromEnvLocal = join(envDirs.path, 'from-env-local');
-  const file = join(APP, '.env.local');
-  writeFileSync(file, `LLAMA_WEBUI_DATA_DIR=${fromEnvLocal}\n`);
-  try {
-    await startDev({ LLAMA_WEBUI_DATA_DIR: undefined, XDG_DATA_HOME: xdg });
-    expect(existsSync(join(fromEnvLocal, 'llama-webui.sqlite'))).toBe(true);
-    expect(existsSync(xdg)).toBe(false);
-  } finally {
-    rmSync(file, { force: true });
-    dev.kill('SIGINT');
-    await Promise.race([exited, sleep(10_000, null, { ref: false })]);
-  }
-}, 90_000);
-
-test('in dev, .env wins over .env.local: vite.config.ts loads .env first, and Nitro never replaces a variable', async () => {
-  const fromEnv = join(envDirs.path, 'from-env');
-  const fromEnvLocal = join(envDirs.path, 'local-loses');
-  writeFileSync(join(APP, '.env'), `LLAMA_WEBUI_DATA_DIR=${fromEnv}\n`);
-  writeFileSync(join(APP, '.env.local'), `LLAMA_WEBUI_DATA_DIR=${fromEnvLocal}\n`);
-  try {
-    await startDev({ LLAMA_WEBUI_DATA_DIR: undefined, XDG_DATA_HOME: join(envDirs.path, 'xdg2') });
-    expect(existsSync(join(fromEnv, 'llama-webui.sqlite'))).toBe(true);
-    expect(existsSync(fromEnvLocal)).toBe(false);
-  } finally {
-    rmSync(join(APP, '.env'), { force: true });
-    rmSync(join(APP, '.env.local'), { force: true });
-    dev.kill('SIGINT');
-    await Promise.race([exited, sleep(10_000, null, { ref: false })]);
+    devtools.close();
   }
 }, 90_000);

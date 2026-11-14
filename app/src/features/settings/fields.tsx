@@ -107,8 +107,8 @@ export function GpuSwitches({
   hidden,
   onChange,
 }: {
-  gpus: { busId: string; name: string; vramTotalBytes: number }[];
-  hidden: string[];
+  gpus: readonly { busId: string; name: string; vramTotalBytes: number }[];
+  hidden: readonly string[];
   onChange(hidden: string[]): void;
 }) {
   return gpus.map((g) => (

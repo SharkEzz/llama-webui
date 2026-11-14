@@ -1,0 +1,3415 @@
+[
+  {
+    "project": "server",
+    "file": "app/build/licenses.test.ts",
+    "name": "packageRoot finds the package of a bundled module, scoped or not, through pnpm",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/build/licenses.test.ts > packageRoot finds the package of a bundled module, scoped or not, through pnpm"
+  },
+  {
+    "project": "server",
+    "file": "app/build/licenses.test.ts",
+    "name": "render sorts by name and says when a package ships no license file",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/build/licenses.test.ts > render sorts by name and says when a package ships no license file"
+  },
+  {
+    "project": "server",
+    "file": "app/server/api.gen.test.ts",
+    "name": "the generated map is Nitro’s own route table",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "The generator is gone: the client is derived from the HttpApi definition of @llama-webui/shared"
+  },
+  {
+    "project": "server",
+    "file": "app/server/api.gen.test.ts",
+    "name": "apiRoutes keeps the API routes with a method, reads Body and Query, sorts by path then method",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "The generator is gone: the client is derived from the HttpApi definition of @llama-webui/shared"
+  },
+  {
+    "project": "server",
+    "file": "app/server/api.gen.test.ts",
+    "name": "in dev, a route file added or deleted updates api.gen.ts",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "The generator is gone: the client is derived from the HttpApi definition of @llama-webui/shared"
+  },
+  {
+    "project": "server",
+    "file": "app/server/build.test.ts",
+    "name": "the client is split per page, three.js only in the Topology chunks, no node:* module",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/build.test.ts > each page is a chunk of its own; the client imports no node:* module",
+    "reason": "three.js only in the Topology chunks returns with the Topology page (E4)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/build.test.ts",
+    "name": "a deep URL finds every file its page references, from the root, cached as immutable",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/build.test.ts > a deep URL gets the shell; app/server/http/Static.test.ts > Static > pages are revalidated, hashed assets are immutable, the API sets no cache header"
+  },
+  {
+    "project": "server",
+    "file": "app/server/build.test.ts",
+    "name": "the server imports nothing but node:* builtins: the build is self-contained",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/build.test.ts > the server requires nothing but Node builtins"
+  },
+  {
+    "project": "server",
+    "file": "app/server/build.test.ts",
+    "name": "the licenses of the bundled code ship with the server",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/build.test.ts > the licenses of the bundled code ship with the server"
+  },
+  {
+    "project": "server",
+    "file": "app/server/build.test.ts",
+    "name": "the server finds the NVML sampler: the module that names it sits next to it",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/build.test.ts > the server finds the NVML sampler: the module that names it sits next to it",
+    "reason": "The sampler is an Effect program bundled by Rolldown in app/build/server.ts, spoken to in NDJSON over its stdin and stdout"
+  },
+  {
+    "project": "server",
+    "file": "app/server/build.test.ts",
+    "name": "the NVML sampler ships next to the server entry and starts from the bundle",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/build.test.ts > the NVML sampler ships next to the server entry and starts from the bundle",
+    "reason": "The sampler is an Effect program bundled by Rolldown in app/build/server.ts, spoken to in NDJSON over its stdin and stdout"
+  },
+  {
+    "project": "server",
+    "file": "app/server/dev.test.ts",
+    "name": "saving a route file keeps llama-server and the boot",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Nitro behaviour: a saved server file restarts the whole server"
+  },
+  {
+    "project": "server",
+    "file": "app/server/dev.test.ts",
+    "name": "saving business code rebuilds the runtime and stops the old llama-server",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/dev.test.ts > saving a server file restarts the server",
+    "reason": "the stop of llama-server returns with the supervisor (E3)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/dev.test.ts",
+    "name": "one SIGINT stops vite dev and llama-server",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/dev.test.ts > one SIGINT stops vite dev and the server",
+    "reason": "the stop of llama-server returns with the supervisor (E3)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/dev.test.ts",
+    "name": "one SIGINT with a page open (/ws) undoes the runtime at once, without the dev worker force-closed",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/dev.test.ts > one SIGINT with a page open (/ws) stops at once"
+  },
+  {
+    "project": "server",
+    "file": "app/server/dev.test.ts",
+    "name": "two quick SIGINTs (a double Ctrl+C) still stop llama-server",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/dev.test.ts > two quick SIGINTs still stop the server",
+    "reason": "the stop of llama-server returns with the supervisor (E3)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/dev.test.ts",
+    "name": "dev reads .env.local too: Nitro's Vite plugin loads it (the production launcher reads .env only)",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Nitro behaviour: dev reads .env only, like the launcher"
+  },
+  {
+    "project": "server",
+    "file": "app/server/dev.test.ts",
+    "name": "in dev, .env wins over .env.local: vite.config.ts loads .env first, and Nitro never replaces a variable",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/dev.test.ts > dev reads .env, the environment wins over it",
+    "reason": "no .env.local any more: what is left is the precedence of .env in dev"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/gate.test.ts",
+    "name": "the server stopped for a benchmark restarts with the profile as it is now (#39)",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/gate.test.ts",
+    "name": "without a rebuilt command (profile deleted), the recorded one is used (#39)",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/hardware.test.ts",
+    "name": "buildOf reads the version again after the binary is rebuilt",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/hardware.test.ts",
+    "name": "a crashed device listing is not cached, and the last good list is kept (#15)",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/hardware.test.ts",
+    "name": "a crash with no earlier list gives no devices and says why (#15)",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/hardware.test.ts",
+    "name": "a GPU listed with 0 MiB is not cached (#15)",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/parse.test.ts",
+    "name": "benchFailure reports an out-of-memory load",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "restarts the server it stopped even when llama-bench fails",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "a successful run stores pp/tg and refuses a second run meanwhile",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "a server run measures r times and reports draft acceptance",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "a missing model is refused before anything stops",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "a failed restart is recorded on the run",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "dispose (shutdown) saves the running sweep item and its sweep as interrupted",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "a bench run gets its profile's environment",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "a server that dies of OOM is reported as OOM even when a long backtrace follows the allocation error",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "the warm-up prompt is a sentence: a 2-token prompt crashes llama-server with -sm tensor and an MTP draft",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "a server run runs in its profile's directory",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "a sweep stops the server once, continues after an OOM item and restarts it once",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "cancelSweep cancels the queue and releases the gate",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "validating an interrupted sweep also finishes its interrupted items",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "the VRAM sampler takes its last reading when the run ends, then stops",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "server validation runs get the sweep context when the profile sets no -c (#24)",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/runner.test.ts",
+    "name": "resuming a sweep whose model was deleted is one 400, before anything stops (#37)",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/bench/vram.test.ts",
+    "name": "parseSmiLine reads nvidia-smi loop lines as monitor keys",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/chat/request.test.ts",
+    "name": "empty sampling sends no sampling key, reasoning and failed messages stay out",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/request.test.ts > request > empty sampling sends no sampling key, reasoning and failed messages stay out"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/chat/request.test.ts",
+    "name": "a context overflow becomes a clear message, other errors keep llama-server's text",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/request.test.ts > request > a context overflow becomes a clear message, other errors keep llama-server's text",
+    "reason": "llamaErrorMessage is failureMessage of a LlamaHttpFailed or LlamaStreamFailed, the tagged failures of llama/chatStream.ts"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/chat/request.test.ts",
+    "name": "consecutive messages of the same role are merged (strict templates require alternating roles)",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/request.test.ts > request > consecutive messages of the same role are merged (strict templates require alternating roles)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/chat/runs.test.ts",
+    "name": "a run keeps going and is saved when its listener leaves",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > a run keeps going and is saved when its listener leaves"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/chat/runs.test.ts",
+    "name": "stop saves the partial answer as stopped",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > stop saves the partial answer as stopped"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/chat/runs.test.ts",
+    "name": "a late subscriber gets what was already written",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > a late subscriber gets what was already written"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/chat/runs.test.ts",
+    "name": "a stream that ends without [DONE] or breaks is an error that keeps the partial answer",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > a stream that ends without [DONE] or breaks is an error that keeps the partial answer"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/chat/runs.test.ts",
+    "name": "dispose emits done(stopped) to listeners, so their streams close",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > dispose emits done(stopped) to listeners, so their streams close",
+    "reason": "dispose is the shutdown step of ChatRuns, run through Shutdown.run"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "parseCli: defaults without flag or env",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > defaults without flag or env"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "parseCli: environment variables",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > environment variables"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "parseCli: a flag overrides the env, --opt=val form accepted",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > a flag overrides the env, --opt=val form accepted"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "parseCli: empty env ignored (as before)",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > an empty variable is ignored"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "parseCli: --help and -h",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > --help and -h print the help and start nothing"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "parseCli: invalid port (flag or env)",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/config/Cli.test.ts > cli > invalid port, flag or env",
+    "reason": "the wording of a usage error is that of effect/cli; it exits 1, not 2"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "parseCli: unknown option, missing value, positional, empty value",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/config/Cli.test.ts > cli > unknown option, missing value, positional, empty value are refused",
+    "reason": "the wording of a usage error is that of effect/cli; it exits 1, not 2"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "helpText: the installed command and the pnpm scripts, one Node.js process",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/config/Cli.test.ts > cli > the help names the installed command and the pnpm scripts",
+    "reason": "the help is generated by effect/cli"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "parseCli: --env-override is accepted (read by the entry points before the .env is loaded)",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > --env-override is accepted and reaches start"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/cli.test.ts",
+    "name": "--help names how each way of running reads its options",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/config/Cli.test.ts > cli > the help names the installed command and the pnpm scripts; cli > the help names each option with its variable"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "parseFdinfo amdgpu",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > parseFdinfo amdgpu"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "readProcAmdVram dedupes by client id",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > readProcAmdVram dedupes by client id"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "discoverAmdCards + readAmdCard",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > discoverAmdCards + readAmdCard"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "parseLinkSpeed",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/hardware/pci.test.ts > pci helpers > parseLinkSpeed / minKnown / chipsetLabel",
+    "reason": "parseLinkSpeed lives in hardware/pci.ts and is tested once, with the other PCIe helpers"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "parseDpm",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > parseDpm"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "readAmdCard reads link, clocks, fan and power cap",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > readAmdCard reads link, clocks, fan and power cap"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "isRuntimeSuspended reads power/runtime_status without touching the device",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > isRuntimeSuspended reads power/runtime_status without touching the device"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "a card behind its own PCIe switch reports the slot link, bounded by the slot (RX 9070 XT in a Gen4 x4 chipset slot)",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > a card behind its own PCIe switch reports the slot link, bounded by the slot (RX 9070 XT in a Gen4 x4 chipset slot)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "the slot link walk stops below an ATI-chipset root port (vendor 0x1002) and is bounded by it",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > the slot link walk stops below an ATI-chipset root port (vendor 0x1002) and is bounded by it"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "a slot port reporting max_link_width 0 leaves the card's width as the maximum, and is read again until known",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > a slot port reporting max_link_width 0 leaves the card's width as the maximum, and is read again until known"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "a link that is down or retraining (current width 0) has an unknown width, not x0",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > a link that is down or retraining (current width 0) has an unknown width, not x0"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "pciIdsName names a card from sysfs ids and pci.ids, without lspci (which would wake a suspended card)",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > pciIdsName names a card from sysfs ids and pci.ids, without lspci (which would wake a suspended card); app/server/hardware/pci.test.ts > PciIds > PciIds: a missing file is looked at again, a found name is not read twice",
+    "reason": "pci.ids is read by the PciIds service; discoverAmdCards asks it the ids sysfs holds (a stub PciIds in this test)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "discoverAmdCards lists each card's DRM nodes (card and render), so fds can be matched to a card",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > discoverAmdCards lists each card's DRM nodes (card and render), so fds can be matched to a card"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/amdgpu.test.ts",
+    "name": "readProcAmdVram skips fds on cards not to read (hidden or suspended), without opening their fdinfo",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > readProcAmdVram skips fds on cards not to read (hidden or suspended), without opening their fdinfo"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/membw.test.ts",
+    "name": "parsePerfLine: perf stat CSV, unsupported counts",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > parsePerfLine: perf stat CSV, unsupported counts"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/membw.test.ts",
+    "name": "MemBandwidthSampler: system read/write rates from per-interval CAS counts × 64 bytes",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: system read/write rates from per-interval CAS counts × 64 bytes"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/membw.test.ts",
+    "name": "MemBandwidthSampler: perf missing or event unknown → unknown, retried only after a delay",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: perf missing or event unknown → unknown, retried only after a delay"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/membw.test.ts",
+    "name": "MemBandwidthSampler: one perf per followed PID, replaced when the PID changes, none for a dead PID",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: one perf per followed PID, replaced when the PID changes, none for a dead PID"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/membw.test.ts",
+    "name": "MemBandwidthSampler: a new interval restarts the streams with it",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: a new interval restarts the streams with it"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/membw.test.ts",
+    "name": "MemBandwidthSampler: a PID perf cannot attach to is not retried, even when setPid runs every tick",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: a PID perf cannot attach to is not retried, even when setPid runs every tick"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/membw.test.ts",
+    "name": "MemBandwidthSampler: system perf failing every time is retried once per delay, not every tick",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: system perf failing every time is retried once per delay, not every tick",
+    "reason": "On real time: 2 to 4 starts in about 1 s at a 300 ms delay, where the injected clock gave exactly 4"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/membw.test.ts",
+    "name": "MemBandwidthSampler: perf that dies after giving values is relaunched after the delay",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: perf that dies after giving values is relaunched after the delay"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "normalizeBusId",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/gpu.test.ts > gpu helpers > normalizeBusId"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "parseNvidiaGpuLine",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > parseNvidiaGpuLine"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "parseComputeApps",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > parseComputeApps"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "NvidiaMonitor streams lines split across chunks",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > NvidiaMonitor streams lines split across chunks"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "NvidiaMonitor procVram from compute apps",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > NvidiaMonitor procVram from compute apps"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "compute apps with [N/A] memory keep the process on its card, counting the card's VRAM in use",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > compute apps with [N/A] memory keep the process on its card, counting the card's VRAM in use"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "NvidiaMonitor without nvidia-smi stays empty",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > NvidiaMonitor without nvidia-smi stays empty"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "a compute-apps read abandoned on timeout may fail later without reaching the process",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > a compute-apps read abandoned on timeout may fail later without reaching the process"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "selectUsedGpus",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/gpu.test.ts > gpu helpers > selectUsedGpus keeps the cards above 64 MiB, by bus id",
+    "reason": "Moved with selectUsedGpus to collectors/gpu.ts, its name saying what it checks"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "hung nvidia-smi compute-apps query times out, is killed, and calls don't pile up",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > hung nvidia-smi compute-apps query times out, is killed, and calls don't pile up"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvidia.test.ts",
+    "name": "configure restarts a running nvidia-smi stream at the new pace, and only then",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > configure restarts a running nvidia-smi stream at the new pace, and only then"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvml/monitor.test.ts",
+    "name": "lowering the interval keeps the last sample fresh until the worker samples at the new pace",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML state > lowering the interval keeps the last sample fresh until the worker samples at the new pace",
+    "reason": "The freshness is a pure reducer of Nvml.ts (onConfigure, onSample, isFresh), tested without a process"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvml/monitor.test.ts",
+    "name": "workerUrl: worker.ts next to the module in development, nvml-worker.mjs next to the bundle",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML reader > workerPath: worker.ts next to the module in development, nvml-worker.mjs next to the bundle",
+    "reason": "workerUrl is workerPath: the path a spawned program takes, not a URL for fork"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvml/monitor.test.ts",
+    "name": "a real worker with a missing NVML library resolves null (the nvidia-smi fallback)",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML reader > a real worker with a missing NVML library resolves null (the nvidia-smi fallback)",
+    "reason": "The sampler is a child process of effect/process spoken to in NDJSON (fake samplers: testing/fixtures/fakeNvml.ts), not a fork with IPC"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvml/monitor.test.ts",
+    "name": "a real worker reads NVML when the library is here",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML reader > a real worker reads NVML when the library is here",
+    "reason": "The sampler is a child process of effect/process spoken to in NDJSON (fake samplers: testing/fixtures/fakeNvml.ts), not a fork with IPC"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/collectors/nvml/monitor.test.ts",
+    "name": "a sampler stuck in a native call does not hold the process when it exits",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML reader > a sampler stuck in a native call does not hold the process when it exits",
+    "reason": "The sampler is a child process of effect/process spoken to in NDJSON (fake samplers: testing/fixtures/fakeNvml.ts), not a fork with IPC"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/contract/cases.test.ts",
+    "name": "normalize replaces the hash of a built asset: the record survives a client change",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/cases.test.ts > normalize replaces the hash of a built asset: the record survives a client change"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/contract/contract.test.ts",
+    "name": "the route table lists every API route of the app",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/contract/contract.test.ts > the cases cover every endpoint of the API definition",
+    "reason": "the endpoints come from HttpApi.reflect, not from a route table"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/contract/contract.test.ts",
+    "name": "no case that breaks a body or a guard succeeds",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/contract.test.ts > no case that breaks a payload or the guard succeeds"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/contract/contract.test.ts",
+    "name": "every reply matches the golden record",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/contract/contract.test.ts > every reply matches the golden record",
+    "reason": "a new golden with the E1 cases; the other endpoints come back with their milestone"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/contract/wire.test.ts",
+    "name": "a body is sent with its content-length; the reply keeps its status, lower-case headers and body",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/wire.test.ts > a body is sent with its content-length; the reply keeps its status, lower-case headers and body"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/contract/wire.test.ts",
+    "name": "a chunked reply is reassembled",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/wire.test.ts > a chunked reply is reassembled"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/contract/wire.test.ts",
+    "name": "a 204 and a HEAD reply have an empty body",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/wire.test.ts > a 204 and a HEAD reply have an empty body"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/contract/wire.test.ts",
+    "name": "a request without body sends neither content-length nor transfer-encoding; headers are sent as given",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/wire.test.ts > a request without body sends neither content-length nor transfer-encoding; headers are sent as given"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/contract/wire.test.ts",
+    "name": "readSse stops at the condition on a stream that never ends",
+    "milestone": "E5",
+    "status": "dropped",
+    "reason": "The contract records no SSE reply: a reply needs a ready llama-server, which the contract runner does not wait for (its chat cases are the refusals before any reply), so app/server/contract/wire.ts has no readSse; a reply over the wire is read by chat/http.test.ts (the typed client decodes a reply of llama-server, started by the supervisor, into its events) and lifecycle.test.ts (SIGTERM with the UI open and a reply streaming…)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/benchRuns.test.ts",
+    "name": "a run whose profile no longer exists is created without it",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/benchRuns.test.ts",
+    "name": "lastOkByProfile: the latest successful one-off run per profile; failures, sweep items and orphans ignored",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/migrations.test.ts",
+    "name": "a deleted profile's id is never given to a new profile (#38)",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/db/Db.test.ts > Db > a deleted profile's id is never given to a new profile (#38)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/migrations.test.ts",
+    "name": "rebuilding profiles keeps their ids and every link to them (#38)",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/db/Db.test.ts > Db > an older database is brought up to date: profiles keep their ids and every link to them (#38)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/settings.test.ts",
+    "name": "settings: defaults, then a persisted patch",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > settings: defaults, then a persisted patch"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/settings.test.ts",
+    "name": "settings: a stored value that became invalid falls back to the default and can be repaired",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > settings: a stored value that became invalid falls back to the default and can be repaired"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/settings.test.ts",
+    "name": "settings: llama-server listens on loopback by default, like llama-webui (#27)",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > settings: llama-server listens on loopback by default, like llama-webui (#27)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/settings.test.ts",
+    "name": "settings: env is replaced as a whole (a variable left out is removed) and its names are checked",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > settings: env is replaced as a whole (a variable left out is removed) and its names are checked"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "get returns null when no row matches, all the rows, run the changes and the last rowid",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "a value count that does not match the placeholders throws (node:sqlite alone binds NULL)",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "RETURNING rows are read through get",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "exec runs every statement; run returns the changes of its one statement, and refuses several",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "booleans bind as 1 and 0, undefined as NULL (node:sqlite alone refuses them)",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/db/Db.test.ts > Db > a number bound to an INTEGER column is stored as an integer, a boolean as 1 or 0",
+    "reason": "undefined is never bound: the schemas encode an absent value"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "an integral number binds as INTEGER (node:sqlite alone binds every number as REAL)",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/db/Db.test.ts > Db > a number bound to an INTEGER column is stored as an integer, a boolean as 1 or 0"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "a transaction returns its value and commits; a throw rolls back and rethrows the same error",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node (SqlClient.withTransaction)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "a nested transaction is a savepoint: a caught inner failure only undoes the inner writes",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node (SqlClient.withTransaction)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "an error that made SQLite roll back the transaction itself is rethrown as is",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node (SqlClient.withTransaction)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sqlite.test.ts",
+    "name": "foreign keys are off by default, readonly refuses writes, close is idempotent, using closes",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/db/Db.test.ts > Db > foreign keys are on once the database is open",
+    "reason": "readonly, close and using belonged to the wrapper"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sweeps.test.ts",
+    "name": "a deleted run's id is never handed out again",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sweeps.test.ts",
+    "name": "the migration keeps every run of a J5 database: ids, values and the next id",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sweeps.test.ts",
+    "name": "a sweep counts its queued items, cascades on delete and forgets a deleted best run",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/db/sweeps.test.ts",
+    "name": "stopOrphans interrupts running sweeps and their running item",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/env.test.ts",
+    "name": "loadDotEnv: the file fills what the environment lacks, a variable already set wins",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: the file fills what the environment lacks, a variable already set wins"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/env.test.ts",
+    "name": "loadDotEnv: { override: true } (--env-override) lets the file override the environment",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: { override: true } (--env-override) lets the file override the environment"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/env.test.ts",
+    "name": "loadDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=1 in the environment lets the file override it",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=1 in the environment lets the file override it"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/env.test.ts",
+    "name": "loadDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=true in the file itself lets it override the environment",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=true in the file itself lets it override the environment"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/env.test.ts",
+    "name": "loadDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=0 keeps the environment",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=0 keeps the environment"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/env.test.ts",
+    "name": "loadDotEnv: no file, nothing happens",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > loadDotEnv: no file, nothing happens"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/env.test.ts",
+    "name": "useEnvProxy: no proxy variable, nothing changes",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/env.test.ts",
+    "name": "useEnvProxy: fetch goes through HTTP_PROXY, except for loopback and the hosts of NO_PROXY",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hardware/pci.test.ts",
+    "name": "readPciTopology: nodes of the reference machine",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: nodes of the reference machine"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hardware/pci.test.ts",
+    "name": "readPciTopology: links, their capacity is the smaller of both ends",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: links, their capacity is the smaller of both ends"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hardware/pci.test.ts",
+    "name": "readPciTopology: a third-party switch or a Thunderbolt bridge is not a chipset",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: a third-party switch or a Thunderbolt bridge is not a chipset"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hardware/pci.test.ts",
+    "name": "readPciTopology: unreadable sysfs still yields CPU and RAM",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: unreadable sysfs still yields CPU and RAM"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hardware/pci.test.ts",
+    "name": "cpuLabel",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci helpers > cpuLabel"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hardware/pci.test.ts",
+    "name": "readPciTopology: a sleeping card reporting width 63 (config read 0xFFFF) gives an unknown width",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: a sleeping card reporting width 63 (config read 0xFFFF) gives an unknown width"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hardware/pci.test.ts",
+    "name": "parseLinkSpeed / minKnown / chipsetLabel",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci helpers > parseLinkSpeed / minKnown / chipsetLabel"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hardware/pci.test.ts",
+    "name": "findPciIdsEntry: the device line of its own vendor only, not a subsystem or a class line",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci helpers > findPciIdsEntry: the device line of its own vendor only, not a subsystem or a class line"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > downloads every shard, checks it and renames it into place; the token never reaches the CDN",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > resumes an existing .part with a Range request",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > starts over when the server ignores the Range header",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > a connection cut mid-file is resumed where it stopped",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > a body that ends early without an error is resumed, not started over; the hash is not read again",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > network errors are retried, then the item fails once the retries are spent",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > a gated repo fails at once, with its code",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > a checksum mismatch deletes the file",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > cancel: a running item stops and its files are deleted; a queued one never starts",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > retrying a canceled split model downloads again the shards the cancel deleted",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > concurrent or repeated requests for one variant queue it once; retry refuses a variant already queued",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > retry checks the disk space like a new download",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > refuses a duplicate and a download that does not fit on the disk; skips files already there",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > remove and clear finished items",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/downloader.test.ts",
+    "name": "DownloadQueue > after a restart, the next queue resumes the item from its .part",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "token > HF_TOKEN first, then the hf token file",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "token > token file location follows the hf CLI",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "token > endpoint",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "paths > downloads go to <modelsDir>/<org>/<name>",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "paths > a path cannot leave the repo folder",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "groupRepoFiles > single files, shard sets, projectors; other files ignored; smallest first",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "imatrix files in GGUF format are not offered as variants (#31)",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "HfClient > repo files: sizes and sha256 from the blobs listing, pinned commit",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "HfClient > search: GGUF filter, most downloaded first",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "HfClient > errors carry a code",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/hf/hf.test.ts",
+    "name": "HfClient > status: token source and account, a rejected token is reported",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/http.test.ts",
+    "name": "appError: h3’s own HTTPError keeps its status; a wrapped error answers as the original",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: an error reply is the encoded error of the endpoint"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/http.test.ts",
+    "name": "errorResponse: an HttpError keeps its status and code, any other error is a 500",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/http/HttpLive.test.ts > HttpLive > a defect answers 500 without its message, and is logged",
+    "reason": "an expected error keeps its status through its HttpApiSchema annotation (settings/http.test.ts)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/http.test.ts",
+    "name": "a method a pattern lacks is a 405 with Allow, not the next matching pattern (#37)",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "HttpApi has no 405: a wrong method is a 404 RouteNotFound (recorded in behaviours.md)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/http.test.ts",
+    "name": "an empty segment does not match a :param: a trailing slash stays an unknown route",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 router behaviour: the router of effect/http ignores a trailing slash (GET /api/settings/ is GET /api/settings, recorded in the contract); the empty :id segment returns with the first :id endpoint (E2)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/http.test.ts",
+    "name": "idParam() is a 404 for anything but a positive integer",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition; the first :id endpoint (E2) records its 404 in the contract. Back at E2: packages/webui-shared/src/api/errors.test.ts > IdParam reads decimal digits only, app/server/http/RequestErrors.test.ts > a path parameter that does not decode is the 404 of an unknown route"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/http.test.ts",
+    "name": "readJson(object): Invalid JSON, then JSON object expected",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition; a payload that is not a JSON object is a bare 400"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/http.test.ts",
+    "name": "a reply keeps the content type its handler gave it",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/http.test.ts",
+    "name": "readBody() validates a JSON object with zod: Invalid JSON, JSON object expected, then the schema",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/http/HttpLive.test.ts > HttpLive > a payload that does not decode is a 400, not logged as a failure",
+    "reason": "the messages Invalid JSON and JSON object expected are gone: a bare 400 from HttpApi"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/http.test.ts",
+    "name": "queryOf() gives the handler the declared keys, decoded as searchParams, and refuses nothing",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition; no E1 endpoint has a query"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: sends the method, headers and body; answers a Response with the status, headers and body",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > sends the method, the headers and the body, and answers the status, the headers and the body"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: a GET by default, and an error status is a Response, not a rejection",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > an error status is a response, not a failure"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: a status without a body (204) has a null body",
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "An Effect response has no null body"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: the body is streamed as it arrives, and cancelling it closes the connection",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > the body is streamed as it arrives, and leaving it closes the connection"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: nothing listening is a TypeError \"fetch failed\" with its cause, like fetch",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > nothing listening fails with a transport error"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: a signal aborted before the answer rejects with its reason (a timeout stays a TimeoutError)",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > a timeout before the answer ends the request and closes the connection"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: a signal aborted during the body breaks the stream with its reason",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > the body is streamed as it arrives, and leaving it closes the connection",
+    "reason": "An abort is the interruption of the reader: leaving the body"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: a connection cut during the body breaks the stream",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > a connection cut during the body fails the stream"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: stays direct when the environment sets a proxy",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > stays direct when the environment sets a proxy"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "llamaFetch: streamChatCompletion streams through it and stops the request when left early",
+    "milestone": "E5",
+    "status": "rewritten",
+    "to": "app/server/llama/chatStream.test.ts > streamChat > streamChat streams through LlamaHttp and stops the request when left early",
+    "reason": "The chat goes through LlamaHttp (streamChat of llama/chatStream.ts), not streamChatCompletion over llamaFetch"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "downloadFetch: a redirect is the response, with its location, not followed",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "downloadFetch: sends the headers, streams the body, and an abort during it breaks the stream",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "downloadFetch: an https URL goes through node:https (TLS against a plain HTTP server fails like fetch)",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/llamaFetch.test.ts",
+    "name": "downloadFetch: goes through the proxy of the environment, like fetch",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/logs/lines.test.ts",
+    "name": "the idle loop line of -lv 4 is noise, the request lines are not (#16)",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/logs/lines.test.ts > the idle loop line of -lv 4 is noise, the request lines are not (#16)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "weightSizes > shared experts stay with the layer (--n-cpu-moe moves only _exps / _chexps)",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "weightSizes > groups tensors by layer, experts apart",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "tensorBytes > last tensor ends at the end of the file",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > reads a dense model's metadata and tensors",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > reads a hybrid model: full_attention_interval, ssm tensors, nextn layers",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > sums the shards of a -00001-of-00002 model",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > a missing shard is a ModelReadError",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > an absent file is a ModelReadError",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > a file that is not a GGUF is a ModelReadError",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > the cache returns the same object until the file changes",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > a changed second shard is re-read even when the first is untouched",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > the cache keeps the last 8 models only",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "readModel > a file behind a directory the user cannot enter is told apart from a missing one",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "vocabulary size > <arch>.vocab_size when present",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "vocabulary size > else the tokenizer's token list (llama.cpp's own source)",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "vocabulary size > else the output tensor's second dimension",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "vocabulary size > else the embedding tensor's",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/gguf.test.ts",
+    "name": "a multimodal projector is kind mmproj; a chat template is noticed",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/routes.test.ts",
+    "name": "deleting a split model removes every part and the folders left empty, not the models folder",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/routes.test.ts",
+    "name": "only a model the scan found can be deleted: another path is a 404",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/routes.test.ts",
+    "name": "usage lists the profiles opening the file as model or projector, through a relative path or a symlink",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/routes.test.ts",
+    "name": "deleteProfiles deletes the profiles using the model and resets the default; false keeps them",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/routes.test.ts",
+    "name": "a model the running server or a benchmark uses is a 409, and nothing is deleted",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/scan.test.ts",
+    "name": "groupGgufFiles groups shards under the first and reports missing ones",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/models/scan.test.ts",
+    "name": "scanModels skips hidden dirs, classifies mmproj, reports unreadable files and reuses the cache",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: real llama-server start, buffers summed per device, bus ids from “using device”",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: real llama-server start, buffers summed per device, bus ids from “using device”",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: real MTP + mmproj start, compute per context (last reservation wins), recurrent state with the KV",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: real MTP + mmproj start, compute per context (last reservation wins), recurrent state with the KV",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: at -lv 5 the -fit probes (no-alloc loads, 0 MiB buffers, own contexts) are left out",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: at -lv 5 the -fit probes (no-alloc loads, 0 MiB buffers, own contexts) are left out",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: the main model only, not a draft model (-md) nor the mmproj buffers",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: the main model only, not a draft model (-md) nor the mmproj buffers",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: only the last launch counts; no launch → null; bare lines (no timestamp) parse too",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: only the last launch counts; no launch → null; bare lines (no timestamp) parse too",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "PlacementTracker: replays the ring at construction, follows new lines and the server state",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/monitor/Placement.test.ts > Placement > Placement: replays the ring at construction without a message, follows new lines and the server state",
+    "reason": "The Placement service on a real supervisor and log ring, followed through their subscriptions (changes, batches) instead of a fake state"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "PlacementTracker: an external server has no placement even if the ring holds an old launch",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/monitor/Placement.test.ts > Placement > Placement: an external server has no placement even if the ring holds an old launch",
+    "reason": "The Placement service on a real supervisor and log ring, followed through their subscriptions (changes, batches) instead of a fake state"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "PlacementTracker: the launch evicted from the ring keeps the placement of the same server",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/monitor/Placement.test.ts > Placement > Placement: the launch evicted from the ring keeps the placement of the same server",
+    "reason": "The Placement service on a real supervisor and log ring, followed through their subscriptions (changes, batches) instead of a fake state"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: -sm tensor spreads the Meta() buffers over its devices by -ts, marked estimated (#17)",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: -sm tensor spreads the Meta() buffers over its devices by -ts, marked estimated (#17)",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: -sm tensor without -ts gives each device an equal part (#17)",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: -sm tensor without -ts gives each device an equal part (#17)",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: peer-to-peer is requested by the line llama-webui adds to the launch, for that launch only",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: peer-to-peer is requested by the line llama-webui adds to the launch, for that launch only",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: NCCL (NCCL_DEBUG=INFO) says whether peer-to-peer is really in use",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: NCCL (NCCL_DEBUG=INFO) says whether peer-to-peer is really in use",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: with -sm tensor, NCCL (NCCL_DEBUG=INFO) gives the PCI address of each CUDA device",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: with -sm tensor, NCCL (NCCL_DEBUG=INFO) gives the PCI address of each CUDA device",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/monitor/placement.test.ts",
+    "name": "parsePlacement: the address llama-server logs itself wins over NCCL",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: the address llama-server logs itself wins over NCCL",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "spawnProc pipes stdout and stderr and reports the exit code",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > the ring holds the launch line, then what llama-server wrote, without the idle noise"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "a process killed by a signal has no exit code",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > a crash: crashed with the exit code; killed from outside: crashed with the signal and no code"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "timeout kills the process with killSignal",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/flags/Flags.test.ts > Flags > a --help that never ends fails after 5 s and its process is gone"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "kill() after the exit does not throw",
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "effect/process and FileSystem own it"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "cwd and env reach the process",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > cwd and the environment reach llama-server: the settings variables, the profile ones over them, llama-webui's own under both"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "a spawn failure throws at once, naming the binary and the cause",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > a launch that cannot spawn is crashed with the cause"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "a spawn failure is diagnosed with the PATH of the child environment, a directory is not executable",
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "effect/process and FileSystem own it: the message of a spawn failure is Node's"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "an error event after the start (a failed kill) does not crash the process",
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "effect/process and FileSystem own it"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "which looks the binary up in the PATH",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "fileRange reads [start, end)",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "fileRange reads in 1 MiB chunks, so the disk speed check is not held back by the stream",
+    "milestone": "E6"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/proc.test.ts",
+    "name": "fileExists is true for a file only, readText reads UTF-8",
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "FileSystem owns it"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "POST /api/chat: profileId null records no profile, omitted the active one, a string is a 400 (#37)",
+    "milestone": "E5",
+    "status": "rewritten",
+    "to": "app/server/chat/http.test.ts > ChatApi > over HTTP > POST /api/chat: profileId null records no profile, omitted the active one, a string is a 400 (#37)",
+    "reason": "Over HTTP, the active profile that of the fake llama-server started through the API; a string profileId is a 400 RequestInvalid of the strict payload (was profileId: expected an integer or null)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "GET /api/chat/:id/stream is a 404 for a conversation that does not exist, a 204 without a reply (#37)",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/http.test.ts > ChatApi > over HTTP > GET /api/chat/:id/stream is a 404 for a conversation that does not exist, a 204 without a reply (#37)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "GET /api/chat/:id/stream sends the run as SSE events and ends after done",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/http.test.ts > ChatApi > over HTTP > GET /api/chat/:id/stream sends the run as SSE events and ends after done"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "GET /api/chat/:id/stream: a client that leaves only unsubscribes",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/http.test.ts > ChatApi > over HTTP > GET /api/chat/:id/stream: a client that leaves only unsubscribes"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "/api/server/props: a reply from llama-server that is not JSON is a 502 (#37)",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/http.test.ts > ServerApi over HTTP > props: llama-server's JSON as it is when ready; a 409 ServerNotReady when idle or starting; a 502 for an error status, for a body that is not JSON (#37) and for no answer"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "WsHub ignores a frame that parses to something other than an object (#37)",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/ws/WsHub.test.ts > text that is not a JSON object is ignored (#37)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "PATCH /api/settings merges collectors field by field (#35)",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > an object setting is merged field by field (#35)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "PATCH /api/settings: saved but not applied by the monitor is a 200 with a warning, not a 500 (#35)",
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/settings/http.test.ts > SettingsApi with a monitor that refuses the change > PATCH /api/settings: saved but not applied by the monitor is a 200 with a warning, not a 500 (#35)",
+    "reason": "A monitor whose configure fails with CollectorsNotApplied, through the typed client"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "pollIntervalMs is capped at 60 s (#37)",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/http.test.ts > SettingsApi > pollIntervalMs is capped at 60 s (#37)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/routes.test.ts",
+    "name": "GET /api/bench/runs caps an explicit limit at the sweep default, 10,000 (#37)",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/schemas.test.ts",
+    "name": "ProfileInputSchema: parsed by POST /api/profiles, then by ProfilesRepo.create",
+    "milestone": "E2",
+    "status": "rewritten",
+    "to": "packages/webui-shared/src/profile.test.ts > ProfileInput: a missing or empty name or model says so; app/server/profiles/http.test.ts > an invalid profile is a 400 RequestInvalid naming each field, on create and on update",
+    "reason": "The payload schema decodes the body at the edge (RequestInvalid): the repository takes a decoded ProfileInput and does not parse it again"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/security.test.ts",
+    "name": "guard: localhost or IP host accepted, domain name rejected (DNS rebinding)",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: localhost or IP host accepted, domain name rejected (DNS rebinding)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/security.test.ts",
+    "name": "guard: Origin from another site rejected, same origin accepted",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: Origin from another site rejected, same origin accepted"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/security.test.ts",
+    "name": "guard: write without JSON rejected (simple request CSRF)",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: write without JSON rejected (simple request CSRF)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/security.test.ts",
+    "name": "guard: the body is judged from content-length and transfer-encoding, not from the body stream",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: the body is judged from content-length and transfer-encoding, not from the body stream"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/security.test.ts",
+    "name": "guard: a Host that is not an authority is a 400, not a crash (req.url is built from it)",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: a Host that is not an authority is a 400, not a crash (req.url is built from it)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/setup.test.ts",
+    "name": "setup: binary not found and models folder missing → not ready",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/setup.test.ts",
+    "name": "setup: an executable binary and an empty folder → ready, 0 models",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/setup.test.ts",
+    "name": "setup: a non-executable file or a directory is not a binary",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/setup.test.ts",
+    "name": "setup: counts readable models only (projectors and unreadable files left out)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/setup.test.ts",
+    "name": "readPerfParanoid: parsed value, null when unreadable",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/setup.test.ts",
+    "name": "launchpad: model, last bench and fit per profile; an unreadable model only sets modelError",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/setup.test.ts",
+    "name": "launchpad: a failing estimate drops the fit badge only",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/setup.test.ts",
+    "name": "setup: llama-server exposed on the network only when its host is not loopback (#27)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "builds argv with pdeathsig and mandatory flags",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > builds argv with pdeathsig and mandatory flags"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "~ in model and mmproj is expanded for llama-server, which runs without a shell",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > ~ in model and mmproj is expanded for llama-server, which runs without a shell"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "profilePaths: the files as llama-server opens them, from its cwd, ~ expanded everywhere",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > profilePaths: the files as llama-server opens them, from its cwd, ~ expanded everywhere"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "profile port/host override server",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > profile port/host override server"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "display omits setpriv prefix and quotes spaces",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > display omits setpriv prefix and quotes spaces"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "env merges process env with profile env",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/command.test.ts > command > the settings variables then the profile ones are laid over the environment; app/server/supervisor/Supervisor.test.ts > Supervisor > cwd and the environment reach llama-server: the settings variables, the profile ones over them, llama-webui's own under both",
+    "reason": "The command holds the settings and profile variables; llama-webui's own environment is laid under them by the spawn (extendEnv)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "cwd defaults to process.cwd()",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > cwd defaults to process.cwd()"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "shellQuote",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/shell.test.ts > shellQuote"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "shellSplit undoes shellQuote",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/shell.test.ts > shellSplit undoes shellQuote"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "shellSplit reads what a user types: spaces separate, quotes group",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/shell.test.ts > shellSplit reads what a user types: spaces separate, quotes group"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "shellSplit says why it cannot read a line",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/shell.test.ts > shellSplit says why it cannot read a line"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "adds -lv 4 so the buffer sizes are logged, unless the profile sets a verbosity (#16)",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > adds -lv 4 so the buffer sizes are logged, unless the profile sets a verbosity (#16)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "the binary setting is run with ~ expanded (#32)",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > the binary setting is run with ~ expanded (#32)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "launchLines: the launch line, plus the peer-to-peer one when GGML_CUDA_P2P is set, whatever its value",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > launchLines: the launch line, plus the peer-to-peer one when GGML_CUDA_P2P is set, whatever its value"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/args.test.ts",
+    "name": "the settings variables are in the environment, under the profile ones, and can set the verbosity",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > the settings variables are in the environment, under the profile ones, and can set the verbosity"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/external.test.ts",
+    "name": "no external server is detected while a benchmark owns the port",
+    "milestone": "E7"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/external.test.ts",
+    "name": "after a crash, the settings port and the last profile port are watched (#39, #28)",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/ExternalWatch.test.ts > ExternalWatch > after a crash, the settings port and the last profile port are watched (#39, #28)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/supervisor/supervisor.test.ts",
+    "name": "stop() leaves no timer keeping the process alive once llama-server has exited",
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > stop returns as soon as llama-server exited, long before the kill timeout",
+    "reason": "The wait is an Effect timeout: no timer outlives the stop by construction"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/checks.test.ts",
+    "name": "a governor other than performance is a warning with the exact command",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/checks.test.ts",
+    "name": "disk speed: unknown until measured, warning under 2 GiB/s",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/checks.test.ts",
+    "name": "only the cards of the estimate are retained: the others are not applicable (#36)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/checks.test.ts",
+    "name": "a PCIe link trained down while the card is idle is unknown, not a warning (#36)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/disk.test.ts",
+    "name": "measureDiskSpeed: a missing path or a directory is a 404, a small file a 400",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/disk.test.ts",
+    "name": "measureDiskSpeed: reads the requested bytes and times them",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "big preset puts experts on the CPU and uses the three cards",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "a dense model that fits on one card gets -ngl all and one CUDA device",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "a MoE that overflows one card is split before its experts go to RAM",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "pinned values are kept, and -ncmoe on a dense model warns",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "planSweep crosses -ncmoe with device sets and drops what does not fit unless asked",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "a CUDA pair with margin beats a single card at the limit, and the AMD card alone comes after the CUDA pair",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "pinned -fa and -ctk show up in the rows and the kv field, not the searched values (#36)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "an -ot rule to an unknown device is reported and does not fit (#36)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "when nothing fits because of RAM, the reason names RAM, not the all-GPU fallback (#25)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "with -fa off, an f8_e4m3 cache keeps the model on a CUDA card where f16 does not fit",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "with -fa off, the estimator never picks f8_e4m3 on a Vulkan card",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "with -fa off and the largest context, f8_e4m3 only wins when f16 cannot reach the model context",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/estimate.test.ts",
+    "name": "a pinned f8_e4m3 cache is not called quantized and warns on a Vulkan card",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/match.test.ts",
+    "name": "matchGpus pairs NVIDIA cards by name and AMD cards by VRAM size, the Vulkan copies included (#26)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/match.test.ts",
+    "name": "VRAM used by another process shrinks the budget, the managed server’s own does not (#26)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/match.test.ts",
+    "name": "a device the monitor does not know keeps the list values (#26)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/placement.test.ts",
+    "name": "deviceRole skips the Vulkan copies of the CUDA cards and the iGPU",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/placement.test.ts",
+    "name": "deviceRole treats the ROCm iGPU as integrated and the Vulkan copy of a ROCm card as a duplicate (#22)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/placement.test.ts",
+    "name": "-ncmoe moves the experts of the first N layers to RAM",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/placement.test.ts",
+    "name": "-ot wins over -ngl and -ts splits the layers in order",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/placement.test.ts",
+    "name": "no -dev means the dedicated cards; no -ngl means every layer",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/placement.test.ts",
+    "name": "fitOf says fits, tight, then no as the model grows",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/placement.test.ts",
+    "name": "RAM overflow is tight, never no (mmap reads the rest from disk)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/placement.test.ts",
+    "name": "-ot to an unknown device is an issue, to a host buffer is RAM (#36)",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/tuning/placement.test.ts",
+    "name": "an f8_e4m3 KV cache takes half the bytes of an f16 one",
+    "milestone": "E8"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lib/version.test.ts",
+    "name": "APP_VERSION: dev when running from source",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/AppInfo.test.ts > AppInfo > version: dev when running from source"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lifecycle.test.ts",
+    "name": "SIGTERM with the UI open and a reply streaming stops in under 2 s",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/lifecycle.test.ts > SIGTERM with the UI open stops in under 2 s",
+    "reason": "the reply streaming returns with the chat (E5)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lifecycle.test.ts",
+    "name": "a second instance on a taken port exits 1",
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/lifecycle.test.ts > a second instance on a taken port exits 1 and names it"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lifecycle.test.ts",
+    "name": "a second instance on the same port and data dir leaves the first one's data alone",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/lifecycle.test.ts > a second instance on the same port and data dir leaves the first one",
+    "reason": "its llama-server and profile rows return with the supervisor (E3)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lifecycle.test.ts",
+    "name": "HTTP cache > pages are revalidated, hashed assets are immutable, the API sets no cache header",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/http/Static.test.ts > Static > pages are revalidated, hashed assets are immutable, the API sets no cache header; app/server/contract/golden.json (cache-control of each reply)"
+  },
+  {
+    "project": "server",
+    "file": "app/server/lifecycle.test.ts",
+    "name": "HTTP cache > a missing asset is h3's own 404, not a 500 (a stale tab after an upgrade)",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/http/Static.test.ts > Static > a missing asset is a 404, not the page; app/server/contract/golden.json (GET /assets/index-00000000.js)"
+  },
+  {
+    "project": "web",
+    "file": "app/src/app/routes.test.ts",
+    "name": "navGroups splits consecutive entries of the same group",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/app/routes.test.ts",
+    "name": "each sidebar group is contiguous, so it gets a single divider",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/app/routes.test.ts",
+    "name": "Settings is the only entry of the settings group, and the last one",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/app/sidebarPrefs.test.ts",
+    "name": "parseCollapsed: the sidebar is expanded unless the browser stored \"collapsed\"",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/profiles/draft.test.ts",
+    "name": "commandChanged ignores a rename and the timestamps, not the command fields",
+    "milestone": "E2",
+    "status": "ported",
+    "to": "app/src/features/profiles/draft.test.ts > commandChanged ignores a rename and the timestamps, not the command fields"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkFlows: GPU links carry NVML PCIe rates, host → GPU forward; capacity follows the current link state",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkFlows: an NVMe link carries its own disk (writes forward, reads back); chipset sums what sits behind it; memory shows activity only",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkFlows: memory activity is a share of the whole machine (0–100), for llama-server as for the system",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkFlows / nodeLive: with perf, the memory link carries measured DRAM traffic (writes forward, reads back)",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkFlows: without a snapshot every flow is unknown, capacities still known",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "nodeLive: GPU facts, load and dimming",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "nodeLive: CPU, RAM, NVMe and chipset",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "placementSeries: GPUs in graph order with their tone, host last, none when unknown",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "levelOf: ok below the warning threshold, unknown is ok",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkFlows: saturation is the busier direction over the current capacity, amber from 70%, red from 90%",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkFlows: a chipset link is measured against its own uplink, with the sum of what sits behind it",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkBadge: both directions in the words of each kind of link, nothing at rest under 8 MiB/s, nothing without a measurement",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkBadge: a chipset link speaks of the devices behind it",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "nodeLive: a GPU tank is filled to the measured VRAM, split by what the logs say it holds",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "nodeLive: the measured VRAM wins over the sizes announced by the logs (loading, tensor estimate)",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "nodeLive: without a known split a GPU tank has one layer; a hidden GPU has none",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "nodeLive: tank alerts from 85% and 95% full",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "nodeLive: memory is a single layer (mapped weights are page cache), the CPU carries its threads",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "peerLinks: the GPUs of one backend that hold the model are joined when peer-to-peer is requested or reported",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "peerLinks: a single GPU per backend or a device without a PCI address: nothing to join",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "peerLinks: three cards of one backend are joined as a chain, in the order of the scene",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "nodeLive: a GPU says what is known of its peer-to-peer, and with which cards",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/flows.test.ts",
+    "name": "linkShown: at rest only from 8 MiB/s in the busier direction, from 100 kB/s while llama-server works",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/hudPrefs.test.ts",
+    "name": "parseCollapsed: cards are open by default, only known cards and booleans are kept",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/hudPrefs.test.ts",
+    "name": "parseCollapsed: unreadable storage falls back to open cards",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/layout.test.ts",
+    "name": "layoutGraph: every node is placed, none overlap on the ground plane",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/layout.test.ts",
+    "name": "layoutGraph: CPU at the origin, RAM behind it, root-port devices in a row in front, chipset devices further",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/layout.test.ts",
+    "name": "layoutGraph: bounds cover every node; fitCamera looks at the middle from above and in front",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/layout.test.ts",
+    "name": "layoutGraph: one path per link, from a facing side to the other, arcing above both ends",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/layout.test.ts",
+    "name": "layoutGraph: CPU and RAM alone (sysfs unreadable) still lay out",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/layout.test.ts",
+    "name": "peerPath: joins two blocks of a row by their front faces, passing in front of whatever sits between them",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/pacing.test.ts",
+    "name": "FramePacer: something animating renders at 60 fps whatever the display rate",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/pacing.test.ts",
+    "name": "FramePacer: camera drift alone renders at 20 fps; a still scene stops after its first frame",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/pacing.test.ts",
+    "name": "FramePacer: a request or a gesture brings frames back, and damping keeps them a while after it",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/smooth.test.ts",
+    "name": "Smoother: exponential approach, first value snaps, unknown resets to zero",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/smooth.test.ts",
+    "name": "Smoother: a frame after a long pause eases in (dt capped), it does not jump to the target",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/smooth.test.ts",
+    "name": "flowVisual: log scale, nothing under 100 kB/s, bounded at 20 GB/s",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/features/topology/smooth.test.ts",
+    "name": "flowVisual: more traffic means more streaks, longer and faster, at every decade",
+    "milestone": "keep"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/api.test.ts",
+    "name": "api() returns the JSON body of a 2xx reply",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() resolves with the decoded reply of the endpoint"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/api.test.ts",
+    "name": "api() gives undefined for an empty 2xx reply (204)",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "No E1 endpoint answers 204: the derived client decodes the success schema of each endpoint. Back at E2 with the profile deletion: app/server/profiles/http.test.ts > remove answers 204 with no body and clears the default profile setting"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/api.test.ts",
+    "name": "api() throws the ApiError of an error reply, with issues and code",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() rejects with the tagged error of the endpoint"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/api.test.ts",
+    "name": "api() falls back to the status for an error reply that is not JSON",
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "The derived client decodes an undeclared reply as HttpApi does; no fallback of its own"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/api.test.ts",
+    "name": "api() maps a fetch that rejects to an unreachable server",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() rejects with ApiUnreachable when fetch rejects"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/api.test.ts",
+    "name": "api() passes the request options (signal) through to fetch",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() passes its signal: an abort reaches fetch and rejects the call"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/api.test.ts",
+    "name": "api() fills in :id, the query and the JSON body",
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() fills in the path, the query and the JSON payload"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/bench.test.ts",
+    "name": "a -ts without -dev survives the form",
+    "milestone": "E7"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/bench.test.ts",
+    "name": "a llama-bench run keeps the profile's projector",
+    "milestone": "E7"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/props.test.ts",
+    "name": "isRecord: a JSON object only",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/src/lib/props.test.ts > isRecord: a JSON object only"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/props.test.ts",
+    "name": "serverPropsOf keeps the fields of the right type and drops the others",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/src/lib/props.test.ts > serverPropsOf keeps the fields of the right type and drops the others"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/tuning.test.ts",
+    "name": "-ot suggestions name the dedicated cards of this machine, not a hard-coded device (#23)",
+    "milestone": "E8"
+  },
+  {
+    "project": "web",
+    "file": "app/src/lib/tuning.test.ts",
+    "name": "the profile flags replaced by the recommendation leave out those pinned to the same value",
+    "milestone": "E8"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/bench.test.ts",
+    "name": "paramsFromServerArgs splits a real profile into fields and the rest",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/bench.test.ts",
+    "name": "an unreadable value stays in the rest with its flag",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/bench.test.ts",
+    "name": "each tool gets its own separators",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/bench.test.ts",
+    "name": "ignoredByBench flags every speculative flag, not only --spec-type (#30)",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/bench.test.ts",
+    "name": "ignoredByBench names context and speculative decoding",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/bench.test.ts",
+    "name": "BenchSpecSchema refuses managed flags in serverArgs at their index",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/bench.test.ts",
+    "name": "isOomError recognizes the current and the legacy out-of-memory errors",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/bench.test.ts",
+    "name": "the f8_e4m3 KV cache type is accepted by the schema and read from the server flags",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/chat.test.ts",
+    "name": "statsFromTimings maps llama-server timings",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "packages/webui-shared/src/chat.test.ts > statsFromTimings maps llama-server timings"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/chat.test.ts",
+    "name": "autoTitle keeps the first six words within 48 characters",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "packages/webui-shared/src/chat.test.ts > autoTitle keeps the first six words within 48 characters"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/chat.test.ts",
+    "name": "isDefaultTitle accepts the current and the legacy default title",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "packages/webui-shared/src/chat.test.ts > isDefaultTitle accepts the current and the legacy default title"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/chat.test.ts",
+    "name": "contextUsed counts the cached prompt too, not only the new tokens (#29)",
+    "milestone": "E5",
+    "status": "ported",
+    "to": "packages/webui-shared/src/chat.test.ts > contextUsed counts the cached prompt too, not only the new tokens (#29)"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/dispose.test.ts",
+    "name": "defer runs at the end of the block, after a return or a throw, in reverse order",
+    "milestone": "keep"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/dispose.test.ts",
+    "name": "defer waits for the awaits of an async block",
+    "milestone": "keep"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/format.test.ts",
+    "name": "fmtInt formats with the shared locale, not a hard-coded one (#40)",
+    "milestone": "keep"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/hf.test.ts",
+    "name": "parseHfInput > empty and free text",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/hf.test.ts",
+    "name": "parseHfInput > repo id, with an optional quantization",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/hf.test.ts",
+    "name": "parseHfInput > a malformed escape in a URL does not throw",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/hf.test.ts",
+    "name": "parseHfInput > Hugging Face URLs",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/hf.test.ts",
+    "name": "parseHfInput > site pages and other repo types are searches",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/hf.test.ts",
+    "name": "vramFit > thresholds",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/hf.test.ts",
+    "name": "vramFit > no GPU",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/hf.test.ts",
+    "name": "DownloadRequestSchema > accepts a request",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/hf.test.ts",
+    "name": "DownloadRequestSchema > rejects a bad repo, revision or empty keys",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/logs.test.ts",
+    "name": "onBoot: same boot → nothing changes; another boot → everything starts over, hiding included",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/logs.test.ts > onBoot: same boot → nothing changes; another boot → everything starts over, hiding included"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/logs.test.ts",
+    "name": "mergeLogs: append at the end, deduplicated and sorted replay, cap",
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/logs.test.ts > mergeLogs: append at the end, deduplicated and sorted replay, cap"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/models.test.ts",
+    "name": "profileModelPath fills an empty cwd with models_dir and keeps paths relative under the cwd",
+    "milestone": "E6"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/profile.test.ts",
+    "name": "llama-tui import: whole config",
+    "milestone": "E2",
+    "status": "ported",
+    "to": "packages/webui-shared/src/profile.test.ts > import: a whole exported file, other keys ignored",
+    "reason": "Renamed: the llama-tui import is not ported (user, 2026-11-14); the { profiles } shape it tested is the exported file"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/profile.test.ts",
+    "name": "import: valid ones kept, invalid ones explained",
+    "milestone": "E2",
+    "status": "ported",
+    "to": "packages/webui-shared/src/profile.test.ts > import: valid ones kept, invalid ones explained"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/profile.test.ts",
+    "name": "import: single profile and array",
+    "milestone": "E2",
+    "status": "ported",
+    "to": "packages/webui-shared/src/profile.test.ts > import: single profile and array"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/setup.test.ts",
+    "name": "isSetupCheck: keeps machine checks, drops those needing a model or a running server",
+    "milestone": "E8"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/setup.test.ts",
+    "name": "ctxFromArgs: short, long and = forms; the last one wins; absent or invalid is undefined",
+    "milestone": "E8"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/setup.test.ts",
+    "name": "isLoopback",
+    "milestone": "E8"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/sweep.test.ts",
+    "name": "expandSpace crosses the dimensions in field order and applies -ts only where it fits",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/sweep.test.ts",
+    "name": "expandSpace drops duplicates and a base -ts that no longer matches the devices",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/sweep.test.ts",
+    "name": "itemLabel names only the varying dimensions",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/sweep.test.ts",
+    "name": "rankRuns marks ties inside the noise band and leaves failures unranked",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/sweep.test.ts",
+    "name": "SweepSpecSchema refuses an empty value list for a dimension",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/sweep.test.ts",
+    "name": "sweepCtx reads -c= and the last -c, like ctxFromArgs (#24)",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/sweep.test.ts",
+    "name": "withCtx adds -c only when the flags set no context (#24)",
+    "milestone": "E7"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/topology.test.ts",
+    "name": "phaseOf: no server, stopping or crashed → stopped",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > phaseOf: no server, stopping or crashed → stopped"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/topology.test.ts",
+    "name": "phaseOf: starting, or ready while health is still loading → loading",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > phaseOf: starting, or ready while health is still loading → loading"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/topology.test.ts",
+    "name": "phaseOf: ready with no busy slot → idle",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > phaseOf: ready with no busy slot → idle"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/topology.test.ts",
+    "name": "phaseOf: a slot still reading its prompt → prompt, then generating",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > phaseOf: a slot still reading its prompt → prompt, then generating"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/topology.test.ts",
+    "name": "pcieBps: payload rate for a generation and width, unknown when either is missing",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > pcieBps: payload rate for a generation and width, unknown when either is missing"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/topology.test.ts",
+    "name": "hostDevice: CPU-side buffers are not GPUs",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > hostDevice: CPU-side buffers are not GPUs"
+  },
+  {
+    "project": "shared",
+    "file": "packages/webui-shared/src/topology.test.ts",
+    "name": "placementTotals: model bytes on GPUs vs host",
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > placementTotals: model bytes on GPUs vs host"
+  },
+  {
+    "project": "server",
+    "file": "scripts/package.test.ts",
+    "name": "the root package is the one npm installs",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/package.test.ts",
+    "name": "the package has no runtime dependency: the build is self-contained",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/package.test.ts",
+    "name": "packing without a build fails instead of shipping a package with no command",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/poc/inventory.test.ts",
+    "name": "milestoneOf places a test file in the milestone that ports it",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/poc/inventory.test.ts",
+    "name": "milestoneOf throws on an unmapped file",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/poc/measure.test.ts",
+    "name": "classify sorts paths by pattern, not by folder names of the Nitro server",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/poc/measure.test.ts",
+    "name": "classify never counts the reference folders",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/poc/measure.test.ts",
+    "name": "countLines counts newlines, as wc -l",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/poc/measure.test.ts",
+    "name": "median of an odd and of an even number of values",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/poc/measure.test.ts",
+    "name": "upstreamRefs finds owner/repo#N references with their line",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/release.test.ts",
+    "name": "every package.json has the same version (pnpm release <version>)",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/release.test.ts",
+    "name": "parseVersion: with or without v, semantic versions only",
+    "milestone": "keep"
+  },
+  {
+    "project": "server",
+    "file": "scripts/release.test.ts",
+    "name": "withVersion: replaces it in place, or adds it after name; other keys keep their order",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/scripts/cli.test.ts",
+    "name": "a script takes its flags after the -- that npm habits add (pnpm passes it through)",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/scripts/links.test.ts",
+    "name": "extractLinks > reads href, src, every srcset candidate and ids",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/scripts/links.test.ts",
+    "name": "classify > pages, anchors, files and external links",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/scripts/links.test.ts",
+    "name": "classify > rejects pages without a trailing slash and URLs outside the base",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/scripts/serve.test.ts",
+    "name": "serve.ts > redirects to the trailing slash like GitHub Pages",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/scripts/serve.test.ts",
+    "name": "serve.ts > serves files with their type and a 10 minute cache",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/scripts/serve.test.ts",
+    "name": "serve.ts > gzips text only, when accepted",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/scripts/serve.test.ts",
+    "name": "serve.ts > answers 404.html for an unknown page, Not found outside the base",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/scripts/serve.test.ts",
+    "name": "serve.ts > HEAD sends the headers only",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/docs/nav.test.ts",
+    "name": "content/nav.ts > lists every page under content/",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/docs/nav.test.ts",
+    "name": "content/nav.ts > has a file for every entry, listed once",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/docs/nav.test.ts",
+    "name": "content/nav.ts > keeps each page in the section of its folder",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/docs/nav.test.ts",
+    "name": "nav helpers > locate finds neighbours across groups, not across sections",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/docs/nav.test.ts",
+    "name": "nav helpers > sectionOf reads the first segment",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/landing/telemetry.test.ts",
+    "name": "createSimulation > is deterministic for a given seed (prerender and hydration match)",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/landing/telemetry.test.ts",
+    "name": "createSimulation > starts warm: full history and some finished requests",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/landing/telemetry.test.ts",
+    "name": "createSimulation > history is one point per second, oldest first",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/landing/telemetry.test.ts",
+    "name": "createSimulation > stays within measured bounds over a long run",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/landing/telemetry.test.ts",
+    "name": "createSimulation > alternates idle gaps and generations",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/landing/telemetry.test.ts",
+    "name": "createSimulation > lists requests newest first with consistent durations",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/landing/telemetry.test.ts",
+    "name": "clock formats seconds since midnight",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/content.test.ts",
+    "name": "contentRoute > maps a page to its path",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/content.test.ts",
+    "name": "contentRoute > maps index files to their folder",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/content.test.ts",
+    "name": "contentRoute > ignores non-MDX files and files outside a section",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/content.test.ts",
+    "name": "contentRoute > normalizes Windows separators",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/content.test.ts",
+    "name": "contentRoutes sorts and filters",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/content.test.ts",
+    "name": "href always has leading and trailing slashes",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "resolveTheme > dark with system dark = false resolves to dark",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "resolveTheme > dark with system dark = true resolves to dark",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "resolveTheme > light with system dark = false resolves to light",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "resolveTheme > light with system dark = true resolves to light",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "resolveTheme > system with system dark = false resolves to light",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "resolveTheme > system with system dark = true resolves to dark",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > writes the resolved class for \"dark\" with system dark = false",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > writes the resolved class for \"dark\" with system dark = true",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > writes the resolved class for \"light\" with system dark = false",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > writes the resolved class for \"light\" with system dark = true",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > writes the resolved class for \"system\" with system dark = false",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > writes the resolved class for \"system\" with system dark = true",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > falls back to the default mode when nothing is stored (system dark = false)",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > falls back to the default mode when nothing is stored (system dark = true)",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > falls back to the default mode on an unknown stored value (system dark = false)",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > falls back to the default mode on an unknown stored value (system dark = true)",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > falls back to the default mode when localStorage throws (system dark = false)",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > falls back to the default mode when localStorage throws (system dark = true)",
+    "milestone": "keep"
+  },
+  {
+    "project": "site",
+    "file": "site/src/lib/theme.test.ts",
+    "name": "THEME_INIT_SCRIPT > always leaves a non-empty class, so the attribute can be matched exactly",
+    "milestone": "keep"
+  }
+]
