@@ -1,10 +1,11 @@
 import { catalogFrom, type FlagCatalog } from '@llama-webui/shared';
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { ApiError, api } from './api';
+import { call } from './api';
 
 interface FlagsStore {
   catalog: FlagCatalog | null;
+  /** Why there is no catalogue: the message of `FlagsUnavailable` (`llama-server --help failed (<binary>)`), or of the call. */
   error?: string;
   loading: boolean;
 }
@@ -18,9 +19,12 @@ export function useFlags(): FlagsStore {
     const st = useFlagsStore.getState();
     if (st.catalog || st.loading || st.error) return;
     useFlagsStore.setState({ loading: true });
-    api('GET /api/flags').then(
-      (r) => useFlagsStore.setState({ catalog: catalogFrom(r.flags), loading: false }),
-      (e) => useFlagsStore.setState({ error: e instanceof ApiError ? e.message : String(e), loading: false }),
+    call((api) => api.flags.get()).then(
+      (r) => {
+        const flags = r.flags.map((f) => ({ ...f, names: [...f.names] }));
+        useFlagsStore.setState({ catalog: catalogFrom(flags), loading: false });
+      },
+      (e: unknown) => useFlagsStore.setState({ error: e instanceof Error ? e.message : String(e), loading: false }),
     );
   }, []);
   return s;

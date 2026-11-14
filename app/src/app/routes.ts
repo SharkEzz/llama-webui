@@ -51,7 +51,6 @@ export const MILESTONE_BY_PATH: Record<string, string> = {
   '/': 'E3',
   '/dashboard': 'E4',
   '/models': 'E6',
-  '/profiles': 'E2',
   '/server': 'E3',
   '/chat': 'E5',
   '/system': 'E4',

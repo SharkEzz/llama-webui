@@ -1,7 +1,6 @@
 import type { Settings } from '@llama-webui/shared';
-import { profileModelPath } from '@llama-webui/shared';
 import { Download, Plus, SlidersHorizontal, Upload } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { GlassCard } from '@/components/glass/GlassCard';
@@ -9,13 +8,9 @@ import { GLASS } from '@/components/glass/glass';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/lib/api';
-import { matchingProjector, stem, useModels } from '@/lib/models';
+import { call } from '@/lib/api';
 import { importProfiles, importSummary, useProfiles } from '@/lib/profiles';
-import { isRunning, useServer } from '@/lib/server';
 import { cn } from '@/lib/utils';
-import type { Draft } from './draft';
-import { ImportBanner } from './ImportBanner';
 import { ProfileForm } from './ProfileForm';
 
 const basename = (p: string) => p.split('/').pop() ?? p;
@@ -25,47 +20,16 @@ export function ProfilesPage() {
   const [params, setParams] = useSearchParams();
   const [settings, setSettings] = useState<Settings | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const view = useServer((s) => s.view);
 
   useEffect(() => {
     void reload().catch((e: Error) => toast.error(e.message));
-    api('GET /api/settings').then(setSettings, () => {});
+    call((api) => api.settings.get()).then(setSettings, () => {});
   }, [reload]);
 
   const creating = params.get('new') === '1';
-  const fromModel = creating ? params.get('model') : null;
-  const models = useModels((s) => s.list);
-  const refreshModels = useModels((s) => s.refresh);
-  useEffect(() => {
-    if (fromModel) void refreshModels();
-  }, [fromModel, refreshModels]);
-  const initial = useMemo((): Partial<Draft> | undefined => {
-    if (!fromModel || !models) return undefined;
-    const place = (abs: string, cwd?: string) =>
-      profileModelPath(abs, { cwd, modelsDir: models.setting, home: models.home });
-    const { cwd, model } = place(fromModel);
-    const projector = matchingProjector(fromModel, models.models);
-    return {
-      name: stem(fromModel),
-      cwd: cwd ?? '',
-      model,
-      ...(projector ? { mmproj: place(projector, cwd).model } : {}),
-    };
-  }, [fromModel, models]);
   const requested = Number(params.get('id'));
   const selected = creating ? null : (profiles.find((p) => p.id === requested) ?? profiles[0] ?? null);
   const select = (id: number | 'new') => setParams(id === 'new' ? { new: '1' } : { id: String(id) }, { replace: true });
-
-  // Opened without a selection: the running profile, written once into the URL (a later start or stop must not
-  // change the selection, which would remount the form and lose its edits).
-  const preselected = useRef(false);
-  const runningId = isRunning(view) ? (view?.profileId ?? null) : null;
-  useEffect(() => {
-    if (preselected.current || !loaded || view === null) return;
-    preselected.current = true;
-    if (params.has('id') || params.has('new') || runningId === null) return;
-    if (profiles.some((p) => p.id === runningId)) setParams({ id: String(runningId) }, { replace: true });
-  }, [loaded, view, params, runningId, profiles, setParams]);
 
   const onFile = async (file: File) => {
     let raw: unknown;
@@ -118,8 +82,6 @@ export function ProfilesPage() {
         />
       </header>
 
-      {loaded && <ImportBanner profileCount={profiles.length} onImported={() => void reload()} />}
-
       {loaded && profiles.length === 0 && !creating ? (
         <Alert className={GLASS}>
           <SlidersHorizontal />
@@ -134,37 +96,30 @@ export function ProfilesPage() {
           <nav aria-label="Profiles" className={cn(GLASS, 'flex flex-col gap-0.5 p-2')}>
             {!loaded && [0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             {creating && <div className="rounded-md bg-accent px-3 py-2 text-sm font-medium">New profile</div>}
-            {profiles.map((p) => {
-              const active = view?.profileId === p.id && isRunning(view);
-              return (
-                <Button
-                  key={p.id}
-                  variant="ghost"
-                  onClick={() => select(p.id)}
-                  aria-current={selected?.id === p.id ? 'true' : undefined}
-                  className={cn(
-                    'h-auto flex-col items-start gap-0.5 px-3 py-2 text-left',
-                    selected?.id === p.id && 'bg-accent',
-                  )}
-                >
-                  <span className="flex w-full items-center gap-2 text-sm font-medium">
-                    <span className="truncate">{p.name}</span>
-                    {active && (
-                      <span className="ml-auto size-2 shrink-0 rounded-full bg-success" title="Server running" />
-                    )}
-                  </span>
-                  <span className="w-full truncate font-mono text-[0.7rem] font-normal text-muted-foreground">
-                    {basename(p.model)}
-                  </span>
-                </Button>
-              );
-            })}
+            {profiles.map((p) => (
+              <Button
+                key={p.id}
+                variant="ghost"
+                onClick={() => select(p.id)}
+                aria-current={selected?.id === p.id ? 'true' : undefined}
+                className={cn(
+                  'h-auto flex-col items-start gap-0.5 px-3 py-2 text-left',
+                  selected?.id === p.id && 'bg-accent',
+                )}
+              >
+                <span className="flex w-full items-center gap-2 text-sm font-medium">
+                  <span className="truncate">{p.name}</span>
+                </span>
+                <span className="w-full truncate font-mono text-[0.7rem] font-normal text-muted-foreground">
+                  {basename(p.model)}
+                </span>
+              </Button>
+            ))}
           </nav>
 
           <GlassCard title={selected ? selected.name : 'New profile'}>
             <ProfileForm
-              key={selected?.id ?? `new:${initial ? fromModel : ''}`}
-              initial={initial}
+              key={selected?.id ?? 'new'}
               profile={selected}
               settings={settings}
               onSaved={(p) => void reload().then(() => select(p.id))}

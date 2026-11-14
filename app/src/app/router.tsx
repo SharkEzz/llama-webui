@@ -20,6 +20,7 @@ const placeholder = (title: string, milestone?: string) => ({
 /** The pages the Effect server serves again, each loaded on first visit. */
 const PORTED: Partial<Record<string, () => Promise<ComponentType>>> = {
   '/settings': async () => (await import('@/features/settings/SettingsPage')).SettingsPage,
+  '/profiles': async () => (await import('@/features/profiles/ProfilesPage')).ProfilesPage,
 };
 
 const pageOf = (r: AppRoute) => {
