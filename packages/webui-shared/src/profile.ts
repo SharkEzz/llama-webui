@@ -66,10 +66,30 @@ export type ProfileInput = typeof ProfileInput.Type;
 export const ProfileSource = Schema.Literals(['ui', 'import', 'llama-tui']);
 export type ProfileSource = typeof ProfileSource.Type;
 
-/** A stored profile: its input, its id, where it comes from, when it was created and last changed (epoch ms). */
+/**
+ * The fields of a profile as they are stored, without the rules of `ProfileInput`: a reply and an export carry what
+ * the table holds, and a row written before a rule existed (an argument that became reserved since) must still be
+ * listed, read, exported and copied. Only a create, an update and an import apply the rules.
+ */
+const storedFields = {
+  name: Schema.String,
+  model: Schema.String,
+  mmproj: Schema.optionalKey(Schema.String),
+  cwd: Schema.optionalKey(Schema.String),
+  host: Schema.optionalKey(Schema.String),
+  port: Schema.optionalKey(Schema.Int),
+  args: Schema.Array(Schema.String),
+  env: Schema.Record(Schema.String, Schema.String),
+};
+
+/** A stored profile in the import and export format: the fields of `ProfileInput`, as stored. */
+export const ProfileExport = Schema.Struct(storedFields);
+export type ProfileExport = typeof ProfileExport.Type;
+
+/** A stored profile: its fields, its id, where it comes from, when it was created and last changed (epoch ms). */
 export const Profile = Schema.Struct({
   id: Schema.Int,
-  ...ProfileInput.fields,
+  ...storedFields,
   source: ProfileSource,
   createdAt: Schema.Int,
   updatedAt: Schema.Int,

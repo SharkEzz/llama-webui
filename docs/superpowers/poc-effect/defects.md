@@ -106,6 +106,9 @@ Found while porting E2, accepted with its result:
 - `POST /api/profiles/:id/duplicate` copies the stored profile as it is, without validating it again (was a 400
   `Invalid data: …` for a stored profile that no longer passes the schema).
 - An item of an import that is not an object is explained as `Expected object` (was zod's own message).
+- A stored profile that the input rules now refuse (an argument that became reserved after it was saved) is listed,
+  read, exported and copied as it is; saving it again answers the 400 that names the argument. Nitro did the same
+  except for the copy (above).
 
 Decided (user, 2026-11-14): the llama-tui import is not ported (llama-tui was never deployed beyond the user): its two
 endpoints, the `llamaTuiImportDismissed` setting and the import banner are dropped. The generic import still reads a

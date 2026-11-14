@@ -71,9 +71,14 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 
 - A file to download: the endpoint's `success` is the schema of the file (the typed client decodes it), and the
   handler returns `attachment(schema)({ filename, body })` of `app/server/http/attachment.ts`, built once per schema:
-  the body encoded by that schema (a `Profile` through `ProfileInput` loses its id, source and dates), 2-space JSON, a
+  the body encoded by that schema (a `Profile` through `ProfileExport` loses its id, source and dates), 2-space JSON, a
   trailing newline, `content-disposition: attachment; filename*=UTF-8''<percent-encoded>` (`exportOne` of
   `profiles/http.ts`).
+- A reply carries what is stored, so its schema has no input rule: a check runs on encoding too, and one stored row
+  that a rule now refuses would turn every reply that holds it into a 500. The rules live in the payload's schema
+  (`ProfileInput`); the reply and the export have the same fields without them (`Profile`, `ProfileExport` of
+  `packages/webui-shared/src/profile.ts`). A domain's HTTP test stores such a row by SQL and reads it back
+  (`a stored profile the input rules now refuse…` in `profiles/http.test.ts`).
 - A 204: an endpoint with no `success` (`remove` of `ProfilesApi`), whose handler succeeds with `void`.
 
 ## Programs and the home folder

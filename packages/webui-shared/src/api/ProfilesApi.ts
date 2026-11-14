@@ -1,6 +1,6 @@
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
-import { Profile, ProfileInput } from '../profile.ts';
+import { Profile, ProfileExport, ProfileInput } from '../profile.ts';
 import { IdParam } from './params.ts';
 
 /** No profile has this id: `Profile not found`. */
@@ -17,7 +17,7 @@ export class ProfileNameTaken extends Schema.TaggedError<
 >()('ProfileNameTaken', { message: Schema.String }, { httpApiStatus: 409 }) {}
 
 /** The file of every profile, in the import format (`llama-webui-profiles.json`). */
-export const ProfilesFile = Schema.Struct({ profiles: Schema.Array(ProfileInput) });
+export const ProfilesFile = Schema.Struct({ profiles: Schema.Array(ProfileExport) });
 
 /** What an import created, and each profile it skipped with the reason. */
 export const ImportResult = Schema.Struct({
@@ -54,7 +54,7 @@ export class ProfilesApi extends HttpApiGroup.make('profiles').add(
   }),
   HttpApiEndpoint.get('exportOne', '/api/profiles/:id/export', {
     params,
-    success: ProfileInput,
+    success: ProfileExport,
     error: ProfileNotFound,
   }),
 ) {}

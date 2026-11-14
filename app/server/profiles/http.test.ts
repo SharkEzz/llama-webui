@@ -3,6 +3,7 @@ import { Api, Profile, type ProfileInput, ProfilesFile } from '@llama-webui/shar
 import { Array as Arr, Effect, Layer, Option, Schema, String as Str } from 'effect';
 import { HttpClient, HttpClientRequest, HttpServer } from 'effect/http';
 import { HttpApiTest } from 'effect/http-api';
+import { SqlClient } from 'effect/sql';
 import { ApiRoutes, serve } from '../http/HttpLive.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { ServerTest } from '../testing/http.ts';
@@ -227,6 +228,37 @@ describe('ProfilesApi', () => {
         assert.strictEqual(malformed.status, 400);
         const malformedRefused = yield* as(Refused, malformed.json);
         assert.strictEqual(malformedRefused.message, 'Invalid data: Expected a valid JSON body');
+      }),
+    );
+
+    it.effect('a stored profile the input rules now refuse is still listed, read, exported and copied', () =>
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        // As the Nitro server could have stored it before `--metrics` became a reserved flag.
+        yield* sql`INSERT INTO profiles (name, model_path, args_json, env_json, source, created_at, updated_at)
+                   VALUES ('Old row', '/m.gguf', '["--metrics","-c","1"]', '{}', 'llama-tui', 1, 1)`;
+        const list = yield* send('GET', '/api/profiles');
+        assert.strictEqual(list.status, 200);
+        const profiles = yield* as(Schema.Array(Schema.Struct({ id: Schema.Int, name: Schema.String })), list.json);
+        const old = Arr.findFirst(profiles, (p) => p.name === 'Old row');
+        assert.isTrue(Option.isSome(old));
+        const id = Option.getOrThrow(old).id;
+        const got = yield* send('GET', `/api/profiles/${id}`);
+        assert.strictEqual(got.status, 200);
+        const one = yield* send('GET', `/api/profiles/${id}/export`);
+        assert.strictEqual(one.status, 200);
+        const all = yield* send('GET', '/api/profiles/export');
+        assert.strictEqual(all.status, 200);
+        const copy = yield* send('POST', `/api/profiles/${id}/duplicate`);
+        assert.strictEqual(copy.status, 201);
+        assert.deepStrictEqual((yield* as(Profile, copy.json)).args, ['--metrics', '-c', '1']);
+        // Saving it again is refused until the reserved flag is removed: the form shows where.
+        const saved = yield* send(
+          'PUT',
+          `/api/profiles/${id}`,
+          '{"name":"Old row","model":"/m.gguf","args":["--metrics"]}',
+        );
+        assert.strictEqual(saved.status, 400);
       }),
     );
   });

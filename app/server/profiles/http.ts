@@ -1,4 +1,4 @@
-import { Api, ProfileInput, ProfilesFile, parseProfileImport } from '@llama-webui/shared';
+import { Api, ProfileExport, ProfilesFile, parseProfileImport } from '@llama-webui/shared';
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import { attachment } from '../http/attachment.ts';
@@ -7,7 +7,7 @@ import { ProfilesRepo } from './ProfilesRepo.ts';
 import { removeProfile } from './removeProfile.ts';
 
 const exportFile = attachment(ProfilesFile);
-const exportProfile = attachment(ProfileInput);
+const exportProfile = attachment(ProfileExport);
 
 /** The endpoints of `/api/profiles`, on the repository. */
 export const ProfilesHandlers = HttpApiBuilder.group(
