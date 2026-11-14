@@ -3,13 +3,16 @@ import { assert, layer } from '@effect/vitest';
 import { DEFAULT_SETTINGS, type Settings, Snapshot, type WsMessage } from '@llama-webui/shared';
 import {
   Array as Arr,
+  Cause,
   Clock,
   ConfigProvider,
   Context,
-  type Duration,
+  Duration,
   Effect,
+  Exit,
   FileSystem,
   Layer,
+  Logger,
   Option,
   Path,
   Queue,
@@ -17,21 +20,23 @@ import {
   Ref,
   Schedule,
   Schema,
-  type Scope,
+  Scope,
   String as Str,
 } from 'effect';
-import type { ChildProcessSpawner } from 'effect/process';
+import { ChildProcessSpawner } from 'effect/process';
 import { Collectors, CollectorsNotApplied } from '../collectors/Collectors.ts';
 import * as Db from '../db/Db.ts';
 import { PciIds } from '../hardware/PciIds.ts';
 import { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { isAlive } from '../llama/procScan.ts';
 import { LogRing } from '../logs/LogRing.ts';
+import { CLOSE_BOUND } from '../process/followed.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { buildCommand } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
 import { FAKE, freePort, httpStub } from '../testing/llama.ts';
+import { stuckRelease } from '../testing/stuckRelease.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { Monitor } from './Monitor.ts';
 
@@ -85,6 +90,14 @@ interface Options {
   readonly collectors?: (collectors: Collectors['Service']) => Collectors['Service'];
   /** The NVML sampler the collectors start (with `collectors.nvml` on in `patch`). */
   readonly nvmlCommand?: { readonly cmd: string; readonly args: ReadonlyArray<string> };
+  /** How long the collectors wait for the sampler's `ready`. */
+  readonly readyTimeout?: Duration.Input;
+  /** The spawner of the collectors' programs. */
+  readonly spawner?: ChildProcessSpawner.ChildProcessSpawner['Service'];
+  /** How long the collectors take to be built, past their own start. */
+  readonly buildDelay?: Duration.Input;
+  /** How long the monitor waits for its collectors. */
+  readonly collectorsWait?: Duration.Input;
 }
 
 /** The settings of the test: every 250 ms, 30 s of history (120 points), NVML off. */
@@ -95,30 +108,47 @@ const patchOf = (options: Options) => ({
   ...options.patch,
 });
 
-/** `test` with a monitor on collectors that find no program, the settings of `options` stored first. */
-const withMonitor = <A, E>(
-  options: Options,
-  test: (monitor: Monitor['Service'], settings: Settings) => Effect.Effect<A, E, Services>,
-) =>
+/** The monitor on collectors that find no program, the settings of `options` stored first. */
+const monitorLayer = (options: Options) =>
   Effect.gen(function* () {
     const repo = yield* SettingsRepo;
     const settings = yield* repo.patch(patchOf(options));
+    const platform = yield* ChildProcessSpawner.ChildProcessSpawner;
     const found = Collectors.layerWith({
       initial: settings,
       nvmlLib: Option.some(`${MISSING}/libnvidia-ml.so.1`),
       nvidiaSmi: MISSING,
       perfBin: MISSING,
       ...(options.nvmlCommand === undefined ? {} : { nvmlCommand: options.nvmlCommand }),
-    });
+      ...(options.readyTimeout === undefined ? {} : { readyTimeout: options.readyTimeout }),
+    }).pipe(Layer.provide(Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, options.spawner ?? platform)));
     const change = options.collectors;
-    const collectors =
+    const changed =
       change === undefined
         ? found
         : Layer.effect(
             Collectors,
             Collectors.use((original) => Effect.succeed(change(original))),
           ).pipe(Layer.provide(found));
-    const context = yield* Layer.build(Monitor.layerWith({ modelDiskRetry: '30 seconds', appsEvery: 5, collectors }));
+    const delay = options.buildDelay;
+    const collectors = delay === undefined ? changed : Layer.unwrap(Effect.as(Effect.sleep(delay), changed));
+    const layer = Monitor.layerWith({
+      modelDiskRetry: '30 seconds',
+      appsEvery: 5,
+      collectors,
+      ...(options.collectorsWait === undefined ? {} : { collectorsWait: options.collectorsWait }),
+    });
+    return { layer, settings };
+  });
+
+/** `test` with a monitor on collectors that find no program, the settings of `options` stored first. */
+const withMonitor = <A, E>(
+  options: Options,
+  test: (monitor: Monitor['Service'], settings: Settings) => Effect.Effect<A, E, Services>,
+) =>
+  Effect.gen(function* () {
+    const { layer, settings } = yield* monitorLayer(options);
+    const context = yield* Layer.build(layer);
     return yield* test(Context.get(context, Monitor), settings);
   }).pipe(Effect.scoped);
 
@@ -209,12 +239,14 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
   );
 
   it.effect('configure resizes the history keeping the newest points and moves the next tick to the new interval', () =>
-    withMonitor({}, (monitor, settings) =>
+    withMonitor({}, (monitor) =>
       Effect.gen(function* () {
+        const repo = yield* SettingsRepo;
         for (let i = 0; i < 4; i++) yield* next();
         const before = yield* monitor.history;
         assert.isAtLeast(before.times.length, 4);
-        yield* monitor.configure({ ...settings, pollIntervalMs: 10_000 });
+        yield* repo.patch({ pollIntervalMs: 10_000 });
+        yield* monitor.configure;
         const shrunk = yield* monitor.history;
         assert.deepStrictEqual([shrunk.intervalMs, shrunk.capacity, shrunk.times.length], [10_000, 3, 3]);
         // The newest points: none older than the third newest before the change.
@@ -224,7 +256,8 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
         yield* Effect.sleep('300 millis');
         yield* drain;
         const t0 = yield* Clock.currentTimeMillis;
-        yield* monitor.configure({ ...settings, pollIntervalMs: 250 });
+        yield* repo.patch({ pollIntervalMs: 250 });
+        yield* monitor.configure;
         const after = yield* next('1 second');
         assert.isBelow((yield* Clock.currentTimeMillis) - t0, 1000);
         assert.deepStrictEqual(after.history, { intervalMs: 250, capacity: 120 });
@@ -241,10 +274,11 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
         ...collectors,
         configure: () => Effect.fail(CollectorsNotApplied.make({ message: 'refused' })),
       });
-      yield* withMonitor({ collectors: refuse }, (monitor, settings) =>
+      yield* withMonitor({ collectors: refuse }, (monitor) =>
         Effect.gen(function* () {
           yield* next();
-          const error = yield* Effect.flip(monitor.configure({ ...settings, pollIntervalMs: 500, historySeconds: 60 }));
+          yield* SettingsRepo.use((repo) => repo.patch({ pollIntervalMs: 500, historySeconds: 60 }));
+          const error = yield* Effect.flip(monitor.configure);
           assert.strictEqual(error._tag, 'CollectorsNotApplied');
           const history = yield* monitor.history;
           assert.deepStrictEqual([history.intervalMs, history.capacity], [250, 120]);
@@ -299,6 +333,10 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
           (n) => (n === 0 ? Effect.die(new Error('boom')) : collectors.system),
         ),
       });
+      const errors: Array<{ readonly message: unknown; readonly cause: string }> = [];
+      const logger = Logger.make(({ logLevel, message, cause }) => {
+        if (logLevel === 'Error') errors.push({ message, cause: Cause.pretty(cause) });
+      });
       yield* withMonitor({ collectors: dyingOnce }, () =>
         Effect.gen(function* () {
           const first = yield* next();
@@ -306,7 +344,11 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
           const second = yield* next();
           assert.strictEqual(second.tick, 3);
         }),
-      );
+      ).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
+      // The first tick's death, logged once with its cause.
+      assert.lengthOf(errors, 1);
+      assert.deepStrictEqual(errors[0]?.message, ['monitoring tick']);
+      assert.include(errors[0]?.cause ?? '', 'boom');
     }),
   );
 
@@ -351,6 +393,102 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
     }),
   );
 
+  it.effect('configure applies the stored settings, whatever a caller saw', () =>
+    withMonitor({}, (monitor) =>
+      Effect.gen(function* () {
+        const repo = yield* SettingsRepo;
+        yield* next();
+        // Two changes saved, then applied in either order: the monitor ends on the last one saved.
+        yield* repo.patch({ historySeconds: 60 });
+        yield* repo.patch({ historySeconds: 120 });
+        yield* Effect.all([monitor.configure, monitor.configure], { concurrency: 2 });
+        const history = yield* monitor.history;
+        assert.deepStrictEqual([history.intervalMs, history.capacity], [250, 480]);
+      }),
+    ),
+  );
+
+  it.effect('collectors not up within the wait refuse a change, then apply what is stored once they are', () =>
+    withMonitor({ buildDelay: '800 millis', collectorsWait: '200 millis' }, (monitor) =>
+      Effect.gen(function* () {
+        const repo = yield* SettingsRepo;
+        yield* repo.patch({ historySeconds: 60 });
+        const [elapsed, refused] = yield* Effect.timed(Effect.flip(monitor.configure));
+        assert.strictEqual(refused.message, 'the collectors are not up yet');
+        assert.isBelow(Duration.toMillis(elapsed), 600);
+        const source = yield* monitor.nvidiaSource;
+        assert.strictEqual(source, 'nvidia-smi');
+        // Built 800 ms after the start: the change refused is applied before the first tick.
+        const first = yield* next('3 seconds');
+        assert.deepStrictEqual(first.history, { intervalMs: 250, capacity: 240 });
+      }),
+    ),
+  );
+
+  it.effect(
+    'a sampler killed but stuck in the kernel at startup: the monitor falls back to nvidia-smi and answers',
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-monitor-' });
+        const fake = path.resolve(import.meta.dirname, '../testing/fixtures/fakeNvml.ts');
+        const stuck = yield* stuckRelease;
+        const options: Options = {
+          patch: { collectors: { nvml: true, system: true, disk: true } },
+          nvmlCommand: { cmd: process.execPath, args: [fake, 'silent', dir] },
+          readyTimeout: '300 millis',
+          spawner: stuck.spawner,
+        };
+        yield* withMonitor(options, (monitor) =>
+          Effect.gen(function* () {
+            const [elapsed, source] = yield* Effect.timed(monitor.nvidiaSource);
+            assert.strictEqual(source, 'nvidia-smi');
+            assert.isBelow(Duration.toMillis(elapsed), 300 + Duration.toMillis(CLOSE_BOUND) + 1000);
+            const first = yield* next('3 seconds');
+            assert.strictEqual(first.tick, 1);
+            yield* SettingsRepo.use((repo) => repo.patch({ historySeconds: 60 }));
+            yield* monitor.configure.pipe(Effect.timeout('2 seconds'));
+            const history = yield* monitor.history;
+            assert.strictEqual(history.capacity, 240);
+          }),
+        );
+        const recorded = yield* fs.readFileString(path.join(dir, 'pids'));
+        const pids = Arr.map(Arr.filter(Str.split(recorded, '\n'), Str.isNonEmpty), Number);
+        const alive = yield* Effect.filter(pids, isAlive);
+        assert.deepStrictEqual(alive, []);
+        yield* stuck.unstick;
+      }),
+  );
+
+  it.effect("the end of the monitor's layer returns within the bound when its sampler is stuck in the kernel", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-monitor-' });
+      const fake = path.resolve(import.meta.dirname, '../testing/fixtures/fakeNvml.ts');
+      const stuck = yield* stuckRelease;
+      const { layer } = yield* monitorLayer({
+        patch: { collectors: { nvml: true, system: true, disk: true } },
+        nvmlCommand: { cmd: process.execPath, args: [fake, 'ready-then-sample', dir] },
+        spawner: stuck.spawner,
+      });
+      const scope = yield* Scope.make();
+      const context = yield* Layer.buildWithScope(layer, scope);
+      const source = yield* Context.get(context, Monitor).nvidiaSource;
+      assert.strictEqual(source, 'nvml');
+      yield* next('3 seconds');
+      const [elapsed] = yield* Effect.timed(Scope.close(scope, Exit.void));
+      assert.isBelow(Duration.toMillis(elapsed), Duration.toMillis(CLOSE_BOUND) + 700);
+      const recorded = yield* fs.readFileString(path.join(dir, 'pids'));
+      const pids = Arr.map(Arr.filter(Str.split(recorded, '\n'), Str.isNonEmpty), Number);
+      assert.lengthOf(pids, 1);
+      const alive = yield* Effect.filter(pids, isAlive);
+      assert.deepStrictEqual(alive, []);
+      yield* stuck.unstick;
+    }),
+  );
+
   it.effect('collectors that cannot start leave the monitor without snapshots, every change refused', () =>
     Effect.gen(function* () {
       const broken = Layer.effect(Collectors, Effect.die('no collectors here'));
@@ -358,7 +496,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
         Monitor.layerWith({ modelDiskRetry: '30 seconds', appsEvery: 5, collectors: broken }),
       );
       const monitor = Context.get(context, Monitor);
-      const refused = yield* Effect.flip(monitor.configure({ ...DEFAULT_SETTINGS }));
+      const refused = yield* Effect.flip(monitor.configure);
       assert.strictEqual(refused._tag, 'CollectorsNotApplied');
       const source = yield* monitor.nvidiaSource;
       const system = yield* monitor.nvmlSystem;
@@ -388,7 +526,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
       assert.deepStrictEqual(history, { intervalMs: 1000, capacity: 0, at: 0, times: [], series: {} });
       assert.strictEqual(source, 'nvml');
       assert.isNull(system);
-      yield* monitor.configure({ ...DEFAULT_SETTINGS });
+      yield* monitor.configure;
       yield* Effect.sleep('300 millis');
       const published = yield* Published;
       const size = yield* Queue.size(published);

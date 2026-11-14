@@ -30,7 +30,7 @@ const Refusing = Layer.effect(
     const stub = yield* Monitor;
     return Monitor.of({
       ...stub,
-      configure: () => Effect.fail(CollectorsNotApplied.make({ message: 'NVML init failed' })),
+      configure: Effect.fail(CollectorsNotApplied.make({ message: 'NVML init failed' })),
     });
   }),
 ).pipe(Layer.provide(Monitor.layerStub));
@@ -77,10 +77,26 @@ layer(handlersOn(Refusing))('SettingsApi with a monitor that refuses the change'
   it.effect('PATCH /api/settings: saved but not applied by the monitor is a 200 with a warning, not a 500 (#35)', () =>
     Effect.gen(function* () {
       const client = yield* makeClient;
-      const patched = yield* client.settings.patch({ payload: { port: 9000 } });
-      assert.strictEqual(patched.port, 9000);
+      const patched = yield* client.settings.patch({ payload: { pollIntervalMs: 2000 } });
+      assert.strictEqual(patched.pollIntervalMs, 2000);
       assert.strictEqual(patched.warning, 'Saved, but the monitor could not apply it: NVML init failed');
-      assert.strictEqual((yield* (yield* SettingsRepo).get).port, 9000);
+      const stored = yield* (yield* SettingsRepo).get;
+      assert.strictEqual(stored.pollIntervalMs, 2000);
+    }),
+  );
+
+  it.effect('PATCH /api/settings: a change of what the monitor does not follow is not handed to it', () =>
+    Effect.gen(function* () {
+      const client = yield* makeClient;
+      // The theme and the port: no warning, the monitor is not asked.
+      const patched = yield* client.settings.patch({ payload: { theme: 'dark', port: 9000 } });
+      assert.strictEqual(patched.port, 9000);
+      assert.isUndefined(patched.warning);
+      // The same value again for a field it follows: nothing changed for it either.
+      const same = yield* client.settings.patch({ payload: { pollIntervalMs: patched.pollIntervalMs } });
+      assert.isUndefined(same.warning);
+      const hidden = yield* client.settings.patch({ payload: { hiddenGpus: ['0000:01:00.0'] } });
+      assert.strictEqual(hidden.warning, 'Saved, but the monitor could not apply it: NVML init failed');
     }),
   );
 });
