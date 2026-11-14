@@ -8,7 +8,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { type Launched, launch } from '../testing/launch.ts';
 import { type TempDir, tempDir } from '../testing/tempDir.ts';
-import { assetOf, cases, endpoints, type NormalizeCtx, type Outcome, runContract } from './cases.ts';
+import { assetOf, cases, covers, endpoints, type NormalizeCtx, type Outcome, runContract } from './cases.ts';
 
 const GOLDEN = resolve(import.meta.dirname, process.env.GOLDEN ?? 'golden.json');
 const REPO = resolve(import.meta.dirname, '../../..');
@@ -36,13 +36,13 @@ afterAll(async () => {
 });
 
 test('the cases cover every endpoint of the API definition', async () => {
-  const covered = new Set(cases({ asset: await assetOf(app.base) }).map((c) => `${c.req.method} ${c.req.path}`));
-  expect(endpoints().filter((endpoint) => !covered.has(endpoint))).toEqual([]);
+  const all = cases({ asset: await assetOf(app.base) });
+  expect(endpoints().filter((endpoint) => !all.some((c) => covers(endpoint, c.req)))).toEqual([]);
 });
 
-test('no case that breaks a payload or the guard succeeds', async () => {
+test('no case that breaks a payload or the guard, or that the domain refuses, succeeds', async () => {
   const kinds = new Map(cases({ asset: await assetOf(app.base) }).map((c) => [c.name, c.kind]));
-  const breaking = new Set(['violation', 'body', 'guard']);
+  const breaking = new Set(['violation', 'refusal', 'body', 'guard']);
   const wrong = Object.entries(outcomes).filter(([name, o]) => breaking.has(kinds.get(name) ?? '') && o.status < 400);
   expect(wrong.map(([name, o]) => `${name} → ${o.status}`)).toEqual([]);
 });

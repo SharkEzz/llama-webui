@@ -8,10 +8,11 @@ import { request, type WireRequest, type WireResponse } from './wire.ts';
 /**
  * - `read`, `write`: an endpoint used as the web uses it;
  * - `violation`: a payload that breaks the endpoint's schema; `body`: a body the edge refuses; `guard`: a request the
- *   guard refuses (all three must fail, with a status of 400 or more);
+ *   guard refuses; `refusal`: a valid request the domain refuses (a 404 of a missing row, a 409) (all four must fail,
+ *   with a status of 400 or more);
  * - `other`: outside the API definition (an unknown path, `/ws` without an upgrade); `web`: the UI's files.
  */
-export type CaseKind = 'read' | 'write' | 'violation' | 'body' | 'guard' | 'other' | 'web';
+export type CaseKind = 'read' | 'write' | 'violation' | 'refusal' | 'body' | 'guard' | 'other' | 'web';
 
 export interface Case {
   name: string;
@@ -29,6 +30,18 @@ export function endpoints(): string[] {
     onEndpoint: ({ endpoint }) => out.push(`${endpoint.method} ${endpoint.path}`),
   });
   return out;
+}
+
+/**
+ * Whether a request (its path may carry a query string) is a use of `endpoint` (`METHOD /path/:param`): same method,
+ * as many segments, a `:param` segment matching one non-empty segment and a literal segment only itself.
+ */
+export function covers(endpoint: string, req: { method: string; path: string }): boolean {
+  const [method, pattern = ''] = endpoint.split(' ');
+  if (method !== req.method) return false;
+  const want = pattern.split('/');
+  const got = (req.path.split('?')[0] ?? '').split('/');
+  return want.length === got.length && want.every((seg, i) => (seg.startsWith(':') ? got[i] !== '' : seg === got[i]));
 }
 
 const JSON_TYPE = { 'Content-Type': 'application/json' };
@@ -68,6 +81,7 @@ export function cases(ctx: { asset: string }): Case[] {
   // Outside the API definition.
   add('other', 'GET /api/nope', bare('GET', '/api/nope'));
   add('other', 'GET /api/settings/ (trailing slash)', bare('GET', '/api/settings/'));
+  add('other', 'GET /api/settings/?x=1 (trailing slash, query)', bare('GET', '/api/settings/?x=1'));
   add('other', 'DELETE /api/health (a method the path lacks)', bare('DELETE', '/api/health'));
   add('other', 'HEAD /api/health', bare('HEAD', '/api/health'));
   add('other', 'GET /ws (no upgrade)', bare('GET', '/ws'));
@@ -105,7 +119,7 @@ export interface Outcome {
 }
 
 /** The headers the contract keeps (others, such as `date` or `content-length`, are framing). */
-const KEPT_HEADERS = ['content-type', 'allow', 'cache-control', 'content-disposition'];
+const KEPT_HEADERS = ['content-type', 'allow', 'cache-control', 'content-disposition', 'location'];
 
 export interface NormalizeCtx {
   /** Temporary directory of the run (data dir, home). */

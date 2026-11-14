@@ -56,7 +56,7 @@ export function refusal(request: GuardedRequest): { readonly status: number; rea
 }
 
 /** The path of a request target, without its query or fragment. */
-const pathOf = (url: string): string => Arr.headNonEmpty(Str.split(url, /[?#]/));
+export const pathOf = (url: string): string => Arr.headNonEmpty(Str.split(url, /[?#]/));
 
 /** The paths the guard judges: the API and the WebSocket. The UI is not guarded. */
 const guarded = (path: string): boolean => path === '/api' || Str.startsWith('/api/')(path) || path === '/ws';

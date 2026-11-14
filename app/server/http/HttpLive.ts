@@ -13,6 +13,7 @@ import { WsHub } from '../ws/WsHub.ts';
 import { guard } from './Guard.ts';
 import { RequestErrorsLive } from './RequestErrors.ts';
 import * as Static from './Static.ts';
+import { noTrailingSlash } from './TrailingSlash.ts';
 
 /** Any other path under /api, whatever the method: a 404 `RouteNotFound` as JSON, not the UI's page. */
 const UnknownApi = HttpRouter.add(
@@ -49,12 +50,15 @@ const logDefects = <E, R>(app: Effect.Effect<HttpServerResponse.HttpServerRespon
     Arr.some(cause.reasons, isDefect) ? Effect.logError('a request failed', cause) : Effect.void,
   );
 
-/** `routes` on the HTTP server as the app serves them: behind the guard, defects logged, no access log. */
+/**
+ * `routes` on the HTTP server as the app serves them: behind the guard, a trailing slash under /api and /ws
+ * redirected, defects logged, no access log.
+ */
 export const serve = <A, E, R>(routes: Layer.Layer<A, E, R>) =>
   HttpRouter.serve(routes, {
     disableLogger: true,
     disableListenLog: true,
-    middleware: (app) => app.pipe(logDefects, guard),
+    middleware: (app) => app.pipe(noTrailingSlash, logDefects, guard),
   });
 
 /**

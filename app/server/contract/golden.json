@@ -67,28 +67,15 @@
     }
   },
   "GET /api/settings/ (trailing slash)": {
-    "status": 200,
+    "status": 308,
     "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "binary": "llama-server",
-      "host": "127.0.0.1",
-      "port": 8080,
-      "modelsDir": "~/models",
-      "pollIntervalMs": 1000,
-      "historySeconds": 300,
-      "hiddenGpus": [],
-      "defaultProfileId": null,
-      "llamaTuiImportDismissed": false,
-      "onboardingDone": false,
-      "collectors": {
-        "nvml": true,
-        "system": true,
-        "disk": true
-      },
-      "theme": "system",
-      "env": {}
+      "location": "/api/settings"
+    }
+  },
+  "GET /api/settings/?x=1 (trailing slash, query)": {
+    "status": 308,
+    "headers": {
+      "location": "/api/settings?x=1"
     }
   },
   "DELETE /api/health (a method the path lacks)": {
