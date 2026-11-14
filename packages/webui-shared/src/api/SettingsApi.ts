@@ -1,13 +1,14 @@
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
 import { Settings } from '../settings.ts';
+import { Issue } from './errors.ts';
 
 /** A patch that does not validate: `Invalid settings`, and the message of each field it fails on. */
 export class SettingsInvalid extends Schema.TaggedError<SettingsInvalid, { readonly SettingsInvalid: unique symbol }>()(
   'SettingsInvalid',
   {
     message: Schema.String,
-    issues: Schema.Array(Schema.Struct({ path: Schema.Array(Schema.String), message: Schema.String })),
+    issues: Schema.Array(Issue),
   },
   { httpApiStatus: 400 },
 ) {}

@@ -1,5 +1,5 @@
-import { Settings, SettingsInvalid } from '@llama-webui/shared';
-import { Array as Arr, Context, Effect, Layer, Predicate, Record as Rec, Schema, SchemaIssue } from 'effect';
+import { issuesOf, Settings, SettingsInvalid } from '@llama-webui/shared';
+import { Array as Arr, Context, Effect, Layer, Predicate, Record as Rec, Schema } from 'effect';
 import { SqlClient } from 'effect/sql';
 
 type Key = keyof Settings;
@@ -16,20 +16,11 @@ const decode = Schema.decodeUnknownEffect(Settings);
 const Json = Schema.fromJsonString(Schema.Unknown);
 const parseJson = Schema.decodeEffect(Json);
 const toJson = Schema.encodeEffect(Json);
-const format = SchemaIssue.makeFormatterStandardSchemaV1();
 
 /** `merged` as settings, or `SettingsInvalid` with the message of each field it fails on. */
 const validate = (merged: Readonly<Record<string, unknown>>) =>
   decode(merged, { errors: 'all' }).pipe(
-    Effect.mapError((error) =>
-      SettingsInvalid.make({
-        message: 'Invalid settings',
-        issues: Arr.map(format(error.issue).issues, (issue) => ({
-          path: Arr.map(issue.path ?? [], String),
-          message: issue.message,
-        })),
-      }),
-    ),
+    Effect.mapError((error) => SettingsInvalid.make({ message: 'Invalid settings', issues: issuesOf(error.issue) })),
   );
 
 /** `partial` over `current`: objects merge field by field (`collectors`), except `env`, replaced as a whole. */

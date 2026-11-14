@@ -11,6 +11,7 @@ import { HealthHandlers } from '../health/http.ts';
 import { SettingsHandlers } from '../settings/http.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { guard } from './Guard.ts';
+import { RequestErrorsLive } from './RequestErrors.ts';
 import * as Static from './Static.ts';
 
 /** Any other path under /api, whatever the method: a 404 `RouteNotFound` as JSON, not the UI's page. */
@@ -22,9 +23,14 @@ const UnknownApi = HttpRouter.add(
   ),
 );
 
-/** The endpoints of the API, and the 404 of any other /api path. */
+/**
+ * The endpoints of the API (each group's handlers, and the answer to a request that does not decode), and the 404 of
+ * any other /api path.
+ */
 export const ApiRoutes = Layer.merge(
-  HttpApiBuilder.layer(Api).pipe(Layer.provide(Layer.mergeAll(HealthHandlers, SettingsHandlers))),
+  HttpApiBuilder.layer(Api).pipe(
+    Layer.provide(Layer.mergeAll(HealthHandlers, SettingsHandlers).pipe(Layer.provideMerge(RequestErrorsLive))),
+  ),
   UnknownApi,
 );
 

@@ -4,12 +4,17 @@ import { Effect, Layer } from 'effect';
 import { HttpServer } from 'effect/http';
 import { HttpApiTest } from 'effect/http-api';
 import * as Db from '../db/Db.ts';
+import { RequestErrorsLive } from '../http/RequestErrors.ts';
 import { SettingsHandlers } from './http.ts';
 import { SettingsRepo } from './SettingsRepo.ts';
 
 const makeClient = HttpApiTest.groups(Api, ['settings']);
 
-const Handlers = SettingsHandlers.pipe(Layer.provide(SettingsRepo.layer), Layer.provide(Db.layerAt(':memory:')));
+const Handlers = SettingsHandlers.pipe(
+  Layer.provide(SettingsRepo.layer),
+  Layer.provide(Db.layerAt(':memory:')),
+  Layer.provideMerge(RequestErrorsLive),
+);
 
 layer(Layer.mergeAll(Handlers, HttpServer.layerServices))('SettingsApi', (it) => {
   it.effect('GET gives the settings, PATCH the settings after the patch', () =>

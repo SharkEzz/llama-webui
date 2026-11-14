@@ -82,6 +82,25 @@ test('call() rejects with ApiUnreachable when fetch rejects', async () => {
   expect((error as Error).message).toBe('llama-webui server unreachable');
 });
 
+test('a payload the client refuses to send rejects as the RequestInvalid the server would answer', async () => {
+  class NamedApi extends HttpApi.make('named').add(
+    HttpApiGroup.make('n').add(
+      HttpApiEndpoint.post('create', '/n', {
+        payload: Schema.Struct({ name: Schema.String.check(Schema.isMinLength(1, { message: 'cannot be empty' })) }),
+      }),
+    ),
+  ) {}
+  const fetchImpl = vi.fn<typeof fetch>();
+  const call = makeCall(NamedApi, fetchImpl);
+  const error = await call((api) => api.n.create({ payload: { name: '' } })).catch((e: unknown) => e);
+  expect(errorTag(error)).toBe('RequestInvalid');
+  expect(error).toMatchObject({
+    message: 'Invalid data: cannot be empty (name)',
+    issues: [{ path: ['name'], message: 'cannot be empty' }],
+  });
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+
 test('call() passes its signal: an abort reaches fetch and rejects the call', async () => {
   const { call, seen } = stub(
     ({ init }) =>

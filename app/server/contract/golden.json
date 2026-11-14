@@ -153,7 +153,19 @@
   },
   "PATCH /api/settings (malformed JSON)": {
     "status": 400,
-    "headers": {}
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
   },
   "PATCH /api/settings (schema violation)": {
     "status": 400,

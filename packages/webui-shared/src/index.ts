@@ -3,8 +3,18 @@ export * from 'llamacpp-js/flags';
 export { type SseEvent, SseParser } from 'llamacpp-js/sse';
 // The HTTP API (Effect `HttpApi`): served by the server, its client derived by the web.
 export { Api } from './api/Api.ts';
-export { RequestRefused, RouteNotFound } from './api/errors.ts';
+export {
+  describeIssue,
+  Issue,
+  issuesOf,
+  RequestInvalid,
+  RequestRefused,
+  RouteNotFound,
+  requestInvalid,
+} from './api/errors.ts';
 export { HealthApi } from './api/HealthApi.ts';
+export { IdParam } from './api/params.ts';
+export { RequestErrors } from './api/RequestErrors.ts';
 export { SettingsApi, SettingsInvalid } from './api/SettingsApi.ts';
 export * from './bench.ts';
 export * from './chat.ts';

@@ -1,5 +1,5 @@
-import { Api } from '@llama-webui/shared';
-import { Effect, ManagedRuntime } from 'effect';
+import { Api, requestInvalid } from '@llama-webui/shared';
+import { Effect, ManagedRuntime, Schema } from 'effect';
 import { FetchHttpClient, type HttpClient, HttpClientError } from 'effect/http';
 import { type HttpApi, HttpApiClient, type HttpApiGroup } from 'effect/http-api';
 
@@ -17,7 +17,8 @@ const runtime = ManagedRuntime.make(FetchHttpClient.layer);
 
 /**
  * One call of an API: resolves with the decoded reply, rejects with the endpoint's tagged error as the server sent
- * it, or with `ApiUnreachable`. `fetchImpl` replaces `fetch` in tests.
+ * it, or with `ApiUnreachable`. A payload the client refuses to send (it encodes it with the endpoint's schema first)
+ * rejects with the `RequestInvalid` the server would have answered. `fetchImpl` replaces `fetch` in tests.
  */
 export function makeCall<Id extends string, Groups extends HttpApiGroup.Constraint>(
   api: HttpApi.HttpApi<Id, Groups>,
@@ -34,6 +35,8 @@ export function makeCall<Id extends string, Groups extends HttpApiGroup.Constrai
         (e) => HttpClientError.isHttpClientError(e) && e.reason._tag === 'TransportError',
         (e) => Effect.fail(new ApiUnreachable({ cause: e })),
       ),
+      // The payload did not encode: no request was made, the caller sees what the server answers such a payload.
+      Effect.mapError((e) => (Schema.isSchemaError(e) ? requestInvalid(e.issue) : e)),
       // The web's APIs declare no client middleware: the client needs nothing but the HTTP client, which TypeScript
       // cannot tell for a generic `Groups`.
     ) as Effect.Effect<A, E | ApiUnreachable, HttpClient.HttpClient>;
