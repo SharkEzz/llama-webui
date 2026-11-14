@@ -298,49 +298,67 @@
     "project": "server",
     "file": "app/server/lib/chat/request.test.ts",
     "name": "empty sampling sends no sampling key, reasoning and failed messages stay out",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/request.test.ts > request > empty sampling sends no sampling key, reasoning and failed messages stay out"
   },
   {
     "project": "server",
     "file": "app/server/lib/chat/request.test.ts",
     "name": "a context overflow becomes a clear message, other errors keep llama-server's text",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/request.test.ts > request > a context overflow becomes a clear message, other errors keep llama-server's text",
+    "reason": "llamaErrorMessage is failureMessage of a LlamaHttpFailed or LlamaStreamFailed, the tagged failures of llama/chatStream.ts"
   },
   {
     "project": "server",
     "file": "app/server/lib/chat/request.test.ts",
     "name": "consecutive messages of the same role are merged (strict templates require alternating roles)",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/request.test.ts > request > consecutive messages of the same role are merged (strict templates require alternating roles)"
   },
   {
     "project": "server",
     "file": "app/server/lib/chat/runs.test.ts",
     "name": "a run keeps going and is saved when its listener leaves",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > a run keeps going and is saved when its listener leaves"
   },
   {
     "project": "server",
     "file": "app/server/lib/chat/runs.test.ts",
     "name": "stop saves the partial answer as stopped",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > stop saves the partial answer as stopped"
   },
   {
     "project": "server",
     "file": "app/server/lib/chat/runs.test.ts",
     "name": "a late subscriber gets what was already written",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > a late subscriber gets what was already written"
   },
   {
     "project": "server",
     "file": "app/server/lib/chat/runs.test.ts",
     "name": "a stream that ends without [DONE] or breaks is an error that keeps the partial answer",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > a stream that ends without [DONE] or breaks is an error that keeps the partial answer"
   },
   {
     "project": "server",
     "file": "app/server/lib/chat/runs.test.ts",
     "name": "dispose emits done(stopped) to listeners, so their streams close",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/ChatRuns.test.ts > ChatRuns > dispose emits done(stopped) to listeners, so their streams close",
+    "reason": "dispose is the shutdown step of ChatRuns, run through Shutdown.run"
   },
   {
     "project": "server",
@@ -808,7 +826,9 @@
     "project": "server",
     "file": "app/server/lib/contract/wire.test.ts",
     "name": "readSse stops at the condition on a stream that never ends",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "dropped",
+    "reason": "The contract records no SSE reply: a reply needs a ready llama-server, which the contract runner does not wait for (its chat cases are the refusals before any reply), so app/server/contract/wire.ts has no readSse; a reply over the wire is read by chat/http.test.ts (the typed client decodes a reply of llama-server, started by the supervisor, into its events) and lifecycle.test.ts (SIGTERM with the UI open and a reply streaming…)"
   },
   {
     "project": "server",
@@ -1407,7 +1427,10 @@
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: streamChatCompletion streams through it and stops the request when left early",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "rewritten",
+    "to": "app/server/llama/chatStream.test.ts > streamChat > streamChat streams through LlamaHttp and stops the request when left early",
+    "reason": "The chat goes through LlamaHttp (streamChat of llama/chatStream.ts), not streamChatCompletion over llamaFetch"
   },
   {
     "project": "server",
@@ -1811,25 +1834,34 @@
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "POST /api/chat: profileId null records no profile, omitted the active one, a string is a 400 (#37)",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "rewritten",
+    "to": "app/server/chat/http.test.ts > ChatApi > over HTTP > POST /api/chat: profileId null records no profile, omitted the active one, a string is a 400 (#37)",
+    "reason": "Over HTTP, the active profile that of the fake llama-server started through the API; a string profileId is a 400 RequestInvalid of the strict payload (was profileId: expected an integer or null)"
   },
   {
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "GET /api/chat/:id/stream is a 404 for a conversation that does not exist, a 204 without a reply (#37)",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/http.test.ts > ChatApi > over HTTP > GET /api/chat/:id/stream is a 404 for a conversation that does not exist, a 204 without a reply (#37)"
   },
   {
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "GET /api/chat/:id/stream sends the run as SSE events and ends after done",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/http.test.ts > ChatApi > over HTTP > GET /api/chat/:id/stream sends the run as SSE events and ends after done"
   },
   {
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "GET /api/chat/:id/stream: a client that leaves only unsubscribes",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "app/server/chat/http.test.ts > ChatApi > over HTTP > GET /api/chat/:id/stream: a client that leaves only unsubscribes"
   },
   {
     "project": "server",
@@ -2763,25 +2795,33 @@
     "project": "shared",
     "file": "packages/webui-shared/src/chat.test.ts",
     "name": "statsFromTimings maps llama-server timings",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "packages/webui-shared/src/chat.test.ts > statsFromTimings maps llama-server timings"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/chat.test.ts",
     "name": "autoTitle keeps the first six words within 48 characters",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "packages/webui-shared/src/chat.test.ts > autoTitle keeps the first six words within 48 characters"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/chat.test.ts",
     "name": "isDefaultTitle accepts the current and the legacy default title",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "packages/webui-shared/src/chat.test.ts > isDefaultTitle accepts the current and the legacy default title"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/chat.test.ts",
     "name": "contextUsed counts the cached prompt too, not only the new tokens (#29)",
-    "milestone": "E5"
+    "milestone": "E5",
+    "status": "ported",
+    "to": "packages/webui-shared/src/chat.test.ts > contextUsed counts the cached prompt too, not only the new tokens (#29)"
   },
   {
     "project": "shared",

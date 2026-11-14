@@ -32,8 +32,8 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 - The overrides relax the platform rules (Node builtins, `fetch`, timers, `JSON`, Effect's array and string helpers,
   `strictBooleanExpressions`) only for code that drives the build from outside: `**/testing/**`, `**/contract/**`,
   `lifecycle.test.ts`, `build.test.ts`, `dev.test.ts`, `runApp.test.ts`; and for the plain modules of the shared
-  package, except `api/**`, `logs.ts`, `monitor.ts`, `profile.ts`, `server.ts`, `settings.ts`, `topology.ts` and
-  `ws.ts`, which follow the server's rules (the third override: a milestone adds the modules it moves to Schema).
+  package, except `api/**`, `chat.ts`, `logs.ts`, `monitor.ts`, `profile.ts`, `server.ts`, `settings.ts`, `topology.ts`
+  and `ws.ts`, which follow the server's rules (the third override: a milestone adds the modules it moves to Schema).
   Nothing else is added to the overrides.
 - Two directives are allowed, each with its reason on the line:
   `// @effect-diagnostics-next-line nodeBuiltinImport:off <reason>` (one today: `node:http` in
@@ -82,6 +82,22 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
   `packages/webui-shared/src/profile.ts`). A domain's HTTP test stores such a row by SQL and reads it back
   (`a stored profile the input rules now refuse…` in `profiles/http.test.ts`).
 - A 204: an endpoint with no `success` (`remove` of `ProfilesApi`), whose handler succeeds with `void`.
+- A reply that streams (server-sent events): the endpoint's `success` is `HttpApiSchema.StreamSse({ events })`, where
+  `events` is the codec of one event as `{ event, data }` (`ChatSseEvent` of `api/ChatApi.ts`: `event:` the type,
+  `data:` the JSON of a `ChatEvent`), so the typed client decodes the body into a `Stream` of the domain's events. The
+  handler is `handle`, never `handleRaw` (which does not decode the payload: `HttpApiBuilder.ts:968`), and returns
+  `sseResponse(Stream.mapEffect(events, Schema.encodeEffect(Codec)))` of `app/server/http/Sse.ts`: the headers of the
+  Nitro stream (`cache-control`, `x-accel-buffering: no`, `connection: close`), a `: ping` every 15 s, a client that
+  goes away interrupts the stream (`replyResponse` of `chat/http.ts`). A returned `HttpServerResponse` passes through
+  the endpoint's encoder as it is; a declared error still answers its status. An endpoint that streams or answers
+  nothing has `success: [Stream, HttpApiSchema.NoContent]`: the handler returns `void` for the 204 (`follow`), the
+  client reads `undefined`.
+- The web calls a streaming endpoint with `callStream((api) => api.<group>.<endpoint>(…), onEvent, { signal })` of
+  `app/src/lib/api.ts`: each decoded event in order, resolved at the end of the stream; rejected with the endpoint's
+  tagged error, `ApiUnreachable` (no answer, or a body that breaks off: `HttpClientError`) or `ApiReplyInvalid` (an
+  event that does not decode: `SchemaError`, `SseError`, `Retry`; logged); an abort of `signal`, before the response
+  or during the stream, ends it without an error and aborts the request. The SSE wire is tested with the typed client
+  over HTTP (`the typed client decodes a reply…` in `chat/http.test.ts`), the headers over raw HTTP.
 
 ## Programs and the home folder
 
@@ -134,6 +150,19 @@ The model is `app/server/supervisor/Supervisor.ts`.
   sees what is held and answers the next value, or none. The new state is published inside
   `SynchronizedRef.modifyEffect`, so the messages leave in the order of the changes. `f` checks that the state is
   still the one its caller saw (the same process, still `starting`), so a late answer never undoes a newer state.
+- **State of several runs** (one reply per conversation: `app/server/chat/ChatRuns.ts`): one
+  `SynchronizedRef<ReadonlyMap<key, Run>>`, and the start of a run is one step under its lock
+  (`SynchronizedRef.modifyEffect(runs, …)`, made `Effect.uninterruptible`): the checks (the row exists, no run for the
+  key, a server answers), the writes that precede the run, the fork of the run (`Effect.forkIn(run, scope)`, the
+  layer's scope) and its registration. Two requests at once then give one run and one refusal; a check then a later
+  `set` does not (the test that proves it delays a step of the start: synchronous SQLite never interleaves). A read
+  that must see a start in flight takes the lock too (`SynchronizedRef.modify(runs, (now) => [now, now])`), then waits
+  outside it: the run's end takes the lock to leave the map, removing itself by identity. Each run holds its own
+  `SynchronizedRef` (what it wrote) and a `PubSub` of its events, published inside the change of that ref, so a
+  subscriber that takes the replay and subscribes in one `modifyEffect` misses nothing and gets nothing twice. A stop
+  completes a `Deferred` the run's consumption races (`Effect.raceFirst`): leaving the stream aborts its request. The
+  run's `Effect.onExit` takes it out of the map, logs a failure that is not an interruption and shuts its `PubSub`
+  down when it ended unsaved, so its clients' streams end.
 - **`LlamaHttp`** (`app/server/llama/LlamaHttp.ts`) is the client of every request to a llama-server, under its own
   tag (`Context.Service<LlamaHttp, HttpClient.HttpClient>`). It is not `HttpClient.HttpClient`: in the HTTP tests that
   tag is the test server's client, and Hugging Face gets its own client (E6, with the proxy).
@@ -146,11 +175,11 @@ The model is `app/server/supervisor/Supervisor.ts`.
     (`llama/procScan.ts`).
 - **The tiers of `Services`** (`app/server/App.ts`): each `Layer.provideMerge` is a tier, built after the ones below
   it and undone before them.
-  - From the bottom: the database, `AppInfo`, the hub and the repositories, the ring, `LlamaHttp` and `PciIds`,
-    `Flags`, the supervisor, the monitor and the placement, the watch.
-  - The watch ends first (no look while the rest stops). The monitor ends before the supervisor, and the collectors'
-    programs with it. The supervisor stops llama-server while the ring and the hub it writes to are still up. The
-    database closes last.
+  - From the bottom: the database, `AppInfo`, the hub and the repositories (`ConversationsRepo` with them), the ring,
+    `LlamaHttp` and `PciIds`, `Flags`, the supervisor, the monitor, the placement and the chat's `ChatRuns`, the watch.
+  - The watch ends first (no look while the rest stops). The monitor and `ChatRuns` end before the supervisor, the
+    collectors' programs with the monitor, the replies left by the shutdown step interrupted with `ChatRuns`. The
+    supervisor stops llama-server while the ring and the hub it writes to are still up. The database closes last.
   - All of it runs after the shutdown steps and after the HTTP server closed (`Shutdown.layerRunner`, E1).
   - A service's own end goes in its layer (`Effect.addFinalizer`, `Effect.acquireRelease`). It is a shutdown step
     only when it must run while the clients are still connected.
@@ -241,6 +270,11 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
   server stops serving; a step that fails is logged and the next ones still run. The hub's own flush step is
   registered when the hub is built, so it runs after the steps of the services built on it. A wait in a step is made
   `Effect.interruptible` before `Effect.timeout`: a finalizer runs uninterruptibly and the timeout could not end it.
+  A step that saves what a process is doing (a reply of llama-server) belongs to a service of a tier above the
+  supervisor, so it runs while the process still answers, and the service's layer ends before the supervisor stops it.
+  The step saves first, then stops the work, and the work writes nothing once it finds its result saved (`final` of
+  a run in `ChatRuns`, written under the run's own lock): a work stopped first would save its own result and race the
+  step. It publishes the last event itself (`done`), so the clients' streams end before the HTTP server closes.
 - **A /ws message**: a `Schema.Struct({ type: Schema.Literal('…'), payload })` in `packages/webui-shared/src/ws.ts`,
   added to the `WsMessage` union, sent with `WsHub.publish`.
 - **A contract case**: an `add(kind, name, req)` in `cases()` of `app/server/contract/cases.ts` for each endpoint of the
@@ -256,10 +290,12 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
   `launch()`), so no snapshot depends on the machine.
 - **A web page that returns**: its import in `PORTED` of `app/src/app/router.tsx`, its entry out of
   `MILESTONE_BY_PATH` in `app/src/app/routes.ts`, its tests out of the `"exclude"` of `app/tsconfig.json`. Its calls go
-  through `call((api) => api.<group>.<endpoint>(…))`; an error is told by its `_tag` (`fieldErrors` of
-  `features/profiles/errors.ts` puts a `RequestInvalid`'s issues on their fields). A part that needs a store of a
-  later milestone (`@/lib/server` until E3, `@/lib/models` until E6) is removed, not stubbed, and recorded as a
-  `From E<n>:` line in the section of that milestone in `behaviours.md`; it comes back with the store.
+  through `call((api) => api.<group>.<endpoint>(…))` (a stream through `callStream`, see Replies); an error is told
+  by its `_tag` (`fieldErrors` of `features/profiles/errors.ts` puts a `RequestInvalid`'s issues on their fields). A
+  part that needs a store of a later milestone (`@/lib/server` until E3, `@/lib/models` until E6) is removed, not
+  stubbed, and recorded as a `From E<n>:` line in the section of that milestone in `behaviours.md`; it comes back with
+  the store. A pure function of such a store's module moves, unchanged, to a module the page can import (`stem` of
+  `app/src/lib/stem.ts`, E5).
 
 ## Tests
 
@@ -278,8 +314,10 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
   - The durations of a service are options of its `layerWith` (`Supervisor.layerWith({ killTimeout, healthPoll })`,
     `ExternalWatch.layerWith({ interval })`), shortened in `ServicesTest`.
   - `app/server/testing/llama.ts` holds the fake llama-server (`FAKE`, `testdata/fake/`), `freePort`, `httpStub`, a
-    fake started outside the supervisor (`fakeOutside`), and the start of the fake through the API of a running build
-    (`startFakeThrough`).
+    fake started outside the supervisor (`fakeOutside`), the start of the fake through the API of a running build
+    (`startFakeThrough`, with the fake's `FAKE_*` environment), and `chatStub`, a llama-server on loopback whose chat
+    reply the test writes chunk by chunk (`chunk`, `done`, `end` without `[DONE]`, `cut`), given to
+    `ChatRuns.layerWith` as its `target` or found as an external server (`supervisor.detectExternal`).
   - A test that starts a process asserts that it is dead at the end.
   - A program whose exit never comes back once killed (stuck in a driver call) is faked by `stuckRelease` of
     `app/server/testing/stuckRelease.ts`: the platform's spawner, whose release waits, once the process is killed

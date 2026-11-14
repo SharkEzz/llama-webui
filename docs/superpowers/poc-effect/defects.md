@@ -67,9 +67,19 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 
 ### E5: chat
 
-- The comment of `stopOrphans` says "interrupted", the code writes "stopped". `unverified`
-- `liveIds()` is never called. `unverified`
-- Stopping an unknown id answers 409. `unverified`
+- The comment of `stopOrphans` says "interrupted", the code writes "stopped". `fixed in E5`: the doc comment of
+  `ConversationsRepo.stopOrphans` says `stopped`, and the code still writes it (`chat/ConversationsRepo.test.ts`:
+  stopOrphans marks every streaming message stopped and counts them; `chat/ChatRuns.test.ts`: orphans are marked
+  stopped when the layer is built).
+- `liveIds()` is never called. `confirmed`: not ported (`ChatRuns` has `live` and `isLive` of one conversation, the
+  list asks `isLive` of each).
+- Stopping an unknown id answers 409. `design choice`: a stop names a reply, not a conversation, and the answer is the
+  same whether the conversation is missing or idle (`No reply in progress`); ported as it is (`chat/http.test.ts`: each
+  endpoint of a conversation that does not exist is a 404, a stop of one a 409; contract `POST /api/chat/999/stop`).
+- A send that registers between the wait of a delete (`stopAndWait`) and the delete itself starts a reply whose rows
+  the cascade deletes: its writes find no message, its `done` is built in memory, and llama-server writes the reply for
+  nobody. `not a defect`: the send is answered and nothing of the deleted conversation is left; the Nitro server had
+  the same window (its delete awaited the run, then deleted). Ported as it is; no test makes it happen.
 
 ### E6: models and downloads
 
@@ -242,3 +252,72 @@ Found by the final review of E4, fixed with it:
   patches saved at once could configure in the other order and leave the monitor on the older ones), and the handler
   calls it only when the patch changed what the monitor follows (`collectors`, `pollIntervalMs`, `historySeconds`,
   `hiddenGpus`): with collectors that could not start, a theme or a binary saved no longer shows the warning.
+
+Decided (the E5 plan):
+
+- The three streaming endpoints (`messages`, `regenerate`, `stream`) are `HttpApi` endpoints whose success is an
+  `HttpApiSchema.StreamSse` of `ChatSseEvent` (one server-sent event per `ChatEvent`: `event:` its type, `data:` its
+  JSON); the typed client decodes a reply into a `Stream` of `ChatEvent`. Their handlers answer `sseResponse` of
+  `app/server/http/Sse.ts`, which keeps the headers of the Nitro stream and its `: ping` every 15 s. The plan named
+  `handleRaw`: they use `handle` (see below).
+- `GET /api/chat/:id/stream` answers 204 when no reply runs: its success is the `StreamSse` or
+  `HttpApiSchema.NoContent`, read as `undefined` by the client.
+- The errors are tagged, with the Nitro messages word for word: `ConversationNotFound` (404 `Conversation not found`),
+  `ReplyInProgress` (409 `A reply is already in progress in this conversation`), `NoReplyInProgress` (409 `No reply in
+  progress`), `NothingToRegenerate` (409 `Nothing to regenerate`), `EmptyMessage` (400 `Empty message`), and E3's
+  `ServerNotReady` (409 `llama-server is not ready`) and E2's `ProfileNotFound` (404).
+- The requests are strict: `POST /api/chat` takes `{ profileId?: Int | null }`, `POST /api/chat/:id/messages`
+  `{ content: String }`, `PATCH /api/chat/:id` the `ConversationPatch` schema with the limits and messages of the zod
+  schema; any other key or type is a 400 `RequestInvalid` (was `profileId: expected an integer or null`, `content:
+  expected a string`, `Invalid JSON`, `JSON object expected`).
+- Two sends at once to one conversation give one reply and one 409: the check that no reply runs, the look for a
+  server, the storing of the messages and the registration of the run are one uninterruptible step under the lock of
+  the runs (the Nitro server got this from JavaScript's single thread).
+- A stop of a conversation that does not exist answers 409 `No reply in progress`, as before; `liveIds()` is not
+  ported; the comment of `stopOrphans` says `stopped` (above).
+- llama-server's `timings` are decoded with `LlamaTimingsSchema` (all `Finite`) before they become `MessageStats`:
+  timings that do not decode are dropped alone (the chunk keeps its delta), and the reply then has no stats, instead of
+  a NaN that would stop its `done` from encoding.
+- Time is the `Clock`'s: the 1000 ms throttle of the partial writes (tested on the `TestClock`), the time to first
+  token and the duration.
+- The chat does not use the I/O of `llamacpp-js`: the request goes through `LlamaHttp` (`llama/chatStream.ts`), the
+  SSE body is parsed by `Sse.decode` of `effect/encoding`, and the failures are tagged (`LlamaHttpFailed`,
+  `LlamaStreamFailed`, `LlamaStreamCut`, `LlamaUnreachable`) instead of thrown `Llama*Error`s.
+
+Found while porting E5, accepted with its result:
+
+- The streaming endpoints are served with `handle` returning `sseResponse`, not `handleRaw`: `handleRaw` never decodes
+  the payload (`HttpApiBuilder.ts:968` of `repos/effect`), so the strict request rules would not apply to `messages`. A
+  handler's declared error still answers with its status (both forms).
+- A request that never reaches llama-server reads `llama-server unreachable: <the cause's message>` (`connect
+  ECONNREFUSED 127.0.0.1:<port>`); the Nitro `llamaFetch` rejected with `fetch failed`, so the reply read
+  `llama-server unreachable: fetch failed`.
+- A strict-request refusal reads in Schema's wording: `Invalid data: Expected number | null (profileId)`, `Invalid
+  data: Expected string (content)`, `Invalid data: Expected string (title)` (as the start's `Expected number
+  (profileId)` since E3), `unknown key` for an unknown key; the sampling, title and system prompt messages of the
+  PATCH are kept.
+- `MessageStats` is all finite: a stored stats that no longer decodes (a `null` the Nitro server wrote for a NaN rate)
+  reads as no stats, with a warning, the message kept; a run saves its stats only when every number is finite, else
+  none; the `done` message built in memory (the conversation deleted) carries the stats a save would have written.
+- The run leaves the runs before its `done` is published: a client that sends again as soon as it reads `done` gets no
+  409.
+- The shutdown step and `stopAndWait` read the runs under their lock (`SynchronizedRef.modify`), so a start in flight is
+  stopped and saved too; the step saves every reply `stopped` first, then stops its run, so the run writes nothing after
+  it.
+- A new subscriber takes the replay and its subscription to the run's `PubSub` in one step: a listener is a stream, not
+  a callback, so the Nitro "a listener that throws is dropped" has no counterpart.
+- One lock serialises the starts of every conversation, not of one: a start is a few synchronous SQLite statements and
+  the look for a server, so the cost is small, and the check and the registration stay one step.
+- `ChatRuns.layerWith` needs the services of `chatTarget` (`Supervisor`, `ProfilesRepo`, `Path`) even when a test
+  gives its own `target`.
+- `ServicesTest` builds `ChatRuns.layer`: every test on it marks the `streaming` rows `stopped` when it is built and
+  registers the replies' shutdown step.
+- The contract has no successful reply and no `409 Nothing to regenerate`: a reply, and the regeneration check, which
+  comes after the look for a server, need a ready llama-server, which the contract runner cannot wait for (the Nitro
+  contract had a stream case run after the others, `runStreams`); `chat/http.test.ts` covers both over HTTP.
+- The Chat page's `stem` (a pure function of `@/lib/models`, whose module does not compile until E6's store) moved
+  unchanged to `app/src/lib/stem.ts`. The web's `callStream` (`app/src/lib/api.ts`) tells a body that breaks off
+  (`ApiUnreachable`, the store reads the conversation again) from an event that does not decode (`ApiReplyInvalid`,
+  logged, a toast).
+- The developer pages of the site still describe the Nitro client (`readSse()`, `apiError()` in
+  `site/content/developers/frontend.mdx`): they are rewritten at E10 (design spec, the E10 row and its sync rule).
