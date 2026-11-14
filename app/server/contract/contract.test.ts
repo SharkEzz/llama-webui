@@ -6,14 +6,15 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { writeGguf } from '../testing/gguf.ts';
 import { type Launched, launch } from '../testing/launch.ts';
 import { type TempDir, tempDir } from '../testing/tempDir.ts';
 import {
   assetOf,
-  type Binaries,
   cases,
   covers,
   endpoints,
+  type Fixtures,
   type NormalizeCtx,
   type Outcome,
   runContract,
@@ -25,13 +26,32 @@ const REPO = resolve(import.meta.dirname, '../../..');
 let dir: TempDir;
 let app: Launched;
 let ctx: NormalizeCtx;
-let binaries: Binaries;
+let fixtures: Fixtures;
 let outcomes: Record<string, Outcome> = {};
 
 beforeAll(async () => {
   dir = tempDir('lw-contract-');
   const home = join(dir.path, 'home');
-  mkdirSync(home);
+  mkdirSync(join(home, 'models'), { recursive: true });
+  // The models folder (the default `~/models`) holds one small model.
+  const model = join(home, 'models', 'm.gguf');
+  await writeGguf(
+    model,
+    {
+      'general.architecture': { type: 'string', value: 'llama' },
+      'general.name': { type: 'string', value: 'Tiny' },
+      'general.file_type': { type: 'u32', value: 15 },
+      'llama.block_count': { type: 'u32', value: 1 },
+      'llama.embedding_length': { type: 'u32', value: 64 },
+      'llama.attention.head_count': { type: 'u32', value: 4 },
+      'llama.context_length': { type: 'u32', value: 4096 },
+    },
+    [
+      { name: 'token_embd.weight', shape: [64, 100], bytes: 6400 },
+      { name: 'blk.0.attn_q.weight', shape: [64, 64], bytes: 4096 },
+      { name: 'output.weight', shape: [64, 100], bytes: 6400 },
+    ],
+  );
   // A home and XDG folders of the run's own: nothing of the user's shows in a reply. The stub monitor: no program
   // runs, no snapshot comes, the history stays empty.
   app = await launch({
@@ -44,11 +64,13 @@ beforeAll(async () => {
     },
   });
   ctx = { tmp: dir.path, repo: REPO, home, ports: app.watchPort === null ? [app.port] : [app.port, app.watchPort] };
-  binaries = {
+  fixtures = {
     fake: join(REPO, 'testdata/fake/fake-llama-server'),
     missing: join(dir.path, 'no-such-llama-server'),
+    model,
+    noModel: join(dir.path, 'no-such-model.gguf'),
   };
-  outcomes = await runContract(app.base, ctx, binaries);
+  outcomes = await runContract(app.base, ctx, fixtures);
 }, 60_000);
 afterAll(async () => {
   await app?.[Symbol.asyncDispose]();
@@ -56,12 +78,12 @@ afterAll(async () => {
 });
 
 test('the cases cover every endpoint of the API definition', async () => {
-  const all = cases({ asset: await assetOf(app.base), ...binaries });
+  const all = cases({ asset: await assetOf(app.base), ...fixtures });
   expect(endpoints().filter((endpoint) => !all.some((c) => covers(endpoint, c.req)))).toEqual([]);
 });
 
 test('no case that breaks a payload or the guard, or that the domain refuses, succeeds', async () => {
-  const kinds = new Map(cases({ asset: await assetOf(app.base), ...binaries }).map((c) => [c.name, c.kind]));
+  const kinds = new Map(cases({ asset: await assetOf(app.base), ...fixtures }).map((c) => [c.name, c.kind]));
   const breaking = new Set(['violation', 'refusal', 'body', 'guard']);
   const wrong = Object.entries(outcomes).filter(([name, o]) => breaking.has(kinds.get(name) ?? '') && o.status < 400);
   expect(wrong.map(([name, o]) => `${name} → ${o.status}`)).toEqual([]);

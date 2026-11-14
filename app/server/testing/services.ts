@@ -9,6 +9,9 @@ import { PciIds } from '../hardware/PciIds.ts';
 import { RequestErrorsLive } from '../http/RequestErrors.ts';
 import { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { LogRing } from '../logs/LogRing.ts';
+import { ActiveWrites } from '../models/ActiveWrites.ts';
+import { GgufReader } from '../models/GgufReader.ts';
+import { ModelCacheRepo } from '../models/ModelCacheRepo.ts';
 import { Monitor } from '../monitor/Monitor.ts';
 import { Placement } from '../monitor/Placement.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
@@ -23,14 +26,23 @@ import { WsHub } from '../ws/WsHub.ts';
  * the server's routes do. The monitor is the stub (no program, no tick); the placement follows the supervisor. The
  * supervisor polls `/health` every 50 ms, and sends SIGKILL 1 s after SIGTERM. The chat's replies are `ChatRuns.layer`'s:
  * building it marks every reply left `streaming` in the database `stopped` (`stopOrphans`) and registers the shutdown
- * step of the replies (saved `stopped` when `Shutdown.run` runs).
+ * step of the replies (saved `stopped` when `Shutdown.run` runs). No download writes a model (`ActiveWrites.layerNone`).
  */
 export const ServicesTest = Layer.mergeAll(Monitor.layerStub, Placement.layer, ChatRuns.layer).pipe(
   Layer.provideMerge(Supervisor.layerWith({ killTimeout: '1 second', healthPoll: '50 millis' })),
   Layer.provideMerge(Flags.layer),
   Layer.provideMerge(Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer)),
   Layer.provideMerge(
-    Layer.mergeAll(WsHub.layer, SettingsRepo.layer, ProfilesRepo.layer, ConversationsRepo.layer, RequestErrorsLive),
+    Layer.mergeAll(
+      WsHub.layer,
+      SettingsRepo.layer,
+      ProfilesRepo.layer,
+      ConversationsRepo.layer,
+      ModelCacheRepo.layer,
+      GgufReader.layer,
+      ActiveWrites.layerNone,
+      RequestErrorsLive,
+    ),
   ),
   Layer.provideMerge(AppInfo.layer),
   Layer.provideMerge(Db.layerAt(':memory:')),

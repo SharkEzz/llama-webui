@@ -1067,5 +1067,205 @@
         "live": false
       }
     ]
+  },
+  "GET /api/models": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "dir": "<home>/models",
+      "setting": "~/models",
+      "home": "<home>",
+      "scannedAt": "<time>",
+      "models": [
+        {
+          "ok": true,
+          "path": "<home>/models/m.gguf",
+          "relPath": "m.gguf",
+          "files": [
+            "<home>/models/m.gguf"
+          ],
+          "fileBytes": 17376,
+          "kind": "model",
+          "arch": "llama",
+          "name": "Tiny",
+          "quant": "Q4_K_M",
+          "params": 16896,
+          "blockCount": 1,
+          "contextLength": 4096,
+          "embeddingLength": 64,
+          "headCount": 4,
+          "headCountKv": 4,
+          "expertCount": 0,
+          "expertUsedCount": 0,
+          "nextnLayers": 0,
+          "recurrent": false,
+          "slidingWindow": null,
+          "hasChatTemplate": false
+        }
+      ]
+    }
+  },
+  "GET /api/models/info": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "path": "<home>/models/m.gguf",
+      "relPath": "m.gguf",
+      "files": [
+        "<home>/models/m.gguf"
+      ],
+      "fileBytes": 17376,
+      "kind": "model",
+      "arch": "llama",
+      "name": "Tiny",
+      "quant": "Q4_K_M",
+      "params": 16896,
+      "blockCount": 1,
+      "contextLength": 4096,
+      "embeddingLength": 64,
+      "headCount": 4,
+      "headCountKv": 4,
+      "expertCount": 0,
+      "expertUsedCount": 0,
+      "nextnLayers": 0,
+      "recurrent": false,
+      "slidingWindow": null,
+      "hasChatTemplate": false,
+      "tensorCount": 3,
+      "weights": {
+        "embedBytes": 6400,
+        "outputBytes": 6400,
+        "layersBytes": 4096,
+        "expertsBytes": 0,
+        "otherBytes": 0,
+        "totalBytes": 16896
+      }
+    }
+  },
+  "GET /api/models/info (relative path)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Absolute path to a .gguf file expected (path)",
+      "issues": [
+        {
+          "path": [
+            "path"
+          ],
+          "message": "Absolute path to a .gguf file expected"
+        }
+      ]
+    }
+  },
+  "GET /api/models/info (no such file)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelFileNotFound",
+      "message": "File not found"
+    }
+  },
+  "POST /api/profiles (opens the model)": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 4,
+      "name": "Gamma",
+      "model": "m.gguf",
+      "cwd": "~/models",
+      "args": [],
+      "env": {},
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "GET /api/models/usage": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "path": "<home>/models/m.gguf",
+      "files": [
+        "<home>/models/m.gguf"
+      ],
+      "fileBytes": 17376,
+      "profiles": [
+        {
+          "id": 4,
+          "name": "Gamma",
+          "role": "model"
+        }
+      ],
+      "blocked": null
+    }
+  },
+  "GET /api/models/usage (no path)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: path required (path)",
+      "issues": [
+        {
+          "path": [
+            "path"
+          ],
+          "message": "path required"
+        }
+      ]
+    }
+  },
+  "GET /api/models/usage (not a model of the folder)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelNotFound",
+      "message": "Model not found"
+    }
+  },
+  "DELETE /api/models (empty path)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: path required (path)",
+      "issues": [
+        {
+          "path": [
+            "path"
+          ],
+          "message": "path required"
+        }
+      ]
+    }
+  },
+  "DELETE /api/models (not a model of the folder)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelNotFound",
+      "message": "Model not found"
+    }
   }
 }

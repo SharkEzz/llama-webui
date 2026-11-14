@@ -14,14 +14,17 @@ const assets = join(OUTPUT, 'public/assets');
 
 /** What a built module imports: `import`/`export … from`, bare `import '…'`, `import('…')` and `require('…')`. */
 const specifiers = (code: string) =>
-  Arr.map(
+  pipe(
     [
       ...Str.matchAll(/^\s*(?:import|export)\b[^'"`;]*?\bfrom\s*["']([^"']+)["']/gm)(code),
       ...Str.matchAll(/^\s*import\s*["']([^"']+)["']/gm)(code),
       ...Str.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g)(code),
       ...Str.matchAll(/\brequire\(\s*["']([^"']+)["']\s*\)/g)(code),
     ],
-    (m) => m[1] as string,
+    Arr.map((m) => m[1] as string),
+    // `import … from '${lib}'` inside a template literal: code shown to the user (the Hugging Face snippets that
+    // `@huggingface/gguf` brings), not an import.
+    Arr.filter((spec) => !Str.includes('${')(spec)),
   );
 
 const dir = tempDir('lw-build-');

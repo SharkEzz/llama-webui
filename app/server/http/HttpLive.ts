@@ -11,6 +11,7 @@ import { AppInfo } from '../config/AppInfo.ts';
 import { FlagsHandlers } from '../flags/http.ts';
 import { HealthHandlers } from '../health/http.ts';
 import { LogsHandlers } from '../logs/http.ts';
+import { ModelsHandlers } from '../models/http.ts';
 import { MonitorHandlers } from '../monitor/http.ts';
 import { ProfilesHandlers } from '../profiles/http.ts';
 import { SettingsHandlers } from '../settings/http.ts';
@@ -46,6 +47,7 @@ export const ApiRoutes = Layer.merge(
         ServerHandlers,
         MonitorHandlers,
         ChatHandlers,
+        ModelsHandlers,
       ).pipe(Layer.provideMerge(RequestErrorsLive)),
     ),
   ),

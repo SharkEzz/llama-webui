@@ -3,6 +3,7 @@ import { ChatApi } from './ChatApi.ts';
 import { FlagsApi } from './FlagsApi.ts';
 import { HealthApi } from './HealthApi.ts';
 import { LogsApi } from './LogsApi.ts';
+import { ModelsApi } from './ModelsApi.ts';
 import { MonitorApi } from './MonitorApi.ts';
 import { ProfilesApi } from './ProfilesApi.ts';
 import { RequestErrors } from './RequestErrors.ts';
@@ -24,5 +25,6 @@ export class Api extends HttpApi.make('llama-webui')
   .add(ServerApi)
   .add(MonitorApi)
   .add(ChatApi)
+  .add(ModelsApi)
   .annotate(HttpApi.PayloadParseOptions, { onExcessProperty: 'error', errors: 'all' })
   .middleware(RequestErrors) {}

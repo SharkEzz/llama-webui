@@ -72,12 +72,23 @@ export interface Binaries {
   missing: string;
 }
 
+/** The models folder of the run: the default setting (`~/models`), under the run's home. */
+export interface ModelFiles {
+  /** `<home>/models/m.gguf`: a small GGUF, the folder's one model. */
+  model: string;
+  /** A GGUF path in the run's temporary folder where nothing is. */
+  noModel: string;
+}
+
+/** What the cases name on the disk of the run. */
+export type Fixtures = Binaries & ModelFiles;
+
 /**
  * Every HTTP case, in run order: reads first (llama-server's commands among them), then what changes the settings, then the profiles, then the flag
  * catalogue of a fake llama-server and of one that is not there (so the reply does not depend on the machine's
- * `PATH`), then the chat. `asset` is the path of a hashed file of the build (`ASSET`).
+ * `PATH`), then the chat, then the models folder. `asset` is the path of a hashed file of the build (`ASSET`).
  */
-export function cases(ctx: { asset: string } & Binaries): Case[] {
+export function cases(ctx: { asset: string } & Fixtures): Case[] {
   const out: Case[] = [];
   const add = (kind: CaseKind, name: string, req: WireRequest, flags: { headOnly?: true; machine?: true } = {}) =>
     out.push({ kind, name, req, ...flags });
@@ -235,6 +246,31 @@ export function cases(ctx: { asset: string } & Binaries): Case[] {
   add('refusal', 'DELETE /api/chat/999 (no such conversation)', bare('DELETE', '/api/chat/999'));
   add('read', 'GET /api/chat (after the writes)', bare('GET', '/api/chat'));
 
+  // The models folder holds one GGUF (`ctx.model`); a profile that opens it, then its usage. Nothing is deleted.
+  const query = (path: string) => encodeURIComponent(path);
+  add('read', 'GET /api/models', bare('GET', '/api/models'));
+  add('read', 'GET /api/models/info', bare('GET', `/api/models/info?path=${query(ctx.model)}`));
+  add('violation', 'GET /api/models/info (relative path)', bare('GET', '/api/models/info?path=rel.gguf'));
+  add('refusal', 'GET /api/models/info (no such file)', bare('GET', `/api/models/info?path=${query(ctx.noModel)}`));
+  add(
+    'write',
+    'POST /api/profiles (opens the model)',
+    json('POST', '/api/profiles', '{"name":"Gamma","cwd":"~/models","model":"m.gguf"}'),
+  );
+  add('read', 'GET /api/models/usage', bare('GET', `/api/models/usage?path=${query(ctx.model)}`));
+  add('violation', 'GET /api/models/usage (no path)', bare('GET', '/api/models/usage'));
+  add(
+    'refusal',
+    'GET /api/models/usage (not a model of the folder)',
+    bare('GET', `/api/models/usage?path=${query(ctx.noModel)}`),
+  );
+  add('violation', 'DELETE /api/models (empty path)', json('DELETE', '/api/models', '{"path":""}'));
+  add(
+    'refusal',
+    'DELETE /api/models (not a model of the folder)',
+    json('DELETE', '/api/models', JSON.stringify({ path: ctx.noModel })),
+  );
+
   const names = new Set<string>();
   for (const c of out) {
     if (names.has(c.name)) throw new Error(`duplicate contract case: ${c.name}`);
@@ -341,10 +377,10 @@ export async function assetOf(base: string): Promise<string> {
 export async function runContract(
   base: string,
   ctx: NormalizeCtx,
-  binaries: Binaries,
+  fixtures: Fixtures,
 ): Promise<Record<string, Outcome>> {
   const out: Record<string, Outcome> = {};
-  for (const c of cases({ asset: await assetOf(base), ...binaries }))
+  for (const c of cases({ asset: await assetOf(base), ...fixtures }))
     out[c.name] = record(await request(base, c.req), ctx, c);
   return out;
 }

@@ -11,6 +11,9 @@ import { PciIds } from './hardware/PciIds.ts';
 import { HttpLive } from './http/HttpLive.ts';
 import { LlamaHttp } from './llama/LlamaHttp.ts';
 import { LogRing } from './logs/LogRing.ts';
+import { ActiveWrites } from './models/ActiveWrites.ts';
+import { GgufReader } from './models/GgufReader.ts';
+import { ModelCacheRepo } from './models/ModelCacheRepo.ts';
 import { Monitor } from './monitor/Monitor.ts';
 import { Placement } from './monitor/Placement.ts';
 import { ProfilesRepo } from './profiles/ProfilesRepo.ts';
@@ -25,14 +28,26 @@ import { WsHub } from './ws/WsHub.ts';
  * is opened (and brought up to date) first. The watch of a server started by hand is built last and undone first: no
  * look runs while the rest stops. The monitor, the placement and the chat's replies are under it: they end, the
  * collectors' programs with the monitor and the replies saved, before the supervisor stops llama-server, while the
- * ring and the hub it writes to are still up. Later tasks add theirs, each on `Shutdown.layer`.
+ * ring and the hub it writes to are still up. The models are scanned and read on each request (the summaries cached in
+ * the database, the last GGUFs read in memory); no download queue writes a model yet (`ActiveWrites.layerNone`). Later
+ * tasks add theirs, each on `Shutdown.layer`.
  */
 const Services = ExternalWatch.layer.pipe(
   Layer.provideMerge(Layer.mergeAll(Monitor.layer, Placement.layer, ChatRuns.layer)),
   Layer.provideMerge(Supervisor.layer),
   Layer.provideMerge(Flags.layer),
   Layer.provideMerge(Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer)),
-  Layer.provideMerge(Layer.mergeAll(WsHub.layer, SettingsRepo.layer, ProfilesRepo.layer, ConversationsRepo.layer)),
+  Layer.provideMerge(
+    Layer.mergeAll(
+      WsHub.layer,
+      SettingsRepo.layer,
+      ProfilesRepo.layer,
+      ConversationsRepo.layer,
+      ModelCacheRepo.layer,
+      GgufReader.layer,
+      ActiveWrites.layerNone,
+    ),
+  ),
   Layer.provideMerge(AppInfo.layer),
   Layer.provideMerge(Db.layer),
 );
