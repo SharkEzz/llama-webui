@@ -4,6 +4,9 @@ import { SecureRandom } from 'effect/crypto';
 /** Replaced by the build (`build/server.ts`) with the version it built; absent when the server runs from source. */
 declare const LLAMA_WEBUI_VERSION: string | undefined;
 
+/** `dev` from source; at build, `git describe --tags --always --dirty`, else the version of package.json. */
+export const VERSION = typeof LLAMA_WEBUI_VERSION === 'string' ? LLAMA_WEBUI_VERSION : 'dev';
+
 /** What this process is: read by `/api/health` and the hello of `/ws`. */
 export class AppInfo extends Context.Service<
   AppInfo,
@@ -22,7 +25,7 @@ export class AppInfo extends Context.Service<
       const startedAt = yield* Clock.currentTimeMillis;
       const bootId = yield* SecureRandom.SecureRandom.use((random) => random.uuidV4());
       return {
-        version: typeof LLAMA_WEBUI_VERSION === 'string' ? LLAMA_WEBUI_VERSION : 'dev',
+        version: VERSION,
         bootId,
         uptimeMs: Effect.map(Clock.currentTimeMillis, (now) => now - startedAt),
       };

@@ -27,12 +27,19 @@ export interface Launched extends AsyncDisposable {
   stderr(): string;
 }
 
+/** The environment of the test run, as a user's: Vitest's `TEST`, a CI's `CI`, `NODE_ENV` (Vitest sets `test`) and
+ * `LLAMA_WEBUI_DEV` left out, users never set them; `extra` on top. */
+export function userEnv(extra: Record<string, string> = {}): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env, ...extra };
+  for (const k of ['CI', 'TEST', 'NODE_ENV', 'LLAMA_WEBUI_DEV']) delete env[k];
+  return env;
+}
+
 /**
  * The production build in its own process, as a user starts it, on 127.0.0.1, a free port (or `port`) and `dataDir`,
- * from the data dir (no `.env` of the repository around). The address and the data dir go through `LLAMA_WEBUI_HOST`,
- * `LLAMA_WEBUI_PORT` and `LLAMA_WEBUI_DATA_DIR` until the launcher reads flags (E1, Task 4). Vitest's `TEST`, a CI's
- * `CI` and `NODE_ENV` (Vitest sets `test`) are left out: users never set them. `launcher` starts another copy of the
- * build. Resolves once `/api/health` answers; disposing sends SIGTERM and awaits the exit.
+ * from the data dir (no `.env` of the repository around): `--host`, `--port` and `--data-dir`, which win over any
+ * `LLAMA_WEBUI_*` variable of the environment. `env` is added to the user's environment (`userEnv`). `launcher` starts
+ * another copy of the build. Resolves once `/api/health` answers; disposing sends SIGTERM and awaits the exit.
  */
 export async function launch(opts: {
   dataDir: string;
@@ -41,17 +48,10 @@ export async function launch(opts: {
   launcher?: string;
 }): Promise<Launched> {
   const port = opts.port ?? (await freePort());
-  const env: Record<string, string | undefined> = {
-    ...process.env,
-    LLAMA_WEBUI_HOST: '127.0.0.1',
-    LLAMA_WEBUI_PORT: String(port),
-    LLAMA_WEBUI_DATA_DIR: opts.dataDir,
-    ...opts.env,
-  };
-  for (const k of ['CI', 'TEST', 'NODE_ENV', 'LLAMA_WEBUI_DEV']) delete env[k];
-  const proc = spawn(process.execPath, [opts.launcher ?? LAUNCHER], {
+  const args = ['--host', '127.0.0.1', '--port', String(port), '--data-dir', opts.dataDir];
+  const proc = spawn(process.execPath, [opts.launcher ?? LAUNCHER, ...args], {
     cwd: opts.dataDir,
-    env,
+    env: userEnv(opts.env),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stdout = '';
