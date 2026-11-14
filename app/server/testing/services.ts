@@ -4,6 +4,7 @@ import { ChatRuns } from '../chat/ChatRuns.ts';
 import { ConversationsRepo } from '../chat/ConversationsRepo.ts';
 import { AppInfo } from '../config/AppInfo.ts';
 import * as Db from '../db/Db.ts';
+import { DownloadsRepo } from '../downloads/DownloadsRepo.ts';
 import { Flags } from '../flags/Flags.ts';
 import { PciIds } from '../hardware/PciIds.ts';
 import { HfClient } from '../hf/HfClient.ts';
@@ -28,7 +29,8 @@ import { WsHub } from '../ws/WsHub.ts';
  * the server's routes do. The monitor is the stub (no program, no tick); the placement follows the supervisor. The
  * supervisor polls `/health` every 50 ms, and sends SIGKILL 1 s after SIGTERM. The chat's replies are `ChatRuns.layer`'s:
  * building it marks every reply left `streaming` in the database `stopped` (`stopOrphans`) and registers the shutdown
- * step of the replies (saved `stopped` when `Shutdown.run` runs). No download writes a model (`ActiveWrites.layerNone`).
+ * step of the replies (saved `stopped` when `Shutdown.run` runs). The downloads that write a model are the
+ * queued and running rows of the `downloads` table (`ActiveWrites.layer`, on `DownloadsRepo.layer`).
  * The Hub's client reads `HF_ENDPOINT` and the token from the configuration it is built with: a test sets them (a fake
  * Hub, no token of the user's).
  */
@@ -46,7 +48,7 @@ export const ServicesTest = Layer.mergeAll(Monitor.layerStub, Placement.layer, C
       ConversationsRepo.layer,
       ModelCacheRepo.layer,
       GgufReader.layer,
-      ActiveWrites.layerNone,
+      ActiveWrites.layer.pipe(Layer.provideMerge(DownloadsRepo.layer)),
       RequestErrorsLive,
     ),
   ),

@@ -6,6 +6,7 @@ import { ConversationsRepo } from './chat/ConversationsRepo.ts';
 import { AppConfig } from './config/AppConfig.ts';
 import { AppInfo } from './config/AppInfo.ts';
 import * as Db from './db/Db.ts';
+import { DownloadsRepo } from './downloads/DownloadsRepo.ts';
 import { Flags } from './flags/Flags.ts';
 import { PciIds } from './hardware/PciIds.ts';
 import { HfClient } from './hf/HfClient.ts';
@@ -32,8 +33,9 @@ import { WsHub } from './ws/WsHub.ts';
  * collectors' programs with the monitor and the replies saved, before the supervisor stops llama-server, while the
  * ring and the hub it writes to are still up. The models are scanned and read on each request (the summaries cached in
  * the database, the last GGUFs read in memory); the Hub is reached through its own client (`HfClient` on `HfHttp`,
- * beside `LlamaHttp`); no download queue writes a model yet (`ActiveWrites.layerNone`). Later tasks add theirs, each on
- * `Shutdown.layer`.
+ * beside `LlamaHttp`); the downloads a model
+ * must not be deleted under are the queued and running rows of the `downloads` table (`ActiveWrites.layer`). Later
+ * tasks add theirs, each on `Shutdown.layer`.
  */
 const Services = ExternalWatch.layer.pipe(
   Layer.provideMerge(Layer.mergeAll(Monitor.layer, Placement.layer, ChatRuns.layer)),
@@ -50,7 +52,7 @@ const Services = ExternalWatch.layer.pipe(
       ConversationsRepo.layer,
       ModelCacheRepo.layer,
       GgufReader.layer,
-      ActiveWrites.layerNone,
+      ActiveWrites.layer.pipe(Layer.provideMerge(DownloadsRepo.layer)),
     ),
   ),
   Layer.provideMerge(AppInfo.layer),

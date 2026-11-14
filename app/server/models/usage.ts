@@ -118,6 +118,30 @@ const foldersUnder = (paths: Path.Path, root: string, files: ReadonlyArray<strin
 };
 
 /**
+ * Removes the folders between each of `files` (gone by now) and `root` that are left empty, deepest first: shard
+ * subfolders, a repository's, its organization's. A folder that still holds something (or can no longer be read) is
+ * kept; `root` (the models folder) never goes.
+ */
+export const removeEmptyFolders = Effect.fn('models.removeEmptyFolders')(function* (
+  root: string,
+  files: ReadonlyArray<string>,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const paths = yield* Path.Path;
+  yield* Effect.forEach(
+    foldersUnder(paths, root, files),
+    (dir) =>
+      fs.readDirectory(dir).pipe(
+        Effect.flatMap((names) =>
+          Arr.isReadonlyArrayEmpty(names) ? fs.remove(dir, { recursive: true }) : Effect.void,
+        ),
+        Effect.ignore,
+      ),
+    { discard: true },
+  );
+});
+
+/**
  * Deletes a model the scan found: refused (409) while it is used (`blocked`); then its files (a link: the link only),
  * then the folders left empty up to `root`, then, with `deleteProfiles`, the profiles that open it (and the default
  * profile setting when it named one of them). A file that cannot be removed is a defect (500): the profiles are kept,
@@ -134,23 +158,11 @@ export const deleteModel = Effect.fn('models.deleteModel')(function* (options: {
 > {
   const { entry, root, deleteProfiles } = options;
   const fs = yield* FileSystem.FileSystem;
-  const paths = yield* Path.Path;
   const usage = yield* modelUsage(entry);
   if (usage.blocked !== null) return yield* ModelInUse.make({ message: usage.blocked });
 
   yield* Effect.forEach(entry.files, (file) => Effect.orDie(fs.remove(file, { force: true })), { discard: true });
-  // A folder that still holds something (or can no longer be read) is kept.
-  yield* Effect.forEach(
-    foldersUnder(paths, root, entry.files),
-    (dir) =>
-      fs.readDirectory(dir).pipe(
-        Effect.flatMap((names) =>
-          Arr.isReadonlyArrayEmpty(names) ? fs.remove(dir, { recursive: true }) : Effect.void,
-        ),
-        Effect.ignore,
-      ),
-    { discard: true },
-  );
+  yield* removeEmptyFolders(root, entry.files);
 
   const ids = deleteProfiles ? Arr.map(usage.profiles, (profile) => profile.id) : [];
   // A profile deleted meanwhile is gone all the same.
