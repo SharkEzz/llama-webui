@@ -33,7 +33,13 @@ const violations = Effect.gen(function* () {
  * parent deletes its rows first, and `ON DELETE SET NULL` would empty every link to it. A violation already there (an
  * old database) is not the rebuild's: only new ones abort it.
  */
-const rebuild = (version: number, sqls: ReadonlyArray<string>): Migration =>
+export const rebuild = ({
+  version,
+  sqls,
+}: {
+  readonly version: number;
+  readonly sqls: ReadonlyArray<string>;
+}): Migration =>
   Effect.gen(function* () {
     const before = yield* violations;
     yield* statements(...sqls);
@@ -183,8 +189,10 @@ export const MIGRATIONS: Record<string, Migration> = {
   );`),
   // profiles rebuilt with AUTOINCREMENT, ids kept: a deleted profile's id is never given to a new one, so a run, a
   // sweep, a conversation or the last started profile never points to another profile.
-  '0017_profiles_autoincrement': rebuild(17, [
-    `CREATE TABLE profiles_v2(
+  '0017_profiles_autoincrement': rebuild({
+    version: 17,
+    sqls: [
+      `CREATE TABLE profiles_v2(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
         model_path TEXT NOT NULL,
@@ -198,8 +206,9 @@ export const MIGRATIONS: Record<string, Migration> = {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );`,
-    `INSERT INTO profiles_v2(id, name, model_path, mmproj_path, cwd, host, port, args_json, env_json, source, created_at, updated_at) SELECT id, name, model_path, mmproj_path, cwd, host, port, args_json, env_json, source, created_at, updated_at FROM profiles;`,
-    `DROP TABLE profiles;`,
-    `ALTER TABLE profiles_v2 RENAME TO profiles;`,
-  ]),
+      `INSERT INTO profiles_v2(id, name, model_path, mmproj_path, cwd, host, port, args_json, env_json, source, created_at, updated_at) SELECT id, name, model_path, mmproj_path, cwd, host, port, args_json, env_json, source, created_at, updated_at FROM profiles;`,
+      `DROP TABLE profiles;`,
+      `ALTER TABLE profiles_v2 RENAME TO profiles;`,
+    ],
+  }),
 };

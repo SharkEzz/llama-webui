@@ -52,7 +52,7 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 ## SQL
 
 - Through `SqlClient` (`@effect/sql-sqlite-node`), opened by `app/server/db/Db.ts`; migrations in
-  `app/server/db/migrations.ts`, one record entry each, a table rebuild through `rebuild()`.
+  `app/server/db/migrations.ts`, one record entry each, a table rebuild through `rebuild({ version, sqls })`.
 - `node:sqlite` binds a JS number as REAL unless it is integral and the column is INTEGER: a number fed to a JSON
   function or an untyped column is written `CAST(? AS INTEGER)` in the SQL. The client is not wrapped to change this.
 - A failed statement is a `SqlError` whose `reason` says what failed: `reason._tag === 'ConstraintError'` for a

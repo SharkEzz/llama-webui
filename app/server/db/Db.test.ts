@@ -5,6 +5,7 @@ import { Context, Effect, FileSystem, Layer, Path } from 'effect';
 import { SqlClient } from 'effect/sql';
 import { AppConfig } from '../config/AppConfig.ts';
 import * as Db from './Db.ts';
+import { rebuild } from './migrations.ts';
 
 /** A copy of a fixture of `fixtures/` in a temporary folder (never the fixture itself), or a new file's path. */
 const tempFile = Effect.fn('tempFile')(function* (fixture?: string) {
@@ -184,6 +185,33 @@ layer(NodeServices.layer)('Db', (it) => {
           yield* sql`INSERT INTO t(n, b, u) VALUES (${3}, ${true}, ${3})`;
           const types = yield* sql`SELECT typeof(n) n, typeof(b) b, typeof(u) u, b AS v FROM t`;
           assert.deepStrictEqual(types, [{ n: 'integer', b: 'integer', u: 'real', v: 1 }]);
+        }),
+      );
+    }),
+  );
+
+  it.effect('a table rebuild that breaks a link fails and is rolled back; a link already broken is not its fault', () =>
+    Effect.gen(function* () {
+      const file = yield* tempFile();
+      yield* withRaw(file, (sql) =>
+        Effect.gen(function* () {
+          const run = (version: number, sqls: ReadonlyArray<string>) =>
+            sql.withTransaction(rebuild({ version, sqls })).pipe(Effect.provideService(SqlClient.SqlClient, sql));
+          // As `Db` sets them around the migrator.
+          yield* sql`PRAGMA foreign_keys = OFF`;
+          yield* sql`CREATE TABLE parent(id INTEGER PRIMARY KEY)`;
+          yield* sql`CREATE TABLE child(id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))`;
+          yield* sql`INSERT INTO parent(id) VALUES (1)`;
+          // Child 2 points to no row before any rebuild.
+          yield* sql`INSERT INTO child(id, parent_id) VALUES (1, 1), (2, 99)`;
+
+          yield* run(1, ['UPDATE child SET parent_id = 1 WHERE id = 1']);
+
+          const error = yield* run(2, ['DELETE FROM parent']).pipe(Effect.flip);
+          assert.strictEqual(error._tag, 'BrokenForeignKeys');
+          assert.strictEqual(error.message, 'migration 2: broken foreign keys (child:1:0)');
+          const parents = yield* sql`SELECT id FROM parent`;
+          assert.deepStrictEqual(parents, [{ id: 1 }]);
         }),
       );
     }),
