@@ -100,6 +100,18 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('streamChat', (it) => {
     }),
   );
 
+  it.effect('a chunk whose timings do not decode keeps its delta', () =>
+    Effect.gen(function* () {
+      const stub = yield* httpStub((_req, res) => {
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        res.write('data: {"choices":[{"delta":{"content":"end"}}],"timings":{"prompt_n":3}}\n\n');
+        res.write('data: [DONE]\n\n');
+      });
+      const chunks = yield* streamChat(stub.url, {}).pipe(Stream.runCollect);
+      assert.deepStrictEqual(chunks, [{ choices: [{ delta: { content: 'end' } }] }]);
+    }),
+  );
+
   it.effect('a stream error event is LlamaStreamFailed', () =>
     Effect.gen(function* () {
       const stub = yield* httpStub((_req, res) => {

@@ -42,7 +42,10 @@ export class LlamaUnreachable extends Schema.TaggedError<
 /** How a streamed reply from llama-server fails. */
 export type ChatStreamFailure = LlamaHttpFailed | LlamaStreamFailed | LlamaStreamCut | LlamaUnreachable;
 
-/** One chunk of `/v1/chat/completions` as far as the chat reads it: the first choice's delta and the timings. */
+/**
+ * One chunk of `/v1/chat/completions` as far as the chat reads it: the first choice's delta and the timings (absent
+ * when they do not decode).
+ */
 export const ChatChunk = Schema.Struct({
   choices: Schema.optionalKey(
     Schema.Array(
@@ -56,7 +59,8 @@ export const ChatChunk = Schema.Struct({
       }),
     ),
   ),
-  timings: Schema.optionalKey(LlamaTimingsSchema),
+  // Timings that do not decode are dropped alone: the chunk keeps its delta.
+  timings: Schema.optionalKey(LlamaTimingsSchema.pipe(Schema.catchDecoding(() => Effect.succeedNone))),
 });
 export type ChatChunk = typeof ChatChunk.Type;
 
@@ -103,6 +107,7 @@ const chunksOf = <E>(
 /** The message of a request that never got its answer: the cause's (`connect ECONNREFUSED …`), else the client's. */
 const unreachable = (error: HttpClientError.HttpClientError): LlamaUnreachable => {
   const cause = error.reason.cause;
+  // A deliberate change: the Nitro server's `llamaFetch` rejected with `fetch failed`, which named no reason.
   return LlamaUnreachable.make({
     message:
       Predicate.hasProperty(cause, 'message') && Predicate.isString(cause.message) ? cause.message : error.message,
@@ -115,7 +120,8 @@ const isOk = (status: number) => status >= 200 && status < 300;
  * One streamed `POST <baseUrl>/v1/chat/completions` with `body` as its JSON, through `LlamaHttp`: its chunks until
  * `[DONE]`. The request belongs to the stream: ending or interrupting the stream aborts it. An error status is
  * `LlamaHttpFailed`, an error event `LlamaStreamFailed`, a body that ends or breaks before `[DONE]` `LlamaStreamCut`,
- * and a request that never got its answer `LlamaUnreachable`.
+ * and a request that never got its answer `LlamaUnreachable`. `body` is sent as it is: it must ask for a stream
+ * (`stream: true`, as `buildChatRequest` of `chat/request.ts` builds it).
  */
 export const streamChat: {
   (body: unknown): (baseUrl: string) => Stream.Stream<ChatChunk, ChatStreamFailure, LlamaHttp>;
