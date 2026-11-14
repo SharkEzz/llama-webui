@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatBytes, plural } from '@/lib/format';
-import { deleteModel, modelUsage, useModels } from '@/lib/models';
+import { useModels } from '@/lib/models';
 import { useProfiles } from '@/lib/profiles';
 import { stem } from '@/lib/stem';
 
@@ -33,18 +33,21 @@ export function DeleteModelPopover({ path, onDeleted }: { path: string; onDelete
     if (!o) return;
     setUsage(null);
     setError(null);
-    modelUsage(path).then(setUsage, (e: Error) => setError(e.message));
+    useModels
+      .getState()
+      .usage(path)
+      .then(setUsage, (e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   };
 
   const run = async (deleteProfiles: boolean) => {
     setBusy(true);
     try {
-      const r = await deleteModel(path, deleteProfiles);
+      // The store rescans the folder once the model is gone; the profiles are read again here.
+      const r = await useModels.getState().deleteModel(path, deleteProfiles);
       const n = r.deletedProfiles.length;
       toast.success(n > 0 ? `Model and ${n} ${plural(n, 'profile')} deleted` : 'Model deleted');
       setOpen(false);
       onDeleted();
-      void useModels.getState().refresh();
       void useProfiles.getState().reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));

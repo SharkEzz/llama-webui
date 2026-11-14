@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Facts } from '@/features/system/Facts';
-import { api } from '@/lib/api';
+import { call } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatBytes, formatInt, formatParams } from '@/lib/format';
 import { DeleteModelPopover } from './DeleteModelPopover';
@@ -32,14 +32,12 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
     setDetail(null);
     setError(null);
     if (!path) return;
-    let live = true;
-    api('GET /api/models/info', { query: { path } }).then(
-      (d) => live && setDetail(d),
-      (e: Error) => live && setError(e.message),
+    const ac = new AbortController();
+    call((api) => api.models.info({ query: { path } }), { signal: ac.signal }).then(
+      (d) => !ac.signal.aborted && setDetail(d),
+      (e: unknown) => !ac.signal.aborted && setError(e instanceof Error ? e.message : String(e)),
     );
-    return () => {
-      live = false;
-    };
+    return () => ac.abort();
   }, [path]);
 
   const w = detail?.weights;

@@ -5,7 +5,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getHfStatus, searchHf } from '@/lib/downloads';
+import { useDownloads } from '@/lib/downloads';
 import { fmt, formatInt } from '@/lib/format';
 import { QueueList } from './QueueList';
 import { RepoView } from './RepoView';
@@ -48,18 +48,21 @@ function TokenLine({ status }: { status: HfStatus | null }) {
 
 /** Search results for `q`; mount with `key={q}` (no hits or error of the previous text under the new one). */
 function SearchResults({ q, onPick }: { q: string; onPick(id: string): void }) {
-  const [hits, setHits] = useState<HfSearchHit[] | null>(null);
+  const [hits, setHits] = useState<ReadonlyArray<HfSearchHit> | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const ac = new AbortController();
     const t = setTimeout(() => {
-      searchHf(q, ac.signal).then(
-        (h) => {
-          setHits(h);
-          setError(null);
-        },
-        (e: unknown) => !ac.signal.aborted && setError(e instanceof Error ? e.message : String(e)),
-      );
+      useDownloads
+        .getState()
+        .search(q, ac.signal)
+        .then(
+          (h) => {
+            setHits(h);
+            setError(null);
+          },
+          (e: unknown) => !ac.signal.aborted && setError(e instanceof Error ? e.message : String(e)),
+        );
     }, DEBOUNCE_MS);
     return () => {
       clearTimeout(t);
@@ -114,10 +117,13 @@ export function DownloadSheet({
   useEffect(() => {
     if (!open) return;
     let live = true;
-    getHfStatus().then(
-      (s) => live && setStatus(s),
-      () => {},
-    );
+    useDownloads
+      .getState()
+      .status()
+      .then(
+        (s) => live && setStatus(s),
+        () => {},
+      );
     return () => {
       live = false;
     };

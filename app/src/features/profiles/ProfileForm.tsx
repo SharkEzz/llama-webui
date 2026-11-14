@@ -1,4 +1,12 @@
-import { DEFAULT_SETTINGS, defer, type Profile, reservedFlag, type Settings } from '@llama-webui/shared';
+import {
+  DEFAULT_SETTINGS,
+  defer,
+  type ModelKind,
+  type Profile,
+  profileModelPath,
+  reservedFlag,
+  type Settings,
+} from '@llama-webui/shared';
 import { Copy, Download, Play, Save, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -6,7 +14,10 @@ import { CodeTextarea } from '@/components/CodeTextarea';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
+import { ModelPicker } from '@/features/models/ModelPicker';
+import { useModels } from '@/lib/models';
 import { createProfile, deleteProfile, duplicateProfile, type NewProfile, updateProfile } from '@/lib/profiles';
 import { isRunning, restartServer, startProfile, useServer } from '@/lib/server';
 import { ArgsEditor } from './ArgsEditor';
@@ -26,6 +37,7 @@ interface ProfileFormProps {
 
 export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: ProfileFormProps) {
   const [draft, setDraft] = useState(() => draftOf(profile, initial));
+  const models = useModels((s) => s.list);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
   const [restartAsk, setRestartAsk] = useState(false);
@@ -73,6 +85,34 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
     }
   };
 
+  /** File chosen in the picker: fills the working directory if empty, relative path when possible. */
+  const pick = (k: 'model' | 'mmproj') => (abs: string) => {
+    const modelsDir = models?.setting ?? settings?.modelsDir ?? DEFAULT_SETTINGS.modelsDir;
+    const { cwd, model } = profileModelPath(abs, { cwd: draft.cwd, modelsDir, home: models?.home ?? '' });
+    setDraft((d) => ({ ...d, cwd: cwd ?? d.cwd, [k]: model }));
+  };
+
+  const fileField = (k: 'model' | 'mmproj', kind: ModelKind, label: string, placeholder: string) => (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={`pf-${k}`}>{label}</Label>
+      <InputGroup>
+        <InputGroupInput
+          id={`pf-${k}`}
+          value={draft[k]}
+          onChange={set(k)}
+          placeholder={placeholder}
+          aria-invalid={!!errors[k]}
+          className="font-mono text-xs"
+          spellCheck={false}
+        />
+        <InputGroupAddon align="inline-end">
+          <ModelPicker kind={kind} onSelect={pick(k)} />
+        </InputGroupAddon>
+      </InputGroup>
+      {errors[k] && <p className="text-sm text-destructive">{errors[k]}</p>}
+    </div>
+  );
+
   const field = (k: keyof Draft, label: string, opts: { placeholder?: string; hint?: string; mono?: boolean } = {}) => (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={`pf-${k}`}>{label}</Label>
@@ -108,8 +148,8 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
           hint: 'Relative model paths start from here.',
           mono: true,
         })}
-        {field('model', 'Model (GGUF)', { placeholder: 'Qwen3.8-27B-IQ3_S.gguf', mono: true })}
-        {field('mmproj', 'Multimodal projector', { placeholder: 'optional', mono: true })}
+        {fileField('model', 'model', 'Model (GGUF)', 'Qwen3.8-27B-IQ3_S.gguf')}
+        {fileField('mmproj', 'mmproj', 'Multimodal projector', 'optional')}
         {field('host', 'Host', {
           placeholder: settings?.host ?? DEFAULT_SETTINGS.host,
           hint: 'Empty: value from settings.',

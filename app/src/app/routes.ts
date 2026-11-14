@@ -49,7 +49,6 @@ export function navGroups<R extends { group: string }>(routes: readonly R[]): R[
 /** The milestone of the Effect server rewrite that brings each page back; until then, it shows a waiting page. */
 export const MILESTONE_BY_PATH: Record<string, string> = {
   '/': 'E8',
-  '/models': 'E6',
   '/bench': 'E7',
   '/tuning': 'E8',
 };
