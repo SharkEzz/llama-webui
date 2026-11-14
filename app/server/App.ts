@@ -1,6 +1,8 @@
 import { NodeSocket } from '@effect/platform-node';
 import { Effect, Layer, Schema, String as Str } from 'effect';
 import { DevTools } from 'effect/devtools';
+import { ChatRuns } from './chat/ChatRuns.ts';
+import { ConversationsRepo } from './chat/ConversationsRepo.ts';
 import { AppConfig } from './config/AppConfig.ts';
 import { AppInfo } from './config/AppInfo.ts';
 import * as Db from './db/Db.ts';
@@ -21,16 +23,16 @@ import { WsHub } from './ws/WsHub.ts';
 /**
  * The services the routes use, built before the HTTP server opens its port and undone after it closed: the database
  * is opened (and brought up to date) first. The watch of a server started by hand is built last and undone first: no
- * look runs while the rest stops. The monitor and the placement are under it: they end, the collectors' programs
- * with the monitor, before the supervisor stops llama-server, while the ring and the hub it writes to are still up.
- * Later tasks add theirs, each on `Shutdown.layer`.
+ * look runs while the rest stops. The monitor, the placement and the chat's replies are under it: they end, the
+ * collectors' programs with the monitor and the replies saved, before the supervisor stops llama-server, while the
+ * ring and the hub it writes to are still up. Later tasks add theirs, each on `Shutdown.layer`.
  */
 const Services = ExternalWatch.layer.pipe(
-  Layer.provideMerge(Layer.merge(Monitor.layer, Placement.layer)),
+  Layer.provideMerge(Layer.mergeAll(Monitor.layer, Placement.layer, ChatRuns.layer)),
   Layer.provideMerge(Supervisor.layer),
   Layer.provideMerge(Flags.layer),
   Layer.provideMerge(Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer)),
-  Layer.provideMerge(Layer.mergeAll(WsHub.layer, SettingsRepo.layer, ProfilesRepo.layer)),
+  Layer.provideMerge(Layer.mergeAll(WsHub.layer, SettingsRepo.layer, ProfilesRepo.layer, ConversationsRepo.layer)),
   Layer.provideMerge(AppInfo.layer),
   Layer.provideMerge(Db.layer),
 );

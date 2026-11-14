@@ -75,7 +75,7 @@ export interface Binaries {
 /**
  * Every HTTP case, in run order: reads first (llama-server's commands among them), then what changes the settings, then the profiles, then the flag
  * catalogue of a fake llama-server and of one that is not there (so the reply does not depend on the machine's
- * `PATH`). `asset` is the path of a hashed file of the build (`ASSET`).
+ * `PATH`), then the chat. `asset` is the path of a hashed file of the build (`ASSET`).
  */
 export function cases(ctx: { asset: string } & Binaries): Case[] {
   const out: Case[] = [];
@@ -182,6 +182,58 @@ export function cases(ctx: { asset: string } & Binaries): Case[] {
   add('read', 'GET /api/flags', bare('GET', '/api/flags'));
   add('write', 'PATCH /api/settings (binary: a program that is not there)', binary(ctx.missing));
   add('refusal', 'GET /api/flags (--help fails)', bare('GET', '/api/flags'));
+
+  // The chat: no llama-server runs (a reply is refused before any is asked for). Conversations 1 (no profile: none
+  // runs) and 2 (on profile 1), then 2 deleted.
+  add('read', 'GET /api/chat (none yet)', bare('GET', '/api/chat'));
+  add('write', 'POST /api/chat (no profile: none runs)', json('POST', '/api/chat', '{}'));
+  add('write', 'POST /api/chat (profile 1)', json('POST', '/api/chat', '{"profileId":1}'));
+  add('violation', 'POST /api/chat (profileId a string)', json('POST', '/api/chat', '{"profileId":"1"}'));
+  add('body', 'POST /api/chat (malformed JSON)', json('POST', '/api/chat', '{'));
+  add('refusal', 'POST /api/chat (no such profile)', json('POST', '/api/chat', '{"profileId":999}'));
+  add('read', 'GET /api/chat/1', bare('GET', '/api/chat/1'));
+  add('refusal', 'GET /api/chat/999 (no such conversation)', bare('GET', '/api/chat/999'));
+  add(
+    'write',
+    'PATCH /api/chat/1',
+    json(
+      'PATCH',
+      '/api/chat/1',
+      '{"title":"  Renamed  ","systemPrompt":"Be brief.","sampling":{"temperature":0.5},"thinking":false}',
+    ),
+  );
+  add('violation', 'PATCH /api/chat/1 (unknown key)', json('PATCH', '/api/chat/1', '{"nope":1}'));
+  add('violation', 'PATCH /api/chat/1 (title a number)', json('PATCH', '/api/chat/1', '{"title":5}'));
+  add('refusal', 'PATCH /api/chat/999 (no such conversation)', json('PATCH', '/api/chat/999', '{"title":"x"}'));
+  add('read', 'GET /api/chat/1/stream (no reply in progress)', bare('GET', '/api/chat/1/stream'));
+  add('refusal', 'GET /api/chat/999/stream (no such conversation)', bare('GET', '/api/chat/999/stream'));
+  add(
+    'refusal',
+    'POST /api/chat/1/messages (llama-server not ready)',
+    json('POST', '/api/chat/1/messages', '{"content":"Hi"}'),
+  );
+  add('refusal', 'POST /api/chat/1/messages (blank)', json('POST', '/api/chat/1/messages', '{"content":"  "}'));
+  add(
+    'violation',
+    'POST /api/chat/1/messages (content a number)',
+    json('POST', '/api/chat/1/messages', '{"content":5}'),
+  );
+  add(
+    'refusal',
+    'POST /api/chat/999/messages (no such conversation)',
+    json('POST', '/api/chat/999/messages', '{"content":"Hi"}'),
+  );
+  add('refusal', 'POST /api/chat/1/regenerate (llama-server not ready)', bare('POST', '/api/chat/1/regenerate'));
+  add('refusal', 'POST /api/chat/999/regenerate (no such conversation)', bare('POST', '/api/chat/999/regenerate'));
+  add('refusal', 'POST /api/chat/1/stop (no reply in progress)', bare('POST', '/api/chat/1/stop'));
+  add(
+    'refusal',
+    'POST /api/chat/999/stop (no such conversation: no reply in progress)',
+    bare('POST', '/api/chat/999/stop'),
+  );
+  add('write', 'DELETE /api/chat/2', bare('DELETE', '/api/chat/2'));
+  add('refusal', 'DELETE /api/chat/999 (no such conversation)', bare('DELETE', '/api/chat/999'));
+  add('read', 'GET /api/chat (after the writes)', bare('GET', '/api/chat'));
 
   const names = new Set<string>();
   for (const c of out) {

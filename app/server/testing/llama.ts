@@ -271,13 +271,13 @@ async function call(base: string, method: string, path: string, body?: unknown):
 
 /**
  * A profile of the fake on a free port, started through the API of the app at `base` (the build, `vite dev`), as the
- * web starts one: the `binary` setting set to the fake, the profile created, then `/api/server/start`. Resolves with
- * llama-server's pid once the state says `ready` (5 s at most).
+ * web starts one: the `binary` setting set to the fake, the profile created (with `env`, the fake's `FAKE_*`
+ * variables), then `/api/server/start`. Resolves with llama-server's pid once the state says `ready` (5 s at most).
  */
-export async function startFakeThrough(base: string): Promise<number> {
+export async function startFakeThrough(base: string, env: Record<string, string> = {}): Promise<number> {
   await call(base, 'PATCH', '/api/settings', { binary: FAKE });
   const port = await freePortAsync();
-  const profile = (await call(base, 'POST', '/api/profiles', { name: `fake ${port}`, model: 'm.gguf', port })) as {
+  const profile = (await call(base, 'POST', '/api/profiles', { name: `fake ${port}`, model: 'm.gguf', port, env })) as {
     id: number;
   };
   await call(base, 'POST', '/api/server/start', { profileId: profile.id });

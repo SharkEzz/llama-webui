@@ -4,8 +4,10 @@ import { copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import type { Readable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { type SseEvent, SseParser } from '@llama-webui/shared';
 import { afterAll, expect, test } from 'vitest';
 import { freePort, LAUNCHER, launch, userEnv } from './testing/launch.ts';
 import { startFakeThrough } from './testing/llama.ts';
@@ -171,6 +173,60 @@ test('SIGTERM with llama-server running stops it and exits 0 in under 2 s', asyn
   await using again = await launch({ dataDir: data });
   const profiles = (await (await fetch(`${again.base}/api/profiles`)).json()) as unknown[];
   expect(profiles).toHaveLength(1);
+}, 30_000);
+
+test('SIGTERM with the UI open and a reply streaming stops in under 2 s, ends the stream with done and saves the reply stopped', async () => {
+  const data = dataDir();
+  await using app = await launch({ dataDir: data });
+  // One chunk, then ten seconds of silence: the reply is still being written when the app stops.
+  const pid = await startFakeThrough(app.base, { FAKE_CHAT_DELAY_MS: '10000' });
+  const client = await openWs(`${app.base.replace('http', 'ws')}/ws`);
+  await client.next();
+  const post = (path: string, body: unknown) =>
+    fetch(`${app.base}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const { id } = (await (await post('/api/chat', {})).json()) as { id: number };
+  const res = await post(`/api/chat/${id}/messages`, { content: 'Hi' });
+  expect(res.status).toBe(200);
+  const reader = res.body?.getReader();
+  if (reader === undefined) throw new Error('the reply has no body');
+  const parser = new SseParser();
+  const decoder = new TextDecoder();
+  const events: SseEvent[] = [];
+  /** Reads until `until` holds for the events read so far, or the stream ends (or breaks). */
+  const readUntil = async (until: () => boolean) => {
+    while (!until()) {
+      const chunk = await reader.read().catch(() => ({ done: true as const, value: undefined }));
+      if (chunk.done) return;
+      events.push(...parser.push(decoder.decode(chunk.value, { stream: true })));
+    }
+  };
+  await readUntil(() => events.some((e) => e.event === 'delta'));
+  const delta = JSON.parse(events.find((e) => e.event === 'delta')?.data ?? '{}') as { reasoning?: string };
+  const t0 = performance.now();
+  app.proc.kill('SIGTERM');
+  await readUntil(() => false);
+  const code = await app.exited;
+  expect(performance.now() - t0).toBeLessThan(2000);
+  expect(code).toBe(0);
+  expect((await client.closed).code).toBe(1001);
+  const last = events.at(-1);
+  expect(last?.event).toBe('done');
+  const done = JSON.parse(last?.data ?? '{}') as { message: { status: string; reasoning: string } };
+  expect(done.message.status).toBe('stopped');
+  expect(done.message.reasoning).toBe(delta.reasoning);
+  const db = new DatabaseSync(join(data, 'llama-webui.sqlite'), { readOnly: true });
+  try {
+    expect(db.prepare("SELECT status, reasoning FROM messages WHERE role = 'assistant'").all()).toEqual([
+      { status: 'stopped', reasoning: delta.reasoning },
+    ]);
+  } finally {
+    db.close();
+  }
+  expect(alive(pid)).toBe(false);
 }, 30_000);
 
 test("SIGTERM with the monitor's programs running leaves none of them", async () => {

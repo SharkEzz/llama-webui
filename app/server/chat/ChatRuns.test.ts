@@ -25,8 +25,8 @@ import { type ChatReply, ChatRuns } from './ChatRuns.ts';
 import { ConversationsRepo } from './ConversationsRepo.ts';
 import type { ChatTarget } from './target.ts';
 
-/** The services, and the conversations on their database. */
-const Base = ConversationsRepo.layer.pipe(Layer.provideMerge(ServicesTest));
+/** The services, the conversations on their database among them; each test builds the replies it tries. */
+const Base = ServicesTest;
 
 const TIMINGS = { prompt_n: 10, prompt_per_second: 200, predicted_n: 3, predicted_per_second: 51.23 };
 const CUT = 'llama-server cut the reply short (stopped or crashed)';

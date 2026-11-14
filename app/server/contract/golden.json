@@ -750,5 +750,322 @@
       "_tag": "FlagsUnavailable",
       "message": "llama-server --help failed (<tmp>/no-such-llama-server)"
     }
+  },
+  "GET /api/chat (none yet)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": []
+  },
+  "POST /api/chat (no profile: none runs)": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "title": "New conversation",
+      "profileId": null,
+      "modelPath": null,
+      "systemPrompt": "",
+      "sampling": {},
+      "thinking": true,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "POST /api/chat (profile 1)": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 2,
+      "title": "New conversation",
+      "profileId": 1,
+      "modelPath": "/models/a.gguf",
+      "systemPrompt": "",
+      "sampling": {},
+      "thinking": true,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "POST /api/chat (profileId a string)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected number | null (profileId)",
+      "issues": [
+        {
+          "path": [
+            "profileId"
+          ],
+          "message": "Expected number | null"
+        }
+      ]
+    }
+  },
+  "POST /api/chat (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/chat (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "GET /api/chat/1": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "title": "New conversation",
+      "profileId": null,
+      "modelPath": null,
+      "systemPrompt": "",
+      "sampling": {},
+      "thinking": true,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "GET /api/chat/999 (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "PATCH /api/chat/1": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "title": "Renamed",
+      "profileId": null,
+      "modelPath": null,
+      "systemPrompt": "Be brief.",
+      "sampling": {
+        "temperature": 0.5
+      },
+      "thinking": false,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "PATCH /api/chat/1 (unknown key)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: unknown key (nope)",
+      "issues": [
+        {
+          "path": [
+            "nope"
+          ],
+          "message": "unknown key"
+        }
+      ]
+    }
+  },
+  "PATCH /api/chat/1 (title a number)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected string (title)",
+      "issues": [
+        {
+          "path": [
+            "title"
+          ],
+          "message": "Expected string"
+        }
+      ]
+    }
+  },
+  "PATCH /api/chat/999 (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "GET /api/chat/1/stream (no reply in progress)": {
+    "status": 204,
+    "headers": {}
+  },
+  "GET /api/chat/999/stream (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "POST /api/chat/1/messages (llama-server not ready)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ServerNotReady",
+      "message": "llama-server is not ready"
+    }
+  },
+  "POST /api/chat/1/messages (blank)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "EmptyMessage",
+      "message": "Empty message"
+    }
+  },
+  "POST /api/chat/1/messages (content a number)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected string (content)",
+      "issues": [
+        {
+          "path": [
+            "content"
+          ],
+          "message": "Expected string"
+        }
+      ]
+    }
+  },
+  "POST /api/chat/999/messages (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "POST /api/chat/1/regenerate (llama-server not ready)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ServerNotReady",
+      "message": "llama-server is not ready"
+    }
+  },
+  "POST /api/chat/999/regenerate (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "POST /api/chat/1/stop (no reply in progress)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "NoReplyInProgress",
+      "message": "No reply in progress"
+    }
+  },
+  "POST /api/chat/999/stop (no such conversation: no reply in progress)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "NoReplyInProgress",
+      "message": "No reply in progress"
+    }
+  },
+  "DELETE /api/chat/2": {
+    "status": 204,
+    "headers": {}
+  },
+  "DELETE /api/chat/999 (no such conversation)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "GET /api/chat (after the writes)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": [
+      {
+        "id": 1,
+        "title": "Renamed",
+        "updatedAt": "<time>",
+        "messageCount": 0,
+        "modelPath": null,
+        "live": false
+      }
+    ]
   }
 }
