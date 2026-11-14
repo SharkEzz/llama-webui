@@ -6,6 +6,8 @@ import { AppInfo } from '../config/AppInfo.ts';
 import * as Db from '../db/Db.ts';
 import { Flags } from '../flags/Flags.ts';
 import { PciIds } from '../hardware/PciIds.ts';
+import { HfClient } from '../hf/HfClient.ts';
+import { HfHttp } from '../hf/HfHttp.ts';
 import { RequestErrorsLive } from '../http/RequestErrors.ts';
 import { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { LogRing } from '../logs/LogRing.ts';
@@ -27,11 +29,15 @@ import { WsHub } from '../ws/WsHub.ts';
  * supervisor polls `/health` every 50 ms, and sends SIGKILL 1 s after SIGTERM. The chat's replies are `ChatRuns.layer`'s:
  * building it marks every reply left `streaming` in the database `stopped` (`stopOrphans`) and registers the shutdown
  * step of the replies (saved `stopped` when `Shutdown.run` runs). No download writes a model (`ActiveWrites.layerNone`).
+ * The Hub's client reads `HF_ENDPOINT` and the token from the configuration it is built with: a test sets them (a fake
+ * Hub, no token of the user's).
  */
 export const ServicesTest = Layer.mergeAll(Monitor.layerStub, Placement.layer, ChatRuns.layer).pipe(
   Layer.provideMerge(Supervisor.layerWith({ killTimeout: '1 second', healthPoll: '50 millis' })),
   Layer.provideMerge(Flags.layer),
-  Layer.provideMerge(Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer)),
+  Layer.provideMerge(
+    Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer, HfClient.layer.pipe(Layer.provideMerge(HfHttp.layer))),
+  ),
   Layer.provideMerge(
     Layer.mergeAll(
       WsHub.layer,

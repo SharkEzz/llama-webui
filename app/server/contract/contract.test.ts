@@ -53,7 +53,8 @@ beforeAll(async () => {
     ],
   );
   // A home and XDG folders of the run's own: nothing of the user's shows in a reply. The stub monitor: no program
-  // runs, no snapshot comes, the history stays empty.
+  // runs, no snapshot comes, the history stays empty. Offline: no request leaves the machine (a Hub call fails with
+  // `fetch failed`), no token of the user's (variable or file), the default endpoint whatever the user's is.
   app = await launch({
     dataDir: dir.path,
     env: {
@@ -61,6 +62,12 @@ beforeAll(async () => {
       XDG_DATA_HOME: join(home, 'data'),
       XDG_CONFIG_HOME: join(home, 'config'),
       LLAMA_WEBUI_TEST_MONITOR: 'stub',
+      LLAMA_WEBUI_TEST_OFFLINE: '1',
+      HF_TOKEN: '',
+      HUGGING_FACE_HUB_TOKEN: '',
+      HF_HOME: join(home, 'hf'),
+      HF_TOKEN_PATH: join(home, 'hf', 'token'),
+      HF_ENDPOINT: 'https://huggingface.co',
     },
   });
   ctx = { tmp: dir.path, repo: REPO, home, ports: app.watchPort === null ? [app.port] : [app.port, app.watchPort] };

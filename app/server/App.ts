@@ -8,6 +8,8 @@ import { AppInfo } from './config/AppInfo.ts';
 import * as Db from './db/Db.ts';
 import { Flags } from './flags/Flags.ts';
 import { PciIds } from './hardware/PciIds.ts';
+import { HfClient } from './hf/HfClient.ts';
+import { HfHttp } from './hf/HfHttp.ts';
 import { HttpLive } from './http/HttpLive.ts';
 import { LlamaHttp } from './llama/LlamaHttp.ts';
 import { LogRing } from './logs/LogRing.ts';
@@ -29,14 +31,17 @@ import { WsHub } from './ws/WsHub.ts';
  * look runs while the rest stops. The monitor, the placement and the chat's replies are under it: they end, the
  * collectors' programs with the monitor and the replies saved, before the supervisor stops llama-server, while the
  * ring and the hub it writes to are still up. The models are scanned and read on each request (the summaries cached in
- * the database, the last GGUFs read in memory); no download queue writes a model yet (`ActiveWrites.layerNone`). Later
- * tasks add theirs, each on `Shutdown.layer`.
+ * the database, the last GGUFs read in memory); the Hub is reached through its own client (`HfClient` on `HfHttp`,
+ * beside `LlamaHttp`); no download queue writes a model yet (`ActiveWrites.layerNone`). Later tasks add theirs, each on
+ * `Shutdown.layer`.
  */
 const Services = ExternalWatch.layer.pipe(
   Layer.provideMerge(Layer.mergeAll(Monitor.layer, Placement.layer, ChatRuns.layer)),
   Layer.provideMerge(Supervisor.layer),
   Layer.provideMerge(Flags.layer),
-  Layer.provideMerge(Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer)),
+  Layer.provideMerge(
+    Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer, HfClient.layer.pipe(Layer.provideMerge(HfHttp.layer))),
+  ),
   Layer.provideMerge(
     Layer.mergeAll(
       WsHub.layer,

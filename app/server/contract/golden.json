@@ -1267,5 +1267,73 @@
       "_tag": "ModelNotFound",
       "message": "Model not found"
     }
+  },
+  "GET /api/hf/status": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "token": null,
+      "user": null,
+      "tokenInvalid": false,
+      "endpoint": "https://huggingface.co"
+    }
+  },
+  "GET /api/hf/search (offline)": {
+    "status": 502,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "HfUnreachable",
+      "message": "Hugging Face unreachable: fetch failed"
+    }
+  },
+  "GET /api/hf/search (blank text)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Search text expected (200 characters at most) (q)",
+      "issues": [
+        {
+          "path": [
+            "q"
+          ],
+          "message": "Search text expected (200 characters at most)"
+        }
+      ]
+    }
+  },
+  "GET /api/hf/repo (offline)": {
+    "status": 502,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "HfUnreachable",
+      "message": "Hugging Face unreachable: fetch failed"
+    }
+  },
+  "GET /api/hf/repo (not an org/name id)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Invalid repository id: bad (id)",
+      "issues": [
+        {
+          "path": [
+            "id"
+          ],
+          "message": "Invalid repository id: bad"
+        }
+      ]
+    }
   }
 }

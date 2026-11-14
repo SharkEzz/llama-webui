@@ -271,6 +271,13 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
     json('DELETE', '/api/models', JSON.stringify({ path: ctx.noModel })),
   );
 
+  // The Hub: no token, offline (every call to the Hub fails before it leaves: `fetch failed`).
+  add('read', 'GET /api/hf/status', bare('GET', '/api/hf/status'));
+  add('refusal', 'GET /api/hf/search (offline)', bare('GET', '/api/hf/search?q=qwen'));
+  add('violation', 'GET /api/hf/search (blank text)', bare('GET', '/api/hf/search?q=%20'));
+  add('refusal', 'GET /api/hf/repo (offline)', bare('GET', '/api/hf/repo?id=org/repo'));
+  add('violation', 'GET /api/hf/repo (not an org/name id)', bare('GET', '/api/hf/repo?id=bad'));
+
   const names = new Set<string>();
   for (const c of out) {
     if (names.has(c.name)) throw new Error(`duplicate contract case: ${c.name}`);
