@@ -62,11 +62,20 @@ const json = (method: string, path: string, body: string): WireRequest => ({
 /** A hashed file the index page references (`/assets/index-<hash>.js`), found in the page itself. */
 export const ASSET = /\/assets\/index-[\w-]{8}\.js/;
 
+/** The llama-server programs the cases set as the `binary` setting. */
+export interface Binaries {
+  /** `<repo>/testdata/fake/fake-llama-server`: its `--help` lists a few flags. */
+  fake: string;
+  /** A path in the run's temporary folder where nothing is. */
+  missing: string;
+}
+
 /**
- * Every HTTP case, in run order: reads first, then what changes the settings, then the profiles. `asset` is the path
- * of a hashed file of the build (`ASSET`).
+ * Every HTTP case, in run order: reads first, then what changes the settings, then the profiles, then the flag
+ * catalogue of a fake llama-server and of one that is not there (so the reply does not depend on the machine's
+ * `PATH`). `asset` is the path of a hashed file of the build (`ASSET`).
  */
-export function cases(ctx: { asset: string }): Case[] {
+export function cases(ctx: { asset: string } & Binaries): Case[] {
   const out: Case[] = [];
   const add = (kind: CaseKind, name: string, req: WireRequest, headOnly = false) =>
     out.push({ kind, name, req, ...(headOnly ? { headOnly } : {}) });
@@ -140,6 +149,13 @@ export function cases(ctx: { asset: string }): Case[] {
   add('write', 'DELETE /api/profiles/2', bare('DELETE', '/api/profiles/2'));
   add('refusal', 'DELETE /api/profiles/999 (no such profile)', bare('DELETE', '/api/profiles/999'));
   add('read', 'GET /api/profiles (after the writes)', bare('GET', '/api/profiles'));
+
+  // The flag catalogue: of the fake, then of a binary that is not there.
+  const binary = (path: string) => json('PATCH', '/api/settings', `{"binary":${JSON.stringify(path)}}`);
+  add('write', 'PATCH /api/settings (binary: the fake llama-server)', binary(ctx.fake));
+  add('read', 'GET /api/flags', bare('GET', '/api/flags'));
+  add('write', 'PATCH /api/settings (binary: a program that is not there)', binary(ctx.missing));
+  add('refusal', 'GET /api/flags (--help fails)', bare('GET', '/api/flags'));
 
   const names = new Set<string>();
   for (const c of out) {
@@ -231,9 +247,13 @@ export async function assetOf(base: string): Promise<string> {
 }
 
 /** Runs every HTTP case against `base`, one after the other; the keys are the case names, in run order. */
-export async function runContract(base: string, ctx: NormalizeCtx): Promise<Record<string, Outcome>> {
+export async function runContract(
+  base: string,
+  ctx: NormalizeCtx,
+  binaries: Binaries,
+): Promise<Record<string, Outcome>> {
   const out: Record<string, Outcome> = {};
-  for (const c of cases({ asset: await assetOf(base) }))
+  for (const c of cases({ asset: await assetOf(base), ...binaries }))
     out[c.name] = record(await request(base, c.req), ctx, c.headOnly);
   return out;
 }

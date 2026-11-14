@@ -1,4 +1,5 @@
 import { HttpApi } from 'effect/http-api';
+import { FlagsApi } from './FlagsApi.ts';
 import { HealthApi } from './HealthApi.ts';
 import { ProfilesApi } from './ProfilesApi.ts';
 import { RequestErrors } from './RequestErrors.ts';
@@ -14,5 +15,6 @@ export class Api extends HttpApi.make('llama-webui')
   .add(HealthApi)
   .add(SettingsApi)
   .add(ProfilesApi)
+  .add(FlagsApi)
   .annotate(HttpApi.PayloadParseOptions, { onExcessProperty: 'error', errors: 'all' })
   .middleware(RequestErrors) {}

@@ -472,5 +472,82 @@
         "updatedAt": "<time>"
       }
     ]
+  },
+  "PATCH /api/settings (binary: the fake llama-server)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "binary": "<repo>/testdata/fake/fake-llama-server",
+      "host": "127.0.0.1",
+      "port": 8080,
+      "modelsDir": "~/models",
+      "pollIntervalMs": 2000,
+      "historySeconds": 300,
+      "hiddenGpus": [],
+      "defaultProfileId": null,
+      "onboardingDone": false,
+      "collectors": {
+        "nvml": true,
+        "system": true,
+        "disk": true
+      },
+      "theme": "system",
+      "env": {}
+    }
+  },
+  "GET /api/flags": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "flags": [
+        {
+          "names": [
+            "-c",
+            "--ctx-size"
+          ],
+          "value": "N",
+          "help": "size of the prompt context",
+          "section": "common params"
+        }
+      ]
+    }
+  },
+  "PATCH /api/settings (binary: a program that is not there)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "binary": "<tmp>/no-such-llama-server",
+      "host": "127.0.0.1",
+      "port": 8080,
+      "modelsDir": "~/models",
+      "pollIntervalMs": 2000,
+      "historySeconds": 300,
+      "hiddenGpus": [],
+      "defaultProfileId": null,
+      "onboardingDone": false,
+      "collectors": {
+        "nvml": true,
+        "system": true,
+        "disk": true
+      },
+      "theme": "system",
+      "env": {}
+    }
+  },
+  "GET /api/flags (--help fails)": {
+    "status": 503,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "FlagsUnavailable",
+      "message": "llama-server --help failed (<tmp>/no-such-llama-server)"
+    }
   }
 }

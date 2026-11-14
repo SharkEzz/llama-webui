@@ -8,7 +8,16 @@ import { isDeepStrictEqual } from 'node:util';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { type Launched, launch } from '../testing/launch.ts';
 import { type TempDir, tempDir } from '../testing/tempDir.ts';
-import { assetOf, cases, covers, endpoints, type NormalizeCtx, type Outcome, runContract } from './cases.ts';
+import {
+  assetOf,
+  type Binaries,
+  cases,
+  covers,
+  endpoints,
+  type NormalizeCtx,
+  type Outcome,
+  runContract,
+} from './cases.ts';
 
 const GOLDEN = resolve(import.meta.dirname, process.env.GOLDEN ?? 'golden.json');
 const REPO = resolve(import.meta.dirname, '../../..');
@@ -16,6 +25,7 @@ const REPO = resolve(import.meta.dirname, '../../..');
 let dir: TempDir;
 let app: Launched;
 let ctx: NormalizeCtx;
+let binaries: Binaries;
 let outcomes: Record<string, Outcome> = {};
 
 beforeAll(async () => {
@@ -28,7 +38,11 @@ beforeAll(async () => {
     env: { HOME: home, XDG_DATA_HOME: join(home, 'data'), XDG_CONFIG_HOME: join(home, 'config') },
   });
   ctx = { tmp: dir.path, repo: REPO, home, ports: [app.port] };
-  outcomes = await runContract(app.base, ctx);
+  binaries = {
+    fake: join(REPO, 'testdata/fake/fake-llama-server'),
+    missing: join(dir.path, 'no-such-llama-server'),
+  };
+  outcomes = await runContract(app.base, ctx, binaries);
 }, 60_000);
 afterAll(async () => {
   await app?.[Symbol.asyncDispose]();
@@ -36,12 +50,12 @@ afterAll(async () => {
 });
 
 test('the cases cover every endpoint of the API definition', async () => {
-  const all = cases({ asset: await assetOf(app.base) });
+  const all = cases({ asset: await assetOf(app.base), ...binaries });
   expect(endpoints().filter((endpoint) => !all.some((c) => covers(endpoint, c.req)))).toEqual([]);
 });
 
 test('no case that breaks a payload or the guard, or that the domain refuses, succeeds', async () => {
-  const kinds = new Map(cases({ asset: await assetOf(app.base) }).map((c) => [c.name, c.kind]));
+  const kinds = new Map(cases({ asset: await assetOf(app.base), ...binaries }).map((c) => [c.name, c.kind]));
   const breaking = new Set(['violation', 'refusal', 'body', 'guard']);
   const wrong = Object.entries(outcomes).filter(([name, o]) => breaking.has(kinds.get(name) ?? '') && o.status < 400);
   expect(wrong.map(([name, o]) => `${name} → ${o.status}`)).toEqual([]);
