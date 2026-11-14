@@ -12,6 +12,11 @@ catalog:
   zod: ^4.6.7
   shiki: ^4.6.0
   "@types/node": ^26.6.6
+  # Effect: same version as the vendored reference (repos/effect), every @effect/* package moves with it
+  effect: 4.1.4
+  "@effect/platform-node": 4.1.4
+  "@effect/sql-sqlite-node": 4.1.4
+  "@effect/vitest": 4.1.4
 minimumReleaseAgeExclude:
   - "@biomejs/biome@2.6.7"
   - "@biomejs/cli-android-arm64@2.6.7"

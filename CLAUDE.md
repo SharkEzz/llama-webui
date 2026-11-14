@@ -7,8 +7,15 @@ This project vendors external repositories under repos/
 - Prefer examples and patterns from the vendored source code over generated guesses or web search results
 - Do not edit files under repos/ unless explicitly asked
 - Do not import from repos/ - application code should continue importing from normal package dependencies
-- When writing Effect code, inspect repos/effect/ for examples of idiomatic usage, tests, module structure, and API design. Treat it as the source of truth for Effect patterns. The documentation is available at repos/effect/LLMS.md, read it when you really need more informations about the library.
 <!-- /repository-context-instructions -->
+
+# Learning more about Effect
+
+This repository uses the Effect Typescript library (POC on the `poc/effect` branch: the server moves from Nitro to Effect).
+
+Before writing any Effect code, first read `repos/effect/LLMS.md` **completely**, and follow the links in the file when required (they are relative to `repos/effect/`).
+
+If you need to learn more about particular Effect apis and concepts that the guide doesn't cover, search through the source code in `repos/effect/packages/effect/src` (`repos/effect/packages/` for the `@effect/*` packages). `repos/effect` is the same version as the installed packages: read it rather than `node_modules`.
 
 # llama-webui
 
@@ -27,6 +34,7 @@ L'app, ses tests et son build tournent sur Node ; pnpm installe et lance les scr
 - `pnpm install` à la racine installe tout le dépôt, `site/` compris : un seul `pnpm-lock.yaml` (à commiter avec tout changement de dépendance ; la CI fait `pnpm install --frozen-lockfile`). Workspaces (`packages/*`, `app`, `site`), catalogue et réglages pnpm dans `pnpm-workspace.yaml` (pas de champ `workspaces` dans `package.json`, pas de réglage dans `.npmrc`).
 - Le `catalog:` de `pnpm-workspace.yaml` fixe les versions qui doivent bouger ensemble (`"react": "catalog:"`) : pour une de ses entrées, changer la version là, pas dans les `package.json`. D'autres dépendances partagées (`@types/react`, `lucide-react`, `shadcn`…) ont encore leur version dans chaque `package.json` : candidat de refactoring (backlog de `docs/superpowers/plans/2026-11-12-node-migration-notes.md`), à ne pas migrer au passage.
 - `allowBuilds` (absent tant qu'aucun paquet n'en a besoin) liste les scripts d'installation autorisés ; un paquet non listé qui en a un fait échouer l'installation : décider `true` (une fonctionnalité en a besoin) ou `false`. Garder les entrées `minimumReleaseAgeExclude` que pnpm ajoute.
+- `effect` et les `@effect/*` (`platform-node`, `sql-sqlite-node`, `vitest`) sont épinglés à la même version exacte dans le `catalog:`, celle de la copie de référence `repos/effect` (git subtree) : une montée de version change les deux ensemble. Le script `prepare` racine (`effect-tsgo patch`) installe le language service d'Effect dans le `tsc` de `node_modules` à chaque `pnpm install`.
 - `nitro` est épinglé en version exacte (une RC) dans `app/package.json` : une montée de version se fait seule, suites vertes.
 - Biome ne détecte pas React depuis une version `catalog:` (même avec `javascript.resolver.experimentalPnpmCatalogs`) : le domaine `react` est activé explicitement pour `app/src/**` et `site/**` dans `biome.jsonc`.
 
@@ -56,13 +64,13 @@ test('hello world', () => {
 
 ## Type checking
 
-`pnpm check` = `pnpm -r --parallel --include-workspace-root typecheck` : le script `typecheck` de chaque package du workspace, tous en même temps (`tsc` ; racine : `tsc -p scripts` ; `app` : `tsc && tsc -p server` ; `site` : `react-router typegen && tsc`). TypeScript 7 (`tsc` natif), version dans le `catalog:`.
+`pnpm check` = `pnpm -r --parallel --include-workspace-root typecheck` : le script `typecheck` de chaque package du workspace, tous en même temps (`tsc` ; racine : `tsc -p scripts` ; `app` : `tsc && tsc -p server` ; `site` : `react-router typegen && tsc`). TypeScript 7 (`tsc` natif), version dans le `catalog:`. Le projet du serveur (`app/server/tsconfig.json`) active le language service d'Effect (`@effect/tsgo`, plugin `@effect/language-service`) : ses diagnostics sortent dans `tsc` (`effect(<règle>)`), sévérités dans `diagnosticSeverity`. Pendant le POC, les warnings ne font pas échouer `tsc` (`ignoreEffectWarningsInTscExitCode` : le serveur pas encore migré en émet ~2 700, la liste de migration), les erreurs si. `unstableApiUsage` est coupée (`off`) : presque tout Effect hors du cœur est `@stability unstable` (`effect/http`, `effect/sql`, `effect/FileSystem`, les `@effect/*`…), d'où la version exacte dans le `catalog:` et une montée de version faite seule, suites vertes.
 
 **Dans ce projet :** pas de `tsconfig.json` racine ni de project references : chaque base de code a son `tsconfig.json` (`packages/llamacpp-js` en types Node seuls et résolution NodeNext, tests compris, `packages/webui-shared`, `scripts`, et deux pour `app/` : `app/tsconfig.json` pour `src/`, `build/` et `vite.config.ts` (DOM + Node), `app/server/tsconfig.json` pour le serveur et ses tests (Node seul)), qui étend `tsconfig.base.json` (options communes, `noEmit`) et n'ajoute que ses types et ses fichiers. Un projet qui importe un autre package ou dossier en vérifie les sources avec ses propres options (le client celles du serveur, par `api.gen.ts`). Nouveau package → un `tsconfig.json` qui étend la base, un script `typecheck` (`tsc`) et `typescript` (`catalog:`) en devDependency ; pas de `paths` vers des sources d'un autre package.
 
 ## Format et lint (Biome)
 
-Biome (devDependency épinglée, config dans `biome.jsonc`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`app/`, `packages/`, `scripts/`). Règles : preset `recommended` et domaines `tailwind`, `test`, `project` (graphe de modules) et `types` (inférence de types) en `recommended`, plus `react` pour `app/src/**` et `site/**`. `**/src/components/ui` (shadcn généré, app et site) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn ; `app/server/api.gen.ts` et `golden.json` (générés) aussi. Ces exclusions s'écrivent `!` dans `files.includes` (le fichier reste indexé pour les domaines `project` et `types`), pas `!!` (réservé aux sorties de build).
+Biome (devDependency épinglée, config dans `biome.jsonc`) gère le format, le lint et le tri des imports. Style : 2 espaces, guillemets simples (doubles en JSX), 120 colonnes, point-virgules partout (`app/`, `packages/`, `scripts/`). Règles : preset `recommended` et domaines `tailwind`, `test`, `project` (graphe de modules) et `types` (inférence de types) en `recommended`, plus `react` pour `app/src/**` et `site/**`. `correctness/useYield` est coupée pour `app/server/**` : un générateur d'Effect (`Effect.gen`, `Effect.fn`) n'a pas toujours de `yield`. `**/src/components/ui` (shadcn généré, app et site) est ignoré par Biome (ni format, ni lint, ni tri des imports) pour rester comparable aux mises à jour shadcn ; `app/server/api.gen.ts` et `golden.json` (générés) aussi. Ces exclusions s'écrivent `!` dans `files.includes` (le fichier reste indexé pour les domaines `project` et `types`), pas `!!` (réservé aux sorties de build et à `repos/`, les dépôts de référence, jamais importés : pas même indexés).
 
 - `pnpm lint` : vérifie format + lint + imports (lecture seule) ; `pnpm lint:fix` applique les corrections sûres.
 - **Avant de clore un jalon / milestone / lot de travail** (et avant de commiter ou d'ouvrir une PR), tout doit être vert : `pnpm lint`, `pnpm check`, `pnpm test`. Zéro erreur et zéro warning Biome.

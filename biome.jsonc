@@ -23,6 +23,8 @@
       "!app/server/lib/contract/golden.json",
       "!app/server/api.gen.ts",
       "!**/.output",
+      // Vendored reference repositories (read-only, never imported): not even indexed
+      "!!repos",
       // Disable Biome for shadcn components in order to keep their default code style
       "!**/src/components/ui"
     ]
@@ -78,6 +80,17 @@
       "linter": {
         "domains": {
           "react": "recommended"
+        }
+      }
+    },
+    {
+      // Effect code: a generator passed to `Effect.gen` / `Effect.fn` does not always yield
+      "includes": ["app/server/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "useYield": "off"
+          }
         }
       }
     }

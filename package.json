@@ -17,6 +17,7 @@
     "lint": "biome check",
     "lint:fix": "biome check --write",
     "prepack": "node scripts/prepack.ts",
+    "prepare": "effect-tsgo patch --typescript --no-oxlint",
     "release": "node scripts/release.ts",
     "site:build": "pnpm --filter llama-webui-site build",
     "site:dev": "pnpm --filter llama-webui-site dev",
@@ -24,8 +25,7 @@
     "start": "pnpm build && node app/.output/llama-webui.mjs",
     "test": "pnpm test:unit && pnpm --filter llamacpp-js test",
     "test:unit": "vitest run",
-    "typecheck": "tsc -p scripts",
-    "prepare": "effect-tsgo patch --typescript --no-oxlint"
+    "typecheck": "tsc -p scripts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
