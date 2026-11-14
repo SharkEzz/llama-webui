@@ -19,7 +19,7 @@
     "body": {
       "binary": "llama-server",
       "host": "127.0.0.1",
-      "port": 8080,
+      "port": "<port>",
       "modelsDir": "~/models",
       "pollIntervalMs": 1000,
       "historySeconds": 300,
@@ -219,7 +219,7 @@
     "body": {
       "binary": "llama-server",
       "host": "127.0.0.1",
-      "port": 8080,
+      "port": "<port>",
       "modelsDir": "~/models",
       "pollIntervalMs": 2000,
       "historySeconds": 300,
@@ -521,7 +521,7 @@
     "body": {
       "binary": "<repo>/testdata/fake/fake-llama-server",
       "host": "127.0.0.1",
-      "port": 8080,
+      "port": "<port>",
       "modelsDir": "~/models",
       "pollIntervalMs": 2000,
       "historySeconds": 300,
@@ -564,7 +564,7 @@
     "body": {
       "binary": "<tmp>/no-such-llama-server",
       "host": "127.0.0.1",
-      "port": 8080,
+      "port": "<port>",
       "modelsDir": "~/models",
       "pollIntervalMs": 2000,
       "historySeconds": 300,

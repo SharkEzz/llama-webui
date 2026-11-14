@@ -10,6 +10,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
 import { devCopy } from './testing/devCopy.ts';
 import { freePort, userEnv } from './testing/launch.ts';
+import { seedWatchPort } from './testing/seed.ts';
 import { tempDir } from './testing/tempDir.ts';
 import { openWs } from './testing/ws.ts';
 
@@ -86,6 +87,9 @@ async function startDev(env: Record<string, string | undefined> = {}, port?: num
     if (v === undefined) delete full[k];
     else full[k] = v;
   }
+  // The watch of a server started by hand looks at the `port` setting: never at 8080, the user's own llama-server's.
+  const dataDir = full.LLAMA_WEBUI_DATA_DIR;
+  if (dataDir !== undefined) await seedWatchPort(dataDir, await freePort());
   let output = '';
   const chunks: Array<{ at: number; text: string }> = [];
   // Vite itself, not `pnpm dev`: a signal goes to the process that handles it.

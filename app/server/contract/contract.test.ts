@@ -37,7 +37,7 @@ beforeAll(async () => {
     dataDir: dir.path,
     env: { HOME: home, XDG_DATA_HOME: join(home, 'data'), XDG_CONFIG_HOME: join(home, 'config') },
   });
-  ctx = { tmp: dir.path, repo: REPO, home, ports: [app.port] };
+  ctx = { tmp: dir.path, repo: REPO, home, ports: app.watchPort === null ? [app.port] : [app.port, app.watchPort] };
   binaries = {
     fake: join(REPO, 'testdata/fake/fake-llama-server'),
     missing: join(dir.path, 'no-such-llama-server'),

@@ -1,8 +1,10 @@
 import { type ChildProcessByStdio, spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { Readable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { seedWatchPort } from './seed.ts';
 
 /** The launcher of the production build (`pnpm build`; the server tests' globalSetup builds it, `build.ts`). */
 export const LAUNCHER = resolve(import.meta.dirname, '../../.output/llama-webui.mjs');
@@ -18,6 +20,8 @@ export async function freePort(): Promise<number> {
 export interface Launched extends AsyncDisposable {
   base: string;
   port: number;
+  /** The `port` setting `launch` gave a data folder without a database (null when it had one). */
+  watchPort: number | null;
   proc: ChildProcessByStdio<null, Readable, Readable>;
   /** The exit code (null on a signal). */
   exited: Promise<number | null>;
@@ -39,7 +43,9 @@ export function userEnv(extra: Record<string, string> = {}): Record<string, stri
  * The production build in its own process, as a user starts it, on 127.0.0.1, a free port (or `port`) and `dataDir`,
  * from the data dir (no `.env` of the repository around): `--host`, `--port` and `--data-dir`, which win over any
  * `LLAMA_WEBUI_*` variable of the environment. `env` is added to the user's environment (`userEnv`). `launcher` starts
- * another copy of the build. Resolves once `/api/health` answers; disposing sends SIGTERM and awaits the exit.
+ * another copy of the build. A data folder without a database gets one whose `port` setting is a free port
+ * (`seedWatchPort`): the build never looks at 8080. Resolves once `/api/health` answers; disposing sends SIGTERM and
+ * awaits the exit.
  */
 export async function launch(opts: {
   dataDir: string;
@@ -48,6 +54,11 @@ export async function launch(opts: {
   launcher?: string;
 }): Promise<Launched> {
   const port = opts.port ?? (await freePort());
+  let watchPort: number | null = null;
+  if (!existsSync(join(opts.dataDir, 'llama-webui.sqlite'))) {
+    watchPort = await freePort();
+    await seedWatchPort(opts.dataDir, watchPort);
+  }
   const args = ['--host', '127.0.0.1', '--port', String(port), '--data-dir', opts.dataDir];
   const proc = spawn(process.execPath, [opts.launcher ?? LAUNCHER, ...args], {
     cwd: opts.dataDir,
@@ -77,6 +88,7 @@ export async function launch(opts: {
   return {
     base,
     port,
+    watchPort,
     proc,
     exited,
     stdout: () => stdout,
