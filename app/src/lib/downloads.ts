@@ -50,7 +50,29 @@ export interface DownloadsCalls {
   readonly call: typeof webCall;
   /** A download finished: what is in the models folder changed. */
   readonly downloaded?: (item: DownloadItem) => void;
+  /** Goes to a page of the app: a finished download's Details opens its model on the Models page. */
+  readonly navigate?: (to: string) => void;
 }
+
+/**
+ * What the queue's messages changed while a request was in flight: each item's last state (null: deleted), and the
+ * live progress. Newer than the reply, read before them: the reply does not undo them.
+ */
+interface Touched {
+  readonly items: Map<number, DownloadItem | null>;
+  live?: { readonly value: DownloadLive | null };
+}
+
+/** The list read by `load`, with what the messages changed during the request in place of what it says. */
+const merged = (items: ReadonlyArray<DownloadItem>, touched: Touched): ReadonlyArray<DownloadItem> => {
+  const listed = new Set(items.map((i) => i.id));
+  const kept = items.flatMap((i) => {
+    const now = touched.items.get(i.id);
+    return now === undefined ? [i] : now === null ? [] : [now];
+  });
+  const added = [...touched.items.values()].filter((i): i is DownloadItem => i !== null && !listed.has(i.id));
+  return [...kept, ...added];
+};
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const fail = (e: unknown) => void toast.error(message(e));
@@ -66,20 +88,35 @@ const upsert = (items: ReadonlyArray<DownloadItem>, item: DownloadItem) =>
 const addMissing = (items: ReadonlyArray<DownloadItem>, item: DownloadItem) =>
   items.some((i) => i.id === item.id) ? items : [...items, item];
 
-/** Opens a model's detail dialog on the Models page (router imported lazily: no cycle with the pages). */
-const showModel = (path: string) =>
-  void import('@/app/router').then(({ router }) => router.navigate(`/models?open=${encodeURIComponent(path)}`));
+/** The page of the Models list that opens the detail dialog of the model at `path`. */
+const modelPage = (path: string) => `/models?open=${encodeURIComponent(path)}`;
 
 /** The download queue's store, making its calls through `calls`. */
-export const makeDownloadsStore = ({ call, downloaded }: DownloadsCalls) =>
-  create<DownloadsState>((set, get) => ({
+export const makeDownloadsStore = ({ call, downloaded, navigate }: DownloadsCalls) => {
+  /** One per request in flight: `receive` records in each what it changes. */
+  const inFlight = new Set<Touched>();
+  /** `request`'s reply, and what the messages changed while it was awaited. */
+  const during = async <A>(request: () => Promise<A>): Promise<{ readonly reply: A; readonly touched: Touched }> => {
+    const touched: Touched = { items: new Map() };
+    inFlight.add(touched);
+    try {
+      return { reply: await request(), touched };
+    } finally {
+      inFlight.delete(touched);
+    }
+  };
+  /** `items` with those of a reply that are missing, but for one deleted while the reply was awaited. */
+  const addReplied = (items: ReadonlyArray<DownloadItem>, replied: ReadonlyArray<DownloadItem>, touched: Touched) =>
+    replied.reduce((acc, i) => (touched.items.get(i.id) === null ? acc : addMissing(acc, i)), items);
+
+  return create<DownloadsState>((set, get) => ({
     items: [],
     live: null,
 
     async load() {
       try {
-        const { items, live } = await call((api) => api.downloads.list());
-        set({ items, live });
+        const { reply, touched } = await during(() => call((api) => api.downloads.list()));
+        set({ items: merged(reply.items, touched), live: touched.live ? touched.live.value : reply.live });
       } catch {
         // Offline: the WS reconnection reloads.
       }
@@ -87,9 +124,11 @@ export const makeDownloadsStore = ({ call, downloaded }: DownloadsCalls) =>
 
     async enqueue(repo, revision, keys) {
       try {
-        const { items } = await call((api) => api.downloads.create({ payload: { repo, revision, keys } }));
-        if (items.length === 0) toast.info('Already downloaded');
-        set({ items: items.reduce(addMissing, get().items) });
+        const { reply, touched } = await during(() =>
+          call((api) => api.downloads.create({ payload: { repo, revision, keys } })),
+        );
+        if (reply.items.length === 0) toast.info('Already downloaded');
+        set({ items: addReplied(get().items, reply.items, touched) });
         return true;
       } catch (e) {
         fail(e);
@@ -102,8 +141,8 @@ export const makeDownloadsStore = ({ call, downloaded }: DownloadsCalls) =>
     },
 
     async retry(id) {
-      await call((api) => api.downloads.retry({ params: { id } })).then(
-        (item) => set({ items: addMissing(get().items, item) }),
+      await during(() => call((api) => api.downloads.retry({ params: { id } }))).then(
+        ({ reply, touched }) => set({ items: addReplied(get().items, [reply], touched) }),
         fail,
       );
     },
@@ -119,15 +158,18 @@ export const makeDownloadsStore = ({ call, downloaded }: DownloadsCalls) =>
     receive(m) {
       switch (m.type) {
         case 'download-progress':
+          for (const touched of inFlight) touched.live = { value: m.payload };
           set({ live: m.payload });
           return;
         case 'download-deleted': {
           const gone = new Set(m.payload.ids);
+          for (const touched of inFlight) for (const id of gone) touched.items.set(id, null);
           set({ items: get().items.filter((i) => !gone.has(i.id)) });
           return;
         }
         case 'download': {
           const item = m.payload;
+          for (const touched of inFlight) touched.items.set(item.id, item);
           const prev = get().items.find((i) => i.id === item.id);
           set({ items: upsert(get().items, item) });
           if (prev?.status === item.status) return;
@@ -136,7 +178,7 @@ export const makeDownloadsStore = ({ call, downloaded }: DownloadsCalls) =>
             downloaded?.(item);
             toast.success(`${label} downloaded`, {
               description: item.repo,
-              action: { label: 'Details', onClick: () => showModel(downloadPath(item)) },
+              action: { label: 'Details', onClick: () => navigate?.(modelPage(downloadPath(item))) },
             });
           } else if (item.status === 'error') {
             toast.error(`Download of ${label} failed`, { description: item.error ?? undefined });
@@ -149,16 +191,25 @@ export const makeDownloadsStore = ({ call, downloaded }: DownloadsCalls) =>
     search: (q, signal) => call((api) => api.hf.search({ query: { q } }), { signal }),
     status: () => call((api) => api.hf.status()),
   }));
+};
+
+/** How the app goes to a page: the router's, given to `startDownloadsSync` by `main.tsx` (no import of the pages). */
+let navigateTo: ((to: string) => void) | undefined;
 
 /** A finished download rescans the models. */
 export const useDownloads = makeDownloadsStore({
   call: webCall,
   downloaded: () => void useModels.getState().refresh(),
+  navigate: (to) => navigateTo?.(to),
 });
 
 let started = false;
-/** WS subscription (once, at startup): queue changes and progress; the queue read again on each (re)connection. */
-export function startDownloadsSync(): void {
+/**
+ * WS subscription (once, at startup): queue changes and progress; the queue read again on each (re)connection.
+ * `navigate` is the router's, which a finished download's Details uses.
+ */
+export function startDownloadsSync(options: { readonly navigate: (to: string) => void }): void {
+  navigateTo = options.navigate;
   if (started) return;
   started = true;
   const receive = (m: DownloadMessage) => useDownloads.getState().receive(m);

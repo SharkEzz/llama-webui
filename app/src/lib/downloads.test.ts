@@ -61,8 +61,9 @@ function server(routes: Record<string, () => Response>) {
     return answer ? answer() : json(404, { _tag: 'RouteNotFound', message: 'Unknown route' });
   }) as typeof fetch;
   const downloaded = vi.fn<(i: DownloadItem) => void>();
-  const store = makeDownloadsStore({ call: makeCall(Api, fetchImpl), downloaded });
-  return { store, seen, downloaded };
+  const navigate = vi.fn<(to: string) => void>();
+  const store = makeDownloadsStore({ call: makeCall(Api, fetchImpl), downloaded, navigate });
+  return { store, seen, downloaded, navigate };
 }
 
 test('download posts the repo, revision and keys and adds the items', async () => {
@@ -106,7 +107,7 @@ test('a reply that arrives after the queue has moved on does not undo its messag
 });
 
 test('a download, download-progress or download-deleted message updates the store', () => {
-  const { store, downloaded } = server({});
+  const { store, downloaded, navigate } = server({});
   const success = vi.spyOn(toast, 'success');
   const error = vi.spyOn(toast, 'error');
 
@@ -127,6 +128,13 @@ test('a download, download-progress or download-deleted message updates the stor
   // A finished download is told once: the models folder changed.
   expect(downloaded).toHaveBeenCalledExactlyOnceWith(done);
   expect(success).toHaveBeenCalledOnce();
+  // Its Details opens the model on the Models page, through the navigation the store was given.
+  const action = success.mock.calls[0]?.[1]?.action;
+  expect(action).toMatchObject({ label: 'Details' });
+  if (action && typeof action === 'object' && 'onClick' in action) action.onClick({} as never);
+  expect(navigate).toHaveBeenCalledExactlyOnceWith(
+    `/models?open=${encodeURIComponent('/models/org/repo-GGUF/repo-Q4_K_M.gguf')}`,
+  );
   store.getState().receive({ type: 'download', payload: done });
   expect(downloaded).toHaveBeenCalledOnce();
 
@@ -162,6 +170,46 @@ test('load reads the queue and its live progress', async () => {
   const { store } = server({ 'GET /api/downloads': () => json(200, list) });
   await store.getState().load();
   expect(store.getState()).toMatchObject(list);
+});
+
+test('a message that arrives while the queue is read is kept: the list read before it does not undo it', async () => {
+  // The queue moves on while its list travels: item 1 starts, item 2 is cleared, item 3 is queued, a file progresses.
+  const { store } = server({
+    'GET /api/downloads': () => {
+      store.getState().receive({ type: 'download', payload: item({ id: 1, status: 'downloading' }) });
+      store.getState().receive({ type: 'download-deleted', payload: { ids: [2] } });
+      store.getState().receive({ type: 'download', payload: item({ id: 3 }) });
+      store.getState().receive({ type: 'download-progress', payload: live({ id: 1, bytesDone: 10 }) });
+      return json(200, { items: [item({ id: 1 }), item({ id: 2, status: 'done' }), item({ id: 4 })], live: null });
+    },
+  });
+  await store.getState().load();
+  expect(store.getState().items).toEqual([item({ id: 1, status: 'downloading' }), item({ id: 4 }), item({ id: 3 })]);
+  expect(store.getState().live).toEqual(live({ id: 1, bytesDone: 10 }));
+  // Once read, the list is the queue again: a later load replaces what the messages had set.
+  const { store: next } = server({ 'GET /api/downloads': () => json(200, { items: [item({ id: 5 })], live: null }) });
+  next.getState().receive({ type: 'download', payload: item({ id: 1 }) });
+  await next.getState().load();
+  expect(next.getState().items).toEqual([item({ id: 5 })]);
+});
+
+test('an enqueue or retry reply that comes after its item was cleared does not bring it back', async () => {
+  const { store } = server({
+    'POST /api/downloads': () => {
+      // Queued, finished at once (every file on disk) and cleared, all before the reply.
+      store.getState().receive({ type: 'download', payload: item({ id: 1 }) });
+      store.getState().receive({ type: 'download-deleted', payload: { ids: [1] } });
+      return json(202, { items: [item({ id: 1 }), item({ id: 2 })] });
+    },
+    'POST /api/downloads/3/retry': () => {
+      store.getState().receive({ type: 'download-deleted', payload: { ids: [3] } });
+      return json(202, item({ id: 3 }));
+    },
+  });
+  await store.getState().enqueue('org/repo-GGUF', SHA, ['repo-Q4_K_M.gguf']);
+  expect(store.getState().items.map((i) => i.id)).toEqual([2]);
+  await store.getState().retry(3);
+  expect(store.getState().items.map((i) => i.id)).toEqual([2]);
 });
 
 test('cancel, retry and clear call their endpoint; a refusal shows its message', async () => {

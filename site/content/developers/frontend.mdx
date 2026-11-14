@@ -61,9 +61,12 @@ startServerSync();
 startMonitorSync();
 startLogsSync();
 startTopologySync();
-startDownloadsSync();
+startDownloadsSync({ navigate: (to) => void router.navigate(to) });
 useWs.getState().connect();
 ```
+
+`startDownloadsSync` takes the router's navigation, which the Details button of a finished download's toast uses to
+open the model on the Models page: the store does not import the router (which imports the pages).
 
 The benchmark and tuning stores start their own sync the first time their page mounts (`startBenchSync()` in
 `BenchPage`, `startTuningSync()` in `TuningPage`).

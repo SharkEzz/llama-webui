@@ -16,7 +16,7 @@ startServerSync();
 startLogsSync();
 startMonitorSync();
 startTopologySync();
-startDownloadsSync();
+startDownloadsSync({ navigate: (to) => void router.navigate(to) });
 useWs.getState().connect();
 
 createRoot(document.getElementById('root')!).render(
