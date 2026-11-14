@@ -42,7 +42,6 @@ const DEFAULTS = {
   historySeconds: 300,
   hiddenGpus: [] as ReadonlyArray<string>,
   defaultProfileId: null,
-  llamaTuiImportDismissed: false,
   onboardingDone: false,
   collectors: { nvml: true, system: true, disk: true },
   theme: 'system' as typeof Theme.Type,
@@ -67,9 +66,6 @@ export const Settings = Schema.Struct({
   hiddenGpus: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(DEFAULTS.hiddenGpus))),
   defaultProfileId: Schema.NullOr(Schema.Int).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(DEFAULTS.defaultProfileId)),
-  ),
-  llamaTuiImportDismissed: Schema.Boolean.pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULTS.llamaTuiImportDismissed)),
   ),
   onboardingDone: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(DEFAULTS.onboardingDone))),
   collectors: Collectors.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),

@@ -46,7 +46,7 @@ const Args = Schema.Array(Schema.String).check(
   ),
 );
 
-/** A profile as llama-tui writes it in its config (the import and export format). */
+/** A profile as a person writes it: the input of a create or an update, and the import and export format. */
 export const ProfileInput = Schema.Struct({
   name: Required,
   model: Required,
@@ -59,7 +59,10 @@ export const ProfileInput = Schema.Struct({
 }).annotate({ messageUnexpectedKey: 'unknown key' });
 export type ProfileInput = typeof ProfileInput.Type;
 
-/** Where a profile comes from: made in the UI, imported from a file, or from the llama-tui config. */
+/**
+ * Where a profile comes from: made in the UI or imported from a file. `llama-tui` is the source of the rows the Nitro
+ * server imported from the llama-tui config; nothing writes it any more, but stored rows still carry it.
+ */
 export const ProfileSource = Schema.Literals(['ui', 'import', 'llama-tui']);
 export type ProfileSource = typeof ProfileSource.Type;
 
@@ -93,7 +96,7 @@ const nameOf = (item: unknown): string =>
   Predicate.isObject(item) && Predicate.isString(item.name) && Str.isNonEmpty(item.name) ? item.name : '(unnamed)';
 
 /**
- * Reads an import JSON: a whole llama-tui config (`{ profiles: [...] }`, other keys ignored), an array of profiles or
+ * Reads an import JSON: an object with `profiles` (the export file, other keys ignored), an array of profiles or
  * a single profile. Each profile is validated on its own: valid ones are kept, the others explained (the first issue,
  * then its path), and a name the file already gave is refused.
  */

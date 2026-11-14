@@ -103,6 +103,20 @@ describe('SettingsRepo', () => {
     ),
   );
 
+  it.effect('a stored key that is no longer a setting is ignored (llamaTuiImportDismissed)', () =>
+    fresh(
+      Effect.gen(function* () {
+        const sql = yield* SqlClient.SqlClient;
+        const repo = yield* SettingsRepo;
+        yield* sql`INSERT INTO settings(key, value_json) VALUES ('llamaTuiImportDismissed', 'true')`;
+        const settings = yield* repo.get;
+        assert.isFalse('llamaTuiImportDismissed' in settings);
+        const next = yield* repo.patch({ port: 9003 });
+        assert.strictEqual(next.port, 9003);
+      }),
+    ),
+  );
+
   it.effect('a patch that is invalid writes nothing and names the field', () =>
     fresh(
       Effect.gen(function* () {

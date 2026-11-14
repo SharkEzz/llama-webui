@@ -25,7 +25,6 @@
       "historySeconds": 300,
       "hiddenGpus": [],
       "defaultProfileId": null,
-      "llamaTuiImportDismissed": false,
       "onboardingDone": false,
       "collectors": {
         "nvml": true,
@@ -186,7 +185,6 @@
       "historySeconds": 300,
       "hiddenGpus": [],
       "defaultProfileId": null,
-      "llamaTuiImportDismissed": false,
       "onboardingDone": false,
       "collectors": {
         "nvml": true,

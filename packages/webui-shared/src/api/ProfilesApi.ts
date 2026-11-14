@@ -16,18 +16,6 @@ export class ProfileNameTaken extends Schema.TaggedError<
   { readonly ProfileNameTaken: unique symbol }
 >()('ProfileNameTaken', { message: Schema.String }, { httpApiStatus: 409 }) {}
 
-/** The llama-tui config is not there: `llama-tui config not found (<path>)`. */
-export class LlamaTuiConfigNotFound extends Schema.TaggedError<
-  LlamaTuiConfigNotFound,
-  { readonly LlamaTuiConfigNotFound: unique symbol }
->()('LlamaTuiConfigNotFound', { message: Schema.String }, { httpApiStatus: 404 }) {}
-
-/** The llama-tui config cannot be read or is not JSON: `Unreadable llama-tui config: <error>`. */
-export class LlamaTuiConfigUnreadable extends Schema.TaggedError<
-  LlamaTuiConfigUnreadable,
-  { readonly LlamaTuiConfigUnreadable: unique symbol }
->()('LlamaTuiConfigUnreadable', { message: Schema.String }, { httpApiStatus: 400 }) {}
-
 /** The file of every profile, in the import format (`llama-webui-profiles.json`). */
 export const ProfilesFile = Schema.Struct({ profiles: Schema.Array(ProfileInput) });
 
@@ -35,16 +23,6 @@ export const ProfilesFile = Schema.Struct({ profiles: Schema.Array(ProfileInput)
 export const ImportResult = Schema.Struct({
   imported: Schema.Array(Profile),
   skipped: Schema.Array(Schema.Struct({ name: Schema.String, reason: Schema.String })),
-});
-
-/** The llama-tui config as the import banner reads it: where, whether it is there, its profiles, and what is here. */
-export const LlamaTuiStatus = Schema.Struct({
-  path: Schema.String,
-  exists: Schema.Boolean,
-  names: Schema.Array(Schema.String),
-  error: Schema.optionalKey(Schema.String),
-  dismissed: Schema.Boolean,
-  profileCount: Schema.Int,
 });
 
 const Created = Profile.pipe(HttpApiSchema.status(201));
@@ -61,11 +39,6 @@ export class ProfilesApi extends HttpApiGroup.make('profiles').add(
   HttpApiEndpoint.get('exportAll', '/api/profiles/export', { success: ProfilesFile }),
   // Any JSON: each item is validated on its own, so that one bad profile does not refuse the others.
   HttpApiEndpoint.post('importMany', '/api/profiles/import', { payload: Schema.Unknown, success: ImportResult }),
-  HttpApiEndpoint.get('llamaTuiStatus', '/api/profiles/import/llama-tui', { success: LlamaTuiStatus }),
-  HttpApiEndpoint.post('importLlamaTui', '/api/profiles/import/llama-tui', {
-    success: ImportResult,
-    error: [LlamaTuiConfigNotFound, LlamaTuiConfigUnreadable],
-  }),
   HttpApiEndpoint.get('get', '/api/profiles/:id', { params, success: Profile, error: ProfileNotFound }),
   HttpApiEndpoint.put('update', '/api/profiles/:id', {
     params,

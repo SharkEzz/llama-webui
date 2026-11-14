@@ -16,9 +16,6 @@ export { FlagsApi, FlagsUnavailable } from './api/FlagsApi.ts';
 export { HealthApi } from './api/HealthApi.ts';
 export {
   ImportResult,
-  LlamaTuiConfigNotFound,
-  LlamaTuiConfigUnreadable,
-  LlamaTuiStatus,
   ProfileNameTaken,
   ProfileNotFound,
   ProfilesApi,
