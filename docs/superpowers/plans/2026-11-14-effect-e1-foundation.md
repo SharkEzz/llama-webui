@@ -135,8 +135,10 @@ NodeRuntime.runMain(program, {
   `Config.withDefault`, a variable that is set but empty gives the default; `LLAMA_WEBUI_PORT=abc` fails with an error
   naming the variable.
 - **Language service:** diagnostics are reported on the files of the server project only, not on the shared sources
-  it imports. The per-file `overrides` option works with globs of the form `**/testing/**/*.ts`. `node:http` for
-  `createServer` is reported by `nodeBuiltinImport`; `apiStabilityLeak` fires on nearly every exported layer.
+  it imports. The per-file `overrides` option works with globs of the form `**/testing/**/*.ts` and
+  `**/lifecycle.test.ts`; an override is merged into the base map (a rule it does not name keeps its base severity).
+  `node:http` for `createServer` is reported by `nodeBuiltinImport`; `apiStabilityLeak` fires on nearly every exported
+  layer.
 
 ## Reference files
 
@@ -271,8 +273,9 @@ derived client and shows a waiting page for what is not ported. Until Task 9, `p
 - Modify: `biome.jsonc` (`"!!app/server-legacy"` next to `"!!repos"`; drop the entries of the generated files that
   left), `vitest.config.ts` (`globalSetup: ['app/server/testing/build.ts']`), `app/package.json` (remove `nitro`;
   `"build": "vite build && node build/server.ts"`), `packages/webui-shared/package.json` (`"effect": "catalog:"`),
-  `pnpm-lock.yaml`, `app/vite.config.ts` (no Nitro, `build.outDir: '.output/public'`), `app/build/licenses.ts`,
-  `CLAUDE.md`
+  `pnpm-lock.yaml`, `app/vite.config.ts` (no Nitro, `build.outDir: '.output/public'`; its `.env` loading, imported
+  from the old server, returns in Task 9), `app/build/licenses.ts`, `scripts/prepack.ts` and
+  `scripts/package.test.ts` (`server/nvml-worker.mjs` leaves their file lists until E4), `CLAUDE.md`
 - Create: `app/server/tsconfig.json`
 - Create: `packages/webui-shared/src/api/HealthApi.ts`, `packages/webui-shared/src/api/Api.ts` (exported by
   `index.ts`)
@@ -477,16 +480,19 @@ Expected: FAIL (no server, no build script).
   - `router.tsx`: only the placeholder routes remain (`/setup` and `/chat/:id` included).
   - `PlaceholderPage`: card title `Not ported yet`, text `` `Back with milestone ${milestone} of the Effect server
     rewrite.` ``.
-  - `main.tsx`: keeps the theme and the WebSocket connection; the five `start…Sync()` calls of unported domains
-    leave. `StatusBar`: without the server badge. `theme.ts`: its two settings calls leave until Task 7 (the theme
-    stays a local preference meanwhile).
+  - The shell, as a rule: every module still reachable from `main.tsx` drops its imports of unported stores and
+    pages, and nothing else changes in it. Known cases: `main.tsx` keeps the theme and the WebSocket connection and
+    loses the `start…Sync()` calls of unported domains; `StatusBar` loses the server badge (`@/lib/server`,
+    `ServerStateBadge`); `theme.ts` loses its two settings calls until Task 7 (the theme stays a local preference
+    meanwhile). Name every module changed under this rule in the task summary.
   - `app/tsconfig.json` as the parking rule says.
 
 - [ ] **Step 7: Run everything**
 
 Run: `pnpm lint && pnpm check && pnpm test`, then `pnpm check 2>&1 | grep -c 'effect('`
-Expected: green, and `0`. If Biome or `tsc` reports a parked web file that the parking rule does not cover, stop and
-report.
+Expected: green, and `0`. A `tsc` error in a web module is settled by the shell rule (the module is reachable from
+`main.tsx`) or by the parking rule (it is reached through a test file only); stop and report only for an error
+neither rule covers, or for a Biome report on a parked file.
 
 - [ ] **Step 8: Commit**
 
