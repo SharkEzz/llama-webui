@@ -225,24 +225,27 @@ export const makeMemBandwidth = Effect.fn('makeMemBandwidth')(function* (options
       return { ...next, proc: Option.some(proc) };
     });
 
-  yield* SynchronizedRef.updateEffect(held, startSystem);
+  // A change of the state that may launch a stream is uninterruptible: no stream runs that the state does not name.
+  yield* Effect.uninterruptible(SynchronizedRef.updateEffect(held, startSystem));
 
-  const sample = SynchronizedRef.modifyEffect(held, (h) =>
-    Effect.gen(function* () {
-      const now = yield* Clock.currentTimeMillis;
-      if (isDead(h.system)) {
-        const next = canRetry(h.system, now) ? yield* startSystem(h) : h;
-        return [null, next] as const;
-      }
-      const maxAgeMs = h.intervalMs * 3;
-      const read = rateOf(h.system, SYSTEM_EVENTS.read, maxAgeMs, now);
-      const write = rateOf(h.system, SYSTEM_EVENTS.write, maxAgeMs, now);
-      const bw: MemBandwidth | null =
-        read === null && write === null
-          ? null
-          : { readBps: (read ?? 0) * BYTES_PER_EVENT, writeBps: (write ?? 0) * BYTES_PER_EVENT };
-      return [bw, h] as const;
-    }),
+  const sample = Effect.uninterruptible(
+    SynchronizedRef.modifyEffect(held, (h) =>
+      Effect.gen(function* () {
+        const now = yield* Clock.currentTimeMillis;
+        if (isDead(h.system)) {
+          const next = canRetry(h.system, now) ? yield* startSystem(h) : h;
+          return [null, next] as const;
+        }
+        const maxAgeMs = h.intervalMs * 3;
+        const read = rateOf(h.system, SYSTEM_EVENTS.read, maxAgeMs, now);
+        const write = rateOf(h.system, SYSTEM_EVENTS.write, maxAgeMs, now);
+        const bw: MemBandwidth | null =
+          read === null && write === null
+            ? null
+            : { readBps: (read ?? 0) * BYTES_PER_EVENT, writeBps: (write ?? 0) * BYTES_PER_EVENT };
+        return [bw, h] as const;
+      }),
+    ),
   ).pipe(Effect.withSpan('MemBandwidth.sample'));
 
   const procSample = Effect.gen(function* () {
@@ -259,19 +262,21 @@ export const makeMemBandwidth = Effect.fn('makeMemBandwidth')(function* (options
   }).pipe(Effect.withSpan('MemBandwidth.procSample'));
 
   const setPid = Effect.fn('MemBandwidth.setPid')(function* (pid: number | null) {
-    yield* SynchronizedRef.updateEffect(held, (h) => follow(h, pid));
+    yield* Effect.uninterruptible(SynchronizedRef.updateEffect(held, (h) => follow(h, pid)));
   });
 
   const configure = Effect.fn('MemBandwidth.configure')(function* (intervalMs: number) {
-    yield* SynchronizedRef.updateEffect(held, (h) =>
-      h.intervalMs === intervalMs
-        ? Effect.succeed(h)
-        : Effect.gen(function* () {
-            const withSystem = yield* startSystem({ ...h, intervalMs });
-            // The process stream is replaced too: stopped, then started at the new interval for the same pid.
-            const none = yield* follow(withSystem, null);
-            return yield* follow(none, h.pid);
-          }),
+    yield* Effect.uninterruptible(
+      SynchronizedRef.updateEffect(held, (h) =>
+        h.intervalMs === intervalMs
+          ? Effect.succeed(h)
+          : Effect.gen(function* () {
+              const withSystem = yield* startSystem({ ...h, intervalMs });
+              // The process stream is replaced too: stopped, then started at the new interval for the same pid.
+              const none = yield* follow(withSystem, null);
+              return yield* follow(none, h.pid);
+            }),
+      ),
     );
   });
 

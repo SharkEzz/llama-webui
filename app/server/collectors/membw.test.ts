@@ -62,7 +62,11 @@ const withFakes = <A, E>(test: (ws: Workspace) => Effect.Effect<A, E, Services |
 
 /** `effect` again every 10 ms until `ok` holds, 3 s at most. */
 const eventually = <A, E, R>(effect: Effect.Effect<A, E, R>, ok: (a: A) => boolean) =>
-  effect.pipe(Effect.repeat({ until: ok, schedule: Schedule.spaced('10 millis') }), Effect.orDie);
+  effect.pipe(
+    Effect.repeat({ until: ok, schedule: Schedule.spaced('10 millis') }),
+    Effect.timeout('3 seconds'),
+    Effect.orDie,
+  );
 
 /** Shell that prints `lines` with a short pause between them. */
 const printed = (lines: ReadonlyArray<string>) =>

@@ -5,10 +5,8 @@ import {
   Duration,
   Effect,
   Exit,
-  Fiber,
   Option,
   Scope,
-  Semaphore,
   String as Str,
   Stream,
   SynchronizedRef,
@@ -135,7 +133,8 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
   // The streams and their watchers live in a scope the end of the caller's scope closes.
   const scope = yield* Effect.scope;
   const ops = yield* Scope.fork(scope);
-  const appsLock = yield* Semaphore.make(1);
+  /** Completed once the compute-apps query in flight ended; none before the first one. */
+  const inFlight = yield* SynchronizedRef.make<Option.Option<Deferred.Deferred<void>>>(Option.none());
   const held = yield* SynchronizedRef.make<Held>({
     intervalMs: options.intervalMs,
     stream: Option.none(),
@@ -164,7 +163,7 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
   /** Launches the stream at `h.intervalMs`; a launch that fails makes nvidia-smi unavailable. */
   const launch = (h: Held): Effect.Effect<Held> =>
     Effect.gen(function* () {
-      const scope = yield* Scope.fork(ops);
+      const streamScope = yield* Scope.fork(ops);
       const spawned = yield* spawner
         .spawn(
           ChildProcess.make(
@@ -173,23 +172,23 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
             { stdin: 'ignore', stderr: 'ignore', forceKillAfter: FORCE_KILL_AFTER },
           ),
         )
-        .pipe(Scope.provide(scope), Effect.result);
+        .pipe(Scope.provide(streamScope), Effect.result);
       if (spawned._tag === 'Failure') {
-        yield* Scope.close(scope, Exit.void);
+        yield* Scope.close(streamScope, Exit.void);
         return { ...h, stream: Option.none(), available: false };
       }
       const handle = spawned.success;
-      const stream: SmiStream = { scope };
+      const stream: SmiStream = { scope: streamScope };
       const drained = yield* Deferred.make<void>();
       yield* read(stream, handle.stdout).pipe(
         Effect.ensuring(Deferred.succeed(drained, undefined)),
-        Effect.forkIn(scope),
+        Effect.forkIn(streamScope),
       );
       // Once it exits, its reader is joined (1 s at most), then its scope is closed.
       yield* handle.exitCode.pipe(
         Effect.ignore,
         Effect.andThen(Deferred.await(drained).pipe(Effect.interruptible, Effect.timeoutOption(DRAIN_TIMEOUT))),
-        Effect.andThen(Scope.close(scope, Exit.void)),
+        Effect.andThen(Scope.close(streamScope, Exit.void)),
         Effect.forkIn(ops),
       );
       return { ...h, stream: Option.some(stream), pending: [] };
@@ -198,16 +197,20 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
   /** Stops a stream without waiting for it: its reader no longer counts once the state names another one. */
   const stop = (stream: SmiStream) => Effect.forkIn(Scope.close(stream.scope, Exit.void), ops).pipe(Effect.asVoid);
 
-  const start = SynchronizedRef.updateEffect(held, (h) =>
-    Option.isSome(h.stream) || !h.available ? Effect.succeed(h) : launch(h),
-  ).pipe(Effect.withSpan('NvidiaSmi.start'));
+  /** A change of the state that may launch a stream: uninterruptible, so no stream runs that the state does not name. */
+  const changeStream = (f: (h: Held) => Effect.Effect<Held>) =>
+    Effect.uninterruptible(SynchronizedRef.updateEffect(held, f));
+
+  const start = changeStream((h) => (Option.isSome(h.stream) || !h.available ? Effect.succeed(h) : launch(h))).pipe(
+    Effect.withSpan('NvidiaSmi.start'),
+  );
 
   /**
    * A new interval restarts the stream at that pace. Every card is still queried, hidden ones included: one call reads
    * them all and reads no PCIe throughput; the monitor only identifies the hidden ones.
    */
   const configure = Effect.fn('NvidiaSmi.configure')(function* (o: { readonly intervalMs: number }) {
-    yield* SynchronizedRef.updateEffect(held, (h) => {
+    yield* changeStream((h) => {
       if (o.intervalMs === h.intervalMs) return Effect.succeed(h);
       const next = { ...h, intervalMs: o.intervalMs };
       return Option.match(h.stream, {
@@ -248,25 +251,33 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
   }).pipe(Effect.scoped);
 
   /**
-   * One query at a time: a call while one runs returns at once. The query runs in a fiber of its own, so a caller waits
-   * `appsTimeout` and the kill's grace at most, even for a program the kill cannot end yet (stuck in the driver); the
-   * next query waits until it is gone. The previous mapping stays when the query gives none.
+   * One query at a time: a call while one runs waits for that same query. The query runs in a fiber of its own, so a
+   * caller waits `appsTimeout` and the kill's grace at most, even for a program the kill cannot end yet (stuck in the
+   * driver); the next query starts once it is gone. The previous mapping stays when the query gives none.
    */
   const refreshApps = Effect.uninterruptibleMask((restore) =>
     Effect.gen(function* () {
       const { available } = yield* SynchronizedRef.get(held);
-      if (!available || !(yield* Semaphore.takeIfAvailable(appsLock, 1))) return;
-      const query = queryApps.pipe(
-        Effect.flatMap(
-          Option.match({
-            onNone: () => Effect.void,
-            onSome: (text) => SynchronizedRef.update(held, (h) => ({ ...h, apps: parseComputeApps(text) })),
-          }),
-        ),
-        Effect.ensuring(Semaphore.release(appsLock, 1)),
+      if (!available) return;
+      const done = yield* SynchronizedRef.modifyEffect(inFlight, (running) =>
+        Effect.gen(function* () {
+          if (Option.isSome(running) && !(yield* Deferred.isDone(running.value)))
+            return [running.value, running] as const;
+          const ended = yield* Deferred.make<void>();
+          yield* queryApps.pipe(
+            Effect.flatMap(
+              Option.match({
+                onNone: () => Effect.void,
+                onSome: (text) => SynchronizedRef.update(held, (h) => ({ ...h, apps: parseComputeApps(text) })),
+              }),
+            ),
+            Effect.ensuring(Deferred.succeed(ended, undefined)),
+            Effect.forkIn(ops),
+          );
+          return [ended, Option.some(ended)] as const;
+        }),
       );
-      const fiber = yield* Effect.forkIn(query, ops, { startImmediately: true });
-      yield* restore(Fiber.join(fiber).pipe(Effect.timeoutOption(Duration.sum(appsTimeout, KILL_GRACE))));
+      yield* restore(Deferred.await(done).pipe(Effect.timeoutOption(Duration.sum(appsTimeout, KILL_GRACE))));
     }),
   ).pipe(Effect.withSpan('NvidiaSmi.refreshApps'));
 

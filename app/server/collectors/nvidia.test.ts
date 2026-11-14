@@ -229,6 +229,24 @@ layer(NodeServices.layer, { excludeTestServices: true })('nvidia-smi', (it) => {
     ),
   );
 
+  it.effect('a refreshApps call while a query runs waits for that same query', () =>
+    withFakes((ws) =>
+      Effect.gen(function* () {
+        const apps = yield* fx('nvidia-apps.csv');
+        yield* ws.write('apps', apps);
+        const bin = yield* fakeSmi(ws, 'exec sleep 60', 'sleep 0.3; cat "$DIR/apps"');
+        const smi = yield* makeNvidiaSmi({ bin, intervalMs: 1000 });
+        const seen = smi.refreshApps.pipe(Effect.andThen(smi.procVram(49730)));
+        // The second caller comes while the first query runs.
+        const [first, second] = yield* Effect.all([seen, Effect.delay(seen, '100 millis')], { concurrency: 2 });
+        assert.strictEqual(first.get(CARD), 5875 * MiB);
+        assert.strictEqual(second.get(CARD), 5875 * MiB);
+        const calls = yield* ws.calls;
+        assert.strictEqual(calls.length, 1);
+      }),
+    ),
+  );
+
   it.effect("hung nvidia-smi compute-apps query times out, is killed, and calls don't pile up", () =>
     withFakes((ws) =>
       Effect.gen(function* () {
