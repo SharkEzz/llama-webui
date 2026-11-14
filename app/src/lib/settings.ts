@@ -26,13 +26,15 @@ export function useSettingsEditor() {
   const save = async (patch: Partial<Settings>, o: { quiet?: boolean } = {}): Promise<boolean> => {
     const keys = Object.keys(patch) as (keyof Settings)[];
     try {
-      setSettings(await call((api) => api.settings.patch({ payload: patch })));
+      const { warning, ...next } = await call((api) => api.settings.patch({ payload: patch }));
+      setSettings(next);
+      if (warning !== undefined) toast.warning(warning);
       setErrors((e) => {
         const copy = { ...e };
         for (const k of keys) delete copy[k];
         return copy;
       });
-      if (!o.quiet) toast.success('Setting saved', { id: 'settings-saved' });
+      if (!o.quiet && warning === undefined) toast.success('Setting saved', { id: 'settings-saved' });
       return true;
     } catch (e) {
       const refused = invalid(e);

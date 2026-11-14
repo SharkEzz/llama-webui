@@ -19,6 +19,9 @@ const placeholder = (title: string, milestone?: string) => ({
 
 /** The pages the Effect server serves again, each loaded on first visit. */
 const PORTED: Partial<Record<string, () => Promise<ComponentType>>> = {
+  '/dashboard': async () => (await import('@/features/dashboard/DashboardPage')).DashboardPage,
+  '/system': async () => (await import('@/features/system/SystemPage')).SystemPage,
+  '/topology': async () => (await import('@/features/topology/TopologyPage')).TopologyPage,
   '/settings': async () => (await import('@/features/settings/SettingsPage')).SettingsPage,
   '/profiles': async () => (await import('@/features/profiles/ProfilesPage')).ProfilesPage,
   '/server': async () => (await import('@/features/server/ServerPage')).ServerPage,
