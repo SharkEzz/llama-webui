@@ -318,6 +318,30 @@ Found while porting E5, accepted with its result:
 - The Chat page's `stem` (a pure function of `@/lib/models`, whose module does not compile until E6's store) moved
   unchanged to `app/src/lib/stem.ts`. The web's `callStream` (`app/src/lib/api.ts`) tells a body that breaks off
   (`ApiUnreachable`, the store reads the conversation again) from an event that does not decode (`ApiReplyInvalid`,
-  logged, a toast).
+  logged, a toast). The store is built by `makeChatStore` on the calls it is given, so `app/src/lib/chat.test.ts`
+  drives it on a fake `fetch` (a follow answered 204, a reply without `done`, a body that breaks off, a 409, a reply
+  aborted when another conversation opens).
 - The developer pages of the site still describe the Nitro client (`readSse()`, `apiError()` in
   `site/content/developers/frontend.mdx`): they are rewritten at E10 (design spec, the E10 row and its sync rule).
+
+Found by the final review of E5, fixed with it:
+
+- A run that dies (a defect in its fiber, such as a database write that dies) is saved `error` with its text so far
+  and the error `llama-webui: internal error`, then its `done` is published: its row was left `streaming` until the
+  next start and its streams never ended. The save is best-effort (`Effect.ignoreCause`, logged), so a save that dies
+  too still ends the streams (`chat/ChatRuns.test.ts`: a reply whose run dies is saved error with its text so far, and
+  its stream ends with done).
+- The shutdown step closes the runs under their lock, in the step that takes them: a send or a regeneration accepted
+  after the step started a reply that no step saved `stopped` (the end of the layer interrupted it, its row left
+  `streaming`); it is now a 409 `ServerNotReady` that stores nothing (`chat/ChatRuns.test.ts`: a send after the
+  shutdown step is ServerNotReady and stores nothing).
+- A reply is traced under its own root span `ChatRuns.reply` (attribute `conversationId`): forked into the layer's
+  scope, it was a child of the span of the request that started it, which ends long before the reply.
+
+## Measures (`e<N>.json`)
+
+The startup and shutdown medians of `scripts/poc/measure.ts` depend on the machine's load at the time: `e5.json`
+reads a startup of 378 ms against 276 ms in `e4.json`, while the two builds measured back to back, interleaved, on
+the same machine (`--skip-durations`) read 318 and 319 ms for E4 (`7b607b9`) and 321 and 314 ms for E5 (`aaf0c7a`),
+shutdown 28/28 and 29/28. Startup and shutdown figures taken at different times are not comparable: to compare two
+milestones, measure both builds back to back. The sizes and counts of the files do not drift.
