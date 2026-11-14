@@ -6,6 +6,7 @@ import { ConversationsRepo } from './chat/ConversationsRepo.ts';
 import { AppConfig } from './config/AppConfig.ts';
 import { AppInfo } from './config/AppInfo.ts';
 import * as Db from './db/Db.ts';
+import { Downloads } from './downloads/Downloads.ts';
 import { DownloadsRepo } from './downloads/DownloadsRepo.ts';
 import { Flags } from './flags/Flags.ts';
 import { PciIds } from './hardware/PciIds.ts';
@@ -29,16 +30,17 @@ import { WsHub } from './ws/WsHub.ts';
 /**
  * The services the routes use, built before the HTTP server opens its port and undone after it closed: the database
  * is opened (and brought up to date) first. The watch of a server started by hand is built last and undone first: no
- * look runs while the rest stops. The monitor, the placement and the chat's replies are under it: they end, the
- * collectors' programs with the monitor and the replies saved, before the supervisor stops llama-server, while the
- * ring and the hub it writes to are still up. The models are scanned and read on each request (the summaries cached in
- * the database, the last GGUFs read in memory); the Hub is reached through its own client (`HfClient` on `HfHttp`,
- * beside `LlamaHttp`); the downloads a model
- * must not be deleted under are the queued and running rows of the `downloads` table (`ActiveWrites.layer`). Later
- * tasks add theirs, each on `Shutdown.layer`.
+ * look runs while the rest stops. The monitor, the placement, the chat's replies and the download queue are under it:
+ * they end, the collectors' programs with the monitor, the replies saved and the running transfer stopped (its `.part`
+ * kept, its row left `downloading` for the next start), before the supervisor stops llama-server, while the ring, the
+ * hub they write to and the database are still up. Their shutdown steps (`Shutdown.before`) are registered after the
+ * hub's, so they run before it flushes its last messages. The models are scanned and read on each request (the
+ * summaries cached in the database, the last GGUFs read in memory); the Hub is reached through its own client
+ * (`HfClient` on `HfHttp`, beside `LlamaHttp`), the queue's transfers through `HfHttp`; the downloads a model must not
+ * be deleted under are the queued and running rows of the `downloads` table (`ActiveWrites.layer`).
  */
 const Services = ExternalWatch.layer.pipe(
-  Layer.provideMerge(Layer.mergeAll(Monitor.layer, Placement.layer, ChatRuns.layer)),
+  Layer.provideMerge(Layer.mergeAll(Monitor.layer, Placement.layer, ChatRuns.layer, Downloads.layer)),
   Layer.provideMerge(Supervisor.layer),
   Layer.provideMerge(Flags.layer),
   Layer.provideMerge(

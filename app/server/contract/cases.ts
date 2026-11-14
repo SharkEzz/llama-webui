@@ -278,6 +278,17 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
   add('refusal', 'GET /api/hf/repo (offline)', bare('GET', '/api/hf/repo?id=org/repo'));
   add('violation', 'GET /api/hf/repo (not an org/name id)', bare('GET', '/api/hf/repo?id=bad'));
 
+  // The download queue: empty, and offline (a request fails at the Hub before anything is queued).
+  const download = JSON.stringify({ repo: 'org/repo', revision: '0'.repeat(40), keys: ['m.gguf'] });
+  add('read', 'GET /api/downloads (empty)', bare('GET', '/api/downloads'));
+  add('refusal', 'POST /api/downloads (offline)', json('POST', '/api/downloads', download));
+  add('violation', 'POST /api/downloads (empty repo)', json('POST', '/api/downloads', '{"repo":""}'));
+  add('body', 'POST /api/downloads (malformed JSON)', json('POST', '/api/downloads', '{'));
+  add('write', 'POST /api/downloads/clear (nothing to clear)', bare('POST', '/api/downloads/clear'));
+  add('refusal', 'DELETE /api/downloads/999 (no such download)', bare('DELETE', '/api/downloads/999'));
+  add('refusal', 'POST /api/downloads/999/retry (no such download)', bare('POST', '/api/downloads/999/retry'));
+  add('read', 'GET /api/downloads (after the writes)', bare('GET', '/api/downloads'));
+
   const names = new Set<string>();
   for (const c of out) {
     if (names.has(c.name)) throw new Error(`duplicate contract case: ${c.name}`);

@@ -8,6 +8,7 @@ import { HttpApiBuilder } from 'effect/http-api';
 import { ChatHandlers } from '../chat/http.ts';
 import { AppConfig } from '../config/AppConfig.ts';
 import { AppInfo } from '../config/AppInfo.ts';
+import { DownloadsHandlers } from '../downloads/http.ts';
 import { FlagsHandlers } from '../flags/http.ts';
 import { HealthHandlers } from '../health/http.ts';
 import { HfHandlers } from '../hf/http.ts';
@@ -50,6 +51,7 @@ export const ApiRoutes = Layer.merge(
         ChatHandlers,
         ModelsHandlers,
         HfHandlers,
+        DownloadsHandlers,
       ).pipe(Layer.provideMerge(RequestErrorsLive)),
     ),
   ),

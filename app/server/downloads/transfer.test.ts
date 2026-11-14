@@ -24,7 +24,7 @@ import { partPath, sizeOf } from '../hf/paths.ts';
 import type { NewDownload } from '../hf/repo.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { type FakeHub, fakeHub } from '../testing/hub.ts';
-import { ServicesTest } from '../testing/services.ts';
+import { ServicesWithoutQueue } from '../testing/services.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { Downloads } from './Downloads.ts';
 import { DownloadsRepo } from './DownloadsRepo.ts';
@@ -69,7 +69,7 @@ const Logs = Logger.layer([
 
 /** The services of the app with `HOME` a temporary folder, the fake Hub as the endpoint and `hf_secret` as the token. */
 const Base = Layer.mergeAll(Layer.effect(Published, Ref.make<ReadonlyArray<WsMessage>>([])), Logs).pipe(
-  Layer.provideMerge(ServicesTest),
+  Layer.provideMerge(ServicesWithoutQueue),
   Layer.provideMerge(
     ConfigProvider.layerAdd(
       Effect.gen(function* () {

@@ -1335,5 +1335,110 @@
         }
       ]
     }
+  },
+  "GET /api/downloads (empty)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "items": [],
+      "live": null
+    }
+  },
+  "POST /api/downloads (offline)": {
+    "status": 502,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "HfUnreachable",
+      "message": "Hugging Face unreachable: fetch failed"
+    }
+  },
+  "POST /api/downloads (empty repo)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Repository id expected (org/name) (repo)",
+      "issues": [
+        {
+          "path": [
+            "repo"
+          ],
+          "message": "Repository id expected (org/name)"
+        },
+        {
+          "path": [
+            "revision"
+          ],
+          "message": "Missing key"
+        },
+        {
+          "path": [
+            "keys"
+          ],
+          "message": "Missing key"
+        }
+      ]
+    }
+  },
+  "POST /api/downloads (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/downloads/clear (nothing to clear)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "deleted": 0
+    }
+  },
+  "DELETE /api/downloads/999 (no such download)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "DownloadNotFound",
+      "message": "Download not found"
+    }
+  },
+  "POST /api/downloads/999/retry (no such download)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "DownloadNotFound",
+      "message": "Download not found"
+    }
+  },
+  "GET /api/downloads (after the writes)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "items": [],
+      "live": null
+    }
   }
 }

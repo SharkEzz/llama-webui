@@ -1,5 +1,6 @@
 import { HttpApi } from 'effect/http-api';
 import { ChatApi } from './ChatApi.ts';
+import { DownloadsApi } from './DownloadsApi.ts';
 import { FlagsApi } from './FlagsApi.ts';
 import { HealthApi } from './HealthApi.ts';
 import { HfApi } from './HfApi.ts';
@@ -28,5 +29,6 @@ export class Api extends HttpApi.make('llama-webui')
   .add(ChatApi)
   .add(ModelsApi)
   .add(HfApi)
+  .add(DownloadsApi)
   .annotate(HttpApi.PayloadParseOptions, { onExcessProperty: 'error', errors: 'all' })
   .middleware(RequestErrors) {}

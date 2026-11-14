@@ -1,6 +1,6 @@
 // The production build as a process: how it starts, refuses to start, and reads its options.
 import { type ChildProcessByStdio, spawn } from 'node:child_process';
-import { copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
@@ -9,6 +9,7 @@ import type { Readable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { type SseEvent, SseParser } from '@llama-webui/shared';
 import { afterAll, expect, test } from 'vitest';
+import { startHub } from './testing/hub.ts';
 import { freePort, LAUNCHER, launch, userEnv } from './testing/launch.ts';
 import { startFakeThrough } from './testing/llama.ts';
 import { tempDir } from './testing/tempDir.ts';
@@ -334,4 +335,80 @@ test('an exit without its finalizers leaves no llama-server', async () => {
   // handler would kill it too: this proves the outcome, not which of them did it.
   for (let i = 0; i < 100 && alive(pid); i++) await sleep(20);
   expect(alive(pid)).toBe(false);
+}, 30_000);
+
+test('SIGTERM during a download keeps its .part and the next start resumes it', async () => {
+  const data = dataDir();
+  const home = join(data, 'home');
+  mkdirSync(join(home, 'models'), { recursive: true });
+  // A model of 256 KiB on the fake Hub (loopback); its CDN sends the first 64 KiB, then nothing more.
+  const body = Buffer.alloc(256 * 1024, 'q');
+  const first = 64 * 1024;
+  const hub = await startHub({ repos: [{ id: 'org/repo', files: { 'Model-Q4_K_M.gguf': body } }] });
+  try {
+    hub.fail('cdn', { stall: first });
+    // A home of the test's own (the models folder its `~/models`), the fake Hub, no token of the user's.
+    const env = {
+      HOME: home,
+      XDG_DATA_HOME: join(home, 'data'),
+      XDG_CONFIG_HOME: join(home, 'config'),
+      LLAMA_WEBUI_TEST_MONITOR: 'stub',
+      HF_HOME: join(home, 'hf'),
+      HF_TOKEN: '',
+      HUGGING_FACE_HUB_TOKEN: '',
+      HF_TOKEN_PATH: join(home, 'hf', 'token'),
+      HF_ENDPOINT: hub.url,
+    };
+    const dest = join(home, 'models', 'org', 'repo', 'Model-Q4_K_M.gguf');
+    const sizeOf = (path: string) => {
+      try {
+        return statSync(path).size;
+      } catch {
+        return null;
+      }
+    };
+    let id: number;
+    {
+      await using app = await launch({ dataDir: data, env });
+      const res = await fetch(`${app.base}/api/downloads`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repo: 'org/repo', revision: hub.shaOf('org/repo'), keys: ['Model-Q4_K_M.gguf'] }),
+      });
+      expect(res.status).toBe(202);
+      const created = (await res.json()) as { items: Array<{ id: number }> };
+      id = created.items[0]?.id ?? 0;
+      for (let i = 0; i < 250 && sizeOf(`${dest}.part`) !== first; i++) await sleep(20);
+      expect(sizeOf(`${dest}.part`)).toBe(first);
+      const t0 = performance.now();
+      app.proc.kill('SIGTERM');
+      const code = await app.exited;
+      expect(performance.now() - t0).toBeLessThan(2000);
+      expect(code).toBe(0);
+    }
+    // The `.part` kept as it was, the item still `downloading`.
+    expect(sizeOf(`${dest}.part`)).toBe(first);
+    expect(sizeOf(dest)).toBeNull();
+    const db = new DatabaseSync(join(data, 'llama-webui.sqlite'), { readOnly: true });
+    try {
+      expect(db.prepare('SELECT id, status FROM downloads').all()).toEqual([{ id, status: 'downloading' }]);
+    } finally {
+      db.close();
+    }
+    // The next start resumes it from the `.part`, and finishes it.
+    await using again = await launch({ dataDir: data, env });
+    let status = '';
+    for (let i = 0; i < 250 && status !== 'done'; i++) {
+      const list = (await (await fetch(`${again.base}/api/downloads`)).json()) as { items: Array<{ status: string }> };
+      status = list.items[0]?.status ?? '';
+      if (status !== 'done') await sleep(20);
+    }
+    expect(status).toBe('done');
+    const cdn = hub.requests().filter((r) => r.route === 'cdn');
+    expect(cdn.map((r) => r.headers.range)).toEqual([undefined, `bytes=${first}-`]);
+    expect(readFileSync(dest).equals(body)).toBe(true);
+    expect(sizeOf(`${dest}.part`)).toBeNull();
+  } finally {
+    await hub.close();
+  }
 }, 30_000);

@@ -21,7 +21,7 @@ import {
 } from 'effect';
 import { SqlClient } from 'effect/sql';
 import type { NewDownload } from '../hf/repo.ts';
-import { ServicesTest } from '../testing/services.ts';
+import { ServicesWithoutQueue } from '../testing/services.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { Downloads } from './Downloads.ts';
 import { DownloadsRepo } from './DownloadsRepo.ts';
@@ -151,7 +151,7 @@ const Base = Layer.mergeAll(
   Layer.effect(Published, Ref.make<ReadonlyArray<WsMessage>>([])),
   Errors,
 ).pipe(
-  Layer.provideMerge(ServicesTest),
+  Layer.provideMerge(ServicesWithoutQueue),
   Layer.provideMerge(
     ConfigProvider.layerAdd(
       Effect.gen(function* () {
