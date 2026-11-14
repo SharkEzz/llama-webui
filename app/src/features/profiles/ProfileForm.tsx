@@ -1,5 +1,5 @@
 import { DEFAULT_SETTINGS, defer, type Profile, reservedFlag, type Settings } from '@llama-webui/shared';
-import { Copy, Download, Save, Trash2 } from 'lucide-react';
+import { Copy, Download, Play, Save, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { CodeTextarea } from '@/components/CodeTextarea';
@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createProfile, deleteProfile, duplicateProfile, type NewProfile, updateProfile } from '@/lib/profiles';
+import { isRunning, restartServer, startProfile, useServer } from '@/lib/server';
 import { ArgsEditor } from './ArgsEditor';
 import { parseArgs, parseEnv } from './argsText';
-import { type Draft, draftOf } from './draft';
+import { commandChanged, type Draft, draftOf } from './draft';
 import { type FieldErrors, fieldErrors } from './errors';
 import { highlightEnv } from './highlight';
 
@@ -27,6 +28,9 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
   const [draft, setDraft] = useState(() => draftOf(profile, initial));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
+  const [restartAsk, setRestartAsk] = useState(false);
+  const view = useServer((s) => s.view);
+  const isActive = profile !== null && view?.profileId === profile.id && isRunning(view);
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(draftOf(profile)), [draft, profile]);
 
   const set = (k: keyof Draft) => (e: { target: { value: string } }) =>
@@ -60,6 +64,8 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
       const saved = profile ? await updateProfile(profile.id, input) : await createProfile(input);
       setErrors({});
       toast.success(profile ? 'Profile saved' : 'Profile created');
+      // The running server still uses the previous version: offer to restart it.
+      if (profile && isActive && commandChanged(profile, saved)) setRestartAsk(true);
       onSaved(saved);
     } catch (e) {
       setErrors(fieldErrors(e));
@@ -141,6 +147,16 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
         )}
       </div>
 
+      <ConfirmDialog
+        open={restartAsk}
+        onOpenChange={setRestartAsk}
+        title="Restart llama-server?"
+        description={`“${draft.name.trim()}” is running with its previous settings. Restart it to apply the changes? Running requests will be interrupted.`}
+        cancelLabel="Later"
+        confirmLabel="Restart"
+        onConfirm={restartServer}
+      />
+
       {errors.form && <p className="text-sm text-destructive">{errors.form}</p>}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-5">
@@ -149,6 +165,21 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
         </Button>
         {profile && (
           <>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={dirty || isRunning(view) || view?.state.kind === 'external'}
+              title={
+                dirty
+                  ? 'Save first'
+                  : isRunning(view)
+                    ? 'A server is already running: use Switch on the Server page'
+                    : undefined
+              }
+              onClick={() => void startProfile(profile.id)}
+            >
+              <Play /> Start this profile
+            </Button>
             <Button
               type="button"
               variant="ghost"
@@ -188,7 +219,12 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
                   )
                 }
                 trigger={
-                  <Button type="button" variant="destructive">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={isActive}
+                    title={isActive ? 'Stop the server first' : undefined}
+                  >
                     <Trash2 /> Delete
                   </Button>
                 }

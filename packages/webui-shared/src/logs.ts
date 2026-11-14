@@ -87,11 +87,11 @@ const bySeq = Order.mapInput(Order.Number, (l: LogLine) => l.seq);
 
 /** Merges by number (deduplicated, sorted) and keeps the last `max` lines. */
 export const mergeLogs: {
-  (incoming: LogLine[], max: number): (view: LogView) => LogView;
-  (view: LogView, incoming: LogLine[], max: number): LogView;
+  (incoming: ReadonlyArray<LogLine>, max: number): (view: LogView) => LogView;
+  (view: LogView, incoming: ReadonlyArray<LogLine>, max: number): LogView;
 } = dual(
   3,
-  (view: LogView, incoming: LogLine[], max: number): LogView =>
+  (view: LogView, incoming: ReadonlyArray<LogLine>, max: number): LogView =>
     Arr.match(incoming, {
       onEmpty: () => view,
       onNonEmpty: (batch) => {

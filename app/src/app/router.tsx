@@ -21,6 +21,8 @@ const placeholder = (title: string, milestone?: string) => ({
 const PORTED: Partial<Record<string, () => Promise<ComponentType>>> = {
   '/settings': async () => (await import('@/features/settings/SettingsPage')).SettingsPage,
   '/profiles': async () => (await import('@/features/profiles/ProfilesPage')).ProfilesPage,
+  '/server': async () => (await import('@/features/server/ServerPage')).ServerPage,
+  '/logs': async () => (await import('@/features/logs/LogsPage')).LogsPage,
 };
 
 const pageOf = (r: AppRoute) => {

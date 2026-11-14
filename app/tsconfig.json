@@ -14,5 +14,5 @@
     }
   },
   "include": ["src/main.tsx", "src/*.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "build", "vite.config.ts"],
-  "exclude": ["src/lib/bench.test.ts", "src/lib/props.test.ts", "src/lib/tuning.test.ts"]
+  "exclude": ["src/lib/bench.test.ts", "src/lib/tuning.test.ts"]
 }

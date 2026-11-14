@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { call } from '@/lib/api';
 import { importProfiles, importSummary, useProfiles } from '@/lib/profiles';
+import { isRunning, useServer } from '@/lib/server';
 import { cn } from '@/lib/utils';
 import { ProfileForm } from './ProfileForm';
 
@@ -20,6 +21,7 @@ export function ProfilesPage() {
   const [params, setParams] = useSearchParams();
   const [settings, setSettings] = useState<Settings | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const view = useServer((s) => s.view);
 
   useEffect(() => {
     void reload().catch((e: Error) => toast.error(e.message));
@@ -30,6 +32,17 @@ export function ProfilesPage() {
   const requested = Number(params.get('id'));
   const selected = creating ? null : (profiles.find((p) => p.id === requested) ?? profiles[0] ?? null);
   const select = (id: number | 'new') => setParams(id === 'new' ? { new: '1' } : { id: String(id) }, { replace: true });
+
+  // Opened without a selection: the running profile, written once into the URL (a later start or stop must not
+  // change the selection, which would remount the form and lose its edits).
+  const preselected = useRef(false);
+  const runningId = isRunning(view) ? (view?.profileId ?? null) : null;
+  useEffect(() => {
+    if (preselected.current || !loaded || view === null) return;
+    preselected.current = true;
+    if (params.has('id') || params.has('new') || runningId === null) return;
+    if (profiles.some((p) => p.id === runningId)) setParams({ id: String(runningId) }, { replace: true });
+  }, [loaded, view, params, runningId, profiles, setParams]);
 
   const onFile = async (file: File) => {
     let raw: unknown;
@@ -96,25 +109,31 @@ export function ProfilesPage() {
           <nav aria-label="Profiles" className={cn(GLASS, 'flex flex-col gap-0.5 p-2')}>
             {!loaded && [0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             {creating && <div className="rounded-md bg-accent px-3 py-2 text-sm font-medium">New profile</div>}
-            {profiles.map((p) => (
-              <Button
-                key={p.id}
-                variant="ghost"
-                onClick={() => select(p.id)}
-                aria-current={selected?.id === p.id ? 'true' : undefined}
-                className={cn(
-                  'h-auto flex-col items-start gap-0.5 px-3 py-2 text-left',
-                  selected?.id === p.id && 'bg-accent',
-                )}
-              >
-                <span className="flex w-full items-center gap-2 text-sm font-medium">
-                  <span className="truncate">{p.name}</span>
-                </span>
-                <span className="w-full truncate font-mono text-[0.7rem] font-normal text-muted-foreground">
-                  {basename(p.model)}
-                </span>
-              </Button>
-            ))}
+            {profiles.map((p) => {
+              const active = view?.profileId === p.id && isRunning(view);
+              return (
+                <Button
+                  key={p.id}
+                  variant="ghost"
+                  onClick={() => select(p.id)}
+                  aria-current={selected?.id === p.id ? 'true' : undefined}
+                  className={cn(
+                    'h-auto flex-col items-start gap-0.5 px-3 py-2 text-left',
+                    selected?.id === p.id && 'bg-accent',
+                  )}
+                >
+                  <span className="flex w-full items-center gap-2 text-sm font-medium">
+                    <span className="truncate">{p.name}</span>
+                    {active && (
+                      <span className="ml-auto size-2 shrink-0 rounded-full bg-success" title="Server running" />
+                    )}
+                  </span>
+                  <span className="w-full truncate font-mono text-[0.7rem] font-normal text-muted-foreground">
+                    {basename(p.model)}
+                  </span>
+                </Button>
+              );
+            })}
           </nav>
 
           <GlassCard title={selected ? selected.name : 'New profile'}>
