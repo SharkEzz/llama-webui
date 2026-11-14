@@ -32,6 +32,7 @@ import { Supervisor } from '../supervisor/Supervisor.ts';
 import { ServerTest } from '../testing/http.ts';
 import { chatStub, FAKE, freePort, pidAlive, until } from '../testing/llama.ts';
 import { ServicesTest } from '../testing/services.ts';
+import { ChatRuns } from './ChatRuns.ts';
 import { ConversationsRepo } from './ConversationsRepo.ts';
 
 /** The API as the app serves it, on a real server, with the services it uses for what a test checks behind it. */
@@ -153,6 +154,28 @@ const stopFake = (pid: number) =>
     yield* until(() => !pidAlive(pid));
   });
 
+/**
+ * Waits until the reply of `id` has read `content` (looked at every 10 ms, for 5 s at most): the text of the replay a
+ * new follower gets, once the reply has written a delta.
+ */
+const writtenWhen = (id: number, content: string) =>
+  Effect.gen(function* () {
+    const runs = yield* ChatRuns;
+    const written = Effect.gen(function* () {
+      const reply = yield* runs.live(id).pipe(Effect.flatMap(Effect.fromOption), Effect.orDie);
+      // The start, then the delta of what was written so far.
+      const replay = yield* reply.events.pipe(Stream.take(2), Stream.runCollect);
+      return Arr.findFirst(replay, (e) => e.type === 'delta').pipe(
+        Option.flatMap((e) => (e.type === 'delta' ? Option.fromNullishOr(e.content) : Option.none())),
+        Option.getOrElse(() => ''),
+      );
+    });
+    yield* written.pipe(
+      Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (text) => text === content }),
+      Effect.timeout('5 seconds'),
+    );
+  });
+
 /** A detail without its messages and `live`: the conversation as stored. */
 const storedOf = ({ messages: _messages, live: _live, ...conversation }: ConversationDetail) => conversation;
 
@@ -261,6 +284,8 @@ describe('ChatApi', () => {
         yield* sent.got(2);
         yield* Scope.close(scope, Exit.void);
         yield* llama.chunk({ content: ' world' });
+        // Read by the run before the new follower comes: its replay then holds the whole text.
+        yield* writtenWhen(id, 'Hello world');
         const detail = yield* read(ConversationDetail, `/api/chat/${id}`);
         assert.isTrue(detail.live);
         const again = yield* open('GET', `/api/chat/${id}/stream`);
