@@ -53,7 +53,8 @@ const workspace = Effect.gen(function* () {
   const calls = Effect.gen(function* () {
     if (!(yield* fs.exists(file('calls')))) return [];
     const text = yield* fs.readFileString(file('calls'));
-    return Arr.map(Str.split(Str.trim(text), '\n'), (line): Call => {
+    // The shell creates the file before it writes its line: an empty file is no start yet.
+    return Arr.map(Arr.filter(Str.split(Str.trim(text), '\n'), Str.isNonEmpty), (line): Call => {
       const [pid = '', ...args] = Str.split(line, ' ');
       return { pid: Number(pid), args };
     });

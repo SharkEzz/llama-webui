@@ -7,7 +7,6 @@ import { Schema } from 'effect';
 
 /** What the sampler reads (`GpuNeeds` of `../gpu.ts`). */
 export const Needs = Schema.Struct({
-  gpus: Schema.Boolean,
   pcie: Schema.Boolean,
   skipGpus: Schema.Array(Schema.String),
 });

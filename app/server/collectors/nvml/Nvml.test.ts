@@ -206,12 +206,12 @@ layer(NodeServices.layer, { excludeTestServices: true })('the NVML reader', (it)
         const system = yield* nvml.system;
         assert.deepStrictEqual(system, { driver: '580.95.05', cudaDriver: 13000 });
         yield* nvml.refreshApps;
-        yield* nvml.configure({ intervalMs: 500, needs: { gpus: true, pcie: false, skipGpus: ['0000:02:00.0'] } });
+        yield* nvml.configure({ intervalMs: 500, needs: { pcie: false, skipGpus: ['0000:02:00.0'] } });
         const received = yield* eventually(ws.received, (r) => r.length === 2);
         const commands = yield* Effect.forEach(received, (line) => decodeCommand(line));
         assert.deepStrictEqual(commands, [
           { type: 'start', intervalMs: 100, needs: MEASURE_ALL, lib: '/x/libnvidia-ml.so.1' },
-          { type: 'configure', intervalMs: 500, needs: { gpus: true, pcie: false, skipGpus: ['0000:02:00.0'] } },
+          { type: 'configure', intervalMs: 500, needs: { pcie: false, skipGpus: ['0000:02:00.0'] } },
         ]);
       }),
     ),

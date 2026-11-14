@@ -7,18 +7,15 @@ import { dual, pipe } from 'effect/Function';
  * only identified.
  */
 export interface GpuNeeds {
-  /** false: no card is read. */
-  readonly gpus: boolean;
   /** PCIe bandwidth (NVML blocks about 50 ms per GPU to read it). */
   readonly pcie: boolean;
   /** Hidden cards (PCI bus ids): not read. */
   readonly skipGpus: ReadonlyArray<string>;
 }
 
-export const MEASURE_ALL: GpuNeeds = { gpus: true, pcie: true, skipGpus: [] };
+export const MEASURE_ALL: GpuNeeds = { pcie: true, skipGpus: [] };
 
 export const gpuNeeds = (hiddenGpus: ReadonlyArray<string>): GpuNeeds => ({
-  gpus: true,
   pcie: true,
   skipGpus: hiddenGpus,
 });
@@ -27,7 +24,7 @@ export const gpuNeeds = (hiddenGpus: ReadonlyArray<string>): GpuNeeds => ({
 export const gpuSkipped: {
   (busId: string): (needs: GpuNeeds) => boolean;
   (needs: GpuNeeds, busId: string): boolean;
-} = dual(2, (needs: GpuNeeds, busId: string): boolean => !needs.gpus || needs.skipGpus.includes(busId));
+} = dual(2, (needs: GpuNeeds, busId: string): boolean => needs.skipGpus.includes(busId));
 
 /** A card listed without its readings: asleep (`suspended`), or shown nowhere (`hidden`). */
 type Identity = Pick<GpuReading, 'key' | 'vendor' | 'name' | 'busId'>;

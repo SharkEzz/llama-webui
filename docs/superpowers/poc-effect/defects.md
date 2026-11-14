@@ -50,10 +50,20 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 
 ### E4: monitor and collectors
 
-- The `Monitor` class has no direct test. `unverified`
-- `Ring.max()` and the `gpus: false` branch are never reached. `unverified`
-- An NVML child that fails once it is ready is never started again. `unverified`
-- `collectors.nvml` is only read at startup. `unverified`
+- The `Monitor` class has no direct test. `fixed in E4`: the tick is a pure step tested without timers
+  (`monitor/tick.test.ts`), and the service on real time, with the fake llama-server and the collectors
+  (`monitor/Monitor.test.ts`).
+- `Ring.max()` and the `gpus: false` branch are never reached. `confirmed`: `max()` is not ported
+  (`monitor/History.ts`), and since no caller sets `gpus: false`, the field is removed from `GpuNeeds` and from the
+  `Needs` of the NVML protocol (`collectors/gpu.ts`, `collectors/nvml/protocol.ts`): a card is skipped only by its bus
+  id.
+- An NVML child that fails once it is ready is never started again. `design choice`: a sampler that failed on this
+  machine would fail again, and its readings are cleared at once rather than left stale; ported as it is, and a line
+  on its stdout that is not a message ends it the same way (`collectors/nvml/Nvml.test.ts`: a sampler that exits
+  after ready clears its readings for good; a sampler that writes a line that is not a message is dead for good, and
+  killed).
+- `collectors.nvml` is only read at startup. `design choice`: NVML or nvidia-smi is chosen when the collectors start;
+  ported as it is (`collectors/Collectors.test.ts`: collectors.nvml is read at startup only).
 
 ### E5: chat
 
@@ -155,3 +165,60 @@ Found while porting E3, accepted with its result:
 - `/proc` is read through `FileSystem` (`llama/procScan.ts`), not by `findLlamaServerPid` of `llamacpp-js`.
 - `LlamaHttp` has no null body (204, 205, 304, HEAD) and no `TypeError` on a `Request` or an odd body: a request is an
   `HttpClientRequest`.
+
+Decided (the E4 plan):
+
+- The NVML sampler is an Effect program over stdin and stdout (`collectors/nvml/worker.ts`, run through
+  `effect/process`), not `fork` and IPC: NDJSON commands on its stdin, NDJSON messages on its stdout, both decoded
+  with the schemas of `collectors/nvml/protocol.ts`; it exits when its stdin ends (was: the IPC disconnect), and the
+  end of its scope kills it with SIGKILL at once. `effect/workers` was not chosen: its close waits 5 s for a worker
+  stuck in the driver, and it needs `fork` in the server.
+- The plan expected one new directive (`nodeBuiltinImport:off` on `node:ffi`): the rule does not flag `node:ffi`, and
+  a directive that suppresses nothing fails `tsc`, so the tree has no new directive. The only change of
+  `tsconfig.effect.json`: `monitor.ts` and `topology.ts` of the shared package joined the third override.
+- The System page comes back without its Checks card (tuning checks E8, model list E6, bench E7): it moves to E8.
+- The placement follows two subscriptions (`Supervisor.changes`, `LogRing.batches`): a `placement` message leaves just
+  after the `server-state` message of the change that caused it (was: synchronously inside it), and two placements
+  are compared with `Equal.equals` (was: their JSON).
+- `PATCH /api/settings` answers `SettingsPatched` (the settings and an optional `warning`), the shape of the Nitro
+  reply, and the web shows the warning again; the warning is logged with `Effect.logWarning` (was a line prefixed
+  `[llama-webui]`).
+- Every number the monitor sends is finite (`Schema.Finite`, `Schema.Int`): a reading that is not is sent as `null`
+  where the field allows it, else as `0`, and an integral field takes the integral part (`monitor/finite.ts`). The
+  Nitro server let `JSON.stringify` turn such a value into `null` even in a field typed `number`.
+- Time is the `Clock`'s: the tick time, the freshness of NVML readings, the retry delays of perf and of the model
+  disk; each delay is an option of its maker or layer.
+
+Found while porting E4, accepted with its result:
+
+- The monitor no longer holds the start of the app (the Nitro boot awaited it): the collectors are built by a fiber
+  of its layer, then the ticks start. Until then `latest` is null and the history the empty dump of the configured
+  shape; `configure`, `nvidiaSource` (now an effect) and `nvmlSystem` wait for them, so `GET /api/system/info` can
+  wait up to NVML's 3 s `ready` after a start. Collectors that fail to start leave the monitor without snapshots:
+  `nvidiaSource` `nvidia-smi`, `nvmlSystem` null, every settings change a 200 with the warning `the collectors could
+  not start`.
+- The parser of the placement is `monitor/placementLog.ts` (the plan said `placement.ts`, which `tsc` refuses next to
+  `Placement.ts`: the names differ only by case). A buffer size that is not a finite number and a layer count that
+  is not a safe integer are skipped; such an `offloaded` line no longer ends the main section.
+- An unreadable `/proc/stat` gives `cpuPct` 0 and no core, an unreadable `/proc/diskstats` zero rates and no model
+  disk (was null: the fields are numbers).
+- A system collector switched off then on gets a fresh sampler: its first CPU reading is 0 again (the Nitro registry
+  kept the instance).
+- A `refreshApps` call while a compute-apps query runs waits for that same query, as the Nitro `appsInFlight` did,
+  each caller at most the query's timeout plus 1 s; a query whose exit code is not 0 keeps the previous mapping (the
+  Nitro reader parsed the output whatever the code).
+- The nvidia-smi stream is started once the settings are applied (`start`), and a restart on a new interval drops the
+  pending cycle (the Nitro reader kept it, which could mix two cycles); a cycle ends when a card's key is seen again.
+- A line of the NVML sampler that is not a message, or its stdout ending, abandons it: logged as a warning, killed,
+  its readings cleared (a line before `ready` gives the nvidia-smi fallback at once).
+- `hiddenGpus` is applied by the tick to every reading, NVIDIA included (`monitor/gpus.ts`), as the Nitro
+  `collectGpus` did: the nvidia-smi stream reads every card.
+- A wait for the next tick is cut when the interval changes and counted again from the start of the last tick (the
+  Nitro monitor re-armed its `setInterval`); the 30 s retry of the model disk is counted from the end of the lookup
+  that missed (was its start).
+- pci.ids: a later file of the list names a device an earlier one lacks, and an unknown device is remembered only once
+  some file could be read (`hardware/PciIds.ts`, two `Cache`s); a PCIe link width that is not an integer is unknown.
+- The Settings page gets its "Displayed GPUs" card back (its placeholder named E4), on `GET /api/system/info`.
+- A reader that dies during a tick gives its own fallback (null, or no card), as the Nitro `.catch(() => null)` did;
+  a defect of a collector during `configure` becomes `CollectorsNotApplied` (the readers report no error of their
+  own), so the patch answers 200 with its warning.

@@ -32,11 +32,13 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 - The overrides relax the platform rules (Node builtins, `fetch`, timers, `JSON`, Effect's array and string helpers,
   `strictBooleanExpressions`) only for code that drives the build from outside: `**/testing/**`, `**/contract/**`,
   `lifecycle.test.ts`, `build.test.ts`, `dev.test.ts`, `runApp.test.ts`; and for the plain modules of the shared
-  package, except `api/**`, `settings.ts` and `ws.ts`, which follow the server's rules (a milestone adds the modules it
-  moves to Schema). Nothing else is added to the overrides.
+  package, except `api/**`, `logs.ts`, `monitor.ts`, `profile.ts`, `server.ts`, `settings.ts`, `topology.ts` and
+  `ws.ts`, which follow the server's rules (the third override: a milestone adds the modules it moves to Schema).
+  Nothing else is added to the overrides.
 - Two directives are allowed, each with its reason on the line:
   `// @effect-diagnostics-next-line nodeBuiltinImport:off <reason>` (one today: `node:http` in
-  `app/server/http/HttpLive.ts`, `NodeHttpServer.layer` takes its factory) and `processEnv:off` at the one write of
+  `app/server/http/HttpLive.ts`, `NodeHttpServer.layer` takes its factory; `node:ffi` is not flagged and needs none)
+  and `processEnv:off` at the one write of
   `.env` into the environment (not needed: `applyDotEnv(process.env, …)` in `config/DotEnv.ts` is not flagged). A
   directive that suppresses nothing fails `tsc`.
 - A Schema class takes the brand the rule asks for (`TaggedError<X, { readonly X: unique symbol }>()`) and is built
@@ -130,10 +132,11 @@ The model is `app/server/supervisor/Supervisor.ts`.
     (`llama/procScan.ts`).
 - **The tiers of `Services`** (`app/server/App.ts`): each `Layer.provideMerge` is a tier, built after the ones below
   it and undone before them.
-  - From the bottom: the database, `AppInfo`, the hub and the repositories, the ring and `LlamaHttp`, `Flags`, the
-    supervisor, the watch.
-  - The watch ends first (no look while the rest stops). The supervisor stops llama-server while the ring and the
-    hub it writes to are still up. The database closes last.
+  - From the bottom: the database, `AppInfo`, the hub and the repositories, the ring, `LlamaHttp` and `PciIds`,
+    `Flags`, the supervisor, the monitor and the placement, the watch.
+  - The watch ends first (no look while the rest stops). The monitor ends before the supervisor, and the collectors'
+    programs with it. The supervisor stops llama-server while the ring and the hub it writes to are still up. The
+    database closes last.
   - All of it runs after the shutdown steps and after the HTTP server closed (`Shutdown.layerRunner`, E1).
   - A service's own end goes in its layer (`Effect.addFinalizer`, `Effect.acquireRelease`). It is a shutdown step
     only when it must run while the clients are still connected.
@@ -143,6 +146,65 @@ The model is `app/server/supervisor/Supervisor.ts`.
   - each next run starts `interval` after the previous one ended, so one runs at a time;
   - the end of the layer interrupts it;
   - its interval is an option of `layerWith`.
+
+## Following a service's changes
+
+- A service whose state others follow exposes its changes as a subscription: `changes` of `Supervisor`, `batches`
+  of `LogRing`, each `Effect.map(PubSub.subscribe(pubsub), Stream.fromSubscription)`, an
+  `Effect<Stream<A>, never, Scope>`. The service publishes to its `PubSub` in the step that changes its state (inside
+  the `SynchronizedRef.modifyEffect` of `change`, after the `/ws` message), so the subscribers get the changes in
+  their order.
+- A follower subscribes first, then reads the current value, then follows the stream in a fiber of its layer
+  (`Stream.runForEach(…)`, `Effect.forkScoped`): nothing that changes between the read and the subscription is missed
+  (`app/server/monitor/Placement.ts`, which merges both streams into one fiber).
+
+## A pure step with its I/O around it
+
+- What a loop decides is a pure function of what it read: `beginTick` and `endTick` of `app/server/monitor/tick.ts`
+  (the memory of the previous tick and the readings in, the next memory, the history's points and the snapshot out),
+  `onSample`, `onConfigure`, `isFresh` and `procVramOf` of `app/server/collectors/nvml/Nvml.ts` (the reader's state
+  and a message or the time in, the next state out). The service around it reads (in parallel, each read with its
+  fallback), calls the step, and stores and publishes the result (`Monitor.tick`).
+- The step is tested as a plain function (`describe`/`it`, no layer, the time passed in): every rule of the tick is
+  asserted in a few milliseconds, without timers or programs (`monitor/tick.test.ts`). The service's test on real
+  time then asserts only what the loop adds: the publishing, the interval, a tick that dies, a reader that never
+  answers (`monitor/Monitor.test.ts`).
+
+## Finite numbers
+
+- Every number a schema of the shared package sends is `Schema.Finite` or `Schema.Int`, never `Schema.Number`
+  (`packages/webui-shared/src/monitor.ts`, `topology.ts`): a reply carries no NaN or Infinity. `Int` is for what is
+  integral by construction (times in ms, counts, ticks, PCIe gen and width); a measure or a gauge (an average such as
+  `busySlots`) is `Finite`.
+- The hub drops a message that does not encode, silently: what a reading gives is made finite before it reaches a
+  schema (`app/server/monitor/finite.ts`: `null` where the field allows it, else `0`; an `Int` field takes the integral
+  part). The history keeps the raw values, and its dump writes a value that is not finite as `null`. A test feeds the
+  step non-finite readings and encodes its result (`tick.test.ts`: a tick fed non-finite readings still encodes as a
+  Snapshot).
+
+## A child program spoken to in NDJSON
+
+The model is the NVML sampler, `app/server/collectors/nvml/`.
+
+- The program is an Effect program of its own (`worker.ts`: `NodeRuntime.runMain(program.pipe(Effect.provide(
+  NodeServices.layer)))`), run as is by Node in development (imports with `.ts`) and bundled to
+  `.output/server/nvml-worker.mjs` by `app/build/server.ts`, next to `index.mjs`: the module that starts it finds it
+  next to itself (`workerPath(import.meta.url)`: `worker.ts` next to a `.ts` module, `nvml-worker.mjs` otherwise), and
+  `build.test.ts` checks that it sits there and starts from the bundle.
+- Both sides decode the lines with one schema module (`protocol.ts`: `ToSampler`, `FromSampler`), through
+  `Ndjson.decodeSchema(schema)({ ignoreEmptyLines: true })` and `Ndjson.encodeSchemaString(schema)()` in
+  `Stream.pipeThroughChannel`. The program reads `Stdio.stdin` and writes `stdio.stdout()`; the server feeds
+  `handle.stdin` from a `Queue` (ended to close the program's stdin) and reads `handle.stdout`.
+- The end of its stdin is its exit: the program sends what it queued, then its scope stops the rest, exit 0. A server
+  killed with SIGKILL closes the pipe all the same, so the program never outlives it. The server spawns it with
+  `killSignal: 'SIGKILL'` (a program stuck in a native call is not asked to stop) in a scope of its own, and abandons it
+  (killed, its readings cleared) on an `error`, an exit or a line that is not a message.
+- `node:ffi` is imported by `symbols.ts` with no directive: the `nodeBuiltinImport` rule does not flag it (an unused
+  directive would fail `tsc`). It is run with `--disable-warning=ExperimentalWarning`.
+- Tests fake the program with a Node script (`app/server/testing/fixtures/fakeNvml.ts <behaviour> <dir>`, which
+  records its pid and what it received) and run the real `worker.ts` where the machine allows. A fake that stands for a
+  long-lived program is one process (`exec`, or Node): a shell loop leaves zombie children that this container's init
+  reaps late, and the spawner then waits out `forceKillAfter` (`lifecycle.test.ts`, its fake nvidia-smi).
 
 ## SQL
 
@@ -172,7 +234,11 @@ The model is `app/server/supervisor/Supervisor.ts`.
   (a 404 of a missing row, a 409), then `UPDATE_GOLDEN=1` and read the diff of `golden.json`. A case that needs a
   setting sets it with a `PATCH /api/settings` case just before it; a file or a program it needs comes through the
   context of `cases()` (`Binaries`: the fake llama-server of `testdata/fake/`, a path in the run's temporary folder),
-  and its paths are recorded as `<repo>`, `<tmp>` or `<home>`, never as they are on this machine.
+  and its paths are recorded as `<repo>`, `<tmp>` or `<home>`, never as they are on this machine. A reply that depends
+  on the machine (its CPU, its PCI devices: `GET /api/system/info`, `GET /api/topology`) is added with
+  `{ machine: true }`: its success records the sorted names of its fields (`fields`), not its body; its values are
+  asserted by the domain's HTTP test. The suite runs on the stub monitor (`LLAMA_WEBUI_TEST_MONITOR=stub`, set by its
+  `launch()`), so no snapshot depends on the machine.
 - **A web page that returns**: its import in `PORTED` of `app/src/app/router.tsx`, its entry out of
   `MILESTONE_BY_PATH` in `app/src/app/routes.ts`, its tests out of the `"exclude"` of `app/tsconfig.json`. Its calls go
   through `call((api) => api.<group>.<endpoint>(…))`; an error is told by its `_tag` (`fieldErrors` of

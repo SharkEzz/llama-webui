@@ -76,13 +76,19 @@
     "project": "server",
     "file": "app/server/build.test.ts",
     "name": "the server finds the NVML sampler: the module that names it sits next to it",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/build.test.ts > the server finds the NVML sampler: the module that names it sits next to it",
+    "reason": "The sampler is an Effect program bundled by Rolldown in app/build/server.ts, spoken to in NDJSON over its stdin and stdout"
   },
   {
     "project": "server",
     "file": "app/server/build.test.ts",
     "name": "the NVML sampler ships next to the server entry and starts from the bundle",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/build.test.ts > the NVML sampler ships next to the server entry and starts from the bundle",
+    "reason": "The sampler is an Effect program bundled by Rolldown in app/build/server.ts, spoken to in NDJSON over its stdin and stdout"
   },
   {
     "project": "server",
@@ -423,229 +429,314 @@
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "parseFdinfo amdgpu",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > parseFdinfo amdgpu"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "readProcAmdVram dedupes by client id",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > readProcAmdVram dedupes by client id"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "discoverAmdCards + readAmdCard",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > discoverAmdCards + readAmdCard"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "parseLinkSpeed",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/hardware/pci.test.ts > pci helpers > parseLinkSpeed / minKnown / chipsetLabel",
+    "reason": "parseLinkSpeed lives in hardware/pci.ts and is tested once, with the other PCIe helpers"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "parseDpm",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > parseDpm"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "readAmdCard reads link, clocks, fan and power cap",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > readAmdCard reads link, clocks, fan and power cap"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "isRuntimeSuspended reads power/runtime_status without touching the device",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > isRuntimeSuspended reads power/runtime_status without touching the device"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "a card behind its own PCIe switch reports the slot link, bounded by the slot (RX 9070 XT in a Gen4 x4 chipset slot)",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > a card behind its own PCIe switch reports the slot link, bounded by the slot (RX 9070 XT in a Gen4 x4 chipset slot)"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "the slot link walk stops below an ATI-chipset root port (vendor 0x1002) and is bounded by it",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > the slot link walk stops below an ATI-chipset root port (vendor 0x1002) and is bounded by it"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "a slot port reporting max_link_width 0 leaves the card's width as the maximum, and is read again until known",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > a slot port reporting max_link_width 0 leaves the card's width as the maximum, and is read again until known"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "a link that is down or retraining (current width 0) has an unknown width, not x0",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > a link that is down or retraining (current width 0) has an unknown width, not x0"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "pciIdsName names a card from sysfs ids and pci.ids, without lspci (which would wake a suspended card)",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > pciIdsName names a card from sysfs ids and pci.ids, without lspci (which would wake a suspended card); app/server/hardware/pci.test.ts > PciIds > PciIds: a missing file is looked at again, a found name is not read twice",
+    "reason": "pci.ids is read by the PciIds service; discoverAmdCards asks it the ids sysfs holds (a stub PciIds in this test)"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "discoverAmdCards lists each card's DRM nodes (card and render), so fds can be matched to a card",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > discoverAmdCards lists each card's DRM nodes (card and render), so fds can be matched to a card"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/amdgpu.test.ts",
     "name": "readProcAmdVram skips fds on cards not to read (hidden or suspended), without opening their fdinfo",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/amdgpu.test.ts > amdgpu > readProcAmdVram skips fds on cards not to read (hidden or suspended), without opening their fdinfo"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/membw.test.ts",
     "name": "parsePerfLine: perf stat CSV, unsupported counts",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > parsePerfLine: perf stat CSV, unsupported counts"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/membw.test.ts",
     "name": "MemBandwidthSampler: system read/write rates from per-interval CAS counts × 64 bytes",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: system read/write rates from per-interval CAS counts × 64 bytes"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/membw.test.ts",
     "name": "MemBandwidthSampler: perf missing or event unknown → unknown, retried only after a delay",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: perf missing or event unknown → unknown, retried only after a delay"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/membw.test.ts",
     "name": "MemBandwidthSampler: one perf per followed PID, replaced when the PID changes, none for a dead PID",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: one perf per followed PID, replaced when the PID changes, none for a dead PID"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/membw.test.ts",
     "name": "MemBandwidthSampler: a new interval restarts the streams with it",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: a new interval restarts the streams with it"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/membw.test.ts",
     "name": "MemBandwidthSampler: a PID perf cannot attach to is not retried, even when setPid runs every tick",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: a PID perf cannot attach to is not retried, even when setPid runs every tick"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/membw.test.ts",
     "name": "MemBandwidthSampler: system perf failing every time is retried once per delay, not every tick",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: system perf failing every time is retried once per delay, not every tick",
+    "reason": "On real time: 2 to 4 starts in about 1 s at a 300 ms delay, where the injected clock gave exactly 4"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/membw.test.ts",
     "name": "MemBandwidthSampler: perf that dies after giving values is relaunched after the delay",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/membw.test.ts > perf > MemBandwidthSampler: perf that dies after giving values is relaunched after the delay"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "normalizeBusId",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/gpu.test.ts > gpu helpers > normalizeBusId"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "parseNvidiaGpuLine",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > parseNvidiaGpuLine"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "parseComputeApps",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > parseComputeApps"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "NvidiaMonitor streams lines split across chunks",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > NvidiaMonitor streams lines split across chunks"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "NvidiaMonitor procVram from compute apps",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > NvidiaMonitor procVram from compute apps"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "compute apps with [N/A] memory keep the process on its card, counting the card's VRAM in use",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > compute apps with [N/A] memory keep the process on its card, counting the card's VRAM in use"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "NvidiaMonitor without nvidia-smi stays empty",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > NvidiaMonitor without nvidia-smi stays empty"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "a compute-apps read abandoned on timeout may fail later without reaching the process",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > a compute-apps read abandoned on timeout may fail later without reaching the process"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "selectUsedGpus",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/gpu.test.ts > gpu helpers > selectUsedGpus keeps the cards above 64 MiB, by bus id",
+    "reason": "Moved with selectUsedGpus to collectors/gpu.ts, its name saying what it checks"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "hung nvidia-smi compute-apps query times out, is killed, and calls don't pile up",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > hung nvidia-smi compute-apps query times out, is killed, and calls don't pile up"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvidia.test.ts",
     "name": "configure restarts a running nvidia-smi stream at the new pace, and only then",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/collectors/nvidia.test.ts > nvidia-smi > configure restarts a running nvidia-smi stream at the new pace, and only then"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvml/monitor.test.ts",
     "name": "lowering the interval keeps the last sample fresh until the worker samples at the new pace",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML state > lowering the interval keeps the last sample fresh until the worker samples at the new pace",
+    "reason": "The freshness is a pure reducer of Nvml.ts (onConfigure, onSample, isFresh), tested without a process"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvml/monitor.test.ts",
     "name": "workerUrl: worker.ts next to the module in development, nvml-worker.mjs next to the bundle",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML reader > workerPath: worker.ts next to the module in development, nvml-worker.mjs next to the bundle",
+    "reason": "workerUrl is workerPath: the path a spawned program takes, not a URL for fork"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvml/monitor.test.ts",
     "name": "a real worker with a missing NVML library resolves null (the nvidia-smi fallback)",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML reader > a real worker with a missing NVML library resolves null (the nvidia-smi fallback)",
+    "reason": "The sampler is a child process of effect/process spoken to in NDJSON (fake samplers: testing/fixtures/fakeNvml.ts), not a fork with IPC"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvml/monitor.test.ts",
     "name": "a real worker reads NVML when the library is here",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML reader > a real worker reads NVML when the library is here",
+    "reason": "The sampler is a child process of effect/process spoken to in NDJSON (fake samplers: testing/fixtures/fakeNvml.ts), not a fork with IPC"
   },
   {
     "project": "server",
     "file": "app/server/lib/collectors/nvml/monitor.test.ts",
     "name": "a sampler stuck in a native call does not hold the process when it exits",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/collectors/nvml/Nvml.test.ts > the NVML reader > a sampler stuck in a native call does not hold the process when it exits",
+    "reason": "The sampler is a child process of effect/process spoken to in NDJSON (fake samplers: testing/fixtures/fakeNvml.ts), not a fork with IPC"
   },
   {
     "project": "server",
@@ -949,49 +1040,65 @@
     "project": "server",
     "file": "app/server/lib/hardware/pci.test.ts",
     "name": "readPciTopology: nodes of the reference machine",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: nodes of the reference machine"
   },
   {
     "project": "server",
     "file": "app/server/lib/hardware/pci.test.ts",
     "name": "readPciTopology: links, their capacity is the smaller of both ends",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: links, their capacity is the smaller of both ends"
   },
   {
     "project": "server",
     "file": "app/server/lib/hardware/pci.test.ts",
     "name": "readPciTopology: a third-party switch or a Thunderbolt bridge is not a chipset",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: a third-party switch or a Thunderbolt bridge is not a chipset"
   },
   {
     "project": "server",
     "file": "app/server/lib/hardware/pci.test.ts",
     "name": "readPciTopology: unreadable sysfs still yields CPU and RAM",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: unreadable sysfs still yields CPU and RAM"
   },
   {
     "project": "server",
     "file": "app/server/lib/hardware/pci.test.ts",
     "name": "cpuLabel",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci helpers > cpuLabel"
   },
   {
     "project": "server",
     "file": "app/server/lib/hardware/pci.test.ts",
     "name": "readPciTopology: a sleeping card reporting width 63 (config read 0xFFFF) gives an unknown width",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci > readPciTopology: a sleeping card reporting width 63 (config read 0xFFFF) gives an unknown width"
   },
   {
     "project": "server",
     "file": "app/server/lib/hardware/pci.test.ts",
     "name": "parseLinkSpeed / minKnown / chipsetLabel",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci helpers > parseLinkSpeed / minKnown / chipsetLabel"
   },
   {
     "project": "server",
     "file": "app/server/lib/hardware/pci.test.ts",
     "name": "findPciIdsEntry: the device line of its own vendor only, not a subsystem or a class line",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/hardware/pci.test.ts > pci helpers > findPciIdsEntry: the device line of its own vendor only, not a subsystem or a class line"
   },
   {
     "project": "server",
@@ -1488,85 +1595,127 @@
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: real llama-server start, buffers summed per device, bus ids from “using device”",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: real llama-server start, buffers summed per device, bus ids from “using device”",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: real MTP + mmproj start, compute per context (last reservation wins), recurrent state with the KV",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: real MTP + mmproj start, compute per context (last reservation wins), recurrent state with the KV",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: at -lv 5 the -fit probes (no-alloc loads, 0 MiB buffers, own contexts) are left out",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: at -lv 5 the -fit probes (no-alloc loads, 0 MiB buffers, own contexts) are left out",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: the main model only, not a draft model (-md) nor the mmproj buffers",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: the main model only, not a draft model (-md) nor the mmproj buffers",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: only the last launch counts; no launch → null; bare lines (no timestamp) parse too",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: only the last launch counts; no launch → null; bare lines (no timestamp) parse too",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "PlacementTracker: replays the ring at construction, follows new lines and the server state",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/monitor/Placement.test.ts > Placement > Placement: replays the ring at construction without a message, follows new lines and the server state",
+    "reason": "The Placement service on a real supervisor and log ring, followed through their subscriptions (changes, batches) instead of a fake state"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "PlacementTracker: an external server has no placement even if the ring holds an old launch",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/monitor/Placement.test.ts > Placement > Placement: an external server has no placement even if the ring holds an old launch",
+    "reason": "The Placement service on a real supervisor and log ring, followed through their subscriptions (changes, batches) instead of a fake state"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "PlacementTracker: the launch evicted from the ring keeps the placement of the same server",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/monitor/Placement.test.ts > Placement > Placement: the launch evicted from the ring keeps the placement of the same server",
+    "reason": "The Placement service on a real supervisor and log ring, followed through their subscriptions (changes, batches) instead of a fake state"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: -sm tensor spreads the Meta() buffers over its devices by -ts, marked estimated (#17)",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: -sm tensor spreads the Meta() buffers over its devices by -ts, marked estimated (#17)",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: -sm tensor without -ts gives each device an equal part (#17)",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: -sm tensor without -ts gives each device an equal part (#17)",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: peer-to-peer is requested by the line llama-webui adds to the launch, for that launch only",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: peer-to-peer is requested by the line llama-webui adds to the launch, for that launch only",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: NCCL (NCCL_DEBUG=INFO) says whether peer-to-peer is really in use",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: NCCL (NCCL_DEBUG=INFO) says whether peer-to-peer is really in use",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: with -sm tensor, NCCL (NCCL_DEBUG=INFO) gives the PCI address of each CUDA device",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: with -sm tensor, NCCL (NCCL_DEBUG=INFO) gives the PCI address of each CUDA device",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
     "file": "app/server/lib/monitor/placement.test.ts",
     "name": "parsePlacement: the address llama-server logs itself wins over NCCL",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "app/server/monitor/placementLog.test.ts > parsePlacement: the address llama-server logs itself wins over NCCL",
+    "reason": "The parser is monitor/placementLog.ts: placement.ts would differ from Placement.ts only by case"
   },
   {
     "project": "server",
@@ -1710,7 +1859,10 @@
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "PATCH /api/settings: saved but not applied by the monitor is a 200 with a warning, not a 500 (#35)",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "rewritten",
+    "to": "app/server/settings/http.test.ts > SettingsApi with a monitor that refuses the change > PATCH /api/settings: saved but not applied by the monitor is a 200 with a warning, not a 500 (#35)",
+    "reason": "A monitor whose configure fails with CollectorsNotApplied, through the typed client"
   },
   {
     "project": "server",
@@ -2814,43 +2966,57 @@
     "project": "shared",
     "file": "packages/webui-shared/src/topology.test.ts",
     "name": "phaseOf: no server, stopping or crashed → stopped",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > phaseOf: no server, stopping or crashed → stopped"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/topology.test.ts",
     "name": "phaseOf: starting, or ready while health is still loading → loading",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > phaseOf: starting, or ready while health is still loading → loading"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/topology.test.ts",
     "name": "phaseOf: ready with no busy slot → idle",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > phaseOf: ready with no busy slot → idle"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/topology.test.ts",
     "name": "phaseOf: a slot still reading its prompt → prompt, then generating",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > phaseOf: a slot still reading its prompt → prompt, then generating"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/topology.test.ts",
     "name": "pcieBps: payload rate for a generation and width, unknown when either is missing",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > pcieBps: payload rate for a generation and width, unknown when either is missing"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/topology.test.ts",
     "name": "hostDevice: CPU-side buffers are not GPUs",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > hostDevice: CPU-side buffers are not GPUs"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/topology.test.ts",
     "name": "placementTotals: model bytes on GPUs vs host",
-    "milestone": "E4"
+    "milestone": "E4",
+    "status": "ported",
+    "to": "packages/webui-shared/src/topology.test.ts > placementTotals: model bytes on GPUs vs host"
   },
   {
     "project": "server",

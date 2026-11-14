@@ -40,7 +40,6 @@ describe('gpu helpers', () => {
     assert.isTrue(gpuSkipped(needs, '0000:01:00.0'));
     assert.isFalse(gpuSkipped(needs, '0000:02:00.0'));
     assert.isFalse(gpuSkipped(MEASURE_ALL, '0000:01:00.0'));
-    assert.isTrue(gpuSkipped({ ...MEASURE_ALL, gpus: false }, '0000:02:00.0'));
     const r = identityReading({ key: 'k', vendor: 'amd', name: 'n', busId: 'b' }, 'hidden');
     assert.strictEqual(r.hidden, true);
     assert.strictEqual(r.vramTotalBytes, 0);
