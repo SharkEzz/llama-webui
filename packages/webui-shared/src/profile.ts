@@ -68,8 +68,8 @@ export type ProfileSource = typeof ProfileSource.Type;
 
 /** A stored profile: its input, its id, where it comes from, when it was created and last changed (epoch ms). */
 export const Profile = Schema.Struct({
-  ...ProfileInput.fields,
   id: Schema.Int,
+  ...ProfileInput.fields,
   source: ProfileSource,
   createdAt: Schema.Int,
   updatedAt: Schema.Int,

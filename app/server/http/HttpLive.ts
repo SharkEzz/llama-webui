@@ -8,6 +8,7 @@ import { HttpApiBuilder } from 'effect/http-api';
 import { AppConfig } from '../config/AppConfig.ts';
 import { AppInfo } from '../config/AppInfo.ts';
 import { HealthHandlers } from '../health/http.ts';
+import { ProfilesHandlers } from '../profiles/http.ts';
 import { SettingsHandlers } from '../settings/http.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { guard } from './Guard.ts';
@@ -30,7 +31,9 @@ const UnknownApi = HttpRouter.add(
  */
 export const ApiRoutes = Layer.merge(
   HttpApiBuilder.layer(Api).pipe(
-    Layer.provide(Layer.mergeAll(HealthHandlers, SettingsHandlers).pipe(Layer.provideMerge(RequestErrorsLive))),
+    Layer.provide(
+      Layer.mergeAll(HealthHandlers, SettingsHandlers, ProfilesHandlers).pipe(Layer.provideMerge(RequestErrorsLive)),
+    ),
   ),
   UnknownApi,
 );

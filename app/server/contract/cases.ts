@@ -63,8 +63,8 @@ const json = (method: string, path: string, body: string): WireRequest => ({
 export const ASSET = /\/assets\/index-[\w-]{8}\.js/;
 
 /**
- * Every HTTP case, in run order: reads first, then what changes the settings. `asset` is the path of a hashed file of
- * the build (`ASSET`).
+ * Every HTTP case, in run order: reads first, then what changes the settings, then the profiles. `asset` is the path
+ * of a hashed file of the build (`ASSET`).
  */
 export function cases(ctx: { asset: string }): Case[] {
   const out: Case[] = [];
@@ -102,6 +102,44 @@ export function cases(ctx: { asset: string }): Case[] {
   add('body', 'PATCH /api/settings (malformed JSON)', json('PATCH', '/api/settings', '{'));
   add('violation', 'PATCH /api/settings (schema violation)', json('PATCH', '/api/settings', '{"pollIntervalMs":10}'));
   add('write', 'PATCH /api/settings', json('PATCH', '/api/settings', '{"pollIntervalMs":2000}'));
+
+  // The profiles: created, refused, read, changed, copied, exported, imported, deleted, in that order (ids 1, 2…).
+  add('read', 'GET /api/profiles (none yet)', bare('GET', '/api/profiles'));
+  add(
+    'write',
+    'POST /api/profiles',
+    json(
+      'POST',
+      '/api/profiles',
+      '{"name":"Alpha","model":"/models/a.gguf","port":8081,"args":["-c","4096"],"env":{"A":"1"}}',
+    ),
+  );
+  add(
+    'violation',
+    'POST /api/profiles (schema violation)',
+    json('POST', '/api/profiles', '{"name":"","model":"m","port":70000,"args":["--port","1"],"extra":1}'),
+  );
+  add('body', 'POST /api/profiles (malformed JSON)', json('POST', '/api/profiles', '{'));
+  add('refusal', 'POST /api/profiles (name taken)', json('POST', '/api/profiles', '{"name":"Alpha","model":"m"}'));
+  add('read', 'GET /api/profiles/1', bare('GET', '/api/profiles/1'));
+  add('refusal', 'GET /api/profiles/999 (no such profile)', bare('GET', '/api/profiles/999'));
+  add('other', 'GET /api/profiles/abc (id that is not a number)', bare('GET', '/api/profiles/abc'));
+  add('write', 'PUT /api/profiles/1', json('PUT', '/api/profiles/1', '{"name":"Alpha 2","model":"/models/a.gguf"}'));
+  add('write', 'POST /api/profiles/1/duplicate', bare('POST', '/api/profiles/1/duplicate'));
+  add('read', 'GET /api/profiles/1/export', bare('GET', '/api/profiles/1/export'));
+  add('read', 'GET /api/profiles/export', bare('GET', '/api/profiles/export'));
+  add(
+    'write',
+    'POST /api/profiles/import',
+    json(
+      'POST',
+      '/api/profiles/import',
+      '{"profiles":[{"name":"Beta","model":"/models/b.gguf"},{"name":"bad"},{"name":"Beta","model":"x"},{"name":"Alpha 2","model":"x"}]}',
+    ),
+  );
+  add('write', 'DELETE /api/profiles/2', bare('DELETE', '/api/profiles/2'));
+  add('refusal', 'DELETE /api/profiles/999 (no such profile)', bare('DELETE', '/api/profiles/999'));
+  add('read', 'GET /api/profiles (after the writes)', bare('GET', '/api/profiles'));
 
   const names = new Set<string>();
   for (const c of out) {

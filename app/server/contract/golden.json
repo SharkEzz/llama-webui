@@ -194,5 +194,283 @@
       "theme": "system",
       "env": {}
     }
+  },
+  "GET /api/profiles (none yet)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": []
+  },
+  "POST /api/profiles": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "name": "Alpha",
+      "model": "/models/a.gguf",
+      "port": 8081,
+      "args": [
+        "-c",
+        "4096"
+      ],
+      "env": {
+        "A": "1"
+      },
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "POST /api/profiles (schema violation)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: unknown key (extra)",
+      "issues": [
+        {
+          "path": [
+            "extra"
+          ],
+          "message": "unknown key"
+        },
+        {
+          "path": [
+            "name"
+          ],
+          "message": "cannot be empty"
+        },
+        {
+          "path": [
+            "port"
+          ],
+          "message": "port between 1 and 65535"
+        },
+        {
+          "path": [
+            "args",
+            "0"
+          ],
+          "message": "--port is managed by llama-webui (use the profile fields)"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (name taken)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNameTaken",
+      "message": "A profile named “Alpha” already exists"
+    }
+  },
+  "GET /api/profiles/1": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "name": "Alpha",
+      "model": "/models/a.gguf",
+      "port": 8081,
+      "args": [
+        "-c",
+        "4096"
+      ],
+      "env": {
+        "A": "1"
+      },
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "GET /api/profiles/999 (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "GET /api/profiles/abc (id that is not a number)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/profiles/1": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 1,
+      "name": "Alpha 2",
+      "model": "/models/a.gguf",
+      "args": [],
+      "env": {},
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "POST /api/profiles/1/duplicate": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 2,
+      "name": "Alpha 2 (copy)",
+      "model": "/models/a.gguf",
+      "args": [],
+      "env": {},
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
+    }
+  },
+  "GET /api/profiles/1/export": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "content-disposition": "attachment; filename*=UTF-8''Alpha%202.json"
+    },
+    "body": {
+      "name": "Alpha 2",
+      "model": "/models/a.gguf",
+      "args": [],
+      "env": {}
+    }
+  },
+  "GET /api/profiles/export": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json",
+      "content-disposition": "attachment; filename*=UTF-8''llama-webui-profiles.json"
+    },
+    "body": {
+      "profiles": [
+        {
+          "name": "Alpha 2",
+          "model": "/models/a.gguf",
+          "args": [],
+          "env": {}
+        },
+        {
+          "name": "Alpha 2 (copy)",
+          "model": "/models/a.gguf",
+          "args": [],
+          "env": {}
+        }
+      ]
+    }
+  },
+  "POST /api/profiles/import": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "imported": [
+        {
+          "id": 3,
+          "name": "Beta",
+          "model": "/models/b.gguf",
+          "args": [],
+          "env": {},
+          "source": "import",
+          "createdAt": "<time>",
+          "updatedAt": "<time>"
+        }
+      ],
+      "skipped": [
+        {
+          "name": "bad",
+          "reason": "required (model)"
+        },
+        {
+          "name": "Beta",
+          "reason": "duplicate name in the file"
+        },
+        {
+          "name": "Alpha 2",
+          "reason": "already exists"
+        }
+      ]
+    }
+  },
+  "DELETE /api/profiles/2": {
+    "status": 204,
+    "headers": {}
+  },
+  "DELETE /api/profiles/999 (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "GET /api/profiles (after the writes)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": [
+      {
+        "id": 1,
+        "name": "Alpha 2",
+        "model": "/models/a.gguf",
+        "args": [],
+        "env": {},
+        "source": "ui",
+        "createdAt": "<time>",
+        "updatedAt": "<time>"
+      },
+      {
+        "id": 3,
+        "name": "Beta",
+        "model": "/models/b.gguf",
+        "args": [],
+        "env": {},
+        "source": "import",
+        "createdAt": "<time>",
+        "updatedAt": "<time>"
+      }
+    ]
   }
 }
