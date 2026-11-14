@@ -2,11 +2,12 @@
  * The server half of `vite dev`: the Effect server from source under `node --watch`, on a free loopback port, with
  * `/api` and `/ws` proxied to it. Vite keeps the public address and serves the UI with HMR; a save of a file the
  * server imports (`server/`, `packages/`) restarts the server (a new `bootId`). Stopping Vite (SIGINT, SIGTERM) stops
- * the server with SIGTERM and waits for it; a second signal kills it.
+ * the server with SIGTERM and waits for it (SIGHUP too); a second signal kills it.
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { connect, createServer } from 'node:net';
+import { constants } from 'node:os';
 import { resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { Plugin } from 'vite';
@@ -115,9 +116,9 @@ export function devServer(): Plugin {
         else next();
       });
 
-      // Vite stops on SIGTERM by itself (`server.close()`, then the `closeServer` hook), not on SIGINT: as a shell does
-      // on Ctrl+C, it exits 130 once the server stopped, first, so that an open page gets the server's 1001.
-      // A second signal kills the server and exits at once.
+      // Vite stops on SIGTERM by itself (`server.close()`, then the `closeServer` hook), not on SIGINT (Ctrl+C) nor
+      // SIGHUP (the terminal closed): on those, the server stops first, so that an open page gets its 1001, then Vite,
+      // and the exit code is a shell's (128 + the signal). A second signal kills the server and exits at once.
       let signals = 0;
       const onSignal = (signal: NodeJS.Signals) => {
         signals += 1;
@@ -125,19 +126,19 @@ export function devServer(): Plugin {
           signalGroup(proc, 'SIGKILL');
           process.exit(130);
         }
-        if (signal === 'SIGINT')
+        if (signal !== 'SIGTERM')
           void stop()
             .then(() => server.close())
-            .finally(() => process.exit(130));
+            .finally(() => process.exit(128 + constants.signals[signal]));
       };
-      // Whatever ends Vite, the server does not outlive it.
+      // When Vite exits, the server does not outlive it. A SIGKILL of Vite is the one end nothing can catch: `node
+      // --watch` and the server, in their own process group, then keep running.
       const onExit = () => signalGroup(proc, 'SIGKILL');
-      process.on('SIGINT', onSignal);
-      process.on('SIGTERM', onSignal);
+      const signalsHandled: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+      for (const signal of signalsHandled) process.on(signal, onSignal);
       process.on('exit', onExit);
       detach = () => {
-        process.off('SIGINT', onSignal);
-        process.off('SIGTERM', onSignal);
+        for (const signal of signalsHandled) process.off(signal, onSignal);
         process.off('exit', onExit);
       };
     },

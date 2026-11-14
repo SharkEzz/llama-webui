@@ -228,6 +228,14 @@ test('two quick SIGINTs still stop the server', async () => {
   await stopped(dev, pids, 5000);
 }, 90_000);
 
+test('a SIGHUP (the terminal closed) stops vite dev and the server', async () => {
+  const dev = await startDev();
+  const pids = tree(dev.proc.pid ?? 0);
+  dev.proc.kill('SIGHUP');
+  await stopped(dev, pids, 5000);
+  expect(await dev.exited).toBe(129);
+}, 90_000);
+
 test('dev reads .env, the environment wins over it', async () => {
   const fromFile = await freePort();
   writeFileSync(join(APP, '.env'), `LLAMA_WEBUI_PORT=${fromFile}\n`);
