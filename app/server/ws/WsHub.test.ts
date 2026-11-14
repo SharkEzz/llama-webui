@@ -133,7 +133,7 @@ it.live('a client that misses 2 pings is closed with 4000, a pong keeps it', () 
   }),
 );
 
-it.live('text that is not a JSON object is ignored', () =>
+it.live('text that is not a JSON object is ignored (#37)', () =>
   Effect.gen(function* () {
     const { open } = yield* start();
     const client = yield* open();
@@ -142,6 +142,16 @@ it.live('text that is not a JSON object is ignored', () =>
     client.send({ type: 'ping' });
     yield* next(client, 'pong');
     assert.strictEqual(client.socket.readyState, WebSocket.OPEN);
+  }),
+);
+
+it.live('a binary frame is read as UTF-8 text', () =>
+  Effect.gen(function* () {
+    const { open } = yield* start();
+    const client = yield* open();
+    yield* next(client, 'hello');
+    client.socket.send(new TextEncoder().encode('{"type":"ping"}'));
+    yield* next(client, 'pong');
   }),
 );
 

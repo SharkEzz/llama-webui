@@ -51,3 +51,21 @@ test('each bound keeps its message', async () => {
     expect(issues.map((i) => [i.path[0], i.message])).toStrictEqual([[field, message]]);
   }
 });
+
+test('every other field refuses a value of the wrong kind', async () => {
+  const cases: [Record<string, unknown>, string][] = [
+    [{ host: '' }, 'host'],
+    [{ modelsDir: '' }, 'modelsDir'],
+    [{ hiddenGpus: [1] }, 'hiddenGpus'],
+    [{ defaultProfileId: 1.5 }, 'defaultProfileId'],
+    [{ llamaTuiImportDismissed: 'yes' }, 'llamaTuiImportDismissed'],
+    [{ onboardingDone: 1 }, 'onboardingDone'],
+    [{ collectors: { nvml: 'on' } }, 'collectors'],
+    [{ theme: 'blue' }, 'theme'],
+  ];
+  for (const [input, field] of cases) {
+    const issues = await messagesOf(input);
+    expect(issues.map((i) => i.path[0])).toStrictEqual([field]);
+  }
+  expect(await messagesOf({ defaultProfileId: 3, theme: 'dark', collectors: { disk: false } })).toStrictEqual([]);
+});

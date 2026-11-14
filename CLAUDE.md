@@ -17,6 +17,8 @@ Before writing any Effect code, first read `repos/effect/LLMS.md` **completely**
 
 If you need to learn more about particular Effect apis and concepts that the guide doesn't cover, search through the source code in `repos/effect/packages/effect/src` (`repos/effect/packages/` for the `@effect/*` packages). `repos/effect` is the same version as the installed packages: read it rather than `node_modules`.
 
+Sur `poc/effect`, les règles du nouveau serveur (`app/server/`, `packages/webui-shared/src/api/`) sont dans `docs/superpowers/poc-effect/conventions.md` : où va chaque partie d'un domaine, le régime des diagnostics Effect, le SQL, l'ajout d'un groupe, d'un service, d'une étape d'arrêt, d'un message `/ws`, d'un cas de contrat ou d'une page, et les commandes. Le lire avant d'écrire du code du serveur ; les sections ci-dessous décrivent encore le serveur Nitro (`app/server-legacy/`) jusqu'à E10.
+
 # llama-webui
 
 > **Sur `poc/effect` :** le serveur est le serveur Effect de `app/server/` (point d'entrée `app/server/main.ts`, build par `app/build/server.ts`). Les sections ci-dessous qui décrivent Nitro, `lib/`, `routes/` et `api.gen.ts` décrivent `app/server-legacy/`, une référence en lecture seule (ni importée, ni lue par Biome, ni éditée) ; là où elles divergent du plan du jalon en cours, le plan l'emporte. Les autres sections sont réécrites à E10.

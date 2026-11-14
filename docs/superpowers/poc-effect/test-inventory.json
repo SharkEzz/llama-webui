@@ -3,109 +3,146 @@
     "project": "server",
     "file": "app/build/licenses.test.ts",
     "name": "packageRoot finds the package of a bundled module, scoped or not, through pnpm",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/build/licenses.test.ts > packageRoot finds the package of a bundled module, scoped or not, through pnpm"
   },
   {
     "project": "server",
     "file": "app/build/licenses.test.ts",
     "name": "render sorts by name and says when a package ships no license file",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/build/licenses.test.ts > render sorts by name and says when a package ships no license file"
   },
   {
     "project": "server",
     "file": "app/server/api.gen.test.ts",
     "name": "the generated map is Nitro’s own route table",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "The generator is gone: the client is derived from the HttpApi definition of @llama-webui/shared"
   },
   {
     "project": "server",
     "file": "app/server/api.gen.test.ts",
     "name": "apiRoutes keeps the API routes with a method, reads Body and Query, sorts by path then method",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "The generator is gone: the client is derived from the HttpApi definition of @llama-webui/shared"
   },
   {
     "project": "server",
     "file": "app/server/api.gen.test.ts",
     "name": "in dev, a route file added or deleted updates api.gen.ts",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "The generator is gone: the client is derived from the HttpApi definition of @llama-webui/shared"
   },
   {
     "project": "server",
     "file": "app/server/build.test.ts",
     "name": "the client is split per page, three.js only in the Topology chunks, no node:* module",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/build.test.ts > each page is a chunk of its own; the client imports no node:* module",
+    "reason": "three.js only in the Topology chunks returns with the Topology page (E4)"
   },
   {
     "project": "server",
     "file": "app/server/build.test.ts",
     "name": "a deep URL finds every file its page references, from the root, cached as immutable",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/build.test.ts > a deep URL gets the shell; app/server/http/Static.test.ts > Static > pages are revalidated, hashed assets are immutable, the API sets no cache header"
   },
   {
     "project": "server",
     "file": "app/server/build.test.ts",
     "name": "the server imports nothing but node:* builtins: the build is self-contained",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/build.test.ts > the server requires nothing but Node builtins"
   },
   {
     "project": "server",
     "file": "app/server/build.test.ts",
     "name": "the licenses of the bundled code ship with the server",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/build.test.ts > the licenses of the bundled code ship with the server"
   },
   {
     "project": "server",
     "file": "app/server/build.test.ts",
     "name": "the server finds the NVML sampler: the module that names it sits next to it",
-    "milestone": "E1"
+    "milestone": "E4"
   },
   {
     "project": "server",
     "file": "app/server/build.test.ts",
     "name": "the NVML sampler ships next to the server entry and starts from the bundle",
-    "milestone": "E1"
+    "milestone": "E4"
   },
   {
     "project": "server",
     "file": "app/server/dev.test.ts",
     "name": "saving a route file keeps llama-server and the boot",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Nitro behaviour: a saved server file restarts the whole server"
   },
   {
     "project": "server",
     "file": "app/server/dev.test.ts",
     "name": "saving business code rebuilds the runtime and stops the old llama-server",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/dev.test.ts > saving a server file restarts the server",
+    "reason": "the stop of llama-server returns with the supervisor (E3)"
   },
   {
     "project": "server",
     "file": "app/server/dev.test.ts",
     "name": "one SIGINT stops vite dev and llama-server",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/dev.test.ts > one SIGINT stops vite dev and the server",
+    "reason": "the stop of llama-server returns with the supervisor (E3)"
   },
   {
     "project": "server",
     "file": "app/server/dev.test.ts",
     "name": "one SIGINT with a page open (/ws) undoes the runtime at once, without the dev worker force-closed",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/dev.test.ts > one SIGINT with a page open (/ws) stops at once"
   },
   {
     "project": "server",
     "file": "app/server/dev.test.ts",
     "name": "two quick SIGINTs (a double Ctrl+C) still stop llama-server",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/dev.test.ts > two quick SIGINTs still stop the server",
+    "reason": "the stop of llama-server returns with the supervisor (E3)"
   },
   {
     "project": "server",
     "file": "app/server/dev.test.ts",
     "name": "dev reads .env.local too: Nitro's Vite plugin loads it (the production launcher reads .env only)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Nitro behaviour: dev reads .env only, like the launcher"
   },
   {
     "project": "server",
     "file": "app/server/dev.test.ts",
     "name": "in dev, .env wins over .env.local: vite.config.ts loads .env first, and Nitro never replaces a variable",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/dev.test.ts > dev reads .env, the environment wins over it",
+    "reason": "no .env.local any more: what is left is the precedence of .env in dev"
   },
   {
     "project": "server",
@@ -303,61 +340,84 @@
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "parseCli: defaults without flag or env",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > defaults without flag or env"
   },
   {
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "parseCli: environment variables",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > environment variables"
   },
   {
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "parseCli: a flag overrides the env, --opt=val form accepted",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > a flag overrides the env, --opt=val form accepted"
   },
   {
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "parseCli: empty env ignored (as before)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > an empty variable is ignored"
   },
   {
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "parseCli: --help and -h",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > --help and -h print the help and start nothing"
   },
   {
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "parseCli: invalid port (flag or env)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/config/Cli.test.ts > cli > invalid port, flag or env",
+    "reason": "the wording of a usage error is that of effect/cli; it exits 1, not 2"
   },
   {
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "parseCli: unknown option, missing value, positional, empty value",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/config/Cli.test.ts > cli > unknown option, missing value, positional, empty value are refused",
+    "reason": "the wording of a usage error is that of effect/cli; it exits 1, not 2"
   },
   {
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "helpText: the installed command and the pnpm scripts, one Node.js process",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/config/Cli.test.ts > cli > the help names the installed command and the pnpm scripts",
+    "reason": "the help is generated by effect/cli"
   },
   {
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "parseCli: --env-override is accepted (read by the entry points before the .env is loaded)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/Cli.test.ts > cli > --env-override is accepted and reaches start"
   },
   {
     "project": "server",
     "file": "app/server/lib/cli.test.ts",
     "name": "--help names how each way of running reads its options",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/config/Cli.test.ts > cli > the help names the installed command and the pnpm scripts; cli > the help names each option with its variable"
   },
   {
     "project": "server",
@@ -591,55 +651,73 @@
     "project": "server",
     "file": "app/server/lib/contract/cases.test.ts",
     "name": "normalize replaces the hash of a built asset: the record survives a client change",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/cases.test.ts > normalize replaces the hash of a built asset: the record survives a client change"
   },
   {
     "project": "server",
     "file": "app/server/lib/contract/contract.test.ts",
     "name": "the route table lists every API route of the app",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/contract/contract.test.ts > the cases cover every endpoint of the API definition",
+    "reason": "the endpoints come from HttpApi.reflect, not from a route table"
   },
   {
     "project": "server",
     "file": "app/server/lib/contract/contract.test.ts",
     "name": "no case that breaks a body or a guard succeeds",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/contract.test.ts > no case that breaks a payload or the guard succeeds"
   },
   {
     "project": "server",
     "file": "app/server/lib/contract/contract.test.ts",
     "name": "every reply matches the golden record",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/contract/contract.test.ts > every reply matches the golden record",
+    "reason": "a new golden with the E1 cases; the other endpoints come back with their milestone"
   },
   {
     "project": "server",
     "file": "app/server/lib/contract/wire.test.ts",
     "name": "a body is sent with its content-length; the reply keeps its status, lower-case headers and body",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/wire.test.ts > a body is sent with its content-length; the reply keeps its status, lower-case headers and body"
   },
   {
     "project": "server",
     "file": "app/server/lib/contract/wire.test.ts",
     "name": "a chunked reply is reassembled",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/wire.test.ts > a chunked reply is reassembled"
   },
   {
     "project": "server",
     "file": "app/server/lib/contract/wire.test.ts",
     "name": "a 204 and a HEAD reply have an empty body",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/wire.test.ts > a 204 and a HEAD reply have an empty body"
   },
   {
     "project": "server",
     "file": "app/server/lib/contract/wire.test.ts",
     "name": "a request without body sends neither content-length nor transfer-encoding; headers are sent as given",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/contract/wire.test.ts > a request without body sends neither content-length nor transfer-encoding; headers are sent as given"
   },
   {
     "project": "server",
     "file": "app/server/lib/contract/wire.test.ts",
     "name": "readSse stops at the condition on a stream that never ends",
-    "milestone": "E1"
+    "milestone": "E5"
   },
   {
     "project": "server",
@@ -657,97 +735,131 @@
     "project": "server",
     "file": "app/server/lib/db/migrations.test.ts",
     "name": "a deleted profile's id is never given to a new profile (#38)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/db/Db.test.ts > Db > a deleted profile's id is never given to a new profile (#38)"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/migrations.test.ts",
     "name": "rebuilding profiles keeps their ids and every link to them (#38)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/db/Db.test.ts > Db > an older database is brought up to date: profiles keep their ids and every link to them (#38)"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/settings.test.ts",
     "name": "settings: defaults, then a persisted patch",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > settings: defaults, then a persisted patch"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/settings.test.ts",
     "name": "settings: a stored value that became invalid falls back to the default and can be repaired",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > settings: a stored value that became invalid falls back to the default and can be repaired"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/settings.test.ts",
     "name": "settings: llama-server listens on loopback by default, like llama-webui (#27)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > settings: llama-server listens on loopback by default, like llama-webui (#27)"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/settings.test.ts",
     "name": "settings: env is replaced as a whole (a variable left out is removed) and its names are checked",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > settings: env is replaced as a whole (a variable left out is removed) and its names are checked"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "get returns null when no row matches, all the rows, run the changes and the last rowid",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "a value count that does not match the placeholders throws (node:sqlite alone binds NULL)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "RETURNING rows are read through get",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "exec runs every statement; run returns the changes of its one statement, and refuses several",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "booleans bind as 1 and 0, undefined as NULL (node:sqlite alone refuses them)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/db/Db.test.ts > Db > a number bound to an INTEGER column is stored as an integer, a boolean as 1 or 0",
+    "reason": "undefined is never bound: the schemas encode an absent value"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "an integral number binds as INTEGER (node:sqlite alone binds every number as REAL)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/db/Db.test.ts > Db > a number bound to an INTEGER column is stored as an integer, a boolean as 1 or 0"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "a transaction returns its value and commits; a throw rolls back and rethrows the same error",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node (SqlClient.withTransaction)"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "a nested transaction is a savepoint: a caught inner failure only undoes the inner writes",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node (SqlClient.withTransaction)"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "an error that made SQLite roll back the transaction itself is rethrown as is",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "Removed with the wrapper: the database is the SqlClient of @effect/sql-sqlite-node (SqlClient.withTransaction)"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sqlite.test.ts",
     "name": "foreign keys are off by default, readonly refuses writes, close is idempotent, using closes",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/db/Db.test.ts > Db > foreign keys are on once the database is open",
+    "reason": "readonly, close and using belonged to the wrapper"
   },
   {
     "project": "server",
@@ -777,49 +889,61 @@
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "loadDotEnv: the file fills what the environment lacks, a variable already set wins",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: the file fills what the environment lacks, a variable already set wins"
   },
   {
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "loadDotEnv: { override: true } (--env-override) lets the file override the environment",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: { override: true } (--env-override) lets the file override the environment"
   },
   {
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "loadDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=1 in the environment lets the file override it",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=1 in the environment lets the file override it"
   },
   {
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "loadDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=true in the file itself lets it override the environment",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=true in the file itself lets it override the environment"
   },
   {
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "loadDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=0 keeps the environment",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > applyDotEnv: LLAMA_WEBUI_ENV_OVERRIDE=0 keeps the environment"
   },
   {
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "loadDotEnv: no file, nothing happens",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/DotEnv.test.ts > applyDotEnv > loadDotEnv: no file, nothing happens"
   },
   {
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "useEnvProxy: no proxy variable, nothing changes",
-    "milestone": "E1"
+    "milestone": "E6"
   },
   {
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "useEnvProxy: fetch goes through HTTP_PROXY, except for loopback and the hosts of NO_PROXY",
-    "milestone": "E1"
+    "milestone": "E6"
   },
   {
     "project": "server",
@@ -1029,55 +1153,75 @@
     "project": "server",
     "file": "app/server/lib/http.test.ts",
     "name": "appError: h3’s own HTTPError keeps its status; a wrapped error answers as the original",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: an error reply is the encoded error of the endpoint"
   },
   {
     "project": "server",
     "file": "app/server/lib/http.test.ts",
     "name": "errorResponse: an HttpError keeps its status and code, any other error is a 500",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/http/HttpLive.test.ts > HttpLive > a defect answers 500 without its message, and is logged",
+    "reason": "an expected error keeps its status through its HttpApiSchema annotation (settings/http.test.ts)"
   },
   {
     "project": "server",
     "file": "app/server/lib/http.test.ts",
     "name": "a method a pattern lacks is a 405 with Allow, not the next matching pattern (#37)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "HttpApi has no 405: a wrong method is a 404 RouteNotFound (recorded in behaviours.md)"
   },
   {
     "project": "server",
     "file": "app/server/lib/http.test.ts",
     "name": "an empty segment does not match a :param: a trailing slash stays an unknown route",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 router behaviour: the router of effect/http ignores a trailing slash (GET /api/settings/ is GET /api/settings, recorded in the contract); the empty :id segment returns with the first :id endpoint (E2)"
   },
   {
     "project": "server",
     "file": "app/server/lib/http.test.ts",
     "name": "idParam() is a 404 for anything but a positive integer",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition; the first :id endpoint (E2) records its 404 in the contract"
   },
   {
     "project": "server",
     "file": "app/server/lib/http.test.ts",
     "name": "readJson(object): Invalid JSON, then JSON object expected",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition; a payload that is not a JSON object is a bare 400"
   },
   {
     "project": "server",
     "file": "app/server/lib/http.test.ts",
     "name": "a reply keeps the content type its handler gave it",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition"
   },
   {
     "project": "server",
     "file": "app/server/lib/http.test.ts",
     "name": "readBody() validates a JSON object with zod: Invalid JSON, JSON object expected, then the schema",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/http/HttpLive.test.ts > HttpLive > a payload that does not decode is a 400, not logged as a failure",
+    "reason": "the messages Invalid JSON and JSON object expected are gone: a bare 400 from HttpApi"
   },
   {
     "project": "server",
     "file": "app/server/lib/http.test.ts",
     "name": "queryOf() gives the handler the declared keys, decoded as searchParams, and refuses nothing",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition; no E1 endpoint has a query"
   },
   {
     "project": "server",
@@ -1407,73 +1551,73 @@
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "spawnProc pipes stdout and stderr and reports the exit code",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "a process killed by a signal has no exit code",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "timeout kills the process with killSignal",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "kill() after the exit does not throw",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "cwd and env reach the process",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "a spawn failure throws at once, naming the binary and the cause",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "a spawn failure is diagnosed with the PATH of the child environment, a directory is not executable",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "an error event after the start (a failed kill) does not crash the process",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "which looks the binary up in the PATH",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads [start, end)",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads in 1 MiB chunks, so the disk speed check is not held back by the stream",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileExists is true for a file only, readText reads UTF-8",
-    "milestone": "E1"
+    "milestone": "E3"
   },
   {
     "project": "server",
@@ -1509,25 +1653,31 @@
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "WsHub ignores a frame that parses to something other than an object (#37)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/ws/WsHub.test.ts > text that is not a JSON object is ignored (#37)"
   },
   {
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "PATCH /api/settings merges collectors field by field (#35)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/settings/SettingsRepo.test.ts > SettingsRepo > an object setting is merged field by field (#35)"
   },
   {
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "PATCH /api/settings: saved but not applied by the monitor is a 200 with a warning, not a 500 (#35)",
-    "milestone": "E1"
+    "milestone": "E4"
   },
   {
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "pollIntervalMs is capped at 60 s (#37)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/settings/http.test.ts > SettingsApi > pollIntervalMs is capped at 60 s (#37)"
   },
   {
     "project": "server",
@@ -1545,31 +1695,41 @@
     "project": "server",
     "file": "app/server/lib/security.test.ts",
     "name": "guard: localhost or IP host accepted, domain name rejected (DNS rebinding)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: localhost or IP host accepted, domain name rejected (DNS rebinding)"
   },
   {
     "project": "server",
     "file": "app/server/lib/security.test.ts",
     "name": "guard: Origin from another site rejected, same origin accepted",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: Origin from another site rejected, same origin accepted"
   },
   {
     "project": "server",
     "file": "app/server/lib/security.test.ts",
     "name": "guard: write without JSON rejected (simple request CSRF)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: write without JSON rejected (simple request CSRF)"
   },
   {
     "project": "server",
     "file": "app/server/lib/security.test.ts",
     "name": "guard: the body is judged from content-length and transfer-encoding, not from the body stream",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: the body is judged from content-length and transfer-encoding, not from the body stream"
   },
   {
     "project": "server",
     "file": "app/server/lib/security.test.ts",
     "name": "guard: a Host that is not an authority is a 400, not a crash (req.url is built from it)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/http/Guard.test.ts > guard > guard: a Host that is not an authority is a 400, not a crash (req.url is built from it)"
   },
   {
     "project": "server",
@@ -1917,37 +2077,51 @@
     "project": "server",
     "file": "app/server/lib/version.test.ts",
     "name": "APP_VERSION: dev when running from source",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/config/AppInfo.test.ts > AppInfo > version: dev when running from source"
   },
   {
     "project": "server",
     "file": "app/server/lifecycle.test.ts",
     "name": "SIGTERM with the UI open and a reply streaming stops in under 2 s",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/lifecycle.test.ts > SIGTERM with the UI open stops in under 2 s",
+    "reason": "the reply streaming returns with the chat (E5)"
   },
   {
     "project": "server",
     "file": "app/server/lifecycle.test.ts",
     "name": "a second instance on a taken port exits 1",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "ported",
+    "to": "app/server/lifecycle.test.ts > a second instance on a taken port exits 1 and names it"
   },
   {
     "project": "server",
     "file": "app/server/lifecycle.test.ts",
     "name": "a second instance on the same port and data dir leaves the first one's data alone",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/lifecycle.test.ts > a second instance on the same port and data dir leaves the first one",
+    "reason": "its llama-server and profile rows return with the supervisor (E3)"
   },
   {
     "project": "server",
     "file": "app/server/lifecycle.test.ts",
     "name": "HTTP cache > pages are revalidated, hashed assets are immutable, the API sets no cache header",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/http/Static.test.ts > Static > pages are revalidated, hashed assets are immutable, the API sets no cache header; app/server/contract/golden.json (cache-control of each reply)"
   },
   {
     "project": "server",
     "file": "app/server/lifecycle.test.ts",
     "name": "HTTP cache > a missing asset is h3's own 404, not a 500 (a stale tab after an upgrade)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/server/http/Static.test.ts > Static > a missing asset is a 404, not the page; app/server/contract/golden.json (GET /assets/index-00000000.js)"
   },
   {
     "project": "web",
@@ -2211,43 +2385,57 @@
     "project": "web",
     "file": "app/src/lib/api.test.ts",
     "name": "api() returns the JSON body of a 2xx reply",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() resolves with the decoded reply of the endpoint"
   },
   {
     "project": "web",
     "file": "app/src/lib/api.test.ts",
     "name": "api() gives undefined for an empty 2xx reply (204)",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "No E1 endpoint answers 204: the derived client decodes the success schema of each endpoint"
   },
   {
     "project": "web",
     "file": "app/src/lib/api.test.ts",
     "name": "api() throws the ApiError of an error reply, with issues and code",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() rejects with the tagged error of the endpoint"
   },
   {
     "project": "web",
     "file": "app/src/lib/api.test.ts",
     "name": "api() falls back to the status for an error reply that is not JSON",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "dropped",
+    "reason": "The derived client decodes an undeclared reply as HttpApi does; no fallback of its own"
   },
   {
     "project": "web",
     "file": "app/src/lib/api.test.ts",
     "name": "api() maps a fetch that rejects to an unreachable server",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() rejects with ApiUnreachable when fetch rejects"
   },
   {
     "project": "web",
     "file": "app/src/lib/api.test.ts",
     "name": "api() passes the request options (signal) through to fetch",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() passes its signal: an abort reaches fetch and rejects the call"
   },
   {
     "project": "web",
     "file": "app/src/lib/api.test.ts",
     "name": "api() fills in :id, the query and the JSON body",
-    "milestone": "E1"
+    "milestone": "E1",
+    "status": "rewritten",
+    "to": "app/src/lib/api.test.ts > call() fills in the path, the query and the JSON payload"
   },
   {
     "project": "web",

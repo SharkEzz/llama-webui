@@ -51,6 +51,14 @@ layer(TestLayer)('cli', (it) => {
     }),
   );
 
+  it.effect('the data directory follows XDG_DATA_HOME; HOST and PORT of the environment are not ours', () =>
+    Effect.gen(function* () {
+      const env = { HOME: '/home/u', XDG_DATA_HOME: '/xdg', HOST: '0.0.0.0', PORT: '1234' };
+      const config = Option.getOrThrow((yield* run([], env)).started);
+      assert.deepStrictEqual([config.host, config.port, config.dataDir], ['127.0.0.1', 7860, '/xdg/llama-webui']);
+    }),
+  );
+
   it.effect('environment variables', () =>
     Effect.gen(function* () {
       const env = { LLAMA_WEBUI_HOST: '0.0.0.0', LLAMA_WEBUI_PORT: '8080', LLAMA_WEBUI_DATA_DIR: '/tmp/d' };

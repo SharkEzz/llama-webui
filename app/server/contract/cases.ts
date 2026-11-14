@@ -67,6 +67,9 @@ export function cases(ctx: { asset: string }): Case[] {
 
   // Outside the API definition.
   add('other', 'GET /api/nope', bare('GET', '/api/nope'));
+  add('other', 'GET /api/settings/ (trailing slash)', bare('GET', '/api/settings/'));
+  add('other', 'DELETE /api/health (a method the path lacks)', bare('DELETE', '/api/health'));
+  add('other', 'HEAD /api/health', bare('HEAD', '/api/health'));
   add('other', 'GET /ws (no upgrade)', bare('GET', '/ws'));
 
   // The UI: the app, a deep URL of it, a hashed file and one that is not there (a stale tab after an upgrade).

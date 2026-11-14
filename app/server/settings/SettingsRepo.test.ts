@@ -75,7 +75,7 @@ describe('SettingsRepo', () => {
     ),
   );
 
-  it.effect('an object setting is merged field by field', () =>
+  it.effect('an object setting is merged field by field (#35)', () =>
     fresh(
       Effect.gen(function* () {
         const repo = yield* SettingsRepo;

@@ -66,6 +66,47 @@
       "message": "Unknown route"
     }
   },
+  "GET /api/settings/ (trailing slash)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "binary": "llama-server",
+      "host": "127.0.0.1",
+      "port": 8080,
+      "modelsDir": "~/models",
+      "pollIntervalMs": 1000,
+      "historySeconds": 300,
+      "hiddenGpus": [],
+      "defaultProfileId": null,
+      "llamaTuiImportDismissed": false,
+      "onboardingDone": false,
+      "collectors": {
+        "nvml": true,
+        "system": true,
+        "disk": true
+      },
+      "theme": "system",
+      "env": {}
+    }
+  },
+  "DELETE /api/health (a method the path lacks)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/health": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
   "GET /ws (no upgrade)": {
     "status": 426,
     "headers": {

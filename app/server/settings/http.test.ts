@@ -33,4 +33,18 @@ layer(Layer.mergeAll(Handlers, HttpServer.layerServices))('SettingsApi', (it) =>
       assert.deepStrictEqual(refused.issues, [{ path: ['historySeconds'], message: 'Between 30 and 1800 s' }]);
     }),
   );
+
+  it.effect('pollIntervalMs is capped at 60 s (#37)', () =>
+    Effect.gen(function* () {
+      const client = yield* makeClient;
+      assert.strictEqual(
+        (yield* client.settings.patch({ payload: { pollIntervalMs: 60_000 } })).pollIntervalMs,
+        60_000,
+      );
+      const refused = yield* Effect.flip(client.settings.patch({ payload: { pollIntervalMs: 3_600_000 } }));
+      assert(refused._tag === 'SettingsInvalid');
+      assert.strictEqual((yield* client.settings.get()).pollIntervalMs, 60_000);
+      assert.strictEqual(DEFAULT_SETTINGS.pollIntervalMs, 1000);
+    }),
+  );
 });
