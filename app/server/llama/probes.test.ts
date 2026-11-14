@@ -2,13 +2,28 @@ import { assert, layer } from '@effect/vitest';
 import { Array as Arr, Clock, Effect, Option } from 'effect';
 import { freePort, httpStub, until } from '../testing/llama.ts';
 import { LlamaHttp } from './LlamaHttp.ts';
-import { health, isLlamaServer, props } from './probes.ts';
+import { health, isLlamaServer, props, readLlama } from './probes.ts';
 
 /** A stub that answers every request with `status` and `body`. */
 const answering = (status: number, body: string, type = 'application/json') =>
   httpStub((_req, res) => {
     res.writeHead(status, { 'content-type': type }).end(body);
   });
+
+/** One busy slot, as llama-server's `/slots` answers it (`testdata/fake/slots-busy.json`). */
+const SLOTS =
+  '[{"id":0,"n_ctx":40192,"is_processing":true,"id_task":2,"n_prompt_tokens":92,"n_prompt_tokens_processed":68,' +
+  '"next_token":[{"has_next_token":true,"n_remain":279,"n_decoded":21}]}]';
+const METRICS = Arr.join(
+  [
+    '# HELP llamacpp:tokens_predicted_total Number of generation tokens processed',
+    '# TYPE llamacpp:tokens_predicted_total counter',
+    'llamacpp:tokens_predicted_total 300',
+    'llamacpp:requests_processing 1',
+    '',
+  ],
+  '\n',
+);
 
 layer(LlamaHttp.layer, { excludeTestServices: true })('probes', (it) => {
   it.effect('health is the status, none when nothing listens or nothing answers within 800 ms', () =>
@@ -81,5 +96,67 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('probes', (it) => {
           ['PropsUnavailable', 'llama-server is not responding on /props'],
         ]);
       }),
+  );
+
+  it.effect('readLlama reads health, slots and metrics of a loaded server', () =>
+    Effect.gen(function* () {
+      const server = yield* httpStub((req, res) => {
+        if (req.url === '/health') res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+        else if (req.url === '/slots') res.writeHead(200, { 'content-type': 'application/json' }).end(SLOTS);
+        else if (req.url === '/metrics') res.writeHead(200, { 'content-type': 'text/plain' }).end(METRICS);
+        else res.writeHead(404).end();
+      });
+      const before = yield* Clock.currentTimeMillis;
+      const raw = yield* readLlama({ host: '0.0.0.0', port: server.port });
+      assert.strictEqual(raw.health, 'ok');
+      assert.isAtLeast(raw.at, before);
+      assert.deepStrictEqual(raw.slots, [
+        {
+          id: 0,
+          nCtx: 40192,
+          processing: true,
+          idTask: 2,
+          nPromptTokens: 92,
+          nPromptProcessed: 68,
+          nDecoded: 21,
+          nRemain: 279,
+        },
+      ]);
+      assert.strictEqual(raw.metrics?.get('llamacpp:tokens_predicted_total'), 300);
+      assert.strictEqual(server.requests(), 3);
+    }),
+  );
+
+  it.effect('readLlama stops at a loading server', () =>
+    Effect.gen(function* () {
+      const loading = yield* answering(503, '{"error":{"type":"unavailable_error"}}');
+      const raw = yield* readLlama({ port: loading.port });
+      assert.deepStrictEqual([raw.health, raw.slots, raw.metrics], ['loading', null, null]);
+      assert.strictEqual(loading.requests(), 1);
+      const failing = yield* answering(500, 'boom', 'text/plain');
+      const error = yield* readLlama({ port: failing.port });
+      assert.deepStrictEqual([error.health, error.slots, error.metrics], ['error', null, null]);
+    }),
+  );
+
+  it.effect('a llama-server that never answers gives health down within a second', () =>
+    Effect.gen(function* () {
+      const silent = yield* httpStub(() => {});
+      const start = yield* Clock.currentTimeMillis;
+      const raw = yield* readLlama({ port: silent.port });
+      const waited = (yield* Clock.currentTimeMillis) - start;
+      assert.deepStrictEqual([raw.health, raw.slots, raw.metrics], ['down', null, null]);
+      assert.isAtLeast(waited, 750);
+      assert.isBelow(waited, 1000);
+      // Health answered, then /slots and /metrics silent: each gives up after 800 ms, together.
+      const halfSilent = yield* httpStub((req, res) => {
+        if (req.url === '/health') res.writeHead(200).end('{"status":"ok"}');
+      });
+      const t0 = yield* Clock.currentTimeMillis;
+      const partial = yield* readLlama({ port: halfSilent.port });
+      const took = (yield* Clock.currentTimeMillis) - t0;
+      assert.deepStrictEqual([partial.health, partial.slots, partial.metrics], ['ok', null, null]);
+      assert.isBelow(took, 1500);
+    }),
   );
 });

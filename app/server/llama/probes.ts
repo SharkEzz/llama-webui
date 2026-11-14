@@ -1,6 +1,8 @@
 import { PropsUnavailable } from '@llama-webui/shared';
-import { Effect, Option, Schema } from 'effect';
+import { Clock, Effect, Option, Schema } from 'effect';
+import type { HttpClientResponse } from 'effect/http';
 import { probeUrl } from 'llamacpp-js/client';
+import { type Health, type LlamaRaw, parsePrometheus, parseSlots } from 'llamacpp-js/metrics';
 import { LlamaHttp } from './LlamaHttp.ts';
 
 /** How long a probe of `/health` waits for its answer. */
@@ -14,7 +16,8 @@ export interface Target {
   readonly port: number;
 }
 
-const healthUrl = (target: Target) => `${probeUrl(target.host, target.port)}/health`;
+const urlOf = (target: Target, path: string) => `${probeUrl(target.host, target.port)}${path}`;
+const healthUrl = (target: Target) => urlOf(target, '/health');
 
 /** The status `/health` answers (200 once loaded, 503 while loading), none when nothing answers within 800 ms. */
 export const health = Effect.fn('probes.health')(function* (target: Target) {
@@ -25,6 +28,38 @@ export const health = Effect.fn('probes.health')(function* (target: Target) {
     Effect.timeoutOption(PROBE_TIMEOUT),
     Effect.orElseSucceed(Option.none<number>),
   );
+});
+
+const healthOf = (status: number): Health => (status === 200 ? 'ok' : status === 503 ? 'loading' : 'error');
+
+/**
+ * One monitoring read of llama-server: `/health` (200 `ok`, 503 `loading`, another status `error`, nothing within
+ * 800 ms `down`), then, once it is `ok`, `/slots` and `/metrics` together, each within 800 ms, null on any failure.
+ * `at` is the time of the read.
+ */
+export const readLlama = Effect.fn('probes.readLlama')(function* (target: Target) {
+  const client = yield* LlamaHttp;
+  const at = yield* Clock.currentTimeMillis;
+  const status = yield* health(target);
+  if (Option.isNone(status)) return { at, health: 'down', slots: null, metrics: null } satisfies LlamaRaw;
+  const state = healthOf(status.value);
+  if (state !== 'ok') return { at, health: state, slots: null, metrics: null } satisfies LlamaRaw;
+  const read = <A>(path: string, body: (res: HttpClientResponse.HttpClientResponse) => Effect.Effect<A, unknown>) =>
+    client.get(urlOf(target, path)).pipe(
+      Effect.flatMap(body),
+      Effect.scoped,
+      Effect.timeoutOption(PROBE_TIMEOUT),
+      Effect.map(Option.getOrNull),
+      Effect.orElseSucceed(() => null),
+    );
+  const [slots, metrics] = yield* Effect.all(
+    [
+      read('/slots', (res) => Effect.map(res.json, parseSlots)),
+      read('/metrics', (res) => Effect.map(res.text, parsePrometheus)),
+    ],
+    { concurrency: 2 },
+  );
+  return { at, health: state, slots, metrics } satisfies LlamaRaw;
 });
 
 /**
