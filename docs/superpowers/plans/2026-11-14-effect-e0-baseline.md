@@ -261,7 +261,9 @@ export interface InventoryEntry {
 
 `app/server/lib/routes.test.ts` tests route handlers of several domains: `milestoneOf` cannot place it by file, so
 the command (Step 3) assigns its entries by test name with this rule, in order: name contains `chat` or `stream` →
-`E5`; `bench` → `E7`; `props` → `E3`; `settings` → `E1`; anything else throws.
+`E5`; `bench` → `E7`; `props` → `E3`; `settings` → `E1`; `WsHub` → `E1`; `pollIntervalMs` → `E1`; anything else
+throws. (`WsHub` and `pollIntervalMs` were added while executing the plan: two tests of the file, on the hub and on
+the settings' cap, matched none of the first words.)
 
 - [ ] **Step 1: Write the failing tests** in `scripts/poc/inventory.test.ts`
 
@@ -298,7 +300,8 @@ Run: `LLAMA_WEBUI_TEST_BUILD=0 pnpm exec vitest run scripts/poc/inventory.test.t
 Expected: FAIL, `./inventory.ts` cannot be resolved.
 
 - [ ] **Step 3: Implement `milestoneOf` and the command** `node scripts/poc/inventory.ts --out <file.json>`: it runs
-      `pnpm exec vitest list --json` with `LLAMA_WEBUI_TEST_BUILD=0` (an array of `{ name, file, projectName }`), turns
+      `pnpm exec vitest list --json --staticParse=false` with `LLAMA_WEBUI_TEST_BUILD=0` (Vitest 5 parses statically by
+      default, which lists a `test.each` once with its template and drops a `test.skipIf`) (an array of `{ name, file, projectName }`), turns
       each item into an `InventoryEntry` (no `status`), keeps the order of the listing within a file, sorts files by
       path, and writes the array as JSON. Entries are not deduplicated. The command runs only under
       `if (import.meta.main)`. The tests of `packages/llamacpp-js` (`node:test`) are not listed: the package does not
