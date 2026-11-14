@@ -43,6 +43,8 @@ the handlers. The web's Profiles page calls the derived client; its parts that n
   is read once per binary path per run by design. All three are reproduced.
 - Legacy files: E2 deletes its own (listed in Task 9) and the ones E1 left behind; `lib/profiles/remove.ts` stays
   until E3 (it holds the 409 above).
+- **User (during execution):** the llama-tui import is not ported: its two endpoints, the `LlamaTui` service, the
+  `llamaTuiImportDismissed` setting and the import banner are dropped; Task 5 keeps `Home` only.
 
 ## Global Constraints
 

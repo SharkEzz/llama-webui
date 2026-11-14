@@ -118,12 +118,15 @@ describe('ProfilesApi', () => {
     );
 
     it.effect(
-      'update of a profile that is not there is a 404 ProfileNotFound, an id that is not a number the unknown route',
+      'update of a profile that is not there is a 404 ProfileNotFound after the body, an id that is not a number the unknown route',
       () =>
         Effect.gen(function* () {
           const missing = yield* send('PUT', '/api/profiles/999', '{"name":"x","model":"m"}');
           assert.strictEqual(missing.status, 404);
           assert.deepStrictEqual(missing.json, notFound);
+          // The body is decoded first: an invalid one is a 400 even when the profile is not there.
+          const invalid = yield* send('PUT', '/api/profiles/999', '{"name":"","model":"m"}');
+          assert.strictEqual(invalid.status, 400);
           for (const path of ['/api/profiles/abc', '/api/profiles/0', '/api/profiles/1.5']) {
             const word = yield* send('GET', path);
             assert.strictEqual(word.status, 404, path);

@@ -24,9 +24,12 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 
 ### E2: profiles and flags
 
-- Deleting the profile the server is running answers 409 before the 404 of an unknown id is considered. `unverified`
-- The profile schema is strict and sets no maximum length on the name. `unverified`
-- The cache of the flags of `--help` is never invalidated. `unverified`
+- Deleting the profile the server is running answers 409 before the 404 of an unknown id is considered. `not a defect`:
+  only a profile that exists can be running, so an unknown id never meets the 409 (returns with the supervisor, E3).
+- The profile schema is strict and sets no maximum length on the name. `design choice`: the strict schema refuses a
+  typo'd key, and a name has no limit to keep; ported as it is (`ProfileInput`).
+- The cache of the flags of `--help` is never invalidated. `design choice`: the catalogue is read once per binary path
+  per run (a failure is not kept); a rebuilt binary at the same path is read again after a restart (`Flags`).
 
 ### E3: supervisor, logs, setup
 
@@ -82,10 +85,28 @@ Recorded in the E1 section of `behaviours.md`.
 Decided (the E1 plan, or accepted with its result):
 
 - A wrong method on a known `/api` path and `HEAD` answer 404 `RouteNotFound` (was 405 with `Allow`, and HEAD as GET).
-- A body that is not a JSON object answers a bare 400 (was `Invalid JSON` / `JSON object expected`).
+- A body that is not a JSON object answered a bare 400 at E1 (was `Invalid JSON` / `JSON object expected`); since E2 it is
+  a 400 `RequestInvalid` with its `issues` (`Invalid data: Expected a valid JSON body`).
 - A usage error of the command line exits 1 with the help (was 2).
 
-Open, to settle before E2 adds `:id` routes:
+Decided (user): a path under `/api/` and `/ws/` that ends with a slash is a 308 to the path without it, query string
+kept, after the guard (was 404; at E1 the router of `effect/http` ignored the slash). The UI's paths keep theirs.
 
-- A trailing slash matches the route: `GET /api/settings/` answers as `GET /api/settings` (was 404). It comes from the
-  router of `effect/http`, nobody chose it.
+Decided (the E2 plan): requests are validated by their schema at the edge.
+
+- On `PUT /api/profiles/:id` an invalid body is a 400 even when the profile does not exist (was 404 first).
+- An id that is not a positive integer answers 404 `RouteNotFound` `Unknown route` (was `Profile not found`).
+- A body that is not JSON answers `Invalid data: Expected a valid JSON body`, an empty one `Invalid data: Expected JSON
+  value` (was `Invalid JSON`).
+- An unknown key answers `unknown key` and comes first among the issues (zod worded it its own way, after the fields).
+- The `code` of an error (`name-taken`) is its `_tag` (`ProfileNameTaken`).
+
+Found while porting E2, accepted with its result:
+
+- `POST /api/profiles/:id/duplicate` copies the stored profile as it is, without validating it again (was a 400
+  `Invalid data: …` for a stored profile that no longer passes the schema).
+- An item of an import that is not an object is explained as `Expected object` (was zod's own message).
+
+Decided (user, 2026-11-14): the llama-tui import is not ported (llama-tui was never deployed beyond the user): its two
+endpoints, the `llamaTuiImportDismissed` setting and the import banner are dropped. The generic import still reads a
+`{ profiles }` file, and `duplicate` still turns a `llama-tui` source into `import`.

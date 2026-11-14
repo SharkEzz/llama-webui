@@ -88,7 +88,7 @@ export function ProfilesPage() {
           <AlertTitle>No profiles</AlertTitle>
           <AlertDescription>
             A profile combines the model to load and the llama-server arguments: create one, or import a JSON file
-            exported from llama-webui or llama-tui.
+            exported from llama-webui.
           </AlertDescription>
         </Alert>
       ) : (

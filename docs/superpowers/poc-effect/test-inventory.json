@@ -1188,7 +1188,7 @@
     "name": "idParam() is a 404 for anything but a positive integer",
     "milestone": "E1",
     "status": "dropped",
-    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition; the first :id endpoint (E2) records its 404 in the contract"
+    "reason": "h3 helper: HttpApi decodes paths, payloads and queries from the API definition; the first :id endpoint (E2) records its 404 in the contract. Back at E2: packages/webui-shared/src/api/errors.test.ts > IdParam reads decimal digits only, app/server/http/RequestErrors.test.ts > a path parameter that does not decode is the 404 of an unknown route"
   },
   {
     "project": "server",
@@ -1689,7 +1689,10 @@
     "project": "server",
     "file": "app/server/lib/schemas.test.ts",
     "name": "ProfileInputSchema: parsed by POST /api/profiles, then by ProfilesRepo.create",
-    "milestone": "E2"
+    "milestone": "E2",
+    "status": "rewritten",
+    "to": "packages/webui-shared/src/profile.test.ts > ProfileInput: a missing or empty name or model says so; app/server/profiles/http.test.ts > an invalid profile is a 400 RequestInvalid naming each field, on create and on update",
+    "reason": "The payload schema decodes the body at the edge (RequestInvalid): the repository takes a decoded ProfileInput and does not parse it again"
   },
   {
     "project": "server",
@@ -2151,7 +2154,9 @@
     "project": "web",
     "file": "app/src/features/profiles/draft.test.ts",
     "name": "commandChanged ignores a rename and the timestamps, not the command fields",
-    "milestone": "E2"
+    "milestone": "E2",
+    "status": "ported",
+    "to": "app/src/features/profiles/draft.test.ts > commandChanged ignores a rename and the timestamps, not the command fields"
   },
   {
     "project": "web",
@@ -2395,7 +2400,7 @@
     "name": "api() gives undefined for an empty 2xx reply (204)",
     "milestone": "E1",
     "status": "dropped",
-    "reason": "No E1 endpoint answers 204: the derived client decodes the success schema of each endpoint"
+    "reason": "No E1 endpoint answers 204: the derived client decodes the success schema of each endpoint. Back at E2 with the profile deletion: app/server/profiles/http.test.ts > remove answers 204 with no body and clears the default profile setting"
   },
   {
     "project": "web",
@@ -2639,19 +2644,26 @@
     "project": "shared",
     "file": "packages/webui-shared/src/profile.test.ts",
     "name": "llama-tui import: whole config",
-    "milestone": "E2"
+    "milestone": "E2",
+    "status": "ported",
+    "to": "packages/webui-shared/src/profile.test.ts > import: a whole exported file, other keys ignored",
+    "reason": "Renamed: the llama-tui import is not ported (user, 2026-11-14); the { profiles } shape it tested is the exported file"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/profile.test.ts",
     "name": "import: valid ones kept, invalid ones explained",
-    "milestone": "E2"
+    "milestone": "E2",
+    "status": "ported",
+    "to": "packages/webui-shared/src/profile.test.ts > import: valid ones kept, invalid ones explained"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/profile.test.ts",
     "name": "import: single profile and array",
-    "milestone": "E2"
+    "milestone": "E2",
+    "status": "ported",
+    "to": "packages/webui-shared/src/profile.test.ts > import: single profile and array"
   },
   {
     "project": "shared",

@@ -49,6 +49,48 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 - Configuration: nothing reads `Config` (or `AppConfig`) before `loadDotEnv` has run (`app/server/main.ts`: the
   default provider snapshots the environment on first use).
 
+## Requests
+
+- Every endpoint declares what it reads as schemas: `params` (an id is `IdParam` of
+  `packages/webui-shared/src/api/params.ts`, a positive integer in decimal digits), `payload`, `query`. A handler
+  never parses a body or a parameter itself.
+- `Api` decodes payloads strictly (`HttpApi.PayloadParseOptions`: an unknown key is an issue, every issue reported)
+  and carries the `RequestErrors` middleware (`.middleware(RequestErrors)` after the last `.add`: it reaches only the
+  groups added before it). `RequestErrorsLive` (`app/server/http/RequestErrors.ts`) answers a payload, a query or a
+  header that does not decode with a 400 `RequestInvalid` `{ message: "Invalid data: <first issue> (<path>)", issues }`
+  (`requestInvalid` of `api/errors.ts`) and a path parameter with the 404 `RouteNotFound`; it is not logged as a
+  failure. A field's message is the `message` of its check (`'cannot be empty'`), an unknown key's the
+  `messageUnexpectedKey` annotation of the struct (`'unknown key'`, `ProfileInput`).
+- Validation is tested over raw HTTP against the built routes (`send` in `profiles/http.test.ts`,
+  `http/RequestErrors.test.ts`): the typed client encodes a payload before sending, so a bad one never leaves it. The
+  web's `makeCall` (`app/src/lib/api.ts`) turns that refusal into the same `RequestInvalid`, so a page reads one shape.
+- A path that ends with a slash under `/api/` or `/ws/` is a 308 to the path without it (`http/TrailingSlash.ts`),
+  after the guard.
+
+## Replies
+
+- A file to download: the endpoint's `success` is the schema of the file (the typed client decodes it), and the
+  handler returns `attachment(schema)({ filename, body })` of `app/server/http/attachment.ts`, built once per schema:
+  the body encoded by that schema (a `Profile` through `ProfileInput` loses its id, source and dates), 2-space JSON, a
+  trailing newline, `content-disposition: attachment; filename*=UTF-8''<percent-encoded>` (`exportOne` of
+  `profiles/http.ts`).
+- A 204: an endpoint with no `success` (`remove` of `ProfilesApi`), whose handler succeeds with `void`.
+
+## Programs and the home folder
+
+- A path a person wrote goes through `expandHome` of `app/server/config/Home.ts` (`~` and `~/…`, `HOME` read with
+  `Config`, else the system's home). Effect has no home directory of its own: the module imports `homedir` of `node:os`.
+- A program runs through `effect/process`: `ChildProcess.make(cmd, args, { stdin: 'ignore', stderr: 'ignore',
+  forceKillAfter })` and `ChildProcessSpawner.spawn` in an `Effect.scoped`; the scope's end kills the process group
+  (`SIGTERM`, then `SIGKILL` after `forceKillAfter`). Read its output and its exit code together
+  (`Effect.all([Stream.mkString(Stream.decodeText(out)), handle.exitCode], { concurrency: 2 })`), bound the output
+  (`Stream.mapEffect` counting bytes), treat a non-zero code as a failure, and put the whole run under
+  `Effect.timeout`: a timeout interrupts the run, the scope closes and the program is killed (`flags/Flags.ts`). A
+  one-shot command whose output is not read: `spawner.exitCode(command)`. Tests write their programs as shell
+  scripts in a scoped temporary folder (`flags/Flags.test.ts`).
+- A result per key computed once: `Cache.makeWith(lookup, { capacity, timeToLive })`, a failure kept for
+  `Duration.zero` so the next call runs it again; concurrent gets of one key share the lookup.
+
 ## SQL
 
 - Through `SqlClient` (`@effect/sql-sqlite-node`), opened by `app/server/db/Db.ts`; migrations in
@@ -72,10 +114,18 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 - **A /ws message**: a `Schema.Struct({ type: Schema.Literal('…'), payload })` in `packages/webui-shared/src/ws.ts`,
   added to the `WsMessage` union, sent with `WsHub.publish`.
 - **A contract case**: an `add(kind, name, req)` in `cases()` of `app/server/contract/cases.ts` for each endpoint of the
-  group (the coverage test fails without one), a `violation`, `body` or `guard` case for what it refuses, then
-  `UPDATE_GOLDEN=1` and read the diff of `golden.json`.
+  group (the coverage test fails without one: `covers(endpoint, req)` matches a `:param` with any non-empty segment),
+  a `violation`, `body` or `guard` case for what the edge refuses and a `refusal` case for what the domain refuses
+  (a 404 of a missing row, a 409), then `UPDATE_GOLDEN=1` and read the diff of `golden.json`. A case that needs a
+  setting sets it with a `PATCH /api/settings` case just before it; a file or a program it needs comes through the
+  context of `cases()` (`Binaries`: the fake llama-server of `testdata/fake/`, a path in the run's temporary folder),
+  and its paths are recorded as `<repo>`, `<tmp>` or `<home>`, never as they are on this machine.
 - **A web page that returns**: its import in `PORTED` of `app/src/app/router.tsx`, its entry out of
-  `MILESTONE_BY_PATH` in `app/src/app/routes.ts`, its tests out of the `"exclude"` of `app/tsconfig.json`.
+  `MILESTONE_BY_PATH` in `app/src/app/routes.ts`, its tests out of the `"exclude"` of `app/tsconfig.json`. Its calls go
+  through `call((api) => api.<group>.<endpoint>(…))`; an error is told by its `_tag` (`fieldErrors` of
+  `features/profiles/errors.ts` puts a `RequestInvalid`'s issues on their fields). A part that needs a store of a
+  later milestone (`@/lib/server` until E3, `@/lib/models` until E6) is removed, not stubbed, and recorded as a
+  `From E<n>:` line in the section of that milestone in `behaviours.md`; it comes back with the store.
 
 ## Tests
 
