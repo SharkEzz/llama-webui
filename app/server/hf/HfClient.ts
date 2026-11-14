@@ -1,4 +1,5 @@
 import {
+  HF_REPO_RE,
   type HfFile,
   HfGated,
   HfNotFound,
@@ -11,12 +12,14 @@ import {
 import {
   Array as Arr,
   Context,
+  Deferred,
   Effect,
   type FileSystem,
   Layer,
   Option,
   Predicate,
   Schema,
+  type Scope,
   String as Str,
   SynchronizedRef,
 } from 'effect';
@@ -36,8 +39,23 @@ export interface RepoFiles {
   readonly files: ReadonlyArray<HfFile>;
 }
 
-/** How long a call to the Hub's API may take, its body read. */
+/** How long a call to the Hub's API may take, its redirects followed and its body read. */
 const API_TIMEOUT = '10 seconds';
+
+/** How many redirects a call to the Hub's API follows (a renamed repository answers 307 to its new name). */
+const MAX_REDIRECTS = 5;
+
+const isRedirect = (status: number): boolean =>
+  status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+
+/** Where `location` (resolved against `from`) leads, when it stays on `origin`: the token never leaves it. */
+const sameOrigin = (location: string | undefined, from: string, origin: string): Option.Option<string> =>
+  Option.flatMap(Option.fromNullishOr(location), (to) =>
+    Option.map(
+      Option.filter(Option.fromNullishOr(URL.parse(to, from)), (url) => url.origin === origin),
+      (url) => url.href,
+    ),
+  );
 
 /**
  * The error of a Hub answer that is not a success: its `x-error-code` first (a private or missing repository answers
@@ -113,7 +131,9 @@ const SearchRow = Schema.Struct({
 });
 
 const RepoInfo = Schema.Struct({
-  id: Schema.String,
+  // The id makes a folder under the models folder: an id that is not `org/name` (a mirror or a proxy answering
+  // `../x`) is an invalid response.
+  id: Schema.String.check(Schema.isPattern(HF_REPO_RE)),
   sha: Schema.String,
   gated: Schema.optionalKey(Gated),
   siblings: Schema.optionalKey(
@@ -149,7 +169,8 @@ export class HfClient extends Context.Service<
 >()('@llama-webui/app/server/hf/HfClient') {
   /**
    * Every call goes through `HfHttp`, in a scope of its own (it ends with the call, or when the caller is interrupted:
-   * the request is aborted), within 10 s, its body read; a 200 is decoded with a schema. The token and the endpoint are
+   * the request is aborted), within 10 s, its redirects on the endpoint's origin followed (5 at most) and its body
+   * read; a 200 is decoded with a schema. The token and the endpoint are
    * read on each call (an `hf auth login` done while the app runs is used), with the configuration the client was
    * built with.
    */
@@ -158,9 +179,31 @@ export class HfClient extends Context.Service<
     Effect.gen(function* () {
       const http = yield* HfHttp;
       const context = yield* Effect.context<FileSystem.FileSystem>();
-      const accounts = yield* SynchronizedRef.make<ReadonlyMap<string, Account>>(new Map());
+      // The whoami requests run here, not in their caller: a caller that leaves does not end one another waits on.
+      const scope = yield* Effect.scope;
+      const accounts = yield* SynchronizedRef.make<ReadonlyMap<string, Deferred.Deferred<Account>>>(new Map());
 
-      /** A GET of the API at `path`, its 200 decoded with `schema`. */
+      /**
+       * `request`, and the redirects it answers that stay on `origin` (the endpoint's), at most `MAX_REDIRECTS`, with
+       * the same headers. Any other answer is the response: a redirect elsewhere, or one too many, is its error.
+       */
+      const follow = (
+        request: HttpClientRequest.HttpClientRequest,
+        origin: Option.Option<string>,
+        hops: number,
+      ): Effect.Effect<HttpClientResponse.HttpClientResponse, HttpClientError.HttpClientError, Scope.Scope> =>
+        Effect.flatMap(http.execute(request), (response) => {
+          const next =
+            isRedirect(response.status) && hops < MAX_REDIRECTS
+              ? Option.flatMap(origin, (o) => sameOrigin(response.headers.location, request.url, o))
+              : Option.none();
+          return Option.match(next, {
+            onNone: () => Effect.succeed(response),
+            onSome: (url) => follow(HttpClientRequest.get(url, { headers: request.headers }), origin, hops + 1),
+          });
+        });
+
+      /** A GET of the API at `path` (its same-origin redirects followed), its 200 decoded with `schema`. */
       const api = <A, I>(
         path: string,
         schema: Schema.Codec<A, I>,
@@ -172,7 +215,8 @@ export class HfClient extends Context.Service<
             headers: hubHeaders(options.token),
             urlParams: options.urlParams ?? [],
           });
-          const response = yield* http.execute(request).pipe(Effect.mapError(unreachable));
+          const origin = Option.map(Option.fromNullishOr(URL.parse(endpoint)), (url) => url.origin);
+          const response = yield* follow(request, origin, 0).pipe(Effect.mapError(unreachable));
           if (response.status < 200 || response.status >= 300) {
             return yield* hubError(response, { repo: options.repo, hasToken: options.token !== null });
           }
@@ -189,26 +233,51 @@ export class HfClient extends Context.Service<
           }),
         );
 
+      /** The account of `token` as the Hub tells it, and whether to keep it (not after a failure of the network). */
+      const askAccount = (token: string) =>
+        api('/api/whoami-v2', WhoAmI, { token }).pipe(
+          Effect.map((who) => ({ account: { user: who.name ?? null, invalid: false }, keep: true })),
+          Effect.catchTag('HfUnauthorized', () =>
+            Effect.succeed({ account: { user: null, invalid: true }, keep: true }),
+          ),
+          Effect.orElseSucceed(() => ({ account: { user: null, invalid: false }, keep: false })),
+        );
+
+      /** `known` without the answer `pending` of `token` (a newer one stays). */
+      const forget = (
+        known: ReadonlyMap<string, Deferred.Deferred<Account>>,
+        token: string,
+        pending: Deferred.Deferred<Account>,
+      ) => (known.get(token) === pending ? new Map(Arr.filter([...known], ([key]) => key !== token)) : known);
+
       /**
-       * The account of `token`, asked of the Hub once: a rejected token is remembered as such, a failure of another
-       * kind (the network, the Hub) is not, so the next status asks again.
+       * The account of `token`, asked of the Hub once: the calls that come while it is asked wait for the same answer.
+       * A rejected token is remembered as such; a failure of another kind (the network, the Hub) is not, so the next
+       * status asks again.
        */
       const accountOf = (token: string) =>
-        SynchronizedRef.modifyEffect(accounts, (known) => {
-          const cached = known.get(token);
-          if (cached !== undefined) return Effect.succeed([cached, known] as const);
-          return api('/api/whoami-v2', WhoAmI, { token }).pipe(
-            Effect.map((who): Option.Option<Account> => Option.some({ user: who.name ?? null, invalid: false })),
-            Effect.catchTag('HfUnauthorized', () => Effect.succeedSome<Account>({ user: null, invalid: true })),
-            Effect.orElseSucceed(() => Option.none<Account>()),
-            Effect.map((account) =>
-              Option.match(account, {
-                onNone: () => [{ user: null, invalid: false }, known] as const,
-                onSome: (checked) => [checked, new Map([...known, [token, checked]])] as const,
-              }),
-            ),
-          );
-        });
+        Effect.flatMap(
+          SynchronizedRef.modifyEffect(accounts, (known) => {
+            const pending = known.get(token);
+            if (pending !== undefined) return Effect.succeed([pending, known] as const);
+            return Effect.gen(function* () {
+              const asked = yield* Deferred.make<Account>();
+              yield* askAccount(token).pipe(
+                Effect.flatMap(({ account, keep }) =>
+                  Effect.andThen(
+                    keep ? Effect.void : SynchronizedRef.update(accounts, (now) => forget(now, token, asked)),
+                    Deferred.succeed(asked, account),
+                  ),
+                ),
+                // Interrupted with the client: those waiting get no account rather than wait forever.
+                Effect.ensuring(Deferred.succeed(asked, { user: null, invalid: false })),
+                Effect.forkIn(scope),
+              );
+              return [asked, new Map([...known, [token, asked]])] as const;
+            });
+          }),
+          Deferred.await,
+        );
 
       const status = Effect.gen(function* () {
         const { token, source } = yield* hfToken;

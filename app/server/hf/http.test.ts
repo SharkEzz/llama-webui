@@ -200,6 +200,22 @@ layer(Served, { excludeTestServices: true, buildPerTest: true })('over HTTP', (i
     }),
   );
 
+  it.effect('repo of a renamed repository answers the new id, its page and its folder', () =>
+    Effect.gen(function* () {
+      const hub = yield* Hub;
+      const home = yield* Home;
+      hub.add({ id: 'org/renamed', files: FILES });
+      hub.fail('repo', { status: 307, headers: { location: '/api/models/org/renamed/revision/main?blobs=true' } });
+      const reply = yield* get('/api/hf/repo?id=org/repo');
+      assert.strictEqual(reply.status, 200);
+      const repo = yield* as(HfRepo, reply.json);
+      assert.deepStrictEqual(
+        [repo.id, repo.sha, repo.url, repo.dir],
+        ['org/renamed', hub.shaOf('org/renamed'), `${hub.url}/org/renamed`, `${home}/models/org/renamed`],
+      );
+    }),
+  );
+
   it.effect('repo of a gated repository is a 403 HfGated', () =>
     Effect.gen(function* () {
       const hub = yield* Hub;

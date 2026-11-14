@@ -177,7 +177,8 @@ export async function startHub(options: HubOptions = {}): Promise<FakeHub & { re
     const after = 'cut' in fault ? fault.cut : fault.stall;
     res.writeHead(answer.status, answer.headers);
     res.write(Buffer.from(answer.body ?? '').subarray(0, after));
-    if ('cut' in fault) setTimeout(() => res.destroy(), 20);
+    // Unref'd: a cut still pending when the Hub closes does not hold the process.
+    if ('cut' in fault) setTimeout(() => res.destroy(), 20).unref();
   };
 
   const cdn = createServer((req, res) => {

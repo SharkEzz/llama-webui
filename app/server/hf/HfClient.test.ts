@@ -212,6 +212,76 @@ layer(NodeFileSystem.layer, { excludeTestServices: true })('HfClient', (it) => {
     }),
   );
 
+  it.effect('a repository id that is not org/name is an invalid response', () =>
+    Effect.gen(function* () {
+      const hub = yield* hubWithRepo;
+      const client = yield* clientOn(hub);
+      // A mirror or a proxy answering an id that would make a folder outside the models folder.
+      for (const id of ['../x', '../../.ssh', 'o/r/x', 'o']) {
+        hub.fail('repo', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          body: `{"id":"${id}","sha":"${SHA}","siblings":[]}`,
+        });
+        yield* failsWith(
+          client.repoFiles('o/r', 'main'),
+          HfUnreachable.make({ message: 'Hugging Face sent an invalid response (/api/models/o/r/revision/main)' }),
+        );
+      }
+    }),
+  );
+
+  it.effect('a redirect on the same origin is followed with the token, up to 5 times', () =>
+    Effect.gen(function* () {
+      const hub = yield* fakeHub({
+        repos: [{ id: 'o/new', sha: SHA, files: { 'm.gguf': 'gguf' } }],
+        tokens: { hf_secret: 'alice' },
+      });
+      const client = yield* clientOn(hub);
+      // A renamed repository: its old API path answers 307 to the new one (relative, then absolute).
+      hub.fail('repo', { status: 307, headers: { location: '/api/models/o/new/revision/main?blobs=true' } });
+      const renamed = yield* client.repoFiles('o/r', 'main');
+      assert.strictEqual(renamed.id, 'o/new');
+      assert.deepStrictEqual(
+        Arr.map(hub.requests(), (r) => [r.url, r.headers.authorization, r.headers['user-agent']]),
+        [
+          ['/api/models/o/r/revision/main?blobs=true', 'Bearer hf_secret', 'llama-webui'],
+          ['/api/models/o/new/revision/main?blobs=true', 'Bearer hf_secret', 'llama-webui'],
+        ],
+      );
+      const again = `${hub.url}/api/models/o/new/revision/main?blobs=true`;
+      hub.fail('repo', { status: 301, headers: { location: again } }, 5);
+      yield* equals(
+        Effect.map(client.repoFiles('o/r', 'main'), (files) => files.id),
+        'o/new',
+      );
+      assert.strictEqual(hub.requests().length, 8);
+      // A sixth redirect is not followed: the error of the answer.
+      hub.fail('repo', { status: 307, headers: { location: again } }, 6);
+      yield* failsWith(client.repoFiles('o/r', 'main'), HfUnreachable.make({ message: 'Hugging Face error 307' }));
+      assert.strictEqual(hub.requests().length, 14);
+    }),
+  );
+
+  it.effect('a redirect to another origin is refused, and the token is not sent there', () =>
+    Effect.gen(function* () {
+      const hub = yield* hubWithRepo;
+      const other = yield* hubWithRepo;
+      const client = yield* clientOn(hub);
+      hub.fail('repo', {
+        status: 302,
+        headers: { location: `${other.url}/api/models/o/r/revision/main?blobs=true` },
+      });
+      yield* failsWith(client.repoFiles('o/r', 'main'), HfUnreachable.make({ message: 'Hugging Face error 302' }));
+      assert.deepStrictEqual(other.requests(), []);
+      // The same host on another port is another origin.
+      const [host, port] = [new URL(hub.url).hostname, new URL(other.url).port];
+      hub.fail('repo', { status: 307, headers: { location: `http://${host}:${port}/api/models/o/r/revision/main` } });
+      yield* failsWith(client.repoFiles('o/r', 'main'), HfUnreachable.make({ message: 'Hugging Face error 307' }));
+      assert.deepStrictEqual(other.requests(), []);
+    }),
+  );
+
   it.effect('a Hub call is aborted when its scope closes', () =>
     Effect.gen(function* () {
       const hub = yield* hubWithRepo;
@@ -294,6 +364,26 @@ layer(NodeFileSystem.layer)('HfClient timeout', (it) => {
       );
       // The request is dropped with it.
       yield* hub.abandoned(1);
+    }),
+  );
+
+  it.effect('concurrent status calls share one whoami', () =>
+    Effect.gen(function* () {
+      const hub = yield* hubWithRepo;
+      const client = yield* clientOn(hub);
+      hub.fail('whoami', { silence: true });
+      const first = yield* Effect.forkChild(client.status);
+      const second = yield* Effect.forkChild(client.status);
+      yield* hub.requested(1, 'whoami');
+      // Both answer once the one request times out, not one 10 s after the other.
+      yield* TestClock.adjust('10 seconds');
+      const unchecked: HfStatus = { token: 'env', user: null, tokenInvalid: false, endpoint: hub.url };
+      yield* equals(Fiber.join(first), unchecked);
+      yield* equals(Fiber.join(second), unchecked);
+      assert.strictEqual(Arr.filter(hub.requests(), (r) => r.route === 'whoami').length, 1);
+      // A failure that is not a rejection is not kept: the next status asks again, and the Hub answers.
+      yield* equals(client.status, { ...unchecked, user: 'alice' });
+      assert.strictEqual(Arr.filter(hub.requests(), (r) => r.route === 'whoami').length, 2);
     }),
   );
 });

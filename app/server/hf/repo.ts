@@ -68,7 +68,7 @@ export const describeRepo = Effect.fn('repo.describeRepo')(function* (
   const client = yield* HfClient;
   const info = yield* client.repoFiles(id, revision);
   const { dir: modelsDir } = yield* modelsRoot;
-  const dir = repoDir(modelsDir, info.id);
+  const dir = yield* repoDir(modelsDir, info.id);
   const { variants, projectors } = groupRepoFiles(info.files);
   const endpoint = yield* hfEndpoint;
   return {
@@ -98,7 +98,7 @@ export const downloadInputs = Effect.fn('repo.downloadInputs')(function* (
   const client = yield* HfClient;
   const info = yield* client.repoFiles(request.repo, request.revision);
   const { dir: modelsDir } = yield* modelsRoot;
-  const dir = repoDir(modelsDir, info.id);
+  const dir = yield* repoDir(modelsDir, info.id);
   const { variants, projectors } = groupRepoFiles(info.files);
   const all = Arr.appendAll(variants, projectors);
   const chosen = yield* Effect.forEach(request.keys, (key) =>

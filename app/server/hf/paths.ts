@@ -1,18 +1,26 @@
 import { HfInvalidPath } from '@llama-webui/shared';
-import { Array as Arr, Effect, FileSystem, Option, String as Str } from 'effect';
+import { Array as Arr, Effect, FileSystem, Option, Path, String as Str } from 'effect';
 import { dual } from 'effect/Function';
 
 /** `dir` without its trailing slashes (`/` stays `/`). */
 const trimmed = (dir: string): string => (dir.length > 1 ? Str.replace(/\/+$/, '')(dir) : dir);
 
 /**
- * The local folder of a repository's downloads: `<modelsDir>/<org>/<name>`. `repo` is already checked by
- * `HF_REPO_RE` (no `..`, no slash but the one between its two parts).
+ * The local folder of a repository's downloads: `<modelsDir>/<org>/<name>`, the models folder resolved (from the
+ * working folder when it is relative). `repo` is already checked by `HF_REPO_RE` (no `..`, no slash but the one between
+ * its two parts): the request's id by its schema, the id the Hub answers by `HfClient`'s.
  */
 export const repoDir: {
-  (repo: string): (modelsDir: string) => string;
-  (modelsDir: string, repo: string): string;
-} = dual(2, (modelsDir: string, repo: string): string => `${trimmed(modelsDir)}/${repo}`);
+  (repo: string): (modelsDir: string) => Effect.Effect<string, never, Path.Path>;
+  (modelsDir: string, repo: string): Effect.Effect<string, never, Path.Path>;
+} = dual(
+  2,
+  (modelsDir: string, repo: string): Effect.Effect<string, never, Path.Path> =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      return path.join(path.resolve(modelsDir), ...Str.split(repo, '/'));
+    }),
+);
 
 /** The segments of a relative path once `.` and `..` are resolved; none when a `..` would leave its folder. */
 const normalized = (path: string): Option.Option<ReadonlyArray<string>> =>
