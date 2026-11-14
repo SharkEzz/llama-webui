@@ -228,6 +228,31 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('ChatRuns', (it) 
     }),
   );
 
+  it.effect('stopAndWait returns once the reply is saved stopped, after a start in flight', () =>
+    Effect.gen(function* () {
+      const { llama, repo, conv, runs } = yield* setup({ targetDelay: '50 millis' });
+      const reply = yield* runs.send(conv.id, 'Hi');
+      const listener = yield* follow(reply);
+      yield* llama.requested(1);
+      yield* llama.chunk({ content: 'Hel' });
+      yield* listener.got(2);
+      // No shutdown first: as the delete of a conversation does.
+      yield* runs.stopAndWait(conv.id);
+      const a = yield* assistantOf(repo, conv.id);
+      assert.deepStrictEqual([a.status, a.content], ['stopped', 'Hel']);
+      yield* noRunLeft(runs, conv.id);
+
+      // A send still waiting for its target holds the runs' lock: stopAndWait queues behind it and stops its reply.
+      const other = yield* repo.create({ profileId: null, modelPath: null });
+      const sending = yield* Effect.forkChild(runs.send(other.id, 'Hi'), { startImmediately: true });
+      yield* runs.stopAndWait(other.id);
+      yield* Fiber.join(sending);
+      const stopped = yield* assistantOf(repo, other.id);
+      assert.deepStrictEqual([stopped.status, stopped.content], ['stopped', '']);
+      yield* noRunLeft(runs, other.id);
+    }),
+  );
+
   it.effect('two sends at once give one reply and one 409', () =>
     Effect.gen(function* () {
       // The target answers late: were the check and the registration two steps, both sends would pass the check.
@@ -347,7 +372,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('ChatRuns', (it) 
     }),
   );
 
-  it.effect('the first reply of a conversation without a model takes the target’s', () =>
+  it.effect("the first reply of a conversation without a model takes the target's", () =>
     Effect.gen(function* () {
       const repo = yield* ConversationsRepo;
       const profiles = yield* ProfilesRepo;
@@ -542,17 +567,21 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('ChatRuns', (it) 
       yield* llama.chunk({ content: 'Hel' });
       yield* listener.got(2);
       yield* repo.remove(conv.id);
-      yield* llama.chunk({ content: 'lo' });
+      yield* llama.chunk({ content: 'lo' }, { timings: TIMINGS });
       yield* llama.done;
       const events = yield* Fiber.join(end);
       const [start] = events;
       const assistant = start?.type === 'start' ? start.assistant : assert.fail('no start');
-      assert.deepStrictEqual(doneOf(events), {
+      const done = doneOf(events);
+      // With the stats a save would have written.
+      assert.strictEqual(done.stats?.tgTps, 51.23);
+      assert.deepStrictEqual(done, {
         ...assistant,
         content: 'Hello',
         reasoning: '',
         status: 'done',
         error: null,
+        stats: done.stats,
       });
       const messages = yield* repo.messages(conv.id);
       assert.deepStrictEqual(messages, []);

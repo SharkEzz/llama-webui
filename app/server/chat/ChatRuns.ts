@@ -141,7 +141,10 @@ const textOf = (chunk: ChatChunk) => {
   };
 };
 
-/** A stats every number of which is finite (`MessageStats` encodes no other), else none. */
+/**
+ * A stats every number of which is finite (`MessageStats` encodes no other, and `updateMessage` dies on any other). A
+ * backstop: the timings decoder already drops non-finite values, and the ttft and the duration come from the `Clock`.
+ */
 const isEncodable = Schema.is(MessageStats);
 
 /** The replies being written: at most one per conversation, each in a fiber of its own, saved as it streams. */
@@ -221,13 +224,19 @@ export class ChatRuns extends Context.Service<
                     status: outcome.status,
                     error: outcome.error,
                   };
-                  const saved = yield* stats.pipe(
-                    Effect.flatMap((s) =>
-                      repo.updateMessage(run.assistant.id, s === undefined ? fields : { ...fields, stats: s }),
-                    ),
-                    // The conversation was deleted while the reply was written.
-                    Effect.catchTag('MessageNotFound', () => Effect.succeed({ ...run.assistant, ...fields })),
-                  );
+                  const measured = yield* stats;
+                  const saved = yield* repo
+                    .updateMessage(run.assistant.id, measured === undefined ? fields : { ...fields, stats: measured })
+                    .pipe(
+                      // The conversation was deleted while the reply was written: the message it would have saved.
+                      Effect.catchTag('MessageNotFound', () =>
+                        Effect.succeed({
+                          ...run.assistant,
+                          ...fields,
+                          ...(measured === undefined ? {} : { stats: measured }),
+                        }),
+                      ),
+                    );
                   // Out of the runs before its `done`: a client that sends on `done` finds no reply in progress.
                   if (options.leave) yield* withoutRun(run);
                   yield* PubSub.publish(run.events, { type: 'done', message: saved });
@@ -397,6 +406,9 @@ export class ChatRuns extends Context.Service<
 
         const runOf = (id: number) => Effect.map(SynchronizedRef.get(runs), (now) => Option.fromNullishOr(now.get(id)));
 
+        /** The runs, read under their lock: after a start in flight, which a plain read would miss. */
+        const lockedRuns = SynchronizedRef.modify(runs, (now) => [now, now] as const);
+
         const stop = Effect.fn('ChatRuns.stop')(function* (id: number) {
           const run = yield* runOf(id);
           if (Option.isNone(run)) return yield* NoReplyInProgress.make({ message: 'No reply in progress' });
@@ -404,10 +416,12 @@ export class ChatRuns extends Context.Service<
         });
 
         const stopAndWait = Effect.fn('ChatRuns.stopAndWait')(function* (id: number) {
-          const run = yield* runOf(id);
-          if (Option.isNone(run)) return;
-          yield* Deferred.succeed(run.value.stopped, undefined);
-          yield* Deferred.await(run.value.ended);
+          // Read under the lock, waited for outside it: the run's end takes the lock to leave the runs.
+          const now = yield* lockedRuns;
+          const run = now.get(id);
+          if (run === undefined) return;
+          yield* Deferred.succeed(run.stopped, undefined);
+          yield* Deferred.await(run.ended);
         });
 
         const live = Effect.fn('ChatRuns.live')(function* (id: number) {
@@ -424,7 +438,7 @@ export class ChatRuns extends Context.Service<
         // `done` ends the clients' streams, and its run writes nothing after it.
         yield* shutdown.before(
           Effect.gen(function* () {
-            const now = yield* SynchronizedRef.get(runs);
+            const now = yield* lockedRuns;
             yield* Effect.forEach(
               now.values(),
               (run) =>
