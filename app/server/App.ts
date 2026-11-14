@@ -1,4 +1,5 @@
-import { Layer } from 'effect';
+import { NodeSocket } from '@effect/platform-node';
+import { Effect, Layer, Schema, String as Str } from 'effect';
 import { DevTools } from 'effect/devtools';
 import { AppConfig } from './config/AppConfig.ts';
 import { AppInfo } from './config/AppInfo.ts';
@@ -20,13 +21,42 @@ const Services = Layer.mergeAll(WsHub.layer, SettingsRepo.layer).pipe(
 /** The HTTP server on the services it uses. */
 const Http = HttpLive.pipe(Layer.provide(Services));
 
+/** How long the dev start waits to learn whether the DevTools listen: a refused connection on loopback answers at once. */
+const PROBE_TIMEOUT = '200 millis';
+
+/** Whether something accepts a TCP connection at the host and port of the WebSocket URL `url`. */
+const accepts = (url: string) =>
+  Schema.decodeEffect(Schema.URLFromString)(url).pipe(
+    Effect.flatMap(({ hostname, port, protocol }) =>
+      NodeSocket.makeNet({
+        // `[::1]` is how a URL writes an IPv6 host: a connection takes it without the brackets.
+        host: Str.replace(/^\[(.*)\]$/, '$1')(hostname),
+        port: port === '' ? (protocol === 'wss:' ? 443 : 80) : Number(port),
+        openTimeout: PROBE_TIMEOUT,
+      }),
+    ),
+    Effect.flatMap((socket) => socket.reader),
+    Effect.scoped,
+    Effect.timeout(PROBE_TIMEOUT),
+    Effect.isSuccess,
+  );
+
 /**
- * In dev (`LLAMA_WEBUI_DEV=1`, set by `vite dev`), the spans go to the Effect DevTools; a production start never adds
- * them. Nothing listening there costs a second at the start (the client waits that long for a first connection), then
- * it retries in the background.
+ * In dev (`LLAMA_WEBUI_DEV=1`, set by `vite dev`), the spans go to the Effect DevTools when they run: the DevTools
+ * client waits a second for a first connection, which nothing listening would add to each restart. A production
+ * start never adds them, nor looks for them.
  */
 const DevToolsInDev = Layer.unwrap(
-  AppConfig.useSync(({ dev, devToolsUrl }) => (dev ? DevTools.layer(devToolsUrl) : Layer.empty)),
+  Effect.gen(function* () {
+    const { dev, devToolsUrl } = yield* AppConfig;
+    if (!dev) return Layer.empty;
+    if (yield* accepts(devToolsUrl)) {
+      yield* Effect.logInfo(`Effect DevTools connected (${devToolsUrl})`);
+      return DevTools.layer(devToolsUrl);
+    }
+    yield* Effect.logInfo(`no Effect DevTools at ${devToolsUrl}: start them, then save a server file`);
+    return Layer.empty;
+  }),
 );
 
 /**

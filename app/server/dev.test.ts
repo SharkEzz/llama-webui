@@ -23,6 +23,8 @@ interface Dev {
   readonly exited: Promise<number | null>;
   readonly base: string;
   output(): string;
+  /** Each chunk of its output, with the time (`performance.now()`) it arrived. */
+  readonly chunks: ReadonlyArray<{ readonly at: number; readonly text: string }>;
 }
 
 /** Every dev server a test started, stopped after it if it still runs. */
@@ -85,22 +87,23 @@ async function startDev(env: Record<string, string | undefined> = {}, port?: num
     else full[k] = v;
   }
   let output = '';
+  const chunks: Array<{ at: number; text: string }> = [];
   // Vite itself, not `pnpm dev`: a signal goes to the process that handles it.
   const proc = spawn(process.execPath, [join(APP, 'node_modules/vite/bin/vite.js'), 'dev'], {
     cwd: APP,
     env: full,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  proc.stdout.on('data', (c) => {
+  const collect = (c: Buffer) => {
     output += c;
-  });
-  proc.stderr.on('data', (c) => {
-    output += c;
-  });
+    chunks.push({ at: performance.now(), text: String(c) });
+  };
+  proc.stdout.on('data', collect);
+  proc.stderr.on('data', collect);
   const exited = new Promise<number | null>((done) => proc.once('exit', (code) => done(code)));
   // The port Vite listens on: the environment's, else the `.env`'s, given as `port`.
   const listens = port ?? Number(full.LLAMA_WEBUI_PORT);
-  const dev: Dev = { proc, exited, base: `http://127.0.0.1:${listens}`, output: () => output };
+  const dev: Dev = { proc, exited, base: `http://127.0.0.1:${listens}`, output: () => output, chunks };
   started.add(dev);
   await until('vite dev answers /api/health', async () => (await health(dev.base)).bootId !== undefined, 60_000, dev);
   return dev;
@@ -195,6 +198,33 @@ test('saving a web file keeps the server', async () => {
   expect(await bootId(dev.base)).toBe(before);
 }, 30_000);
 
+test('in dev, without Effect DevTools, a restart does not wait for them', async () => {
+  const dev = sharedDev();
+  // `startDev` points the DevTools address at a closed port.
+  expect(dev.output()).toMatch(/no Effect DevTools at ws:\/\/127\.0\.0\.1:\d+: start them, then save a server file/);
+  const before = await bootId(dev.base);
+  const from = dev.chunks.length;
+  let booted = '';
+  let bootedAt = 0;
+  await edited('server/health/http.ts', () =>
+    until(
+      'a new boot',
+      async () => {
+        booted = await bootId(dev.base);
+        bootedAt = performance.now();
+        return booted !== before;
+      },
+      30_000,
+      dev,
+    ),
+  );
+  // From the line `node --watch` prints when it restarts the server to the first answer of the new one.
+  const restarting = dev.chunks.slice(from).find((chunk) => chunk.text.includes('Restarting'));
+  if (restarting === undefined) throw new Error(`no Restarting line\n${dev.output()}`);
+  expect(bootedAt - restarting.at).toBeLessThan(1000);
+  await until('the boot after the restore', async () => (await bootId(dev.base)) !== booted, 30_000, dev);
+}, 90_000);
+
 test('one SIGINT stops vite dev and the server', async () => {
   const dev = sharedDev();
   started.add(dev);
@@ -263,6 +293,7 @@ test('in dev the server connects to the Effect DevTools address', async () => {
   try {
     const dev = await startDev({ LLAMA_WEBUI_DEVTOOLS_URL: `ws://127.0.0.1:${port}` });
     await until('an upgrade request to the DevTools address', () => upgrades > 0, 5000, dev);
+    expect(dev.output()).toContain(`Effect DevTools connected (ws://127.0.0.1:${port})`);
   } finally {
     devtools.close();
   }
