@@ -1,5 +1,8 @@
+import { Exit, Option, Schema } from 'effect';
 import { describe, expect, test } from 'vitest';
-import { DownloadRequestSchema, parseHfInput, vramFit } from './hf.ts';
+import { issuesOf } from './api/errors.ts';
+import { DownloadRequest, parseHfInput, vramFit } from './hf.ts';
+import { STRICT } from './profile.ts';
 
 describe('parseHfInput', () => {
   test('empty and free text', () => {
@@ -70,11 +73,20 @@ describe('vramFit', () => {
 
 describe('DownloadRequestSchema', () => {
   const ok = { repo: 'org/repo', revision: 'a'.repeat(40), keys: ['model.gguf'] };
-  test('accepts a request', () => expect(DownloadRequestSchema.parse(ok)).toEqual(ok));
+  const decode = Schema.decodeUnknownExit(DownloadRequest, STRICT);
+  /** The messages of a request that must not decode. */
+  const messages = (input: unknown) => {
+    const error = Exit.findErrorOption(decode(input));
+    if (Option.isNone(error)) throw new Error('expected the request to be refused');
+    return issuesOf(error.value.issue).map((issue) => issue.message);
+  };
+  test('accepts a request', () => expect(decode(ok)).toEqual(Exit.succeed(ok)));
   test('rejects a bad repo, revision or empty keys', () => {
-    expect(() => DownloadRequestSchema.parse({ ...ok, repo: '../etc' })).toThrow();
-    expect(() => DownloadRequestSchema.parse({ ...ok, revision: 'main' })).toThrow();
-    expect(() => DownloadRequestSchema.parse({ ...ok, keys: [] })).toThrow();
-    expect(() => DownloadRequestSchema.parse({ ...ok, extra: 1 })).toThrow();
+    expect(messages({ ...ok, repo: '../etc' })).toEqual(['Repository id expected (org/name)']);
+    expect(messages({ ...ok, revision: 'main' })).toEqual(['Commit sha expected']);
+    expect(messages({ ...ok, keys: [] })).toHaveLength(1);
+    expect(messages({ ...ok, keys: Array.from({ length: 17 }, (_, i) => `m${i}.gguf`) })).toHaveLength(1);
+    expect(messages({ ...ok, keys: [''] })).toHaveLength(1);
+    expect(messages({ ...ok, extra: 1 })).toEqual(['unknown key']);
   });
 });

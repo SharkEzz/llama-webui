@@ -1,4 +1,5 @@
 import { Schema } from 'effect';
+import { DownloadItem, DownloadLive } from './hf.ts';
 import { LogLine } from './logs.ts';
 import { Snapshot } from './monitor.ts';
 import { ServerView } from './server.ts';
@@ -28,6 +29,32 @@ export const WsSnapshot = Schema.Struct({ type: Schema.Literal('snapshot'), payl
 /** Where the model is (devices, layers, bytes), sent when it changes; null when no model is placed. */
 export const WsPlacement = Schema.Struct({ type: Schema.Literal('placement'), payload: Schema.NullOr(ModelPlacement) });
 
+/** A download of the queue, sent when it is created or changes (status, files done, error). */
+export const WsDownload = Schema.Struct({ type: Schema.Literal('download'), payload: DownloadItem });
+
+/** The live progress of the running download, at most every 250 ms; null when none runs. */
+export const WsDownloadProgress = Schema.Struct({
+  type: Schema.Literal('download-progress'),
+  payload: Schema.NullOr(DownloadLive),
+});
+
+/** Downloads removed from the list (one removed, or the finished ones cleared). */
+export const WsDownloadDeleted = Schema.Struct({
+  type: Schema.Literal('download-deleted'),
+  payload: Schema.Struct({ ids: Schema.Array(Schema.Int) }),
+});
+
 /** The messages of the /ws push channel, one member per message; each later milestone adds its own. */
-export const WsMessage = Schema.Union([WsHello, WsPing, WsPong, WsServerState, WsLog, WsSnapshot, WsPlacement]);
+export const WsMessage = Schema.Union([
+  WsHello,
+  WsPing,
+  WsPong,
+  WsServerState,
+  WsLog,
+  WsSnapshot,
+  WsPlacement,
+  WsDownload,
+  WsDownloadProgress,
+  WsDownloadDeleted,
+]);
 export type WsMessage = typeof WsMessage.Type;

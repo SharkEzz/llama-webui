@@ -1,107 +1,145 @@
-import { z } from 'zod';
+import { Effect, Schema, String as Str } from 'effect';
+import { dual } from 'effect/Function';
 
-export type ModelKind = 'model' | 'mmproj';
+export const ModelKind = Schema.Literals(['model', 'mmproj']);
+export type ModelKind = typeof ModelKind.Type;
 
-/** Summary of a GGUF (header only), cached in the database. */
-export interface ModelSummary {
+/**
+ * Summary of a GGUF (header only), cached in the database. A reply carries what the `model_cache` table holds, so no
+ * field has an input rule: what the file's metadata says is `Finite` (a GGUF may write a count as a float), what the
+ * file system or the server counts is `Int`.
+ */
+export const ModelSummary = Schema.Struct({
   /** Absolute path of the file (the first shard of a split model). */
-  path: string;
+  path: Schema.String,
   /** Path relative to the models directory. */
-  relPath: string;
-  files: string[];
-  fileBytes: number;
-  kind: ModelKind;
-  arch: string;
-  name: string;
-  quant: string;
-  params: number;
-  blockCount: number;
-  contextLength: number;
-  embeddingLength: number;
-  headCount: number;
+  relPath: Schema.String,
+  files: Schema.Array(Schema.String),
+  fileBytes: Schema.Int,
+  kind: ModelKind,
+  arch: Schema.String,
+  name: Schema.String,
+  quant: Schema.String,
+  params: Schema.Finite,
+  blockCount: Schema.Finite,
+  contextLength: Schema.Finite,
+  embeddingLength: Schema.Finite,
+  headCount: Schema.Finite,
   /** Maximum across layers. */
-  headCountKv: number;
-  expertCount: number;
-  expertUsedCount: number;
-  nextnLayers: number;
-  recurrent: boolean;
-  slidingWindow: number | null;
-  hasChatTemplate: boolean;
-}
+  headCountKv: Schema.Finite,
+  expertCount: Schema.Finite,
+  expertUsedCount: Schema.Finite,
+  nextnLayers: Schema.Finite,
+  recurrent: Schema.Boolean,
+  slidingWindow: Schema.NullOr(Schema.Finite),
+  hasChatTemplate: Schema.Boolean,
+});
+export type ModelSummary = typeof ModelSummary.Type;
 
-export type ModelEntry =
-  | ({ ok: true } & ModelSummary)
-  | { ok: false; path: string; relPath: string; files: string[]; fileBytes: number; error: string };
+/** A GGUF of the models folder: its summary, or why it could not be read. */
+export const ModelEntry = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), ...ModelSummary.fields }),
+  Schema.Struct({
+    ok: Schema.Literal(false),
+    path: Schema.String,
+    relPath: Schema.String,
+    files: Schema.Array(Schema.String),
+    fileBytes: Schema.Int,
+    error: Schema.String,
+  }),
+]);
+export type ModelEntry = typeof ModelEntry.Type;
 
-export interface ModelList {
+export const ModelList = Schema.Struct({
   /** Models directory, expanded (absolute). */
-  dir: string;
+  dir: Schema.String,
   /** Models directory as entered in the settings (`~` included). */
-  setting: string;
-  home: string;
-  scannedAt: number;
-  models: ModelEntry[];
-}
+  setting: Schema.String,
+  home: Schema.String,
+  scannedAt: Schema.Int,
+  models: Schema.Array(ModelEntry),
+});
+export type ModelList = typeof ModelList.Type;
 
-export interface ModelDetail extends ModelSummary {
-  tensorCount: number;
-  weights: {
-    embedBytes: number;
-    outputBytes: number;
-    layersBytes: number;
-    expertsBytes: number;
-    otherBytes: number;
-    totalBytes: number;
-  };
-}
+/** The bytes of a model's weights, by part. */
+export const ModelWeights = Schema.Struct({
+  embedBytes: Schema.Int,
+  outputBytes: Schema.Int,
+  layersBytes: Schema.Int,
+  expertsBytes: Schema.Int,
+  otherBytes: Schema.Int,
+  totalBytes: Schema.Int,
+});
+export type ModelWeights = typeof ModelWeights.Type;
+
+/** A GGUF read whole (`GET /api/models/info`): its summary, its tensors' count and its weights. */
+export const ModelDetail = Schema.Struct({
+  ...ModelSummary.fields,
+  tensorCount: Schema.Int,
+  weights: ModelWeights,
+});
+export type ModelDetail = typeof ModelDetail.Type;
 
 /** A profile that opens a model file, as its model or as its projector. */
-export interface ModelProfileUse {
-  id: number;
-  name: string;
-  role: ModelKind;
-}
+export const ModelProfileUse = Schema.Struct({ id: Schema.Int, name: Schema.String, role: ModelKind });
+export type ModelProfileUse = typeof ModelProfileUse.Type;
 
 /** What deleting a model would remove, and why it is refused (`blocked`), from `GET /api/models/usage`. */
-export interface ModelUsage {
-  path: string;
+export const ModelUsage = Schema.Struct({
+  path: Schema.String,
   /** Every file deleted (all the parts of a split model). */
-  files: string[];
-  fileBytes: number;
-  profiles: ModelProfileUse[];
-  /** Why the model cannot be deleted now (the running server, a benchmark or a download uses it); null if it can. */
-  blocked: string | null;
-}
-
-export const ModelDeleteSchema = z.strictObject({
-  path: z.string().min(1, 'path required'),
-  /** Also delete the profiles that use the model. */
-  deleteProfiles: z.boolean().default(false),
+  files: Schema.Array(Schema.String),
+  fileBytes: Schema.Int,
+  profiles: Schema.Array(ModelProfileUse),
+  /** Why the model cannot be deleted now (the running server or a download uses it); null if it can. */
+  blocked: Schema.NullOr(Schema.String),
 });
+export type ModelUsage = typeof ModelUsage.Type;
 
-export interface ModelDeleted {
-  deletedFiles: string[];
-  deletedProfiles: number[];
-}
+/** A deletion of a model (`DELETE /api/models`). */
+export const ModelDelete = Schema.Struct({
+  path: Schema.String.check(Schema.isMinLength(1, { message: 'path required' })).pipe(
+    Schema.annotateKey({ messageMissingKey: 'path required' }),
+  ),
+  /** Also delete the profiles that use the model. */
+  deleteProfiles: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
+}).annotate({ messageUnexpectedKey: 'unknown key' });
+export type ModelDelete = typeof ModelDelete.Type;
 
-const expand = (p: string, home: string) => (p === '~' ? home : p.startsWith('~/') ? `${home}/${p.slice(2)}` : p);
-const trimSlash = (p: string) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
+/** What a deletion removed: the files, and the ids of the profiles. */
+export const ModelDeleted = Schema.Struct({
+  deletedFiles: Schema.Array(Schema.String),
+  deletedProfiles: Schema.Array(Schema.Int),
+});
+export type ModelDeleted = typeof ModelDeleted.Type;
+
+const expand = (p: string, home: string) =>
+  p === '~' ? home : Str.startsWith('~/')(p) ? `${home}/${Str.slice(2)(p)}` : p;
+const trimSlash = (p: string) => (p.length > 1 ? Str.replace(/\/+$/, '')(p) : p);
 
 /** `abs` relative to `dir` if inside it, otherwise null. */
 function relativeTo(abs: string, dir: string): string | null {
   const d = trimSlash(dir);
-  return abs.startsWith(`${d}/`) ? abs.slice(d.length + 1) : null;
+  return Str.startsWith(`${d}/`)(abs) ? Str.slice(d.length + 1)(abs) : null;
+}
+
+/** Where a profile's model path is written from: its working directory (if any), the models directory, the home. */
+export interface ModelPathContext {
+  readonly cwd?: string;
+  readonly modelsDir: string;
+  readonly home: string;
 }
 
 /**
  * Model path to write into a profile: without a working directory, the models directory is used (as entered) and the
  * path is relative to it; under the working directory, relative; elsewhere, absolute.
  */
-export function profileModelPath(
-  abs: string,
-  o: { cwd?: string; modelsDir: string; home: string },
-): { cwd?: string; model: string } {
-  const cwd = o.cwd?.trim() ? o.cwd.trim() : o.modelsDir;
+export const profileModelPath: {
+  (o: ModelPathContext): (abs: string) => { cwd?: string; model: string };
+  (abs: string, o: ModelPathContext): { cwd?: string; model: string };
+} = dual(2, (abs: string, o: ModelPathContext): { cwd?: string; model: string } => {
+  const given = Str.trim(o.cwd ?? '');
+  const cwd = Str.isNonEmpty(given) ? given : o.modelsDir;
   const rel = relativeTo(abs, expand(cwd, o.home));
   return { cwd, model: rel ?? abs };
-}
+});

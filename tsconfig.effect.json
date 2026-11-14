@@ -205,7 +205,9 @@
             "include": [
               "packages/webui-shared/src/api/**/*.ts",
               "packages/webui-shared/src/chat.ts",
+              "packages/webui-shared/src/hf.ts",
               "packages/webui-shared/src/logs.ts",
+              "packages/webui-shared/src/models.ts",
               "packages/webui-shared/src/monitor.ts",
               "packages/webui-shared/src/profile.ts",
               "packages/webui-shared/src/server.ts",

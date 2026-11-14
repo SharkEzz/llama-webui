@@ -13,6 +13,14 @@ export {
   ReplyInProgress,
 } from './api/ChatApi.ts';
 export {
+  AlreadyQueued,
+  DiskFull,
+  DownloadNotFound,
+  DownloadsApi,
+  ListedTwice,
+  NotFinished,
+} from './api/DownloadsApi.ts';
+export {
   describeIssue,
   Issue,
   issuesOf,
@@ -23,7 +31,18 @@ export {
 } from './api/errors.ts';
 export { FlagsApi, FlagsUnavailable } from './api/FlagsApi.ts';
 export { HealthApi } from './api/HealthApi.ts';
+export {
+  HfApi,
+  HfGated,
+  HfInvalidPath,
+  HfNotFound,
+  HfRateLimited,
+  HfUnauthorized,
+  HfUnreachable,
+  HubErrors,
+} from './api/HfApi.ts';
 export { LogsApi } from './api/LogsApi.ts';
+export { ModelFileNotFound, ModelInUse, ModelNotFound, ModelsApi, ModelUnreadable } from './api/ModelsApi.ts';
 export { HistoryReply, MonitorApi, Topology } from './api/MonitorApi.ts';
 export {
   ImportResult,
