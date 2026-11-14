@@ -1,8 +1,10 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, layer } from '@effect/vitest';
-import { Array as Arr, Effect, FileSystem, Path, Schedule, type Scope, String as Str } from 'effect';
-import type { ChildProcessSpawner } from 'effect/process';
+import { Array as Arr, Duration, Effect, Exit, FileSystem, Path, Schedule, Scope, String as Str } from 'effect';
+import { ChildProcessSpawner } from 'effect/process';
 import { isAlive } from '../llama/procScan.ts';
+import { CLOSE_BOUND } from '../process/followed.ts';
+import { stuckRelease } from '../testing/stuckRelease.ts';
 import { makeMemBandwidth, parsePerfLine } from './membw.ts';
 
 /** One start of a fake program: its pid and its command line (the program first). */
@@ -148,6 +150,25 @@ layer(NodeServices.layer, { excludeTestServices: true })('perf', (it) => {
         }),
       ),
     10_000,
+  );
+
+  it.effect('MemBandwidthSampler: streams killed but stuck in the kernel do not hold the end of the sampler', () =>
+    withFakes((ws) =>
+      Effect.gen(function* () {
+        const stuck = yield* stuckRelease;
+        const bin = yield* fakePerf(ws, { system: printed(SYS), pid42: `echo '${PROC_LINE}'` });
+        const scope = yield* Scope.make();
+        const s = yield* makeMemBandwidth({ bin, intervalMs: 1000 }).pipe(
+          Scope.provide(scope),
+          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, stuck.spawner),
+        );
+        yield* s.setPid(42);
+        yield* eventually(ws.recorded, (c) => c.length === 2);
+        const [elapsed] = yield* Effect.timed(Scope.close(scope, Exit.void));
+        assert.isBelow(Duration.toMillis(elapsed), Duration.toMillis(CLOSE_BOUND) + 500);
+        yield* stuck.unstick;
+      }),
+    ),
   );
 
   it.effect('MemBandwidthSampler: perf missing or event unknown → unknown, retried only after a delay', () =>

@@ -69,6 +69,7 @@ export const followProgram = Effect.fnUntraced(function* <R1 = never, R2 = never
   readonly read: (program: Followed) => Effect.Effect<void, never, R2>;
   readonly onExit?: (
     ended: Result.Result<ChildProcessSpawner.ExitCode, PlatformError.PlatformError>,
+    program: Followed,
   ) => Effect.Effect<void, never, R3>;
 }): Effect.fn.Return<Followed, PlatformError.PlatformError, ChildProcessSpawner.ChildProcessSpawner | R1 | R2 | R3> {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -94,7 +95,7 @@ export const followProgram = Effect.fnUntraced(function* <R1 = never, R2 = never
       Effect.gen(function* () {
         // Made interruptible for the timeout to end it: the rest runs whatever happens.
         yield* Deferred.await(drained).pipe(Effect.interruptible, Effect.timeoutOption(DRAIN_TIMEOUT));
-        yield* onExit(exit);
+        yield* onExit(exit, program);
         yield* stop;
         yield* Deferred.succeed(ended, undefined);
       }).pipe(Effect.uninterruptible),

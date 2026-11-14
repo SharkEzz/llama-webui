@@ -1,7 +1,8 @@
 import type { MemBandwidth } from '@llama-webui/shared';
-import { Clock, Deferred, Duration, Effect, Exit, Option, Scope, String as Str, Stream, SynchronizedRef } from 'effect';
-import { ChildProcess, ChildProcessSpawner } from 'effect/process';
+import { Clock, Duration, Effect, Option, Scope, String as Str, Stream, SynchronizedRef } from 'effect';
+import { ChildProcess, type ChildProcessSpawner } from 'effect/process';
 import { linesOf } from '../logs/lines.ts';
+import { FORCE_KILL_AFTER, type Followed, followProgram } from '../process/followed.ts';
 
 /*
  * DRAM bandwidth through `perf stat`, without root when perf_event_paranoid ≤ 0 (or CAP_PERFMON on perf):
@@ -16,12 +17,6 @@ export const SYSTEM_EVENTS = { read: 'umc_cas_cmd.rd', write: 'umc_cas_cmd.wr' }
 export const PROC_EVENT = 'ls_any_fills_from_sys.dram_io_all';
 /** One CAS command or one line fill = 64 bytes. */
 export const BYTES_PER_EVENT = 64;
-
-/** How long the end of a stream waits for its reader. */
-const DRAIN_TIMEOUT = '1 second';
-
-/** The backstop of a stream scope closed on a live perf: SIGKILL that long after its SIGTERM. */
-const FORCE_KILL_AFTER = '1 second';
 
 export interface PerfLine {
   /** Seconds since perf was started. */
@@ -61,8 +56,8 @@ export interface MemBandwidthSampler {
 
 /** One launched `perf stat` and what it reported: a rate (events/s) per event, from each interval's count. */
 interface Perf {
-  /** The scope of the process, its reader and nothing else; none when perf could not be launched. */
-  readonly scope: Option.Option<Scope.Closeable>;
+  /** The program, followed with its reader; none when perf could not be launched. */
+  readonly program: Option.Option<Followed>;
   readonly prevTime: ReadonlyMap<string, number>;
   readonly rates: ReadonlyMap<string, number>;
   /** When the last line came. */
@@ -113,16 +108,16 @@ export const makeMemBandwidth = Effect.fn('makeMemBandwidth')(function* (options
   readonly intervalMs: number;
   readonly retryAfter?: Duration.Input;
 }) {
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const context = yield* Effect.context<ChildProcessSpawner.ChildProcessSpawner>();
   const bin = options.bin ?? 'perf';
   const retryAfterMs = Duration.toMillis(Duration.fromInputUnsafe(options.retryAfter ?? '60 seconds'));
-  // The streams and their watchers live in a scope the end of the caller's scope closes.
+  // The streams and their watchers live in a scope the end of the caller's scope closes, every program at once.
   const scope = yield* Effect.scope;
-  const ops = yield* Scope.fork(scope);
+  const ops = yield* Scope.fork(scope, 'parallel');
 
   /** A perf never launched: dead from the start, so the first look launches it. */
   const unlaunched: Perf = {
-    scope: Option.none(),
+    program: Option.none(),
     prevTime: new Map(),
     rates: new Map(),
     lastAt: 0,
@@ -137,11 +132,11 @@ export const makeMemBandwidth = Effect.fn('makeMemBandwidth')(function* (options
   });
 
   /** Updates the perf of `slot` while it is still the one of `stream`: a stream that was replaced changes nothing. */
-  const updateIf = (slot: Slot, stream: Scope.Closeable, f: (p: Perf) => Perf) =>
+  const updateIf = (slot: Slot, stream: Followed, f: (p: Perf) => Perf) =>
     SynchronizedRef.update(held, (h) =>
       Option.match(slotOf(h, slot), {
         onNone: () => h,
-        onSome: (p) => (Option.getOrUndefined(p.scope) === stream ? withSlot(h, slot, f(p)) : h),
+        onSome: (p) => (Option.getOrUndefined(p.program) === stream ? withSlot(h, slot, f(p)) : h),
       }),
     );
 
@@ -149,52 +144,42 @@ export const makeMemBandwidth = Effect.fn('makeMemBandwidth')(function* (options
   const launch = (slot: Slot, args: ReadonlyArray<string>, intervalMs: number): Effect.Effect<Perf> =>
     Effect.gen(function* () {
       const now = yield* Clock.currentTimeMillis;
-      const streamScope = yield* Scope.fork(ops);
-      const spawned = yield* spawner
-        .spawn(
-          ChildProcess.make(bin, ['stat', ...args, '-I', String(intervalMs), '-x', ',', '--log-fd', '1'], {
-            stdin: 'ignore',
-            stderr: 'ignore',
-            forceKillAfter: FORCE_KILL_AFTER,
-          }),
-        )
-        .pipe(Scope.provide(streamScope), Effect.result);
-      if (spawned._tag === 'Failure') {
-        yield* Scope.close(streamScope, Exit.void);
-        return { ...unlaunched, diedAt: Option.some(now) };
-      }
-      const handle = spawned.success;
-      const perf: Perf = { ...unlaunched, scope: Option.some(streamScope), diedAt: Option.none() };
-      const drained = yield* Deferred.make<void>();
-      yield* linesOf(handle.stdout).pipe(
-        Stream.runForEach((text) => {
-          const line = parsePerfLine(text);
-          return line === null
-            ? Effect.void
-            : Effect.flatMap(Clock.currentTimeMillis, (at) => updateIf(slot, streamScope, (p) => onLine(p, line, at)));
+      const launched = yield* followProgram({
+        command: ChildProcess.make(bin, ['stat', ...args, '-I', String(intervalMs), '-x', ',', '--log-fd', '1'], {
+          stdin: 'ignore',
+          stderr: 'ignore',
+          forceKillAfter: FORCE_KILL_AFTER,
         }),
-        // A stream cut short keeps its last values: they go stale.
-        Effect.ignore,
-        Effect.ensuring(Deferred.succeed(drained, undefined)),
-        Effect.forkIn(streamScope),
-      );
-      // Once perf exits, its reader is joined (1 s at most), it is marked dead, then its scope is closed.
-      yield* handle.exitCode.pipe(
-        Effect.ignore,
-        Effect.andThen(Deferred.await(drained).pipe(Effect.interruptible, Effect.timeoutOption(DRAIN_TIMEOUT))),
-        Effect.andThen(Clock.currentTimeMillis),
-        Effect.flatMap((at) => updateIf(slot, streamScope, (p) => ({ ...p, diedAt: Option.some(at) }))),
-        Effect.andThen(Scope.close(streamScope, Exit.void)),
-        Effect.forkIn(ops),
-      );
-      return perf;
+        parent: ops,
+        name: 'perf',
+        read: (stream) =>
+          linesOf(stream.handle.stdout).pipe(
+            Stream.runForEach((text) => {
+              const line = parsePerfLine(text);
+              return line === null
+                ? Effect.void
+                : Effect.flatMap(Clock.currentTimeMillis, (at) => updateIf(slot, stream, (p) => onLine(p, line, at)));
+            }),
+            // A stream cut short keeps its last values: they go stale.
+            Effect.ignore,
+          ),
+        // Once perf exited and its reader is joined, it is marked dead; then its scope is closed.
+        onExit: (_, stream) =>
+          Effect.flatMap(Clock.currentTimeMillis, (at) =>
+            updateIf(slot, stream, (p) => ({ ...p, diedAt: Option.some(at) })),
+          ),
+      }).pipe(Effect.option, Effect.provideContext(context));
+      return Option.match(launched, {
+        onNone: (): Perf => ({ ...unlaunched, diedAt: Option.some(now) }),
+        onSome: (program): Perf => ({ ...unlaunched, program: Option.some(program), diedAt: Option.none() }),
+      });
     });
 
   /** Stops a stream without waiting for it. */
   const stop = (p: Perf) =>
-    Option.match(p.scope, {
+    Option.match(p.program, {
       onNone: () => Effect.void,
-      onSome: (s) => Effect.forkIn(Scope.close(s, Exit.void), ops).pipe(Effect.asVoid),
+      onSome: (program) => Effect.forkIn(program.stop, ops).pipe(Effect.asVoid),
     });
 
   const systemArgs = ['-a', '-e', `${SYSTEM_EVENTS.read},${SYSTEM_EVENTS.write}`];

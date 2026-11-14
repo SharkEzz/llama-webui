@@ -123,9 +123,9 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const context = yield* Effect.context<ChildProcessSpawner.ChildProcessSpawner>();
   const appsTimeout = Duration.fromInputUnsafe(options.appsTimeout ?? '3 seconds');
-  // The streams and their watchers live in a scope the end of the caller's scope closes.
+  // The streams and their watchers live in a scope the end of the caller's scope closes, every program at once.
   const scope = yield* Effect.scope;
-  const ops = yield* Scope.fork(scope);
+  const ops = yield* Scope.fork(scope, 'parallel');
   /** Completed once the compute-apps query in flight ended; none before the first one. */
   const inFlight = yield* SynchronizedRef.make<Option.Option<Deferred.Deferred<void>>>(Option.none());
   const held = yield* SynchronizedRef.make<Held>({
