@@ -222,3 +222,23 @@ Found while porting E4, accepted with its result:
 - A reader that dies during a tick gives its own fallback (null, or no card), as the Nitro `.catch(() => null)` did;
   a defect of a collector during `configure` becomes `CollectorsNotApplied` (the readers report no error of their
   own), so the patch answers 200 with its warning.
+- A launch of a perf or nvidia-smi stream and the write of the state that names it are one uninterruptible step: no
+  stream runs that the state does not name, and the reader of a stream that was replaced changes nothing.
+
+Found by the final review of E4, fixed with it:
+
+- A killed program's exit is awaited 1 s at most (`closeWithin` of `app/server/process/followed.ts`, through
+  `followProgram` for every long-lived program and the compute-apps query): the spawner's release waits for the exit
+  without a limit, and a program in uninterruptible sleep in a driver call does not exit on SIGKILL until the call
+  returns. Past the bound the close is logged and goes on alone. At the start, an NVML sampler that does not come up
+  falls back to nvidia-smi after its 3 s and that second at most; at the end, the collectors' scope closes in 1 s at
+  most, their programs together, before the supervisor stops llama-server (the Nitro `terminate()` + `unref()` did
+  not wait at all). A compute-apps query stuck that way stays in flight until it is gone: stuck queries do not pile
+  up.
+- `configure`, `nvidiaSource` and `nvmlSystem` of the monitor wait 10 s at most for the collectors: a patch is a 200
+  with the warning `the collectors are not up yet` instead of a request that hangs, and the change is applied once
+  they are up.
+- The monitor's `configure` applies the stored settings, read under its lock (it was handed the patched settings: two
+  patches saved at once could configure in the other order and leave the monitor on the older ones), and the handler
+  calls it only when the patch changed what the monitor follows (`collectors`, `pollIntervalMs`, `historySeconds`,
+  `hiddenGpus`): with collectors that could not start, a theme or a binary saved no longer shows the warning.

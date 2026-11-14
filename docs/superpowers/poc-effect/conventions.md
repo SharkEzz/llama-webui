@@ -102,12 +102,26 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 
 The model is `app/server/supervisor/Supervisor.ts`.
 
-- **A long-lived process** is spawned into a scope of its own (`Scope.fork` of a scope the layer owns, then
-  `Scope.provide(scope)` on `spawner.spawn`), never the caller's. Its readers and its health poll are forked into
-  that scope, and the fiber that watches its exit into the layer's scope of operations. When it exits, join the
-  readers first (a `Deferred` completed by `Effect.ensuring`, awaited 1 s at most), then close its scope: closing it
-  at once loses the last lines. `handle.exitCode` fails when a signal ended the process; read the signal from the
-  message of its cause (`/signal: '([A-Z0-9]+)'/`). A stop in two signals:
+- **A long-lived process** goes through `followProgram` of `app/server/process/followed.ts`, never a hand-written
+  spawn, with the layer's scope of operations as its `parent` (forked `'parallel'` when it holds several programs, so
+  that at the end they stop at once: `ops` of `collectors/nvidia.ts`, `programs` of `collectors/Collectors.ts`):
+  - `followProgram({ command, parent, name, onSpawn?, read, onExit? })` spawns `command` in a scope of its own forked
+    from `parent` (`Followed.scope`, where the caller forks what goes next to the readers, a health poll), runs
+    `onSpawn` (the state names the process, before any output is read), forks `read` into that scope, and watches the
+    exit from a fiber of `parent`: it joins `read` (1 s at most, `DRAIN_TIMEOUT`: closing at once loses the last
+    lines), runs `onExit(ended, program)` with the code or the failure of `exitCode`, then closes the program's scope,
+    uninterruptibly; `ended` completes then. A spawn that fails fails with the spawner's error, nothing left behind.
+  - `Followed.stop` closes the program's scope (it kills the program), and every close of that scope, by `stop`, by
+    the exit or by the end of `parent`, waits `CLOSE_BOUND` (1 s) at most: the spawner's release waits for the exit
+    without a limit, and a program in uninterruptible sleep in a driver call does not exit on SIGKILL until the call
+    returns. Past the bound `closeWithin` logs `<name> did not end 1s after its stop` and lets the close go on alone.
+    A program's own scope outside `followProgram` (a one-shot query that may hang: `queryApps` of
+    `collectors/nvidia.ts`) is closed with `closeWithin` too.
+  - `FORCE_KILL_AFTER` (1 s) is the `forceKillAfter` of a program asked to stop with SIGTERM; a program stuck in a
+    native call is spawned with `killSignal: 'SIGKILL'`. Models: `supervisor/Supervisor.ts` (llama-server),
+    `collectors/nvidia.ts`, `collectors/membw.ts`, `collectors/nvml/Nvml.ts`.
+- `handle.exitCode` fails when a signal ended the process; read the signal from the message of its cause
+  (`/signal: '([A-Z0-9]+)'/`). A stop in two signals:
   `handle.kill({ killSignal: 'SIGTERM' }).pipe(Effect.interruptible, Effect.timeoutOption(timeout))`, then
   `kill({ killSignal: 'SIGKILL' })` on none. `Effect.interruptible` lets the timeout end the wait, in a finalizer
   too. `forceKillAfter` of `ChildProcess.make` is the backstop of a scope closed on a live process.
@@ -162,8 +176,9 @@ The model is `app/server/supervisor/Supervisor.ts`.
 
 - What a loop decides is a pure function of what it read: `beginTick` and `endTick` of `app/server/monitor/tick.ts`
   (the memory of the previous tick and the readings in, the next memory, the history's points and the snapshot out),
-  `onSample`, `onConfigure`, `isFresh` and `procVramOf` of `app/server/collectors/nvml/Nvml.ts` (the reader's state
-  and a message or the time in, the next state out). The service around it reads (in parallel, each read with its
+  `onSample`, `onConfigure` and `isFresh` of `app/server/collectors/nvml/Nvml.ts` (the reader's state and a message
+  or the time in, the next state out), `procVramOf` of `app/server/collectors/gpu.ts` (the cards and their processes
+  in, the VRAM of a pid per card out). The service around it reads (in parallel, each read with its
   fallback), calls the step, and stores and publishes the result (`Monitor.tick`).
 - The step is tested as a plain function (`describe`/`it`, no layer, the time passed in): every rule of the tick is
   asserted in a few milliseconds, without timers or programs (`monitor/tick.test.ts`). The service's test on real
@@ -197,8 +212,8 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
   `handle.stdin` from a `Queue` (ended to close the program's stdin) and reads `handle.stdout`.
 - The end of its stdin is its exit: the program sends what it queued, then its scope stops the rest, exit 0. A server
   killed with SIGKILL closes the pipe all the same, so the program never outlives it. The server spawns it with
-  `killSignal: 'SIGKILL'` (a program stuck in a native call is not asked to stop) in a scope of its own, and abandons it
-  (killed, its readings cleared) on an `error`, an exit or a line that is not a message.
+  `killSignal: 'SIGKILL'` (a program stuck in a native call is not asked to stop) through `followProgram`, and
+  abandons it (killed, its readings cleared) on an `error`, an exit or a line that is not a message.
 - `node:ffi` is imported by `symbols.ts` with no directive: the `nodeBuiltinImport` rule does not flag it (an unused
   directive would fail `tsc`). It is run with `--disable-warning=ExperimentalWarning`.
 - Tests fake the program with a Node script (`app/server/testing/fixtures/fakeNvml.ts <behaviour> <dir>`, which
@@ -266,6 +281,10 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
     fake started outside the supervisor (`fakeOutside`), and the start of the fake through the API of a running build
     (`startFakeThrough`).
   - A test that starts a process asserts that it is dead at the end.
+  - A program whose exit never comes back once killed (stuck in a driver call) is faked by `stuckRelease` of
+    `app/server/testing/stuckRelease.ts`: the platform's spawner, whose release waits, once the process is killed
+    and gone, until the test's `unstick` (`process/followed.test.ts`, `monitor/Monitor.test.ts`). A real unkillable
+    process cannot be made here.
   - Every profile of a test sets its own free port, and every test of the watch sets the `port` setting to a free
     one: never 8080, where a real llama-server may listen.
   - The data folder of a build or of `vite dev` that a test runs is seeded with a free `port` setting before the start
