@@ -347,14 +347,15 @@ test('SIGTERM during a download keeps its .part and the next start resumes it', 
   const hub = await startHub({ repos: [{ id: 'org/repo', files: { 'Model-Q4_K_M.gguf': body } }] });
   try {
     hub.fail('cdn', { stall: first });
-    // A home of the test's own (the models folder its `~/models`), the fake Hub, no token of the user's.
+    // A home of the test's own (the models folder its `~/models`), the fake Hub, a fake token (never the user's).
+    const token = 'hf_lifecycle_fake';
     const env = {
       HOME: home,
       XDG_DATA_HOME: join(home, 'data'),
       XDG_CONFIG_HOME: join(home, 'config'),
       LLAMA_WEBUI_TEST_MONITOR: 'stub',
       HF_HOME: join(home, 'hf'),
-      HF_TOKEN: '',
+      HF_TOKEN: token,
       HUGGING_FACE_HUB_TOKEN: '',
       HF_TOKEN_PATH: join(home, 'hf', 'token'),
       HF_ENDPOINT: hub.url,
@@ -375,8 +376,10 @@ test('SIGTERM during a download keeps its .part and the next start resumes it', 
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ repo: 'org/repo', revision: hub.shaOf('org/repo'), keys: ['Model-Q4_K_M.gguf'] }),
       });
-      expect(res.status).toBe(202);
-      const created = (await res.json()) as { items: Array<{ id: number }> };
+      // On a refusal (a 507 `Not enough disk space` on a full disk), the failure shows the server's answer.
+      const reply = await res.text();
+      expect(res.status, reply).toBe(202);
+      const created = JSON.parse(reply) as { items: Array<{ id: number }> };
       id = created.items[0]?.id ?? 0;
       for (let i = 0; i < 250 && sizeOf(`${dest}.part`) !== first; i++) await sleep(20);
       expect(sizeOf(`${dest}.part`)).toBe(first);
@@ -406,6 +409,11 @@ test('SIGTERM during a download keeps its .part and the next start resumes it', 
     expect(status).toBe('done');
     const cdn = hub.requests().filter((r) => r.route === 'cdn');
     expect(cdn.map((r) => r.headers.range)).toEqual([undefined, `bytes=${first}-`]);
+    // The token goes to the Hub on each start, the resumed request's included, and never to the CDN (another origin).
+    const resolve = hub.requests().filter((r) => r.route === 'resolve');
+    expect(resolve.length).toBe(2);
+    expect(resolve.map((r) => r.headers.authorization)).toEqual([`Bearer ${token}`, `Bearer ${token}`]);
+    expect(cdn.map((r) => r.headers.authorization)).toEqual([undefined, undefined]);
     expect(readFileSync(dest).equals(body)).toBe(true);
     expect(sizeOf(`${dest}.part`)).toBeNull();
   } finally {

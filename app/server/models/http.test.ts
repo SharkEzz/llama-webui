@@ -354,10 +354,13 @@ describe('ModelsApi', () => {
           const reply = yield* usageOf(at('small.gguf'));
           assert.strictEqual(reply.status, 200);
           const usage = reply.json as ModelUsage;
+          // The bytes of the file on disk (`writeGguf` writes a header, its metadata and its tensors).
+          const { size } = yield* fs.stat(at('small.gguf'));
+          assert.isAbove(Number(size), 0);
           assert.deepStrictEqual(usage, {
             path: at('small.gguf'),
             files: [at('small.gguf')],
-            fileBytes: usage.fileBytes,
+            fileBytes: Number(size),
             profiles: [
               { id: a.id, name: 'A', role: 'model' },
               { id: b.id, name: 'B', role: 'model' },
@@ -365,7 +368,6 @@ describe('ModelsApi', () => {
             ],
             blocked: null,
           });
-          assert.isAbove(usage.fileBytes, 0);
         }),
     );
 
