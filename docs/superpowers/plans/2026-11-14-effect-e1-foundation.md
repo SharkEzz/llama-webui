@@ -1032,13 +1032,14 @@ git commit -m "feat(dev): Run the Effect server under vite dev, with the DevTool
 **Files:**
 
 - Create: `app/server/contract/cases.ts`, `app/server/contract/wire.ts`, `app/server/contract/contract.test.ts`,
-  `app/server/contract/golden.json` (generated; ignored by Biome with `!` like the old one)
+  `app/server/contract/wire.test.ts`, `app/server/contract/cases.test.ts`, `app/server/contract/golden.json` (generated; ignored by Biome with `!` like the old one)
 - Modify: `app/server/lifecycle.test.ts`, `scripts/smoke.ts`
 
 **Interfaces:**
 
-- Port from: `app/server-legacy/lib/contract/` (how a case is replayed, how a reply is normalised, `UPDATE_GOLDEN=1`),
-  `app/server-legacy/lifecycle.test.ts`.
+- Port from: `app/server-legacy/lib/contract/` (how a case is replayed, how a reply is normalised, `UPDATE_GOLDEN=1`;
+  `wire.ts` and `normalize` keep their tests, `wire.test.ts` and `cases.test.ts`, minus `readSse`, which returns with
+  the chat at E5), `app/server-legacy/lifecycle.test.ts`.
 - Produces: the contract suite every later milestone extends: one or more cases per endpoint of `Api`, replayed over
   HTTP against the build started by `launch()`, each reply (status, the headers the old golden kept, body) compared
   to `golden.json`. Normalised before comparing: asset hashes (`<hash>`), `uptimeMs`, `bootId`, `version`.
@@ -1087,22 +1088,32 @@ git commit -m "test(server): Record the contract and the lifecycle of the Effect
 - Modify: `docs/superpowers/poc-effect/test-inventory.json`, `docs/superpowers/poc-effect/behaviours.md`, `CLAUDE.md`
 - Create: `docs/superpowers/poc-effect/conventions.md`, `docs/superpowers/poc-effect/e1.json`
 
-- [ ] **Step 1: Account for the tests.** In `test-inventory.json` (an array of entries), every entry whose
-      `milestone` is `E1` gets a `status`: `ported` or `rewritten` with `to` (the new test file), or `dropped` with a
-      `reason`. Re-assigned instead (their `milestone` changes, no status): the entries of
-      `app/server/lib/proc.test.ts` to `E3`; the two `useEnvProxy: …` tests to `E6`; the two NVML tests of
-      `app/server/build.test.ts` to `E4`; the reply half of `SIGTERM with the UI open and a reply streaming stops in under
-  2 s` is noted in its `reason` as back in `E5`. Expected drops, each with its reason: the three tests of
-      `api.gen.test.ts` (generator replaced by the `HttpApi` definition), the tests of `lib/db/sqlite.test.ts` whose
-      behaviour belonged to the removed wrapper, the h3 helper tests of `lib/http.test.ts`, `dev reads .env.local too`
-      (a Nitro behaviour).
+- [ ] **Step 1: Account for the tests.** `test-inventory.json` is an array of `{ project, file, name, milestone }`
+      written by E0 (104 entries have `milestone: 'E1'`; `scripts/poc/inventory.ts` declares the optional `status`, `to`
+      and `reason`). Edit the file with a throwaway script, never by regenerating it (that would lose the statuses).
+      Every `E1` entry gets a `status`: `ported` or `rewritten` with `to` (the new test file), or `dropped` with a
+      `reason`.
+  - Re-assigned instead (their `milestone` changes, no status): the 12 entries of `app/server/lib/proc.test.ts` to
+    `E3`; the two `useEnvProxy: …` tests of `lib/env.test.ts` to `E6`; the two NVML tests of
+    `app/server/build.test.ts` and `PATCH /api/settings: saved but not applied by the monitor is a 200 with a warning,
+    not a 500 (#35)` to `E4`.
+  - Rewritten with a half that returns later, said in `reason`: `SIGTERM with the UI open and a reply streaming stops
+    in under 2 s` (the reply: E5); the `dev.test.ts` and `lifecycle.test.ts` tests that name llama-server (its stop:
+    E3).
+  - Expected drops, each with its reason: the three tests of `api.gen.test.ts` (generator replaced by the `HttpApi`
+    definition); the tests of `lib/db/sqlite.test.ts` whose behaviour belonged to the removed wrapper (its foreign
+    keys and binding tests are rewritten in `db/Db.test.ts`); the h3 helper tests of `lib/http.test.ts` (the 405 test
+    included; the unknown-route and 500 ones are rewritten in `http/HttpLive.test.ts`); `saving a route file keeps
+    llama-server and the boot` and `dev reads .env.local too…` (Nitro behaviours); the `api()` tests of
+    `app/src/lib/api.test.ts` with no counterpart on the derived client (a 204, a reply that is not JSON).
 
 Run: `node -e "const a=require('./docs/superpowers/poc-effect/test-inventory.json');console.log(a.filter(e=>e.milestone==='E1'&&!e.status).length)"`
 Expected: `0`.
 
 - [ ] **Step 2: Account for the behaviours.** In `behaviours.md`, section E1: every line is ticked, or struck with
       `dropped: <reason>` (the 405 with `Allow`, the 503 while starting, `.env.local` in dev, the route reload that kept
-      llama-server, exit code 2 on a usage error), or moved under its milestone with a note (the monitor warning of
+      llama-server, exit code 2 on a usage error and the wording of the launcher's usage errors, now those of `effect/cli`,
+      `NITRO_HOST`/`NITRO_PORT`), or moved under its milestone with a note (the monitor warning of
       `PATCH /api/settings`: E4; `GET /api/state`: E3; the smoke checks removed in Task 10). Add what is new: `--version`,
       `bootId` in `/api/health`, the second-signal handler.
 
