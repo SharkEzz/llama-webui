@@ -90,14 +90,14 @@ Decided (the E1 plan, or accepted with its result):
 - A usage error of the command line exits 1 with the help (was 2).
 
 Decided (user): a path under `/api/` and `/ws/` that ends with a slash is a 308 to the path without it, query string
-kept, after the guard (was 404; at E1 the router of `effect/http` ignored the slash). The UI's paths keep theirs.
+kept, after the guard (which judges `/ws` itself only: `/ws/` is redirected unjudged, its target guarded) (was 404; at E1 the router of `effect/http` ignored the slash). The UI's paths keep theirs.
 
 Decided (the E2 plan): requests are validated by their schema at the edge.
 
 - On `PUT /api/profiles/:id` an invalid body is a 400 even when the profile does not exist (was 404 first).
 - An id that is not a positive integer answers 404 `RouteNotFound` `Unknown route` (was `Profile not found`).
-- A body that is not JSON answers `Invalid data: Expected a valid JSON body`, an empty one `Invalid data: Expected JSON
-  value` (was `Invalid JSON`).
+- A body that is not JSON answers `Invalid data: Expected a valid JSON body`, an empty one `Invalid data: Expected object`
+  on a profile payload and `Invalid data: Expected JSON value` on the import, which takes any JSON (was `Invalid JSON`).
 - An unknown key answers `unknown key` and comes first among the issues (zod worded it its own way, after the fields).
 - The `code` of an error (`name-taken`) is its `_tag` (`ProfileNameTaken`).
 
