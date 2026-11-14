@@ -1,8 +1,9 @@
 /**
  * The server half of `pnpm build`, run after `vite build` wrote the client to `.output/public`: bundles the Effect
- * server (`server/main.ts`) into `.output/server/index.mjs` and the launcher (`bin/llama-webui.ts`) into
- * `.output/llama-webui.mjs`, each one file that requires nothing but Node builtins, then writes
- * `.output/server/THIRD-PARTY-LICENSES.md` from the modules bundled into the server.
+ * server (`server/main.ts`) into `.output/server/index.mjs`, the NVML sampler (`server/collectors/nvml/worker.ts`)
+ * into `.output/server/nvml-worker.mjs` and the launcher (`bin/llama-webui.ts`) into `.output/llama-webui.mjs`, each
+ * one file that requires nothing but Node builtins, then writes
+ * `.output/server/THIRD-PARTY-LICENSES.md` from the modules bundled into the server and the sampler.
  */
 import { execFileSync } from 'node:child_process';
 import { chmodSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -50,6 +51,14 @@ const server = await build({
   output: { file: join(SERVER, 'index.mjs'), codeSplitting: false },
 });
 
+// The NVML sampler, a program of its own: `workerPath` of `server/collectors/nvml/Nvml.ts` finds it next to `index.mjs`.
+const sampler = await build({
+  input: r('server/collectors/nvml/worker.ts'),
+  platform: 'node',
+  plugins: [optionalAddons],
+  output: { file: join(SERVER, 'nvml-worker.mjs'), codeSplitting: false },
+});
+
 const launcher = join(OUTPUT, 'llama-webui.mjs');
 await build({
   input: r('bin/llama-webui.ts'),
@@ -61,6 +70,6 @@ await build({
 chmodSync(launcher, 0o755);
 
 writeLicenses(
-  server.output.flatMap((out) => (out.type === 'chunk' ? out.moduleIds : [])),
+  [...server.output, ...sampler.output].flatMap((out) => (out.type === 'chunk' ? out.moduleIds : [])),
   join(SERVER, 'THIRD-PARTY-LICENSES.md'),
 );
