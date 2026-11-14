@@ -2,12 +2,13 @@
 import { createServer } from 'node:http';
 import { NodeHttpServer } from '@effect/platform-node';
 import { Api, RouteNotFound } from '@llama-webui/shared';
-import { Array as Arr, Cause, Effect, Layer } from 'effect';
+import { Array as Arr, Cause, Effect, ErrorReporter, Layer } from 'effect';
 import { HttpRouter, HttpServer, HttpServerResponse } from 'effect/http';
 import { HttpApiBuilder } from 'effect/http-api';
 import { AppConfig } from '../config/AppConfig.ts';
 import { AppInfo } from '../config/AppInfo.ts';
 import { HealthHandlers } from '../health/http.ts';
+import { SettingsHandlers } from '../settings/http.ts';
 import { guard } from './Guard.ts';
 import * as Static from './Static.ts';
 
@@ -21,14 +22,19 @@ const UnknownApi = HttpRouter.add(
 );
 
 /** The endpoints of the API, and the 404 of any other /api path. */
-export const ApiRoutes = Layer.merge(HttpApiBuilder.layer(Api).pipe(Layer.provide(HealthHandlers)), UnknownApi);
+export const ApiRoutes = Layer.merge(
+  HttpApiBuilder.layer(Api).pipe(Layer.provide(Layer.mergeAll(HealthHandlers, SettingsHandlers))),
+  UnknownApi,
+);
 
 /**
  * A defect of a handler, not the response the router carries as one (the 404 of a missing file, the 500 that answers
- * a defect).
+ * a defect), nor an error Effect marks as not to report (the 400 of a payload that does not decode).
  */
 const isDefect = (reason: Cause.Reason<unknown>): boolean =>
-  Cause.isDieReason(reason) && !HttpServerResponse.isHttpServerResponse(reason.defect);
+  Cause.isDieReason(reason) &&
+  !HttpServerResponse.isHttpServerResponse(reason.defect) &&
+  !ErrorReporter.isIgnored(reason.defect);
 
 /** A defect is logged: the client only gets a 500 without its message. */
 const logDefects = <E, R>(app: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>) =>

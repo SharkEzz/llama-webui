@@ -1,5 +1,6 @@
 import type { ThemeMode } from '@llama-webui/shared';
 import { create } from 'zustand';
+import { call } from './api';
 
 const KEY = 'llama-webui:theme';
 const media = window.matchMedia('(prefers-color-scheme: dark)');
@@ -29,7 +30,7 @@ function apply(mode: ThemeMode): 'light' | 'dark' {
 interface ThemeState {
   mode: ThemeMode;
   resolved: 'light' | 'dark';
-  /** Applies the theme and stores it in the browser. */
+  /** Applies the theme and stores it in the browser and the database. */
   setMode(mode: ThemeMode): void;
 }
 
@@ -40,14 +41,20 @@ export const useTheme = create<ThemeState>((set) => {
     resolved: resolve(mode),
     setMode(next) {
       set({ mode: next, resolved: apply(next) });
+      call((api) => api.settings.patch({ payload: { theme: next } })).catch(() => {});
     },
   };
 });
 
-/** Follows prefers-color-scheme in System mode. A browser preference until the settings are ported (E1, Task 7). */
+/** Follows prefers-color-scheme in System mode; the database wins at startup (choice made from another browser). */
 export function startThemeSync() {
   media.addEventListener('change', () => {
     const { mode } = useTheme.getState();
     if (mode === 'system') useTheme.setState({ resolved: apply('system') });
   });
+  call((api) => api.settings.get())
+    .then((s) => {
+      if (s.theme !== useTheme.getState().mode) useTheme.setState({ mode: s.theme, resolved: apply(s.theme) });
+    })
+    .catch(() => {});
 }

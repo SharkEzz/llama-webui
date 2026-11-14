@@ -1,6 +1,7 @@
+import type { ComponentType } from 'react';
 import { createBrowserRouter, type RouteObject } from 'react-router';
 import { AppLayout } from './AppLayout';
-import { MILESTONE_BY_PATH, ROUTES } from './routes';
+import { type AppRoute, MILESTONE_BY_PATH, ROUTES } from './routes';
 
 /**
  * A page of the menu that the Effect server does not serve yet: the waiting page, loaded on first visit (the initial
@@ -16,10 +17,18 @@ const placeholder = (title: string, milestone?: string) => ({
   },
 });
 
+/** The pages the Effect server serves again, each loaded on first visit. */
+const PORTED: Partial<Record<string, () => Promise<ComponentType>>> = {
+  '/settings': async () => (await import('@/features/settings/SettingsPage')).SettingsPage,
+};
+
+const pageOf = (r: AppRoute) => {
+  const Component = PORTED[r.path];
+  return Component ? { lazy: { Component } } : placeholder(r.label, MILESTONE_BY_PATH[r.path]);
+};
+
 const pages: RouteObject[] = ROUTES.map((r) =>
-  r.path === '/'
-    ? { index: true, ...placeholder(r.label, MILESTONE_BY_PATH[r.path]) }
-    : { path: r.path.slice(1), ...placeholder(r.label, MILESTONE_BY_PATH[r.path]) },
+  r.path === '/' ? { index: true, ...pageOf(r) } : { path: r.path.slice(1), ...pageOf(r) },
 );
 
 export const router = createBrowserRouter([

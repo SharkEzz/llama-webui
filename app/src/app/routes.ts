@@ -59,5 +59,4 @@ export const MILESTONE_BY_PATH: Record<string, string> = {
   '/logs': 'E3',
   '/bench': 'E7',
   '/tuning': 'E8',
-  '/settings': 'E1',
 };

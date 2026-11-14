@@ -5,6 +5,7 @@ export { type SseEvent, SseParser } from 'llamacpp-js/sse';
 export { Api } from './api/Api.ts';
 export { RequestRefused, RouteNotFound } from './api/errors.ts';
 export { HealthApi } from './api/HealthApi.ts';
+export { SettingsApi, SettingsInvalid } from './api/SettingsApi.ts';
 export * from './bench.ts';
 export * from './chat.ts';
 export * from './dispose.ts';

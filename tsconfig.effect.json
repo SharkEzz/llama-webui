@@ -202,7 +202,7 @@
           },
           {
             // Its Effect modules follow the server's rules. Each milestone adds the modules it moves to Schema.
-            "include": ["packages/webui-shared/src/api/**/*.ts"],
+            "include": ["packages/webui-shared/src/api/**/*.ts", "packages/webui-shared/src/settings.ts"],
             "options": {
               "diagnosticSeverity": {
                 "strictBooleanExpressions": "warning",

@@ -10,13 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { SystemInfo } from '@/features/system/SystemPage';
-import { api } from '@/lib/api';
 import { formatDuration } from '@/lib/format';
 import { type SettingsErrors, useSettingsEditor } from '@/lib/settings';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
-import { EnvField, GpuSwitches, SwitchRow, TextField } from './fields';
+import { EnvField, SwitchRow, TextField } from './fields';
 
 const INTERVALS = [250, 500, 1000, 2000].map((ms) => ({ value: String(ms), label: `${ms} ms` }));
 const THEMES: { value: ThemeMode; label: string }[] = [
@@ -134,12 +132,8 @@ function Server({ settings, errors, save }: SectionProps & { errors: SettingsErr
 }
 
 function Monitoring({ settings, save }: SectionProps) {
-  const [info, setInfo] = useState<SystemInfo | null>(null);
   const [history, setHistory] = useState(settings.historySeconds);
   useEffect(() => setHistory(settings.historySeconds), [settings.historySeconds]);
-  useEffect(() => {
-    void api('GET /api/system/info').then(setInfo, () => {});
-  }, []);
   const c = settings.collectors;
 
   return (
@@ -206,15 +200,10 @@ function Monitoring({ settings, save }: SectionProps) {
           <p className="text-sm text-muted-foreground">
             A hidden GPU is no longer read (it is not woken up if asleep).
           </p>
-          {!info ? (
-            <Skeleton className="h-24" />
-          ) : (
-            <GpuSwitches
-              gpus={info.gpus}
-              hidden={settings.hiddenGpus}
-              onChange={(hiddenGpus) => save({ hiddenGpus })}
-            />
-          )}
+          {/* The GPU list comes from the monitor (GET /api/system/info), which the Effect server does not serve yet. */}
+          <p className="text-sm text-muted-foreground">
+            Not ported yet: the GPU list is back with milestone E4 of the Effect server rewrite.
+          </p>
         </div>
       </GlassCard>
     </div>

@@ -1,13 +1,13 @@
 import { assert, layer } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { HttpClient } from 'effect/http';
-import { AppInfo } from '../config/AppInfo.ts';
 import { ServerTest } from '../testing/http.ts';
 import { PUBLIC, PublicTest } from '../testing/public.ts';
+import { ServicesTest } from '../testing/services.ts';
 import { ApiRoutes, serve } from './HttpLive.ts';
 
 const TestApp = serve(Layer.merge(ApiRoutes, PublicTest)).pipe(
-  Layer.provide(AppInfo.layer),
+  Layer.provide(ServicesTest),
   Layer.provideMerge(ServerTest),
 );
 

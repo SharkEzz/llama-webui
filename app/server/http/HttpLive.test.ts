@@ -1,9 +1,9 @@
 import { assert, layer } from '@effect/vitest';
 import { Array as Arr, Effect, Layer, Logger } from 'effect';
 import { HttpClient, HttpClientRequest, HttpRouter } from 'effect/http';
-import { AppInfo } from '../config/AppInfo.ts';
 import { ServerTest } from '../testing/http.ts';
 import { PublicTest } from '../testing/public.ts';
+import { ServicesTest } from '../testing/services.ts';
 import { ApiRoutes, serve } from './HttpLive.ts';
 
 const Boom = HttpRouter.add('GET', '/api/boom', Effect.die(new Error('secret')));
@@ -18,7 +18,7 @@ const Errors = Logger.layer([
 
 /** The API, a route that dies, and a UI of one page, served as the app serves them. */
 const TestApp = serve(Layer.mergeAll(ApiRoutes, Boom, PublicTest)).pipe(
-  Layer.provide(AppInfo.layer),
+  Layer.provide(ServicesTest),
   Layer.provideMerge(ServerTest),
   Layer.provide(Errors),
 );
@@ -62,6 +62,20 @@ layer(TestApp)('HttpLive', (it) => {
       );
       assert.strictEqual(ws.status, 403);
       assert.strictEqual(ws.headers.connection, 'close');
+    }),
+  );
+
+  it.effect('a payload that does not decode is a 400, not logged as a failure', () =>
+    Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const logged = errors.length;
+      for (const body of ['[1]', '{bad']) {
+        const res = yield* client.execute(
+          HttpClientRequest.patch('/api/settings').pipe(HttpClientRequest.bodyText(body, 'application/json')),
+        );
+        assert.strictEqual(res.status, 400, body);
+      }
+      assert.strictEqual(errors.length, logged);
     }),
   );
 
