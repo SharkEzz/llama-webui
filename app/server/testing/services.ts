@@ -1,6 +1,7 @@
 import { Layer } from 'effect';
 import { AppInfo } from '../config/AppInfo.ts';
 import * as Db from '../db/Db.ts';
+import { Shutdown } from '../runtime/Shutdown.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { WsHub } from '../ws/WsHub.ts';
 
@@ -8,4 +9,5 @@ import { WsHub } from '../ws/WsHub.ts';
 export const ServicesTest = Layer.mergeAll(WsHub.layer, SettingsRepo.layer).pipe(
   Layer.provideMerge(AppInfo.layer),
   Layer.provideMerge(Db.layerAt(':memory:')),
+  Layer.provideMerge(Shutdown.layer),
 );

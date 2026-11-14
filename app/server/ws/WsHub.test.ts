@@ -1,8 +1,10 @@
 import { assert, it } from '@effect/vitest';
-import { WsHello, type WsMessage } from '@llama-webui/shared';
+import { WsHello, WsMessage } from '@llama-webui/shared';
 import {
+  Array as Arr,
   Clock,
   Context,
+  Deferred,
   type Duration,
   Effect,
   Exit,
@@ -14,6 +16,8 @@ import {
   String as Str,
 } from 'effect';
 import { HttpClient, HttpClientRequest, HttpServer } from 'effect/http';
+import { Socket } from 'effect/socket';
+import { TestClock } from 'effect/testing';
 import { AppInfo } from '../config/AppInfo.ts';
 import { serve } from '../http/HttpLive.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
@@ -32,15 +36,19 @@ const appWith = <E, R>(ping: Duration.Input, extra: Layer.Layer<never, E, R>) =>
 
 /** The app, its hub, and how to open a client on its `/ws`; stopped with the test's scope. */
 const start = Effect.fn('start')(function* (
-  options: { readonly ping?: Duration.Input; readonly scope?: Scope.Scope; readonly atShutdown?: WsMessage } = {},
+  options: {
+    readonly ping?: Duration.Input;
+    readonly scope?: Scope.Scope;
+    readonly atShutdown?: ReadonlyArray<WsMessage>;
+  } = {},
 ) {
-  const { ping = '1 minute', scope, atShutdown } = options;
-  // A step that publishes `atShutdown` when the app stops.
+  const { ping = '1 minute', scope, atShutdown = [] } = options;
+  // A step that publishes `atShutdown`, in order, when the app stops.
   const step = Layer.effectDiscard(
     Effect.gen(function* () {
       const shutdown = yield* Shutdown;
       const hub = yield* WsHub;
-      if (atShutdown !== undefined) yield* shutdown.before(hub.publish(atShutdown));
+      yield* shutdown.before(Effect.forEach(atShutdown, hub.publish, { discard: true }));
     }),
   );
   const app = appWith(ping, step);
@@ -173,7 +181,7 @@ it.live('/ws without an upgrade is a 426', () =>
 it.live('closing the app sends 1001 after the Shutdown.before steps', () =>
   Effect.gen(function* () {
     const scope = yield* Scope.make();
-    const { open, hub } = yield* start({ scope, atShutdown: { type: 'pong' } });
+    const { open, hub } = yield* start({ scope, atShutdown: [{ type: 'pong' }] });
     const client = yield* open();
     yield* next(client, 'hello');
     yield* sizeIs(hub, 1);
@@ -184,5 +192,68 @@ it.live('closing the app sends 1001 after the Shutdown.before steps', () =>
     yield* Fiber.join(stopping);
     yield* Effect.promise(() => client.closed).pipe(Effect.timeout('2 seconds'));
     assert.deepStrictEqual(order, ['{"type":"pong"}', 'close 1001']);
+  }),
+);
+
+/** The messages and the close of `client`, in the order they arrive, from now on. */
+const recorded = (client: WsClient) => {
+  const order: Array<string> = [];
+  client.socket.addEventListener('message', (event) => order.push(String(event.data)));
+  client.socket.addEventListener('close', (event) => order.push(`close ${event.code}`));
+  return order;
+};
+
+it.live('a shutdown step that publishes many messages: every client gets them all, then its 1001', () =>
+  Effect.gen(function* () {
+    const scope = yield* Scope.make();
+    const many = Arr.makeBy(200, (i): WsMessage => ({ type: 'hello', payload: { serverTime: i, bootId: 'step' } }));
+    const { open, hub } = yield* start({ scope, atShutdown: many });
+    const a = yield* open();
+    const b = yield* open();
+    yield* next(a, 'hello');
+    yield* next(b, 'hello');
+    yield* sizeIs(hub, 2);
+    const orders = [recorded(a), recorded(b)];
+    yield* Scope.close(scope, Exit.void);
+    yield* Effect.promise(() => Promise.all([a.closed, b.closed])).pipe(Effect.timeout('2 seconds'));
+    const encode = Schema.encodeEffect(Schema.fromJsonString(WsMessage));
+    const texts = yield* Effect.forEach(many, (message) => encode(message));
+    const expected = [...texts, 'close 1001'];
+    for (const order of orders) assert.deepStrictEqual(order, expected);
+  }),
+);
+
+it.effect('a client that does not read does not hold the stop past the timeout', () =>
+  Effect.gen(function* () {
+    const ctx = yield* Layer.build(
+      WsHub.layerWith({ pingInterval: '1 minute' }).pipe(
+        Layer.provideMerge(AppInfo.layer),
+        Layer.provideMerge(Shutdown.layer),
+      ),
+    );
+    const hub = Context.get(ctx, WsHub);
+    const shutdown = Context.get(ctx, Shutdown);
+    // A client whose writes block once it got its hello, as a socket that waits for the peer to read would.
+    const greeted = yield* Deferred.make<void>();
+    const stuck = Socket.make({
+      reader: Effect.succeed({ pull: Effect.never, upgrade: () => Effect.void }),
+      writer: Effect.succeed({
+        write: () =>
+          Deferred.succeed(greeted, undefined).pipe(Effect.flatMap((first) => (first ? Effect.void : Effect.never))),
+        writeAll: () => Effect.never,
+      }),
+    });
+    yield* hub.attach(stuck).pipe(Effect.forkChild);
+    yield* Deferred.await(greeted);
+    yield* shutdown.before(hub.publish({ type: 'ping' }));
+
+    const start = yield* Clock.currentTimeMillis;
+    const stopping = yield* shutdown.run.pipe(Effect.forkChild);
+    // The test clock moves 10 ms at a time until the stop ends: it cannot end before the 500 ms of the timeout.
+    for (let i = 0; i < 100 && stopping.pollUnsafe() === undefined; i++) yield* TestClock.adjust('10 millis');
+    assert.isDefined(stopping.pollUnsafe(), 'the stop still waits after 1 s');
+    const elapsed = (yield* Clock.currentTimeMillis) - start;
+    assert.isAtLeast(elapsed, 500);
+    assert.isBelow(elapsed, 600);
   }),
 );
