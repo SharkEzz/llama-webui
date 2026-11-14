@@ -1,15 +1,15 @@
 {
-  "commit": "4fce4a14d",
-  "date": "2026-11-14T04:37:24.924Z",
+  "commit": "7389a18ab",
+  "date": "2026-11-14T04:47:46.055Z",
   "node": "v26.13.1",
   "code": {
     "server": {
       "files": 20,
-      "lines": 1339
+      "lines": 1348
     },
     "serverTests": {
       "files": 33,
-      "lines": 2691
+      "lines": 2727
     },
     "shared": {
       "files": 22,
@@ -50,23 +50,23 @@
     ]
   },
   "output": {
-    "totalBytes": 2841709,
-    "serverBytes": 1577570,
+    "totalBytes": 2841730,
+    "serverBytes": 1577591,
     "clientBytes": 1264079,
     "clientGzipBytes": 295077
   },
   "startupMs": {
-    "runs": [83, 77, 77, 80, 76, 76, 79],
+    "runs": [84, 78, 77, 78, 77, 76, 77],
     "median": 77
   },
   "shutdownMs": {
-    "runs": [6, 6, 6, 6, 5, 5, 6],
+    "runs": [6, 6, 5, 5, 9, 6, 6],
     "median": 6
   },
   "durationsMs": {
-    "build": 768,
-    "check": 730,
-    "test": 15496
+    "build": 717,
+    "check": 748,
+    "test": 15485
   },
   "workarounds": []
 }
