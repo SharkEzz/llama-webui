@@ -14,15 +14,26 @@ export {
 } from './api/errors.ts';
 export { FlagsApi, FlagsUnavailable } from './api/FlagsApi.ts';
 export { HealthApi } from './api/HealthApi.ts';
+export { LogsApi } from './api/LogsApi.ts';
 export {
   ImportResult,
   ProfileNameTaken,
   ProfileNotFound,
+  ProfileRunning,
   ProfilesApi,
   ProfilesFile,
 } from './api/ProfilesApi.ts';
-export { IdParam } from './api/params.ts';
+export { IdParam, SeqParam } from './api/params.ts';
 export { RequestErrors } from './api/RequestErrors.ts';
+export {
+  NoProfileToRestart,
+  OperationInProgress,
+  PortInUse,
+  PropsUnavailable,
+  ServerAlreadyRunning,
+  ServerApi,
+  ServerNotReady,
+} from './api/ServerApi.ts';
 export { SettingsApi, SettingsInvalid } from './api/SettingsApi.ts';
 export * from './bench.ts';
 export * from './chat.ts';

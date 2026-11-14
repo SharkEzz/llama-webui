@@ -16,6 +16,13 @@ export class ProfileNameTaken extends Schema.TaggedError<
   { readonly ProfileNameTaken: unique symbol }
 >()('ProfileNameTaken', { message: Schema.String }, { httpApiStatus: 409 }) {}
 
+/** A deletion of the profile the running server belongs to: `This profile belongs to the running server: stop it first`. */
+export class ProfileRunning extends Schema.TaggedError<ProfileRunning, { readonly ProfileRunning: unique symbol }>()(
+  'ProfileRunning',
+  { message: Schema.String },
+  { httpApiStatus: 409 },
+) {}
+
 /** The file of every profile, in the import format (`llama-webui-profiles.json`). */
 export const ProfilesFile = Schema.Struct({ profiles: Schema.Array(ProfileExport) });
 
@@ -46,7 +53,7 @@ export class ProfilesApi extends HttpApiGroup.make('profiles').add(
     success: Profile,
     error: [ProfileNotFound, ProfileNameTaken],
   }),
-  HttpApiEndpoint.delete('remove', '/api/profiles/:id', { params, error: ProfileNotFound }),
+  HttpApiEndpoint.delete('remove', '/api/profiles/:id', { params, error: [ProfileNotFound, ProfileRunning] }),
   HttpApiEndpoint.post('duplicate', '/api/profiles/:id/duplicate', {
     params,
     success: Created,
