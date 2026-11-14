@@ -12,7 +12,18 @@ export {
   RouteNotFound,
   requestInvalid,
 } from './api/errors.ts';
+export { FlagsApi, FlagsUnavailable } from './api/FlagsApi.ts';
 export { HealthApi } from './api/HealthApi.ts';
+export {
+  ImportResult,
+  LlamaTuiConfigNotFound,
+  LlamaTuiConfigUnreadable,
+  LlamaTuiStatus,
+  ProfileNameTaken,
+  ProfileNotFound,
+  ProfilesApi,
+  ProfilesFile,
+} from './api/ProfilesApi.ts';
 export { IdParam } from './api/params.ts';
 export { RequestErrors } from './api/RequestErrors.ts';
 export { SettingsApi, SettingsInvalid } from './api/SettingsApi.ts';
