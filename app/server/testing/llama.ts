@@ -152,3 +152,25 @@ export const nodeFetchText = (url: string): Effect.Effect<string> => Effect.prom
 export const later = (ms: number, f: () => void): void => {
   setTimeout(f, ms);
 };
+
+/** Sends SIGKILL to `pid`, as something outside llama-webui would. */
+export const killFromOutside = (pid: number): Effect.Effect<void> =>
+  Effect.sync(() => {
+    process.kill(pid, 'SIGKILL');
+  });
+
+/** For the life of the scope, llama-webui's own environment holds `name` set to `value`; restored when it closes. */
+export const ownVariable = (name: string, value: string): Effect.Effect<void, never, Scope.Scope> =>
+  Effect.acquireRelease(
+    Effect.sync(() => setVariable(name, value)),
+    (restore) => Effect.sync(restore),
+  ).pipe(Effect.asVoid);
+
+function setVariable(name: string, value: string): () => void {
+  const saved = process.env[name];
+  process.env[name] = value;
+  return () => {
+    if (saved === undefined) delete process.env[name];
+    else process.env[name] = saved;
+  };
+}

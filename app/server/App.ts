@@ -11,13 +11,16 @@ import { LogRing } from './logs/LogRing.ts';
 import { ProfilesRepo } from './profiles/ProfilesRepo.ts';
 import { Shutdown } from './runtime/Shutdown.ts';
 import { SettingsRepo } from './settings/SettingsRepo.ts';
+import { Supervisor } from './supervisor/Supervisor.ts';
 import { WsHub } from './ws/WsHub.ts';
 
 /**
  * The services the routes use, built before the HTTP server opens its port and undone after it closed: the database
- * is opened (and brought up to date) first. Later tasks add theirs, each on `Shutdown.layer`.
+ * is opened (and brought up to date) first. The supervisor is the top tier: its end stops llama-server while the
+ * ring and the hub it writes to are still up. Later tasks add theirs, each on `Shutdown.layer`.
  */
-const Services = Flags.layer.pipe(
+const Services = Supervisor.layer.pipe(
+  Layer.provideMerge(Flags.layer),
   Layer.provideMerge(Layer.merge(LogRing.layer, LlamaHttp.layer)),
   Layer.provideMerge(Layer.mergeAll(WsHub.layer, SettingsRepo.layer, ProfilesRepo.layer)),
   Layer.provideMerge(AppInfo.layer),

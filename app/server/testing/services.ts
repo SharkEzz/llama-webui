@@ -9,6 +9,7 @@ import { LogRing } from '../logs/LogRing.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
+import { Supervisor } from '../supervisor/Supervisor.ts';
 import { WsHub } from '../ws/WsHub.ts';
 
 /**
@@ -16,7 +17,8 @@ import { WsHub } from '../ws/WsHub.ts';
  * catalogue runs llama-server); and the answer to a request that does not decode, which `HttpApiTest.groups` needs as
  * the server's routes do.
  */
-export const ServicesTest = Flags.layer.pipe(
+export const ServicesTest = Supervisor.layer.pipe(
+  Layer.provideMerge(Flags.layer),
   Layer.provideMerge(Layer.merge(LogRing.layer, LlamaHttp.layer)),
   Layer.provideMerge(Layer.mergeAll(WsHub.layer, SettingsRepo.layer, ProfilesRepo.layer, RequestErrorsLive)),
   Layer.provideMerge(AppInfo.layer),

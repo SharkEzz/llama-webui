@@ -185,3 +185,36 @@ test('the build never connects to the Effect DevTools', async () => {
     devtools.close();
   }
 }, 30_000);
+
+/** Whether a process with this pid exists (signal 0). */
+function alive(pid: number) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+test('an exit without its finalizers leaves no llama-server', async () => {
+  const fixture = join(import.meta.dirname, 'testing/fixtures/exitWithServer.ts');
+  const proc = spawn(process.execPath, [fixture], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  proc.stdout.on('data', (c) => {
+    stdout += c;
+  });
+  proc.stderr.on('data', (c) => {
+    stderr += c;
+  });
+  const exited = new Promise<number | null>((done) => proc.once('exit', done));
+  const code = await Promise.race([exited, sleep(10_000, 'timeout' as const, { ref: false })]);
+  if (code === 'timeout') proc.kill('SIGKILL');
+  expect(code, stderr).toBe(1);
+  const pid = Number(stdout.trim());
+  expect(pid, stdout).toBeGreaterThan(0);
+  // The supervisor's `exit` handler sends SIGKILL; the kernel's pdeathsig (setpriv) and the spawner's own `exit`
+  // handler would kill it too: this proves the outcome, not which of them did it.
+  for (let i = 0; i < 100 && alive(pid); i++) await sleep(20);
+  expect(alive(pid)).toBe(false);
+}, 30_000);
