@@ -22,8 +22,10 @@ Rolldown 1.2.18, Vite, Vitest 5, Biome.
 **Calls made by this plan** (the author's, listed for the user's review; each is recorded in `behaviours.md` by
 Task 11):
 
-- `GET /api/state` returns with E3 (its content is the supervisor's); `/api/health` carries `bootId` meanwhile.
-- One signal handler of our own remains: a second signal forces the exit (`NodeRuntime.runMain` only re-interrupts).
+- `GET /api/state` returns with E3 (its content is the supervisor's); `/api/health` carries `bootId` meanwhile
+  (accepted by the user).
+- One signal handler of our own remains: a second signal forces the exit (`NodeRuntime.runMain` only re-interrupts)
+  (accepted by the user).
 - Dropped with the Nitro server: the 405 with `Allow`, the 503 while starting, `.env.local` in dev, the route save
   that kept llama-server. A usage error of the launcher exits 1 (was 2); `--version` is new.
 - Unported web code stays where it is, kept out of the type check by not being reachable (Task 3).
@@ -44,7 +46,7 @@ Task 11):
   `Config`, output from `Effect.log*`. Promise code wrapped in `Effect.promise` does not count as ported.
 - **Effect diagnostics are blocking from Task 3 on (user):** `pnpm check` prints no `effect(<rule>)` line, warnings
   included. Fix what a rule reports with its own suggestion. The only exceptions, all set up by Task 3:
-  - code that drives the build from outside (the override of `app/server/tsconfig.json`);
+  - code that drives the build from outside (the first override of `tsconfig.effect.json`);
   - `// @effect-diagnostics-next-line nodeBuiltinImport:off` where an Effect API takes the Node builtin itself
     (`createServer` for `NodeHttpServer.layer`) or Effect has no equivalent (`parseEnv`, `isBuiltin`), with the reason
     on the line;
@@ -134,11 +136,14 @@ NodeRuntime.runMain(program, {
 - **Config:** the constructors are capitalised (`Config.String`, `Config.Port`, `Config.Boolean`). With
   `Config.withDefault`, a variable that is set but empty gives the default; `LLAMA_WEBUI_PORT=abc` fails with an error
   naming the variable.
-- **Language service:** diagnostics are reported on the files of the server project only, not on the shared sources
-  it imports. The per-file `overrides` option works with globs of the form `**/testing/**/*.ts` and
-  `**/lifecycle.test.ts`; an override is merged into the base map (a rule it does not name keeps its base severity).
-  `node:http` for `createServer` is reported by `nodeBuiltinImport`; `apiStabilityLeak` fires on nearly every exported
-  layer.
+- **Language service:** a project reports on its own files, those it imports from its folder included, and not on
+  the sources of another package: the server project says nothing about `packages/webui-shared`. A plugin block
+  inherited through `extends` applies. The globs of `overrides` are relative to the folder of the config file that
+  declares them (`**/testing/**/*.ts`, `**/lifecycle.test.ts`, `packages/webui-shared/src/**/*.ts` from the root); an
+  override is merged into the base map (a rule it does not name keeps its base severity) and a later override wins
+  over an earlier one. With the server's rules, the plain TypeScript of `packages/webui-shared/src` gets 216 reports
+  from 8 rules. `node:http` for `createServer` is reported by `nodeBuiltinImport`; `apiStabilityLeak` fires on nearly
+  every exported layer.
 
 ## Reference files
 
@@ -276,7 +281,7 @@ derived client and shows a waiting page for what is not ported. Until Task 9, `p
   `pnpm-lock.yaml`, `app/vite.config.ts` (no Nitro, `build.outDir: '.output/public'`; its `.env` loading, imported
   from the old server, returns in Task 9), `app/build/licenses.ts`, `scripts/prepack.ts` and
   `scripts/package.test.ts` (`server/nvml-worker.mjs` leaves their file lists until E4), `CLAUDE.md`
-- Create: `app/server/tsconfig.json`
+- Create: `tsconfig.effect.json`, `app/server/tsconfig.json`; modify `packages/webui-shared/tsconfig.json`
 - Create: `packages/webui-shared/src/api/HealthApi.ts`, `packages/webui-shared/src/api/Api.ts` (exported by
   `index.ts`)
 - Create: `app/server/main.ts`, `app/server/App.ts`, `app/server/config/AppConfig.ts`,
@@ -293,8 +298,11 @@ derived client and shows a waiting page for what is not ported. Until Task 9, `p
 
 **Interfaces:**
 
-- `app/server/tsconfig.json`: the one of `app/server-legacy/`, with these changes to the plugin options and
-  `"erasableSyntaxOnly": true`:
+- Effect diagnostics, one configuration for the two projects that hold Effect code (user: the shared package is
+  checked too). `tsconfig.effect.json` (root) extends `tsconfig.base.json` and holds the plugin block of
+  `app/server-legacy/tsconfig.json`, changed as below. `app/server/tsconfig.json` (Node types,
+  `"erasableSyntaxOnly": true`, `"include": ["."]`) and `packages/webui-shared/tsconfig.json` extend it and declare no
+  plugin of their own.
 
 ```jsonc
 // removed: "ignoreEffectWarningsInTscExitCode" and its comment
@@ -302,6 +310,7 @@ derived client and shows a waiting page for what is not ported. Until Task 9, `p
   // …the existing map, with one change: nearly every Effect module beyond the core is unstable (see unstableApiUsage)
   "apiStabilityLeak": "off"
 },
+// Globs are relative to this file; a later entry wins over an earlier one.
 "overrides": [
   {
     // Code that drives the build from outside (child process, fetch, timers): the platform is its subject.
@@ -328,11 +337,46 @@ derived client and shows a waiting page for what is not ported. Until Task 9, `p
         "cryptoRandomUUID": "off"
       }
     }
+  },
+  {
+    // The shared package's pure logic stays plain TypeScript (spec): not asked to be written with Effect.
+    "include": ["packages/webui-shared/src/**/*.ts"],
+    "options": {
+      "diagnosticSeverity": {
+        "strictBooleanExpressions": "off",
+        "preferEffectArray": "off",
+        "preferEffectString": "off",
+        "preferEffectRecord": "off",
+        "missingPipeableSignature": "off",
+        "missedPipeableOpportunity": "off",
+        "nodeBuiltinImport": "off",
+        "asyncFunction": "off",
+        "globalJson": "off"
+      }
+    }
+  },
+  {
+    // Its Effect modules follow the server's rules. Each milestone adds the modules it moves to Schema.
+    "include": ["packages/webui-shared/src/api/**/*.ts"],
+    "options": {
+      "diagnosticSeverity": {
+        "strictBooleanExpressions": "warning",
+        "preferEffectArray": "warning",
+        "preferEffectString": "warning",
+        "preferEffectRecord": "warning",
+        "missingPipeableSignature": "warning",
+        "missedPipeableOpportunity": "warning",
+        "nodeBuiltinImport": "warning",
+        "asyncFunction": "warning",
+        "globalJson": "warning"
+      }
+    }
   }
 ]
 ```
 
-No other file is added to that list without asking.
+No other file or rule is added to the first two entries without asking. Tasks 7 and 8 add
+`packages/webui-shared/src/settings.ts` and `packages/webui-shared/src/ws.ts` to the third.
 
 - `CLAUDE.md`, under the `# llama-webui` title, a note: on `poc/effect` the server is the Effect server of
   `app/server/`; the sections below that describe Nitro, `lib/`, `routes/` and `api.gen.ts` describe
@@ -771,7 +815,8 @@ git commit -m "feat(db): Open the database through SqlClient and recognise the N
 
 **Files:**
 
-- Rewrite: `packages/webui-shared/src/settings.ts` (Schema, no zod)
+- Rewrite: `packages/webui-shared/src/settings.ts` (Schema, no zod; added to the third override of
+  `tsconfig.effect.json`)
 - Create: `packages/webui-shared/src/api/SettingsApi.ts` (added to `Api`), `app/server/settings/SettingsRepo.ts`,
   `app/server/settings/http.ts`
 - Modify: `app/server/App.ts`, `app/src/lib/settings.ts`, `app/src/lib/theme.ts`, `app/src/app/router.tsx`,
@@ -855,7 +900,7 @@ git commit -m "feat(settings): Serve the settings from the Effect server"
 
 **Files:**
 
-- Rewrite: `packages/webui-shared/src/ws.ts`
+- Rewrite: `packages/webui-shared/src/ws.ts` (added to the third override of `tsconfig.effect.json`)
 - Create: `app/server/ws/WsHub.ts`
 - Modify: `app/server/http/HttpLive.ts` (the route; `websocket: { maxPayload: 4096 }` on `NodeHttpServer`),
   `app/server/App.ts`, `app/src/lib/ws.ts`
