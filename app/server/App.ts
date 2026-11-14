@@ -4,12 +4,16 @@ import * as Db from './db/Db.ts';
 import { HttpLive } from './http/HttpLive.ts';
 import { Shutdown } from './runtime/Shutdown.ts';
 import { SettingsRepo } from './settings/SettingsRepo.ts';
+import { WsHub } from './ws/WsHub.ts';
 
 /**
  * The services the routes use, built before the HTTP server opens its port and undone after it closed: the database
  * is opened (and brought up to date) first. Later tasks add theirs, each on `Shutdown.layer`.
  */
-const Services = Layer.mergeAll(AppInfo.layer, SettingsRepo.layer).pipe(Layer.provideMerge(Db.layer));
+const Services = Layer.mergeAll(WsHub.layer, SettingsRepo.layer).pipe(
+  Layer.provideMerge(AppInfo.layer),
+  Layer.provideMerge(Db.layer),
+);
 
 /** The HTTP server on the services it uses. */
 const Http = HttpLive.pipe(Layer.provide(Services));

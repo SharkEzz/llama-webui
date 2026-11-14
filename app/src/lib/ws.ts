@@ -1,4 +1,5 @@
-import type { WsMessage } from '@llama-webui/shared';
+import { WsMessage } from '@llama-webui/shared';
+import { Option, Schema } from 'effect';
 import { create } from 'zustand';
 
 export type WsStatus = 'connecting' | 'open' | 'closed';
@@ -11,6 +12,9 @@ interface WsState {
 
 const BACKOFF_START_MS = 500;
 const BACKOFF_MAX_MS = 10_000;
+
+/** A frame as a message of the push channel; what does not decode (not JSON, an unknown type) is none. */
+const decodeFrame = Schema.decodeUnknownOption(Schema.fromJsonString(WsMessage));
 
 type Listener = (msg: WsMessage) => void;
 const listeners = new Map<WsMessage['type'], Set<Listener>>();
@@ -53,13 +57,9 @@ export const useWs = create<WsState>()((set, get) => {
       set({ status: 'open' });
     };
     ws.onmessage = (event) => {
-      let msg: WsMessage;
-      try {
-        msg = JSON.parse(String(event.data));
-      } catch {
-        return;
-      }
-      if (typeof msg !== 'object' || msg === null) return;
+      const decoded = decodeFrame(String(event.data));
+      if (Option.isNone(decoded)) return;
+      const msg = decoded.value;
       if (msg.type === 'ping') ws.send(JSON.stringify({ type: 'pong' } satisfies WsMessage));
       set({ lastMessage: msg });
       for (const fn of listeners.get(msg.type) ?? []) fn(msg);

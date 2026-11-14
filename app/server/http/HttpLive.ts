@@ -9,6 +9,7 @@ import { AppConfig } from '../config/AppConfig.ts';
 import { AppInfo } from '../config/AppInfo.ts';
 import { HealthHandlers } from '../health/http.ts';
 import { SettingsHandlers } from '../settings/http.ts';
+import { WsHub } from '../ws/WsHub.ts';
 import { guard } from './Guard.ts';
 import * as Static from './Static.ts';
 
@@ -50,11 +51,20 @@ export const serve = <A, E, R>(routes: Layer.Layer<A, E, R>) =>
     middleware: (app) => app.pipe(logDefects, guard),
   });
 
-/** The Node server on the configured address. A stop waits half a second for open connections, then cuts them. */
+/**
+ * How the Node server runs, on any address: a stop waits half a second for open connections, then cuts them; a client
+ * message over 4096 bytes closes its WebSocket with 1009 (`ws` does it).
+ */
+export const SERVER_OPTIONS = {
+  gracefulShutdownTimeout: '500 millis',
+  websocket: { maxPayload: 4096 },
+} as const;
+
+/** The Node server on the configured address. */
 const Server = Layer.unwrap(
   Effect.gen(function* () {
     const { host, port } = yield* AppConfig;
-    return NodeHttpServer.layer(createServer, { host, port, gracefulShutdownTimeout: '500 millis' });
+    return NodeHttpServer.layer(createServer, { host, port, ...SERVER_OPTIONS });
   }),
 );
 
@@ -71,6 +81,6 @@ const Ready = Layer.effectDiscard(
  * provided from outside (`App.ts`), so they are built before the port is opened.
  */
 export const HttpLive = Ready.pipe(
-  Layer.provideMerge(serve(Layer.merge(ApiRoutes, Static.layer))),
+  Layer.provideMerge(serve(Layer.mergeAll(ApiRoutes, WsHub.route, Static.layer))),
   Layer.provide(Server),
 );
