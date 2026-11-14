@@ -90,6 +90,9 @@ interface Start {
   readonly user: ChatMessage | null;
 }
 
+/** The error text of a reply whose run died before it was saved (the cause is logged). */
+const INTERNAL_ERROR = 'llama-webui: internal error';
+
 const replyInProgress = () => ReplyInProgress.make({ message: 'A reply is already in progress in this conversation' });
 const serverNotReady = () => ServerNotReady.make({ message: 'llama-server is not ready' });
 
@@ -172,8 +175,9 @@ export class ChatRuns extends Context.Service<
   /**
    * The replies: the text so far is written at most every `flushInterval`, each reply is asked of `target` (the
    * llama-server `chatTarget` finds by default). The replies a hard stop left `streaming` are marked `stopped` when the
-   * layer is built; when the app stops, a shutdown step saves every reply in progress `stopped` and ends its clients'
-   * streams, and the end of the layer interrupts what is left.
+   * layer is built; when the app stops, a shutdown step saves every reply in progress `stopped`, ends its clients'
+   * streams and refuses the sends that follow (`ServerNotReady`), and the end of the layer interrupts what is left. A
+   * run that dies is saved `error` with its text so far.
    */
   static readonly layerWith = (options: {
     readonly flushInterval: Duration.Input;
@@ -194,6 +198,8 @@ export class ChatRuns extends Context.Service<
 
         /** The runs by conversation: checked and registered in one step, so two sends at once give one run. */
         const runs = yield* SynchronizedRef.make<ReadonlyMap<number, Run>>(new Map());
+        /** Set by the shutdown step under the runs' lock: no run starts after it. */
+        const closing = yield* Ref.make(false);
 
         const withoutRun = (run: Run) =>
           SynchronizedRef.update(runs, (now) => {
@@ -308,8 +314,21 @@ export class ChatRuns extends Context.Service<
                 yield* withoutRun(run);
                 if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) {
                   yield* Effect.logError(`the reply of conversation ${run.conversationId} failed`, exit.cause);
+                  // Dead before it was saved: saved `error` with its text so far, its `done` ends the clients'
+                  // streams. Best-effort: a save that fails too leaves the row to the next start's `stopOrphans`.
+                  yield* save({
+                    run,
+                    outcome: { status: 'error', error: INTERNAL_ERROR },
+                    stats: Effect.undefined,
+                    leave: false,
+                  }).pipe(
+                    Effect.ignoreCause({
+                      log: true,
+                      message: `the failed reply of conversation ${run.conversationId} was not saved`,
+                    }),
+                  );
                 }
-                // Interrupted (the end of the layer) or dead before it was saved: its clients' streams end.
+                // Interrupted (the end of the layer) or unsaved after its death: its clients' streams end.
                 const { final } = yield* SynchronizedRef.get(run.written);
                 if (Exit.isFailure(exit) && Option.isNone(final)) yield* PubSub.shutdown(run.events);
                 yield* Deferred.succeed(run.ended, undefined);
@@ -352,13 +371,20 @@ export class ChatRuns extends Context.Service<
               ended: yield* Deferred.make<void>(),
             };
             const body = buildChatRequest(conversation, history);
-            yield* Effect.forkIn(consume(run, probeUrl(to.host, to.port), body, started), scope);
+            // A span of its own: the reply outlives the request that started it.
+            yield* Effect.forkIn(
+              consume(run, probeUrl(to.host, to.port), body, started).pipe(
+                Effect.withSpan('ChatRuns.reply', { root: true, attributes: { conversationId: id } }),
+              ),
+              scope,
+            );
             return [replyOf(run), new Map(now).set(id, run)] as const;
           });
 
         /**
          * `prepare` and the start in one step under the runs' lock, uninterrupted: the conversation exists, no run is
-         * in it, a server answers, then `prepare` stores what precedes the reply and the run is registered.
+         * in it, the app is not stopping, a server answers, then `prepare` stores what precedes the reply and the run
+         * is registered.
          */
         const starting = <E>(
           id: number,
@@ -368,6 +394,8 @@ export class ChatRuns extends Context.Service<
             Effect.gen(function* () {
               const conversation = yield* repo.get(id);
               if (now.has(id)) return yield* replyInProgress();
+              // The shutdown step saved the runs it found: a run started after it would not be saved `stopped`.
+              if (yield* Ref.get(closing)) return yield* serverNotReady();
               const to = yield* target;
               if (Option.isNone(to)) return yield* serverNotReady();
               const user = yield* prepare(conversation);
@@ -435,10 +463,13 @@ export class ChatRuns extends Context.Service<
         });
 
         // While the clients are still connected: every reply is stopped and saved `stopped` with its text so far, its
-        // `done` ends the clients' streams, and its run writes nothing after it.
+        // `done` ends the clients' streams, and its run writes nothing after it. The runs are read and closed in one
+        // step under their lock, so a send that comes after it (the HTTP server still serves) is refused.
         yield* shutdown.before(
           Effect.gen(function* () {
-            const now = yield* lockedRuns;
+            const now = yield* SynchronizedRef.modifyEffect(runs, (held) =>
+              Effect.as(Ref.set(closing, true), [held, held]),
+            );
             yield* Effect.forEach(
               now.values(),
               (run) =>

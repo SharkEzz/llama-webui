@@ -228,6 +228,57 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('ChatRuns', (it) 
     }),
   );
 
+  it.effect('a send after the shutdown step is ServerNotReady and stores nothing', () =>
+    Effect.gen(function* () {
+      const { llama, repo, conv, runs } = yield* setup();
+      const shutdown = yield* Shutdown;
+      yield* shutdown.run;
+      // The HTTP server still serves while the steps run: a reply started now would not be saved `stopped`.
+      const sent = yield* Effect.flip(runs.send(conv.id, 'Hi'));
+      assert.deepStrictEqual([sent._tag, sent.message], ['ServerNotReady', 'llama-server is not ready']);
+      const regenerated = yield* Effect.flip(runs.regenerate(conv.id));
+      assert.strictEqual(regenerated._tag, 'ServerNotReady');
+      const messages = yield* repo.messages(conv.id);
+      assert.deepStrictEqual(messages, []);
+      assert.strictEqual(llama.requests(), 0);
+      yield* noRunLeft(runs, conv.id);
+    }),
+  );
+
+  it.effect('a reply whose run dies is saved error with its text so far, and its stream ends with done', () =>
+    Effect.gen(function* () {
+      const llama = yield* chatStub;
+      const repo = yield* ConversationsRepo;
+      const conv = yield* repo.create({ profileId: null, modelPath: '/m.gguf' });
+      // The second write of the reply's text dies: the run dies mid-reply, the save after it succeeds.
+      const writes = yield* Ref.make(0);
+      const dying = ConversationsRepo.of({
+        ...repo,
+        updateMessage: (messageId, update) =>
+          Ref.updateAndGet(writes, (n) => n + 1).pipe(
+            Effect.flatMap((n) => (n === 2 ? Effect.die('the disk is gone') : repo.updateMessage(messageId, update))),
+          ),
+      });
+      const runs = yield* runsWith({ target: Effect.succeedSome(targetOf(llama)) }).pipe(
+        Effect.provideService(ConversationsRepo, dying),
+      );
+      const reply = yield* runs.send(conv.id, 'Hi');
+      const end = yield* toEnd(reply);
+      const listener = yield* follow(reply);
+      yield* llama.requested(1);
+      yield* llama.chunk({ content: 'Hel' });
+      yield* listener.got(2);
+      yield* llama.chunk({ content: 'lo' });
+      const done = yield* doneAt(end);
+      assert.deepStrictEqual([done.status, done.content, done.error], ['error', 'Hel', 'llama-webui: internal error']);
+      const a = yield* assistantOf(repo, conv.id);
+      assert.deepStrictEqual([a.status, a.content, a.error], ['error', 'Hel', 'llama-webui: internal error']);
+      // Its request was aborted with it.
+      yield* until(() => llama.aborted() === 1);
+      yield* noRunLeft(runs, conv.id);
+    }),
+  );
+
   it.effect('stopAndWait returns once the reply is saved stopped, after a start in flight', () =>
     Effect.gen(function* () {
       const { llama, repo, conv, runs } = yield* setup({ targetDelay: '50 millis' });
