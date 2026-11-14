@@ -17,6 +17,8 @@ const placeholder = (title: string, milestone?: string) => ({
   },
 });
 
+const chatPage = async () => (await import('@/features/chat/ChatPage')).ChatPage;
+
 /** The pages the Effect server serves again, each loaded on first visit. */
 const PORTED: Partial<Record<string, () => Promise<ComponentType>>> = {
   '/dashboard': async () => (await import('@/features/dashboard/DashboardPage')).DashboardPage,
@@ -26,6 +28,7 @@ const PORTED: Partial<Record<string, () => Promise<ComponentType>>> = {
   '/profiles': async () => (await import('@/features/profiles/ProfilesPage')).ProfilesPage,
   '/server': async () => (await import('@/features/server/ServerPage')).ServerPage,
   '/logs': async () => (await import('@/features/logs/LogsPage')).LogsPage,
+  '/chat': chatPage,
 };
 
 const pageOf = (r: AppRoute) => {
@@ -46,7 +49,7 @@ export const router = createBrowserRouter([
     children: [
       ...pages,
       { path: 'setup', ...placeholder('Setup', MILESTONE_BY_PATH['/']) },
-      { path: 'chat/:id', ...placeholder('Chat', MILESTONE_BY_PATH['/chat']) },
+      { path: 'chat/:id', lazy: { Component: chatPage } },
       { path: '*', ...placeholder('Page not found') },
     ],
   },

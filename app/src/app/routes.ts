@@ -50,7 +50,6 @@ export function navGroups<R extends { group: string }>(routes: readonly R[]): R[
 export const MILESTONE_BY_PATH: Record<string, string> = {
   '/': 'E8',
   '/models': 'E6',
-  '/chat': 'E5',
   '/bench': 'E7',
   '/tuning': 'E8',
 };

@@ -4,8 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ApiError } from '@/lib/api';
 import { useChat } from '@/lib/chat';
+import { type FieldErrors, fieldErrors } from './errors';
 import type { ServerProps } from './useServerProps';
 
 type Key = keyof Sampling;
@@ -39,7 +39,7 @@ export function SamplingPanel({ props }: { props: ServerProps | null }) {
 
 function SamplingForm({ current, props }: { current: ConversationDetail; props: ServerProps | null }) {
   const patch = useChat((s) => s.patch);
-  const [errors, setErrors] = useState<Partial<Record<Key | 'systemPrompt', string>>>({});
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [system, setSystem] = useState(current.systemPrompt);
   // The prompt changes in the store (save, another tab): the field follows it during render rather than in an effect,
   // unless it holds unsaved input (which wins and will be saved on blur).
@@ -55,8 +55,7 @@ function SamplingForm({ current, props }: { current: ConversationDetail; props: 
       await patch(p);
       setErrors((e) => ({ ...e, [field]: undefined }));
     } catch (e) {
-      const msg = e instanceof ApiError ? (e.issues[0]?.message ?? e.message) : String(e);
-      setErrors((old) => ({ ...old, [field]: msg }));
+      setErrors((old) => ({ ...old, ...fieldErrors(e, field) }));
     }
   };
 

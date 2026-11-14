@@ -9,8 +9,9 @@ import {
 import { toast } from 'sonner';
 import { ApiError } from '@/lib/api';
 import { EMPTY_FORM, formFromSpec, useBench } from '@/lib/bench';
-import { stem, useModels } from '@/lib/models';
+import { useModels } from '@/lib/models';
 import { createProfile, useProfiles } from '@/lib/profiles';
+import { stem } from '@/lib/stem';
 import { useTuning } from '@/lib/tuning';
 
 /** The profile's other flags minus those the estimate already sets (-c, --fit, --mlock, --numa…), values included. */

@@ -1,7 +1,7 @@
 import { Schema } from 'effect';
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from 'effect/http-api';
+import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { errorTag, makeCall } from './api';
+import { errorTag, makeCall, makeCallStream } from './api';
 
 class TestNotFound extends Schema.TaggedError<TestNotFound>()(
   'TestNotFound',
@@ -20,6 +20,13 @@ class TestApi extends HttpApi.make('test').add(
       error: TestNotFound,
     }),
     HttpApiEndpoint.post('create', '/t', { payload: Item, success: Item }),
+    HttpApiEndpoint.get('events', '/t/:id/events', {
+      params: { id: Schema.NumberFromString },
+      success: HttpApiSchema.StreamSse({
+        events: Schema.Struct({ event: Schema.String, data: Schema.fromJsonString(Item) }),
+      }),
+      error: TestNotFound,
+    }),
   ),
 ) {}
 
@@ -44,7 +51,7 @@ function stub(reply: (seen: Seen) => Promise<Response>) {
     seen.push(s);
     return reply(s);
   }) as typeof fetch;
-  return { call: makeCall(TestApi, fetchImpl), seen };
+  return { call: makeCall(TestApi, fetchImpl), callStream: makeCallStream(TestApi, fetchImpl), seen };
 }
 
 const json = (status: number, body: unknown) => () =>
@@ -111,5 +118,79 @@ test('call() passes its signal: an abort reaches fetch and rejects the call', as
   await vi.waitFor(() => expect(seen).toHaveLength(1));
   controller.abort();
   await expect(pending).rejects.toBeDefined();
+  expect(seen[0]?.init?.signal?.aborted).toBe(true);
+});
+
+const sse = (body: ReadableStream<Uint8Array>) => () =>
+  Promise.resolve(new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }));
+
+/** A body that sends `chunks` one per read, then ends, fails with `end`, or stays open (`'open'`). */
+function body(chunks: string[], end: 'close' | 'open' | Error = 'close') {
+  const left = [...chunks];
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      const chunk = left.shift();
+      if (chunk !== undefined) controller.enqueue(new TextEncoder().encode(chunk));
+      else if (end === 'close') controller.close();
+      else if (end !== 'open') controller.error(end);
+      else return new Promise<void>(() => {});
+    },
+  });
+}
+
+const item = (id: number) => `event: item\ndata: ${JSON.stringify({ id, name: `n${id}` })}\n\n`;
+
+test('callStream() gives each event of the stream in order and resolves at its end', async () => {
+  const { callStream } = stub(sse(body([item(1), item(2), item(3)])));
+  const seen: unknown[] = [];
+  await callStream(
+    (api) => api.t.events({ params: { id: 7 } }),
+    (e) => seen.push(e.data),
+  );
+  expect(seen).toEqual([
+    { id: 1, name: 'n1' },
+    { id: 2, name: 'n2' },
+    { id: 3, name: 'n3' },
+  ]);
+});
+
+test('callStream() rejects with the tagged error of the endpoint', async () => {
+  const { callStream } = stub(json(404, { _tag: 'TestNotFound', message: 'No item 7' }));
+  const onEvent = vi.fn();
+  const error = await callStream((api) => api.t.events({ params: { id: 7 } }), onEvent).catch((e: unknown) => e);
+  expect(errorTag(error)).toBe('TestNotFound');
+  expect((error as Error).message).toBe('No item 7');
+  expect(onEvent).not.toHaveBeenCalled();
+});
+
+test('callStream() rejects with ApiUnreachable when fetch rejects or the stream breaks off', async () => {
+  const refused = stub(() => Promise.reject(new TypeError('fetch failed')));
+  const error = await refused.callStream((api) => api.t.events({ params: { id: 7 } }), vi.fn()).catch((e) => e);
+  expect(errorTag(error)).toBe('ApiUnreachable');
+
+  const cut = stub(sse(body([item(1)], new TypeError('terminated'))));
+  const seen: unknown[] = [];
+  const broken = await cut
+    .callStream(
+      (api) => api.t.events({ params: { id: 7 } }),
+      (e) => seen.push(e.data),
+    )
+    .catch((e: unknown) => e);
+  expect(errorTag(broken)).toBe('ApiUnreachable');
+  expect(seen).toEqual([{ id: 1, name: 'n1' }]);
+});
+
+test('an abort ends callStream() without an error and aborts its request', async () => {
+  const { callStream, seen } = stub(sse(body([item(1)], 'open')));
+  const controller = new AbortController();
+  const events: unknown[] = [];
+  const pending = callStream(
+    (api) => api.t.events({ params: { id: 7 } }),
+    (e) => events.push(e.data),
+    { signal: controller.signal },
+  );
+  await vi.waitFor(() => expect(events).toHaveLength(1));
+  controller.abort();
+  await expect(pending).resolves.toBeUndefined();
   expect(seen[0]?.init?.signal?.aborted).toBe(true);
 });

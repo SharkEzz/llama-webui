@@ -1,15 +1,17 @@
 import {
+  type Api,
   type ChatEvent,
   type ChatMessage,
   type ConversationDetail,
   type ConversationPatch,
   type ConversationSummary,
   defer,
-  SseParser,
 } from '@llama-webui/shared';
+import { Effect, Stream } from 'effect';
+import type { HttpApiClient } from 'effect/http-api';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { ApiError, api, apiError, request } from './api';
+import { call, callStream, errorTag } from './api';
 
 /** Reply being written in the open conversation. */
 export interface Streaming {
@@ -20,7 +22,7 @@ export interface Streaming {
 }
 
 interface ChatState {
-  list: ConversationSummary[];
+  list: ReadonlyArray<ConversationSummary>;
   current: ConversationDetail | null;
   streaming: Streaming | null;
   loadList(): Promise<void>;
@@ -35,39 +37,19 @@ interface ChatState {
   stop(): Promise<void>;
 }
 
-/** Reads an SSE stream of ChatEvent to the end (or until aborted). */
-export async function readSse(
-  res: { readonly body: ReadableStream | null },
-  onEvent: (e: ChatEvent) => void,
-): Promise<void> {
-  const reader = res.body!.getReader();
-  const decoder = new TextDecoder();
-  const parser = new SseParser();
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) return;
-    for (const ev of parser.push(decoder.decode(value, { stream: true }))) onEvent(JSON.parse(ev.data) as ChatEvent);
-  }
-}
-
 /** Stream followed for the open conversation; aborting it does not stop generation on the server. */
 let follow: AbortController | null = null;
 
-type StreamReply = Response;
+/** A reply as an endpoint streams it: the events of the reply, or the endpoint's error. */
+type ReplyCall = (api: HttpApiClient.ForApi<typeof Api>) => Effect.Effect<Stream.Stream<ChatEvent, unknown>, unknown>;
 
-/** A stream request's reply: null for 204 (nothing running), otherwise read with `readSse`. */
-async function openStream(req: Promise<StreamReply>): Promise<StreamReply | null> {
-  const res = await req;
-  if (res.status === 204) return null;
-  if (!res.ok) throw apiError(res.status, await res.json().catch(() => null));
-  return res;
-}
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const replace = (messages: ReadonlyArray<ChatMessage>, m: ChatMessage) => messages.map((x) => (x.id === m.id ? m : x));
 
 export const useChat = create<ChatState>((set, get) => {
   /** Follows a stream: text accumulates and is pushed to the store only once per frame. */
-  const consume = async (conversationId: number, request: (signal: AbortSignal) => Promise<StreamReply | null>) => {
+  const consume = async (conversationId: number, reply: ReplyCall) => {
     follow?.abort();
     const ctl = new AbortController();
     follow = ctl;
@@ -121,8 +103,7 @@ export const useChat = create<ChatState>((set, get) => {
       }
     };
     try {
-      const res = await request(ctl.signal);
-      if (res) await readSse(res, onEvent);
+      await callStream(reply, onEvent, { signal: ctl.signal });
       // Stream ended without “done” (server restarted or cut off), or nothing running (204): reread the saved state.
       if (!ended && !ctl.signal.aborted) {
         if (get().streaming?.conversationId === conversationId) set({ streaming: null });
@@ -135,8 +116,9 @@ export const useChat = create<ChatState>((set, get) => {
     } catch (e) {
       if (!ctl.signal.aborted) {
         if (get().streaming?.conversationId === conversationId) set({ streaming: null });
-        if (e instanceof ApiError) toast.error(e.message);
-        else void get().open(conversationId); // connection lost: reread the saved state
+        // Connection lost: reread the saved state. Anything else is the endpoint's refusal.
+        if (errorTag(e) === 'ApiUnreachable') void get().open(conversationId);
+        else toast.error(message(e));
       }
     }
   };
@@ -148,9 +130,9 @@ export const useChat = create<ChatState>((set, get) => {
 
     loadList: async () => {
       try {
-        set({ list: await api('GET /api/chat') });
+        set({ list: await call((api) => api.chat.list()) });
       } catch (e) {
-        toast.error((e as Error).message);
+        toast.error(message(e));
       }
     },
 
@@ -164,18 +146,21 @@ export const useChat = create<ChatState>((set, get) => {
       follow?.abort();
       set({ streaming: null });
       try {
-        const c = await api('GET /api/chat/:id', { params: { id: id } });
+        const c = await call((api) => api.chat.get({ params: { id } }));
         set({ current: c });
+        // A 204 (the reply ended meanwhile) is an empty stream: the saved state is reread.
         if (c.live)
-          void consume(id, (signal) => openStream(request('GET /api/chat/:id/stream', { params: { id: id }, signal })));
+          void consume(id, (api) =>
+            api.chat.follow({ params: { id } }).pipe(Effect.map((reply) => reply ?? Stream.empty)),
+          );
       } catch (e) {
         set({ current: null });
-        toast.error((e as Error).message);
+        toast.error(message(e));
       }
     },
 
     create: async () => {
-      const c = await api('POST /api/chat', { body: {} });
+      const c = await call((api) => api.chat.create({ payload: {} }));
       follow?.abort();
       set({ current: c, streaming: null });
       void get().loadList();
@@ -185,24 +170,24 @@ export const useChat = create<ChatState>((set, get) => {
     patch: async (p) => {
       const cur = get().current;
       if (!cur) return;
-      const c = await api('PATCH /api/chat/:id', { params: { id: cur.id }, body: p });
+      const c = await call((api) => api.chat.patch({ params: { id: cur.id }, payload: p }));
       if (get().current?.id === c.id) set({ current: { ...get().current!, ...c, messages: get().current!.messages } });
       if (p.title) void get().loadList();
     },
 
     rename: async (id, title) => {
       try {
-        const c = await api('PATCH /api/chat/:id', { params: { id: id }, body: { title } });
+        const c = await call((api) => api.chat.patch({ params: { id }, payload: { title } }));
         const cur = get().current;
         if (cur?.id === id) set({ current: { ...cur, title: c.title } });
         await get().loadList();
       } catch (e) {
-        toast.error((e as Error).message);
+        toast.error(message(e));
       }
     },
 
     remove: async (id) => {
-      await api('DELETE /api/chat/:id', { params: { id: id } });
+      await call((api) => api.chat.remove({ params: { id } }));
       if (get().current?.id === id) {
         follow?.abort();
         set({ current: null, streaming: null });
@@ -213,23 +198,19 @@ export const useChat = create<ChatState>((set, get) => {
     send: async (text) => {
       const cur = get().current;
       if (!cur) return;
-      await consume(cur.id, (signal) =>
-        openStream(request('POST /api/chat/:id/messages', { params: { id: cur.id }, body: { content: text }, signal })),
-      );
+      await consume(cur.id, (api) => api.chat.send({ params: { id: cur.id }, payload: { content: text } }));
     },
 
     regenerate: async () => {
       const cur = get().current;
       if (!cur) return;
-      await consume(cur.id, (signal) =>
-        openStream(request('POST /api/chat/:id/regenerate', { params: { id: cur.id }, signal })),
-      );
+      await consume(cur.id, (api) => api.chat.regenerate({ params: { id: cur.id } }));
     },
 
     stop: async () => {
       const cur = get().current;
       if (!cur) return;
-      await api('POST /api/chat/:id/stop', { params: { id: cur.id } }).catch((e: Error) => toast.error(e.message));
+      await call((api) => api.chat.stop({ params: { id: cur.id } })).catch((e: unknown) => toast.error(message(e)));
     },
   };
 });
