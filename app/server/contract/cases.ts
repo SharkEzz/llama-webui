@@ -71,7 +71,7 @@ export interface Binaries {
 }
 
 /**
- * Every HTTP case, in run order: reads first, then what changes the settings, then the profiles, then the flag
+ * Every HTTP case, in run order: reads first (llama-server's commands among them), then what changes the settings, then the profiles, then the flag
  * catalogue of a fake llama-server and of one that is not there (so the reply does not depend on the machine's
  * `PATH`). `asset` is the path of a hashed file of the build (`ASSET`).
  */
@@ -85,6 +85,21 @@ export function cases(ctx: { asset: string } & Binaries): Case[] {
   add('read', 'GET /api/logs', bare('GET', '/api/logs'));
   add('read', 'GET /api/logs?since=0', bare('GET', '/api/logs?since=0'));
   add('violation', 'GET /api/logs?since=abc (not a line number)', bare('GET', '/api/logs?since=abc'));
+
+  // llama-server: none runs here, and nothing is ever launched (the start and the switch name no profile).
+  add('read', 'GET /api/server/state', bare('GET', '/api/server/state'));
+  add('read', 'GET /api/state', bare('GET', '/api/state'));
+  add('write', 'POST /api/server/stop (nothing runs)', bare('POST', '/api/server/stop'));
+  add('refusal', 'POST /api/server/start (no such profile)', json('POST', '/api/server/start', '{"profileId":999}'));
+  add('refusal', 'POST /api/server/switch (no such profile)', json('POST', '/api/server/switch', '{"profileId":999}'));
+  add('refusal', 'POST /api/server/restart (nothing launched)', bare('POST', '/api/server/restart'));
+  add('refusal', 'GET /api/server/props (not ready)', bare('GET', '/api/server/props'));
+  add('violation', 'POST /api/server/start (no profileId)', json('POST', '/api/server/start', '{}'));
+  add(
+    'violation',
+    'POST /api/server/start (profileId a string)',
+    json('POST', '/api/server/start', '{"profileId":"1"}'),
+  );
 
   // The guard: DNS rebinding (a domain as Host) and another site's page.
   add('guard', 'GET /api/health (foreign Origin)', bare('GET', '/api/health', { Origin: 'http://evil.example' }));

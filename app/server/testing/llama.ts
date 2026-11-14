@@ -174,3 +174,35 @@ function setVariable(name: string, value: string): () => void {
     else process.env[name] = saved;
   };
 }
+
+/** A JSON request to a running app; a status of 400 or more throws with the reply's text. */
+async function call(base: string, method: string, path: string, body?: unknown): Promise<unknown> {
+  const res = await fetch(`${base}${path}`, {
+    method,
+    ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+  });
+  const text = await res.text();
+  if (res.status >= 400) throw new Error(`${method} ${path}: ${res.status} ${text}`);
+  return text === '' ? undefined : JSON.parse(text);
+}
+
+/**
+ * A profile of the fake on a free port, started through the API of the app at `base` (the build, `vite dev`), as the
+ * web starts one: the `binary` setting set to the fake, the profile created, then `/api/server/start`. Resolves with
+ * llama-server's pid once the state says `ready` (5 s at most).
+ */
+export async function startFakeThrough(base: string): Promise<number> {
+  await call(base, 'PATCH', '/api/settings', { binary: FAKE });
+  const port = await freePortAsync();
+  const profile = (await call(base, 'POST', '/api/profiles', { name: `fake ${port}`, model: 'm.gguf', port })) as {
+    id: number;
+  };
+  await call(base, 'POST', '/api/server/start', { profileId: profile.id });
+  const t0 = performance.now();
+  for (;;) {
+    const { state } = (await call(base, 'GET', '/api/server/state')) as { state: { kind: string; pid?: number } };
+    if (state.kind === 'ready' && state.pid !== undefined) return state.pid;
+    if (performance.now() - t0 > 5000) throw new Error(`llama-server is not ready: ${JSON.stringify(state)}`);
+    await new Promise((done) => setTimeout(done, 20));
+  }
+}

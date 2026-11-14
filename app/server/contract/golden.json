@@ -75,6 +75,125 @@
       ]
     }
   },
+  "GET /api/server/state": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "state": {
+        "kind": "idle"
+      },
+      "command": null,
+      "profileId": null
+    }
+  },
+  "GET /api/state": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "server": {
+        "state": {
+          "kind": "idle"
+        },
+        "command": null,
+        "profileId": null
+      },
+      "logSeq": 0,
+      "bootId": "<bootId>"
+    }
+  },
+  "POST /api/server/stop (nothing runs)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "state": {
+        "kind": "idle"
+      },
+      "command": null,
+      "profileId": null
+    }
+  },
+  "POST /api/server/start (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "POST /api/server/switch (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "POST /api/server/restart (nothing launched)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "NoProfileToRestart",
+      "message": "No profile to restart"
+    }
+  },
+  "GET /api/server/props (not ready)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ServerNotReady",
+      "message": "Server not ready"
+    }
+  },
+  "POST /api/server/start (no profileId)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Missing key (profileId)",
+      "issues": [
+        {
+          "path": [
+            "profileId"
+          ],
+          "message": "Missing key"
+        }
+      ]
+    }
+  },
+  "POST /api/server/start (profileId a string)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected number (profileId)",
+      "issues": [
+        {
+          "path": [
+            "profileId"
+          ],
+          "message": "Expected number"
+        }
+      ]
+    }
+  },
   "GET /api/health (foreign Origin)": {
     "status": 403,
     "headers": {

@@ -10,6 +10,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
 import { devCopy } from './testing/devCopy.ts';
 import { freePort, userEnv } from './testing/launch.ts';
+import { startFakeThrough } from './testing/llama.ts';
 import { seedWatchPort } from './testing/seed.ts';
 import { tempDir } from './testing/tempDir.ts';
 import { openWs } from './testing/ws.ts';
@@ -68,6 +69,8 @@ function tree(pid: number): number[] {
 
 const health = async (base: string) => (await fetch(`${base}/api/health`)).json() as Promise<{ bootId: string }>;
 const bootId = async (base: string) => (await health(base)).bootId;
+const serverKind = async (base: string) =>
+  ((await (await fetch(`${base}/api/server/state`)).json()) as { state: { kind: string } }).state.kind;
 
 /**
  * Starts `vite dev` in the copy on a free port (or the `.env`'s, with `LLAMA_WEBUI_PORT: undefined`), with `env` over
@@ -173,6 +176,7 @@ function sharedDev(): Dev {
 
 test('saving a server file restarts the server', async () => {
   const dev = sharedDev();
+  const pid = await startFakeThrough(dev.base);
   const before = await bootId(dev.base);
   let booted = '';
   await edited('server/health/http.ts', () =>
@@ -186,6 +190,9 @@ test('saving a server file restarts the server', async () => {
       dev,
     ),
   );
+  // The old server stopped its llama-server; the new one runs none.
+  expect(isAlive(pid)).toBe(false);
+  expect(await serverKind(dev.base)).toBe('idle');
   // Restoring the file is a second save, a second restart: settled before the next test.
   await until('the boot after the restore', async () => (await bootId(dev.base)) !== booted, 30_000, dev);
 }, 90_000);
@@ -232,9 +239,11 @@ test('in dev, without Effect DevTools, a restart does not wait for them', async 
 test('one SIGINT stops vite dev and the server', async () => {
   const dev = sharedDev();
   started.add(dev);
+  const llama = await startFakeThrough(dev.base);
   const pids = tree(dev.proc.pid ?? 0);
-  // Vite, `node --watch` and the server.
-  expect(pids.length).toBeGreaterThanOrEqual(3);
+  // Vite, `node --watch`, the server and its llama-server.
+  expect(pids.length).toBeGreaterThanOrEqual(4);
+  expect(pids).toContain(llama);
   dev.proc.kill('SIGINT');
   expect(await stopped(dev, pids, 5000)).toBeLessThan(5000);
 }, 30_000);
@@ -255,7 +264,10 @@ test('one SIGINT with a page open (/ws) stops at once', async () => {
 
 test('two quick SIGINTs still stop the server', async () => {
   const dev = await startDev();
+  const llama = await startFakeThrough(dev.base);
   const pids = tree(dev.proc.pid ?? 0);
+  // No llama-server left either.
+  expect(pids).toContain(llama);
   dev.proc.kill('SIGINT');
   await sleep(20);
   dev.proc.kill('SIGINT');

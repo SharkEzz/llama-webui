@@ -8,6 +8,7 @@ import type { Readable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, expect, test } from 'vitest';
 import { freePort, LAUNCHER, launch, userEnv } from './testing/launch.ts';
+import { startFakeThrough } from './testing/llama.ts';
 import { tempDir } from './testing/tempDir.ts';
 import { openWs } from './testing/ws.ts';
 
@@ -149,6 +150,27 @@ test('SIGTERM with the UI open stops in under 2 s', async () => {
   expect(performance.now() - t0).toBeLessThan(2000);
   expect(code).toBe(0);
   expect((await client.closed).code).toBe(1001);
+}, 30_000);
+
+test('SIGTERM with llama-server running stops it and exits 0 in under 2 s', async () => {
+  const data = dataDir();
+  {
+    await using app = await launch({ dataDir: data });
+    const pid = await startFakeThrough(app.base);
+    const client = await openWs(`${app.base.replace('http', 'ws')}/ws`);
+    await client.next();
+    const t0 = performance.now();
+    app.proc.kill('SIGTERM');
+    const code = await app.exited;
+    expect(performance.now() - t0).toBeLessThan(2000);
+    expect(code).toBe(0);
+    expect((await client.closed).code).toBe(1001);
+    expect(alive(pid)).toBe(false);
+  }
+  // The data folder opens again, the profile in it.
+  await using again = await launch({ dataDir: data });
+  const profiles = (await (await fetch(`${again.base}/api/profiles`)).json()) as unknown[];
+  expect(profiles).toHaveLength(1);
 }, 30_000);
 
 test('a data directory of the Nitro server opens untouched', async () => {

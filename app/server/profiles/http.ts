@@ -3,6 +3,7 @@ import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import { attachment } from '../http/attachment.ts';
 import type { SettingsRepo } from '../settings/SettingsRepo.ts';
+import type { Supervisor } from '../supervisor/Supervisor.ts';
 import { ProfilesRepo } from './ProfilesRepo.ts';
 import { removeProfile } from './removeProfile.ts';
 
@@ -16,7 +17,7 @@ export const ProfilesHandlers = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const repo = yield* ProfilesRepo;
     // Taken when the routes are built, as `repo`: a handler then needs nothing from the request.
-    const services = yield* Effect.context<ProfilesRepo | SettingsRepo>();
+    const services = yield* Effect.context<ProfilesRepo | SettingsRepo | Supervisor>();
 
     /** Each valid profile of any JSON, created with source `import`; the parser's rejections come first. */
     const importFile = Effect.fn('ProfilesHandlers.importFile')(function* (payload: unknown) {

@@ -4,6 +4,7 @@ import { HealthApi } from './HealthApi.ts';
 import { LogsApi } from './LogsApi.ts';
 import { ProfilesApi } from './ProfilesApi.ts';
 import { RequestErrors } from './RequestErrors.ts';
+import { ServerApi } from './ServerApi.ts';
 import { SettingsApi } from './SettingsApi.ts';
 
 /**
@@ -18,5 +19,6 @@ export class Api extends HttpApi.make('llama-webui')
   .add(ProfilesApi)
   .add(FlagsApi)
   .add(LogsApi)
+  .add(ServerApi)
   .annotate(HttpApi.PayloadParseOptions, { onExcessProperty: 'error', errors: 'all' })
   .middleware(RequestErrors) {}

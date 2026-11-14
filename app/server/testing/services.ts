@@ -15,9 +15,9 @@ import { WsHub } from '../ws/WsHub.ts';
 /**
  * The services the routes use, as `App.ts` builds them, on a new in-memory database and the Node platform (the flag
  * catalogue runs llama-server); and the answer to a request that does not decode, which `HttpApiTest.groups` needs as
- * the server's routes do.
+ * the server's routes do. The supervisor polls `/health` every 50 ms, and sends SIGKILL 1 s after SIGTERM.
  */
-export const ServicesTest = Supervisor.layer.pipe(
+export const ServicesTest = Supervisor.layerWith({ killTimeout: '1 second', healthPoll: '50 millis' }).pipe(
   Layer.provideMerge(Flags.layer),
   Layer.provideMerge(Layer.merge(LogRing.layer, LlamaHttp.layer)),
   Layer.provideMerge(Layer.mergeAll(WsHub.layer, SettingsRepo.layer, ProfilesRepo.layer, RequestErrorsLive)),

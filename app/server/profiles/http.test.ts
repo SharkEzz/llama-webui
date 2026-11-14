@@ -1,12 +1,14 @@
 import { assert, describe, layer } from '@effect/vitest';
-import { Api, Profile, type ProfileInput, ProfilesFile } from '@llama-webui/shared';
-import { Array as Arr, Effect, Layer, Option, Schema, String as Str } from 'effect';
+import { Api, Profile, type ProfileInput, ProfilesFile, type ServerState } from '@llama-webui/shared';
+import { Array as Arr, Effect, Fiber, Layer, Option, Schedule, Schema, String as Str } from 'effect';
 import { HttpClient, HttpClientRequest, HttpServer } from 'effect/http';
 import { HttpApiTest } from 'effect/http-api';
 import { SqlClient } from 'effect/sql';
 import { ApiRoutes, serve } from '../http/HttpLive.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
+import { Supervisor } from '../supervisor/Supervisor.ts';
 import { ServerTest } from '../testing/http.ts';
+import { FAKE, freePort } from '../testing/llama.ts';
 import { ServicesTest } from '../testing/services.ts';
 import { ProfilesHandlers } from './http.ts';
 import { ProfilesRepo } from './ProfilesRepo.ts';
@@ -44,6 +46,13 @@ const Refused = Schema.TaggedStruct('RequestInvalid', {
 });
 
 const notFound = { _tag: 'ProfileNotFound', message: 'Profile not found' };
+
+/** Waits until the supervisor is in `kind` (looked at every 10 ms, for 5 s at most). */
+const stateWhen = (supervisor: Supervisor['Service'], kind: ServerState['kind']) =>
+  supervisor.state.pipe(
+    Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (state) => state.kind === kind }),
+    Effect.timeout('5 seconds'),
+  );
 
 /** The smallest valid input. */
 const input = (name: string, more: Partial<ProfileInput> = {}): ProfileInput => ({
@@ -260,6 +269,49 @@ describe('ProfilesApi', () => {
         );
         assert.strictEqual(saved.status, 400);
       }),
+    );
+  });
+
+  // On the real clock: the supervisor polls `/health` and the test waits on its states.
+  layer(Served, { excludeTestServices: true })('over HTTP, with llama-server', (it) => {
+    it.effect(
+      'deleting the profile of the running server is a 409 ProfileRunning while starting, ready or stopping; after the stop it is deleted',
+      () =>
+        Effect.gen(function* () {
+          const repo = yield* ProfilesRepo;
+          const settings = yield* SettingsRepo;
+          const supervisor = yield* Supervisor;
+          yield* settings.patch({ binary: FAKE });
+          const port = yield* freePort;
+          // Slow to load, and deaf to SIGTERM: each state lasts long enough to be tried.
+          const profile = yield* repo.create(
+            input('Running', { port, env: { FAKE_LOAD_MS: '300', FAKE_IGNORE_TERM: '1' } }),
+          );
+          const running = {
+            _tag: 'ProfileRunning',
+            message: 'This profile belongs to the running server: stop it first',
+          };
+          const refused = (kind: ServerState['kind']) =>
+            Effect.gen(function* () {
+              const state = yield* supervisor.state;
+              const reply = yield* send('DELETE', `/api/profiles/${profile.id}`);
+              assert.strictEqual(state.kind, kind);
+              assert.deepStrictEqual([reply.status, reply.json], [409, running], kind);
+            });
+          const started = yield* send('POST', '/api/server/start', `{"profileId":${profile.id}}`);
+          assert.strictEqual(started.status, 202);
+          yield* refused('starting');
+          yield* stateWhen(supervisor, 'ready');
+          yield* refused('ready');
+          const stopping = yield* Effect.forkChild(send('POST', '/api/server/stop'));
+          yield* stateWhen(supervisor, 'stopping');
+          yield* refused('stopping');
+          yield* Fiber.join(stopping);
+          const removed = yield* send('DELETE', `/api/profiles/${profile.id}`);
+          assert.strictEqual(removed.status, 204);
+          const gone = yield* send('GET', `/api/profiles/${profile.id}`);
+          assert.strictEqual(gone.status, 404);
+        }),
     );
   });
 
