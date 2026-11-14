@@ -1,8 +1,8 @@
 // Topology page: hardware graph (sysfs), model placement (llama-server logs) and inference phase.
 // DOM-free module: shared by the server and the UI.
 
-import type { Snapshot } from './monitor';
-import type { ServerState } from './server';
+import type { Snapshot } from './monitor.ts';
+import type { ServerState } from './server.ts';
 
 export type TopologyNodeKind = 'cpu' | 'ram' | 'nvme' | 'gpu' | 'chipset';
 

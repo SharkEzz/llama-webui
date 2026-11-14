@@ -1,7 +1,7 @@
 {
   // Runs in Node and in the browser bundle. Node types for its tests and for the globals both have (URL…); no DOM, so
-  // a browser-only API fails here.
+  // a browser-only API fails here. Node runs the sources as they are (type stripping): erasable syntax only.
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "types": ["node"] },
+  "compilerOptions": { "types": ["node"], "erasableSyntaxOnly": true },
   "include": ["src"]
 }

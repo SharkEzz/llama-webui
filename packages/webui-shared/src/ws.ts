@@ -1,10 +1,10 @@
-import type { BenchLive, BenchRun } from './bench';
-import type { DownloadItem, DownloadLive } from './hf';
-import type { LogLine } from './logs';
-import type { Snapshot } from './monitor';
-import type { ServerView } from './server';
-import type { Sweep, SweepLive } from './sweep';
-import type { ModelPlacement } from './topology';
+import type { BenchLive, BenchRun } from './bench.ts';
+import type { DownloadItem, DownloadLive } from './hf.ts';
+import type { LogLine } from './logs.ts';
+import type { Snapshot } from './monitor.ts';
+import type { ServerView } from './server.ts';
+import type { Sweep, SweepLive } from './sweep.ts';
+import type { ModelPlacement } from './topology.ts';
 
 /** Messages exchanged over the /ws WebSocket. */
 export type WsMessage =

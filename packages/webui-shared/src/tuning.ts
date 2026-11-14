@@ -1,5 +1,5 @@
-import type { BenchDevice, BenchParams, CacheType } from './bench';
-import type { CpuInfo } from './monitor';
+import type { BenchDevice, BenchParams, CacheType } from './bench.ts';
+import type { CpuInfo } from './monitor.ts';
 
 export type PresetId = 'chat' | 'agent' | 'context' | 'fit' | 'big';
 

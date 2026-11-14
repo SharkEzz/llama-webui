@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { parseProfileImport } from './profile';
+import { parseProfileImport } from './profile.ts';
 
 test('llama-tui import: whole config', async () => {
   const raw = JSON.parse(await readFile(join(import.meta.dirname, '../../../testdata/llama-tui-config.json'), 'utf8'));

@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
-import type { BenchRun, Measure } from './bench';
-import { withCtx } from './bench';
-import { expandSpace, itemLabel, rankRuns, SweepSpecSchema, sweepCtx } from './sweep';
-import { presetOf } from './tuning';
+import type { BenchRun, Measure } from './bench.ts';
+import { withCtx } from './bench.ts';
+import { expandSpace, itemLabel, rankRuns, SweepSpecSchema, sweepCtx } from './sweep.ts';
+import { presetOf } from './tuning.ts';
 
 test('expandSpace crosses the dimensions in field order and applies -ts only where it fits', () => {
   const { items, droppedTs } = expandSpace(

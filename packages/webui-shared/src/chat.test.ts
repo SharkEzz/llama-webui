@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { autoTitle, contextUsed, DEFAULT_TITLE, isDefaultTitle, statsFromTimings } from './chat';
+import { autoTitle, contextUsed, DEFAULT_TITLE, isDefaultTitle, statsFromTimings } from './chat.ts';
 
 test('statsFromTimings maps llama-server timings', () => {
   const t = {

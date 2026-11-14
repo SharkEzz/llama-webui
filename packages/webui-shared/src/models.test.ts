@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { profileModelPath } from './models';
+import { profileModelPath } from './models.ts';
 
 test('profileModelPath fills an empty cwd with models_dir and keeps paths relative under the cwd', () => {
   const abs = '/h/Modèles/q/a.gguf';

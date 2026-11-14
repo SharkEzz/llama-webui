@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { DownloadRequestSchema, parseHfInput, vramFit } from './hf';
+import { DownloadRequestSchema, parseHfInput, vramFit } from './hf.ts';
 
 describe('parseHfInput', () => {
   test('empty and free text', () => {

@@ -1,5 +1,5 @@
-import type { BenchDevice } from './bench';
-import type { FitVerdict } from './tuning';
+import type { BenchDevice } from './bench.ts';
+import type { FitVerdict } from './tuning.ts';
 
 /** First-run checklist: what llama-webui needs, and what makes it work better. */
 export interface SetupReport {

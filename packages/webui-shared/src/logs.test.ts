@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { type LogLine, type LogView, mergeLogs, onBoot } from './logs';
+import { type LogLine, type LogView, mergeLogs, onBoot } from './logs.ts';
 
 const line = (seq: number): LogLine => ({ seq, text: `l${seq}`, level: 'info', kind: 'other' });
 const view = (seqs: number[], extra: Partial<LogView> = {}): LogView => ({
