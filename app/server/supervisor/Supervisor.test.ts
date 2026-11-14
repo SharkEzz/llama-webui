@@ -17,6 +17,7 @@ import {
   Schedule,
   Scope,
   String as Str,
+  Stream,
 } from 'effect';
 import type { ChildProcessSpawner } from 'effect/process';
 import { LlamaHttp } from '../llama/LlamaHttp.ts';
@@ -616,6 +617,25 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
         assert.deepStrictEqual(views[1], ready);
         assert.deepStrictEqual(views[3], idle);
         assert.deepStrictEqual(idle, { state: { kind: 'idle' }, command: cmd.display, profileId: cmd.profileId });
+      }),
+    ),
+  );
+
+  it.effect('changes streams every new state in order', () =>
+    fresh()(
+      Effect.gen(function* () {
+        const supervisor = yield* Supervisor;
+        const changes = yield* supervisor.changes;
+        yield* startFake();
+        const ready = yield* stateWhen(kindIs('ready'));
+        yield* supervisor.stop;
+        const states = yield* changes.pipe(Stream.take(4), Stream.runCollect, Effect.timeout('5 seconds'));
+        assert.deepStrictEqual(
+          Arr.map(states, (state) => state.kind),
+          ['starting', 'ready', 'stopping', 'idle'],
+        );
+        assert.deepStrictEqual(states[1], ready);
+        yield* assertGone(pidOf(ready));
       }),
     ),
   );

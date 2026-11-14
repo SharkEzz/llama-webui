@@ -1,6 +1,6 @@
 import { assert, layer } from '@effect/vitest';
-import type { WsMessage } from '@llama-webui/shared';
-import { Array as Arr, Context, Effect, Layer, Ref, Schedule } from 'effect';
+import type { LogLine, WsMessage } from '@llama-webui/shared';
+import { Array as Arr, Context, Effect, Layer, Ref, Schedule, Stream } from 'effect';
 import { WsHub } from '../ws/WsHub.ts';
 import { LogRing } from './LogRing.ts';
 
@@ -68,6 +68,39 @@ layer(ringOf(10_000), { excludeTestServices: true, buildPerTest: true })('LogRin
         Effect.repeat({ schedule: Schedule.spaced('5 millis'), until: (got) => got.length >= 10 }),
       );
       assert.deepStrictEqual(all, Arr.range(0, 9));
+    }),
+  );
+
+  it.effect('batches streams what is published, from the subscription on', () =>
+    Effect.gen(function* () {
+      const ring = yield* LogRing;
+      const published = yield* Published;
+      const logs = Effect.map(
+        Ref.get(published),
+        Arr.flatMap((message) => (message.type === 'log' ? [message.payload] : [])),
+      );
+      yield* ring.push('before');
+      // Published already: the subscription comes after it.
+      yield* logs.pipe(Effect.repeat({ schedule: Schedule.spaced('5 millis'), until: (got) => got.length >= 1 }));
+      const batches = yield* ring.batches;
+      yield* pushAll(['after 1', 'after 2', 'after 3']);
+      const streamed = yield* batches.pipe(
+        Stream.mapAccum(
+          () => 0,
+          (seen, batch: ReadonlyArray<LogLine>) => [seen + batch.length, [{ batch, seen: seen + batch.length }]],
+        ),
+        Stream.takeUntil(({ seen }) => seen >= 3),
+        Stream.map(({ batch }) => batch),
+        Stream.runCollect,
+        Effect.timeout('5 seconds'),
+      );
+      assert.deepStrictEqual(
+        Arr.map(Arr.flatten(streamed), (line) => line.text),
+        ['after 1', 'after 2', 'after 3'],
+      );
+      // The same batches as the log messages that followed the subscription.
+      const after = yield* logs;
+      assert.deepStrictEqual(Arr.drop(after, 1), streamed);
     }),
   );
 });

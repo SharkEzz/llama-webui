@@ -1,5 +1,16 @@
 import { classifyLine, type LogLine } from '@llama-webui/shared';
-import { Array as Arr, Context, Effect, Layer, Option, Queue, SynchronizedRef } from 'effect';
+import {
+  Array as Arr,
+  Context,
+  Effect,
+  Layer,
+  Option,
+  PubSub,
+  Queue,
+  type Scope,
+  Stream,
+  SynchronizedRef,
+} from 'effect';
 import { WsHub } from '../ws/WsHub.ts';
 
 /** The lines held and the number of the next one. */
@@ -18,9 +29,14 @@ export class LogRing extends Context.Service<
     readonly since: (seq: number) => Effect.Effect<ReadonlyArray<LogLine>>;
     /** The number of the next line. */
     readonly seq: Effect.Effect<number>;
+    /** Each batch published as a `log` message from the subscription on; subscribed when the effect runs. */
+    readonly batches: Effect.Effect<Stream.Stream<ReadonlyArray<LogLine>>, never, Scope.Scope>;
   }
 >()('@llama-webui/app/server/logs/LogRing') {
-  /** A ring of the last `capacity` lines; a fiber publishes what was pushed since its last turn as one `log` message. */
+  /**
+   * A ring of the last `capacity` lines; a fiber publishes what was pushed since its last turn as one `log` message,
+   * then to `batches`.
+   */
   static readonly layerWith = (options: { readonly capacity: number }) =>
     Layer.effect(
       LogRing,
@@ -28,9 +44,12 @@ export class LogRing extends Context.Service<
         const hub = yield* WsHub;
         const held = yield* SynchronizedRef.make<Held>({ lines: [], next: 0 });
         const unpublished = yield* Queue.unbounded<LogLine>();
+        const published = yield* PubSub.unbounded<ReadonlyArray<LogLine>>();
 
         yield* Queue.takeAll(unpublished).pipe(
-          Effect.flatMap((batch) => hub.publish({ type: 'log', payload: batch })),
+          Effect.flatMap((batch) =>
+            hub.publish({ type: 'log', payload: batch }).pipe(Effect.andThen(PubSub.publish(published, batch))),
+          ),
           Effect.forever,
           Effect.forkScoped,
         );
@@ -54,7 +73,12 @@ export class LogRing extends Context.Service<
           return Arr.drop(lines, seq - first);
         });
 
-        return { push, since, seq: Effect.map(SynchronizedRef.get(held), (h) => h.next) };
+        return {
+          push,
+          since,
+          seq: Effect.map(SynchronizedRef.get(held), (h) => h.next),
+          batches: Effect.map(PubSub.subscribe(published), Stream.fromSubscription),
+        };
       }),
     );
 

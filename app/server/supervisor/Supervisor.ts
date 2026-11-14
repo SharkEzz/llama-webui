@@ -19,6 +19,7 @@ import {
   Option,
   type Path,
   Predicate,
+  PubSub,
   Ref,
   Scope,
   Semaphore,
@@ -108,6 +109,8 @@ export class Supervisor extends Context.Service<
     /** The last command launched (kept after a stop), none before any launch. */
     readonly lastCommand: Effect.Effect<Option.Option<BuiltCommand>>;
     readonly view: Effect.Effect<ServerView>;
+    /** Every new state from the subscription on, in the order of the changes; subscribed when the effect runs. */
+    readonly changes: Effect.Effect<Stream.Stream<ServerState>, never, Scope.Scope>;
     readonly start: (cmd: BuiltCommand) => Effect.Effect<void, OperationInProgress | ServerAlreadyRunning | PortInUse>;
     /** Stops the managed server, then launches `cmd`, as one operation. */
     readonly switchTo: (cmd: BuiltCommand) => Effect.Effect<void, OperationInProgress | PortInUse>;
@@ -150,6 +153,7 @@ export class Supervisor extends Context.Service<
           proc: Option.none(),
         });
         const lock = yield* Semaphore.make(1);
+        const states = yield* PubSub.unbounded<ServerState>();
 
         // Last resort: an exit of llama-webui without its finalizers (an uncaught error) still kills llama-server.
         // A plain variable, read by a synchronous handler.
@@ -174,8 +178,9 @@ export class Supervisor extends Context.Service<
 
         /**
          * The one way the state changes: `f` sees what is held and answers what to hold instead, or none (the state is
-         * no longer the one its caller saw). A new state is published as `server-state`, under the same lock: the
-         * clients get the states in the order they happened. Answers whether `f` changed anything.
+         * no longer the one its caller saw). A new state is published as `server-state` and to `changes`, under the
+         * same lock: the clients and the subscribers get the states in the order they happened. Answers whether `f`
+         * changed anything.
          */
         const change = (f: (now: Held) => Option.Option<Held>): Effect.Effect<boolean> =>
           SynchronizedRef.modifyEffect(held, (now) =>
@@ -184,7 +189,9 @@ export class Supervisor extends Context.Service<
               onSome: (next) =>
                 (next.state === now.state
                   ? Effect.void
-                  : hub.publish({ type: 'server-state', payload: viewOf(next) })
+                  : hub
+                      .publish({ type: 'server-state', payload: viewOf(next) })
+                      .pipe(Effect.andThen(PubSub.publish(states, next.state)))
                 ).pipe(Effect.as([true, next] as const)),
             }),
           );
@@ -492,6 +499,7 @@ export class Supervisor extends Context.Service<
           state: Effect.map(SynchronizedRef.get(held), (h) => h.state),
           lastCommand: Effect.map(SynchronizedRef.get(held), (h) => h.last),
           view: Effect.map(SynchronizedRef.get(held), viewOf),
+          changes: Effect.map(PubSub.subscribe(states), Stream.fromSubscription),
           start,
           switchTo,
           stop,
