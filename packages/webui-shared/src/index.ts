@@ -15,6 +15,7 @@ export {
 export { FlagsApi, FlagsUnavailable } from './api/FlagsApi.ts';
 export { HealthApi } from './api/HealthApi.ts';
 export { LogsApi } from './api/LogsApi.ts';
+export { HistoryReply, MonitorApi, Topology } from './api/MonitorApi.ts';
 export {
   ImportResult,
   ProfileNameTaken,
@@ -34,7 +35,7 @@ export {
   ServerApi,
   ServerNotReady,
 } from './api/ServerApi.ts';
-export { SettingsApi, SettingsInvalid } from './api/SettingsApi.ts';
+export { SettingsApi, SettingsInvalid, SettingsPatched } from './api/SettingsApi.ts';
 export * from './bench.ts';
 export * from './chat.ts';
 export * from './dispose.ts';

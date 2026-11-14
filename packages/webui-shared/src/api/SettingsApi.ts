@@ -13,12 +13,16 @@ export class SettingsInvalid extends Schema.TaggedError<SettingsInvalid, { reado
   { httpApiStatus: 400 },
 ) {}
 
+/** The settings after a patch, with a warning when the monitor could not apply them (saved all the same). */
+export const SettingsPatched = Schema.Struct({ ...Settings.fields, warning: Schema.optionalKey(Schema.String) });
+export type SettingsPatched = typeof SettingsPatched.Type;
+
 export class SettingsApi extends HttpApiGroup.make('settings').add(
   HttpApiEndpoint.get('get', '/api/settings', { success: Settings }),
   HttpApiEndpoint.patch('patch', '/api/settings', {
     // Any object: the repository validates the merge, for the message of each field.
     payload: Schema.Record(Schema.String, Schema.Unknown),
-    success: Settings,
+    success: SettingsPatched,
     error: SettingsInvalid,
   }),
 ) {}

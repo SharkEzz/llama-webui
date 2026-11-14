@@ -504,7 +504,7 @@ function TankFill({ id, size, live, color, colors, smoother }: TankFillProps) {
 
 interface CoreGridProps {
   size: Vec3;
-  cores: number[];
+  cores: readonly number[];
   colors: SceneColors;
 }
 
