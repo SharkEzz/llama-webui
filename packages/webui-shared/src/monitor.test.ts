@@ -88,6 +88,13 @@ test('a snapshot with NaN does not encode', async () => {
   expect(Exit.isFailure(exit)).toBe(true);
 });
 
+test('a snapshot with a fractional busySlots encodes', async () => {
+  // `llamacpp:n_busy_slots_per_decode` is an average per llama_decode() call: 1.5 when the occupancy varies.
+  const fractional = { ...snapshot, queue: { processing: 2, deferred: 0, busySlots: 1.5 } };
+  const exit = await Effect.runPromiseExit(Schema.encodeUnknownEffect(Json)(fractional));
+  expect(Exit.isSuccess(exit)).toBe(true);
+});
+
 test('WsMessage takes a snapshot and a null placement', async () => {
   const decode = Schema.decodeUnknownEffect(WsMessage);
   expect(await Effect.runPromise(decode({ type: 'placement', payload: null }))).toStrictEqual({

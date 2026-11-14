@@ -183,7 +183,8 @@ export const Snapshot = Schema.Struct({
   rates: Schema.Struct({ genTps: Schema.Finite, ppTps: Schema.Finite }),
   slots: Schema.NullOr(Schema.Array(SlotView)),
   kv: Schema.NullOr(Schema.Struct({ usedTokens: Schema.Int, totalTokens: Schema.Int })),
-  queue: Schema.NullOr(Schema.Struct({ processing: Schema.Int, deferred: Schema.Int, busySlots: Schema.Int })),
+  /** `busySlots`: busy slots per llama_decode() call, an average (`llamacpp:n_busy_slots_per_decode`), so fractional. */
+  queue: Schema.NullOr(Schema.Struct({ processing: Schema.Int, deferred: Schema.Int, busySlots: Schema.Finite })),
   lastRequest: Schema.NullOr(RequestStats),
   spec: Schema.NullOr(SpecStats),
   /** Most recent first. */
