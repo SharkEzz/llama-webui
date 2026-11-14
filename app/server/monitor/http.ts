@@ -31,7 +31,9 @@ export const MonitorHandlers = HttpApiBuilder.group(
         busId,
         vramTotalBytes,
       }));
-      return { cpu: yield* cpu, gpus, nvidiaSource: monitor.nvidiaSource };
+      // Once the collectors are up: the source is chosen when they start.
+      const nvidiaSource = yield* monitor.nvidiaSource;
+      return { cpu: yield* cpu, gpus, nvidiaSource };
     }).pipe(Effect.withSpan('MonitorHandlers.systemInfo'));
 
     /** The hardware graph, read again on every call (the link state changes with power states), and the placement. */

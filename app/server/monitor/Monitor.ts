@@ -11,8 +11,10 @@ import {
   Clock,
   Config,
   Context,
+  Deferred,
   Duration,
   Effect,
+  Exit,
   Fiber,
   type FileSystem,
   Layer,
@@ -21,10 +23,11 @@ import {
   Predicate,
   Queue,
   Ref,
+  Scope,
   Semaphore,
 } from 'effect';
 import type { ChildProcessSpawner } from 'effect/process';
-import { Collectors, type CollectorsNotApplied, type DiskSource } from '../collectors/Collectors.ts';
+import { Collectors, CollectorsNotApplied, type DiskSource } from '../collectors/Collectors.ts';
 import type { NvmlSystem } from '../collectors/nvml/protocol.ts';
 import { homeDir } from '../config/Home.ts';
 import type { PciIds } from '../hardware/PciIds.ts';
@@ -88,38 +91,38 @@ export class Monitor extends Context.Service<
   {
     /** The last tick's snapshot; null before the first one. */
     readonly latest: Effect.Effect<Snapshot | null>;
+    /** The history; empty, of the configured shape, until the collectors are up. */
     readonly history: Effect.Effect<HistoryDump>;
-    /** The NVIDIA source chosen at startup. */
-    readonly nvidiaSource: NvidiaSource;
-    /** The driver's versions NVML reports; null with nvidia-smi or before NVML's first sample. */
+    /** The NVIDIA source chosen at startup, once the collectors are up (`nvidia-smi` when they could not start). */
+    readonly nvidiaSource: Effect.Effect<NvidiaSource>;
+    /** The driver's versions NVML reports, once the collectors are up; null with nvidia-smi or before NVML's first sample. */
     readonly nvmlSystem: Effect.Effect<NvmlSystem | null>;
     /**
-     * Follows the settings: the collectors first; only once they accepted them do the settings become current, the
-     * history is resized (its newest points kept) when its length or the interval changed, and the wait for the next
-     * tick follows the new interval.
+     * Follows the settings, once the collectors are up: the collectors first; only once they accepted them do the
+     * settings become current, the history is resized (its newest points kept) when its length or the interval
+     * changed, and the wait for the next tick follows the new interval.
      */
     readonly configure: (settings: MonitorSettings) => Effect.Effect<void, CollectorsNotApplied>;
   }
 >()('@llama-webui/app/server/monitor/Monitor') {
   /**
-   * The monitor on the collectors and the stored settings: a fiber of the layer's scope ticks at once, without holding
-   * the start of the app, then `pollIntervalMs` after the start of the previous tick (at once when it took longer),
-   * one tick at a time. With nvidia-smi, llama-server's VRAM per card is refreshed and awaited on the first tick of a
-   * pid, then in the background every `appsEvery` ticks. The model disk of a profile is looked up in the background,
-   * again `modelDiskRetry` after a miss. A tick that fails is logged and the next one still comes.
+   * The monitor on `collectors` and the stored settings. Building it returns at once (the API is ready before any
+   * snapshot exists): the collectors are built by a fiber of the layer's scope, in a scope of their own the end of the
+   * layer closes (their programs with it), and the ticks start once they are up. A failure to build them is logged and
+   * leaves the monitor without snapshots, every change of the settings refused. Each tick comes `pollIntervalMs` after
+   * the start of the previous one (at once when it took longer), one tick at a time. With nvidia-smi, llama-server's
+   * VRAM per card is refreshed and awaited on the first tick of a pid, then in the background every `appsEvery`
+   * ticks. The model disk of a profile is looked up in the background, again `modelDiskRetry` after a miss. A tick
+   * that fails is logged and the next one still comes.
    */
-  static readonly layerWith = (options: {
+  static readonly layerWith = <E, R>(options: {
     readonly modelDiskRetry: Duration.Input;
     readonly appsEvery: number;
-  }): Layer.Layer<
-    Monitor,
-    never,
-    Collectors | Supervisor | SettingsRepo | ProfilesRepo | WsHub | LlamaHttp | Path.Path
-  > =>
+    readonly collectors: Layer.Layer<Collectors, E, R>;
+  }): Layer.Layer<Monitor, never, R | Supervisor | SettingsRepo | ProfilesRepo | WsHub | LlamaHttp | Path.Path> =>
     Layer.effect(
       Monitor,
       Effect.gen(function* () {
-        const collectors = yield* Collectors;
         const supervisor = yield* Supervisor;
         const profiles = yield* ProfilesRepo;
         const hub = yield* WsHub;
@@ -136,6 +139,10 @@ export class Monitor extends Context.Service<
         /** Offered when the interval changes: the wait for the next tick starts over with it. */
         const wake = yield* Queue.sliding<void>(1);
         const lock = yield* Semaphore.make(1);
+        /** The collectors once they are up; failed when they could not be built. */
+        const ready = yield* Deferred.make<Collectors['Service'], CollectorsNotApplied>();
+        // Forked before the fiber that builds into it: the end of the layer interrupts the build, then closes it.
+        const collectorsScope = yield* Scope.fork(scope);
 
         const setModelDisk = (id: number, entry: ModelDisk) =>
           Ref.update(modelDisks, (known) => new Map(known).set(id, entry));
@@ -176,7 +183,12 @@ export class Monitor extends Context.Service<
           });
 
         /** The cards, after a refresh of llama-server's VRAM per card when one is due. */
-        const gpusOf = (pid: number | null, ticksForPid: number, hiddenGpus: ReadonlyArray<string>) =>
+        const gpusOf = (
+          collectors: Collectors['Service'],
+          pid: number | null,
+          ticksForPid: number,
+          hiddenGpus: ReadonlyArray<string>,
+        ) =>
           Effect.gen(function* () {
             if (pid !== null) {
               if (ticksForPid === 1) yield* collectors.nvidia.refreshApps;
@@ -186,7 +198,7 @@ export class Monitor extends Context.Service<
             return yield* collectGpus({ collectors, pid, hiddenGpus });
           });
 
-        const tick = Effect.gen(function* () {
+        const tick = Effect.fn('Monitor.tick')(function* (collectors: Collectors['Service']) {
           const { settings } = yield* Ref.get(held);
           const state = yield* supervisor.state;
           const active = activeOf(state);
@@ -207,7 +219,7 @@ export class Monitor extends Context.Service<
                 onNone: () => none,
                 onSome: (a) => readLlama(a.target).pipe(Effect.provideContext(context), orElse(null)),
               }),
-              gpusOf(pid, begun.ticksForPid, settings.hiddenGpus).pipe(orElse([])),
+              gpusOf(collectors, pid, begun.ticksForPid, settings.hiddenGpus).pipe(orElse([])),
               pid === null ? none : collectors.proc(pid).pipe(Effect.map(Option.getOrNull), orElse(null)),
               Option.isSome(active) && Option.isSome(system) ? system.value.memBw.procSample.pipe(orElse(null)) : none,
               Option.match(system, { onNone: () => none, onSome: (s) => s.sample.pipe(orElse(null)) }),
@@ -234,7 +246,7 @@ export class Monitor extends Context.Service<
           yield* Ref.set(memory, done.memory);
           yield* Ref.set(latest, done.snapshot);
           yield* hub.publish({ type: 'snapshot', payload: done.snapshot });
-        }).pipe(Effect.withSpan('Monitor.tick'));
+        });
 
         /** Until `pollIntervalMs` after `startedAt`, the interval read again whenever it changes. */
         const waitAfter = (startedAt: number): Effect.Effect<void> =>
@@ -249,19 +261,37 @@ export class Monitor extends Context.Service<
             if (changed) yield* waitAfter(startedAt);
           });
 
-        const round = Effect.gen(function* () {
-          const startedAt = yield* Clock.currentTimeMillis;
-          yield* tick.pipe(
-            Effect.catchCauseIf(Predicate.not(Cause.hasInterruptsOnly), (cause) =>
-              Effect.logError('monitoring tick', cause),
-            ),
+        const round = (collectors: Collectors['Service']) =>
+          Effect.gen(function* () {
+            const startedAt = yield* Clock.currentTimeMillis;
+            yield* tick(collectors).pipe(
+              Effect.catchCauseIf(Predicate.not(Cause.hasInterruptsOnly), (cause) =>
+                Effect.logError('monitoring tick', cause),
+              ),
+            );
+            yield* waitAfter(startedAt);
+          });
+
+        /** The collectors built into their scope, then the ticks; a build that fails leaves the monitor idle. */
+        const run = Effect.gen(function* () {
+          const built = yield* Layer.buildWithScope(options.collectors, collectorsScope).pipe(
+            Effect.map((services) => Context.get(services, Collectors)),
+            Effect.exit,
           );
-          yield* waitAfter(startedAt);
+          if (Exit.isFailure(built)) {
+            if (Cause.hasInterruptsOnly(built.cause)) return;
+            yield* Effect.logError('the collectors could not start: the monitor takes no snapshot', built.cause);
+            yield* Deferred.fail(ready, CollectorsNotApplied.make({ message: 'the collectors could not start' }));
+            return;
+          }
+          yield* Deferred.succeed(ready, built.value);
+          return yield* Effect.forever(round(built.value));
         });
-        yield* Effect.forkIn(Effect.forever(round), scope);
+        yield* Effect.forkIn(run, scope);
 
         const apply = (next: MonitorSettings) =>
           Effect.gen(function* () {
+            const collectors = yield* Deferred.await(ready);
             yield* collectors.configure(next);
             const intervalChanged = yield* Ref.modify(held, (h): readonly [boolean, Held] => {
               const before = h.settings;
@@ -287,8 +317,14 @@ export class Monitor extends Context.Service<
         return Monitor.of({
           latest: Ref.get(latest),
           history: Effect.flatMap(Ref.get(held), (h) => h.history.dump()),
-          nvidiaSource: collectors.nvidiaSource,
-          nvmlSystem: collectors.nvmlSystem,
+          nvidiaSource: Deferred.await(ready).pipe(
+            Effect.map((collectors) => collectors.nvidiaSource),
+            Effect.orElseSucceed((): NvidiaSource => 'nvidia-smi'),
+          ),
+          nvmlSystem: Deferred.await(ready).pipe(
+            Effect.flatMap((collectors) => collectors.nvmlSystem),
+            Effect.orElseSucceed(() => null),
+          ),
           configure,
         });
       }),
@@ -303,15 +339,15 @@ export class Monitor extends Context.Service<
     Monitor.of({
       latest: Effect.succeed(null),
       history: Effect.succeed({ intervalMs: 1000, capacity: 0, at: 0, times: [], series: {} }),
-      nvidiaSource: 'nvml',
+      nvidiaSource: Effect.succeed('nvml'),
       nvmlSystem: Effect.succeed(null),
       configure: () => Effect.void,
     }),
   );
 
   /**
-   * `LLAMA_WEBUI_TEST_MONITOR=stub` gives the stub; otherwise the monitor on the collectors built for it, which end
-   * right after it: the model disk retried every 30 s, the VRAM per card refreshed every 5 ticks.
+   * `LLAMA_WEBUI_TEST_MONITOR=stub` gives the stub; otherwise the monitor on the collectors it builds in the
+   * background, which end with it: the model disk retried every 30 s, the VRAM per card refreshed every 5 ticks.
    */
   static readonly layer: Layer.Layer<
     Monitor,
@@ -330,7 +366,7 @@ export class Monitor extends Context.Service<
       const mode = yield* Config.option(Config.String('LLAMA_WEBUI_TEST_MONITOR'));
       return Option.contains(mode, 'stub')
         ? Monitor.layerStub
-        : Monitor.layerWith({ modelDiskRetry: '30 seconds', appsEvery: 5 }).pipe(Layer.provide(Collectors.layer));
+        : Monitor.layerWith({ modelDiskRetry: '30 seconds', appsEvery: 5, collectors: Collectors.layer });
     }),
   );
 }

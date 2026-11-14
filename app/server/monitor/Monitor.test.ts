@@ -8,16 +8,17 @@ import {
   Context,
   type Duration,
   Effect,
-  type FileSystem,
+  FileSystem,
   Layer,
   Option,
-  type Path,
+  Path,
   Queue,
   Record as Rec,
   Ref,
   Schedule,
   Schema,
   type Scope,
+  String as Str,
 } from 'effect';
 import type { ChildProcessSpawner } from 'effect/process';
 import { Collectors, CollectorsNotApplied } from '../collectors/Collectors.ts';
@@ -82,6 +83,8 @@ interface Options {
   readonly patch?: Readonly<Record<string, unknown>>;
   /** The collectors as the monitor sees them. */
   readonly collectors?: (collectors: Collectors['Service']) => Collectors['Service'];
+  /** The NVML sampler the collectors start (with `collectors.nvml` on in `patch`). */
+  readonly nvmlCommand?: { readonly cmd: string; readonly args: ReadonlyArray<string> };
 }
 
 /** The settings of the test: every 250 ms, 30 s of history (120 points), NVML off. */
@@ -105,6 +108,7 @@ const withMonitor = <A, E>(
       nvmlLib: Option.some(`${MISSING}/libnvidia-ml.so.1`),
       nvidiaSmi: MISSING,
       perfBin: MISSING,
+      ...(options.nvmlCommand === undefined ? {} : { nvmlCommand: options.nvmlCommand }),
     });
     const change = options.collectors;
     const collectors =
@@ -114,9 +118,7 @@ const withMonitor = <A, E>(
             Collectors,
             Collectors.use((original) => Effect.succeed(change(original))),
           ).pipe(Layer.provide(found));
-    const context = yield* Layer.build(
-      Monitor.layerWith({ modelDiskRetry: '30 seconds', appsEvery: 5 }).pipe(Layer.provide(collectors)),
-    );
+    const context = yield* Layer.build(Monitor.layerWith({ modelDiskRetry: '30 seconds', appsEvery: 5, collectors }));
     return yield* test(Context.get(context, Monitor), settings);
   }).pipe(Effect.scoped);
 
@@ -157,7 +159,8 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
       const pid = yield* startFake;
       yield* withMonitor({}, (monitor) =>
         Effect.gen(function* () {
-          assert.strictEqual(monitor.nvidiaSource, 'nvidia-smi');
+          const source = yield* monitor.nvidiaSource;
+          assert.strictEqual(source, 'nvidia-smi');
           const first = yield* next();
           assert.strictEqual(first.tick, 1);
           assert.strictEqual(first.health, 'ok');
@@ -307,6 +310,69 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
     }),
   );
 
+  it.effect("the monitor's layer is built before its collectors answer", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-monitor-' });
+      const fake = path.resolve(import.meta.dirname, '../testing/fixtures/fakeNvml.ts');
+      const options: Options = {
+        patch: { collectors: { nvml: true, system: true, disk: true } },
+        nvmlCommand: { cmd: process.execPath, args: [fake, 'slow-ready', dir] },
+      };
+      const startedAt = yield* Clock.currentTimeMillis;
+      yield* withMonitor(options, (monitor) =>
+        Effect.gen(function* () {
+          // Built while the sampler has not answered (it answers 1.5 s after its start).
+          const builtIn = (yield* Clock.currentTimeMillis) - startedAt;
+          assert.isBelow(builtIn, 500);
+          const latest = yield* monitor.latest;
+          assert.isNull(latest);
+          const history = yield* monitor.history;
+          assert.deepStrictEqual([history.intervalMs, history.capacity, history.times], [250, 120, []]);
+          // The ticks start once the collectors are up, NVML among them.
+          const first = yield* next('5 seconds');
+          assert.isAtLeast((yield* Clock.currentTimeMillis) - startedAt, 1500);
+          assert.strictEqual(first.tick, 1);
+          assert.deepStrictEqual(
+            Arr.map(first.allGpus, (gpu) => gpu.key),
+            ['nvidia:GPU-fake'],
+          );
+          const source = yield* monitor.nvidiaSource;
+          assert.strictEqual(source, 'nvml');
+        }),
+      );
+      // The end of the monitor's layer killed the sampler.
+      const recorded = yield* fs.readFileString(path.join(dir, 'pids'));
+      const pids = Arr.map(Arr.filter(Str.split(recorded, '\n'), Str.isNonEmpty), Number);
+      assert.lengthOf(pids, 1);
+      const alive = yield* Effect.filter(pids, isAlive);
+      assert.deepStrictEqual(alive, []);
+    }),
+  );
+
+  it.effect('collectors that cannot start leave the monitor without snapshots, every change refused', () =>
+    Effect.gen(function* () {
+      const broken = Layer.effect(Collectors, Effect.die('no collectors here'));
+      const context = yield* Layer.build(
+        Monitor.layerWith({ modelDiskRetry: '30 seconds', appsEvery: 5, collectors: broken }),
+      );
+      const monitor = Context.get(context, Monitor);
+      const refused = yield* Effect.flip(monitor.configure({ ...DEFAULT_SETTINGS }));
+      assert.strictEqual(refused._tag, 'CollectorsNotApplied');
+      const source = yield* monitor.nvidiaSource;
+      const system = yield* monitor.nvmlSystem;
+      assert.strictEqual(source, 'nvidia-smi');
+      assert.isNull(system);
+      yield* Effect.sleep('300 millis');
+      const latest = yield* monitor.latest;
+      assert.isNull(latest);
+      const published = yield* Published;
+      const size = yield* Queue.size(published);
+      assert.strictEqual(size, 0);
+    }),
+  );
+
   it.effect('the stub answers an empty history and no snapshot', () =>
     Effect.gen(function* () {
       const stub = Monitor.layer.pipe(
@@ -317,9 +383,10 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
       const latest = yield* monitor.latest;
       const history = yield* monitor.history;
       const system = yield* monitor.nvmlSystem;
+      const source = yield* monitor.nvidiaSource;
       assert.isNull(latest);
       assert.deepStrictEqual(history, { intervalMs: 1000, capacity: 0, at: 0, times: [], series: {} });
-      assert.strictEqual(monitor.nvidiaSource, 'nvml');
+      assert.strictEqual(source, 'nvml');
       assert.isNull(system);
       yield* monitor.configure({ ...DEFAULT_SETTINGS });
       yield* Effect.sleep('300 millis');

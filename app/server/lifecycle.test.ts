@@ -200,15 +200,16 @@ setInterval(() => process.stdout.write(line + '\\n'), 100);
   const withCard = (message: unknown) =>
     ofType('snapshot')(message) && JSON.stringify(message).includes('nvidia:GPU-00000000-0000-0000-0000-000000000001');
   await client.next(withCard, 10_000);
-  const recorded = readFileSync(pids, 'utf8').trim().split('\n').map(Number);
-  expect(recorded.length).toBeGreaterThan(0);
+  const recorded = () => readFileSync(pids, 'utf8').trim().split('\n').map(Number);
+  expect(recorded().length).toBeGreaterThan(0);
   const t0 = performance.now();
   app.proc.kill('SIGTERM');
   const code = await app.exited;
   expect(performance.now() - t0).toBeLessThan(2000);
   expect(code).toBe(0);
   expect((await client.closed).code).toBe(1001);
-  expect(recorded.filter(alive)).toEqual([]);
+  // Read again: a run started during the stop is checked too.
+  expect(recorded().filter(alive)).toEqual([]);
 }, 30_000);
 
 test('a data directory of the Nitro server opens untouched', async () => {

@@ -2,6 +2,7 @@
 // on its stdin and stdout. It appends its pid to `<dir>/pids` and each line it receives to `<dir>/received`.
 // - `ready-then-sample`: answers `start` with `ready`, then sends `SNAPSHOT` every `intervalMs`; exits 0 once its
 //   stdin ends.
+// - `slow-ready`: as `ready-then-sample`, its `ready` 1.5 s after `start` (a driver slow to come up).
 // - `sample-once`: answers `ready`, sends one sample, then nothing; exits 0 once its stdin ends.
 // - `error`: answers `start` with an `error`; exits 0 once its stdin ends.
 // - `silent`: never answers, and stays up once its stdin ends: only a kill ends it.
@@ -55,6 +56,13 @@ lines.on('line', (line) => {
     send({ type: 'sample', snapshot: SNAPSHOT });
     setInterval(() => send({ type: 'sample', snapshot: SNAPSHOT }), command.intervalMs).unref();
   }
+  if (behaviour === 'slow-ready') {
+    setTimeout(() => {
+      send({ type: 'ready' });
+      send({ type: 'sample', snapshot: SNAPSHOT });
+      setInterval(() => send({ type: 'sample', snapshot: SNAPSHOT }), command.intervalMs).unref();
+    }, 1500).unref();
+  }
   if (behaviour === 'sample-once') {
     send({ type: 'ready' });
     send({ type: 'sample', snapshot: SNAPSHOT });
@@ -85,5 +93,5 @@ lines.on('line', (line) => {
   }
 });
 lines.on('close', () => {
-  if (['ready-then-sample', 'sample-once', 'error'].includes(behaviour)) process.exit(0);
+  if (['ready-then-sample', 'slow-ready', 'sample-once', 'error'].includes(behaviour)) process.exit(0);
 });
