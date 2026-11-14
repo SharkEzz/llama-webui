@@ -2,6 +2,7 @@ import { NodeFileSystem } from '@effect/platform-node';
 import { assert, layer } from '@effect/vitest';
 import { HfRateLimited, type HfStatus, HfUnreachable, type HubErrors } from '@llama-webui/shared';
 import { Array as Arr, ConfigProvider, Context, Effect, Fiber, FileSystem, Layer, String as Str } from 'effect';
+import { HttpClient } from 'effect/http';
 import { TestClock } from 'effect/testing';
 import { type FakeHub, fakeHub } from '../testing/hub.ts';
 import { freePort } from '../testing/llama.ts';
@@ -30,6 +31,22 @@ const clientAt = (endpoint: string, env: Record<string, string> = {}) =>
     ),
   );
 const clientOn = (hub: FakeHub, env: Record<string, string> = {}) => clientAt(hub.url, env);
+
+/** The client on `hub`, its `HfHttp` changed by `change` (the token `hf_secret`). */
+const clientWith = (hub: FakeHub, change: (http: HfHttp['Service']) => HfHttp['Service']) =>
+  Layer.build(
+    HfClient.layer.pipe(
+      Layer.provide(Layer.effect(HfHttp, Effect.map(Effect.service(HfHttp), change)).pipe(Layer.provide(HfHttp.layer))),
+    ),
+  ).pipe(
+    Effect.map(Context.get(HfClient)),
+    Effect.provideService(
+      ConfigProvider.ConfigProvider,
+      ConfigProvider.fromEnv({
+        env: { HOME: NOWHERE, HF_TOKEN_PATH: `${NOWHERE}/token`, HF_ENDPOINT: hub.url, HF_TOKEN: 'hf_secret' },
+      }),
+    ),
+  );
 
 /** The fake Hub with the one repository `o/r`. */
 const hubWithRepo = fakeHub({
@@ -231,6 +248,25 @@ layer(NodeFileSystem.layer, { excludeTestServices: true })('HfClient', (it) => {
     }),
   );
 
+  it.effect('a commit sha that is not 40 hex is an invalid response', () =>
+    Effect.gen(function* () {
+      const hub = yield* hubWithRepo;
+      const client = yield* clientOn(hub);
+      // It pins the downloads: it goes into the resolve URL of every file.
+      for (const sha of ['main', '../x', Str.repeat(39)('a'), Str.repeat(40)('A'), `${Str.repeat(39)('a')}/`]) {
+        hub.fail('repo', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+          body: `{"id":"o/r","sha":"${sha}","siblings":[]}`,
+        });
+        yield* failsWith(
+          client.repoFiles('o/r', 'main'),
+          HfUnreachable.make({ message: 'Hugging Face sent an invalid response (/api/models/o/r/revision/main)' }),
+        );
+      }
+    }),
+  );
+
   it.effect('a redirect on the same origin is followed with the token, up to 5 times', () =>
     Effect.gen(function* () {
       const hub = yield* fakeHub({
@@ -342,6 +378,22 @@ layer(NodeFileSystem.layer, { excludeTestServices: true })('HfClient', (it) => {
       // Asked again, and answered.
       yield* equals(client.status, { ...unchecked, user: 'alice' });
       assert.strictEqual(Arr.filter(hub.requests(), (r) => r.route === 'whoami').length, 3);
+    }),
+  );
+
+  it.effect('a whoami that dies is not cached: the next status asks again', () =>
+    Effect.gen(function* () {
+      const hub = yield* hubWithRepo;
+      let dies = 1;
+      const client = yield* clientWith(hub, (http) =>
+        HttpClient.transform(http, (response, request) =>
+          Str.endsWith('/api/whoami-v2')(request.url) && dies-- > 0 ? Effect.die('whoami broke') : response,
+        ),
+      );
+      const unchecked: HfStatus = { token: 'env', user: null, tokenInvalid: false, endpoint: hub.url };
+      yield* equals(client.status, unchecked);
+      yield* equals(client.status, { ...unchecked, user: 'alice' });
+      assert.strictEqual(Arr.filter(hub.requests(), (r) => r.route === 'whoami').length, 1);
     }),
   );
 });

@@ -1,4 +1,5 @@
 import {
+  HF_COMMIT_RE,
   HF_REPO_RE,
   type HfFile,
   HfGated,
@@ -134,7 +135,8 @@ const RepoInfo = Schema.Struct({
   // The id makes a folder under the models folder: an id that is not `org/name` (a mirror or a proxy answering
   // `../x`) is an invalid response.
   id: Schema.String.check(Schema.isPattern(HF_REPO_RE)),
-  sha: Schema.String,
+  // The commit pins the downloads (it goes into every resolve URL): anything but 40 hex is an invalid response.
+  sha: Schema.String.check(Schema.isPattern(HF_COMMIT_RE)),
   gated: Schema.optionalKey(Gated),
   siblings: Schema.optionalKey(
     Schema.Array(
@@ -252,8 +254,8 @@ export class HfClient extends Context.Service<
 
       /**
        * The account of `token`, asked of the Hub once: the calls that come while it is asked wait for the same answer.
-       * A rejected token is remembered as such; a failure of another kind (the network, the Hub) is not, so the next
-       * status asks again.
+       * A rejected token is remembered as such; a failure of another kind (the network, the Hub, a defect) is not, so
+       * the next status asks again.
        */
       const accountOf = (token: string) =>
         Effect.flatMap(
@@ -269,8 +271,14 @@ export class HfClient extends Context.Service<
                     Deferred.succeed(asked, account),
                   ),
                 ),
-                // Interrupted with the client: those waiting get no account rather than wait forever.
-                Effect.ensuring(Deferred.succeed(asked, { user: null, invalid: false })),
+                // Interrupted with the client, or a defect: forgotten, and those waiting get no account rather than
+                // wait forever; the next status asks again.
+                Effect.onError(() =>
+                  Effect.andThen(
+                    SynchronizedRef.update(accounts, (now) => forget(now, token, asked)),
+                    Deferred.succeed(asked, { user: null, invalid: false }),
+                  ),
+                ),
                 Effect.forkIn(scope),
               );
               return [asked, new Map([...known, [token, asked]])] as const;

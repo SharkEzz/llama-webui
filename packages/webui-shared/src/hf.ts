@@ -7,6 +7,8 @@ import { ModelKind } from './models.ts';
 /** A Hugging Face model repository id: `org/name` (each part starts and ends with a word character, as on the Hub). */
 const SEGMENT = String.raw`\w(?:[\w.-]*\w)?`;
 export const HF_REPO_RE = new RegExp(`^${SEGMENT}/${SEGMENT}$`);
+/** A commit of a repository: 40 lowercase hex digits, as the Hub writes its `sha`. */
+export const HF_COMMIT_RE = /^[0-9a-f]{40}$/;
 const HF_HOSTS = new Set(['huggingface.co', 'www.huggingface.co', 'hf.co']);
 /** First path segments that are not an `org` (site pages, other repo types). */
 const NOT_ORG = new Set(['models', 'datasets', 'spaces', 'docs', 'blog', 'collections', 'papers', 'settings', 'api']);
@@ -177,7 +179,7 @@ export const isDownloadActive = (s: DownloadStatus) => s === 'queued' || s === '
 /** A request to download variants of a repository, pinned to a commit (`POST /api/downloads`). */
 export const DownloadRequest = Schema.Struct({
   repo: Schema.String.check(Schema.isPattern(HF_REPO_RE, { message: 'Repository id expected (org/name)' })),
-  revision: Schema.String.check(Schema.isPattern(/^[0-9a-f]{40}$/, { message: 'Commit sha expected' })),
+  revision: Schema.String.check(Schema.isPattern(HF_COMMIT_RE, { message: 'Commit sha expected' })),
   /** Keys of the variants to download (HfVariant.key). */
   keys: Schema.Array(
     Schema.String.check(
