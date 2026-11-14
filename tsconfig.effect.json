@@ -172,7 +172,14 @@
                 "globalJson": "off",
                 "globalRandom": "off",
                 "processEnv": "off",
-                "cryptoRandomUUID": "off"
+                "cryptoRandomUUID": "off",
+                // Plain JavaScript there: no Effect helper asked for a regex over a bundle or a list of files.
+                "preferEffectArray": "off",
+                "preferEffectString": "off",
+                "preferEffectRecord": "off",
+                "missingPipeableSignature": "off",
+                "missedPipeableOpportunity": "off",
+                "strictBooleanExpressions": "off"
               }
             }
           },

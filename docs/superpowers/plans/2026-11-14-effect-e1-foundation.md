@@ -52,6 +52,10 @@ Task 11):
     on the line;
   - `// @effect-diagnostics-next-line processEnv:off` at the one place that writes `.env` into `process.env` (Task 4).
 
+  `missingPipeableSignature` reports an exported function of two or more parameters: where this plan gives such a
+  signature, keep its names and types and make it pipeable (`dual` from `effect/Function`, data-first and data-last)
+  when its first parameter is the subject, else take one options object; say which in the task summary.
+
   Any other rule that seems wrong for a piece of code: stop and report, do not lower it. Consequences to know before
   writing: a Schema class takes the brand the rule asks for and is built with `X.make(…)`, not `new X(…)`; a service
   key is `@llama-webui/app/server/<path>/<Name>`.
@@ -334,7 +338,14 @@ derived client and shows a waiting page for what is not ported. Until Task 9, `p
         "globalJson": "off",
         "globalRandom": "off",
         "processEnv": "off",
-        "cryptoRandomUUID": "off"
+        "cryptoRandomUUID": "off",
+        // Plain JavaScript there: no Effect helper asked for a regex over a bundle or a list of files.
+        "preferEffectArray": "off",
+        "preferEffectString": "off",
+        "preferEffectRecord": "off",
+        "missingPipeableSignature": "off",
+        "missedPipeableOpportunity": "off",
+        "strictBooleanExpressions": "off"
       }
     }
   },

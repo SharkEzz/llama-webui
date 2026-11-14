@@ -2,6 +2,7 @@
   "name": "@llama-webui/shared",
   "version": "0.3.1",
   "private": true,
+  "sideEffects": false,
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
