@@ -1048,13 +1048,19 @@
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "useEnvProxy: no proxy variable, nothing changes",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/hf/HfHttp.test.ts > HfHttp > no proxy variable, nothing goes to a proxy",
+    "reason": "The proxy of the environment is set on the agents of HfHttp (proxyEnv of layerNodeHttpOptions), not on the global fetch by useEnvProxy at boot"
   },
   {
     "project": "server",
     "file": "app/server/lib/env.test.ts",
     "name": "useEnvProxy: fetch goes through HTTP_PROXY, except for loopback and the hosts of NO_PROXY",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/hf/HfHttp.test.ts > HfHttp > a request goes through the proxy of the environment, loopback and NO_PROXY hosts direct",
+    "reason": "The proxy of the environment is set on the agents of HfHttp (proxyEnv of layerNodeHttpOptions), not on the global fetch by useEnvProxy at boot"
   },
   {
     "project": "server",
@@ -1124,157 +1130,209 @@
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > downloads every shard, checks it and renames it into place; the token never reaches the CDN",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > downloads every shard, checks it and renames it into place; the token never reaches the CDN"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > resumes an existing .part with a Range request",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > resumes an existing .part with a Range request"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > starts over when the server ignores the Range header",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > starts over when the server ignores the Range header"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > a connection cut mid-file is resumed where it stopped",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > a connection cut mid-file is resumed where it stopped"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > a body that ends early without an error is resumed, not started over; the hash is not read again",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > a body that ends early without an error is resumed, not started over; the hash is not read again"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > network errors are retried, then the item fails once the retries are spent",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > network errors are retried, then the item fails once the retries are spent"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > a gated repo fails at once, with its code",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > a gated repo fails at once, with its code"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > a checksum mismatch deletes the file",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > a checksum mismatch deletes the file"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > cancel: a running item stops and its files are deleted; a queued one never starts",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/Downloads.test.ts > cancel: a running item stops and its files are deleted; a queued one never starts"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > retrying a canceled split model downloads again the shards the cancel deleted",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > retrying a canceled split model downloads again the shards the cancel deleted"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > concurrent or repeated requests for one variant queue it once; retry refuses a variant already queued",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/Downloads.test.ts > concurrent or repeated requests for one variant queue it once; retry refuses a variant already queued"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > retry checks the disk space like a new download",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/Downloads.test.ts > retry checks the disk space like a new download"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > refuses a duplicate and a download that does not fit on the disk; skips files already there",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/Downloads.test.ts > refuses a duplicate and a download that does not fit on the disk; skips files already there"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > remove and clear finished items",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/Downloads.test.ts > remove and clear finished items"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/downloader.test.ts",
     "name": "DownloadQueue > after a restart, the next queue resumes the item from its .part",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/downloads/transfer.test.ts > after a restart, the next queue resumes the item from its .part"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "token > HF_TOKEN first, then the hf token file",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/token.test.ts > HF_TOKEN first, then the hf token file"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "token > token file location follows the hf CLI",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/token.test.ts > token file location follows the hf CLI"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "token > endpoint",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/token.test.ts > endpoint"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "paths > downloads go to <modelsDir>/<org>/<name>",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/paths.test.ts > downloads go to <modelsDir>/<org>/<name>"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "paths > a path cannot leave the repo folder",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/paths.test.ts > a path cannot leave the repo folder"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "groupRepoFiles > single files, shard sets, projectors; other files ignored; smallest first",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/variants.test.ts > groupRepoFiles > groupRepoFiles: single files, shard sets, projectors; other files ignored; smallest first"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "imatrix files in GGUF format are not offered as variants (#31)",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/variants.test.ts > groupRepoFiles > imatrix files in GGUF format are not offered as variants (#31)"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "HfClient > repo files: sizes and sha256 from the blobs listing, pinned commit",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/HfClient.test.ts > repo files: sizes and sha256 from the blobs listing, pinned commit"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "HfClient > search: GGUF filter, most downloaded first",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/HfClient.test.ts > search: GGUF filter, most downloaded first"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "HfClient > errors carry a code",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/HfClient.test.ts > errors carry a code"
   },
   {
     "project": "server",
     "file": "app/server/lib/hf/hf.test.ts",
     "name": "HfClient > status: token source and account, a rejected token is reported",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/hf/HfClient.test.ts > status: token source and account, a rejected token is reported"
   },
   {
     "project": "server",
@@ -1436,25 +1494,37 @@
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "downloadFetch: a redirect is the response, with its location, not followed",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/hf/HfHttp.test.ts > HfHttp > a redirect is the response, with its location, not followed",
+    "reason": "The Hub requests go through HfHttp (hf/HfHttp.ts, the node:http and node:https agents of the platform), not downloadFetch; leaving the scope aborts the request instead of an AbortSignal"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "downloadFetch: sends the headers, streams the body, and an abort during it breaks the stream",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/hf/HfHttp.test.ts > HfHttp > sends the headers, streams the body, and leaving the scope during it aborts the request",
+    "reason": "The Hub requests go through HfHttp (hf/HfHttp.ts, the node:http and node:https agents of the platform), not downloadFetch; leaving the scope aborts the request instead of an AbortSignal"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "downloadFetch: an https URL goes through node:https (TLS against a plain HTTP server fails like fetch)",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/hf/HfHttp.test.ts > HfHttp > an https URL goes through node:https (TLS against a plain HTTP server fails)",
+    "reason": "The Hub requests go through HfHttp (hf/HfHttp.ts, the node:http and node:https agents of the platform), not downloadFetch; leaving the scope aborts the request instead of an AbortSignal"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "downloadFetch: goes through the proxy of the environment, like fetch",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/hf/HfHttp.test.ts > HfHttp > a request goes through the proxy of the environment, loopback and NO_PROXY hosts direct",
+    "reason": "The Hub requests go through HfHttp (hf/HfHttp.ts, the node:http and node:https agents of the platform), not downloadFetch; leaving the scope aborts the request instead of an AbortSignal"
   },
   {
     "project": "server",
@@ -1468,151 +1538,206 @@
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "weightSizes > shared experts stay with the layer (--n-cpu-moe moves only _exps / _chexps)",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/sizes.test.ts > weightSizes > shared experts stay with the layer (--n-cpu-moe moves only _exps / _chexps)"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "weightSizes > groups tensors by layer, experts apart",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/sizes.test.ts > weightSizes > groups tensors by layer, experts apart"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "tensorBytes > last tensor ends at the end of the file",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/sizes.test.ts > tensorBytes > last tensor ends at the end of the file"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > reads a dense model's metadata and tensors",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > reads a dense model's metadata and tensors"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > reads a hybrid model: full_attention_interval, ssm tensors, nextn layers",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > reads a hybrid model: full_attention_interval, ssm tensors, nextn layers"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > sums the shards of a -00001-of-00002 model",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > sums the shards of a -00001-of-00002 model"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > a missing shard is a ModelReadError",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > a missing shard is a ModelReadError"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > an absent file is a ModelReadError",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > an absent file is a ModelReadError"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > a file that is not a GGUF is a ModelReadError",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > a file that is not a GGUF is a ModelReadError"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > the cache returns the same object until the file changes",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > the cache returns the same object until the file changes"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > a changed second shard is re-read even when the first is untouched",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > a changed second shard is re-read even when the first is untouched"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > the cache keeps the last 8 models only",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > the cache keeps the last 8 models only"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "readModel > a file behind a directory the user cannot enter is told apart from a missing one",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > a file behind a directory the user cannot enter is told apart from a missing one"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "vocabulary size > <arch>.vocab_size when present",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > vocabulary size > <arch>.vocab_size when present"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "vocabulary size > else the tokenizer's token list (llama.cpp's own source)",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > vocabulary size > else the tokenizer's token list (llama.cpp's own source)"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "vocabulary size > else the output tensor's second dimension",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > vocabulary size > else the output tensor's second dimension"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "vocabulary size > else the embedding tensor's",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > vocabulary size > else the embedding tensor's"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/gguf.test.ts",
     "name": "a multimodal projector is kind mmproj; a chat template is noticed",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/gguf.test.ts > a multimodal projector is kind mmproj; a chat template is noticed"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/routes.test.ts",
     "name": "deleting a split model removes every part and the folders left empty, not the models folder",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/models/http.test.ts > ModelsApi > deleting a split model removes every part and the folders left empty, not the models folder",
+    "reason": "Over HTTP against ModelsApi (models/http.test.ts), the layers of the app with a scratch models folder, not the Nitro handlers through routeApp and provideDeps"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/routes.test.ts",
     "name": "only a model the scan found can be deleted: another path is a 404",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/models/http.test.ts > ModelsApi > only a model the scan found can be deleted: another path is a 404",
+    "reason": "Over HTTP against ModelsApi (models/http.test.ts), the layers of the app with a scratch models folder, not the Nitro handlers through routeApp and provideDeps"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/routes.test.ts",
     "name": "usage lists the profiles opening the file as model or projector, through a relative path or a symlink",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/models/http.test.ts > ModelsApi > usage lists the profiles opening the file as model or projector, through a relative path or a symlink",
+    "reason": "Over HTTP against ModelsApi (models/http.test.ts), the layers of the app with a scratch models folder, not the Nitro handlers through routeApp and provideDeps"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/routes.test.ts",
     "name": "deleteProfiles deletes the profiles using the model and resets the default; false keeps them",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/models/http.test.ts > ModelsApi > deleteProfiles deletes the profiles using the model and resets the default; false keeps them",
+    "reason": "Over HTTP against ModelsApi (models/http.test.ts), the layers of the app with a scratch models folder, not the Nitro handlers through routeApp and provideDeps"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/routes.test.ts",
     "name": "a model the running server or a benchmark uses is a 409, and nothing is deleted",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/models/http.test.ts > ModelsApi > a model the running server uses or a download writes is a 409, and nothing is deleted",
+    "reason": "Over HTTP against ModelsApi (models/http.test.ts), the layers of the app with a scratch models folder, not the Nitro handlers through routeApp and provideDeps; the benchmark check comes back with the bench (E7), the download one is new"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/scan.test.ts",
     "name": "groupGgufFiles groups shards under the first and reports missing ones",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/scan.test.ts > scan > groupGgufFiles groups shards under the first and reports missing ones"
   },
   {
     "project": "server",
     "file": "app/server/lib/models/scan.test.ts",
     "name": "scanModels skips hidden dirs, classifies mmproj, reports unreadable files and reuses the cache",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "app/server/models/scan.test.ts > scan > scanModels skips hidden dirs, classifies mmproj, reports unreadable files and reuses the cache"
   },
   {
     "project": "server",
@@ -1814,13 +1939,19 @@
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads [start, end)",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/downloads/transfer.test.ts > the verifying re-read hashes exactly the .part, in 1 MiB chunks",
+    "reason": "fileRange of lib/proc.ts was used only by the verifying re-read of the downloader; the re-read now reads the .part through FileSystem.stream in 1 MiB chunks, proven by the transfer test"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads in 1 MiB chunks, so the disk speed check is not held back by the stream",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "rewritten",
+    "to": "app/server/downloads/transfer.test.ts > the verifying re-read hashes exactly the .part, in 1 MiB chunks",
+    "reason": "fileRange of lib/proc.ts was used only by the verifying re-read of the downloader; the re-read now reads the .part through FileSystem.stream in 1 MiB chunks, proven by the transfer test"
   },
   {
     "project": "server",
@@ -2845,55 +2976,73 @@
     "project": "shared",
     "file": "packages/webui-shared/src/hf.test.ts",
     "name": "parseHfInput > empty and free text",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/hf.test.ts > parseHfInput > empty and free text"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/hf.test.ts",
     "name": "parseHfInput > repo id, with an optional quantization",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/hf.test.ts > parseHfInput > repo id, with an optional quantization"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/hf.test.ts",
     "name": "parseHfInput > a malformed escape in a URL does not throw",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/hf.test.ts > parseHfInput > a malformed escape in a URL does not throw"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/hf.test.ts",
     "name": "parseHfInput > Hugging Face URLs",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/hf.test.ts > parseHfInput > Hugging Face URLs"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/hf.test.ts",
     "name": "parseHfInput > site pages and other repo types are searches",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/hf.test.ts > parseHfInput > site pages and other repo types are searches"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/hf.test.ts",
     "name": "vramFit > thresholds",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/hf.test.ts > vramFit > thresholds"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/hf.test.ts",
     "name": "vramFit > no GPU",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/hf.test.ts > vramFit > no GPU"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/hf.test.ts",
     "name": "DownloadRequestSchema > accepts a request",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/hf.test.ts > DownloadRequestSchema > accepts a request"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/hf.test.ts",
     "name": "DownloadRequestSchema > rejects a bad repo, revision or empty keys",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/hf.test.ts > DownloadRequestSchema > rejects a bad repo, revision or empty keys"
   },
   {
     "project": "shared",
@@ -2915,7 +3064,9 @@
     "project": "shared",
     "file": "packages/webui-shared/src/models.test.ts",
     "name": "profileModelPath fills an empty cwd with models_dir and keeps paths relative under the cwd",
-    "milestone": "E6"
+    "milestone": "E6",
+    "status": "ported",
+    "to": "packages/webui-shared/src/models.test.ts > profileModelPath fills an empty cwd with models_dir and keeps paths relative under the cwd"
   },
   {
     "project": "shared",

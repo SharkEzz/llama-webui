@@ -83,10 +83,22 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 
 ### E6: models and downloads
 
-- `GET /api/models/info` reads any absolute path that ends in `.gguf`, outside the models folder too. `unverified`
-- Two 409 answers can only be reached in a race. `unverified`
-- Deleting a model deletes its files before its profiles. `unverified`
-- No test posts a valid download. `unverified`
+- `GET /api/models/info` reads any absolute path that ends in `.gguf`, outside the models folder too. `design choice`
+  (the E6 plan's call, decided as E5 did): the site documents it as by design (no allowlist of folders,
+  `site/content/developers/server/security.mdx`), the Tuning page (E8) reads the detail of a profile's model, which may
+  be anywhere, and the API is behind the guard (loopback or the configured origin). Ported as it is
+  (`models/http.test.ts`: info answers the detail of a model and of a file outside the models folder, its relPath
+  absolute).
+- Two 409 answers can only be reached in a race. `confirmed`, `fixed in E6`: `DELETE /api/downloads/:id` decides
+  cancel-or-remove in one step under the queue's lock (`Downloads.remove`), so `This download is not running` (code
+  `not-active`) and `Cancel this download first` (code `active`) are not ported (`downloads/http.test.ts`: delete of a
+  running item cancels it and answers 204 at once; delete of a finished item removes it and keeps its files).
+- Deleting a model deletes its files before its profiles. `design choice`: a file that cannot be removed answers 500
+  and keeps every profile; the other order could leave profiles deleted for a model still on disk. Ported as it is
+  (`models/http.test.ts`: a file that cannot be removed answers 500 and keeps the profiles).
+- No test posts a valid download. `confirmed`, `fixed in E6`: `downloads/http.test.ts` (a valid download request
+  stores the canonical repo id and the resolved sha and answers 202 with the items; a request naming a key the repo
+  lacks is a 404 No GGUF; a key listed twice is a 400), on a fake Hub (`app/server/testing/hub.ts`).
 
 ### E7: bench and sweeps
 
@@ -337,6 +349,88 @@ Found by the final review of E5, fixed with it:
   shutdown step is ServerNotReady and stores nothing).
 - A reply is traced under its own root span `ChatRuns.reply` (attribute `conversationId`): forked into the layer's
   scope, it was a child of the span of the request that started it, which ends long before the reply.
+
+Decided (the E6 plan):
+
+- Hugging Face has its own HTTP service, `HfHttp` (`app/server/hf/HfHttp.ts`): `NodeHttpClient.layerNodeHttpOptions`
+  with `keepAlive` under its own tag, `node:http`/`node:https` in HTTP/1.1 (the HTTP/2 window of Hugging Face capped a
+  stream at ~22 MiB/s), each request in its caller's scope, no time limit of its own (an API call waits 10 s, a
+  transfer 60 s of silence) and no redirect followed. `downloadFetch` is not ported.
+- The proxy of the environment is the agents' (`proxyEnv` of `HfHttp`'s two agents, read through `Config`, with
+  `localhost`, `127.0.0.1` and `::1` always kept direct), not a global one: `useEnvProxy` (`setGlobalProxyFromEnv`) is
+  not ported, nothing else of the Effect server uses `fetch` or Node's global agents, and "set first, undone last at
+  boot" becomes "the agents are made and destroyed with `HfHttp`'s layer". `LlamaHttp` keeps its direct agent.
+- `LLAMA_WEBUI_TEST_OFFLINE=1` (exact value) is read by `HfHttp.layer`: every request fails as a `TransportError`
+  `fetch failed`, so the Hub endpoints answer 502 `Hugging Face unreachable: fetch failed`, as before.
+- The Hub's unreachable message is `Hugging Face unreachable: <reason>`, the reason the `TransportError`'s description,
+  else its cause's message (`connect ECONNREFUSED …`, `getaddrinfo ENOTFOUND …`), else its code: Node's `fetch` said
+  `fetch failed` for all of them. A Hub API call without an answer in 10 s reads `Hugging Face unreachable: no answer
+  in 10 s` (was `The operation was aborted due to timeout`).
+- A stamp is `<mtime ms>:<size>` per part from `FileSystem`'s `mtime`, whole milliseconds: the Nitro server wrote
+  `mtimeMs` with its fraction, so each `model_cache` row it wrote misses once and is read and rewritten at the first
+  scan.
+- The 8 parsed GGUFs are a `Cache.makeWith` of capacity 8 (a failed read kept for no time): Effect's `Cache` is LRU, a
+  hit refreshes the entry, where the Nitro map dropped the oldest read.
+- The query refusals are a 400 `RequestInvalid` `Invalid data: <message> (<key>)`, as E2 to E5 set for bodies:
+  `GET /api/hf/search` `q`, `GET /api/hf/repo` `id`, `GET /api/models/usage` `path`, `GET /api/models/info` `path` (was
+  a 400 with the bare message).
+- An id of `/api/downloads/:id` that is not a positive integer is the 404 `RouteNotFound` `Unknown route` (`IdParam`,
+  as E2; was `Download not found`).
+- The errors are tagged, with the Nitro messages word for word: `ModelNotFound`, `ModelFileNotFound`,
+  `ModelUnreadable`, `ModelInUse`, `HfGated`, `HfNotFound`, `HfUnauthorized`, `HfRateLimited`, `HfUnreachable`,
+  `HfInvalidPath`, `ListedTwice`, `AlreadyQueued`, `DiskFull`, `DownloadNotFound`, `NotFinished` (the Nitro `code` of
+  an answer becomes its tag; the web tells `HfGated` and `HfNotFound` by it). The `code` stored in a `DownloadItem`
+  stays the Nitro string (`hf-gated`, `checksum-mismatch`, `disk-full`, `download-failed`, `hf-unreachable`…).
+- The retries are a loop over the pauses 2, 4, 8, 16 and 30 s (`Effect.sleep` on the `Clock`), not a `Schedule`: the
+  budget is reset after an attempt that received data, which a `Schedule`'s state cannot see without the attempt's
+  outcome.
+- The stall is `Stream.timeoutOrElse` of 60 s on the body plus a 60 s wait for the headers (was a `setTimeout` reset on
+  each chunk); both retry as `no data for 60 s`.
+- The download queue is a scoped service, `Downloads`: one fiber in the layer's scope, its state in one
+  `SynchronizedRef`, `enqueue` and `retry` serialised by a semaphore and their rows written in one uninterruptible
+  step, a shutdown step that stops the transfer and writes nothing (the item stays `downloading`, its `.part` kept).
+- The sha256 (`createHash` of `node:crypto`, `downloads/hash.ts`) and the free space (`statfs` of `node:fs/promises`,
+  `downloads/freeSpace.ts`) are two new `nodeBuiltinImport:off` directives: Effect's `Digest` is one-shot over a
+  `Uint8Array` (a GiB file cannot be held), `FileSystem` has no `statfs`.
+- The model deletion's check of a benchmark in progress and of a running sweep (`A benchmark in progress uses it`, and
+  `blocked` in the usage) is removed until E7, which brings it back with the bench (a `From E6:` line of E7 in
+  `behaviours.md`): `blocked` reads the managed server and the queue's active items only.
+- `app/server-legacy/lib/llamaFetch.ts` is kept whole: `downloadFetch` and `llamaFetch` share `nodeFetch`, legacy files
+  are only deleted, never edited, and the E7 bench reads `llamaFetch`; the file goes with E7.
+
+Found while porting E6, accepted with its result:
+
+- The `HttpApi` groups (`ModelsApi`, `HfApi`, `DownloadsApi`) joined `Api.ts` with their handlers (Tasks 4, 5 and 8),
+  not with the schemas (Task 1): a group in `Api` without its handlers does not build the server.
+- `vramFit` and `profileModelPath` of `@llama-webui/shared` are `dual`s.
+- New messages for the requests: `At least one variant expected` and `16 variants at most` (the keys of a download),
+  `Variant key expected` and `1024 characters at most` (one key); a missing `id` reads `Invalid repository id: `, a
+  missing `q` or info `path` the same message as an invalid value; a query key given twice is a 400.
+- A blank `HF_TOKEN` falls back to `HUGGING_FACE_HUB_TOKEN`, a blank `no_proxy` to `NO_PROXY` (an empty variable is
+  unset). An https request through a proxy (CONNECT) is not tested, and the unreachable tests rely on `*.invalid` not
+  resolving, as the Nitro ones did.
+- The fallback message of a `stat` that fails with no errno is the error's message, not an errno; the branch of a
+  file behind a folder the user cannot enter is not tested as root (`skipIf`).
+- `HfVariant` has no `queued` flag: the plan named one, the Nitro type never had it.
+- A Hub API call follows the redirects that stay on the endpoint's origin, 5 at most, with the token (a renamed
+  repository answers 307 to its new name); a redirect elsewhere is refused and the token never leaves the origin (the
+  Nitro `fetch` followed any redirect). A caller that leaves does not end the whoami that other callers wait on.
+- A download follows 6 redirects and fails on the 7th (`Too many redirects from Hugging Face`), as the plan says: the
+  Nitro loop failed after the 5th. A connection cut mid-file reads `Hugging Face unreachable: <reason>`. The Nitro
+  `empty response` failure could not be reached and is dropped: an empty body reads `<path>: got 0 of <size> bytes`,
+  retried as a short body.
+- A request for one variant listed twice in one enqueue (the schema does not refuse it) is an `AlreadyQueued` 409;
+  the HTTP payload refuses the same key twice first, as a 400 `ListedTwice`.
+- `Downloads.layer` sits in the tier of `ChatRuns` (`App.ts`); its shutdown step runs before the hub's flush, and the
+  tiers are then undone from the top. The lifecycle test of a SIGTERM during a download relies on the real `statfs`
+  with the 1 GiB margin.
+- The contract cases of the models, the Hub and the downloads were reconciled with the existing ones; the unknown
+  download is id `999`.
+- The web: a reply only adds the items the list does not have yet (`addMissing`), and the server publishes an item
+  before it answers, so a reply that arrives after the queue moved on does not undo a `/ws` message (found by the look
+  of Task 9). `main.tsx` starts the downloads' sync again (`startDownloadsSync()`), as before E1. Rolldown's
+  `INEFFECTIVE_DYNAMIC_IMPORT` warning (`src/app/router.tsx` imported lazily by `downloads.ts`, statically by
+  `main.tsx`, as in the Nitro web) is inherited, left for a later fix.
 
 ## Measures (`e<N>.json`)
 

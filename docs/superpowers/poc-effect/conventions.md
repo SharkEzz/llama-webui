@@ -32,15 +32,17 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 - The overrides relax the platform rules (Node builtins, `fetch`, timers, `JSON`, Effect's array and string helpers,
   `strictBooleanExpressions`) only for code that drives the build from outside: `**/testing/**`, `**/contract/**`,
   `lifecycle.test.ts`, `build.test.ts`, `dev.test.ts`, `runApp.test.ts`; and for the plain modules of the shared
-  package, except `api/**`, `chat.ts`, `logs.ts`, `monitor.ts`, `profile.ts`, `server.ts`, `settings.ts`, `topology.ts`
-  and `ws.ts`, which follow the server's rules (the third override: a milestone adds the modules it moves to Schema).
-  Nothing else is added to the overrides.
-- Two directives are allowed, each with its reason on the line:
-  `// @effect-diagnostics-next-line nodeBuiltinImport:off <reason>` (one today: `node:http` in
-  `app/server/http/HttpLive.ts`, `NodeHttpServer.layer` takes its factory; `node:ffi` is not flagged and needs none)
-  and `processEnv:off` at the one write of
-  `.env` into the environment (not needed: `applyDotEnv(process.env, …)` in `config/DotEnv.ts` is not flagged). A
-  directive that suppresses nothing fails `tsc`.
+  package, except `api/**`, `chat.ts`, `hf.ts`, `logs.ts`, `models.ts`, `monitor.ts`, `profile.ts`, `server.ts`,
+  `settings.ts`, `topology.ts` and `ws.ts`, which follow the server's rules (the third override: a milestone adds the
+  modules it moves to Schema). Nothing else is added to the overrides.
+- Two directives are allowed, each with its reason on the line. A directive that suppresses nothing fails `tsc`.
+  - `processEnv:off` at the one write of `.env` into the environment (not needed: `applyDotEnv(process.env, …)` in
+    `config/DotEnv.ts` is not flagged).
+  - `// @effect-diagnostics-next-line nodeBuiltinImport:off <reason>`, three today (`node:ffi` is not flagged and
+    needs none): `node:http` in `app/server/http/HttpLive.ts` (`NodeHttpServer.layer` takes the server factory of
+    `node:http`); `node:crypto` in `app/server/downloads/hash.ts` (`Digest` of effect is one-shot over one
+    `Uint8Array`, and a file of several GiB is hashed as it streams); `node:fs/promises` in
+    `app/server/downloads/freeSpace.ts` (`FileSystem` has no `statfs`).
 - A Schema class takes the brand the rule asks for (`TaggedError<X, { readonly X: unique symbol }>()`) and is built
   with `X.make(…)`, never `new X(…)`.
 - A service is a `Context.Service` class keyed `@llama-webui/app/server/<path>/<Name>`
@@ -173,6 +175,28 @@ The model is `app/server/supervisor/Supervisor.ts`.
     body aborts its request.
   - The probes and `/props` are in `app/server/llama/probes.ts`; `/proc` is read through `FileSystem`
     (`llama/procScan.ts`).
+- **An outside service with its own HTTP client** (`HfHttp`, `app/server/hf/HfHttp.ts`, next to `LlamaHttp`): its
+  own tag (`Context.Service<HfHttp, HttpClient.HttpClient.With<HttpClientError, Scope>>`), never the shared
+  `HttpClient.HttpClient`.
+  - `NodeHttpClient.layerNodeHttpOptions({ keepAlive: true, proxyEnv })`: HTTP/1.1 on agents of its own, the proxy of
+    the environment read through `Config` and set on those agents (loopback and `NO_PROXY` direct), nothing on the
+    global `fetch` or the global agents.
+  - An offline switch read by its layer (`LLAMA_WEBUI_TEST_OFFLINE=1`, exact value): a client whose every request
+    fails with a `TransportError` (`fetch failed`), so the contract suite never leaves the machine.
+  - No time limit and no redirect followed in the client: the caller bounds its wait (`HfClient`: 10 s per call,
+    `Effect.timeoutOrElse`; a download: a stall of 60 s between two chunks) and follows the redirects it accepts
+    (`HfClient`: the same origin only, 5 at most; `downloads/transfer.ts`: 6, the token only to the endpoint's origin).
+  - `HttpClient.withScope`: each request belongs to its caller's scope, a client that leaves aborts it.
+- **A queue in a layer's scope** (`app/server/downloads/Downloads.ts`):
+  - one fiber works the queue, forked in the layer's scope, its state (the loop, the running item) in one
+    `SynchronizedRef`; a call that adds work starts it when it is not running, else sets a `dirty` flag the loop reads
+    before it stops, and the layer's build starts it once (the work left by the last run);
+  - a check and the rows it guards (already queued, the disk space) are one step under a `Semaphore.make(1)`
+    (`withPermits(1)`), so two requests at once see each other's rows;
+  - a decision on an item (cancel the running one, mark a queued one, remove a finished one) is made under the lock of
+    the state, so a request never sees an item between two states;
+  - its shutdown step (`Shutdown.before`) sets a `closing` flag under that lock and interrupts the loop: the running
+    item keeps its row and its files as they are, and the next start takes it first.
 - **The tiers of `Services`** (`app/server/App.ts`): each `Layer.provideMerge` is a tier, built after the ones below
   it and undone before them.
   - From the bottom: the database, `AppInfo`, the hub and the repositories (`ConversationsRepo` with them), the ring,
@@ -258,6 +282,16 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
   function or an untyped column is written `CAST(? AS INTEGER)` in the SQL. The client is not wrapped to change this.
 - A failed statement is a `SqlError` whose `reason` says what failed: `reason._tag === 'ConstraintError'` for a
   constraint, the SQLite text in `reason.cause` (`db/Db.test.ts`, `http/Address.ts` reads `reason.cause` the same way).
+
+## Caches and file system errors
+
+- **A cache checked against a stamp** (the parsed GGUFs, `app/server/models/GgufReader.ts`) is `Cache.makeWith(load, {
+  capacity, timeToLive })` keyed by the path and the stamp of every part (`<mtime ms>:<size>`), so a changed file is a
+  new key and the old entry ages out; `timeToLive` keeps a success forever and a failure for no time
+  (`Exit.isSuccess(exit) ? Duration.infinity : Duration.zero`). It is an LRU: a hit refreshes the entry.
+- **The errno of a `FileSystem` call** (`ENOENT`, `ENOTDIR`, `EACCES`, `ENOSPC`) is not in its `PlatformError`'s
+  `reason` tag: read it from `error.reason.cause`, `Predicate.hasProperty(cause, 'code') && cause.code === 'ENOSPC'`
+  (`errnoOf` of `models/GgufReader.ts`, `downloads/transfer.ts`).
 
 ## Adding
 
