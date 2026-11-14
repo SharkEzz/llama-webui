@@ -9,50 +9,37 @@ import {
 import {
   Clock,
   Context,
-  Deferred,
   Duration,
   Effect,
-  Exit,
   Fiber,
   FileSystem,
   Layer,
   Option,
   type Path,
+  type PlatformError,
   Predicate,
   PubSub,
-  Ref,
+  Result,
   Scope,
   Semaphore,
   Stream,
   SynchronizedRef,
 } from 'effect';
-import { ChildProcess, ChildProcessSpawner } from 'effect/process';
+import { ChildProcess, type ChildProcessSpawner } from 'effect/process';
 import type { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { health, isLlamaServer } from '../llama/probes.ts';
 import { findLlamaServerPid, isAlive } from '../llama/procScan.ts';
 import { LogRing } from '../logs/LogRing.ts';
 import { isIdleNoise, linesOf } from '../logs/lines.ts';
+import { FORCE_KILL_AFTER, type Followed, followProgram } from '../process/followed.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { type BuiltCommand, launchLines } from './command.ts';
 
-/** How long the exit waits for the readers of the output: a grandchild may hold the pipes. */
-const DRAIN_TIMEOUT = '1 second';
-
-/** The backstop of a process scope closed on a live process: SIGKILL that long after its SIGTERM. */
-const FORCE_KILL_AFTER = '1 second';
-
 /** The process llama-webui runs, while it runs. */
 interface Running {
-  readonly handle: ChildProcessSpawner.ChildProcessHandle;
+  /** The process, its readers and its health poll; `ended` once its exit was handled and its scope closed. */
+  readonly program: Followed;
   readonly cmd: BuiltCommand;
-  /** Holds the process, its readers and its health poll. */
-  readonly scope: Scope.Closeable;
-  /** Completed once both readers ended. */
-  readonly drained: Deferred.Deferred<void>;
-  /** Whether someone took on the exit: it is handled once. */
-  readonly claimed: Ref.Ref<boolean>;
-  /** Completed once the exit was handled: the state says so, the scope is closed. */
-  readonly settled: Deferred.Deferred<void>;
 }
 
 /** What the supervisor holds: the state, the last command launched, and the process it runs. */
@@ -74,16 +61,14 @@ const SIGNAL = /signal: '([A-Z0-9]+)'/;
  * The code a process exited with, or the signal that ended it: `exitCode` fails when a signal did, with the signal's
  * name in its cause's message.
  */
-const endingOf = (handle: ChildProcessSpawner.ChildProcessHandle): Effect.Effect<Ending> =>
-  handle.exitCode.pipe(
-    Effect.map((code): Ending => ({ code, signal: null })),
-    Effect.catch((error) =>
-      Effect.succeed<Ending>({
-        code: null,
-        signal: Option.fromNullishOr(SIGNAL.exec(causeMessage(error))?.[1]).pipe(Option.getOrNull),
-      }),
-    ),
-  );
+const endingOf = (ended: Result.Result<ChildProcessSpawner.ExitCode, PlatformError.PlatformError>): Ending =>
+  Result.match(ended, {
+    onSuccess: (code): Ending => ({ code, signal: null }),
+    onFailure: (error): Ending => ({
+      code: null,
+      signal: Option.fromNullishOr(SIGNAL.exec(causeMessage(error))?.[1]).pipe(Option.getOrNull),
+    }),
+  });
 
 /** The message of a platform error's cause (Node's own: `spawn setpriv ENOENT`), else its own. */
 const causeMessage = (error: { readonly message: string; readonly cause?: unknown }): string =>
@@ -142,8 +127,9 @@ export class Supervisor extends Context.Service<
         const ring = yield* LogRing;
         const hub = yield* WsHub;
         const fs = yield* FileSystem.FileSystem;
-        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-        const context = yield* Effect.context<LlamaHttp | FileSystem.FileSystem | Path.Path>();
+        const context = yield* Effect.context<
+          LlamaHttp | FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner
+        >();
         const killTimeout = Duration.fromInputUnsafe(options.killTimeout);
         const procRoot = options.procRoot ?? '/proc';
 
@@ -198,18 +184,14 @@ export class Supervisor extends Context.Service<
 
         const viewOf = (h: Held): ServerView => serverView({ state: h.state, last: Option.getOrNull(h.last) });
 
-        const isThis = (running: Running) => (h: Held) => Option.exists(h.proc, (p) => p === running);
+        const isThis = (running: Running) => (h: Held) => Option.exists(h.proc, (p) => p.program === running.program);
 
         /**
-         * Handles the exit of `running` once, whoever sees it first: waits for the readers (at most 1 s), logs the
-         * exit, sets `idle` after a stop or `crashed` otherwise, closes the process's scope. The others wait for it.
+         * Handles the exit of `running`, once its readers were joined (at most 1 s, `followProgram`): logs the exit,
+         * sets `idle` after a stop or `crashed` otherwise. Its scope is closed next, then `ended` completes.
          */
-        const settle = (running: Running): Effect.Effect<void> =>
+        const exited = (running: Running, ending: Ending): Effect.Effect<void> =>
           Effect.gen(function* () {
-            if (yield* Ref.getAndSet(running.claimed, true)) return yield* Deferred.await(running.settled);
-            const ending = yield* endingOf(running.handle);
-            // Made interruptible for the timeout to end it: the rest runs whatever happens.
-            yield* Deferred.await(running.drained).pipe(Effect.interruptible, Effect.timeoutOption(DRAIN_TIMEOUT));
             yield* ring.push(exitedLine(ending));
             const at = yield* Clock.currentTimeMillis;
             yield* change((now) =>
@@ -231,10 +213,8 @@ export class Supervisor extends Context.Service<
                   })
                 : Option.none(),
             );
-            if (livePid === running.handle.pid) livePid = null;
-            yield* Scope.close(running.scope, Exit.void);
-            yield* Deferred.succeed(running.settled, undefined);
-          }).pipe(Effect.uninterruptible);
+            if (livePid === running.program.handle.pid) livePid = null;
+          });
 
         /** A launch that ended before llama-server ran: the ring says why, the state is `crashed` with the message. */
         const launchFailed = (cmd: BuiltCommand, message: string) =>
@@ -275,7 +255,7 @@ export class Supervisor extends Context.Service<
               isThis(running)(now) && now.state.kind === 'starting'
                 ? Option.some({
                     ...now,
-                    state: { kind: 'ready', ...launchedOf(running.cmd, running.handle.pid), since },
+                    state: { kind: 'ready', ...launchedOf(running.cmd, running.program.handle.pid), since },
                   })
                 : Option.none(),
             );
@@ -348,49 +328,40 @@ export class Supervisor extends Context.Service<
             if (!(yield* fs.exists(cmd.cwd).pipe(Effect.orElseSucceed(() => false)))) {
               return yield* launchFailed(cmd, `directory not found: ${cmd.cwd}`);
             }
-            const scope = yield* Scope.fork(ops);
             const [binary = '', ...args] = cmd.argv;
-            const spawned = yield* spawner
-              .spawn(
-                ChildProcess.make(binary, args, {
-                  cwd: cmd.cwd,
-                  env: { ...cmd.env },
-                  extendEnv: true,
-                  stdin: 'ignore',
-                  forceKillAfter: FORCE_KILL_AFTER,
-                }),
-              )
-              .pipe(Scope.provide(scope), Effect.result);
-            if (spawned._tag === 'Failure') {
-              yield* Scope.close(scope, Exit.void);
-              return yield* launchFailed(cmd, causeMessage(spawned.failure));
-            }
-            const handle = spawned.success;
-            livePid = handle.pid;
-            const running: Running = {
-              handle,
-              cmd,
-              scope,
-              drained: yield* Deferred.make<void>(),
-              claimed: yield* Ref.make(false),
-              settled: yield* Deferred.make<void>(),
-            };
-            yield* Effect.forEach(launchLines(cmd), ring.push, { discard: true });
-            const since = yield* Clock.currentTimeMillis;
-            yield* change((now) =>
-              Option.some({
-                ...now,
-                proc: Option.some(running),
-                state: { kind: 'starting', ...launchedOf(cmd, handle.pid), since },
+            const spawned = yield* followProgram({
+              command: ChildProcess.make(binary, args, {
+                cwd: cmd.cwd,
+                env: { ...cmd.env },
+                extendEnv: true,
+                stdin: 'ignore',
+                forceKillAfter: FORCE_KILL_AFTER,
               }),
-            );
-            // Started once the state names the process: an exit seen at once still finds it to settle.
-            yield* Effect.all([read(handle.stdout), read(handle.stderr)], { concurrency: 2, discard: true }).pipe(
-              Effect.ensuring(Deferred.succeed(running.drained, undefined)),
-              Effect.forkIn(scope),
-            );
-            yield* pollHealth(running).pipe(Effect.forkIn(scope));
-            yield* handle.exitCode.pipe(Effect.ignore, Effect.andThen(settle(running)), Effect.forkIn(ops));
+              parent: ops,
+              name: 'llama-server',
+              // The state names the process before its output is read and its exit watched: an exit seen at once
+              // still finds it.
+              onSpawn: (program) =>
+                Effect.gen(function* () {
+                  const { handle } = program;
+                  livePid = handle.pid;
+                  const running: Running = { program, cmd };
+                  yield* Effect.forEach(launchLines(cmd), ring.push, { discard: true });
+                  const since = yield* Clock.currentTimeMillis;
+                  yield* change((now) =>
+                    Option.some({
+                      ...now,
+                      proc: Option.some(running),
+                      state: { kind: 'starting', ...launchedOf(cmd, handle.pid), since },
+                    }),
+                  );
+                  yield* pollHealth(running).pipe(Effect.forkIn(program.scope));
+                }),
+              read: ({ handle }) =>
+                Effect.all([read(handle.stdout), read(handle.stderr)], { concurrency: 2, discard: true }),
+              onExit: (ended, program) => exited({ program, cmd }, endingOf(ended)),
+            }).pipe(Effect.result);
+            if (spawned._tag === 'Failure') return yield* launchFailed(cmd, causeMessage(spawned.failure));
           }).pipe(Effect.provideContext(context));
 
         const doStop = Effect.gen(function* () {
@@ -406,18 +377,23 @@ export class Supervisor extends Context.Service<
           const running = now.proc.value;
           yield* change((h) =>
             isThis(running)(h) && (h.state.kind === 'starting' || h.state.kind === 'ready')
-              ? Option.some({ ...h, state: { kind: 'stopping', ...launchedOf(running.cmd, running.handle.pid) } })
+              ? Option.some({
+                  ...h,
+                  state: { kind: 'stopping', ...launchedOf(running.cmd, running.program.handle.pid) },
+                })
               : Option.none(),
           );
           // The wait is made interruptible for the timeout to end it, in a finalizer too.
-          const stopped = yield* running.handle
+          const { handle } = running.program;
+          const stopped = yield* handle
             .kill({ killSignal: 'SIGTERM' })
             .pipe(Effect.ignore, Effect.interruptible, Effect.timeoutOption(killTimeout));
           if (Option.isNone(stopped)) {
             yield* ring.push(`[llama-webui] not stopped after ${Duration.toMillis(killTimeout)} ms, SIGKILL`);
-            yield* running.handle.kill({ killSignal: 'SIGKILL' }).pipe(Effect.ignore);
+            yield* handle.kill({ killSignal: 'SIGKILL' }).pipe(Effect.ignore);
           }
-          yield* settle(running);
+          // Its exit handled by the fiber that watches it: the state says so, its scope is closed.
+          yield* running.program.ended;
         });
 
         /** Runs `operation` in a fiber of `ops` and waits for it: the caller may go away, the operation runs to its end. */
