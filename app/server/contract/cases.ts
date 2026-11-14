@@ -82,6 +82,9 @@ export function cases(ctx: { asset: string } & Binaries): Case[] {
 
   add('read', 'GET /api/health', bare('GET', '/api/health'));
   add('read', 'GET /api/settings', bare('GET', '/api/settings'));
+  add('read', 'GET /api/logs', bare('GET', '/api/logs'));
+  add('read', 'GET /api/logs?since=0', bare('GET', '/api/logs?since=0'));
+  add('violation', 'GET /api/logs?since=abc (not a line number)', bare('GET', '/api/logs?since=abc'));
 
   // The guard: DNS rebinding (a domain as Host) and another site's page.
   add('guard', 'GET /api/health (foreign Origin)', bare('GET', '/api/health', { Origin: 'http://evil.example' }));

@@ -6,6 +6,7 @@ import { AppInfo } from './config/AppInfo.ts';
 import * as Db from './db/Db.ts';
 import { Flags } from './flags/Flags.ts';
 import { HttpLive } from './http/HttpLive.ts';
+import { LogRing } from './logs/LogRing.ts';
 import { ProfilesRepo } from './profiles/ProfilesRepo.ts';
 import { Shutdown } from './runtime/Shutdown.ts';
 import { SettingsRepo } from './settings/SettingsRepo.ts';
@@ -16,6 +17,7 @@ import { WsHub } from './ws/WsHub.ts';
  * is opened (and brought up to date) first. Later tasks add theirs, each on `Shutdown.layer`.
  */
 const Services = Flags.layer.pipe(
+  Layer.provideMerge(LogRing.layer),
   Layer.provideMerge(Layer.mergeAll(WsHub.layer, SettingsRepo.layer, ProfilesRepo.layer)),
   Layer.provideMerge(AppInfo.layer),
   Layer.provideMerge(Db.layer),

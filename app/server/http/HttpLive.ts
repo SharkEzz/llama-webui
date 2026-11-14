@@ -9,6 +9,7 @@ import { AppConfig } from '../config/AppConfig.ts';
 import { AppInfo } from '../config/AppInfo.ts';
 import { FlagsHandlers } from '../flags/http.ts';
 import { HealthHandlers } from '../health/http.ts';
+import { LogsHandlers } from '../logs/http.ts';
 import { ProfilesHandlers } from '../profiles/http.ts';
 import { SettingsHandlers } from '../settings/http.ts';
 import { WsHub } from '../ws/WsHub.ts';
@@ -33,7 +34,7 @@ const UnknownApi = HttpRouter.add(
 export const ApiRoutes = Layer.merge(
   HttpApiBuilder.layer(Api).pipe(
     Layer.provide(
-      Layer.mergeAll(HealthHandlers, SettingsHandlers, ProfilesHandlers, FlagsHandlers).pipe(
+      Layer.mergeAll(HealthHandlers, SettingsHandlers, ProfilesHandlers, FlagsHandlers, LogsHandlers).pipe(
         Layer.provideMerge(RequestErrorsLive),
       ),
     ),

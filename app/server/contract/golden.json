@@ -35,6 +35,46 @@
       "env": {}
     }
   },
+  "GET /api/logs": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "lines": [],
+      "seq": 0,
+      "bootId": "<bootId>"
+    }
+  },
+  "GET /api/logs?since=0": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "lines": [],
+      "seq": 0,
+      "bootId": "<bootId>"
+    }
+  },
+  "GET /api/logs?since=abc (not a line number)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a string matching the RegExp ^\\d+$ (since)",
+      "issues": [
+        {
+          "path": [
+            "since"
+          ],
+          "message": "Expected a string matching the RegExp ^\\d+$"
+        }
+      ]
+    }
+  },
   "GET /api/health (foreign Origin)": {
     "status": 403,
     "headers": {
