@@ -10,13 +10,13 @@ import {
   Option,
   Queue,
   Ref,
-  Scope,
   String as Str,
   Stream,
 } from 'effect';
 import { Ndjson } from 'effect/encoding';
 import { dual } from 'effect/Function';
-import { ChildProcess, ChildProcessSpawner } from 'effect/process';
+import { ChildProcess, type ChildProcessSpawner } from 'effect/process';
+import { followProgram } from '../../process/followed.ts';
 import type { GpuNeeds, NvidiaReader } from '../gpu.ts';
 import { FromSampler, type NvmlProc, type NvmlSnapshot, type NvmlSystem, ToSampler } from './protocol.ts';
 
@@ -124,14 +124,12 @@ export interface NvmlReader extends NvidiaReader {
   readonly system: Effect.Effect<NvmlSystem | null>;
 }
 
-/** How long the end of the sampler waits for its reader: its last messages are not lost. */
-const DRAIN_TIMEOUT = '1 second';
-
 /**
  * Starts the sampler (`command`, else `node worker.ts` next to this module) in a scope of its own forked from the
  * caller's, and waits for its `ready` up to `readyTimeout` (3 s): none, the sampler killed, on a timeout, an `error`
  * or an exit before it. After `ready`, each sample updates the state; an `error` or an exit clears the readings for
- * good (no restart, no switch to nvidia-smi). The end of the caller's scope kills the sampler with SIGKILL, at once.
+ * good (no restart, no switch to nvidia-smi). The end of the caller's scope kills the sampler with SIGKILL, at once;
+ * a kill waits 1 s at most for a sampler stuck in the driver to be gone (`followProgram`).
  */
 export const startNvml = Effect.fn('startNvml')(function* (options: {
   readonly intervalMs: number;
@@ -140,40 +138,14 @@ export const startNvml = Effect.fn('startNvml')(function* (options: {
   readonly command?: { readonly cmd: string; readonly args: ReadonlyArray<string> };
   readonly readyTimeout?: Duration.Input;
 }) {
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const scope = yield* Effect.scope;
-  const own = yield* Scope.fork(scope);
   const command = options.command ?? {
     cmd: process.execPath,
     // `node:ffi` is experimental: its warning would print on every start.
     args: ['--disable-warning=ExperimentalWarning', workerPath(import.meta.url)],
   };
-  const spawned = yield* spawner
-    .spawn(
-      ChildProcess.make(command.cmd, command.args, {
-        stdin: 'pipe',
-        stdout: 'pipe',
-        stderr: 'inherit',
-        // A sampler stuck in the driver is not asked to stop.
-        killSignal: 'SIGKILL',
-      }),
-    )
-    .pipe(Scope.provide(own), Effect.result);
-  if (spawned._tag === 'Failure') {
-    yield* Scope.close(own, Exit.void);
-    return Option.none<NvmlReader>();
-  }
-  const handle = spawned.success;
 
   const outbox = yield* Queue.unbounded<ToSampler, Cause.Done>();
-  yield* Stream.fromQueue(outbox).pipe(
-    Stream.pipeThroughChannel(Ndjson.encodeSchemaString(ToSampler)()),
-    Stream.encodeText,
-    Stream.run(handle.stdin),
-    Effect.ignore,
-    Effect.forkIn(own),
-  );
-
   const state = yield* Ref.make<NvmlState>({
     gpus: [],
     procs: [],
@@ -191,50 +163,66 @@ export const startNvml = Effect.fn('startNvml')(function* (options: {
     Effect.andThen(Deferred.succeed(ready, false)),
   );
   /** Dead, and killed at once, from a fiber of the caller's scope: the reader that calls it is in the sampler's. */
-  const abandon = die.pipe(
-    Effect.andThen(handle.kill({ killSignal: 'SIGKILL' }).pipe(Effect.ignore, Effect.forkIn(scope))),
-    Effect.asVoid,
-  );
+  const abandon = (handle: ChildProcessSpawner.ChildProcessHandle) =>
+    die.pipe(
+      Effect.andThen(handle.kill({ killSignal: 'SIGKILL' }).pipe(Effect.ignore, Effect.forkIn(scope))),
+      Effect.asVoid,
+    );
 
-  const onMessage = (message: FromSampler) =>
+  const onMessage = (handle: ChildProcessSpawner.ChildProcessHandle) => (message: FromSampler) =>
     Effect.gen(function* () {
       if (message.type === 'ready') return yield* Deferred.succeed(ready, true);
       // Gone for good: the end of its stdin would end it, the kill does it at once.
-      if (message.type === 'error') return yield* abandon;
+      if (message.type === 'error') return yield* abandon(handle);
       const now = yield* Clock.currentTimeMillis;
       return yield* Ref.update(state, onSample(message.snapshot, now));
     });
 
-  /*
-   * The reader. Its stdout ended, or a line is not a message (a stray print, a native library writing to fd 1): the
-   * sampler is abandoned, since nothing reads its stdout any more and it would freeze on a full pipe. Only the close of
-   * its scope (an interruption) ends the reader quietly.
-   */
-  const drained = yield* Deferred.make<void>();
-  yield* handle.stdout.pipe(
-    Stream.pipeThroughChannel(Ndjson.decodeSchema(FromSampler)({ ignoreEmptyLines: true })),
-    Stream.runForEach(onMessage),
-    Effect.onExit((exit) =>
-      Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)
-        ? Effect.void
-        : Effect.gen(function* () {
-            if (Exit.isFailure(exit))
-              yield* Effect.logWarning('the NVML sampler wrote what is not a message: it is stopped', exit.cause);
-            yield* abandon;
-          }),
-    ),
-    Effect.ignore,
-    Effect.ensuring(Deferred.succeed(drained, undefined)),
-    Effect.forkIn(own),
-  );
-  // Once it exits, its reader is joined (1 s at most): then it is dead, and its scope is closed.
-  yield* handle.exitCode.pipe(
-    Effect.ignore,
-    Effect.andThen(Deferred.await(drained).pipe(Effect.interruptible, Effect.timeoutOption(DRAIN_TIMEOUT))),
-    Effect.andThen(die),
-    Effect.andThen(Scope.close(own, Exit.void)),
-    Effect.forkIn(scope),
-  );
+  const spawned = yield* followProgram({
+    command: ChildProcess.make(command.cmd, command.args, {
+      stdin: 'pipe',
+      stdout: 'pipe',
+      stderr: 'inherit',
+      // A sampler stuck in the driver is not asked to stop.
+      killSignal: 'SIGKILL',
+    }),
+    parent: scope,
+    name: 'the NVML sampler',
+    // Its stdin, fed from the queue.
+    onSpawn: ({ handle, scope: own }) =>
+      Stream.fromQueue(outbox).pipe(
+        Stream.pipeThroughChannel(Ndjson.encodeSchemaString(ToSampler)()),
+        Stream.encodeText,
+        Stream.run(handle.stdin),
+        Effect.ignore,
+        Effect.forkIn(own),
+        Effect.asVoid,
+      ),
+    /*
+     * The reader. Its stdout ended, or a line is not a message (a stray print, a native library writing to fd 1): the
+     * sampler is abandoned, since nothing reads its stdout any more and it would freeze on a full pipe. Only the close
+     * of its scope (an interruption) ends the reader quietly.
+     */
+    read: ({ handle }) =>
+      handle.stdout.pipe(
+        Stream.pipeThroughChannel(Ndjson.decodeSchema(FromSampler)({ ignoreEmptyLines: true })),
+        Stream.runForEach(onMessage(handle)),
+        Effect.onExit((exit) =>
+          Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause)
+            ? Effect.void
+            : Effect.gen(function* () {
+                if (Exit.isFailure(exit))
+                  yield* Effect.logWarning('the NVML sampler wrote what is not a message: it is stopped', exit.cause);
+                yield* abandon(handle);
+              }),
+        ),
+        Effect.ignore,
+      ),
+    // Once it exited and its reader is joined: dead, then its scope is closed.
+    onExit: () => die,
+  }).pipe(Effect.result);
+  if (spawned._tag === 'Failure') return Option.none<NvmlReader>();
+  const sampler = spawned.success;
 
   yield* Queue.offer(outbox, {
     type: 'start',
@@ -247,7 +235,7 @@ export const startNvml = Effect.fn('startNvml')(function* (options: {
     Effect.map(Option.getOrElse(() => false)),
   );
   if (!answered) {
-    yield* Scope.close(own, Exit.void);
+    yield* sampler.stop;
     return Option.none<NvmlReader>();
   }
 

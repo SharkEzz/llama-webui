@@ -19,6 +19,8 @@ import {
 } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 import { isAlive } from '../../llama/procScan.ts';
+import { CLOSE_BOUND } from '../../process/followed.ts';
+import { stuckRelease } from '../../testing/stuckRelease.ts';
 import { MEASURE_ALL } from '../gpu.ts';
 import { isFresh, type NvmlState, onConfigure, onSample, procVramOf, startNvml, workerPath } from './Nvml.ts';
 import { type NvmlSnapshot, ToSampler } from './protocol.ts';
@@ -255,6 +257,50 @@ layer(NodeServices.layer, { excludeTestServices: true })('the NVML reader', (it)
         assert.strictEqual(pids.length, 1);
         const alive = yield* isAlive(pids[0] ?? 0);
         assert.isFalse(alive);
+      }),
+    ),
+  );
+
+  it.effect(
+    'a sampler killed but stuck in the kernel is given up after the ready timeout and the bound of its close',
+    () =>
+      withFakes((ws) =>
+        Effect.gen(function* () {
+          const stuck = yield* stuckRelease;
+          const [elapsed, found] = yield* startNvml({
+            intervalMs: 1000,
+            needs: MEASURE_ALL,
+            lib: Option.none(),
+            command: ws.command('silent'),
+            readyTimeout: '300 millis',
+          }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, stuck.spawner), Effect.timed);
+          // None, for the nvidia-smi fallback: the close of the sampler that never came back does not hold the start.
+          assert.isTrue(Option.isNone(found));
+          assert.isBelow(Duration.toMillis(elapsed), 300 + Duration.toMillis(CLOSE_BOUND) + 700);
+          const pids = yield* ws.pids;
+          assert.strictEqual(pids.length, 1);
+          const alive = yield* isAlive(pids[0] ?? 0);
+          assert.isFalse(alive);
+          yield* stuck.unstick;
+        }),
+      ),
+  );
+
+  it.effect('the end of the scope of a sampler killed but stuck in the kernel returns within the bound', () =>
+    withFakes((ws) =>
+      Effect.gen(function* () {
+        const stuck = yield* stuckRelease;
+        const scope = yield* Scope.make();
+        const found = yield* startNvml({
+          intervalMs: 100,
+          needs: MEASURE_ALL,
+          lib: Option.none(),
+          command: ws.command('ready-then-sample'),
+        }).pipe(Scope.provide(scope), Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, stuck.spawner));
+        assert.isTrue(Option.isSome(found));
+        const [elapsed] = yield* Effect.timed(Scope.close(scope, Exit.void));
+        assert.isBelow(Duration.toMillis(elapsed), Duration.toMillis(CLOSE_BOUND) + 500);
+        yield* stuck.unstick;
       }),
     ),
   );
