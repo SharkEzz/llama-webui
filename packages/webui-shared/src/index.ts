@@ -4,6 +4,15 @@ export { type SseEvent, SseParser } from 'llamacpp-js/sse';
 // The HTTP API (Effect `HttpApi`): served by the server, its client derived by the web.
 export { Api } from './api/Api.ts';
 export {
+  ChatApi,
+  ChatSseEvent,
+  ConversationNotFound,
+  EmptyMessage,
+  NoReplyInProgress,
+  NothingToRegenerate,
+  ReplyInProgress,
+} from './api/ChatApi.ts';
+export {
   describeIssue,
   Issue,
   issuesOf,

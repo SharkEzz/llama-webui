@@ -63,7 +63,7 @@ async function openStream(req: Promise<StreamReply>): Promise<StreamReply | null
   return res;
 }
 
-const replace = (messages: ChatMessage[], m: ChatMessage) => messages.map((x) => (x.id === m.id ? m : x));
+const replace = (messages: ReadonlyArray<ChatMessage>, m: ChatMessage) => messages.map((x) => (x.id === m.id ? m : x));
 
 export const useChat = create<ChatState>((set, get) => {
   /** Follows a stream: text accumulates and is pushed to the store only once per frame. */

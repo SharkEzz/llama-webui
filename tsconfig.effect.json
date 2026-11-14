@@ -204,6 +204,7 @@
             // Its Effect modules follow the server's rules. Each milestone adds the modules it moves to Schema.
             "include": [
               "packages/webui-shared/src/api/**/*.ts",
+              "packages/webui-shared/src/chat.ts",
               "packages/webui-shared/src/logs.ts",
               "packages/webui-shared/src/monitor.ts",
               "packages/webui-shared/src/profile.ts",
