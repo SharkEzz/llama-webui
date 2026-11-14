@@ -96,6 +96,54 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 - A result per key computed once: `Cache.makeWith(lookup, { capacity, timeToLive })`, a failure kept for
   `Duration.zero` so the next call runs it again; concurrent gets of one key share the lookup.
 
+## A long-lived process and the state around it
+
+The model is `app/server/supervisor/Supervisor.ts`.
+
+- **A long-lived process** is spawned into a scope of its own (`Scope.fork` of a scope the layer owns, then
+  `Scope.provide(scope)` on `spawner.spawn`), never the caller's. Its readers and its health poll are forked into
+  that scope, and the fiber that watches its exit into the layer's scope of operations. When it exits, join the
+  readers first (a `Deferred` completed by `Effect.ensuring`, awaited 1 s at most), then close its scope: closing it
+  at once loses the last lines. `handle.exitCode` fails when a signal ended the process; read the signal from the
+  message of its cause (`/signal: '([A-Z0-9]+)'/`). A stop in two signals:
+  `handle.kill({ killSignal: 'SIGTERM' }).pipe(Effect.interruptible, Effect.timeoutOption(timeout))`, then
+  `kill({ killSignal: 'SIGKILL' })` on none. `Effect.interruptible` lets the timeout end the wait, in a finalizer
+  too. `forceKillAfter` of `ChildProcess.make` is the backstop of a scope closed on a live process.
+- **An operation that outlives its request** (a start, a stop) runs in a fiber of the layer's scope
+  (`Effect.forkIn(operation, ops)`), and the caller joins it inside `Effect.uninterruptibleMask` with `restore`: a
+  caller that goes away stops waiting, and the operation runs to its end. For one at a time, use `Semaphore.make(1)`:
+  `Semaphore.takeIfAvailable` (released by `Effect.ensuring`) for an operation that is refused while another runs,
+  `withPermits(1)` for one that waits.
+- **State shared by several fibers** is one `SynchronizedRef` with one function that changes it. In `change(f)`, `f`
+  sees what is held and answers the next value, or none. The new state is published inside
+  `SynchronizedRef.modifyEffect`, so the messages leave in the order of the changes. `f` checks that the state is
+  still the one its caller saw (the same process, still `starting`), so a late answer never undoes a newer state.
+- **`LlamaHttp`** (`app/server/llama/LlamaHttp.ts`) is the client of every request to a llama-server, under its own
+  tag (`Context.Service<LlamaHttp, HttpClient.HttpClient>`). It is not `HttpClient.HttpClient`: in the HTTP tests that
+  tag is the test server's client, and Hugging Face gets its own client (E6, with the proxy).
+  - It is `NodeHttpClient.layerNodeHttpOptions({ keepAlive: false })`: no proxy, no limit on the headers or on the
+    body, and a socket of its own per request.
+  - It is wrapped in `HttpClient.withScope`, so each request belongs to its caller's scope. A probe is therefore
+    `client.get(url).pipe(Effect.map((r) => r.status), Effect.scoped)` under its own timeout, and leaving a streamed
+    body aborts its request.
+  - The probes and `/props` are in `app/server/llama/probes.ts`; `/proc` is read through `FileSystem`
+    (`llama/procScan.ts`).
+- **The tiers of `Services`** (`app/server/App.ts`): each `Layer.provideMerge` is a tier, built after the ones below
+  it and undone before them.
+  - From the bottom: the database, `AppInfo`, the hub and the repositories, the ring and `LlamaHttp`, `Flags`, the
+    supervisor, the watch.
+  - The watch ends first (no look while the rest stops). The supervisor stops llama-server while the ring and the
+    hub it writes to are still up. The database closes last.
+  - All of it runs after the shutdown steps and after the HTTP server closed (`Shutdown.layerRunner`, E1).
+  - A service's own end goes in its layer (`Effect.addFinalizer`, `Effect.acquireRelease`). It is a shutdown step
+    only when it must run while the clients are still connected.
+- **A scoped background loop** (`app/server/supervisor/ExternalWatch.ts`) is
+  `Layer.effectDiscard(check.pipe(Effect.repeat(Schedule.spaced(interval)), Effect.forkScoped))`:
+  - its first run starts at once without holding the start of the app;
+  - each next run starts `interval` after the previous one ended, so one runs at a time;
+  - the end of the layer interrupts it;
+  - its interval is an option of `layerWith`.
+
 ## SQL
 
 - Through `SqlClient` (`@effect/sql-sqlite-node`), opened by `app/server/db/Db.ts`; migrations in
@@ -142,6 +190,20 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
   outside it (`start({ scope })` in `ws/WsHub.test.ts`), then closes that scope: the client sees the stop.
 - Effect's `HashSet` and `Equal` compare structurally: two pending `Deferred`s are equal and a `HashSet` of them has
   one member. Keep identities in a native `Set` (the hub's clients, `ws/WsHub.ts`).
+- **Tests on real time** (processes, sockets, schedules): `layer(L, { excludeTestServices: true })('…', (it) => …)`.
+  Without it, `it.effect` runs on the `TestClock`, and a poll, a schedule or a timeout never moves. Inside a shared
+  layer, `it.live` does not exist.
+  - `buildPerTest: true` gives each test a fresh layer.
+  - The durations of a service are options of its `layerWith` (`Supervisor.layerWith({ killTimeout, healthPoll })`,
+    `ExternalWatch.layerWith({ interval })`), shortened in `ServicesTest`.
+  - `app/server/testing/llama.ts` holds the fake llama-server (`FAKE`, `testdata/fake/`), `freePort`, `httpStub`, a
+    fake started outside the supervisor (`fakeOutside`), and the start of the fake through the API of a running build
+    (`startFakeThrough`).
+  - A test that starts a process asserts that it is dead at the end.
+  - Every profile of a test sets its own free port, and every test of the watch sets the `port` setting to a free
+    one: never 8080, where a real llama-server may listen.
+  - The data folder of a build or of `vite dev` that a test runs is seeded with a free `port` setting before the start
+    (`seedWatchPort` of `app/server/testing/seed.ts`).
 - Black-box suites (`lifecycle.test.ts`, `contract/`, `build.test.ts`, `dev.test.ts`) are plain Node against the build
   (`launch()` of `app/server/testing/launch.ts`) and never pick port 7860 or 7861.
 

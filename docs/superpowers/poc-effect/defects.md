@@ -18,7 +18,7 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 | Where                                      | Defect                                                                                                                                                                                                   | Status    | Ported at |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
 | `lib/tuning/memo.ts:16`                    | `benchBinary(settings.get().binary)` gets the setting without `~` expanded: with a `~/…` binary the device listing of Tuning fails, and with it `POST /api/sweeps`. `GET /api/bench/devices` expands it. | confirmed | E7, E8    |
-| `lib/setup.ts:61`, `lib/bench/hardware.ts` | The raw `binary` setting goes to `buildOf`, which does not expand `~` either: `version` is null in the setup report for a `~/…` binary.                                                                  | confirmed | E3        |
+| `lib/setup.ts:61`, `lib/bench/hardware.ts` | The raw `binary` setting goes to `buildOf`, which does not expand `~` either: `version` is null in the setup report for a `~/…` binary.                                                                  | confirmed | E8        |
 
 ## Reported, to verify with the milestone's plan
 
@@ -33,13 +33,20 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 
 ### E3: supervisor, logs, setup
 
-- `profileId` is coerced with `Number()`: a value of the wrong kind answers 404 instead of a validation error. `unverified`
-- A failed launch still answers 202 and remembers the profile as the last started. `unverified`
-- A refused start can set the state to `external` before its 409. `unverified`
-- A start has no deadline. `unverified`
-- `LLAMA_ARG_LOG_VERBOSITY` is only looked for in the environment of the profile and of the settings. `unverified`
-- `server-state` is never sent to a client when it connects. `unverified`
-- The supervisor calls the global `fetch`: the proxy of the environment applies to its requests to llama-server. `unverified`
+- `profileId` is coerced with `Number()`: a value of the wrong kind answers 404 instead of a validation error.
+  `fixed in E3`: `profileId` is a strict integer, anything else a 400 `RequestInvalid` (`supervisor/http.test.ts`).
+- A failed launch still answers 202 and remembers the profile as the last started. `design choice`: the state
+  `crashed` carries the message a person acts on, and restart takes the profile once it is fixed; ported as it is.
+- A refused start can set the state to `external` before its 409. `design choice`: the start found a llama-server
+  on the port, and the state says so (the 409 names its pid); ported as it is.
+- A start has no deadline. `design choice`: a large model can load for many minutes, and a stop ends the wait;
+  ported as it is (the health poll stays `starting` on a 503).
+- `LLAMA_ARG_LOG_VERBOSITY` is only looked for in the environment of the profile and of the settings. `design choice`:
+  those are what a person sets for llama-server; ported as it is (`supervisor/command.test.ts`).
+- `server-state` is never sent to a client when it connects. `not a defect`: after `hello` the web reads
+  `GET /api/state`, on every (re)connection; ported as it is.
+- The supervisor calls the global `fetch`: the proxy of the environment applies to its requests to llama-server.
+  `fixed in E3`: every request to a llama-server goes through `LlamaHttp`, direct (`llama/LlamaHttp.test.ts`).
 
 ### E4: monitor and collectors
 
@@ -113,3 +120,38 @@ Found while porting E2, accepted with its result:
 Decided (user, 2026-11-14): the llama-tui import is not ported (llama-tui was never deployed beyond the user): its two
 endpoints, the `llamaTuiImportDismissed` setting and the import banner are dropped. The generic import still reads a
 `{ profiles }` file, and `duplicate` still turns a `llama-tui` source into `import`.
+
+Decided (the E3 plan):
+
+- The launchpad (`GET /api/launchpad`), the Home page and the "Run setup again" button of Settings move to E8, with the
+  confirmed defect of `lib/setup.ts:61` (the launchpad needs the GGUF reader, the bench runs, the estimate, the tuning
+  hardware and the monitor).
+- The 409 `A benchmark is running` of the four lifecycle routes, the pause of the external watch during a benchmark and
+  the bench gate's use of the supervisor move to E7, with the bench runner; no stand-in until then.
+- `profileId` of start and switch is a strict integer (`"1"` and `true` selected profile 1; a value that was no integer
+  answered 404): now a 400 `RequestInvalid`. `since` of `/api/logs` is a non-negative integer in decimal digits (a
+  negative value returned the whole ring, anything else counted as 0): now a 400.
+- Every request to a llama-server is direct (`LlamaHttp`): the probes and `/props` no longer go through the proxy of
+  the environment for a non-loopback host. The Hugging Face client keeps the proxy (E6).
+- The 409s and 502s keep their messages and are told by their tag: `OperationInProgress`, `ServerAlreadyRunning`,
+  `PortInUse` (with `port`, `by`, `pid`), `NoProfileToRestart`, `ServerNotReady`, `PropsUnavailable`, and
+  `ProfileRunning` on the profile deletion.
+- A lifecycle operation runs to its end whatever happens to the request that asked for it.
+
+Found while porting E3, accepted with its result:
+
+- A spawn failure is Node's own message (`spawn setpriv ENOENT`); the Nitro server's diagnosis of the `PATH` of the
+  child's environment is dropped. A missing llama-server binary is a crash with code 127 (`setpriv` prints why).
+- `GGML_CUDA_P2P` in llama-webui's own environment is read through `Config`, where an empty value reads as absent; in
+  the `env` of the settings or of the profile any value counts, as before.
+- A `log` message carries what was pushed since the last turn of the ring's publishing fiber (was: one microtask).
+- `server-state` is published by the step that changes the state, under its lock: a step that leaves the state as it
+  was publishes nothing, and a late answer (the health poll, the watch) never undoes a newer state.
+- At an exit, the readers of llama-server's output are joined (1 s at most) before the exit line, so its last line is
+  in the ring before `llama-server exited`.
+- The stop at shutdown is the finalizer of the supervisor's layer: it waits for an operation in progress, and logs
+  `stopping llama-server…` through Effect's logger (was a `console` line prefixed `[llama-webui]`).
+- The external watch looks again 2 s after its previous look ended (`Schedule.spaced`), not on a 2 s clock.
+- `/proc` is read through `FileSystem` (`llama/procScan.ts`), not by `findLlamaServerPid` of `llamacpp-js`.
+- `LlamaHttp` has no null body (204, 205, 304, HEAD) and no `TypeError` on a `Request` or an odd body: a request is an
+  `HttpClientRequest`.

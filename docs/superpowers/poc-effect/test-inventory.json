@@ -1227,91 +1227,112 @@
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: sends the method, headers and body; answers a Response with the status, headers and body",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > sends the method, the headers and the body, and answers the status, the headers and the body"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: a GET by default, and an error status is a Response, not a rejection",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > an error status is a response, not a failure"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: a status without a body (204) has a null body",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "An Effect response has no null body"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: the body is streamed as it arrives, and cancelling it closes the connection",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > the body is streamed as it arrives, and leaving it closes the connection"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: nothing listening is a TypeError \"fetch failed\" with its cause, like fetch",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > nothing listening fails with a transport error"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: a signal aborted before the answer rejects with its reason (a timeout stays a TimeoutError)",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > a timeout before the answer ends the request and closes the connection"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: a signal aborted during the body breaks the stream with its reason",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > the body is streamed as it arrives, and leaving it closes the connection",
+    "reason": "An abort is the interruption of the reader: leaving the body"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: a connection cut during the body breaks the stream",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > a connection cut during the body fails the stream"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: stays direct when the environment sets a proxy",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/llama/LlamaHttp.test.ts > LlamaHttp > stays direct when the environment sets a proxy"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "llamaFetch: streamChatCompletion streams through it and stops the request when left early",
-    "milestone": "E3"
+    "milestone": "E5"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "downloadFetch: a redirect is the response, with its location, not followed",
-    "milestone": "E3"
+    "milestone": "E6"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "downloadFetch: sends the headers, streams the body, and an abort during it breaks the stream",
-    "milestone": "E3"
+    "milestone": "E6"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "downloadFetch: an https URL goes through node:https (TLS against a plain HTTP server fails like fetch)",
-    "milestone": "E3"
+    "milestone": "E6"
   },
   {
     "project": "server",
     "file": "app/server/lib/llamaFetch.test.ts",
     "name": "downloadFetch: goes through the proxy of the environment, like fetch",
-    "milestone": "E3"
+    "milestone": "E6"
   },
   {
     "project": "server",
     "file": "app/server/lib/logs/lines.test.ts",
     "name": "the idle loop line of -lv 4 is noise, the request lines are not (#16)",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/logs/lines.test.ts > the idle loop line of -lv 4 is noise, the request lines are not (#16)"
   },
   {
     "project": "server",
@@ -1551,73 +1572,91 @@
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "spawnProc pipes stdout and stderr and reports the exit code",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > the ring holds the launch line, then what llama-server wrote, without the idle noise"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "a process killed by a signal has no exit code",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > a crash: crashed with the exit code; killed from outside: crashed with the signal and no code"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "timeout kills the process with killSignal",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/flags/Flags.test.ts > Flags > a --help that never ends fails after 5 s and its process is gone"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "kill() after the exit does not throw",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "effect/process and FileSystem own it"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "cwd and env reach the process",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > cwd and the environment reach llama-server: the settings variables, the profile ones over them, llama-webui's own under both"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "a spawn failure throws at once, naming the binary and the cause",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > a launch that cannot spawn is crashed with the cause"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "a spawn failure is diagnosed with the PATH of the child environment, a directory is not executable",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "effect/process and FileSystem own it: the message of a spawn failure is Node's"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "an error event after the start (a failed kill) does not crash the process",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "effect/process and FileSystem own it"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "which looks the binary up in the PATH",
-    "milestone": "E3"
+    "milestone": "E7"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads [start, end)",
-    "milestone": "E3"
+    "milestone": "E6"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads in 1 MiB chunks, so the disk speed check is not held back by the stream",
-    "milestone": "E3"
+    "milestone": "E6"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileExists is true for a file only, readText reads UTF-8",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "dropped",
+    "reason": "FileSystem owns it"
   },
   {
     "project": "server",
@@ -1647,7 +1686,9 @@
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "/api/server/props: a reply from llama-server that is not JSON is a 502 (#37)",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/http.test.ts > ServerApi over HTTP > props: llama-server's JSON as it is when ready; a 409 ServerNotReady when idle or starting; a 502 for an error status, for a body that is not JSON (#37) and for no answer"
   },
   {
     "project": "server",
@@ -1786,109 +1827,145 @@
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "builds argv with pdeathsig and mandatory flags",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > builds argv with pdeathsig and mandatory flags"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "~ in model and mmproj is expanded for llama-server, which runs without a shell",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > ~ in model and mmproj is expanded for llama-server, which runs without a shell"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "profilePaths: the files as llama-server opens them, from its cwd, ~ expanded everywhere",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > profilePaths: the files as llama-server opens them, from its cwd, ~ expanded everywhere"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "profile port/host override server",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > profile port/host override server"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "display omits setpriv prefix and quotes spaces",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > display omits setpriv prefix and quotes spaces"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "env merges process env with profile env",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/command.test.ts > command > the settings variables then the profile ones are laid over the environment; app/server/supervisor/Supervisor.test.ts > Supervisor > cwd and the environment reach llama-server: the settings variables, the profile ones over them, llama-webui's own under both",
+    "reason": "The command holds the settings and profile variables; llama-webui's own environment is laid under them by the spawn (extendEnv)"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "cwd defaults to process.cwd()",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > cwd defaults to process.cwd()"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "shellQuote",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/shell.test.ts > shellQuote"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "shellSplit undoes shellQuote",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/shell.test.ts > shellSplit undoes shellQuote"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "shellSplit reads what a user types: spaces separate, quotes group",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/shell.test.ts > shellSplit reads what a user types: spaces separate, quotes group"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "shellSplit says why it cannot read a line",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/shell.test.ts > shellSplit says why it cannot read a line"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "adds -lv 4 so the buffer sizes are logged, unless the profile sets a verbosity (#16)",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > adds -lv 4 so the buffer sizes are logged, unless the profile sets a verbosity (#16)"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "the binary setting is run with ~ expanded (#32)",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > the binary setting is run with ~ expanded (#32)"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "launchLines: the launch line, plus the peer-to-peer one when GGML_CUDA_P2P is set, whatever its value",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > launchLines: the launch line, plus the peer-to-peer one when GGML_CUDA_P2P is set, whatever its value"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/args.test.ts",
     "name": "the settings variables are in the environment, under the profile ones, and can set the verbosity",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/server/supervisor/command.test.ts > command > the settings variables are in the environment, under the profile ones, and can set the verbosity"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/external.test.ts",
     "name": "no external server is detected while a benchmark owns the port",
-    "milestone": "E3"
+    "milestone": "E7"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/external.test.ts",
     "name": "after a crash, the settings port and the last profile port are watched (#39, #28)",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/ExternalWatch.test.ts > ExternalWatch > after a crash, the settings port and the last profile port are watched (#39, #28)"
   },
   {
     "project": "server",
     "file": "app/server/lib/supervisor/supervisor.test.ts",
     "name": "stop() leaves no timer keeping the process alive once llama-server has exited",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "rewritten",
+    "to": "app/server/supervisor/Supervisor.test.ts > Supervisor > stop returns as soon as llama-server exited, long before the kill timeout",
+    "reason": "The wait is an Effect timeout: no timer outlives the stop by construction"
   },
   {
     "project": "server",
@@ -2458,13 +2535,17 @@
     "project": "web",
     "file": "app/src/lib/props.test.ts",
     "name": "isRecord: a JSON object only",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/src/lib/props.test.ts > isRecord: a JSON object only"
   },
   {
     "project": "web",
     "file": "app/src/lib/props.test.ts",
     "name": "serverPropsOf keeps the fields of the right type and drops the others",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "app/src/lib/props.test.ts > serverPropsOf keeps the fields of the right type and drops the others"
   },
   {
     "project": "web",
@@ -2626,13 +2707,17 @@
     "project": "shared",
     "file": "packages/webui-shared/src/logs.test.ts",
     "name": "onBoot: same boot → nothing changes; another boot → everything starts over, hiding included",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/logs.test.ts > onBoot: same boot → nothing changes; another boot → everything starts over, hiding included"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/logs.test.ts",
     "name": "mergeLogs: append at the end, deduplicated and sorted replay, cap",
-    "milestone": "E3"
+    "milestone": "E3",
+    "status": "ported",
+    "to": "packages/webui-shared/src/logs.test.ts > mergeLogs: append at the end, deduplicated and sorted replay, cap"
   },
   {
     "project": "shared",

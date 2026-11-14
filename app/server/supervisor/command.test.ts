@@ -178,4 +178,12 @@ layer(Path.layer)('command', (it) => {
       assert.notInclude(cmd.argv, '-lv');
     }),
   );
+
+  it.effect('a stored profile is launched with its arguments as stored, a reserved flag included', () =>
+    Effect.gen(function* () {
+      // `ProfileInput` refuses `--port` on a write; a row read back has no input rule.
+      const cmd = yield* commandWith(p({ name: 'q', model: 'm.gguf', args: ['--port', '9000', '-c', '512'] }));
+      assert.include(Arr.join(cmd.argv, ' '), '-m m.gguf --port 9000 -c 512 -lv 4 --host 0.0.0.0 --port 8080');
+    }),
+  );
 });
