@@ -43,5 +43,8 @@ data/
 # Cache Superdesign (maquettes, contexte de design)
 .superdesign/
 
-.agents/
-.claude/
+.agents/skills
+.claude/*.lock
+.claude/*.local.*
+.claude/skills
+.vscode/
