@@ -78,8 +78,10 @@ export {
   ServerNotReady,
 } from './api/ServerApi.ts';
 export { SettingsApi, SettingsInvalid, SettingsPatched } from './api/SettingsApi.ts';
+export { SetupApi } from './api/SetupApi.ts';
 export {
   NothingToResume,
+  NothingToRun,
   NothingToValidate,
   SweepNotFound,
   SweepNotRunning,
@@ -87,6 +89,15 @@ export {
   SweepsApi,
   ValidateRequest,
 } from './api/SweepsApi.ts';
+export {
+  ChecksQuery,
+  FileTooSmall,
+  ModelLoadErrors,
+  ModelPathInvalid,
+  PlanRequest,
+  ProjectorNotFound,
+  TuningApi,
+} from './api/TuningApi.ts';
 export * from './bench.ts';
 export * from './chat.ts';
 export * from './dispose.ts';

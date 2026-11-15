@@ -29,6 +29,8 @@ import { Shutdown } from './runtime/Shutdown.ts';
 import { SettingsRepo } from './settings/SettingsRepo.ts';
 import { ExternalWatch } from './supervisor/ExternalWatch.ts';
 import { Supervisor } from './supervisor/Supervisor.ts';
+import { TuningHardware } from './tuning/TuningHardware.ts';
+import { TuningMemo } from './tuning/TuningMemo.ts';
 import { WsHub } from './ws/WsHub.ts';
 
 /**
@@ -43,10 +45,12 @@ import { WsHub } from './ws/WsHub.ts';
  * so they run before it flushes its last messages. The models are scanned and read on each request (the summaries
  * cached in the database, the last GGUFs read in memory); the Hub is reached through its own client (`HfClient` on
  * `HfHttp`, beside `LlamaHttp`), the queue's transfers through `HfHttp`; the downloads a model must not be deleted
- * under are the queued and running rows of the `downloads` table (`ActiveWrites.layer`).
+ * under are the queued and running rows of the `downloads` table (`ActiveWrites.layer`). The tuning's hardware sits
+ * beside the bench runner, over the monitor and the bench's hardware it reads; its memos (the last estimate and disk
+ * measure of each model) live with the runtime.
  */
 const Services = ExternalWatch.layer.pipe(
-  Layer.provideMerge(BenchRunner.layer),
+  Layer.provideMerge(Layer.mergeAll(BenchRunner.layer, TuningHardware.layer, TuningMemo.layer)),
   Layer.provideMerge(Layer.mergeAll(Monitor.layer, Placement.layer, ChatRuns.layer, Downloads.layer)),
   Layer.provideMerge(Supervisor.layer),
   Layer.provideMerge(Layer.mergeAll(Flags.layer, BenchHardware.layer)),

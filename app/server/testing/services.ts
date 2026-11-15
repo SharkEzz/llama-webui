@@ -26,6 +26,8 @@ import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
+import { TuningHardware } from '../tuning/TuningHardware.ts';
+import { TuningMemo } from '../tuning/TuningMemo.ts';
 import { WsHub } from '../ws/WsHub.ts';
 
 /**
@@ -83,11 +85,15 @@ export const ServicesWithoutQueue = BenchRunner.layerWith({
  * `ServicesWithoutQueue` and the download queue on them, as the routes use it: `Downloads.layerWith` with no disk
  * space check (no `statfs` of the test's folders), its retries 10 ms apart, a stall after 5 s and every progress
  * published. It transfers from the configured Hub, and only starts on a request (the database is new: nothing to
- * resume).
+ * resume). With them, the tuning's hardware (on the stub monitor: no snapshot, the RAM of `/proc/meminfo`) and memos.
  */
-export const ServicesTest = Downloads.layerWith({
-  freeBytes: () => Effect.succeed(null),
-  retryDelays: Arr.replicate('10 millis', 5),
-  stall: '5 seconds',
-  liveEvery: '0 millis',
-}).pipe(Layer.provideMerge(ServicesWithoutQueue));
+export const ServicesTest = Layer.mergeAll(
+  Downloads.layerWith({
+    freeBytes: () => Effect.succeed(null),
+    retryDelays: Arr.replicate('10 millis', 5),
+    stall: '5 seconds',
+    liveEvery: '0 millis',
+  }),
+  TuningHardware.layer,
+  TuningMemo.layer,
+).pipe(Layer.provideMerge(ServicesWithoutQueue));
