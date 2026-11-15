@@ -1,6 +1,6 @@
 // The production build as a process: how it starts, refuses to start, and reads its options.
 import { type ChildProcessByStdio, spawn } from 'node:child_process';
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
@@ -9,9 +9,10 @@ import type { Readable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { type SseEvent, SseParser } from '@llama-webui/shared';
 import { afterAll, expect, test } from 'vitest';
+import { writeGguf } from './testing/gguf.ts';
 import { startHub } from './testing/hub.ts';
 import { freePort, LAUNCHER, launch, userEnv } from './testing/launch.ts';
-import { startFakeThrough } from './testing/llama.ts';
+import { FAKE, FAKE_BENCH, startFakeThrough } from './testing/llama.ts';
 import { tempDir } from './testing/tempDir.ts';
 import { ofType, openWs } from './testing/ws.ts';
 
@@ -228,6 +229,65 @@ test('SIGTERM with the UI open and a reply streaming stops in under 2 s, ends th
     db.close();
   }
   expect(alive(pid)).toBe(false);
+}, 30_000);
+
+test('SIGTERM during a benchmark ends it interrupted and kills llama-bench', async () => {
+  const data = dataDir();
+  // The fakes behind wrappers of the test's own: llama-bench records its pid (`exec` keeps it), then runs ten
+  // seconds a step.
+  const bin = join(data, 'bin');
+  mkdirSync(bin);
+  const pids = join(data, 'bench-pids');
+  const wrapper = (target: string, record: boolean) =>
+    `#!/bin/sh\n${record ? `echo $$ >> '${pids}'\n` : ''}exec '${target}' "$@"\n`;
+  writeFileSync(join(bin, 'fake-llama-server'), wrapper(FAKE, false), { mode: 0o755 });
+  writeFileSync(join(bin, 'fake-llama-bench'), wrapper(FAKE_BENCH, true), { mode: 0o755 });
+  const model = join(data, 'm.gguf');
+  await writeGguf(model, { 'general.architecture': { type: 'string', value: 'llama' } }, []);
+  await using app = await launch({
+    dataDir: data,
+    env: { LLAMA_WEBUI_TEST_MONITOR: 'stub', FAKE_BENCH_STEP_MS: '10000' },
+  });
+  const call = (method: string, path: string, body: unknown) =>
+    fetch(`${app.base}${path}`, {
+      method,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  expect((await call('PATCH', '/api/settings', { binary: join(bin, 'fake-llama-server') })).status).toBe(200);
+  const spec = {
+    kind: 'bench',
+    modelPath: model,
+    mmprojPath: null,
+    profileId: null,
+    p: 512,
+    n: 128,
+    r: 3,
+    params: {},
+    serverArgs: [],
+  };
+  const res = await call('POST', '/api/bench/run', { spec });
+  expect(res.status).toBe(202);
+  const { id } = (await res.json()) as { id: number };
+  const recorded = () => (existsSync(pids) ? readFileSync(pids, 'utf8').trim().split('\n').map(Number) : []);
+  for (let i = 0; i < 100 && recorded().length === 0; i++) await sleep(50);
+  const [pid] = recorded();
+  if (pid === undefined) throw new Error('llama-bench never started');
+  expect(alive(pid)).toBe(true);
+  const t0 = performance.now();
+  app.proc.kill('SIGTERM');
+  const code = await app.exited;
+  expect(performance.now() - t0).toBeLessThan(2000);
+  expect(code).toBe(0);
+  expect(alive(pid)).toBe(false);
+  const db = new DatabaseSync(join(data, 'llama-webui.sqlite'), { readOnly: true });
+  try {
+    expect(db.prepare('SELECT status, error FROM bench_runs WHERE id = ?').all(id)).toEqual([
+      { status: 'interrupted', error: 'interrupted (llama-webui stopped)' },
+    ]);
+  } finally {
+    db.close();
+  }
 }, 30_000);
 
 test("SIGTERM with the monitor's programs running leaves none of them", async () => {

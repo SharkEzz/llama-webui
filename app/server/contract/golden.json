@@ -751,6 +751,178 @@
       "message": "llama-server --help failed (<tmp>/no-such-llama-server)"
     }
   },
+  "GET /api/bench/devices (llama-bench not there)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": []
+  },
+  "GET /api/bench/runs": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "runs": [],
+      "live": null
+    }
+  },
+  "GET /api/sweeps": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "sweeps": [],
+      "live": null
+    }
+  },
+  "GET /api/bench/from-profile/999999 (no such profile)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "DELETE /api/bench/999999 (no such run)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RunNotFound",
+      "message": "Run not found"
+    }
+  },
+  "POST /api/bench/999999/cancel (no such run)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RunNotFound",
+      "message": "Run not found"
+    }
+  },
+  "POST /api/bench/999999/to-profile (no such run)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RunNotFound",
+      "message": "Run not found"
+    }
+  },
+  "DELETE /api/bench/runs (no failed=1)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: ?failed=1 expected (failed)",
+      "issues": [
+        {
+          "path": [
+            "failed"
+          ],
+          "message": "?failed=1 expected"
+        }
+      ]
+    }
+  },
+  "DELETE /api/bench/runs?failed=1 (none)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "deleted": 0
+    }
+  },
+  "POST /api/bench/run (no spec)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Missing key (spec)",
+      "issues": [
+        {
+          "path": [
+            "spec"
+          ],
+          "message": "Missing key"
+        }
+      ]
+    }
+  },
+  "POST /api/bench/run (the model is not there)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "BenchFileMissing",
+      "message": "Model not found: <tmp>/no-such-model.gguf"
+    }
+  },
+  "GET /api/sweeps/999999 (no such sweep)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
+  "DELETE /api/sweeps/999999 (no such sweep)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/999999/cancel (no such sweep)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/999999/resume (no such sweep)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/999999/validate (no such sweep)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
   "GET /api/chat (none yet)": {
     "status": 200,
     "headers": {

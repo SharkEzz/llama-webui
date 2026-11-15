@@ -194,6 +194,40 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
   add('write', 'PATCH /api/settings (binary: a program that is not there)', binary(ctx.missing));
   add('refusal', 'GET /api/flags (--help fails)', bare('GET', '/api/flags'));
 
+  // The bench, its llama-bench beside the binary that is not there: no device, no run, no sweep; nothing is started
+  // (the spec's model is not there).
+  add('read', 'GET /api/bench/devices (llama-bench not there)', bare('GET', '/api/bench/devices'));
+  add('read', 'GET /api/bench/runs', bare('GET', '/api/bench/runs'));
+  add('read', 'GET /api/sweeps', bare('GET', '/api/sweeps'));
+  add('refusal', 'GET /api/bench/from-profile/999999 (no such profile)', bare('GET', '/api/bench/from-profile/999999'));
+  add('refusal', 'DELETE /api/bench/999999 (no such run)', bare('DELETE', '/api/bench/999999'));
+  add('refusal', 'POST /api/bench/999999/cancel (no such run)', bare('POST', '/api/bench/999999/cancel'));
+  add('refusal', 'POST /api/bench/999999/to-profile (no such run)', bare('POST', '/api/bench/999999/to-profile'));
+  add('violation', 'DELETE /api/bench/runs (no failed=1)', bare('DELETE', '/api/bench/runs'));
+  add('write', 'DELETE /api/bench/runs?failed=1 (none)', bare('DELETE', '/api/bench/runs?failed=1'));
+  add('violation', 'POST /api/bench/run (no spec)', json('POST', '/api/bench/run', '{}'));
+  const spec = {
+    kind: 'bench',
+    modelPath: ctx.noModel,
+    mmprojPath: null,
+    profileId: null,
+    p: 512,
+    n: 128,
+    r: 3,
+    params: {},
+    serverArgs: [],
+  };
+  add(
+    'refusal',
+    'POST /api/bench/run (the model is not there)',
+    json('POST', '/api/bench/run', JSON.stringify({ spec })),
+  );
+  add('refusal', 'GET /api/sweeps/999999 (no such sweep)', bare('GET', '/api/sweeps/999999'));
+  add('refusal', 'DELETE /api/sweeps/999999 (no such sweep)', bare('DELETE', '/api/sweeps/999999'));
+  add('refusal', 'POST /api/sweeps/999999/cancel (no such sweep)', bare('POST', '/api/sweeps/999999/cancel'));
+  add('refusal', 'POST /api/sweeps/999999/resume (no such sweep)', json('POST', '/api/sweeps/999999/resume', '{}'));
+  add('refusal', 'POST /api/sweeps/999999/validate (no such sweep)', json('POST', '/api/sweeps/999999/validate', '{}'));
+
   // The chat: no llama-server runs (a reply is refused before any is asked for). Conversations 1 (no profile: none
   // runs) and 2 (on profile 1), then 2 deleted.
   add('read', 'GET /api/chat (none yet)', bare('GET', '/api/chat'));

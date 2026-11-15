@@ -5,6 +5,7 @@ import { Api, RouteNotFound } from '@llama-webui/shared';
 import { Array as Arr, Cause, Effect, ErrorReporter, Layer } from 'effect';
 import { HttpRouter, HttpServer, HttpServerResponse } from 'effect/http';
 import { HttpApiBuilder } from 'effect/http-api';
+import { BenchHandlers, SweepsHandlers } from '../bench/http.ts';
 import { ChatHandlers } from '../chat/http.ts';
 import { AppConfig } from '../config/AppConfig.ts';
 import { AppInfo } from '../config/AppInfo.ts';
@@ -52,6 +53,8 @@ export const ApiRoutes = Layer.merge(
         ModelsHandlers,
         HfHandlers,
         DownloadsHandlers,
+        BenchHandlers,
+        SweepsHandlers,
       ).pipe(Layer.provideMerge(RequestErrorsLive)),
     ),
   ),

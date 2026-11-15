@@ -11,6 +11,9 @@ import { freePort as freePortAsync } from './launch.ts';
 /** `testdata/fake/fake-llama-server`: imitates llama-server (see its source for the `FAKE_*` variables). */
 export const FAKE = resolve(import.meta.dirname, '../../../testdata/fake/fake-llama-server');
 
+/** `testdata/fake/fake-llama-bench`, the llama-bench beside `FAKE` (see its source for the `FAKE_*` variables). */
+export const FAKE_BENCH = resolve(import.meta.dirname, '../../../testdata/fake/fake-llama-bench');
+
 /** A port nothing listens on, on 127.0.0.1, at the time of the call. */
 export const freePort: Effect.Effect<number> = Effect.promise(freePortAsync);
 
