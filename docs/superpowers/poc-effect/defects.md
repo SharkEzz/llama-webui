@@ -167,7 +167,14 @@ Decided (the E1 plan, or accepted with its result):
 - A usage error of the command line exits 1 with the help (was 2).
 
 Decided (user): a path under `/api/` and `/ws/` that ends with a slash is a 308 to the path without it, query string
-kept, after the guard (which judges `/ws` itself only: `/ws/` is redirected unjudged, its target guarded) (was 404; at E1 the router of `effect/http` ignored the slash). The UI's paths keep theirs.
+kept, after the guard (was 404; at E1 the router of `effect/http` ignored the slash). The UI's paths keep theirs.
+
+Fixed (review of the branch): the guard and this 308 compared the raw request target with `/api/` and `/ws`, while
+the router ignores the case, folds repeated slashes, decodes percent escapes and cuts the path at a `;`:
+`/API/settings`, `//api/server/stop`, `/%61pi/health` and an upgrade on `/WS` or `/ws;x` reached their route unjudged,
+from any Host or Origin. Both are now a middleware of the routes (`Guarded`), so they judge what the router matched;
+`/ws/` is judged too (it was redirected unjudged, its target guarded). Tests `a path the router reads as an API route
+or /ws is guarded however it is spelled`, and the `guard` cases of the contract suite.
 
 Decided (the E2 plan): requests are validated by their schema at the edge.
 

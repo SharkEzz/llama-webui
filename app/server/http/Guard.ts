@@ -1,6 +1,7 @@
 import { RequestRefused } from '@llama-webui/shared';
 import { Array as Arr, Effect, String as Str } from 'effect';
-import { HttpServerRequest, HttpServerResponse } from 'effect/http';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
+import { noTrailingSlash } from './TrailingSlash.ts';
 
 /** A request as the guard reads it: its method, and its headers with lower-case names (Node's). */
 export interface GuardedRequest {
@@ -26,7 +27,7 @@ const trustedHostname = (hostname: string): boolean =>
 const refused = (status: number, message: string) => ({ status, message });
 
 /**
- * Why a request to /api/* or /ws is refused, if it is: status and message of the Nitro server's guard. It protects
+ * Why a request to the API or to /ws is refused, if it is: status and message of the Nitro server's guard. It protects
  * the unauthenticated local API from other sites open in the browser:
  * - DNS rebinding: the Host header must be localhost or an IP (a Host that is not an authority is a 400);
  * - cross-site requests: an Origin, when present, must be the page's own (same scheme, host, port);
@@ -55,25 +56,19 @@ export function refusal(request: GuardedRequest): { readonly status: number; rea
   return undefined;
 }
 
-/** The path of a request target, without its query or fragment. */
-export const pathOf = (url: string): string => Arr.headNonEmpty(Str.split(url, /[?#]/));
-
-/** The paths the guard judges: the API and the WebSocket. The UI is not guarded. */
-const guarded = (path: string): boolean => path === '/api' || Str.startsWith('/api/')(path) || path === '/ws';
-
 const encodeRefusal = HttpServerResponse.schemaJson(RequestRefused);
 
 /**
- * The guard as a middleware of the whole server: it judges /api/* and /ws only, and answers a refusal as JSON
- * (`RequestRefused`) with `Connection: close` on an upgrade.
+ * The guard around a route: it answers a refusal as JSON (`RequestRefused`), with `Connection: close` on an upgrade,
+ * and runs the route otherwise.
  */
-export const guard = <E, R>(
-  app: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
+const guard = <E, R>(
+  route: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
 ): Effect.Effect<HttpServerResponse.HttpServerResponse, E, R | HttpServerRequest.HttpServerRequest> =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const verdict = guarded(pathOf(request.url)) ? refusal(request) : undefined;
-    if (verdict === undefined) return yield* app;
+    const verdict = refusal(request);
+    if (verdict === undefined) return yield* route;
     const response = yield* encodeRefusal(RequestRefused.make({ message: verdict.message }), {
       status: verdict.status,
     }).pipe(Effect.orDie);
@@ -82,3 +77,12 @@ export const guard = <E, R>(
       ? response
       : HttpServerResponse.setHeader(response, 'connection', 'close');
   });
+
+/**
+ * What the routes of the API and of /ws are provided (`Layer.provide(Guarded)`): the guard, then the 308 of a trailing
+ * slash. It wraps the routes themselves, so it judges every request the router gives them, however its path is
+ * spelled: the router ignores the case, folds repeated slashes, decodes percent escapes and cuts the path at a `;`,
+ * and a guard that read the path on its own would let `/API/settings` or `/ws;x` through. The UI's routes are not
+ * guarded.
+ */
+export const Guarded = HttpRouter.middleware((route) => route.pipe(noTrailingSlash, guard)).layer;

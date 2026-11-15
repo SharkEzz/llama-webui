@@ -22,10 +22,9 @@ import { ServerHandlers } from '../supervisor/http.ts';
 import { TuningHandlers } from '../tuning/http.ts';
 import { SetupHandlers } from '../tuning/setup.ts';
 import { WsHub } from '../ws/WsHub.ts';
-import { guard } from './Guard.ts';
+import { Guarded } from './Guard.ts';
 import { RequestErrorsLive } from './RequestErrors.ts';
 import * as Static from './Static.ts';
-import { noTrailingSlash } from './TrailingSlash.ts';
 
 /** Any other path under /api, whatever the method: a 404 `RouteNotFound` as JSON, not the UI's page. */
 const UnknownApi = HttpRouter.add(
@@ -38,7 +37,7 @@ const UnknownApi = HttpRouter.add(
 
 /**
  * The endpoints of the API (each group's handlers, and the answer to a request that does not decode), and the 404 of
- * any other /api path.
+ * any other /api path, all behind the guard and the 308 of a trailing slash.
  */
 export const ApiRoutes = Layer.merge(
   HttpApiBuilder.layer(Api).pipe(
@@ -63,7 +62,7 @@ export const ApiRoutes = Layer.merge(
     ),
   ),
   UnknownApi,
-);
+).pipe(Layer.provide(Guarded));
 
 /**
  * A defect of a handler, not the response the router carries as one (the 404 of a missing file, the 500 that answers
@@ -81,14 +80,14 @@ const logDefects = <E, R>(app: Effect.Effect<HttpServerResponse.HttpServerRespon
   );
 
 /**
- * `routes` on the HTTP server as the app serves them: behind the guard, a trailing slash under /api and /ws
- * redirected, defects logged, no access log.
+ * `routes` on the HTTP server as the app serves them: defects logged, no access log. The guard is not here: it is on
+ * the routes it protects (`Guarded`: `ApiRoutes`, `WsHub.route`).
  */
 export const serve = <A, E, R>(routes: Layer.Layer<A, E, R>) =>
   HttpRouter.serve(routes, {
     disableLogger: true,
     disableListenLog: true,
-    middleware: (app) => app.pipe(noTrailingSlash, logDefects, guard),
+    middleware: logDefects,
   });
 
 /**

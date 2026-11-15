@@ -197,6 +197,23 @@ export function cases(ctx: { base: string; asset: string } & Fixtures): Case[] {
     'POST /api/profiles (foreign Origin)',
     json('POST', '/api/profiles', '{"name":"Evil","model":"m"}', { Origin: 'http://evil.example' }),
   );
+  // A path the router folds into a route (the case, a repeated slash, a percent escape, a `;`) is guarded as it is.
+  add('guard', 'GET /API/settings (foreign Origin)', bare('GET', '/API/settings', { Origin: 'http://evil.example' }));
+  add('guard', 'GET //api/settings (Host evil.example)', bare('GET', '//api/settings', { Host: 'evil.example' }));
+  add(
+    'guard',
+    'GET /%61pi/settings (foreign Origin)',
+    bare('GET', '/%61pi/settings', { Origin: 'http://evil.example' }),
+  );
+  add('guard', 'GET /api/settings;x (Host evil.example)', bare('GET', '/api/settings;x', { Host: 'evil.example' }));
+  add(
+    'guard',
+    'POST //api/server/stop (text/plain)',
+    json('POST', '//api/server/stop', '{}', { 'Content-Type': 'text/plain' }),
+  );
+  add('guard', 'GET /WS (foreign Origin)', bare('GET', '/WS', { Origin: 'http://evil.example' }));
+  add('guard', 'GET /ws;x (foreign Origin)', bare('GET', '/ws;x', { Origin: 'http://evil.example' }));
+  add('guard', 'GET /ws/ (foreign Origin)', bare('GET', '/ws/', { Origin: 'http://evil.example' }));
   // What the guard lets through: the app's own page, a loopback name.
   add('read', 'GET /api/health (same Origin)', bare('GET', '/api/health', { Origin: new URL(ctx.base).origin }));
   add('read', 'GET /api/health (Host localhost)', bare('GET', '/api/health', { Host: 'localhost' }));
@@ -205,6 +222,7 @@ export function cases(ctx: { base: string; asset: string } & Fixtures): Case[] {
   add('other', 'GET /api/nope', bare('GET', '/api/nope'));
   add('other', 'GET /api/settings/ (trailing slash)', bare('GET', '/api/settings/'));
   add('other', 'GET /api/settings/?x=1 (trailing slash, query)', bare('GET', '/api/settings/?x=1'));
+  add('other', 'GET //api/settings/ (trailing slash, repeated slash)', bare('GET', '//api/settings/'));
   add('other', 'GET /ws (no upgrade)', bare('GET', '/ws'));
   add('other', 'POST /ws (no upgrade)', bare('POST', '/ws'));
   add('other', 'POST /api/nope', bare('POST', '/api/nope'));

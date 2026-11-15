@@ -43,7 +43,8 @@ described on [Chat](/developers/api/chat/).
 ## The request guard
 
 Every `/api/*` request and every `/ws` request go through the guard (`app/server/http/Guard.ts`) before anything
-else, an unknown path included. The API is unauthenticated and local, so the guard protects it from other websites
+else, an unknown path included, and whatever the spelling of the path the server accepts (`/API/health`,
+`//api/health`). The API is unauthenticated and local, so the guard protects it from other websites
 open in your browser. It does not protect it from people on your network. It applies three checks, in this order:
 
 | Check          | Rule                                                                                                                                      | Refusal                                                          |

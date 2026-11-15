@@ -4,6 +4,7 @@ import { HttpClient, HttpClientRequest, HttpRouter } from 'effect/http';
 import { ServerTest } from '../testing/http.ts';
 import { PublicTest } from '../testing/public.ts';
 import { ServicesTest } from '../testing/services.ts';
+import { WsHub } from '../ws/WsHub.ts';
 import { ApiRoutes, serve } from './HttpLive.ts';
 
 const Boom = HttpRouter.add('GET', '/api/boom', Effect.die(new Error('secret')));
@@ -16,8 +17,8 @@ const Errors = Logger.layer([
   }),
 ]);
 
-/** The API, a route that dies, and a UI of one page, served as the app serves them. */
-const TestApp = serve(Layer.mergeAll(ApiRoutes, Boom, PublicTest)).pipe(
+/** The API, /ws, a route that dies, and a UI of one page, served as the app serves them. */
+const TestApp = serve(Layer.mergeAll(ApiRoutes, WsHub.route, Boom, PublicTest)).pipe(
   Layer.provide(ServicesTest),
   Layer.provideMerge(ServerTest),
   Layer.provide(Errors),
@@ -62,6 +63,42 @@ layer(TestApp)('HttpLive', (it) => {
       );
       assert.strictEqual(ws.status, 403);
       assert.strictEqual(ws.headers.connection, 'close');
+    }),
+  );
+
+  it.effect('a path the router reads as an API route or /ws is guarded however it is spelled', () =>
+    Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      // The router ignores the case, folds repeated slashes, decodes percent escapes and cuts the path at a `;`.
+      for (const path of ['/API/health', '//api/health', '/%61pi/health', '/api/health;x', '/Api//Settings']) {
+        const host = yield* client.execute(
+          HttpClientRequest.get(path).pipe(HttpClientRequest.setHeader('host', 'evil.example')),
+        );
+        assert.strictEqual(host.status, 403, `${path} (host)`);
+        const origin = yield* client.execute(
+          HttpClientRequest.get(path).pipe(HttpClientRequest.setHeader('origin', 'http://evil.example')),
+        );
+        assert.strictEqual(origin.status, 403, `${path} (origin)`);
+      }
+      for (const path of ['//api/server/stop', '/API/server/stop', '/%61pi/server/stop']) {
+        const write = yield* client.execute(
+          HttpClientRequest.post(path).pipe(HttpClientRequest.bodyText('{}', 'text/plain')),
+        );
+        assert.strictEqual(write.status, 415, path);
+      }
+      for (const path of ['/WS', '//ws', '/%77s', '/ws;x']) {
+        const ws = yield* client.execute(
+          HttpClientRequest.get(path).pipe(
+            HttpClientRequest.setHeaders({
+              origin: 'https://evil.example',
+              connection: 'Upgrade',
+              upgrade: 'websocket',
+            }),
+          ),
+        );
+        assert.strictEqual(ws.status, 403, path);
+        assert.strictEqual(ws.headers.connection, 'close', path);
+      }
     }),
   );
 

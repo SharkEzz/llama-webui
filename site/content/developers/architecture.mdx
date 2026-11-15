@@ -73,14 +73,15 @@ messages leave in the order of the changes:
 - the UI: the built files of `app/.output/public/`, and `index.html` for every other `GET`, so reloading `/chat/12`
   serves the app (see [Serving the UI](#serving-the-ui)).
 
-Every request first goes through the server's middlewares, in this order:
+A request to a route of the API or of `/ws` goes through that route's middlewares (`Guarded`,
+`app/server/http/Guard.ts`), in this order, whatever the spelling of the path the router matched:
 
-1. The guard (`guard`, `app/server/http/Guard.ts`), on `/api`, `/api/*` and `/ws`: the `Host`, the `Origin` and the
-   content type of a write (see [Security](/developers/server/security/)). A refusal is JSON, `RequestRefused`.
-2. A path that ends with a slash under `/api/` or `/ws/` is a `308` to the path without it
-   (`app/server/http/TrailingSlash.ts`).
-3. A defect of a handler (an exception, not an error the endpoint declares) is logged with its cause, and the client
-   gets a `500` without its message.
+1. The guard: the `Host`, the `Origin` and the content type of a write (see
+   [Security](/developers/server/security/)). A refusal is JSON, `RequestRefused`.
+2. A path that ends with a slash is a `308` to the path without it (`app/server/http/TrailingSlash.ts`).
+
+Around every route, the UI's included, a defect of a handler (an exception, not an error the endpoint declares) is
+logged with its cause, and the client gets a `500` without its message.
 
 An endpoint declares what it reads as schemas, `params`, `payload` and `query`, and what it answers: its `success`
 schema and its errors, each a `Schema.TaggedError` with its `httpApiStatus`. The handler never parses anything

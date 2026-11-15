@@ -1,23 +1,26 @@
-import { Effect, String as Str } from 'effect';
+import { Array as Arr, Effect, pipe, String as Str } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/http';
-import { pathOf } from './Guard.ts';
 
-/** The paths whose trailing slash goes: under the API and the WebSocket. The UI's paths are the router's of the page. */
-const redirected = (path: string): boolean =>
-  (Str.startsWith('/api/')(path) || Str.startsWith('/ws/')(path)) && Str.endsWith('/')(path);
+/** The path of a request target, without its query or fragment. */
+const pathOf = (url: string): string => Arr.headNonEmpty(Str.split(url, /[?#]/));
 
 /**
- * A path under /api/ or /ws/ that ends with a slash is answered 308 to the same path without its trailing slashes,
- * query string kept; any other request goes on. The target starts with `/api` or `/ws`: always a path of this server.
- * A 308 keeps the method and the body, so a client that follows it replays a write as it was.
+ * Around a route of the API or of /ws (the router matches a path with or without its last slash): a path that ends
+ * with a slash is answered 308 to the same path without its trailing slashes, query string kept; any other request
+ * runs the route. A 308 keeps the method and the body, so a client that follows it replays a write as it was.
+ *
+ * The target is always a path of this server: its leading slashes are folded into one (the router matched
+ * `//api/settings/`, and a `Location` of `//api/settings` would name the host `api`), and a target that is not a path
+ * (`http://host/api/settings/`, the absolute form) is not redirected.
  */
 export const noTrailingSlash = <E, R>(
-  app: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
+  route: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
 ): Effect.Effect<HttpServerResponse.HttpServerResponse, E, R | HttpServerRequest.HttpServerRequest> =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const path = pathOf(request.url);
-    if (!redirected(path)) return yield* app;
+    if (!Str.startsWith('/')(path) || !Str.endsWith('/')(path)) return yield* route;
     const query = Str.slice(path.length)(request.url);
-    return HttpServerResponse.redirect(`${Str.replace(/\/+$/, '')(path)}${query}`, { status: 308 });
+    const target = pipe(path, Str.replace(/^\/+/, '/'), Str.replace(/\/+$/, ''));
+    return HttpServerResponse.redirect(`${target}${query}`, { status: 308 });
   });

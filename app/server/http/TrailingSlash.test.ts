@@ -4,10 +4,11 @@ import { HttpClient, HttpClientRequest } from 'effect/http';
 import { ServerTest } from '../testing/http.ts';
 import { PublicTest } from '../testing/public.ts';
 import { ServicesTest } from '../testing/services.ts';
+import { WsHub } from '../ws/WsHub.ts';
 import { ApiRoutes, serve } from './HttpLive.ts';
 
-/** The API and a UI of one page, served as the app serves them. The client of `ServerTest` follows no redirect. */
-const TestApp = serve(Layer.mergeAll(ApiRoutes, PublicTest)).pipe(
+/** The API, /ws and a UI of one page, served as the app serves them. The client of `ServerTest` follows no redirect. */
+const TestApp = serve(Layer.mergeAll(ApiRoutes, WsHub.route, PublicTest)).pipe(
   Layer.provide(ServicesTest),
   Layer.provideMerge(ServerTest),
 );
@@ -44,6 +45,11 @@ layer(TestApp)('TrailingSlash', (it) => {
         ['/api//', '/api'],
         ['/api/', '/api'],
         ['/ws/', '/ws'],
+        // A path the router folds into a route: the target never starts with `//`, which would name another host.
+        ['//api/settings/', '/api/settings'],
+        ['///api//settings//?a=1', '/api//settings?a=1'],
+        ['/API/settings/', '/API/settings'],
+        ['//ws/', '/ws'],
       ] as const) {
         const reply = yield* send(HttpClientRequest.get(path));
         assert.deepStrictEqual(reply, { status: 308, location, body: '' }, path);

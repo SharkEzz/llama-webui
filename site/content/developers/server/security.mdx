@@ -5,14 +5,14 @@ description: The threat model of an unauthenticated local API, the request guard
 
 llama-webui has no authentication: whoever can send it a request can do anything the interface can, including run a
 program of their choice (the **Binary** setting). Its protection is where it listens, plus one request guard that keeps
-other websites in the browser away from the API. The guard is `refusal()` in `app/server/http/Guard.ts`, run by the
-`guard` middleware of the HTTP server on every request to `/api/*` and `/ws`, before any route.
+other websites in the browser away from the API. The guard is `refusal()` in `app/server/http/Guard.ts`, run around every
+route of the API and of `/ws` (`Guarded`), before the route's handler.
 
 | File | Role |
 | --- | --- |
-| `app/server/http/Guard.ts` | `refusal(request)`: the `Host`, `Origin` and content-type checks; `guard`: the middleware that answers a refusal. |
-| `app/server/http/HttpLive.ts` | `serve()`: the middlewares around the routes (`guard`, then the trailing slash, then the defect log), `SERVER_OPTIONS`. |
-| `app/server/http/TrailingSlash.ts` | `noTrailingSlash`: the `308` of a trailing slash under `/api/` and `/ws/`. |
+| `app/server/http/Guard.ts` | `refusal(request)`: the `Host`, `Origin` and content-type checks; `Guarded`: the route middleware that answers a refusal, then the trailing slash. |
+| `app/server/http/HttpLive.ts` | `ApiRoutes`: the API's routes, provided `Guarded`; `serve()`: the defect log around every route; `SERVER_OPTIONS`. |
+| `app/server/http/TrailingSlash.ts` | `noTrailingSlash`: the `308` of a trailing slash on a route of the API or of `/ws`. |
 | `app/server/http/RequestErrors.ts` | `RequestErrorsLive`: a request that does not decode becomes `RequestInvalid` (or `RouteNotFound` for a path parameter). |
 | `packages/webui-shared/src/api/errors.ts` | `RequestRefused`, `RouteNotFound`, `RequestInvalid`. |
 | `app/server/http/Guard.test.ts` | Tests of each rule of the guard. |
@@ -85,22 +85,22 @@ What follows from these rules:
 
 ## Where it applies
 
-`serve()` (`app/server/http/HttpLive.ts`) puts the middlewares around every route of the server, the guard outermost:
+The guard is a middleware of the routes it protects, not of the server: `Guarded` (`app/server/http/Guard.ts`) is
+provided to the layers that register them, `ApiRoutes` (`app/server/http/HttpLive.ts`) and `WsHub.route`.
 
-```ts title="app/server/http/HttpLive.ts"
-export const serve = <A, E, R>(routes: Layer.Layer<A, E, R>) =>
-  HttpRouter.serve(routes, {
-    disableLogger: true,
-    disableListenLog: true,
-    middleware: (app) => app.pipe(noTrailingSlash, logDefects, guard),
-  });
+```ts title="app/server/http/Guard.ts"
+export const Guarded = HttpRouter.middleware((route) => route.pipe(noTrailingSlash, guard)).layer;
 ```
 
-The guard judges the path of the request target (without its query) and lets anything else through.
+It runs once the router has chosen the route, so it never reads the path itself. The router of `effect/http` ignores
+the case, folds repeated slashes, decodes percent escapes and cuts the path at a `;`: `/API/settings`, `//api/settings`,
+`/%61pi/settings` and `/ws;x` all reach a route, and each is judged as that route is. A guard in front of the router
+that compared the raw path with `/api/` let them through.
 
-- Every `/api/*` request goes through it, the routes of `Api` and the `404` `RouteNotFound` `Unknown route` alike: the
-  middleware is not tied to an endpoint, so a new endpoint is guarded without doing anything. A refused request with
-  a trailing slash gets the refusal, not the `308`.
+- Every request to a route of `ApiRoutes` goes through it, the endpoints of `Api` and the `404` `RouteNotFound`
+  `Unknown route` of any other path under `/api` alike: a new endpoint of `Api` is guarded without doing anything. A
+  route added outside `Api` (`HttpRouter.add`) is guarded only when its layer is provided `Guarded`. A refused request
+  with a trailing slash gets the refusal, not the `308`.
 - The WebSocket endpoint is guarded too: another site cannot open the socket (browsers always send `Origin` on a
   WebSocket handshake). A refused upgrade gets `Connection: close`, so the server closes the socket even when the
   client keeps its side open. A request to `/ws` that is not an upgrade passes the guard, then gets `426`

@@ -294,6 +294,86 @@
       "message": "Origin not allowed"
     }
   },
+  "GET /API/settings (foreign Origin)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Origin not allowed"
+    }
+  },
+  "GET //api/settings (Host evil.example)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Host not allowed"
+    }
+  },
+  "GET /%61pi/settings (foreign Origin)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Origin not allowed"
+    }
+  },
+  "GET /api/settings;x (Host evil.example)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Host not allowed"
+    }
+  },
+  "POST //api/server/stop (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "GET /WS (foreign Origin)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Origin not allowed"
+    }
+  },
+  "GET /ws;x (foreign Origin)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Origin not allowed"
+    }
+  },
+  "GET /ws/ (foreign Origin)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Origin not allowed"
+    }
+  },
   "GET /api/health (same Origin)": {
     "status": 200,
     "headers": {
@@ -338,6 +418,12 @@
     "status": 308,
     "headers": {
       "location": "/api/settings?x=1"
+    }
+  },
+  "GET //api/settings/ (trailing slash, repeated slash)": {
+    "status": 308,
+    "headers": {
+      "location": "/api/settings"
     }
   },
   "GET /ws (no upgrade)": {

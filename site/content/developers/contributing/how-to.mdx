@@ -135,7 +135,9 @@ is one of the endpoint's errors.
 ```
 
 A new group's handlers go into the `Layer.mergeAll(…)` of `ApiRoutes` in `app/server/http/HttpLive.ts`. The guard,
-the `404` of an unknown route and the error bodies apply to every endpoint: there is nothing to wrap.
+the `404` of an unknown route and the error bodies apply to every endpoint of `Api`: there is nothing to wrap. A route
+added outside `Api` with `HttpRouter.add` is not guarded until its layer is provided `Guarded`
+(`app/server/http/Guard.ts`), as `WsHub.route` is.
 
   </Step>
   <Step title="Add its contract cases">

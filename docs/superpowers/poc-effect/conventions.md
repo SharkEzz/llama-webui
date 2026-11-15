@@ -70,8 +70,13 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 - Validation is tested over raw HTTP against the built routes (`send` in `profiles/http.test.ts`,
   `http/RequestErrors.test.ts`): the typed client encodes a payload before sending, so a bad one never leaves it. The
   web's `makeCall` (`app/src/lib/api.ts`) turns that refusal into the same `RequestInvalid`, so a page reads one shape.
-- A path that ends with a slash under `/api/` or `/ws/` is a 308 to the path without it (`http/TrailingSlash.ts`),
-  after the guard.
+- The guard and the 308 of a trailing slash are a middleware of the routes (`Guarded` of `http/Guard.ts`, provided to
+  `ApiRoutes` and to `WsHub.route`), not of the server: they run once the router has chosen the route, so no code
+  compares a raw path with `/api/` (the router ignores the case, folds repeated slashes, decodes percent escapes and
+  cuts the path at a `;`). A route added with `HttpRouter.add` outside `Api` is provided `Guarded`
+  (`Layer.provide(Guarded)`).
+- A path of such a route that ends with a slash is a 308 to the path without it (`http/TrailingSlash.ts`), after the
+  guard, its leading slashes folded into one (a `Location` of `//api/…` would name another host).
 
 ## Replies
 

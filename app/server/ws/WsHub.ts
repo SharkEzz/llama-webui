@@ -15,6 +15,7 @@ import {
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { Socket } from 'effect/socket';
 import { AppInfo } from '../config/AppInfo.ts';
+import { Guarded } from '../http/Guard.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 
 /** Pings a client may leave unanswered: at the next tick it is closed with 4000 `heartbeat`. */
@@ -141,7 +142,7 @@ export class WsHub extends Context.Service<
     pingInterval: '15 seconds',
   });
 
-  /** `GET /ws`: the upgrade, then one fiber per client. Any request without an upgrade is a 426. */
+  /** `GET /ws`, behind the guard: the upgrade, then one fiber per client. Any request without an upgrade is a 426. */
   static readonly route = HttpRouter.add(
     '*',
     '/ws',
@@ -157,5 +158,5 @@ export class WsHub extends Context.Service<
       yield* hub.attach(socket);
       return HttpServerResponse.empty();
     }),
-  );
+  ).pipe(Layer.provide(Guarded));
 }
