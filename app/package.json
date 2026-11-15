@@ -41,6 +41,7 @@
     "zustand": "^5.1.0"
   },
   "devDependencies": {
+    "@effect/tsgo": "0.68.1",
     "@effect/vitest": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",

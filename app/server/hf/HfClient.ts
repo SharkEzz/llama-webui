@@ -65,18 +65,18 @@ const sameOrigin = (location: string | undefined, from: string, origin: string):
  */
 export const hubError: {
   (options: {
-    readonly repo?: string;
+    readonly repo?: string | undefined;
     readonly hasToken: boolean;
   }): (response: HttpClientResponse.HttpClientResponse) => HubError;
   (
     response: HttpClientResponse.HttpClientResponse,
-    options: { readonly repo?: string; readonly hasToken: boolean },
+    options: { readonly repo?: string | undefined; readonly hasToken: boolean },
   ): HubError;
 } = dual(
   2,
   (
     response: HttpClientResponse.HttpClientResponse,
-    options: { readonly repo?: string; readonly hasToken: boolean },
+    options: { readonly repo?: string | undefined; readonly hasToken: boolean },
   ): HubError => {
     const code = response.headers['x-error-code'];
     const what = options.repo ?? 'Hugging Face resource';
@@ -209,7 +209,11 @@ export class HfClient extends Context.Service<
       const api = <A, I>(
         path: string,
         schema: Schema.Codec<A, I>,
-        options: { readonly token: string | null; readonly repo?: string; readonly urlParams?: UrlParams.Input },
+        options: {
+          readonly token: string | null;
+          readonly repo?: string | undefined;
+          readonly urlParams?: UrlParams.Input;
+        },
       ): Effect.Effect<A, HubError> =>
         Effect.gen(function* () {
           const endpoint = yield* hfEndpoint;

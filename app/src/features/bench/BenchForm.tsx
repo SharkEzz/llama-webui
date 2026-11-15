@@ -342,7 +342,7 @@ export function BenchForm() {
   );
 }
 
-function FieldMessage({ error, hint }: { error?: string; hint?: string }) {
+function FieldMessage({ error, hint }: { error?: string | undefined; hint?: string | undefined }) {
   if (error) return <p className="text-xs text-destructive">{error}</p>;
   return hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null;
 }
@@ -350,8 +350,8 @@ function FieldMessage({ error, hint }: { error?: string; hint?: string }) {
 interface TextFieldProps {
   id: string;
   label: string;
-  hint?: string;
-  error?: string;
+  hint?: string | undefined;
+  error?: string | undefined;
   value: string;
   onChange(e: { target: { value: string } }): void;
 }
@@ -410,7 +410,7 @@ function OptionField(props: {
   label: string;
   options: readonly string[];
   value: string;
-  error?: string;
+  error?: string | undefined;
   onChange(v: string): void;
 }) {
   const items = [{ value: DEFAULT, label: 'default' }, ...props.options.map((o) => ({ value: o, label: o }))];

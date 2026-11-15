@@ -104,9 +104,9 @@ const withSlot = (h: Held, slot: Slot, p: Perf): Held =>
  * sooner than `retryAfter` (60 s). The end of the caller's scope stops both.
  */
 export const makeMemBandwidth = Effect.fn('makeMemBandwidth')(function* (options: {
-  readonly bin?: string;
+  readonly bin?: string | undefined;
   readonly intervalMs: number;
-  readonly retryAfter?: Duration.Input;
+  readonly retryAfter?: Duration.Input | undefined;
 }) {
   const context = yield* Effect.context<ChildProcessSpawner.ChildProcessSpawner>();
   const bin = options.bin ?? 'perf';

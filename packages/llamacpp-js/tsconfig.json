@@ -5,9 +5,7 @@
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "types": ["node"],
-    "erasableSyntaxOnly": true,
-    "exactOptionalPropertyTypes": true
+    "types": ["node"]
   },
   "include": ["src", "tests"]
 }

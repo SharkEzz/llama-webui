@@ -6,12 +6,12 @@ import { TONE_VAR, type Tone } from './tones';
 interface StatTileProps {
   label: string;
   value: string | number;
-  unit?: string;
-  hint?: string;
-  tone?: Tone;
+  unit?: string | undefined;
+  hint?: string | undefined;
+  tone?: Tone | undefined;
   /** Value in tabular mono (digits). Set to false for a text value. */
-  mono?: boolean;
-  className?: string;
+  mono?: boolean | undefined;
+  className?: string | undefined;
 }
 
 /** Number tile: label, value in tabular mono, optional unit and hint. */

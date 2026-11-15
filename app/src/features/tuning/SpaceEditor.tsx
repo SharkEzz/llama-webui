@@ -176,7 +176,7 @@ export function SpaceEditor() {
   );
 }
 
-function Row({ flag, hint, children }: { flag: string; hint?: string; children: React.ReactNode }) {
+function Row({ flag, hint, children }: { flag: string; hint?: string | undefined; children: React.ReactNode }) {
   return (
     <div className="grid gap-x-4 gap-y-1.5 py-2.5 sm:grid-cols-[6rem_minmax(0,1fr)]">
       <div className="flex flex-col">
@@ -188,7 +188,7 @@ function Row({ flag, hint, children }: { flag: string; hint?: string; children: 
   );
 }
 
-function Chip({ label, onRemove, mono }: { label: string; onRemove(): void; mono?: boolean }) {
+function Chip({ label, onRemove, mono }: { label: string; onRemove(): void; mono?: boolean | undefined }) {
   return (
     <Badge variant="secondary" className={cn('max-w-full gap-1 pr-0.5', mono && 'font-mono')}>
       <span className="truncate">{label}</span>
@@ -199,7 +199,7 @@ function Chip({ label, onRemove, mono }: { label: string; onRemove(): void; mono
   );
 }
 
-function Suggestion({ label, onClick, mono }: { label: string; onClick(): void; mono?: boolean }) {
+function Suggestion({ label, onClick, mono }: { label: string; onClick(): void; mono?: boolean | undefined }) {
   return (
     <Button variant="ghost" size="xs" className={cn('text-muted-foreground', mono && 'font-mono')} onClick={onClick}>
       <Plus /> {label}
@@ -213,8 +213,8 @@ function ValuesRow<T>(props: {
   onChange(v: ReadonlyArray<T>): void;
   parse(text: string): T | string;
   suggestions?: ReadonlyArray<T>;
-  hint?: string;
-  mono?: boolean;
+  hint?: string | undefined;
+  mono?: boolean | undefined;
   wide?: boolean;
 }) {
   const [text, setText] = useState('');
@@ -355,7 +355,17 @@ function DevRow({
   );
 }
 
-function Field({ label, id, hint, children }: { label: string; id: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  id,
+  hint,
+  children,
+}: {
+  label: string;
+  id: string;
+  hint?: string | undefined;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>

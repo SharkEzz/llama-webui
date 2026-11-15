@@ -1,6 +1,7 @@
 import {
   type BenchParams,
   CACHE_TYPES,
+  type CacheType,
   type Estimate,
   type Profile,
   presetOf,
@@ -75,6 +76,10 @@ export function benchFromEstimate(e: Estimate): void {
   });
 }
 
+function isCacheType(str: string | undefined): str is CacheType {
+  return str != null && CACHE_TYPES.includes(str as never);
+}
+
 export type PinKey = 'ngl' | 'ncmoe' | 'dev' | 'ts' | 'kv' | 't' | 'ub';
 
 /** Value typed to pin a flag → BenchParams patch, or an error message. */
@@ -105,9 +110,7 @@ export function parsePin(key: PinKey, text: string): Partial<BenchParams> | stri
       return xs.length < 2 || xs.some((x) => !Number.isFinite(x) || x < 0) ? 'proportions (3,1)' : { ts: xs };
     }
     case 'kv':
-      return (CACHE_TYPES as readonly string[]).includes(t)
-        ? { ctk: t as BenchParams['ctk'], ctv: t as BenchParams['ctv'] }
-        : `one of ${CACHE_TYPES.join(', ')}`;
+      return isCacheType(t) ? { ctk: t, ctv: t } : `one of ${CACHE_TYPES.join(', ')}`;
   }
 }
 

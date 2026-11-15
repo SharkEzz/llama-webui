@@ -118,7 +118,7 @@ const gpusOf = (h: Held): ReadonlyArray<GpuReading> =>
 export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
   readonly bin: string;
   readonly intervalMs: number;
-  readonly appsTimeout?: Duration.Input;
+  readonly appsTimeout?: Duration.Input | undefined;
 }) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const context = yield* Effect.context<ChildProcessSpawner.ChildProcessSpawner>();

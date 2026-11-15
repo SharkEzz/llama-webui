@@ -83,7 +83,7 @@ export function makeCall<Id extends string, Groups extends HttpApiGroup.Constrai
 ) {
   return async <A, E>(
     f: (client: HttpApiClient.Client<Groups>) => Effect.Effect<A, E>,
-    options?: { signal?: AbortSignal },
+    options?: { signal?: AbortSignal | undefined },
   ): Promise<A> => {
     const exit = await run(request(api, f), fetchImpl, options?.signal);
     if (Exit.isSuccess(exit)) return exit.value;
@@ -104,7 +104,7 @@ export function makeCallStream<Id extends string, Groups extends HttpApiGroup.Co
   return async <A, E, E2>(
     f: (client: HttpApiClient.Client<Groups>) => Effect.Effect<Stream.Stream<A, E2>, E>,
     onEvent: (a: A) => void,
-    options?: { signal?: AbortSignal },
+    options?: { signal?: AbortSignal | undefined },
   ): Promise<void> => {
     const follow = Effect.flatMap(request(api, f), (stream) =>
       stream.pipe(

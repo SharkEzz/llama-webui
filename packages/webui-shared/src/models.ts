@@ -125,7 +125,7 @@ function relativeTo(abs: string, dir: string): string | null {
 
 /** Where a profile's model path is written from: its working directory (if any), the models directory, the home. */
 export interface ModelPathContext {
-  readonly cwd?: string;
+  readonly cwd?: string | undefined;
   readonly modelsDir: string;
   readonly home: string;
 }

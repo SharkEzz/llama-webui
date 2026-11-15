@@ -13,7 +13,7 @@ export function EnvField(props: {
   id: string;
   hint: ReactNode;
   value: Record<string, string>;
-  error?: string;
+  error?: string | undefined;
   onCommit(env: Record<string, string>): void;
 }) {
   const saved = formatEnv(props.value);
@@ -50,9 +50,9 @@ export function TextField(props: {
   label: string;
   hint?: ReactNode;
   value: string;
-  error?: string;
-  inputMode?: 'numeric';
-  placeholder?: string;
+  error?: string | undefined;
+  inputMode?: 'numeric' | undefined;
+  placeholder?: string | undefined;
   onCommit(v: string): void;
 }) {
   const [draft, setDraft] = useState(props.value);

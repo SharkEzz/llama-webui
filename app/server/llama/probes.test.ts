@@ -48,8 +48,9 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('probes', (it) => {
   it.effect('health reaches loopback for a wildcard host', () =>
     Effect.gen(function* () {
       const ok = yield* answering(200, '{"status":"ok"}');
+      // `undefined`: no host at all.
       const statuses = yield* Effect.forEach(['0.0.0.0', '', undefined, null], (host) =>
-        health({ host, port: ok.port }),
+        health(host === undefined ? { port: ok.port } : { host, port: ok.port }),
       );
       assert.deepStrictEqual(statuses, Arr.replicate(Option.some(200), 4));
     }),

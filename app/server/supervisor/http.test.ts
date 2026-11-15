@@ -96,7 +96,9 @@ layer(Served, { excludeTestServices: true, buildPerTest: true })('ServerApi over
       const started = yield* launch('start', profile.id);
       assert.strictEqual(started.status, 202);
       const view = yield* viewOf(started.json);
-      assert.deepInclude(view.state, { kind: 'starting', profile: 'first', profileId: profile.id, port: profile.port });
+      const port = profile.port;
+      assert.isDefined(port);
+      assert.deepInclude(view.state, { kind: 'starting', profile: 'first', profileId: profile.id, port });
       assert.strictEqual(view.profileId, profile.id);
       assert.isTrue(Str.includes(`--port ${profile.port}`)(view.command ?? ''), view.command ?? '');
       const remembered = yield* defaultProfile;

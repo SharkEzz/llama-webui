@@ -1,6 +1,6 @@
 {
   // The Effect server and its tests (Node only). The Effect diagnostics come from the root `tsconfig.effect.json`.
   "extends": "../../tsconfig.effect.json",
-  "compilerOptions": { "types": ["node"], "erasableSyntaxOnly": true },
+  "compilerOptions": { "types": ["node"] },
   "include": ["."]
 }

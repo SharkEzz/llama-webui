@@ -15,8 +15,8 @@ export const TopologyNode = Schema.Struct({
   kind: TopologyNodeKind,
   label: Schema.String,
   /** sysfs PCI address (`0000:01:00.0`), same format as `GpuSample.busId` and the `hiddenGpus` setting. */
-  busId: Schema.optionalKey(Schema.String),
-  vendor: Schema.optionalKey(Schema.Literals(['nvidia', 'amd', 'intel', 'other'])),
+  busId: Schema.optional(Schema.String),
+  vendor: Schema.optional(Schema.Literals(['nvidia', 'amd', 'intel', 'other'])),
   /** Block device of an NVMe (`nvme0n1`): ties the node to `DiskSample.perDisk` and `model.disk`. */
   block: Schema.optionalKey(Schema.String),
   /** Static facts shown in the tooltip (model, cores, size…); null = unknown. */

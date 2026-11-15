@@ -442,7 +442,7 @@ which extends `tsconfig.base.json` (the shared options, `noEmit` among them), di
 
 | Project                               | Covers                                     | Types                                       |
 | ------------------------------------- | ------------------------------------------ | ------------------------------------------- |
-| `packages/llamacpp-js/tsconfig.json`  | The library's sources and its tests (`tests/`), as a Node user compiles them: `erasableSyntaxOnly`, `exactOptionalPropertyTypes`, NodeNext resolution | Node only (no DOM): a browser-only API fails here |
+| `packages/llamacpp-js/tsconfig.json`  | The library's sources and its tests (`tests/`), as a Node user compiles them: NodeNext resolution | Node only (no DOM): a browser-only API fails here |
 | `packages/webui-shared/tsconfig.json` | `@llama-webui/shared` and its tests, with the Effect diagnostics | Node, no DOM: a browser-only API fails here |
 | `app/server/tsconfig.json`            | `app/server/` and its tests, with the Effect diagnostics | Node              |
 | `scripts/tsconfig.json`               | `scripts/`                                 | Node                                        |
@@ -460,9 +460,14 @@ that no chunk of the client bundle imports a `node:` module. The projects do not
 | `strict`, `verbatimModuleSyntax`, `noFallthroughCasesInSwitch`  | yes                         | yes    | yes     |
 | `noUncheckedIndexedAccess`                                      | yes                         | yes    | yes     |
 | `noImplicitOverride`                                            | yes                         | yes    | no      |
+| `exactOptionalPropertyTypes`, `erasableSyntaxOnly`              | yes                         | yes    | no      |
 | `noUnusedLocals`, `noUnusedParameters`                          | no                          | yes    | yes     |
 
-With `verbatimModuleSyntax`, type-only imports must use `import type`.
+With `verbatimModuleSyntax`, type-only imports must use `import type`. With `exactOptionalPropertyTypes`, an optional
+property (`x?: T`) takes no `undefined`: write `x?: T | undefined` (or `Schema.optional`) where a caller passes one on,
+or leave the key out. `erasableSyntaxOnly` refuses what Node cannot strip (`enum`, `namespace`, constructor parameter
+properties); relative imports keep their `.ts` extension (`rewriteRelativeImportExtensions`, `allowImportingTsExtensions`
+in `site/`).
 
 ### Effect diagnostics
 

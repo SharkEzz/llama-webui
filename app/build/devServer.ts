@@ -53,8 +53,8 @@ async function reachable(port: number, ms: number): Promise<void> {
 }
 
 /** The paths the server answers; the rest is Vite's. */
-const API = '^/api(?:[/?]|$)';
-const WS = '^/ws(?:\\?|$)';
+const API = /^\/api(?:[/?]|$)/;
+const WS = /^\/ws(?:\?|$)/;
 
 export function devServer(): Plugin {
   let port = 0;
@@ -89,8 +89,8 @@ export function devServer(): Plugin {
       return {
         server: {
           proxy: {
-            [API]: { target, changeOrigin: false },
-            [WS]: { target, changeOrigin: false, ws: true },
+            [API.source]: { target, changeOrigin: false },
+            [WS.source]: { target, changeOrigin: false, ws: true },
           },
         },
       };
@@ -102,7 +102,7 @@ export function devServer(): Plugin {
       // the server would otherwise get it twice (from the terminal and from `node --watch`) and exit without its stop.
       const proc = spawn(
         process.execPath,
-        ['--watch', '--watch-preserve-output', main, '--host', '127.0.0.1', '--port', String(port)],
+        ['--watch', '--watch-preserve-output', main, '--host', '127.0.0.1', '--port', port.toString(10)],
         { env: { ...process.env, LLAMA_WEBUI_DEV: '1' }, stdio: ['ignore', 'inherit', 'inherit'], detached: true },
       );
       child = proc;
@@ -110,10 +110,21 @@ export function devServer(): Plugin {
 
       // While the server starts (or restarts after a save), an API request waits for it, as it would for the
       // production server's start, rather than failing in the proxy. Before Vite's own middlewares, its proxy included.
-      const api = new RegExp(API);
-      server.middlewares.use((req, _res, next) => {
-        if (api.test(req.url ?? '')) void reachable(port, 10_000).then(() => next());
-        else next();
+      server.middlewares.use(async (req, _res, next) => {
+        if (API.test(req.url ?? '')) {
+          try {
+            await reachable(port, 10_000);
+          } catch (e) {
+            server.environments.ssr.logger.error(`API not reachable on "${req.url}"`, {
+              ...(Error.isError(e) ? { error: e } : undefined),
+              timestamp: true,
+            });
+          } finally {
+            next();
+          }
+        } else {
+          next();
+        }
       });
 
       // Vite stops on SIGTERM by itself (`server.close()`, then the `closeServer` hook), not on SIGINT (Ctrl+C) nor

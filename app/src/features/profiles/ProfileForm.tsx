@@ -32,7 +32,7 @@ interface ProfileFormProps {
   onSaved(p: Profile): void;
   onDeleted(): void;
   /** Initial values of a new profile (“Create profile” from the Models page). */
-  initial?: Partial<Draft>;
+  initial?: Partial<Draft> | undefined;
 }
 
 export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: ProfileFormProps) {

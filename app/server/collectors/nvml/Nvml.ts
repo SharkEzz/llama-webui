@@ -102,8 +102,8 @@ export const startNvml = Effect.fn('startNvml')(function* (options: {
   readonly intervalMs: number;
   readonly needs: GpuNeeds;
   readonly lib: Option.Option<string>;
-  readonly command?: { readonly cmd: string; readonly args: ReadonlyArray<string> };
-  readonly readyTimeout?: Duration.Input;
+  readonly command?: { readonly cmd: string; readonly args: ReadonlyArray<string> } | undefined;
+  readonly readyTimeout?: Duration.Input | undefined;
 }) {
   const scope = yield* Effect.scope;
   const command = options.command ?? {

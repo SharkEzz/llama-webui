@@ -5,7 +5,7 @@ import { copyText } from '@/lib/clipboard';
 import { highlight } from '@/lib/highlight';
 
 /** Code block: language, Copy button, shiki highlighting (plain text until it is ready). */
-export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
+export function CodeBlock({ code, lang }: { code: string; lang?: string | undefined }) {
   const [html, setHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 

@@ -10,7 +10,7 @@ interface HealthState {
   health?: Health;
   /** Date.now() when the response arrived, to advance the uptime locally. */
   fetchedAt?: number;
-  error?: string;
+  error?: string | undefined;
   refresh(): Promise<void>;
 }
 

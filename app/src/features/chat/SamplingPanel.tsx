@@ -100,10 +100,10 @@ function SamplingForm({ current, props }: { current: ConversationDetail; props: 
 function NumberField(props: {
   id: string;
   label: string;
-  step?: string;
+  step?: string | undefined;
   value: number | undefined;
   placeholder: string;
-  error?: string;
+  error?: string | undefined;
   onCommit(v: number | undefined): void;
   onInvalid(msg: string): void;
 }) {
