@@ -157,7 +157,11 @@ Rolldown, and in development Vite only starts it and forwards `/api` and `/ws` t
 default, `strictPort`) of `LLAMA_WEBUI_HOST` (`127.0.0.1` by default). Its plugin `app/build/devServer.ts` starts the
 server from source, `node --watch server/main.ts`, on a free loopback port and in its own process group, with
 `LLAMA_WEBUI_DEV=1`, and proxies `/api` and `/ws` to it without changing the `Host` (the guard reads what the browser
-sent). While the server starts or restarts, an API request waits for it rather than failing in the proxy.
+sent). While the server starts or restarts, an API request waits for it rather than failing in the proxy: the plugin
+keeps one idle connection open to the server (`serverLink()`), which says it is up without a probe per request and
+closes when the server stops (Node also closes it after a minute without a request; the next API request takes a new
+one). A server that still accepts nothing after 10 seconds is logged
+(`API not reachable on "<url>"…`) and the proxy answers for it.
 
 `app/vite.config.ts` applies `.env` the way `main.ts` does, before it reads the address, and the server inherits the
 result. No other environment file is read.

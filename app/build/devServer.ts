@@ -6,7 +6,7 @@
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { connect, createServer } from 'node:net';
+import { connect, createServer, type Socket } from 'node:net';
 import { constants } from 'node:os';
 import { resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -35,22 +35,69 @@ function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   }
 }
 
-/** Resolves once something accepts a connection on `port` of 127.0.0.1, or after `ms` (the proxy then answers). */
-async function reachable(port: number, ms: number): Promise<void> {
+/** A connection to `port` of 127.0.0.1, once something accepts one (tried every 50 ms); none after `ms`. */
+async function connection(port: number, ms: number): Promise<Socket | undefined> {
   const until = performance.now() + ms;
   while (performance.now() < until) {
-    const ok = await new Promise<boolean>((done) => {
-      const socket = connect(port, '127.0.0.1');
-      socket.once('connect', () => {
-        socket.destroy();
-        done(true);
-      });
-      socket.once('error', () => done(false));
+    const socket = await new Promise<Socket | undefined>((done) => {
+      const trying = connect(port, '127.0.0.1');
+      trying.once('connect', () => done(trying));
+      trying.once('error', () => done(undefined));
     });
-    if (ok) return;
+    if (socket !== undefined) return socket;
     await sleep(50);
   }
+  return undefined;
 }
+
+/**
+ * Whether the server accepts connections on `port()`, told by one connection kept open to it rather than by a probe
+ * for each question: while it is open the server is up; it closes when the server stops (a restart of `node --watch`,
+ * an exit) or drops it, and the next question waits for a server again. The connection sends nothing: Node's HTTP
+ * server closes it after a minute without a request (its 408), so the next question takes a new one, and closes it at
+ * once when it stops, so it holds no stop.
+ */
+export function serverLink(port: () => number) {
+  let open: Socket | undefined;
+  let waiting: Promise<boolean> | undefined;
+  let closed = false;
+  return {
+    /**
+     * `true` at once while the connection is open. Else a wait for the server, `ms` at most, shared by those who ask
+     * meanwhile (they get the first one's limit): whether it accepted a connection.
+     */
+    up(ms: number): true | Promise<boolean> {
+      if (open !== undefined) return true;
+      waiting ??= connection(port(), ms).then((socket) => {
+        waiting = undefined;
+        if (socket === undefined) return false;
+        if (closed) {
+          socket.destroy();
+          return false;
+        }
+        open = socket;
+        socket.once('close', () => {
+          if (open === socket) open = undefined;
+        });
+        // Its end is all that is read from it; it does not keep Vite running.
+        socket.on('error', () => {});
+        socket.resume();
+        socket.unref();
+        return true;
+      });
+      return waiting;
+    },
+    /** Drops the connection, and takes no other. */
+    close() {
+      closed = true;
+      open?.destroy();
+      open = undefined;
+    },
+  };
+}
+
+/** How long an API request waits for a server that starts. */
+const SERVER_WAIT_MS = 10_000;
 
 /** The paths the server answers; the rest is Vite's. */
 const API = /^\/api(?:[/?]|$)/;
@@ -60,6 +107,7 @@ export function devServer(): Plugin {
   let port = 0;
   let child: ChildProcess | undefined;
   let stopping: Promise<void> | undefined;
+  let link: ReturnType<typeof serverLink> | undefined;
   /** Undoes what `configureServer` added to the process (its signal and exit listeners). */
   let detach = () => {};
 
@@ -110,21 +158,21 @@ export function devServer(): Plugin {
 
       // While the server starts (or restarts after a save), an API request waits for it, as it would for the
       // production server's start, rather than failing in the proxy. Before Vite's own middlewares, its proxy included.
-      server.middlewares.use(async (req, _res, next) => {
-        if (API.test(req.url ?? '')) {
-          try {
-            await reachable(port, 10_000);
-          } catch (e) {
-            server.environments.ssr.logger.error(`API not reachable on "${req.url}"`, {
-              ...(Error.isError(e) ? { error: e } : undefined),
-              timestamp: true,
-            });
-          } finally {
-            next();
+      // A server that still accepts nothing after 10 s is said, and the proxy answers for it.
+      const serving = serverLink(() => port);
+      link = serving;
+      server.middlewares.use((req, _res, next) => {
+        const up = API.test(req.url ?? '') ? serving.up(SERVER_WAIT_MS) : true;
+        if (up === true) return next();
+        void up.then((ok) => {
+          if (!ok) {
+            server.config.logger.error(
+              `API not reachable on "${req.url}": the server accepted no connection in ${SERVER_WAIT_MS / 1000} s`,
+              { timestamp: true },
+            );
           }
-        } else {
           next();
-        }
+        });
       });
 
       // Vite stops on SIGTERM by itself (`server.close()`, then the `closeServer` hook), not on SIGINT (Ctrl+C) nor
@@ -156,6 +204,7 @@ export function devServer(): Plugin {
 
     // On a stop, and on a restart of Vite (its config changed): the next `configureServer` starts a new server.
     async closeServer() {
+      link?.close();
       await stop();
       detach();
     },

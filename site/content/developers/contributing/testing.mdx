@@ -167,7 +167,9 @@ tests:
   checkout's files and a `pnpm dev` you run meanwhile are left alone: saving a server file restarts the server (a new
   `bootId`), saving a web file keeps it, one `SIGINT` (with a page open too), two quick ones and a `SIGHUP` stop
   `vite dev` and the server, `.env` is read and the environment wins over it, and the server connects to the
-  DevTools address in development only.
+  DevTools address in development only. `app/build/devServer.test.ts` covers the plugin's link to the server on its own
+  (`serverLink()`): it waits for a server that starts, keeps one connection instead of one per request, drops with the
+  server, and gives up after its wait when nothing listens.
 
 ### Tests of llamacpp-js
 
