@@ -100,6 +100,7 @@ test('every new endpoint is in the API definition', () => {
     'POST /api/bench/:id/cancel',
     'POST /api/bench/:id/to-profile',
     'GET /api/sweeps',
+    'POST /api/sweeps',
     'GET /api/sweeps/:id',
     'DELETE /api/sweeps/:id',
     'POST /api/sweeps/:id/cancel',

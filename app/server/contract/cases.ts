@@ -305,6 +305,68 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
     json('DELETE', '/api/models', JSON.stringify({ path: ctx.noModel })),
   );
 
+  // The tuning and the first run, llama-bench beside the binary that is not there: no device, the estimates plan on
+  // the machine's CPU and RAM (its fields only). The folder's model is too small to measure the disk on.
+  const files = (path: string) => JSON.stringify({ modelPath: path });
+  const sweep = (path: string) =>
+    JSON.stringify({
+      spec: {
+        name: 's',
+        modelPath: path,
+        mmprojPath: null,
+        profileId: null,
+        p: 512,
+        n: 128,
+        r: 3,
+        preset: 'chat',
+        base: {},
+        space: { t: [1, 2] },
+        serverArgs: [],
+        includeUnfit: false,
+      },
+    });
+  add('read', 'GET /api/tuning/hardware', bare('GET', '/api/tuning/hardware'), { machine: true });
+  add('read', 'GET /api/tuning/checks (no model)', bare('GET', '/api/tuning/checks'), { machine: true });
+  add('read', 'GET /api/tuning/checks', bare('GET', `/api/tuning/checks?model=${query(ctx.model)}`), { machine: true });
+  add(
+    'read',
+    'POST /api/tuning/estimate',
+    json('POST', '/api/tuning/estimate', JSON.stringify({ modelPath: ctx.model, preset: 'fit' })),
+    { machine: true },
+  );
+  add('violation', 'POST /api/tuning/estimate (no model)', json('POST', '/api/tuning/estimate', '{}'));
+  add(
+    'refusal',
+    'POST /api/tuning/estimate (the model is not there)',
+    json('POST', '/api/tuning/estimate', JSON.stringify({ modelPath: ctx.noModel, preset: 'fit' })),
+  );
+  add('read', 'POST /api/tuning/plan', json('POST', '/api/tuning/plan', sweep(ctx.model)), { machine: true });
+  add('violation', 'POST /api/tuning/plan (empty spec)', json('POST', '/api/tuning/plan', '{"spec":{}}'));
+  add(
+    'refusal',
+    'POST /api/tuning/plan (the model is not there)',
+    json('POST', '/api/tuning/plan', sweep(ctx.noModel)),
+  );
+  add(
+    'refusal',
+    'POST /api/tuning/disk-speed (file too small)',
+    json('POST', '/api/tuning/disk-speed', files(ctx.model)),
+  );
+  add(
+    'refusal',
+    'POST /api/tuning/disk-speed (the model is not there)',
+    json('POST', '/api/tuning/disk-speed', files(ctx.noModel)),
+  );
+  add(
+    'violation',
+    'POST /api/tuning/disk-speed (empty path)',
+    json('POST', '/api/tuning/disk-speed', '{"modelPath":""}'),
+  );
+  add('violation', 'POST /api/sweeps (empty spec)', json('POST', '/api/sweeps', '{"spec":{}}'));
+  add('refusal', 'POST /api/sweeps (the model is not there)', json('POST', '/api/sweeps', sweep(ctx.noModel)));
+  add('read', 'GET /api/setup', bare('GET', '/api/setup'), { machine: true });
+  add('read', 'GET /api/launchpad', bare('GET', '/api/launchpad'), { machine: true });
+
   // The Hub: no token, offline (every call to the Hub fails before it leaves: `fetch failed`).
   add('read', 'GET /api/hf/status', bare('GET', '/api/hf/status'));
   add('refusal', 'GET /api/hf/search (offline)', bare('GET', '/api/hf/search?q=qwen'));

@@ -1,10 +1,24 @@
-import { Api, RunNotFound, RunStillRunning, SweepNotFound, SweepStillRunning } from '@llama-webui/shared';
-import { Effect, type Path } from 'effect';
+import {
+  Api,
+  type BenchSpec,
+  NothingToRun,
+  RunNotFound,
+  RunStillRunning,
+  SweepNotFound,
+  type SweepSpec,
+  SweepStillRunning,
+} from '@llama-webui/shared';
+import { Array as Arr, Effect, type FileSystem, type Path } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
+import { SqlClient } from 'effect/sql';
 import { benchBinary } from 'llamacpp-js/node';
 import { expandHome, type homeDir } from '../config/Home.ts';
+import type { GgufReader } from '../models/GgufReader.ts';
 import type { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
+import { loadModel, mmprojBytes } from '../tuning/models.ts';
+import { planSweep } from '../tuning/space.ts';
+import { TuningHardware } from '../tuning/TuningHardware.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { BenchHardware } from './BenchHardware.ts';
 import { BenchRunner } from './BenchRunner.ts';
@@ -75,7 +89,8 @@ export const BenchHandlers = HttpApiBuilder.group(
 
 /**
  * The endpoints of `/api/sweeps`: the list, a sweep with its items, its deletion, its cancel, its resume and its
- * validation (the last two start in the background, through the runner). E8 adds the creation.
+ * validation (the last two start in the background, through the runner), and its creation: the plan of
+ * `POST /api/tuning/plan`, then the runner.
  */
 export const SweepsHandlers = HttpApiBuilder.group(
   Api,
@@ -85,6 +100,54 @@ export const SweepsHandlers = HttpApiBuilder.group(
     const runs = yield* BenchRunsRepo;
     const sweeps = yield* SweepsRepo;
     const hub = yield* WsHub;
+    const hardware = yield* TuningHardware;
+    const sql = yield* SqlClient.SqlClient;
+    const files = yield* Effect.context<FileSystem.FileSystem | GgufReader>();
+
+    /**
+     * A sweep planned on its GGUF (the loading errors of the plan), then started: under the runner's claim, a plan
+     * that keeps no item is a 409, else the sweep and its items are written in one transaction.
+     */
+    const create = Effect.fn('SweepsHandlers.create')(function* (spec: SweepSpec, stopServer: boolean) {
+      const { model, mmproj, hw } = yield* Effect.all(
+        { model: loadModel(spec.modelPath), mmproj: mmprojBytes(spec.mmprojPath), hw: hardware.read },
+        { concurrency: 'unbounded' },
+      ).pipe(Effect.provideContext(files));
+      const plan = planSweep({ model, hw, spec, mmprojBytes: mmproj });
+      const { modelPath, mmprojPath, profileId, serverArgs, p, n, r } = spec;
+      const sweep = yield* runner.startSweep({
+        files: spec,
+        stopServer,
+        check:
+          plan.items.length === 0
+            ? Effect.fail(
+                NothingToRun.make({ message: `No configuration to run: ${plan.excluded} excluded by the estimator` }),
+              )
+            : Effect.void,
+        prepare: Effect.gen(function* () {
+          const created = yield* sweeps.create(spec);
+          yield* runs.enqueue(
+            created.id,
+            Arr.map(plan.items, (item) => {
+              const itemSpec: BenchSpec = {
+                kind: 'bench',
+                modelPath,
+                mmprojPath,
+                profileId,
+                params: item.params,
+                serverArgs,
+                p,
+                n,
+                r,
+              };
+              return { spec: itemSpec, label: item.label, fit: item.fit.verdict };
+            }),
+          );
+          return created.id;
+        }).pipe(sql.withTransaction, Effect.orDie),
+      });
+      return { sweep, items: plan.items.length, excluded: plan.excluded };
+    });
 
     const get = Effect.fn('SweepsHandlers.get')(function* (id: number) {
       const found = yield* sweeps.get(id);
@@ -113,6 +176,7 @@ export const SweepsHandlers = HttpApiBuilder.group(
       .handle('list', () =>
         Effect.all({ sweeps: sweeps.list, live: runner.sweepLive }).pipe(Effect.withSpan('SweepsHandlers.list')),
       )
+      .handle('create', ({ payload }) => create(payload.spec, payload.stopServer === true))
       .handle('get', ({ params }) => get(params.id))
       .handle('remove', ({ params }) => remove(params.id))
       .handle('cancel', ({ params }) => runner.cancelSweep(params.id))

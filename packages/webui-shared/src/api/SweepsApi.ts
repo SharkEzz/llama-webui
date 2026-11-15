@@ -4,6 +4,7 @@ import { BenchRun } from '../bench.ts';
 import { Sweep, SweepLive, SweepSpec } from '../sweep.ts';
 import { BenchStartErrors } from './BenchApi.ts';
 import { IdParam } from './params.ts';
+import { ModelLoadErrors } from './TuningApi.ts';
 
 /** No sweep has this id: `Sweep not found`. */
 export class SweepNotFound extends Schema.TaggedError<SweepNotFound, { readonly SweepNotFound: unique symbol }>()(
@@ -68,6 +69,11 @@ const params = { id: IdParam };
 export class SweepsApi extends HttpApiGroup.make('sweeps').add(
   HttpApiEndpoint.get('list', '/api/sweeps', {
     success: Schema.Struct({ sweeps: Schema.Array(Sweep), live: Schema.NullOr(SweepLive) }),
+  }),
+  HttpApiEndpoint.post('create', '/api/sweeps', {
+    payload: SweepRequest,
+    success: Schema.Struct({ sweep: Sweep, items: Schema.Int, excluded: Schema.Int }).pipe(HttpApiSchema.status(202)),
+    error: [...ModelLoadErrors, ...BenchStartErrors, NothingToRun],
   }),
   HttpApiEndpoint.get('get', '/api/sweeps/:id', {
     params,

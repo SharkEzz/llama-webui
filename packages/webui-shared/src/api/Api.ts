@@ -12,7 +12,9 @@ import { ProfilesApi } from './ProfilesApi.ts';
 import { RequestErrors } from './RequestErrors.ts';
 import { ServerApi } from './ServerApi.ts';
 import { SettingsApi } from './SettingsApi.ts';
+import { SetupApi } from './SetupApi.ts';
 import { SweepsApi } from './SweepsApi.ts';
+import { TuningApi } from './TuningApi.ts';
 
 /**
  * The HTTP API of llama-webui: the server implements it (`app/server/`), the web derives its client from it. One group
@@ -34,5 +36,7 @@ export class Api extends HttpApi.make('llama-webui')
   .add(DownloadsApi)
   .add(BenchApi)
   .add(SweepsApi)
+  .add(TuningApi)
+  .add(SetupApi)
   .annotate(HttpApi.PayloadParseOptions, { onExcessProperty: 'error', errors: 'all' })
   .middleware(RequestErrors) {}

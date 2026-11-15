@@ -2,15 +2,26 @@ import { createServer } from 'node:http';
 import { NodeHttpClient, NodeHttpServer } from '@effect/platform-node';
 import { Layer } from 'effect';
 import { HttpServer } from 'effect/http';
+import { AppConfig } from '../config/AppConfig.ts';
 import { SERVER_OPTIONS } from '../http/HttpLive.ts';
 
 /**
+ * The app's configuration as the test server listens: on 127.0.0.1 (the variables of the shell running the tests,
+ * `LLAMA_WEBUI_HOST` among them, are not read). The port is the free one the server is given; no data folder.
+ */
+const AppConfigTest = Layer.succeed(
+  AppConfig,
+  AppConfig.of({ host: '127.0.0.1', port: 0, dataDir: '', dev: false, devToolsUrl: '' }),
+);
+
+/**
  * A real Node server on 127.0.0.1 and a free port, run as the app's (`SERVER_OPTIONS`), with the client of
- * the context bound to it. A test that stops the server while a response is read provides a client built outside the
- * server's scope, as a browser is.
+ * the context bound to it, and the app's configuration that says so. A test that stops the server while a response
+ * is read provides a client built outside the server's scope, as a browser is.
  */
 export const ServerWithClient = HttpServer.layerTestClient.pipe(
   Layer.provideMerge(NodeHttpServer.layer(createServer, { host: '127.0.0.1', port: 0, ...SERVER_OPTIONS })),
+  Layer.merge(AppConfigTest),
 );
 
 /**

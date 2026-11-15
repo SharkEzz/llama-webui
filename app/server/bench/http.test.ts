@@ -18,13 +18,15 @@ import { HttpClient, HttpClientRequest, HttpServer } from 'effect/http';
 import { Downloads } from '../downloads/Downloads.ts';
 import { ApiRoutes, serve } from '../http/HttpLive.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
+import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { benchSpec, NO_HARDWARE, sweepSpec } from '../testing/bench.ts';
+import { type KvValue, writeGguf } from '../testing/gguf.ts';
 import { ServerTest } from '../testing/http.ts';
 import { ServicesTest, ServicesWithoutBench } from '../testing/services.ts';
 import { ofType, openWs, type WsClient } from '../testing/ws.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { BenchRunner } from './BenchRunner.ts';
-import { BenchRunsRepo } from './BenchRunsRepo.ts';
+import { BenchRunsRepo, runFilters } from './BenchRunsRepo.ts';
 import { SweepsRepo } from './SweepsRepo.ts';
 
 /** The home of the test (`HOME`): the models folder is the default `~/models` under it. */
@@ -352,12 +354,15 @@ layer(served, { excludeTestServices: true, buildPerTest: true })('over HTTP', (i
   );
 });
 
-/** What the recording runner was asked: each resume and validation, with its options. */
+/** What the recording runner was asked: each sweep started, resume and validation, with its options. */
 class Asked extends Context.Service<Asked, Ref.Ref<ReadonlyArray<unknown>>>()(
   '@llama-webui/app/server/bench/http.test/Asked',
 ) {}
 
-/** A runner that records its resumes and validations and answers the sweep as it is stored. */
+/**
+ * A runner that records its sweeps started, resumes and validations and answers the sweep as it is stored. A sweep
+ * started runs its `check` then its `prepare`, as the real runner does under its claim, and nothing else.
+ */
 const RecordingRunner = Layer.effect(
   BenchRunner,
   Effect.gen(function* () {
@@ -377,7 +382,11 @@ const RecordingRunner = Layer.effect(
       sweepLive: Effect.succeed(null),
       files: Effect.succeed([]),
       start: () => unused,
-      startSweep: () => unused,
+      startSweep: Effect.fnUntraced(function* (request) {
+        if (request.check !== undefined) yield* request.check;
+        const id = yield* request.prepare;
+        return yield* record({ startSweep: { stopServer: request.stopServer } }, id);
+      }),
       resume: (id, options) => record({ resume: options }, id),
       validate: (id, options) => record({ validate: options }, id),
       cancel: () => unused,
@@ -402,6 +411,48 @@ const recorded = serve(ApiRoutes).pipe(
   Layer.provideMerge(homeConfig),
   Layer.provideMerge(NodeServices.layer),
 );
+
+const u32 = (value: number): KvValue => ({ type: 'u32', value });
+
+/** No llama.cpp under the test's home: llama-bench lists no device, the plans run on the CPU. The home. */
+const noBinary = Effect.gen(function* () {
+  const home = yield* Home;
+  const settings = yield* SettingsRepo;
+  yield* settings.patch({ binary: `${home}/bin/llama-server` });
+  return home;
+});
+
+/** A small llama GGUF at `~/<name>` (`kv` over its metadata), with no llama.cpp under the home; its path. */
+const modelAt = Effect.fnUntraced(function* (name: string, kv: Record<string, KvValue> = {}) {
+  const home = yield* noBinary;
+  const file = `${home}/${name}`;
+  yield* Effect.promise(() =>
+    writeGguf(
+      file,
+      {
+        'general.architecture': { type: 'string', value: 'llama' },
+        'llama.block_count': u32(2),
+        'llama.embedding_length': u32(256),
+        'llama.attention.head_count': u32(4),
+        'llama.attention.head_count_kv': u32(4),
+        'llama.context_length': u32(4096),
+        ...kv,
+      },
+      [
+        { name: 'token_embd.weight', shape: [256, 64], bytes: 64 * 1024 },
+        { name: 'blk.0.attn_q.weight', shape: [256, 256], bytes: 64 * 1024 },
+        { name: 'output.weight', shape: [256, 64], bytes: 64 * 1024 },
+      ],
+    ),
+  );
+  return file;
+});
+
+const Created = Schema.Struct({
+  sweep: Schema.Struct({ id: Schema.Int, name: Schema.String, status: Schema.String }),
+  items: Schema.Int,
+  excluded: Schema.Int,
+});
 
 /** A sweep stored `interrupted`, its id. */
 const interruptedSweep = Effect.gen(function* () {
@@ -468,6 +519,63 @@ layer(recorded, { excludeTestServices: true, buildPerTest: true })('the runner a
         { validate: { n: 1, stopServer: false } },
         { validate: { n: 5, stopServer: true } },
       ]);
+    }),
+  );
+
+  it.effect('a sweep is created from its plan: its items stored with their labels and fits, a 202', () =>
+    Effect.gen(function* () {
+      const modelPath = yield* modelAt('a.gguf');
+      const spec = sweepSpec({ modelPath, space: { t: [1, 2] }, includeUnfit: true });
+      const res = yield* send('POST', '/api/sweeps', { spec, stopServer: true });
+      assert.strictEqual(res.status, 202);
+      const created = yield* as(Created, res.json);
+      assert.deepInclude(created, { items: 2, excluded: 0 });
+      assert.deepInclude(created.sweep, { name: 's', status: 'running' });
+      const asked = yield* Asked;
+      yield* equals(Ref.get(asked), [{ startSweep: { stopServer: true } }]);
+      const runs = yield* BenchRunsRepo;
+      const items = yield* runs.list(runFilters({ sweep: `${created.sweep.id}` }));
+      assert.deepStrictEqual(
+        Arr.map(items, (run) => [run.status, run.sweepLabel, run.spec.params.t, run.spec.modelPath, run.fit !== null]),
+        [
+          ['queued', '-t 1', 1, modelPath, true],
+          ['queued', '-t 2', 2, modelPath, true],
+        ],
+      );
+    }),
+  );
+
+  it.effect('a sweep whose every item the estimator excludes is a 409 NothingToRun, and nothing is stored', () =>
+    Effect.gen(function* () {
+      // A device llama-bench does not list (it lists none here): every item is a `no`.
+      const modelPath = yield* modelAt('a.gguf');
+      const spec = sweepSpec({ modelPath, base: { dev: ['CUDA0'] }, space: { t: [1, 2] } });
+      const refused = yield* failure('POST', '/api/sweeps', { spec });
+      assert.deepStrictEqual(refused, {
+        status: 409,
+        _tag: 'NothingToRun',
+        message: 'No configuration to run: 2 excluded by the estimator',
+      });
+      const sweeps = yield* SweepsRepo;
+      yield* equals(Effect.map(sweeps.list, Arr.length), 0);
+    }),
+  );
+
+  it.effect('a sweep is planned on its GGUF: the errors of the model loading, before the runner', () =>
+    Effect.gen(function* () {
+      const home = yield* noBinary;
+      const missing = yield* failure('POST', '/api/sweeps', { spec: sweepSpec({ modelPath: `${home}/gone.gguf` }) });
+      assert.deepStrictEqual(missing, { status: 404, _tag: 'ModelNotFound', message: 'Model not found' });
+      const modelPath = yield* modelAt('a.gguf');
+      const projector = yield* failure('POST', '/api/sweeps', {
+        spec: sweepSpec({ modelPath, mmprojPath: `${home}/gone-mmproj.gguf` }),
+      });
+      assert.deepStrictEqual(projector, { status: 404, _tag: 'ProjectorNotFound', message: 'Projector not found' });
+      // The spec is decoded at the edge: an issue's path starts with `spec`.
+      const invalid = yield* failure('POST', '/api/sweeps', { spec: { ...sweepSpec({ modelPath }), name: undefined } });
+      assert.deepStrictEqual([invalid.status, invalid._tag], [400, 'RequestInvalid']);
+      const asked = yield* Asked;
+      yield* equals(Ref.get(asked), []);
     }),
   );
 });

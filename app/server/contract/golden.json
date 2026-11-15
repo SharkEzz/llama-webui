@@ -1440,6 +1440,253 @@
       "message": "Model not found"
     }
   },
+  "GET /api/tuning/hardware": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "cpu",
+      "devices",
+      "devicesError",
+      "ramAvailableBytes",
+      "ramTotalBytes"
+    ]
+  },
+  "GET /api/tuning/checks (no model)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "at",
+      "checks",
+      "summary"
+    ]
+  },
+  "GET /api/tuning/checks": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "at",
+      "checks",
+      "summary"
+    ]
+  },
+  "POST /api/tuning/estimate": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "ctx",
+      "diskReadBytesPerToken",
+      "fit",
+      "kv",
+      "ok",
+      "params",
+      "preset",
+      "ramOverflowBytes",
+      "reason",
+      "rows",
+      "serverArgs",
+      "warnings"
+    ]
+  },
+  "POST /api/tuning/estimate (no model)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Missing key (modelPath)",
+      "issues": [
+        {
+          "path": [
+            "modelPath"
+          ],
+          "message": "Missing key"
+        },
+        {
+          "path": [
+            "preset"
+          ],
+          "message": "Missing key"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/estimate (the model is not there)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelNotFound",
+      "message": "Model not found"
+    }
+  },
+  "POST /api/tuning/plan": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "droppedTs",
+      "estimatedSeconds",
+      "excluded",
+      "items"
+    ]
+  },
+  "POST /api/tuning/plan (empty spec)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: required (spec.name)",
+      "issues": [
+        {
+          "path": [
+            "spec",
+            "name"
+          ],
+          "message": "required"
+        },
+        {
+          "path": [
+            "spec",
+            "modelPath"
+          ],
+          "message": "required"
+        },
+        {
+          "path": [
+            "spec",
+            "preset"
+          ],
+          "message": "Missing key"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/plan (the model is not there)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelNotFound",
+      "message": "Model not found"
+    }
+  },
+  "POST /api/tuning/disk-speed (file too small)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "FileTooSmall",
+      "message": "File too small to measure (0 MiB)"
+    }
+  },
+  "POST /api/tuning/disk-speed (the model is not there)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelNotFound",
+      "message": "Model not found"
+    }
+  },
+  "POST /api/tuning/disk-speed (empty path)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: cannot be empty (modelPath)",
+      "issues": [
+        {
+          "path": [
+            "modelPath"
+          ],
+          "message": "cannot be empty"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps (empty spec)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: required (spec.name)",
+      "issues": [
+        {
+          "path": [
+            "spec",
+            "name"
+          ],
+          "message": "required"
+        },
+        {
+          "path": [
+            "spec",
+            "modelPath"
+          ],
+          "message": "required"
+        },
+        {
+          "path": [
+            "spec",
+            "preset"
+          ],
+          "message": "Missing key"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps (the model is not there)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelNotFound",
+      "message": "Model not found"
+    }
+  },
+  "GET /api/setup": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": [
+      "bench",
+      "binary",
+      "listen",
+      "llamaListen",
+      "models",
+      "ready",
+      "telemetry"
+    ]
+  },
+  "GET /api/launchpad": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "fields": []
+  },
   "GET /api/hf/status": {
     "status": 200,
     "headers": {

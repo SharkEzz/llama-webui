@@ -19,6 +19,8 @@ import { MonitorHandlers } from '../monitor/http.ts';
 import { ProfilesHandlers } from '../profiles/http.ts';
 import { SettingsHandlers } from '../settings/http.ts';
 import { ServerHandlers } from '../supervisor/http.ts';
+import { TuningHandlers } from '../tuning/http.ts';
+import { SetupHandlers } from '../tuning/setup.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { guard } from './Guard.ts';
 import { RequestErrorsLive } from './RequestErrors.ts';
@@ -55,6 +57,8 @@ export const ApiRoutes = Layer.merge(
         DownloadsHandlers,
         BenchHandlers,
         SweepsHandlers,
+        TuningHandlers,
+        SetupHandlers,
       ).pipe(Layer.provideMerge(RequestErrorsLive)),
     ),
   ),
