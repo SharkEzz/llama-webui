@@ -30,6 +30,7 @@ const PORTED: Partial<Record<string, () => Promise<ComponentType>>> = {
   '/server': async () => (await import('@/features/server/ServerPage')).ServerPage,
   '/logs': async () => (await import('@/features/logs/LogsPage')).LogsPage,
   '/chat': chatPage,
+  '/bench': async () => (await import('@/features/bench/BenchPage')).BenchPage,
 };
 
 const pageOf = (r: AppRoute) => {
