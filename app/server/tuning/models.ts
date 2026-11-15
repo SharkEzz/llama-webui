@@ -10,16 +10,21 @@ const isFile = Effect.fn('tuning.isFile')(function* (path: string) {
   return Option.exists(info, (i) => i.type === 'File');
 });
 
+/** The form of a model path: an absolute path to a `.gguf` file (400 otherwise). */
+export const checkPathForm = (path: string): Effect.Effect<void, ModelPathInvalid> =>
+  Str.startsWith('/')(path) && Str.endsWith('.gguf')(path)
+    ? Effect.void
+    : Effect.fail(ModelPathInvalid.make({ message: 'Expected an absolute path to a .gguf file' }));
+
 /**
  * The GGUF the tuning plans on: an absolute path to a `.gguf` file (400 otherwise), an existing file (404), a readable
- * header (422 with the reader's message).
+ * header (422 with the reader's message). Where the path may be is the caller's (`checkModelPath`): the launchpad reads
+ * the profiles' models.
  */
 export const loadModel = Effect.fn('tuning.loadModel')(function* (
   path: string,
 ): Effect.fn.Return<ModelInfo, ModelPathInvalid | ModelNotFound | ModelUnreadable, GgufReader | FileSystem.FileSystem> {
-  if (!Str.startsWith('/')(path) || !Str.endsWith('.gguf')(path)) {
-    return yield* ModelPathInvalid.make({ message: 'Expected an absolute path to a .gguf file' });
-  }
+  yield* checkPathForm(path);
   if (!(yield* isFile(path))) return yield* ModelNotFound.make({ message: 'Model not found' });
   const reader = yield* GgufReader;
   return yield* reader.read(path).pipe(Effect.mapError((error) => ModelUnreadable.make({ message: error.message })));

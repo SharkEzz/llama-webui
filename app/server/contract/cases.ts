@@ -89,8 +89,10 @@ export interface Binaries {
 export interface ModelFiles {
   /** `<home>/models/m.gguf`: a small GGUF, the folder's one model. */
   model: string;
-  /** A GGUF path in the run's temporary folder where nothing is. */
+  /** A GGUF path in the models folder where nothing is. */
   noModel: string;
+  /** A GGUF path outside the models folder that no profile opens: refused before it is looked for. */
+  outside: string;
 }
 
 /** What the cases name on the disk of the run. */
@@ -288,6 +290,11 @@ export function cases(ctx: { base: string; asset: string } & Fixtures): Case[] {
     'POST /api/bench/run (the model is not there)',
     json('POST', '/api/bench/run', JSON.stringify({ spec })),
   );
+  add(
+    'refusal',
+    'POST /api/bench/run (outside the models folder)',
+    json('POST', '/api/bench/run', JSON.stringify({ spec: { ...spec, modelPath: ctx.outside } })),
+  );
 
   // The chat: no llama-server runs (a reply is refused before any is asked for). Conversations 1 (no profile: none
   // runs) and 2 (on profile 1), then 2 deleted.
@@ -337,6 +344,11 @@ export function cases(ctx: { base: string; asset: string } & Fixtures): Case[] {
   add('read', 'GET /api/models/info', bare('GET', `/api/models/info?path=${query(ctx.model)}`));
   add('violation', 'GET /api/models/info (relative path)', bare('GET', '/api/models/info?path=rel.gguf'));
   add('refusal', 'GET /api/models/info (no such file)', bare('GET', `/api/models/info?path=${query(ctx.noModel)}`));
+  add(
+    'refusal',
+    'GET /api/models/info (outside the models folder)',
+    bare('GET', `/api/models/info?path=${query(ctx.outside)}`),
+  );
   add(
     'write',
     'POST /api/profiles (opens the model)',
@@ -415,6 +427,12 @@ export function cases(ctx: { base: string; asset: string } & Fixtures): Case[] {
   );
   add('violation', 'POST /api/sweeps (empty spec)', json('POST', '/api/sweeps', '{"spec":{}}'));
   add('refusal', 'POST /api/sweeps (the model is not there)', json('POST', '/api/sweeps', sweep(ctx.noModel)));
+  add(
+    'refusal',
+    'POST /api/tuning/estimate (outside the models folder)',
+    json('POST', '/api/tuning/estimate', JSON.stringify({ modelPath: ctx.outside, preset: 'fit' })),
+  );
+  add('refusal', 'POST /api/sweeps (outside the models folder)', json('POST', '/api/sweeps', sweep(ctx.outside)));
   add('read', 'GET /api/setup', bare('GET', '/api/setup'), { machine: true });
   add('read', 'GET /api/launchpad', bare('GET', '/api/launchpad'), { machine: true });
 

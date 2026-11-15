@@ -2,7 +2,7 @@ import { assert, describe, it } from '@effect/vitest';
 import type { Check, Estimate, GpuSample } from '@llama-webui/shared';
 import { Array as Arr, Option, String as Str } from 'effect';
 import { fakeModel, hw3 } from '../testing/tuning.ts';
-import { type CheckContext, runChecks, type SysReadings, summarize } from './checks.ts';
+import { type CheckContext, genericOf, runChecks, type SysReadings, summarize } from './checks.ts';
 import { estimate } from './estimate.ts';
 import { retainedBusIds } from './match.ts';
 
@@ -24,6 +24,8 @@ const readings: SysReadings = {
   cudaDriver: 13000,
   bar1Bytes: {},
   amdDpm: {},
+  amdGfx: {},
+  hipTargets: null,
   buildDate: null,
   systemInfo: null,
   cudaDriverError: false,
@@ -171,7 +173,7 @@ describe('runChecks', () => {
     assert.isFalse(Arr.some(ids, (id) => Str.startsWith('nvidia.')(id) || Str.startsWith('amd.')(id)));
   });
 
-  it('AMD: the DPM level, the HIP backend and the ROCm notice', () => {
+  it('AMD: the DPM level, the HIP backend and the ROCm target of each card', () => {
     const dpm = { '0000:08:00.0': { level: 'auto', path: '/sys/x/power_dpm_force_performance_level' } };
     const auto = byId(on(rx, {}, { amdDpm: dpm }), 'amd.dpm.0000:08:00.0');
     assert.deepStrictEqual(
@@ -184,11 +186,47 @@ describe('runChecks', () => {
     assert.strictEqual(stateOf(on(rx), 'amd.hip'), 'warn');
     assert.strictEqual(stateOf(on(rx, {}, { backendLibs: ['libggml-hip.so'] }), 'amd.hip'), 'ok');
     assert.strictEqual(stateOf(on(rx, {}, { backendLibs: [] }), 'amd.hip'), 'unknown');
-    assert.strictEqual(stateOf(on(rx), 'amd.rocm-gfx'), 'unknown');
+    const gfx = 'amd.rocm-gfx.0000:08:00.0';
+    const seen = { amdGfx: { '0000:08:00.0': 'gfx1201' } };
+    const target = (more: Partial<SysReadings>) => {
+      const check = byId(on(rx, {}, { ...seen, ...more }), gfx);
+      return [check.state, check.detail];
+    };
+    assert.deepStrictEqual(
+      [stateOf(on(rx), gfx), byId(on(rx), gfx).detail],
+      ['warn', 'not seen by ROCm (no KFD node): check the amdgpu driver and the render group'],
+    );
+    assert.deepStrictEqual(target({ hipTargets: null }), ['unknown', 'gfx1201: no HIP build to check']);
+    assert.deepStrictEqual(target({ hipTargets: [] }), [
+      'unknown',
+      'gfx1201: the targets of libggml-hip.so cannot be read',
+    ]);
+    assert.deepStrictEqual(target({ hipTargets: ['gfx1100', 'gfx1201'] }), ['ok', 'gfx1201, in the build']);
+    assert.deepStrictEqual(target({ hipTargets: ['gfx12-generic'] }), ['ok', 'gfx1201, in the build']);
+    assert.deepStrictEqual(target({ hipTargets: ['gfx1030', 'gfx1100'] }), [
+      'warn',
+      'gfx1201 not in the build (gfx1030, gfx1100): rebuild with -DAMDGPU_TARGETS=gfx1201, or set HSA_OVERRIDE_GFX_VERSION',
+    ]);
     const idle = ctx({ gpus: [rx] });
     assert.deepStrictEqual(
-      [stateOf(idle, 'amd.dpm.0000:08:00.0'), stateOf(idle, 'amd.hip'), stateOf(idle, 'amd.rocm-gfx')],
+      [stateOf(idle, 'amd.dpm.0000:08:00.0'), stateOf(idle, 'amd.hip'), stateOf(idle, gfx)],
       ['na', 'na', 'na'],
+    );
+  });
+
+  it('genericOf names the generic target that runs a card, none for a card without one', () => {
+    assert.deepStrictEqual(
+      Arr.map(['gfx1201', 'gfx1100', 'gfx1036', 'gfx1012', 'gfx942', 'gfx906', 'gfx90a', 'gfx803'], genericOf),
+      [
+        'gfx12-generic',
+        'gfx11-generic',
+        'gfx10-3-generic',
+        'gfx10-1-generic',
+        'gfx9-4-generic',
+        'gfx9-generic',
+        null,
+        null,
+      ],
     );
   });
 

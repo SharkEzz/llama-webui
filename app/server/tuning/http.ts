@@ -5,20 +5,24 @@ import type { ChildProcessSpawner } from 'effect/process';
 import { BenchRunner } from '../bench/BenchRunner.ts';
 import { expandHome, type homeDir } from '../config/Home.ts';
 import { LogRing } from '../logs/LogRing.ts';
+import { checkModelPath, checkModelPaths } from '../models/allowedPath.ts';
 import type { GgufReader } from '../models/GgufReader.ts';
 import { Monitor } from '../monitor/Monitor.ts';
+import type { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { runChecks, summarize } from './checks.ts';
 import { measureDiskSpeed } from './disk.ts';
 import { estimate } from './estimate.ts';
 import { retainedBusIds } from './match.ts';
-import { loadModel, mmprojBytes } from './models.ts';
+import { checkPathForm, loadModel, mmprojBytes } from './models.ts';
 import { planSweep } from './space.ts';
 import { readSys } from './sysinfo.ts';
 import { TuningHardware } from './TuningHardware.ts';
 import { TuningMemo } from './TuningMemo.ts';
 
 type Taken =
+  | SettingsRepo
+  | ProfilesRepo
   | FileSystem.FileSystem
   | Path.Path
   | GgufReader
@@ -46,6 +50,7 @@ export const TuningHandlers = HttpApiBuilder.group(
     /** The checks of the machine, against the model at `model` when one is given (an unreadable one is left out). */
     const checks = Effect.fn('TuningHandlers.checks')(function* (model: string | undefined) {
       const modelPath = model === undefined || Str.isEmpty(model) ? null : model;
+      if (modelPath !== null) yield* checkModelPath(modelPath);
       const snapshot = yield* monitor.latest;
       const gpus = snapshot?.allGpus ?? [];
       const nvml = yield* monitor.nvmlSystem;
@@ -56,7 +61,14 @@ export const TuningHandlers = HttpApiBuilder.group(
         {
           hw: hardware.read,
           info: modelPath === null ? Effect.succeedNone : Effect.option(loadModel(modelPath)),
-          readings: readSys({ binary: expanded, modelPath, logLines, nvml, busIds: Arr.map(gpus, (g) => g.busId) }),
+          readings: readSys({
+            binary: expanded,
+            modelPath,
+            logLines,
+            nvml,
+            busIds: Arr.map(gpus, (g) => g.busId),
+            hipTargets: memo.hipTargets,
+          }),
         },
         { concurrency: 'unbounded' },
       );
@@ -86,17 +98,21 @@ export const TuningHandlers = HttpApiBuilder.group(
       if (yield* runner.busy) {
         return yield* BenchRunning.make({ message: 'A benchmark is running: the measurement would be skewed' });
       }
+      yield* checkPathForm(modelPath);
+      yield* checkModelPath(modelPath);
       yield* loadModel(modelPath);
       const speed = yield* measureDiskSpeed({ path: modelPath });
       yield* memo.diskSpeeds.set(modelPath, speed);
       return speed;
     });
 
-    /** The model, its projector's size and the hardware, read together. */
+    /** The model, its projector's size and the hardware, read together, once the paths are allowed. */
     const inputs = Effect.fn('TuningHandlers.inputs')(function* (files: {
       readonly modelPath: string;
       readonly mmprojPath?: string | null | undefined;
     }) {
+      yield* checkPathForm(files.modelPath);
+      yield* checkModelPaths(files);
       return yield* Effect.all(
         { model: loadModel(files.modelPath), mmproj: mmprojBytes(files.mmprojPath), hw: hardware.read },
         { concurrency: 'unbounded' },

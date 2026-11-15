@@ -13,10 +13,11 @@ import { HttpApiBuilder } from 'effect/http-api';
 import { SqlClient } from 'effect/sql';
 import { benchBinary } from 'llamacpp-js/node';
 import { expandHome, type homeDir } from '../config/Home.ts';
+import { checkModelPaths } from '../models/allowedPath.ts';
 import type { GgufReader } from '../models/GgufReader.ts';
 import type { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
-import { loadModel, mmprojBytes } from '../tuning/models.ts';
+import { checkPathForm, loadModel, mmprojBytes } from '../tuning/models.ts';
 import { planSweep } from '../tuning/space.ts';
 import { TuningHardware } from '../tuning/TuningHardware.ts';
 import { WsHub } from '../ws/WsHub.ts';
@@ -26,7 +27,14 @@ import { BenchRunsRepo, runFilters } from './BenchRunsRepo.ts';
 import { SweepsRepo } from './SweepsRepo.ts';
 import { fromProfile, toProfile } from './toProfile.ts';
 
-type Taken = Path.Path | ProfilesRepo | SweepsRepo | BenchRunsRepo | SettingsRepo | Effect.Services<typeof homeDir>;
+type Taken =
+  | FileSystem.FileSystem
+  | Path.Path
+  | ProfilesRepo
+  | SweepsRepo
+  | BenchRunsRepo
+  | SettingsRepo
+  | Effect.Services<typeof homeDir>;
 
 /**
  * The endpoints of `/api/bench`: the devices llama-bench sees, a draft from a profile, the runs, a run started in the
@@ -80,7 +88,12 @@ export const BenchHandlers = HttpApiBuilder.group(
         ),
       )
       .handle('deleteFailed', () => deleteFailed)
-      .handle('run', ({ payload }) => runner.start(payload.spec, { stopServer: payload.stopServer === true }))
+      .handle('run', ({ payload }) =>
+        checkModelPaths(payload.spec).pipe(
+          Effect.provideContext(services),
+          Effect.andThen(runner.start(payload.spec, { stopServer: payload.stopServer === true })),
+        ),
+      )
       .handle('remove', ({ params }) => remove(params.id))
       .handle('cancel', ({ params }) => runner.cancel(params.id))
       .handle('toProfile', ({ params }) => toProfile(params.id).pipe(Effect.provideContext(services)));
@@ -102,13 +115,15 @@ export const SweepsHandlers = HttpApiBuilder.group(
     const hub = yield* WsHub;
     const hardware = yield* TuningHardware;
     const sql = yield* SqlClient.SqlClient;
-    const files = yield* Effect.context<FileSystem.FileSystem | GgufReader>();
+    const files = yield* Effect.context<FileSystem.FileSystem | GgufReader | Path.Path | ProfilesRepo | SettingsRepo>();
 
     /**
      * A sweep planned on its GGUF (the loading errors of the plan), then started: under the runner's claim, a plan
      * that keeps no item is a 409, else the sweep and its items are written in one transaction.
      */
     const create = Effect.fn('SweepsHandlers.create')(function* (spec: SweepSpec, stopServer: boolean) {
+      yield* checkPathForm(spec.modelPath);
+      yield* checkModelPaths(spec).pipe(Effect.provideContext(files));
       const { model, mmproj, hw } = yield* Effect.all(
         { model: loadModel(spec.modelPath), mmproj: mmprojBytes(spec.mmprojPath), hw: hardware.read },
         { concurrency: 'unbounded' },

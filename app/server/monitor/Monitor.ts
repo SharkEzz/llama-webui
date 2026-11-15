@@ -349,7 +349,7 @@ export class Monitor extends Context.Service<
           latest: Ref.get(latest),
           history: Effect.flatMap(Ref.get(held), (h) => h.history.dump()),
           nvidiaSource: collectorsUp.pipe(
-            Effect.map((collectors) => collectors.nvidiaSource),
+            Effect.flatMap((collectors) => collectors.nvidiaSource),
             Effect.orElseSucceed((): NvidiaSource => 'nvidia-smi'),
           ),
           nvmlSystem: collectorsUp.pipe(

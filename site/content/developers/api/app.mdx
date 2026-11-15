@@ -114,7 +114,7 @@ After the write, the handler calls `Monitor.configure` with the new settings:
 
 - `collectors.system`, `collectors.disk`, `hiddenGpus`, `pollIntervalMs` and `historySeconds` apply at once (the
   history is resized, the tick timer restarted).
-- `collectors.nvml` is only read when llama-webui starts: the NVIDIA collector is chosen once.
+- `collectors.nvml` is only read when llama-webui starts: NVML is tried then, or never.
 - `binary`, `host`, `port`, `modelsDir` and `env` are read when they are used: the next start, scan or setup report. A
   running `llama-server` keeps its binary, host and port until it restarts.
 

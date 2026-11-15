@@ -79,7 +79,8 @@ beforeAll(async () => {
     fake: join(REPO, 'testdata/fake/fake-llama-server'),
     missing: join(dir.path, 'no-such-llama-server'),
     model,
-    noModel: join(dir.path, 'no-such-model.gguf'),
+    noModel: join(home, 'models', 'no-such-model.gguf'),
+    outside: join(dir.path, 'outside.gguf'),
     livePort,
   };
   outcomes = { ...(await runContract(app.base, ctx, fixtures)), ...(await runStreams(app.base, ctx, fixtures)) };

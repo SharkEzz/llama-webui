@@ -1,7 +1,9 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, describe, it } from '@effect/vitest';
 import {
+  Array as Arr,
   ConfigProvider,
+  Context,
   Effect,
   FileSystem,
   Layer,
@@ -12,7 +14,8 @@ import {
   String as Str,
 } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
-import { fsTypeOf, largestBar, readSys, resolveBinary } from './sysinfo.ts';
+import { fsTypeOf, gfxName, kfdBusId, largestBar, readHipTargets, readSys, resolveBinary } from './sysinfo.ts';
+import { TuningMemo } from './TuningMemo.ts';
 
 type Services = FileSystem.FileSystem | Path.Path | ChildProcessSpawner.ChildProcessSpawner | Scope.Scope;
 
@@ -169,6 +172,8 @@ describe('sysinfo', () => {
           cudaDriver: null,
           bar1Bytes: {},
           amdDpm: {},
+          amdGfx: {},
+          hipTargets: null,
           buildDate: null,
           systemInfo: null,
           cudaDriverError: false,
@@ -200,6 +205,69 @@ describe('sysinfo', () => {
         assert.deepStrictEqual(Rec.keys(all.amdDpm), ['0000:08:00.0']);
         const other = yield* readSys({ ...options, busIds: ['0000:01:00.0'] });
         assert.deepStrictEqual(other.amdDpm, {});
+      }),
+    ),
+  );
+
+  it('gfxName reads the MMmmss of KFD, minor and stepping in hex; kfdBusId the domain and location', () => {
+    assert.deepStrictEqual(Arr.map([120001, 100306, 90010, 110001, 0, -1], gfxName), [
+      Option.some('gfx1201'),
+      Option.some('gfx1036'),
+      Option.some('gfx90a'),
+      Option.some('gfx1101'),
+      Option.none(),
+      Option.none(),
+    ]);
+    assert.deepStrictEqual(
+      [
+        kfdBusId({ domain: 0, location: 2048 }),
+        kfdBusId({ domain: 0, location: 3328 }),
+        kfdBusId({ domain: 1, location: (0xc3 << 8) | (2 << 3) | 1 }),
+      ],
+      ['0000:08:00.0', '0000:0d:00.0', '0001:c3:02.1'],
+    );
+  });
+
+  it.effect('readSys reads the gfx of the KFD nodes and the HIP targets beside the binary, kept until a rebuild', () =>
+    fresh(
+      Effect.gen(function* () {
+        const { fs, at, write } = yield* workspace;
+        const node = (n: number, gfx: number, location: number) =>
+          write(
+            `sys/class/kfd/kfd/topology/nodes/${n}/properties`,
+            `cpu_cores_count 0\ngfx_target_version ${gfx}\nlocation_id ${location}\ndomain 0\n`,
+          );
+        yield* node(0, 0, 0);
+        yield* node(1, 120001, 2048);
+        yield* node(2, 100306, 3328);
+        const binary = yield* write('bin/llama-server', '#!/bin/sh\n', 0o755);
+        // One target cut in two by the 64 KiB chunks of the stream, another further on; the same twice.
+        const marker = '__CLANG_OFFLOAD_BUNDLE__hipv4-amdgcn-amd-amdhsa--gfx1201';
+        const lib = at('bin/libggml-hip.so');
+        const body = `${Str.repeat(65536 - 40)('x')}${marker}\0${Str.repeat(1000)('y')}hipv4-amdgcn-amd-amdhsa--gfx11-generic\0${marker}`;
+        yield* fs.writeFileString(lib, body);
+        const memos = yield* Layer.build(TuningMemo.layer);
+        const memo = Context.get(memos, TuningMemo);
+        const options = { sysRoot: at('sys'), procRoot: at('proc'), binary, modelPath: null, logLines: NO_LOGS };
+        const first = yield* readSys({ ...options, hipTargets: memo.hipTargets });
+        assert.deepStrictEqual(first.amdGfx, { '0000:08:00.0': 'gfx1201', '0000:0d:00.0': 'gfx1036' });
+        assert.deepStrictEqual(first.hipTargets, ['gfx11-generic', 'gfx1201']);
+        // Kept by path, mtime and size: the same bytes count without a target, the mtime put back, are not read again;
+        // a new mtime (a rebuild) is.
+        const blank = Str.repeat(body.length)('z');
+        const direct = yield* readHipTargets(lib);
+        assert.deepStrictEqual(direct, first.hipTargets);
+        // In seconds.
+        yield* fs.utimes(lib, 0, 1_000);
+        const read = yield* readSys({ ...options, hipTargets: memo.hipTargets });
+        assert.deepStrictEqual(read.hipTargets, first.hipTargets);
+        yield* fs.writeFileString(lib, blank);
+        yield* fs.utimes(lib, 0, 1_000);
+        const kept = yield* readSys({ ...options, hipTargets: memo.hipTargets });
+        assert.deepStrictEqual(kept.hipTargets, first.hipTargets);
+        yield* fs.utimes(lib, 0, 2_000);
+        const rebuilt = yield* readSys({ ...options, hipTargets: memo.hipTargets });
+        assert.deepStrictEqual(rebuilt.hipTargets, []);
       }),
     ),
   );

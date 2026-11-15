@@ -56,7 +56,14 @@ export {
   HubErrors,
 } from './api/HfApi.ts';
 export { LogsApi } from './api/LogsApi.ts';
-export { ModelFileNotFound, ModelInUse, ModelNotFound, ModelsApi, ModelUnreadable } from './api/ModelsApi.ts';
+export {
+  ModelFileNotFound,
+  ModelInUse,
+  ModelNotFound,
+  ModelPathRefused,
+  ModelsApi,
+  ModelUnreadable,
+} from './api/ModelsApi.ts';
 export { HistoryReply, MonitorApi, Topology } from './api/MonitorApi.ts';
 export {
   ImportResult,

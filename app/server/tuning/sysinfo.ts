@@ -8,12 +8,14 @@ import {
   Path,
   Record as Rec,
   String as Str,
+  Stream,
 } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 import { which } from '../bench/which.ts';
 import { resolveModelDisk } from '../collectors/disk.ts';
 import { readTrimmed } from '../collectors/read.ts';
 import type { SysReadings } from './checks.ts';
+import type { Memo } from './TuningMemo.ts';
 
 /** How long `git log` may take to give the build date. */
 const GIT_TIMEOUT = '5 seconds';
@@ -104,10 +106,104 @@ export const fsTypeOf = (options: { readonly mounts: string | null; readonly pat
   return Option.match(best, { onNone: () => null, onSome: (m) => m.type });
 };
 
+/**
+ * The gfx target of a KFD `gfx_target_version` (MMmmss, the minor and the stepping written in hex): 120001 → gfx1201,
+ * 100306 → gfx1036, 90010 → gfx90a. None for 0 (a CPU node) or a value that is not one.
+ */
+export const gfxName = (version: number): Option.Option<string> => {
+  if (!Number.isSafeInteger(version) || version <= 0) return Option.none();
+  const major = Math.floor(version / 10000);
+  const minor = Math.floor(version / 100) % 100;
+  const step = version % 100;
+  return Option.some(`gfx${major}${minor.toString(16)}${step.toString(16)}`);
+};
+
+/** The PCI bus id of a KFD node: its `domain` and `location_id` (bus << 8 | device << 3 | function). */
+export const kfdBusId = ({ domain, location }: { readonly domain: number; readonly location: number }): string => {
+  const hex = (n: number, width: number) => Str.padStart(width, '0')(n.toString(16));
+  return `${hex(domain, 4)}:${hex((location >> 8) & 0xff, 2)}:${hex((location >> 3) & 0x1f, 2)}.${location & 7}`;
+};
+
+/** The numbers of a KFD `properties` file (`name value` lines). */
+const kfdProperties = (text: string): Readonly<Record<string, number>> =>
+  Rec.fromEntries(
+    Arr.getSomes(
+      Arr.map(Str.split(text, '\n'), (line) => {
+        const [key, value] = Str.split(Str.trim(line), /\s+/);
+        if (key === undefined || value === undefined || key === '' || value === '') return Option.none();
+        const n = Number(value);
+        return Number.isFinite(n) ? Option.some([key, n] as const) : Option.none();
+      }),
+    ),
+  );
+
+/** The gfx target of each GPU the ROCm kernel driver (KFD) exposes, by PCI bus id; empty without KFD. */
+const readKfd = Effect.fn('tuning.readKfd')(function* (sys: string) {
+  const path = yield* Path.Path;
+  const nodes = path.join(sys, 'class/kfd/kfd/topology/nodes');
+  const names = yield* namesIn(nodes);
+  const read = yield* Effect.forEach(names, (node) =>
+    Effect.map(readTrimmed(path.join(nodes, node, 'properties')), (text) => {
+      if (text === null) return Option.none();
+      const props = kfdProperties(text);
+      return Option.map(
+        gfxName(props.gfx_target_version ?? 0),
+        (gfx) => [kfdBusId({ domain: props.domain ?? 0, location: props.location_id ?? 0 }), gfx] as const,
+      );
+    }),
+  );
+  return Rec.fromEntries(Arr.getSomes(read));
+});
+
+/** A code object's target in an offload bundle: `amdgcn-amd-amdhsa--gfx1201`, `…--gfx11-generic`, `…--gfx90a:xnack-`. */
+const HIP_TARGET = /amdgcn-amd-amdhsa--(gfx[0-9a-f]+(?:-[0-9]+)*(?:-generic)?)/g;
+
+/** How much of a chunk's end is kept for the next one: a target cut in two by the chunks is still found. */
+const TARGET_OVERLAP = 64;
+
+/**
+ * The gfx targets a HIP library was built for, sorted: the names of its offload bundles, read in one pass over the
+ * file (a build for several cards is hundreds of MB). Empty when none is readable.
+ */
+export const readHipTargets = Effect.fn('tuning.readHipTargets')(function* (file: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const decoder = new TextDecoder('latin1');
+  const found = yield* fs.stream(file).pipe(
+    Stream.runFold(
+      () => ({ tail: '', targets: new Set<string>() }),
+      (acc, chunk) => {
+        const text = acc.tail + decoder.decode(chunk);
+        for (const match of Str.matchAll(HIP_TARGET)(text)) if (match[1] !== undefined) acc.targets.add(match[1]);
+        return { tail: Str.slice(-TARGET_OVERLAP)(text), targets: acc.targets };
+      },
+    ),
+    Effect.orElseSucceed(() => ({ tail: '', targets: new Set<string>() })),
+  );
+  return Arr.sort(Arr.fromIterable(found.targets), Order.String);
+});
+
 /** The number of a `cpuN` folder name. */
 const cpuIndex = (name: string): number => Number(Str.slice(3)(name));
 
 const byCpuIndex = Order.mapInput(Num.Order, cpuIndex);
+
+/** `readHipTargets` of `file`, kept in `memo` under its path, mtime and size: a rebuild reads it again. */
+const hipTargetsOf = Effect.fn('tuning.hipTargetsOf')(function* (file: string, memo?: Memo<ReadonlyArray<string>>) {
+  const fs = yield* FileSystem.FileSystem;
+  const info = yield* Effect.option(fs.stat(file));
+  if (Option.isNone(info)) return [];
+  const mtime = Option.getOrElse(
+    Option.map(info.value.mtime, (d) => d.getTime()),
+    () => 0,
+  );
+  const key = `${file}\0${mtime}\0${info.value.size}`;
+  if (memo === undefined) return yield* readHipTargets(file);
+  const kept = yield* memo.get(key);
+  if (Option.isSome(kept)) return kept.value;
+  const targets = yield* readHipTargets(file);
+  yield* memo.set(key, targets);
+  return targets;
+});
 
 export interface SysOptions {
   readonly procRoot?: string;
@@ -120,6 +216,8 @@ export interface SysOptions {
   readonly nvml?: { readonly driver: string | null; readonly cudaDriver: number | null } | null;
   /** PCI bus ids of the GPUs to look at (BAR1, DPM); every AMD card when missing. */
   readonly busIds?: ReadonlyArray<string>;
+  /** The HIP targets of a library, kept by its path, mtime and size (`TuningMemo`); read each time when missing. */
+  readonly hipTargets?: Memo<ReadonlyArray<string>>;
 }
 
 /** Every reading the system checks need; each one tolerant (null or empty when unreadable), never a failure. */
@@ -166,6 +264,14 @@ export const readSys = Effect.fn('tuning.readSys')(function* (options: SysOption
     Arr.filter(besideBinary, (n) => /^libggml-.*\.so/.test(n)),
     Order.String,
   );
+  const hipLib = Option.flatMap(binaryDir, (dir) =>
+    Option.map(
+      Arr.findFirst(backendLibs, (n) => /^libggml-hip\.so/.test(n)),
+      (n) => path.join(dir, n),
+    ),
+  );
+  const hipTargets = Option.isNone(hipLib) ? null : yield* hipTargetsOf(hipLib.value, options.hipTargets);
+  const amdGfx = yield* readKfd(sys);
   const repo = Option.isNone(binaryDir) ? Option.none<string>() : yield* gitRoot(binaryDir.value);
   const commitMs = Option.isNone(repo) ? Option.none<number>() : yield* lastCommitMs(repo.value);
   const buildDate = Option.getOrNull(commitMs);
@@ -228,6 +334,8 @@ export const readSys = Effect.fn('tuning.readSys')(function* (options: SysOption
     cudaDriver,
     bar1Bytes,
     amdDpm,
+    amdGfx,
+    hipTargets,
     buildDate,
     systemInfo,
     cudaDriverError,

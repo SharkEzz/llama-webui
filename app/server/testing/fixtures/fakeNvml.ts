@@ -7,15 +7,16 @@
 // - `error`: answers `start` with an `error`; exits 0 once its stdin ends.
 // - `silent`: never answers, and stays up once its stdin ends: only a kill ends it.
 // - `exit-after-ready`: answers `ready`, sends one sample, then exits 0 after 300 ms.
+// - `exit-twice`: as `exit-after-ready` for the first two starts in `<dir>`, as `ready-then-sample` after.
 // - `garbage-before-ready`: answers `start` with a line that is not a message, then stays up: only a kill ends it.
 // - `garbage-after-ready`: answers `ready` and one sample, then a line that is not a message, then samples every
 //   `intervalMs` and stays up: only a kill ends it.
 // - `busy`: answers `ready`, then spins in a busy loop, as a sampler stuck in a native call: only SIGKILL ends it.
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-const [behaviour = '', dir = ''] = process.argv.slice(2);
+const [asked = '', dir = ''] = process.argv.slice(2);
 
 /** What the fake samples: one card, and two processes on it (the VRAM of the second one unknown). */
 const SNAPSHOT = {
@@ -42,6 +43,8 @@ const SNAPSHOT = {
 const send = (message: unknown) => process.stdout.write(`${JSON.stringify(message)}\n`);
 
 appendFileSync(join(dir, 'pids'), `${process.pid}\n`);
+const starts = readFileSync(join(dir, 'pids'), 'utf8').trim().split('\n').length;
+const behaviour = asked === 'exit-twice' ? (starts <= 2 ? 'exit-after-ready' : 'ready-then-sample') : asked;
 
 if (behaviour === 'silent') setInterval(() => {}, 60_000);
 

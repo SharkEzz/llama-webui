@@ -10,10 +10,11 @@ import {
   type ProfileRunning,
 } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Option, Order, Path, String as Str } from 'effect';
+import { SqlClient } from 'effect/sql';
 import { BenchRunner } from '../bench/BenchRunner.ts';
 import { homeDir } from '../config/Home.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
-import { removeProfile } from '../profiles/removeProfile.ts';
+import { clearDefaultProfile, refuseRunning } from '../profiles/removeProfile.ts';
 import type { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { profilePaths } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
@@ -152,10 +153,11 @@ export const removeEmptyFolders = Effect.fn('models.removeEmptyFolders')(functio
 });
 
 /**
- * Deletes a model the scan found: refused (409) while it is used (`blocked`); then its files (a link: the link only),
- * then the folders left empty up to `root`, then, with `deleteProfiles`, the profiles that open it (and the default
- * profile setting when it named one of them). A file that cannot be removed is a defect (500): the profiles are kept,
- * which the other order could leave deleted for a model still on disk.
+ * Deletes a model the scan found: refused (409) while it is used (`blocked`); then, in one SQL transaction, with
+ * `deleteProfiles` the profiles that open it (the running server's refused, 409), then its files (a link: the link
+ * only); then the folders left empty up to `root`, and the default profile setting when it named a deleted profile.
+ * A file that cannot be removed is a defect (500) that rolls the profiles back: no profile is lost for a model still
+ * on disk, and no file for a profile kept. A model of several files can then be left with some of them removed.
  */
 export const deleteModel = Effect.fn('models.deleteModel')(function* (options: {
   readonly entry: ModelEntry;
@@ -164,20 +166,37 @@ export const deleteModel = Effect.fn('models.deleteModel')(function* (options: {
 }): Effect.fn.Return<
   ModelDeleted,
   ModelInUse | ProfileRunning,
-  ProfilesRepo | SettingsRepo | Supervisor | BenchRunner | ActiveWrites | FileSystem.FileSystem | Path.Path
+  | ProfilesRepo
+  | SettingsRepo
+  | Supervisor
+  | BenchRunner
+  | ActiveWrites
+  | SqlClient.SqlClient
+  | FileSystem.FileSystem
+  | Path.Path
 > {
   const { entry, root, deleteProfiles } = options;
   const fs = yield* FileSystem.FileSystem;
+  const sql = yield* SqlClient.SqlClient;
+  const profiles = yield* ProfilesRepo;
   const usage = yield* modelUsage(entry);
   if (usage.blocked !== null) return yield* ModelInUse.make({ message: usage.blocked });
 
-  yield* Effect.forEach(entry.files, (file) => Effect.orDie(fs.remove(file, { force: true })), { discard: true });
-  yield* removeEmptyFolders(root, entry.files);
-
   const ids = deleteProfiles ? Arr.map(usage.profiles, (profile) => profile.id) : [];
-  // A profile deleted meanwhile is gone all the same.
-  yield* Effect.forEach(ids, (id) => removeProfile(id).pipe(Effect.catchTag('ProfileNotFound', () => Effect.void)), {
-    discard: true,
-  });
+  yield* Effect.gen(function* () {
+    // A profile deleted meanwhile is gone all the same.
+    yield* Effect.forEach(
+      ids,
+      (id) =>
+        refuseRunning(id).pipe(
+          Effect.andThen(profiles.remove(id)),
+          Effect.catchTag('ProfileNotFound', () => Effect.void),
+        ),
+      { discard: true },
+    );
+    yield* Effect.forEach(entry.files, (file) => Effect.orDie(fs.remove(file, { force: true })), { discard: true });
+  }).pipe(sql.withTransaction, Effect.catchTag('SqlError', Effect.die));
+  yield* removeEmptyFolders(root, entry.files);
+  yield* clearDefaultProfile(ids);
   return { deletedFiles: entry.files, deletedProfiles: ids };
 });

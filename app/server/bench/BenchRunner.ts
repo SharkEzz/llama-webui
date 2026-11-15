@@ -170,8 +170,8 @@ export class BenchRunner extends Context.Service<
    * The runner. `killTimeout`: from SIGTERM to SIGKILL on a cancel; `pause`: between two sweep items;
    * `stoppingTimeout`: the wait for a stop in progress when the gate is taken; `liveThrottle`: the most frequent
    * `bench-progress` of new lines. At its build, the runs and sweeps left `running` become `interrupted`. Its shutdown
-   * step interrupts the work and saves the current run and the running sweep `interrupted`; it publishes nothing and
-   * does not restart llama-server.
+   * step interrupts the work, saves the current run and the running sweep `interrupted` and publishes them, then no
+   * live (`bench-progress` and `sweep-progress` null), before the hub closes; it does not restart llama-server.
    */
   static readonly layerWith = (options: {
     readonly killTimeout: Duration.Input;
@@ -636,7 +636,9 @@ export class BenchRunner extends Context.Service<
         });
 
         // Shutdown: the work interrupted (its child killed through its scope), then the current run and the running
-        // sweep saved `interrupted` for the next start; nothing published, llama-server not restarted.
+        // sweep saved `interrupted` for the next start and published, then no live: the step runs before the hub
+        // closes, so an open page sees the end. The work's own publications are silenced by `closing`; these go to
+        // the hub directly. llama-server is not restarted.
         yield* shutdown.before(
           Effect.gen(function* () {
             const s = yield* SynchronizedRef.updateAndGet(state, (st) => ({ ...st, closing: true }));
@@ -645,13 +647,19 @@ export class BenchRunner extends Context.Service<
             const current = Option.filter(s.current, (c) => !c.finished);
             if (Option.isSome(current)) {
               const run = yield* runs.get(current.value.runId);
-              yield* runs.finish(current.value.runId, {
+              const saved = yield* runs.finish(current.value.runId, {
                 status: 'interrupted',
                 error: Option.getOrNull(Option.flatMap(run, (r) => Option.fromNullishOr(r.error))) ?? INTERRUPTED,
                 durationMs: now - current.value.live.startedAt,
               });
+              yield* hub.publish({ type: 'bench-run', payload: saved });
             }
-            if (Option.isSome(s.sweep)) yield* sweeps.setStatus(s.sweep.value.id, 'interrupted');
+            if (Option.isSome(s.sweep)) {
+              const sweep = yield* sweeps.setStatus(s.sweep.value.id, 'interrupted');
+              yield* hub.publish({ type: 'sweep', payload: sweep });
+            }
+            if (Option.isSome(s.current)) yield* hub.publish({ type: 'bench-progress', payload: null });
+            if (Option.isSome(s.sweepLive)) yield* hub.publish({ type: 'sweep-progress', payload: null });
           }),
         );
 

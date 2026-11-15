@@ -18,6 +18,8 @@ The endpoints that read a model parse its GGUF with `loadModel()` (`app/server/t
 (`ModelLoadErrors` of `TuningApi`):
 
 - `400` `ModelPathInvalid` `Expected an absolute path to a .gguf file`;
+- `403` `ModelPathRefused` `Outside the models folder and not used by a profile`: a model or projector must be under
+  the models folder, or a profile's (see [Security](/developers/server/security/#paths-the-api-reads-and-writes));
 - `404` `ModelNotFound` `Model not found` (or `ProjectorNotFound` `Projector not found` for `mmprojPath`);
 - `422` `ModelUnreadable` with the parser's message when the file is not a readable GGUF.
 
@@ -246,6 +248,8 @@ Checks the drivers, the CPU, the kernel and the `llama-server` build for setting
 | --------- | -------- | ---------------------------------------------------------------------------- |
 | `model`   | no       | Absolute path of a model. A model that cannot be read is ignored.            |
 
+**Errors**: `403` `ModelPathRefused` for a `model` outside the models folder and no profile's.
+
 **Response**: `200` with a `ChecksReport`: `checks` (`Check[]`), `summary` (the count of each state: `warn`, `ok`,
 `unknown`, `na`) and `at` (epoch ms).
 
@@ -267,7 +271,7 @@ Check ids, by family (`<busId>` is a GPU's PCI address):
 | Family   | Ids                                                                                                       |
 | -------- | --------------------------------------------------------------------------------------------------------- |
 | `nvidia` | `nvidia.persistence.<busId>`, `nvidia.powerlimit.<busId>`, `nvidia.rebar.<busId>`, `nvidia.pcie.<busId>`, `nvidia.driver`, `nvidia.uvm` |
-| `amd`    | `amd.dpm.<busId>`, `amd.pcie.<busId>`, `amd.hip`, `amd.rocm-gfx`                                          |
+| `amd`    | `amd.dpm.<busId>`, `amd.pcie.<busId>`, `amd.hip`, `amd.rocm-gfx.<busId>`                                  |
 | `cpu`    | `cpu.governor`, `cpu.thp`, `cpu.memlock`, `cpu.swappiness`, `cpu.numa`                                    |
 | `build`  | `build.cuda`, `build.simd`, `build.age`                                                                   |
 | `kernel` | `kernel.iommu`, `kernel.disk`, `kernel.disk-speed`, `kernel.swap`                                         |

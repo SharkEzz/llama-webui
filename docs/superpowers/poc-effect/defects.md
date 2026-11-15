@@ -11,7 +11,8 @@ milestone that ports a domain verifies the lines of its section when its plan is
 Nothing here is fixed on `master`, and no issue is opened: the list is reviewed with the report of E10.
 
 Status: `unverified` (reported by a reader of the code, not reproduced), `confirmed`, `design choice`, `not a defect`,
-`fixed in <milestone>`.
+`fixed in <milestone>`, `changed after the E10 review (user, 2026-11-15)` (a design choice the user changed when
+reviewing this list, done in E11: `docs/superpowers/plans/2026-11-15-effect-e11-review.md`).
 
 ## Confirmed
 
@@ -57,11 +58,12 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
   (`monitor/History.ts`), and since no caller sets `gpus: false`, the field is removed from `GpuNeeds` and from the
   `Needs` of the NVML protocol (`collectors/gpu.ts`, `collectors/nvml/protocol.ts`): a card is skipped only by its bus
   id.
-- An NVML child that fails once it is ready is never started again. `design choice`: a sampler that failed on this
-  machine would fail again, and its readings are cleared at once rather than left stale; ported as it is, and a line
-  on its stdout that is not a message ends it the same way (`collectors/nvml/Nvml.test.ts`: a sampler that exits
-  after ready clears its readings for good; a sampler that writes a line that is not a message is dead for good, and
-  killed).
+- An NVML child that fails once it is ready is never started again. `changed after the E10 review (user, 2026-11-15)` (was a `design choice`, ported as it was
+  in E4): a sampler that dies after `ready` (an `error`, an exit, a line that is not a message) is cleared and killed
+  as before, then started again after 1 s, 5 s and 30 s, the count starting over after 5 minutes of sampling; when the
+  three restarts are spent, nvidia-smi takes over until the next start (`collectors/Collectors.test.ts`: an NVML
+  sampler that dies is started again, with the last settings; an NVML sampler that keeps dying gives way to nvidia-smi
+  after three restarts; a sampler that lived long enough gives the restarts back).
 - `collectors.nvml` is only read at startup. `design choice`: NVML or nvidia-smi is chosen when the collectors start;
   ported as it is (`collectors/Collectors.test.ts`: collectors.nvml is read at startup only).
 
@@ -83,19 +85,21 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 
 ### E6: models and downloads
 
-- `GET /api/models/info` reads any absolute path that ends in `.gguf`, outside the models folder too. `design choice`
-  (the E6 plan's call, decided as E5 did): the site documents it as by design (no allowlist of folders,
-  `site/content/developers/server/security.mdx`), the Tuning page (E8) reads the detail of a profile's model, which may
-  be anywhere, and the API is behind the guard (loopback or the configured origin). Ported as it is
-  (`models/http.test.ts`: info answers the detail of a model and of a file outside the models folder, its relPath
-  absolute).
+- `GET /api/models/info` reads any absolute path that ends in `.gguf`, outside the models folder too. `changed after the E10 review (user, 2026-11-15)` (was a
+  `design choice` of the E6 plan): every endpoint that takes a model or projector path in its request (info, the
+  tuning endpoints, a run, a sweep's creation) accepts a file under the models folder or a profile's model or
+  projector, and answers 403 `ModelPathRefused` otherwise (`models/allowedPath.ts`; `models/http.test.ts`: info of a
+  path outside the models folder and no profile's is a 403, a link under the folder is not; the same in
+  `tuning/http.test.ts` and `bench/http.test.ts`, and four refusals in the contract).
 - Two 409 answers can only be reached in a race. `confirmed`, `fixed in E6`: `DELETE /api/downloads/:id` decides
   cancel-or-remove in one step under the queue's lock (`Downloads.remove`), so `This download is not running` (code
   `not-active`) and `Cancel this download first` (code `active`) are not ported (`downloads/http.test.ts`: delete of a
   running item cancels it and answers 204 at once; delete of a finished item removes it and keeps its files).
-- Deleting a model deletes its files before its profiles. `design choice`: a file that cannot be removed answers 500
-  and keeps every profile; the other order could leave profiles deleted for a model still on disk. Ported as it is
-  (`models/http.test.ts`: a file that cannot be removed answers 500 and keeps the profiles).
+- Deleting a model deletes its files before its profiles. `changed after the E10 review (user, 2026-11-15)` (was a `design choice`): the checks first, then the
+  profiles and the files in one SQL transaction, profiles first, so a profile the server started meanwhile removes no
+  file, and a file that cannot be removed rolls the profiles back; the default profile setting after the commit. A
+  model of several files can be left with part of them removed (`models/http.test.ts`: a file that cannot be removed
+  answers 500 and rolls back the profiles deleted before it).
 - No test posts a valid download. `confirmed`, `fixed in E6`: `downloads/http.test.ts` (a valid download request
   stores the canonical repo id and the resolved sha and answers 202 with the items; a request naming a key the repo
   lacks is a 404 No GGUF; a key listed twice is a 400), on a fake Hub (`app/server/testing/hub.ts`).
@@ -119,8 +123,11 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
   transaction that returns whether the row existed and the run ids it took; a sweep gone between the look-up and the
   delete is a 404 with nothing published (`bench/SweepsRepo.test.ts`: deleting a sweep that is gone returns none;
   `bench/http.test.ts`: a sweep's delete publishes its run ids, then the sweep, and a running one is a 409).
-- `dispose()` broadcasts nothing. `design choice`: the hub closes every client with 1001 right after the runner's
-  shutdown step, and a client that reconnects reads the rows (`interrupted`). Ported as it is.
+- `dispose()` broadcasts nothing. `changed after the E10 review (user, 2026-11-15)` (was a `design choice`): the shutdown step publishes the run and the sweep it
+  saves `interrupted`, then `bench-progress` and `sweep-progress` null, before the hub's flush; a refusal before a run
+  exists stays the answer of its request (`bench/BenchRunner.test.ts`: dispose (shutdown) saves the running sweep
+  item…; `lifecycle.test.ts`: SIGTERM during a benchmark ends it interrupted, tells the open page and kills
+  llama-bench).
 - `GET /api/bench/runs` reads its query leniently (an unknown `kind` or `status` ignored, an unknown `sweep` read as
   the one-off runs, a bad `limit` as the default). `design choice` (the E7 plan's call): a strict query would turn
   into 400s requests the page never sends; the query schema is optional strings, read by `runFilters`.
@@ -134,14 +141,17 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
   that differ from Nitro's are all this fix.
 - The PCIe and Resizable BAR checks ignore whether the card is kept. `design choice`: the link and the BAR say
   something about the machine whatever the profile uses. Ported as it is.
-- `amd.rocm-gfx` is always `unknown`. `design choice`: rocminfo is not run. Ported as it is.
+- `amd.rocm-gfx` is always `unknown`. `changed after the E10 review (user, 2026-11-15)` (was a `design choice`): one check per kept AMD card,
+  `amd.rocm-gfx.<busId>`, compares its gfx target (the KFD topology in sysfs) with the targets of `libggml-hip.so`
+  (read from its offload bundles, no rocminfo): `ok`, `warn` (no KFD node, or the target not in the build), `unknown`
+  without a HIP library (`tuning/checks.test.ts`, `tuning/sysinfo.test.ts`).
 - A plan body without `spec` is never replayed by the contract suite. `confirmed`, `fixed in E8`: the body is decoded
   at the edge, a missing `spec` is the 400 `RequestInvalid` on the path `spec`, and the contract sends `{"spec":{}}`;
   `tuning/http.test.ts` sends a body without it (a plan without its spec is a 400 on the path spec; with one, its
   items).
 - `POST /api/sweeps` answers 404 `Model not found` where run, resume and validate answer 400 (moved from E7).
   `design choice` (Call 4 of the E8 plan): the creation loads the GGUF to plan, like `POST /api/tuning/plan`, and keeps
-  its errors; run, resume and validate parse no GGUF and keep the 400 `BenchFileMissing`.
+  its errors; run, resume and validate parse no GGUF and keep `BenchFileMissing`, a 404 since E11 (`changed after the E10 review (user, 2026-11-15)`: was a 400).
 - The `git log` of the build date has no timeout. `confirmed`, `fixed in E8`: bounded to 5 s like every program of the
   server, a timeout gives no build date (read, not tested: no test drives a slow git).
 
@@ -529,8 +539,8 @@ Decided (the E7 plan):
   `killTimeout` (5 s in the app, 1 s in the tests), then pushes `[llama-webui] not stopped after <ms> ms, SIGKILL` and
   sends SIGKILL. The trial talks to its llama-server through `LlamaHttp`: `llamaFetch` is not ported.
 - The runner's shutdown is a `Shutdown.before` step: it sets `closing`, interrupts the run and the loop (the child
-  SIGKILLed through its scope), writes the run and its sweep `interrupted`, publishes nothing and does not release the
-  gate. The orphans of the last run are marked when the runner's layer is built, before any request is served.
+  SIGKILLed through its scope), writes the run and its sweep `interrupted`, publishes them since E11 (was nothing),
+  and does not release the gate. The orphans of the last run are marked when the runner's layer is built, before any request is served.
 - Every bench binary (`--list-devices`, `--version`, the run) is the `binary` setting after `expandHome` (the bench
   half of the `~` defect).
 

@@ -412,17 +412,21 @@ describe('ModelsApi', () => {
       }),
     );
 
-    it.effect('a file that cannot be removed answers 500 and keeps the profiles', () =>
+    it.effect('a file that cannot be removed answers 500 and rolls back the profiles deleted before it', () =>
       Effect.gen(function* () {
         const { fs, models, write } = yield* workspace;
         const parts = [yield* write('Stuck-00001-of-00002.gguf'), yield* write(STUCK)];
         const repo = yield* ProfilesRepo;
+        const settings = yield* SettingsRepo;
         const a = yield* repo.create(profile('A', { cwd: models, model: 'Stuck-00001-of-00002.gguf' }));
+        yield* settings.patch({ defaultProfileId: a.id });
         const reply = yield* remove(parts[0] ?? '', true);
         assert.strictEqual(reply.status, 500);
+        // The profiles go first, then the files: the first part is gone, the stuck one is not, the profile is back.
         assert.deepStrictEqual([yield* fs.exists(parts[0] ?? ''), yield* fs.exists(parts[1] ?? '')], [false, true]);
         const profilesKept = yield* profileIds;
         assert.deepStrictEqual(profilesKept, [a.id]);
+        assert.strictEqual((yield* settings.get).defaultProfileId, a.id);
       }),
     );
 
@@ -540,51 +544,84 @@ describe('ModelsApi', () => {
       }),
     );
 
-    it.effect('info answers the detail of a model and of a file outside the models folder, its relPath absolute', () =>
-      Effect.gen(function* () {
-        const { home, write, writeAt } = yield* workspace;
-        const inside = yield* write('sub/tiny.gguf');
-        const outside = yield* writeAt(`${home}/elsewhere/tiny.gguf`);
-        for (const [path, relPath] of [
-          [inside, 'sub/tiny.gguf'],
-          [outside, outside],
-        ] as const) {
-          const reply = yield* infoOf(path);
-          assert.strictEqual(reply.status, 200, path);
-          const detail = yield* as(ModelDetail, reply.json);
-          assert.deepStrictEqual(
-            {
-              path: detail.path,
-              relPath: detail.relPath,
-              files: detail.files,
-              kind: detail.kind,
-              arch: detail.arch,
-              name: detail.name,
-              blockCount: detail.blockCount,
-              tensorCount: detail.tensorCount,
-              weights: detail.weights,
-            },
-            {
-              path,
-              relPath,
-              files: [path],
-              kind: 'model',
-              arch: 'llama',
-              name: 'Tiny',
-              blockCount: 2,
-              tensorCount: 7,
-              weights: {
-                embedBytes: 6400,
-                outputBytes: 6400,
-                layersBytes: 24576,
-                expertsBytes: 0,
-                otherBytes: 64,
-                totalBytes: 37440,
+    it.effect(
+      "info answers the detail of a model and of a profile's file outside the models folder, its relPath absolute",
+      () =>
+        Effect.gen(function* () {
+          const { home, write, writeAt } = yield* workspace;
+          const inside = yield* write('sub/tiny.gguf');
+          const outside = yield* writeAt(`${home}/elsewhere/tiny.gguf`);
+          const repo = yield* ProfilesRepo;
+          yield* repo.create(profile('Outside', { cwd: `${home}/elsewhere`, model: 'tiny.gguf' }));
+          for (const [path, relPath] of [
+            [inside, 'sub/tiny.gguf'],
+            [outside, outside],
+          ] as const) {
+            const reply = yield* infoOf(path);
+            assert.strictEqual(reply.status, 200, path);
+            const detail = yield* as(ModelDetail, reply.json);
+            assert.deepStrictEqual(
+              {
+                path: detail.path,
+                relPath: detail.relPath,
+                files: detail.files,
+                kind: detail.kind,
+                arch: detail.arch,
+                name: detail.name,
+                blockCount: detail.blockCount,
+                tensorCount: detail.tensorCount,
+                weights: detail.weights,
               },
-            },
-          );
-        }
-      }),
+              {
+                path,
+                relPath,
+                files: [path],
+                kind: 'model',
+                arch: 'llama',
+                name: 'Tiny',
+                blockCount: 2,
+                tensorCount: 7,
+                weights: {
+                  embedBytes: 6400,
+                  outputBytes: 6400,
+                  layersBytes: 24576,
+                  expertsBytes: 0,
+                  otherBytes: 64,
+                  totalBytes: 37440,
+                },
+              },
+            );
+          }
+        }),
+    );
+
+    it.effect(
+      "info of a path outside the models folder and no profile's is a 403, a link under the folder is not",
+      () =>
+        Effect.gen(function* () {
+          const { fs, home, models, at, writeAt } = yield* workspace;
+          const outside = yield* writeAt(`${home}/elsewhere/tiny.gguf`);
+          const projector = yield* writeAt(`${home}/elsewhere/mmproj.gguf`, MMPROJ);
+          const refusal = {
+            status: 403,
+            json: { _tag: 'ModelPathRefused', message: 'Outside the models folder and not used by a profile' },
+          };
+          // Outside, through `..`, and a missing file outside (refused before the 404: nothing is told of it).
+          for (const path of [outside, `${models}/../elsewhere/tiny.gguf`, `${home}/elsewhere/gone.gguf`]) {
+            const info = yield* infoOf(path);
+            assert.deepStrictEqual(info, refusal, path);
+          }
+          // A link the user put under the models folder is under it, wherever it leads.
+          yield* fs.makeDirectory(models, { recursive: true });
+          yield* fs.symlink(outside, at('linked.gguf'));
+          assert.strictEqual((yield* infoOf(at('linked.gguf'))).status, 200);
+          // A profile's projector opens it, by its path or by a link to it.
+          const repo = yield* ProfilesRepo;
+          yield* repo.create(profile('P', { cwd: models, model: 'linked.gguf', mmproj: projector }));
+          assert.strictEqual((yield* infoOf(projector)).status, 200);
+          yield* fs.symlink(projector, `${home}/elsewhere/via-link.gguf`);
+          assert.strictEqual((yield* infoOf(`${home}/elsewhere/via-link.gguf`)).status, 200);
+        }),
     );
 
     it.effect('info refuses a relative path or another extension with a 400 RequestInvalid', () =>

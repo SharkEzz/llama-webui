@@ -67,7 +67,7 @@ The heartbeat is made of application messages, not WebSocket protocol pings:
   WebSocket options, `SERVER_OPTIONS` in `app/server/http/HttpLive.ts`): `ping` and `pong` are all a client sends.
 
 At shutdown, the hub's own step first sends every client what the other shutdown steps published (a reply saved
-`stopped`, a run `interrupted`), 500 ms at most; then the HTTP server closes every WebSocket with code `1001`, and cuts
+`stopped`; a run and its sweep `interrupted`, then `bench-progress` and `sweep-progress` `null`), 500 ms at most; then the HTTP server closes every WebSocket with code `1001`, and cuts
 500 ms later a connection that has not answered that close (see [Shutdown](/developers/architecture/#shutdown)). The
 clients reconnect once llama-webui is back, to a new `bootId`. A development restart does the same.
 

@@ -84,16 +84,18 @@ export const isFresh: {
 export const workerPath = (moduleUrl: string): string =>
   decodeURIComponent(new URL(Str.endsWith('.ts')(moduleUrl) ? './worker.ts' : './nvml-worker.mjs', moduleUrl).pathname);
 
-/** The NVML reader: an NVIDIA reader that also tells the driver's versions. */
+/** The NVML reader: an NVIDIA reader that also tells the driver's versions, and when its sampler is gone. */
 export interface NvmlReader extends NvidiaReader {
   readonly system: Effect.Effect<NvmlSystem | null>;
+  /** Waits until the sampler is gone (an `error`, an exit, a stray line): the readings are cleared by then. */
+  readonly died: Effect.Effect<void>;
 }
 
 /**
  * Starts the sampler (`command`, else `node worker.ts` next to this module) in a scope of its own forked from the
  * caller's, and waits for its `ready` up to `readyTimeout` (3 s): none, the sampler killed, on a timeout, an `error`
  * or an exit before it. After `ready`, each sample updates the state; an `error` or an exit clears the readings for
- * good (no restart, no switch to nvidia-smi). The end of the caller's scope kills the sampler with SIGKILL, at once;
+ * good, and `died` returns (the collectors start another one, or switch to nvidia-smi). The end of the caller's scope kills the sampler with SIGKILL, at once;
  * a kill waits 1 s at most for a sampler stuck in the driver to be gone (`followProgram`).
  */
 export const startNvml = Effect.fn('startNvml')(function* (options: {
@@ -122,10 +124,13 @@ export const startNvml = Effect.fn('startNvml')(function* (options: {
   });
   /** true on `ready`, false on an `error` or an exit before it. */
   const ready = yield* Deferred.make<boolean>();
+  /** Done once the sampler is dead. */
+  const gone = yield* Deferred.make<void>();
   /** Dead for good: no reading, and no command any more (the end of the queue ends its stdin). */
   const die = Ref.update(state, onDeath).pipe(
     Effect.andThen(Queue.end(outbox)),
     Effect.andThen(Deferred.succeed(ready, false)),
+    Effect.andThen(Deferred.succeed(gone, undefined)),
   );
   /** Dead, and killed at once, from a fiber of the caller's scope: the reader that calls it is in the sampler's. */
   const abandon = (handle: ChildProcessSpawner.ChildProcessHandle) =>
@@ -234,5 +239,6 @@ export const startNvml = Effect.fn('startNvml')(function* (options: {
     refreshApps: Effect.void,
     configure,
     system: Ref.get(state).pipe(Effect.map((s) => s.system)),
+    died: Deferred.await(gone),
   });
 });

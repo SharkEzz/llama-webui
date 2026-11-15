@@ -97,7 +97,7 @@ The static identity of the machine, for the [System](/docs/system/) and [Setting
 | -------------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
 | `cpu`          | `CpuInfo`                    | Read once from `/proc/cpuinfo` and `/sys` (`readCpuInfo()` in `app/server/hardware/cpu.ts`), then cached. |
 | `gpus`         | object[]                     | `key`, `name`, `vendor`, `busId` and `vramTotalBytes` of every GPU of the latest snapshot's `allGpus` (empty before the first tick). |
-| `nvidiaSource` | `"nvml"` \| `"nvidia-smi"`    | How NVIDIA cards are read: NVML, or the `nvidia-smi` fallback. Chosen once at startup.       |
+| `nvidiaSource` | `"nvml"` \| `"nvidia-smi"`    | How NVIDIA cards are read now: NVML, or `nvidia-smi` (at startup, or once NVML gave up).    |
 
 `CpuInfo`:
 

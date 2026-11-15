@@ -242,6 +242,10 @@ Nearly everything beyond Effect's core is `@stability unstable`: `effect/http`, 
   - The web router still held the `PORTED` placeholders of the port (pages shown only once their milestone was done);
     they were removed at E10 and the router is back to its form of `master`.
 - **The user** validates the running app (E10).
+- **After the review of `defects.md` (E11)**, six design choices changed at the user's call, so these behaviours no
+  longer match `master` on purpose: NVML restarts then nvidia-smi, model paths confined to the models folder and the
+  profiles' files (403 `ModelPathRefused`), a model's profiles deleted before its files in one transaction, the bench's
+  end published at shutdown, `BenchFileMissing` a 404, and the ROCm check per card (`behaviours.md`, E11).
 
 ## A basis for the decision
 

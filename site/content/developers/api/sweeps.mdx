@@ -143,7 +143,8 @@ it. The sweep and its items are written only once the gate is taken: a refused r
 of queued items, and the number of combinations dropped by the estimator.
 
 **Errors**: `400` `RequestInvalid` (no body, or an invalid spec); the [model errors](/developers/api/tuning/#model-errors)
-(`404` `ModelNotFound` or `ProjectorNotFound`, `422` `ModelUnreadable`…); `409` `NothingToRun`
+(`403` `ModelPathRefused` outside the models folder and no profile's, `404` `ModelNotFound` or `ProjectorNotFound`,
+`422` `ModelUnreadable`…); `409` `NothingToRun`
 `No configuration to run: <n> excluded by the estimator`; the [gate errors](/developers/api/bench/#gate-errors)
 (`409` `ServerRunning` when the server must be stopped).
 
@@ -235,7 +236,7 @@ requeued ones. Cancelled items are not resumed.
 
 **Errors**: `400` `RequestInvalid` (no body, or not an object); `404` `SweepNotFound`; `409` `SweepStillRunning`
 `This sweep is still running: cancel it first`; `409` `NothingToResume`
-`Nothing to resume: no interrupted or queued item`; `400` `BenchFileMissing` `Model not found: <path>` or
+`Nothing to resume: no interrupted or queued item`; `404` `BenchFileMissing` `Model not found: <path>` or
 `Projector not found: <path>`
 when the sweep's files were deleted, checked before the gate is taken; the
 [gate errors](/developers/api/bench/#gate-errors).
@@ -265,7 +266,7 @@ sweep's interrupted items are requeued with them. The sweep then runs again, in 
 **Response**: `202` with the `Sweep` (status `running`).
 
 **Errors**: `400` `RequestInvalid` (invalid body); `404` `SweepNotFound`; `409` `SweepStillRunning`; `409`
-`NothingToValidate` `No successful run to validate`; `400` `BenchFileMissing`, checked before
+`NothingToValidate` `No successful run to validate`; `404` `BenchFileMissing`, checked before
 the gate is taken; the [gate errors](/developers/api/bench/#gate-errors).
 
 ```bash title="Terminal"

@@ -130,7 +130,7 @@ sweep and the fiber of the work.
 ### One-off runs
 
 `start(spec, { stopServer })` claims the runner (`409` `BenchRunning` `A benchmark is running` when it is busy),
-checks that the model and the projector exist (`400` `BenchFileMissing` `Model not found: …`, `Projector not found:
+checks that the model and the projector exist (`404` `BenchFileMissing` `Model not found: …`, `Projector not found:
 …`), then takes the gate: a missing file is refused before anything is stopped. It reads the hardware, creates the row
 with status `running`, the command and the hardware frozen (`BenchRunsRepo.create`), publishes it, and returns it while
 the run continues in a fiber of the runner: the endpoint answers `202`.
@@ -468,10 +468,12 @@ running benchmark goes on.
 ### Shutdown and cold start
 
 On `SIGINT` or `SIGTERM`, the shutdown step of the runner (`shutdown.before`) runs before the HTTP server closes and
-while `llama-server` still runs ([Architecture](/developers/architecture/#shutdown)). It sets `closing` (nothing is
-published after it), interrupts the work, which kills the child at once through its scope (`killSignal: 'SIGKILL'`),
-saves the current run (sweep item included) as `interrupted` with the error `interrupted (llama-webui stopped)`, and the
-sweep as `interrupted`. The gate is not released: llama-webui is exiting, and the supervisor stops with it.
+while `llama-server` still runs ([Architecture](/developers/architecture/#shutdown)). It sets `closing` (the work
+publishes nothing after it), interrupts the work, which kills the child at once through its scope
+(`killSignal: 'SIGKILL'`), saves the current run (sweep item included) as `interrupted` with the error
+`interrupted (llama-webui stopped)`, and the sweep as `interrupted`. It publishes them itself, straight to the hub
+(`bench-run`, then `sweep`), then `bench-progress` and `sweep-progress` `null`: the hub is still open, so a page that
+is open sees the end before its `1001`. The gate is not released: llama-webui is exiting, and the supervisor stops with it.
 
 When llama-webui was killed without that chance, rows stay `running`. When the runner's layer is built at the next
 start, it runs `BenchRunsRepo.stopOrphans` (running runs become `interrupted`, with the error
@@ -503,13 +505,14 @@ A client that connects late reads the current state over HTTP: `GET /api/bench/r
   `testdata/fake/fake-llama-bench`, which prints real `--progress` lines and JSON. Environment variables shape the
   fakes: `FAKE_BENCH_OOM`, `FAKE_BENCH_OOM_ARG` (out of memory when the argv contains a fragment), `FAKE_TG_BY_ARG`,
   `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`, `FAKE_LOAD_MS`, `FAKE_BENCH_STEP_MS`. A shutdown test checks that the shutdown
-  step saves the running sweep item and its sweep as `interrupted`.
+  step saves the running sweep item and its sweep as `interrupted`, and publishes them, then no live.
 - `gate.test.ts`, `execute.test.ts`, `trial.test.ts`, `vram.test.ts`, `BenchHardware.test.ts`, `prompt.test.ts`,
   `which.test.ts`, `BenchRunsRepo.test.ts`, `SweepsRepo.test.ts` and `http.test.ts` cover each part;
   `packages/webui-shared/src/sweep.test.ts` the ranking and the space.
 - `packages/llamacpp-js/tests/bench.test.ts` parses outputs captured from real runs in `testdata/llama-bench/`
   (`ok.json`, `oom-stdout.json`, `oom-stderr.txt`, `list-devices.txt`); `app/server/bench/parse.test.ts` words an
   out-of-memory failure from them.
-- `app/server/lifecycle.test.ts`: `SIGTERM` during a benchmark ends it `interrupted` and kills `llama-bench`.
+- `app/server/lifecycle.test.ts`: `SIGTERM` during a benchmark ends it `interrupted`, tells the open page
+  (`bench-run` `interrupted`, then `bench-progress` `null`, before its `1001`) and kills `llama-bench`.
 
 See [Testing](/developers/contributing/testing/) for how to run them.

@@ -154,8 +154,10 @@ message ([WebSocket](/developers/api/websocket/)). The web app (`app/src/lib/mon
 
 `Collectors` (`app/server/collectors/Collectors.ts`) builds every reader once, from the stored settings:
 
-- **NVIDIA**: NVML when the `collectors.nvml` setting is on and its sampler comes up, otherwise `nvidia-smi`. This
-  choice is made once at startup; `nvidiaSource` reports it (`nvml` or `nvidia-smi`).
+- **NVIDIA**: NVML when the `collectors.nvml` setting is on and its sampler comes up, otherwise `nvidia-smi`. A
+  sampler that dies later is started again, and after three failed restarts `nvidia-smi` takes over for good (see
+  [NVIDIA through NVML](#nvidia-through-nvml)); `nvidiaSource` reports the source of the moment (`nvml` or
+  `nvidia-smi`).
 - **AMD**: the cards found by `discoverAmdCards()` at startup.
 - **Process**: one process sampler.
 - **CPU and memory**, **DRAM bandwidth**, **disks**: started by `configure()` according to `collectors.system` and
@@ -206,8 +208,12 @@ The sampler ends at the end of its stdin, so a sampler whose server is gone, eve
 of its own, about 116 MiB of RSS with NVML loaded.
 
 On the server's side, `startNvml()` (`nvml/Nvml.ts`) answers none when the sampler reports an error, exits, or is
-not ready within 3 seconds, and `Collectors` falls back to `nvidia-smi`. After `ready`, an `error` or an exit clears
-the readings for good. A sample older than three intervals is ignored (`isFresh()`): a sampler stuck in an NVML call
+not ready within 3 seconds, and `Collectors` falls back to `nvidia-smi`. After `ready`, an `error`, an exit or a line
+that is not a message clears its readings and kills it, and its `died` returns. `Collectors` then starts a new sampler,
+with the last interval and hidden cards, after a pause of 1 s, then 5 s, then 30 s (`nvmlRestartDelays`), and logs a
+warning at each one. A sampler that sampled for 5 minutes (`nvmlHealthyAfter`) gives the three restarts back. When
+they are spent, `nvidia-smi` is started and stays the source until llama-webui restarts. The `nvidia` reader of
+`Collectors` is a facade on the source of the moment, so the monitor sees a switch at its next tick. A sample older than three intervals is ignored (`isFresh()`): a sampler stuck in an NVML call
 must not pass old numbers off as live ones. When NVML cannot report a process's memory (`NVML_VALUE_NOT_AVAILABLE`,
 for example with MIG), the card's VRAM in use is counted instead, as an upper bound.
 

@@ -425,7 +425,10 @@ const noBinary = Effect.gen(function* () {
 /** A small llama GGUF at `~/<name>` (`kv` over its metadata), with no llama.cpp under the home; its path. */
 const modelAt = Effect.fnUntraced(function* (name: string, kv: Record<string, KvValue> = {}) {
   const home = yield* noBinary;
-  const file = `${home}/${name}`;
+  // Under the models folder (`~/models`): a request opens no other path.
+  const file = `${home}/models/${name}`;
+  const fs = yield* FileSystem.FileSystem;
+  yield* Effect.orDie(fs.makeDirectory(`${home}/models`, { recursive: true }));
   yield* Effect.promise(() =>
     writeGguf(
       file,
@@ -561,14 +564,34 @@ layer(recorded, { excludeTestServices: true, buildPerTest: true })('the runner a
     }),
   );
 
+  it.effect("a run or a sweep of a model outside the models folder and no profile's is a 403, before the runner", () =>
+    Effect.gen(function* () {
+      const home = yield* noBinary;
+      const modelPath = yield* modelAt('a.gguf');
+      const refused = { status: 403, _tag: 'ModelPathRefused' };
+      const run = yield* failure('POST', '/api/bench/run', {
+        spec: { kind: 'bench', modelPath: `${home}/elsewhere/b.gguf`, p: 512, n: 128, r: 1, params: {} },
+      });
+      assert.deepInclude(run, refused);
+      const sweep = yield* failure('POST', '/api/sweeps', {
+        spec: sweepSpec({ modelPath, mmprojPath: `${home}/elsewhere/mmproj.gguf` }),
+      });
+      assert.deepInclude(sweep, refused);
+      const asked = yield* Asked;
+      yield* equals(Ref.get(asked), []);
+    }),
+  );
+
   it.effect('a sweep is planned on its GGUF: the errors of the model loading, before the runner', () =>
     Effect.gen(function* () {
       const home = yield* noBinary;
-      const missing = yield* failure('POST', '/api/sweeps', { spec: sweepSpec({ modelPath: `${home}/gone.gguf` }) });
+      const missing = yield* failure('POST', '/api/sweeps', {
+        spec: sweepSpec({ modelPath: `${home}/models/gone.gguf` }),
+      });
       assert.deepStrictEqual(missing, { status: 404, _tag: 'ModelNotFound', message: 'Model not found' });
       const modelPath = yield* modelAt('a.gguf');
       const projector = yield* failure('POST', '/api/sweeps', {
-        spec: sweepSpec({ modelPath, mmprojPath: `${home}/gone-mmproj.gguf` }),
+        spec: sweepSpec({ modelPath, mmprojPath: `${home}/models/gone-mmproj.gguf` }),
       });
       assert.deepStrictEqual(projector, { status: 404, _tag: 'ProjectorNotFound', message: 'Projector not found' });
       // The spec is decoded at the edge: an issue's path starts with `spec`.

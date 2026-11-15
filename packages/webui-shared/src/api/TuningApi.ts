@@ -11,7 +11,7 @@ import {
   TuningHardware,
 } from '../tuning.ts';
 import { BenchRunning } from './BenchApi.ts';
-import { ModelFileNotFound, ModelNotFound, ModelUnreadable } from './ModelsApi.ts';
+import { ModelFileNotFound, ModelNotFound, ModelPathRefused, ModelUnreadable } from './ModelsApi.ts';
 
 /** A model path that is not absolute or not a `.gguf`: `Expected an absolute path to a .gguf file`. */
 export class ModelPathInvalid extends Schema.TaggedError<
@@ -32,8 +32,14 @@ export class FileTooSmall extends Schema.TaggedError<FileTooSmall, { readonly Fi
   { httpApiStatus: 400 },
 ) {}
 
-/** What loading the model of a tuning request refuses: the path, the file, the GGUF, the projector. */
-export const ModelLoadErrors = [ModelPathInvalid, ModelNotFound, ModelUnreadable, ProjectorNotFound] as const;
+/** What loading the model of a tuning request refuses: the path (its form, then where it is), the file, the GGUF, the projector. */
+export const ModelLoadErrors = [
+  ModelPathInvalid,
+  ModelPathRefused,
+  ModelNotFound,
+  ModelUnreadable,
+  ProjectorNotFound,
+] as const;
 
 /** A plan asked for: the sweep's spec, nothing stored. */
 export const PlanRequest = Schema.Struct({ spec: SweepSpec }).annotate({ messageUnexpectedKey: 'unknown key' });
@@ -43,12 +49,24 @@ export const ChecksQuery = Schema.Struct({ model: Schema.optionalKey(Schema.Stri
 
 /** The tuning tools: the system checks, the hardware, the disk speed, the memory estimate and the plan of a sweep. */
 export class TuningApi extends HttpApiGroup.make('tuning').add(
-  HttpApiEndpoint.get('checks', '/api/tuning/checks', { query: ChecksQuery, success: ChecksReport }),
+  HttpApiEndpoint.get('checks', '/api/tuning/checks', {
+    query: ChecksQuery,
+    success: ChecksReport,
+    error: ModelPathRefused,
+  }),
   HttpApiEndpoint.get('hardware', '/api/tuning/hardware', { success: TuningHardware }),
   HttpApiEndpoint.post('diskSpeed', '/api/tuning/disk-speed', {
     payload: DiskSpeedRequest,
     success: DiskSpeed,
-    error: [BenchRunning, ModelPathInvalid, ModelNotFound, ModelUnreadable, ModelFileNotFound, FileTooSmall],
+    error: [
+      BenchRunning,
+      ModelPathInvalid,
+      ModelPathRefused,
+      ModelNotFound,
+      ModelUnreadable,
+      ModelFileNotFound,
+      FileTooSmall,
+    ],
   }),
   HttpApiEndpoint.post('estimate', '/api/tuning/estimate', {
     payload: EstimateRequest,

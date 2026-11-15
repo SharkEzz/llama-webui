@@ -16,6 +16,15 @@ export class ModelFileNotFound extends Schema.TaggedError<
   { readonly ModelFileNotFound: unique symbol }
 >()('ModelFileNotFound', { message: Schema.String }, { httpApiStatus: 404 }) {}
 
+/**
+ * A model or projector path of a request that is neither under the models folder nor the model or projector of a
+ * profile: `Outside the models folder and not used by a profile`.
+ */
+export class ModelPathRefused extends Schema.TaggedError<
+  ModelPathRefused,
+  { readonly ModelPathRefused: unique symbol }
+>()('ModelPathRefused', { message: Schema.String }, { httpApiStatus: 403 }) {}
+
 /** The file is not a GGUF that can be read: the read error's message (`unreadable GGUF: …`, `permission denied: …`). */
 export class ModelUnreadable extends Schema.TaggedError<ModelUnreadable, { readonly ModelUnreadable: unique symbol }>()(
   'ModelUnreadable',
@@ -39,7 +48,7 @@ const RequiredPath = Schema.String.check(Schema.isMinLength(1, { message: 'path 
 );
 
 const absoluteGguf = 'Absolute path to a .gguf file expected';
-/** The path of a GGUF anywhere on the machine (the detail is not confined to the models folder). */
+/** The path of a GGUF: under the models folder, or a profile's (else `ModelPathRefused`). */
 const GgufPath = Schema.String.check(Schema.isPattern(/^\/.*\.gguf$/su, { message: absoluteGguf })).pipe(
   Schema.annotateKey({ messageMissingKey: absoluteGguf }),
 );
@@ -55,7 +64,7 @@ export class ModelsApi extends HttpApiGroup.make('models').add(
   HttpApiEndpoint.get('info', '/api/models/info', {
     query: { path: GgufPath },
     success: ModelDetail,
-    error: [ModelFileNotFound, ModelUnreadable],
+    error: [ModelPathRefused, ModelFileNotFound, ModelUnreadable],
   }),
   HttpApiEndpoint.get('usage', '/api/models/usage', {
     query: { path: RequiredPath },

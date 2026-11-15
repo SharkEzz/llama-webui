@@ -7,6 +7,7 @@ import type { SettingsRepo } from '../settings/SettingsRepo.ts';
 import type { Supervisor } from '../supervisor/Supervisor.ts';
 import type { ActiveWrites } from './ActiveWrites.ts';
 import { findEntry, modelsRoot } from './access.ts';
+import { checkModelPath } from './allowedPath.ts';
 import { GgufReader } from './GgufReader.ts';
 import type { ModelCacheRepo } from './ModelCacheRepo.ts';
 import { scanModels, toSummary } from './scan.ts';
@@ -65,8 +66,12 @@ export const ModelsHandlers = HttpApiBuilder.group(
       return yield* deleteModel({ entry, root: dir, deleteProfiles });
     });
 
-    /** The detail of the GGUF at `path`, wherever it is: `relPath` relative to the models folder when inside it. */
+    /**
+     * The detail of the GGUF at `path`, under the models folder or a profile's (`checkModelPath`): `relPath` relative
+     * to the models folder when inside it.
+     */
     const info = Effect.fn('ModelsHandlers.info')(function* (path: string) {
+      yield* checkModelPath(path);
       const stat = yield* Effect.option(fs.stat(path));
       if (Option.isNone(stat) || stat.value.type !== 'File') {
         return yield* ModelFileNotFound.make({ message: 'File not found' });

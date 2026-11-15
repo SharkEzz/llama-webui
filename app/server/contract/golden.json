@@ -841,13 +841,23 @@
     }
   },
   "POST /api/bench/run (the model is not there)": {
-    "status": 400,
+    "status": 404,
     "headers": {
       "content-type": "application/json"
     },
     "body": {
       "_tag": "BenchFileMissing",
-      "message": "Model not found: <tmp>/no-such-model.gguf"
+      "message": "Model not found: <home>/models/no-such-model.gguf"
+    }
+  },
+  "POST /api/bench/run (outside the models folder)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelPathRefused",
+      "message": "Outside the models folder and not used by a profile"
     }
   },
   "GET /api/chat (none yet)": {
@@ -1207,6 +1217,16 @@
       "message": "File not found"
     }
   },
+  "GET /api/models/info (outside the models folder)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelPathRefused",
+      "message": "Outside the models folder and not used by a profile"
+    }
+  },
   "POST /api/profiles (opens the model)": {
     "status": 201,
     "headers": {
@@ -1524,6 +1544,26 @@
     "body": {
       "_tag": "ModelNotFound",
       "message": "Model not found"
+    }
+  },
+  "POST /api/tuning/estimate (outside the models folder)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelPathRefused",
+      "message": "Outside the models folder and not used by a profile"
+    }
+  },
+  "POST /api/sweeps (outside the models folder)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ModelPathRefused",
+      "message": "Outside the models folder and not used by a profile"
     }
   },
   "GET /api/setup": {

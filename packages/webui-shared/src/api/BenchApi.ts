@@ -2,6 +2,7 @@ import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BenchDevice, BenchDraft, BenchLive, BenchRun, BenchSpec } from '../bench.ts';
 import { Profile } from '../profile.ts';
+import { ModelPathRefused } from './ModelsApi.ts';
 import { ProfileNameTaken, ProfileNotFound } from './ProfilesApi.ts';
 import { IdParam } from './params.ts';
 
@@ -16,7 +17,7 @@ export class BenchRunning extends Schema.TaggedError<BenchRunning, { readonly Be
 export class BenchFileMissing extends Schema.TaggedError<
   BenchFileMissing,
   { readonly BenchFileMissing: unique symbol }
->()('BenchFileMissing', { message: Schema.String }, { httpApiStatus: 400 }) {}
+>()('BenchFileMissing', { message: Schema.String }, { httpApiStatus: 404 }) {}
 
 /** A stop of llama-server in progress lasts too long: `llama-server is taking too long to stop: try again`. */
 export class ServerStopTooSlow extends Schema.TaggedError<
@@ -117,7 +118,7 @@ export class BenchApi extends HttpApiGroup.make('bench').add(
   HttpApiEndpoint.post('run', '/api/bench/run', {
     payload: BenchRunRequest,
     success: BenchRun.pipe(HttpApiSchema.status(202)),
-    error: BenchStartErrors,
+    error: [ModelPathRefused, ...BenchStartErrors],
   }),
   HttpApiEndpoint.delete('remove', '/api/bench/:id', { params, error: [RunNotFound, RunStillRunning] }),
   HttpApiEndpoint.post('cancel', '/api/bench/:id/cancel', { params, error: [RunNotFound, RunNotRunning] }),

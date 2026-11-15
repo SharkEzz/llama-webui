@@ -302,6 +302,30 @@ layer(served, { excludeTestServices: true, buildPerTest: true })('/api/tuning ov
     }),
   );
 
+  it.effect("a model or projector outside the models folder and no profile's is a 403 on every tuning endpoint", () =>
+    Effect.gen(function* () {
+      yield* noBinary;
+      const home = yield* Home;
+      const good = yield* model('a.gguf');
+      const outside = `${home}/elsewhere/b.gguf`;
+      const refused = { status: 403, _tag: 'ModelPathRefused' };
+      const cases = [
+        { name: 'the model', files: { modelPath: outside } },
+        { name: 'the projector', files: { modelPath: good, mmprojPath: outside } },
+      ];
+      for (const { name, files } of cases) {
+        const estimate = yield* failure('POST', '/api/tuning/estimate', { ...files, preset: 'fit' });
+        assert.deepInclude(estimate, refused, `estimate, ${name}`);
+        const plan = yield* failure('POST', '/api/tuning/plan', { spec: sweepSpec(files) });
+        assert.deepInclude(plan, refused, `plan, ${name}`);
+      }
+      const disk = yield* failure('POST', '/api/tuning/disk-speed', { modelPath: outside });
+      assert.deepInclude(disk, refused);
+      const checks = yield* failure('GET', `/api/tuning/checks?model=${encodeURIComponent(outside)}`);
+      assert.deepInclude(checks, refused);
+    }),
+  );
+
   it.effect('the checks leave out a model that cannot be read, and take an empty model as none', () =>
     Effect.gen(function* () {
       yield* noBinary;

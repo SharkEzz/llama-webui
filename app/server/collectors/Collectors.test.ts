@@ -4,6 +4,7 @@ import {
   Array as Arr,
   ConfigProvider,
   Context,
+  type Duration,
   Effect,
   FileSystem,
   Layer,
@@ -88,9 +89,12 @@ const realSamplers = Effect.gen(function* () {
   return Arr.flatten(found);
 }).pipe(Effect.orDie);
 
-/** `effect` again every 20 ms until `ok` holds, 3 s at most. */
-const eventually = <A, E, R>(effect: Effect.Effect<A, E, R>, ok: (a: A) => boolean) =>
-  effect.pipe(Effect.repeat({ until: ok, schedule: Schedule.spaced('20 millis') }), Effect.timeout('3 seconds'));
+/** `effect` again every 20 ms until `ok` holds, `within` (3 s) at most. */
+const eventually = <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  ok: (a: A) => boolean,
+  within: Duration.Input = '3 seconds',
+) => effect.pipe(Effect.repeat({ until: ok, schedule: Schedule.spaced('20 millis') }), Effect.timeout(within));
 
 const settingsOf = (collectors: Partial<CollectorSettings['collectors']> = {}): CollectorSettings => ({
   collectors: { nvml: true, system: true, disk: true, ...collectors },
@@ -119,6 +123,7 @@ const withCollectors = <A, E, EO>(
         Effect.scoped,
       );
       yield* ws.assertAllDead;
+      yield* assertSamplersDead(ws);
     }),
   );
 
@@ -127,6 +132,38 @@ const fakePerf = (ws: Workspace) => ws.script('perf', 'exec sleep 60');
 
 /** A fake NVML sampler: it would be recorded if it were started. */
 const fakeNvml = (ws: Workspace) => ws.script('nvml', 'exec sleep 60');
+
+/**
+ * The fake sampler that speaks the protocol (`testing/fixtures/fakeNvml.ts`), its pids in `<dir>/pids`; `samplers`
+ * reads them, `assertSamplersDead` checks they are all gone (`withCollectors` does, at the end).
+ */
+const protocolNvml = (ws: Workspace, behaviour: string) => ({
+  cmd: process.execPath,
+  args: [`${import.meta.dirname}/../testing/fixtures/fakeNvml.ts`, behaviour, ws.dir],
+});
+const samplers = Effect.fnUntraced(function* (ws: Workspace) {
+  const fs = yield* FileSystem.FileSystem;
+  const file = `${ws.dir}/pids`;
+  if (!(yield* fs.exists(file))) return Arr.empty<number>();
+  const text = yield* fs.readFileString(file);
+  return Arr.map(Arr.filter(Str.split(text, '\n'), Str.isNonEmpty), Number);
+}, Effect.orDie);
+const assertSamplersDead = Effect.fnUntraced(function* (ws: Workspace) {
+  const pids = yield* samplers(ws);
+  const alive = yield* Effect.filter(pids, isAlive);
+  assert.deepStrictEqual(alive, []);
+});
+
+/** NVML through the fake sampler `behaviour`, nvidia-smi `smi` behind it, the restarts 10 ms apart. */
+const restarting = (ws: Workspace, behaviour: string, smi: string, more: Partial<Options> = {}): Options => ({
+  initial: settingsOf({ system: false, disk: false }),
+  nvmlLib: Option.none(),
+  nvmlCommand: protocolNvml(ws, behaviour),
+  nvidiaSmi: smi,
+  perfBin: MISSING,
+  nvmlRestartDelays: ['10 millis', '10 millis', '10 millis'],
+  ...more,
+});
 
 const Platform = Layer.provideMerge(PciIds.layer, NodeServices.layer);
 
@@ -146,7 +183,8 @@ layer(Platform, { excludeTestServices: true })('Collectors', (it) => {
         }),
       (collectors, ws) =>
         Effect.gen(function* () {
-          assert.strictEqual(collectors.nvidiaSource, 'nvidia-smi');
+          const source = yield* collectors.nvidiaSource;
+          assert.strictEqual(source, 'nvidia-smi');
           const system = yield* collectors.nvmlSystem;
           assert.isNull(system);
           yield* eventually(ws.callsOf('nvidia-smi', '-lms'), (c) => c.length === 1);
@@ -180,7 +218,8 @@ layer(Platform, { excludeTestServices: true })('Collectors', (it) => {
         }),
       (collectors, ws) =>
         Effect.gen(function* () {
-          assert.strictEqual(collectors.nvidiaSource, 'nvidia-smi');
+          const source = yield* collectors.nvidiaSource;
+          assert.strictEqual(source, 'nvidia-smi');
           const started = yield* eventually(ws.callsOf('nvidia-smi', '-lms'), (c) => c.length === 1);
           assert.include(started[0]?.args ?? [], '1000');
           const gpus = yield* eventually(collectors.nvidia.gpus, (g) => g.length === 1);
@@ -207,11 +246,81 @@ layer(Platform, { excludeTestServices: true })('Collectors', (it) => {
       (collectors, ws) =>
         Effect.gen(function* () {
           yield* collectors.configure(settingsOf({ nvml: true }));
-          assert.strictEqual(collectors.nvidiaSource, 'nvidia-smi');
+          const source = yield* collectors.nvidiaSource;
+          assert.strictEqual(source, 'nvidia-smi');
           const system = yield* collectors.nvmlSystem;
           assert.isNull(system);
           const nvmlStarts = yield* ws.callsOf('nvml');
           assert.deepStrictEqual(nvmlStarts, []);
+        }),
+    ),
+  );
+
+  it.effect('an NVML sampler that dies is started again, with the last settings', () =>
+    withCollectors(
+      (ws) =>
+        Effect.gen(function* () {
+          const smi = yield* ws.script('nvidia-smi', `echo '${LINE}'; exec sleep 60`);
+          return restarting(ws, 'exit-twice', smi);
+        }),
+      (collectors, ws) =>
+        Effect.gen(function* () {
+          yield* collectors.configure({ ...settingsOf({ system: false, disk: false }), pollIntervalMs: 500 });
+          // Two deaths, then a sampler that stays: three starts, the last one asked for the interval set meanwhile.
+          const pids = yield* eventually(samplers(ws), (p) => p.length === 3);
+          const gpus = yield* eventually(collectors.nvidia.gpus, (g) => g.length === 1);
+          assert.strictEqual(gpus[0]?.name, 'Fake GPU');
+          const source = yield* collectors.nvidiaSource;
+          assert.strictEqual(source, 'nvml');
+          const system = yield* collectors.nvmlSystem;
+          assert.deepStrictEqual(system, { driver: '580.95.05', cudaDriver: 13000 });
+          const fs = yield* FileSystem.FileSystem;
+          const received = yield* fs.readFileString(`${ws.dir}/received`).pipe(Effect.orDie);
+          const starts = Arr.filter(Str.split(received, '\n'), Str.includes('"start"'));
+          assert.lengthOf(starts, 3);
+          assert.include(starts[2] ?? '', '"intervalMs":500');
+          const smiStarts = yield* ws.callsOf('nvidia-smi');
+          assert.deepStrictEqual(smiStarts, []);
+          assert.lengthOf(pids, 3);
+        }),
+    ),
+  );
+
+  it.effect('an NVML sampler that keeps dying gives way to nvidia-smi after three restarts', () =>
+    withCollectors(
+      (ws) =>
+        Effect.gen(function* () {
+          const smi = yield* ws.script('nvidia-smi', `echo '${LINE}'; exec sleep 60`);
+          return restarting(ws, 'exit-after-ready', smi);
+        }),
+      (collectors, ws) =>
+        Effect.gen(function* () {
+          const source = yield* eventually(collectors.nvidiaSource, (s) => s === 'nvidia-smi', '6 seconds');
+          assert.strictEqual(source, 'nvidia-smi');
+          const pids = yield* samplers(ws);
+          assert.lengthOf(pids, 4);
+          const started = yield* eventually(ws.callsOf('nvidia-smi', '-lms'), (c) => c.length === 1);
+          assert.include(started[0]?.args ?? [], '1000');
+          const gpus = yield* eventually(collectors.nvidia.gpus, (g) => g.length === 1);
+          assert.strictEqual(gpus[0]?.name, 'NVIDIA GeForce RTX 5070 Ti');
+          const system = yield* collectors.nvmlSystem;
+          assert.isNull(system);
+        }),
+    ),
+  );
+
+  it.effect('a sampler that lived long enough gives the restarts back', () =>
+    withCollectors(
+      (ws) =>
+        Effect.gen(function* () {
+          // Each sampler lives 300 ms, more than the 100 ms that count as healthy.
+          return restarting(ws, 'exit-after-ready', MISSING, { nvmlHealthyAfter: '100 millis' });
+        }),
+      (collectors, ws) =>
+        Effect.gen(function* () {
+          yield* eventually(samplers(ws), (p) => p.length >= 6, '10 seconds');
+          const source = yield* collectors.nvidiaSource;
+          assert.strictEqual(source, 'nvml');
         }),
     ),
   );
@@ -360,7 +469,8 @@ layer(Platform, { excludeTestServices: true })('Collectors', (it) => {
             Effect.gen(function* () {
               const collectors = Context.get(context, Collectors);
               // NVML was tried (on by default) with the missing library, then nvidia-smi at the stored interval.
-              assert.strictEqual(collectors.nvidiaSource, 'nvidia-smi');
+              const source = yield* collectors.nvidiaSource;
+              assert.strictEqual(source, 'nvidia-smi');
               const [started] = yield* eventually(ws.callsOf('nvidia-smi', '-lms'), (c) => c.length === 1);
               assert.include(started?.args ?? [], '2000');
             }),

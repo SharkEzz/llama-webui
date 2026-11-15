@@ -35,6 +35,10 @@ export interface SysReadings {
   readonly bar1Bytes: Readonly<Record<string, number>>;
   /** power_dpm_force_performance_level of each AMD card, by bus id, with the file to write. */
   readonly amdDpm: Readonly<Record<string, { readonly level: string; readonly path: string }>>;
+  /** The gfx target of each GPU the ROCm kernel driver (KFD) exposes, by bus id (`gfx1201`). */
+  readonly amdGfx: Readonly<Record<string, string>>;
+  /** The gfx targets `libggml-hip.so` was built for; null without one, empty when none is readable. */
+  readonly hipTargets: ReadonlyArray<string> | null;
   /** ms of the last commit of the git checkout holding the binary; null when there is none. */
   readonly buildDate: number | null;
   /** Last "system_info:" log line. */
@@ -43,6 +47,20 @@ export interface SysReadings {
   readonly cudaDriverError: boolean;
   readonly modelDisk: { readonly rotational: boolean | null; readonly fsType: string | null } | null;
 }
+
+/**
+ * The generic target that runs code built for `gfx` (clang's `gfx*-generic`), when there is one: gfx1201 → gfx12-generic,
+ * gfx1036 → gfx10-3-generic.
+ */
+export const genericOf = (gfx: string): string | null => {
+  if (/^gfx12[0-9a-f]{2}$/.test(gfx)) return 'gfx12-generic';
+  if (/^gfx11[0-9a-f]{2}$/.test(gfx)) return 'gfx11-generic';
+  if (/^gfx103[0-9a-f]$/.test(gfx)) return 'gfx10-3-generic';
+  if (/^gfx101[0-9a-f]$/.test(gfx)) return 'gfx10-1-generic';
+  if (/^gfx9(4[0-9a-f]|50)$/.test(gfx)) return 'gfx9-4-generic';
+  if (/^gfx90[0-9c]$/.test(gfx)) return 'gfx9-generic';
+  return null;
+};
 
 export interface CheckContext {
   readonly readings: SysReadings;
@@ -293,18 +311,43 @@ export const runChecks = (ctx: CheckContext): Array<Check> => {
           impact,
         });
     }
-    {
-      const id = 'amd.rocm-gfx';
-      const label = 'Card recognized by ROCm';
-      const impact = 'HIP rejects the card without HSA_OVERRIDE_GFX_VERSION';
-      if (!anyRetained) push({ id, family: 'amd', label, state: 'na', detail: NA, impact });
-      else
+    for (const g of amd) {
+      const id = `amd.rocm-gfx.${g.busId}`;
+      const label = `ROCm target ${g.name}`;
+      const impact = 'HIP cannot run on the card: llama-server fails, or falls back to Vulkan';
+      const gfx = r.amdGfx[g.busId];
+      if (!retained(g.busId)) push({ id, family: 'amd', label, state: 'na', detail: NA, impact });
+      else if (gfx === undefined)
+        push({
+          id,
+          family: 'amd',
+          label,
+          state: 'warn',
+          detail: 'not seen by ROCm (no KFD node): check the amdgpu driver and the render group',
+          persistence: 'permanent',
+          impact,
+        });
+      else if (r.hipTargets === null)
+        push({ id, family: 'amd', label, state: 'unknown', detail: `${gfx}: no HIP build to check`, impact });
+      else if (!Arr.isReadonlyArrayNonEmpty(r.hipTargets))
         push({
           id,
           family: 'amd',
           label,
           state: 'unknown',
-          detail: 'rocminfo not queried: if HIP rejects the card, add HSA_OVERRIDE_GFX_VERSION=… to the profile env',
+          detail: `${gfx}: the targets of libggml-hip.so cannot be read`,
+          impact,
+        });
+      else if (Arr.some(r.hipTargets, (target) => target === gfx || target === genericOf(gfx)))
+        push({ id, family: 'amd', label, state: 'ok', detail: `${gfx}, in the build`, impact });
+      else
+        push({
+          id,
+          family: 'amd',
+          label,
+          state: 'warn',
+          detail: `${gfx} not in the build (${Arr.join(r.hipTargets, ', ')}): rebuild with -DAMDGPU_TARGETS=${gfx}, or set HSA_OVERRIDE_GFX_VERSION`,
+          persistence: 'permanent',
           impact,
         });
     }

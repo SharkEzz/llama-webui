@@ -164,8 +164,9 @@ status `running` and starts it in the background.
 **Response**: `202` with the created `BenchRun`. The result arrives with the `bench-run` message at the end, or with
 `GET /api/bench/runs`.
 
-**Errors**: `400` `RequestInvalid` (no body, or an invalid spec); `400` `BenchFileMissing` `Model not found: <path>`
-or `Projector not found: <path>`; the [gate errors](#gate-errors).
+**Errors**: `400` `RequestInvalid` (no body, or an invalid spec); `403` `ModelPathRefused` `Outside the models folder
+and not used by a profile` (see [Security](/developers/server/security/#paths-the-api-reads-and-writes)); `404`
+`BenchFileMissing` `Model not found: <path>` or `Projector not found: <path>`; the [gate errors](#gate-errors).
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/bench/run \

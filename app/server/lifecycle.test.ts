@@ -231,7 +231,7 @@ test('SIGTERM with the UI open and a reply streaming stops in under 2 s, ends th
   expect(alive(pid)).toBe(false);
 }, 30_000);
 
-test('SIGTERM during a benchmark ends it interrupted and kills llama-bench', async () => {
+test('SIGTERM during a benchmark ends it interrupted, tells the open page and kills llama-bench', async () => {
   const data = dataDir();
   // The fakes behind wrappers of the test's own: llama-bench records its pid (`exec` keeps it), then runs ten
   // seconds a step.
@@ -254,7 +254,9 @@ test('SIGTERM during a benchmark ends it interrupted and kills llama-bench', asy
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     });
-  expect((await call('PATCH', '/api/settings', { binary: join(bin, 'fake-llama-server') })).status).toBe(200);
+  // The model under the models folder: a run of a file elsewhere is refused.
+  const settings = await call('PATCH', '/api/settings', { binary: join(bin, 'fake-llama-server'), modelsDir: data });
+  expect(settings.status).toBe(200);
   const spec = {
     kind: 'bench',
     modelPath: model,
@@ -274,11 +276,24 @@ test('SIGTERM during a benchmark ends it interrupted and kills llama-bench', asy
   const [pid] = recorded();
   if (pid === undefined) throw new Error('llama-bench never started');
   expect(alive(pid)).toBe(true);
+  const client = await openWs(`${app.base.replace('http', 'ws')}/ws`);
+  await client.next();
   const t0 = performance.now();
   app.proc.kill('SIGTERM');
   const code = await app.exited;
   expect(performance.now() - t0).toBeLessThan(2000);
   expect(code).toBe(0);
+  expect((await client.closed).code).toBe(1001);
+  // The end of the run reached the page before its socket closed: the run interrupted, then no live.
+  const ends = client.messages.flatMap((m): Array<[string, string | null | undefined]> => {
+    const { type, payload } = m as { type: string; payload: { id?: number; status?: string } | null };
+    if (type === 'bench-run' && payload?.id === id) return [[type, payload.status]];
+    return type === 'bench-progress' && payload === null ? [[type, null]] : [];
+  });
+  expect(ends).toEqual([
+    ['bench-run', 'interrupted'],
+    ['bench-progress', null],
+  ]);
   expect(alive(pid)).toBe(false);
   const db = new DatabaseSync(join(data, 'llama-webui.sqlite'), { readOnly: true });
   try {

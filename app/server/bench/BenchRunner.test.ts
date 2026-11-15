@@ -344,7 +344,20 @@ describe('BenchRunner', () => {
       yield* useFake({ FAKE_BENCH_STEP_MS: '200' });
       const sweep = yield* startSweepOf([1, 2]);
       yield* until(Effect.map(benchRuns, (runs) => Arr.some(runs, (r) => r.status === 'running')));
+      const before = (yield* published).length;
       yield* shutdown.run;
+      // The end is published before the hub closes: the run, the sweep, then no live.
+      const all = yield* published;
+      const ends = Arr.map(Arr.drop(all, before), (m): ReadonlyArray<unknown> => {
+        if (m.type === 'bench-run' || m.type === 'sweep') return [m.type, m.payload.status];
+        return m.type === 'bench-progress' || m.type === 'sweep-progress' ? [m.type, m.payload] : [m.type];
+      });
+      assert.deepStrictEqual(ends, [
+        ['bench-run', 'interrupted'],
+        ['sweep', 'interrupted'],
+        ['bench-progress', null],
+        ['sweep-progress', null],
+      ]);
       const items = yield* itemsOf(sweep.id);
       assert.deepStrictEqual(
         Arr.map(items, (r) => [r.status, r.error]),
