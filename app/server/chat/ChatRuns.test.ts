@@ -55,29 +55,29 @@ const targetOf = (stub: Stub): ChatTarget => ({
  * A chat stub, a conversation on `/m.gguf`, and the replies asked of the stub (its target found after `targetDelay`,
  * none by default).
  */
-const setup = (options: { readonly flushInterval?: Duration.Input; readonly targetDelay?: Duration.Input } = {}) =>
-  Effect.gen(function* () {
-    const llama = yield* chatStub;
-    const repo = yield* ConversationsRepo;
-    const conv = yield* repo.create({ profileId: null, modelPath: '/m.gguf' });
-    const target = Effect.succeedSome(targetOf(llama)).pipe(Effect.delay(options.targetDelay ?? 0));
-    const runs = yield* runsWith({
-      ...(options.flushInterval === undefined ? {} : { flushInterval: options.flushInterval }),
-      target,
-    });
-    return { llama, repo, conv, runs };
+const setup = Effect.fnUntraced(function* (
+  options: { readonly flushInterval?: Duration.Input; readonly targetDelay?: Duration.Input } = {},
+) {
+  const llama = yield* chatStub;
+  const repo = yield* ConversationsRepo;
+  const conv = yield* repo.create({ profileId: null, modelPath: '/m.gguf' });
+  const target = Effect.succeedSome(targetOf(llama)).pipe(Effect.delay(options.targetDelay ?? 0));
+  const runs = yield* runsWith({
+    ...(options.flushInterval === undefined ? {} : { flushInterval: options.flushInterval }),
+    target,
   });
+  return { llama, repo, conv, runs };
+});
 
 /** Follows the events of `reply` in a fiber of the test: what came so far, and a wait for the first `n`. */
-const follow = (reply: ChatReply) =>
-  Effect.gen(function* () {
-    const events: Array<ChatEvent> = [];
-    const fiber = yield* reply.events.pipe(
-      Stream.runForEach((event) => Effect.sync(() => events.push(event))),
-      Effect.forkScoped,
-    );
-    return { events, fiber, got: (n: number) => until(() => events.length >= n) };
-  });
+const follow = Effect.fnUntraced(function* (reply: ChatReply) {
+  const events: Array<ChatEvent> = [];
+  const fiber = yield* reply.events.pipe(
+    Stream.runForEach((event) => Effect.sync(() => events.push(event))),
+    Effect.forkScoped,
+  );
+  return { events, fiber, got: (n: number) => until(() => events.length >= n) };
+});
 
 /** Every event of `reply` until its `done`, in a fiber: joined once the reply ended. */
 const toEnd = (reply: ChatReply) => Effect.forkScoped(Stream.runCollect(reply.events));
@@ -99,13 +99,12 @@ const doneOf = (events: ReadonlyArray<ChatEvent>): ChatMessage => {
 };
 
 /** No run of `id` is left. */
-const noRunLeft = (runs: ChatRuns['Service'], id: number) =>
-  Effect.gen(function* () {
-    const live = yield* runs.isLive(id);
-    const reply = yield* runs.live(id);
-    assert.isFalse(live);
-    assert.isTrue(Option.isNone(reply));
-  });
+const noRunLeft = Effect.fnUntraced(function* (runs: ChatRuns['Service'], id: number) {
+  const live = yield* runs.isLive(id);
+  const reply = yield* runs.live(id);
+  assert.isFalse(live);
+  assert.isTrue(Option.isNone(reply));
+});
 
 layer(Base, { excludeTestServices: true, buildPerTest: true })('ChatRuns', (it) => {
   it.effect('a run keeps going and is saved when its listener leaves', () =>
@@ -401,16 +400,15 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('ChatRuns', (it) 
       const nobody = yield* freePort;
       const target = yield* Ref.make<Option.Option<ChatTarget>>(Option.none());
       const runs = yield* runsWith({ target: Ref.get(target) });
-      const replyOn = (port: number) =>
-        Effect.gen(function* () {
-          yield* Ref.set(target, Option.some({ host: null, port, profileId: null, modelPath: null }));
-          const conv = yield* repo.create({ profileId: null, modelPath: null });
-          const reply = yield* runs.send(conv.id, 'Hi');
-          const events = yield* Stream.runCollect(reply.events);
-          const done = doneOf(events);
-          yield* noRunLeft(runs, conv.id);
-          return [done.status, done.content, done.error];
-        });
+      const replyOn = Effect.fnUntraced(function* (port: number) {
+        yield* Ref.set(target, Option.some({ host: null, port, profileId: null, modelPath: null }));
+        const conv = yield* repo.create({ profileId: null, modelPath: null });
+        const reply = yield* runs.send(conv.id, 'Hi');
+        const events = yield* Stream.runCollect(reply.events);
+        const done = doneOf(events);
+        yield* noRunLeft(runs, conv.id);
+        return [done.status, done.content, done.error];
+      });
       const refused = yield* replyOn(refusing.port);
       const unavailable = yield* replyOn(loading.port);
       const broken = yield* replyOn(failing.port);
@@ -496,14 +494,13 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('ChatRuns', (it) 
   it.effect('the auto-title is given on the first user message only', () =>
     Effect.gen(function* () {
       const { llama, repo, conv, runs } = yield* setup();
-      const answer = (id: number, text: string, n: number) =>
-        Effect.gen(function* () {
-          const reply = yield* runs.send(id, text);
-          const end = yield* toEnd(reply);
-          yield* llama.requested(n);
-          yield* llama.done;
-          yield* Fiber.join(end);
-        });
+      const answer = Effect.fnUntraced(function* (id: number, text: string, n: number) {
+        const reply = yield* runs.send(id, text);
+        const end = yield* toEnd(reply);
+        yield* llama.requested(n);
+        yield* llama.done;
+        yield* Fiber.join(end);
+      });
       yield* answer(conv.id, 'Tell me about the seven wonders of the world', 1);
       assert.strictEqual((yield* repo.get(conv.id)).title, 'Tell me about the seven wonders…');
       // Back to the default title, a second message does not rename it.

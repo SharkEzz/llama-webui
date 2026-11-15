@@ -13,12 +13,11 @@ const CARD = 'nvidia:GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28';
 const LINE =
   '0, GPU-c7eed07b-43d3-7fe3-0db0-0e51acaf7d28, NVIDIA GeForce RTX 5070 Ti, 0, 5895, 16303, 38, 49.86, 00000000:01:00.0';
 
-const fx = (name: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    return yield* fs.readFileString(path.resolve(import.meta.dirname, '../../../testdata', name));
-  });
+const fx = Effect.fnUntraced(function* (name: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  return yield* fs.readFileString(path.resolve(import.meta.dirname, '../../../testdata', name));
+});
 
 /** One start of a fake program: its pid and its arguments. */
 interface Call {

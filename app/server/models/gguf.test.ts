@@ -41,13 +41,12 @@ const workspace = Effect.gen(function* () {
 });
 
 /** The read of `path`, failed or not, as its `ModelReadError`. */
-const readError = (path: string) =>
-  Effect.gen(function* () {
-    const reader = yield* GgufReader;
-    const error = yield* Effect.flip(reader.read(path));
-    assert.strictEqual(error._tag, 'ModelReadError');
-    return error.message;
-  });
+const readError = Effect.fnUntraced(function* (path: string) {
+  const reader = yield* GgufReader;
+  const error = yield* Effect.flip(reader.read(path));
+  assert.strictEqual(error._tag, 'ModelReadError');
+  return error.message;
+});
 
 const Live = GgufReader.layer.pipe(Layer.provideMerge(NodeServices.layer));
 

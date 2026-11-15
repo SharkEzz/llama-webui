@@ -14,12 +14,11 @@ const entry = (path: string, files: ReadonlyArray<string> = [path]): ModelEntry 
 });
 
 /** Whether `findEntry` refuses `path` with the 404 `Model not found`. */
-const refused = (models: ReadonlyArray<ModelEntry>, path: string) =>
-  Effect.gen(function* () {
-    const error = yield* Effect.flip(findEntry({ models, root: '/m', path }));
-    assert.strictEqual(error._tag, 'ModelNotFound');
-    assert.strictEqual(error.message, 'Model not found');
-  });
+const refused = Effect.fnUntraced(function* (models: ReadonlyArray<ModelEntry>, path: string) {
+  const error = yield* Effect.flip(findEntry({ models, root: '/m', path }));
+  assert.strictEqual(error._tag, 'ModelNotFound');
+  assert.strictEqual(error.message, 'Model not found');
+});
 
 layer(Path.layer)('findEntry', (it) => {
   it.effect('a scanned entry under the models folder is found', () =>

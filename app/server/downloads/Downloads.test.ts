@@ -49,19 +49,18 @@ type Step = (
 ) => Effect.Effect<void, TransferFailed, FileSystem.FileSystem | Path.Path | DownloadsRepo | SqlClient.SqlClient>;
 
 /** Writes every file not done at its size, as the real transfer puts it in place, and marks it done. */
-const place: Step = (item) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const repo = yield* DownloadsRepo;
-    for (const file of Arr.filter(item.files, (f) => !f.done)) {
-      const dest = path.join(item.dir, file.path);
-      yield* fs.makeDirectory(path.dirname(dest), { recursive: true });
-      yield* fs.writeFileString(dest, Str.repeat(file.size)('x'));
-      yield* fs.remove(`${dest}.part`, { force: true });
-      yield* repo.fileDone(item.id, file.path);
-    }
-  }).pipe(Effect.orDie);
+const place: Step = Effect.fnUntraced(function* (item) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const repo = yield* DownloadsRepo;
+  for (const file of Arr.filter(item.files, (f) => !f.done)) {
+    const dest = path.join(item.dir, file.path);
+    yield* fs.makeDirectory(path.dirname(dest), { recursive: true });
+    yield* fs.writeFileString(dest, Str.repeat(file.size)('x'));
+    yield* fs.remove(`${dest}.part`, { force: true });
+    yield* repo.fileDone(item.id, file.path);
+  }
+}, Effect.orDie);
 
 /** Writes `bytes` of the first file's `.part`, then never ends. */
 const hang =
@@ -235,55 +234,53 @@ const expectFalse = <E, R>(effect: Effect.Effect<boolean, E, R>) =>
   Effect.map(effect, (actual) => assert.isFalse(actual));
 
 /** A row of the table for a variant of `o/r`, written behind the queue's back. */
-const stored = (key: string, files?: ReadonlyArray<readonly [string, number]>) =>
-  Effect.gen(function* () {
-    const repo = yield* DownloadsRepo;
-    const made = yield* input(key, files);
-    return yield* repo.create(made);
-  });
+const stored = Effect.fnUntraced(function* (key: string, files?: ReadonlyArray<readonly [string, number]>) {
+  const repo = yield* DownloadsRepo;
+  const made = yield* input(key, files);
+  return yield* repo.create(made);
+});
 
 /** Writes `size` bytes at `file` under the folder of `o/r`. */
-const writeFile = (file: string, size: number) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const dir = yield* repoDir;
-    const dest = path.join(dir, file);
-    yield* fs.makeDirectory(path.dirname(dest), { recursive: true });
-    yield* fs.writeFileString(dest, Str.repeat(size)('x'));
-  }).pipe(Effect.orDie);
+const writeFile = Effect.fnUntraced(function* (file: string, size: number) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const dir = yield* repoDir;
+  const dest = path.join(dir, file);
+  yield* fs.makeDirectory(path.dirname(dest), { recursive: true });
+  yield* fs.writeFileString(dest, Str.repeat(size)('x'));
+}, Effect.orDie);
 
-const exists = (file: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const dir = yield* repoDir;
-    return yield* fs.exists(path.join(dir, file));
-  }).pipe(Effect.orDie);
+const exists = Effect.fnUntraced(function* (file: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const dir = yield* repoDir;
+  return yield* fs.exists(path.join(dir, file));
+}, Effect.orDie);
 
 /** Waits (real time, 5 s at most) until `check` holds. */
-const eventually = <R>(check: Effect.Effect<boolean, never, R>) =>
-  Effect.gen(function* () {
+const eventually = Effect.fnUntraced(
+  function* <R>(check: Effect.Effect<boolean, never, R>) {
     while (!(yield* check)) yield* Effect.sleep('10 millis');
-  }).pipe(Effect.timeout('5 seconds'), Effect.orDie);
+  },
+  Effect.timeout('5 seconds'),
+  Effect.orDie,
+);
 
-const statusOf = (id: number) =>
-  Effect.gen(function* () {
-    const repo = yield* DownloadsRepo;
-    const item = yield* repo.get(id);
-    return Option.map(item, (found) => found.status);
-  });
+const statusOf = Effect.fnUntraced(function* (id: number) {
+  const repo = yield* DownloadsRepo;
+  const item = yield* repo.get(id);
+  return Option.map(item, (found) => found.status);
+});
 
 /** Waits until item `id` has `status`. */
 const reaches = (id: number, status: DownloadItem['status']) =>
   eventually(Effect.map(statusOf(id), Option.contains(status)));
 
 /** Waits until the transfer of item `id` started `n` times in all. */
-const startedTimes = (id: number, n = 1) =>
-  Effect.gen(function* () {
-    const transfers = yield* Transfers;
-    yield* eventually(Effect.map(transfers.started, (ids) => Arr.filter(ids, (started) => started === id).length >= n));
-  });
+const startedTimes = Effect.fnUntraced(function* (id: number, n = 1) {
+  const transfers = yield* Transfers;
+  yield* eventually(Effect.map(transfers.started, (ids) => Arr.filter(ids, (started) => started === id).length >= n));
+});
 
 /** The messages published so far, as `[type, id, status]` (`id` and `status` null where they do not apply). */
 const messages = Effect.gen(function* () {
@@ -313,11 +310,10 @@ const statuses = (id: number) =>
     ),
   );
 
-const setFree = (bytes: number | null) =>
-  Effect.gen(function* () {
-    const free = yield* Free;
-    yield* Ref.set(free, bytes);
-  });
+const setFree = Effect.fnUntraced(function* (bytes: number | null) {
+  const free = yield* Free;
+  yield* Ref.set(free, bytes);
+});
 
 layer(Base, { excludeTestServices: true, buildPerTest: true })('Downloads', (it) => {
   it.effect(

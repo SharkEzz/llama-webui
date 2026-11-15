@@ -29,18 +29,16 @@ const ringOf = (capacity: number) =>
     Layer.provideMerge(Layer.effect(Published, Ref.make<ReadonlyArray<WsMessage>>([]))),
   );
 
-const pushAll = (texts: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    const ring = yield* LogRing;
-    yield* Effect.forEach(texts, ring.push, { discard: true });
-  });
+const pushAll = Effect.fnUntraced(function* (texts: ReadonlyArray<string>) {
+  const ring = yield* LogRing;
+  yield* Effect.forEach(texts, ring.push, { discard: true });
+});
 
-const texts = (seq: number) =>
-  Effect.gen(function* () {
-    const ring = yield* LogRing;
-    const lines = yield* ring.since(seq);
-    return Arr.map(lines, (line) => line.text);
-  });
+const texts = Effect.fnUntraced(function* (seq: number) {
+  const ring = yield* LogRing;
+  const lines = yield* ring.since(seq);
+  return Arr.map(lines, (line) => line.text);
+});
 
 layer(ringOf(10_000), { excludeTestServices: true, buildPerTest: true })('LogRing', (it) => {
   it.effect('lines are numbered from 0 and classified', () =>

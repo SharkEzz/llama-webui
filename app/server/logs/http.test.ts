@@ -15,12 +15,11 @@ const Health = Schema.Struct({ bootId: Schema.String });
 const Refused = Schema.TaggedStruct('RequestInvalid', { message: Schema.String });
 
 /** The status and the body of a GET, read with `schema`. */
-const get = <A, I>(path: string, schema: Schema.Codec<A, I>) =>
-  Effect.gen(function* () {
-    const res = yield* HttpClient.get(path);
-    const body = yield* HttpClientResponse.schemaBodyJson(schema)(res);
-    return { status: res.status, body };
-  });
+const get = Effect.fnUntraced(function* <A, I>(path: string, schema: Schema.Codec<A, I>) {
+  const res = yield* HttpClient.get(path);
+  const body = yield* HttpClientResponse.schemaBodyJson(schema)(res);
+  return { status: res.status, body };
+});
 
 layer(Served)('LogsApi over HTTP', (it) => {
   it.effect('GET /api/logs answers the lines from since, the next number and the boot id', () =>

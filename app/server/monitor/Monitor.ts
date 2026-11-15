@@ -197,35 +197,32 @@ export class Monitor extends Context.Service<
          * collector off, and until a lookup found it. A lookup runs in a fiber of the layer's scope, never awaited: a
          * stat on a dead mount must never hold a tick.
          */
-        const modelDiskFor = (state: ServerState, disk: Option.Option<DiskSource>) =>
-          Effect.gen(function* () {
-            if (Option.isNone(disk) || !('profileId' in state) || state.kind === 'crashed') return null;
-            const id = state.profileId;
-            const now = yield* Clock.currentTimeMillis;
-            const known = (yield* Ref.get(modelDisks)).get(id);
-            const due = known === undefined || (known.disk === null && !known.pending && now - known.at >= retryMs);
-            if (due) {
-              yield* setModelDisk(id, { disk: null, at: now, pending: true });
-              yield* Effect.forkIn(lookUpModelDisk(id, disk.value), scope);
-            }
-            return known?.disk ?? null;
-          });
+        const modelDiskFor = Effect.fnUntraced(function* (state: ServerState, disk: Option.Option<DiskSource>) {
+          if (Option.isNone(disk) || !('profileId' in state) || state.kind === 'crashed') return null;
+          const id = state.profileId;
+          const now = yield* Clock.currentTimeMillis;
+          const known = (yield* Ref.get(modelDisks)).get(id);
+          const due = known === undefined || (known.disk === null && !known.pending && now - known.at >= retryMs);
+          if (due) {
+            yield* setModelDisk(id, { disk: null, at: now, pending: true });
+            yield* Effect.forkIn(lookUpModelDisk(id, disk.value), scope);
+          }
+          return known?.disk ?? null;
+        });
 
         /** The cards, after a refresh of llama-server's VRAM per card when one is due. */
-        const gpusOf = (
+        const gpusOf = Effect.fnUntraced(function* (
           collectors: Collectors['Service'],
           pid: number | null,
           ticksForPid: number,
           hiddenGpus: ReadonlyArray<string>,
-        ) =>
-          Effect.gen(function* () {
-            if (pid !== null) {
-              if (ticksForPid === 1) yield* collectors.nvidia.refreshApps;
-              else if (ticksForPid % options.appsEvery === 0)
-                yield* Effect.forkIn(collectors.nvidia.refreshApps, scope);
-            }
-            return yield* collectGpus({ collectors, pid, hiddenGpus });
-          });
+        ) {
+          if (pid !== null) {
+            if (ticksForPid === 1) yield* collectors.nvidia.refreshApps;
+            else if (ticksForPid % options.appsEvery === 0) yield* Effect.forkIn(collectors.nvidia.refreshApps, scope);
+          }
+          return yield* collectGpus({ collectors, pid, hiddenGpus });
+        });
 
         const tick = Effect.fn('Monitor.tick')(function* (collectors: Collectors['Service']) {
           const { settings } = yield* Ref.get(held);
@@ -290,16 +287,15 @@ export class Monitor extends Context.Service<
             if (changed) yield* waitAfter(startedAt);
           });
 
-        const round = (collectors: Collectors['Service']) =>
-          Effect.gen(function* () {
-            const startedAt = yield* Clock.currentTimeMillis;
-            yield* tick(collectors).pipe(
-              Effect.catchCauseIf(Predicate.not(Cause.hasInterruptsOnly), (cause) =>
-                Effect.logError('monitoring tick', cause),
-              ),
-            );
-            yield* waitAfter(startedAt);
-          });
+        const round = Effect.fnUntraced(function* (collectors: Collectors['Service']) {
+          const startedAt = yield* Clock.currentTimeMillis;
+          yield* tick(collectors).pipe(
+            Effect.catchCauseIf(Predicate.not(Cause.hasInterruptsOnly), (cause) =>
+              Effect.logError('monitoring tick', cause),
+            ),
+          );
+          yield* waitAfter(startedAt);
+        });
 
         /** The collectors built into their scope, then the ticks; a build that fails leaves the monitor idle. */
         const run = Effect.gen(function* () {

@@ -81,15 +81,14 @@ const Served = serve(ApiRoutes).pipe(
 const parseJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** The status and (when it is JSON) the value of a raw GET. */
-const get = (path: string) =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const res = yield* client.execute(HttpClientRequest.get(path));
-    const text = yield* res.text;
-    const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
-    const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
-    return { status: res.status, json };
-  });
+const get = Effect.fnUntraced(function* (path: string) {
+  const client = yield* HttpClient.HttpClient;
+  const res = yield* client.execute(HttpClientRequest.get(path));
+  const text = yield* res.text;
+  const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
+  const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
+  return { status: res.status, json };
+});
 
 /** A JSON reply as the schema reads it: a reply of another shape fails the test. */
 const as = <A, I>(schema: Schema.Codec<A, I>, json: unknown) => Schema.decodeUnknownEffect(schema)(json);
@@ -99,15 +98,14 @@ const equals = <A, E, R>(effect: Effect.Effect<A, E, R>, expected: A, message?: 
   Effect.map(effect, (actual) => assert.deepStrictEqual(actual, expected, message));
 
 /** Writes `text` at `rel` under the folder of `org/repo` (its folders made). */
-const writeInRepo = (rel: string, text: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const paths = yield* Path.Path;
-    const home = yield* Home;
-    const file = paths.join(home, 'models', 'org', 'repo', rel);
-    yield* fs.makeDirectory(paths.dirname(file), { recursive: true });
-    yield* fs.writeFileString(file, text);
-  });
+const writeInRepo = Effect.fnUntraced(function* (rel: string, text: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const paths = yield* Path.Path;
+  const home = yield* Home;
+  const file = paths.join(home, 'models', 'org', 'repo', rel);
+  yield* fs.makeDirectory(paths.dirname(file), { recursive: true });
+  yield* fs.writeFileString(file, text);
+});
 
 layer(Served, { excludeTestServices: true, buildPerTest: true })('over HTTP', (it) => {
   it.effect('repo answers the variants with their present state none, partial and complete, its url and dir', () =>

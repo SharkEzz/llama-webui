@@ -12,9 +12,9 @@ import { FAKE, freePort } from '../llama.ts';
 
 /** A hub with no client. */
 const SilentHub = Layer.succeed(WsHub, {
-  publish: () => Effect.void,
+  publish: Effect.fn(() => Effect.void),
   size: Effect.succeed(0),
-  attach: () => Effect.void,
+  attach: Effect.fn(() => Effect.void),
 });
 
 const Supervised = Supervisor.layer.pipe(

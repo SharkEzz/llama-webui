@@ -163,21 +163,20 @@ export class Collectors extends Context.Service<
         const lock = yield* Semaphore.make(1);
 
         /** The system collector on: its perf in a scope of its own, forked from the programs'. */
-        const systemOn = (intervalMs: number) =>
-          Effect.gen(function* () {
-            const sampler = yield* makeSystemSampler();
-            // Last: nothing can fail once perf runs. A start that dies stops what it started.
-            const own = yield* Scope.fork(programs);
-            const memBw = yield* makeMemBandwidth({
-              bin: options.perfBin,
-              intervalMs,
-              retryAfter: options.perfRetryAfter,
-            }).pipe(
-              Scope.provide(own),
-              Effect.onError(() => Scope.close(own, Exit.void)),
-            );
-            return { sample: Effect.provideContext(sampler.sample, context), memBw, scope: own } satisfies SystemOn;
-          });
+        const systemOn = Effect.fnUntraced(function* (intervalMs: number) {
+          const sampler = yield* makeSystemSampler();
+          // Last: nothing can fail once perf runs. A start that dies stops what it started.
+          const own = yield* Scope.fork(programs);
+          const memBw = yield* makeMemBandwidth({
+            bin: options.perfBin,
+            intervalMs,
+            retryAfter: options.perfRetryAfter,
+          }).pipe(
+            Scope.provide(own),
+            Effect.onError(() => Scope.close(own, Exit.void)),
+          );
+          return { sample: Effect.provideContext(sampler.sample, context), memBw, scope: own } satisfies SystemOn;
+        });
 
         /** The disk collector on: the disks listed now. */
         const diskOn = Effect.gen(function* () {
@@ -189,8 +188,8 @@ export class Collectors extends Context.Service<
         });
 
         /** One change: uninterruptible, so no perf runs that the state does not name. */
-        const apply = (settings: CollectorSettings) =>
-          Effect.gen(function* () {
+        const apply = Effect.fnUntraced(
+          function* (settings: CollectorSettings) {
             yield* nvidia.configure({ intervalMs: settings.pollIntervalMs, needs: gpuNeeds(settings.hiddenGpus) });
             const { system, disk } = yield* Ref.get(held);
             if (!settings.collectors.system && Option.isSome(system)) {
@@ -209,7 +208,11 @@ export class Collectors extends Context.Service<
               const on = yield* diskOn;
               yield* Ref.update(held, (h) => ({ ...h, disk: Option.some(on) }));
             }
-          }).pipe(Effect.provideContext(context), Semaphore.withPermits(lock, 1), Effect.uninterruptible);
+          },
+          Effect.provideContext(context),
+          Semaphore.withPermits(lock, 1),
+          Effect.uninterruptible,
+        );
 
         yield* apply(initial);
         if (Option.isSome(smi)) yield* smi.value.start;

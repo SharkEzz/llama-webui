@@ -157,74 +157,71 @@ const repoDir = Effect.gen(function* () {
 });
 
 /** A variant of `o/r` (at the Hub's commit) whose files are `files`, with their sha256 unless `sha256` is given. */
-const input = (key: string, files: Files, sha256?: string) =>
-  Effect.gen(function* () {
-    const hub = yield* Hub;
-    const dir = yield* repoDir;
-    return {
-      repo: 'o/r',
-      revision: hub.shaOf('o/r'),
-      key,
-      name: Str.replace(/\.gguf$/, '')(key),
-      quant: null,
-      kind: 'model',
-      dir,
-      files: Arr.map(files, ([path, body]) => ({ path, size: body.length, sha256: sha256 ?? hexOf(body) })),
-    } satisfies NewDownload;
-  });
+const input = Effect.fnUntraced(function* (key: string, files: Files, sha256?: string) {
+  const hub = yield* Hub;
+  const dir = yield* repoDir;
+  return {
+    repo: 'o/r',
+    revision: hub.shaOf('o/r'),
+    key,
+    name: Str.replace(/\.gguf$/, '')(key),
+    quant: null,
+    kind: 'model',
+    dir,
+    files: Arr.map(files, ([path, body]) => ({ path, size: body.length, sha256: sha256 ?? hexOf(body) })),
+  } satisfies NewDownload;
+});
 
 /** `m.gguf` of `size` bytes, served. */
-const single = (size = 4000) =>
-  Effect.gen(function* () {
-    const body = data(size);
-    const files: Files = [['m.gguf', body]];
-    yield* serve(files);
-    return { body, input: yield* input('m.gguf', files) };
-  });
+const single = Effect.fnUntraced(function* (size = 4000) {
+  const body = data(size);
+  const files: Files = [['m.gguf', body]];
+  yield* serve(files);
+  return { body, input: yield* input('m.gguf', files) };
+});
 
 const destOf = (file: string) => Effect.map(repoDir, (dir) => `${dir}/${file}`);
 
 /** Writes `bytes` as the `.part` of `file`. */
-const writePart = (file: string, bytes: Uint8Array) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const dest = yield* destOf(file);
-    yield* fs.makeDirectory(path.dirname(dest), { recursive: true });
-    yield* fs.writeFile(partPath(dest), bytes);
-  }).pipe(Effect.orDie);
+const writePart = Effect.fnUntraced(function* (file: string, bytes: Uint8Array) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const dest = yield* destOf(file);
+  yield* fs.makeDirectory(path.dirname(dest), { recursive: true });
+  yield* fs.writeFile(partPath(dest), bytes);
+}, Effect.orDie);
 
-const partSize = (file: string) =>
-  Effect.gen(function* () {
-    const dest = yield* destOf(file);
-    const size = yield* sizeOf(partPath(dest));
-    return Option.getOrElse(size, () => -1);
-  });
+const partSize = Effect.fnUntraced(function* (file: string) {
+  const dest = yield* destOf(file);
+  const size = yield* sizeOf(partPath(dest));
+  return Option.getOrElse(size, () => -1);
+});
 
-const exists = (file: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const dest = yield* destOf(file);
-    return yield* fs.exists(dest);
-  }).pipe(Effect.orDie);
+const exists = Effect.fnUntraced(function* (file: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const dest = yield* destOf(file);
+  return yield* fs.exists(dest);
+}, Effect.orDie);
 
 /** Fails the test unless `file` is in place with `body` and no `.part` is left. */
-const expectPlaced = (file: string, body: Uint8Array) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const dest = yield* destOf(file);
-    const got = yield* fs.readFile(dest);
-    assert.strictEqual(got.length, body.length);
-    assert.strictEqual(hexOf(got), hexOf(body));
-    const part = yield* fs.exists(partPath(dest));
-    assert.isFalse(part);
-  }).pipe(Effect.orDie);
+const expectPlaced = Effect.fnUntraced(function* (file: string, body: Uint8Array) {
+  const fs = yield* FileSystem.FileSystem;
+  const dest = yield* destOf(file);
+  const got = yield* fs.readFile(dest);
+  assert.strictEqual(got.length, body.length);
+  assert.strictEqual(hexOf(got), hexOf(body));
+  const part = yield* fs.exists(partPath(dest));
+  assert.isFalse(part);
+}, Effect.orDie);
 
 /** Waits (real time, 5 s at most) until `check` holds. */
-const eventually = <R>(check: Effect.Effect<boolean, never, R>) =>
-  Effect.gen(function* () {
+const eventually = Effect.fnUntraced(
+  function* <R>(check: Effect.Effect<boolean, never, R>) {
     while (!(yield* check)) yield* Effect.sleep('10 millis');
-  }).pipe(Effect.timeout('5 seconds'), Effect.orDie);
+  },
+  Effect.timeout('5 seconds'),
+  Effect.orDie,
+);
 
 /** The same on the `TestClock`: the polling on the live clock. */
 const eventuallyLive = <R>(check: Effect.Effect<boolean, never, R>) => TestClock.withLive(eventually(check));
@@ -232,45 +229,41 @@ const eventuallyLive = <R>(check: Effect.Effect<boolean, never, R>) => TestClock
 /** A live pause, for a fiber woken by a message to get to its next sleep. */
 const settle = TestClock.withLive(Effect.sleep('20 millis'));
 
-const itemOf = (id: number) =>
-  Effect.gen(function* () {
-    const repo = yield* DownloadsRepo;
-    const item = yield* repo.get(id);
-    return Option.getOrThrow(item);
-  });
+const itemOf = Effect.fnUntraced(function* (id: number) {
+  const repo = yield* DownloadsRepo;
+  const item = yield* repo.get(id);
+  return Option.getOrThrow(item);
+});
 
 const isFinished = (id: number) =>
   Effect.map(itemOf(id), (item) => item.status === 'done' || item.status === 'error' || item.status === 'canceled');
 
 /** Queues `of` and gives the item it made. */
-const enqueue = (of: NewDownload) =>
-  Effect.gen(function* () {
-    const downloads = yield* Downloads;
-    const [item] = yield* downloads.enqueue([of]);
-    if (item === undefined) return yield* Effect.die('nothing was queued');
-    return item;
-  });
+const enqueue = Effect.fnUntraced(function* (of: NewDownload) {
+  const downloads = yield* Downloads;
+  const [item] = yield* downloads.enqueue([of]);
+  if (item === undefined) return yield* Effect.die('nothing was queued');
+  return item;
+});
 
 /** Queues `of`, waits (real time) until it ends, and gives the item as it ended. */
-const download = (of: NewDownload) =>
-  Effect.gen(function* () {
-    const item = yield* enqueue(of);
-    yield* eventually(isFinished(item.id));
-    return yield* itemOf(item.id);
-  });
+const download = Effect.fnUntraced(function* (of: NewDownload) {
+  const item = yield* enqueue(of);
+  yield* eventually(isFinished(item.id));
+  return yield* itemOf(item.id);
+});
 
 const reaches = (id: number, status: DownloadItem['status']) =>
   eventually(Effect.map(itemOf(id), (item) => item.status === status));
 
 /** The statuses published for item `id`, in order. */
-const statuses = (id: number) =>
-  Effect.gen(function* () {
-    const published = yield* Published;
-    const all = yield* Ref.get(published);
-    return Arr.flatMap(all, (message) =>
-      message.type === 'download' && message.payload.id === id ? [message.payload.status] : [],
-    );
-  });
+const statuses = Effect.fnUntraced(function* (id: number) {
+  const published = yield* Published;
+  const all = yield* Ref.get(published);
+  return Arr.flatMap(all, (message) =>
+    message.type === 'download' && message.payload.id === id ? [message.payload.status] : [],
+  );
+});
 
 /** The live progress published, in order (null once an item ended). */
 const lives = Effect.gen(function* () {
@@ -303,15 +296,14 @@ const expectEqual = <A, E, R>(effect: Effect.Effect<A, E, R>, expected: A) =>
 const logged = (level: 'Error' | 'Warn') => Arr.flatMap(logs, ([at, text]) => (at === level ? [text] : []));
 
 /** The `TransferFailed` of the transfer of `of` run alone (no queue, its row removed after), `report` ignored. */
-const transferFailure = (of: NewDownload) =>
-  Effect.gen(function* () {
-    const repo = yield* DownloadsRepo;
-    const item = yield* repo.create(of);
-    const failure = yield* Effect.flip(transferItem(item, () => Effect.void));
-    // Out of the database, for a queue of the test not to run it.
-    yield* repo.remove(item.id);
-    return failure;
-  });
+const transferFailure = Effect.fnUntraced(function* (of: NewDownload) {
+  const repo = yield* DownloadsRepo;
+  const item = yield* repo.create(of);
+  const failure = yield* Effect.flip(transferItem(item, () => Effect.void));
+  // Out of the database, for a queue of the test not to run it.
+  yield* repo.remove(item.id);
+  return failure;
+});
 
 /** A file system whose writes to an open file fail with ENOSPC. */
 const fullDisk = Effect.gen(function* () {
@@ -761,16 +753,15 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('transfer', (it) 
 
 layer(Base, { buildPerTest: true })('transfer on the TestClock', (it) => {
   /** Waits until `n` `retrying` were published, checks the last one's `retryAt` is `ms` away, then lets it pass. */
-  const pause = (n: number, ms: number) =>
-    Effect.gen(function* () {
-      yield* eventuallyLive(Effect.map(retrying, (all) => all.length >= n));
-      const all = yield* retrying;
-      const now = yield* Clock.currentTimeMillis;
-      const last = Option.getOrThrow(Arr.last(all));
-      assert.strictEqual((last.retryAt ?? 0) - now, ms);
-      yield* settle;
-      yield* TestClock.adjust(ms);
-    });
+  const pause = Effect.fnUntraced(function* (n: number, ms: number) {
+    yield* eventuallyLive(Effect.map(retrying, (all) => all.length >= n));
+    const all = yield* retrying;
+    const now = yield* Clock.currentTimeMillis;
+    const last = Option.getOrThrow(Arr.last(all));
+    assert.strictEqual((last.retryAt ?? 0) - now, ms);
+    yield* settle;
+    yield* TestClock.adjust(ms);
+  });
 
   it.effect('the retry budget is reset after an attempt that received data', () =>
     withQueue(
@@ -869,19 +860,18 @@ layer(Base, { buildPerTest: true })('transfer on the TestClock', (it) => {
   it.effect('progress is published at most once per 250 ms with a smoothed bps', () => {
     const at = (report: Parameters<Transfer>[1], phase: DownloadLive['phase'], bytesDone: number, throttled: boolean) =>
       report({ phase, file: 'm.gguf', bytesDone, retryAt: null, throttled });
-    const scripted: Transfer = (_item, report) =>
-      Effect.gen(function* () {
-        yield* at(report, 'downloading', 0, false);
-        yield* TestClock.adjust('100 millis');
-        yield* at(report, 'downloading', 1000, true);
-        yield* TestClock.adjust('150 millis');
-        yield* at(report, 'downloading', 2500, true);
-        yield* TestClock.adjust('100 millis');
-        yield* at(report, 'downloading', 3000, true);
-        yield* TestClock.adjust('400 millis');
-        yield* at(report, 'downloading', 10000, true);
-        yield* at(report, 'verifying', 10000, false);
-      });
+    const scripted: Transfer = Effect.fnUntraced(function* (_item, report) {
+      yield* at(report, 'downloading', 0, false);
+      yield* TestClock.adjust('100 millis');
+      yield* at(report, 'downloading', 1000, true);
+      yield* TestClock.adjust('150 millis');
+      yield* at(report, 'downloading', 2500, true);
+      yield* TestClock.adjust('100 millis');
+      yield* at(report, 'downloading', 3000, true);
+      yield* TestClock.adjust('400 millis');
+      yield* at(report, 'downloading', 10000, true);
+      yield* at(report, 'verifying', 10000, false);
+    });
     return withQueue(
       Effect.gen(function* () {
         const { input: m } = yield* single(10000);

@@ -50,15 +50,14 @@ const Refusal = Schema.Struct({
   issues: Schema.Array(Schema.Struct({ path: Schema.Array(Schema.String) })),
 });
 
-const post = (text: string) =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const res = yield* client.execute(
-      HttpClientRequest.post('/api/things').pipe(HttpClientRequest.bodyText(text, 'application/json')),
-    );
-    const body = yield* HttpClientResponse.schemaBodyJson(Refusal)(res);
-    return { status: res.status, body };
-  });
+const post = Effect.fnUntraced(function* (text: string) {
+  const client = yield* HttpClient.HttpClient;
+  const res = yield* client.execute(
+    HttpClientRequest.post('/api/things').pipe(HttpClientRequest.bodyText(text, 'application/json')),
+  );
+  const body = yield* HttpClientResponse.schemaBodyJson(Refusal)(res);
+  return { status: res.status, body };
+});
 
 layer(TestApp)('RequestErrors', (it) => {
   it.effect('a payload that does not decode is a 400 RequestInvalid with every issue', () =>

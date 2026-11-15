@@ -5,11 +5,10 @@ import { Effect, Layer } from 'effect';
 import * as Db from '../db/Db.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 
-const setPort = (port: number) =>
-  Effect.gen(function* () {
-    const settings = yield* SettingsRepo;
-    yield* settings.patch({ port }).pipe(Effect.orDie);
-  });
+const setPort = Effect.fnUntraced(function* (port: number) {
+  const settings = yield* SettingsRepo;
+  yield* settings.patch({ port }).pipe(Effect.orDie);
+});
 
 /**
  * The database of `dataDir` made with its `port` setting on `port` (a free one): the watch of a server started by

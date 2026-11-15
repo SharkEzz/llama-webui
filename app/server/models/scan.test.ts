@@ -23,7 +23,7 @@ const Counted = Layer.effect(
     const reads = yield* Reads;
     return GgufReader.of({
       stamp: real.stamp,
-      read: (path) => Ref.update(reads, (n) => n + 1).pipe(Effect.andThen(real.read(path))),
+      read: Effect.fn((path) => Ref.update(reads, (n) => n + 1).pipe(Effect.andThen(real.read(path)))),
     });
   }),
 ).pipe(Layer.provide(GgufReader.layer));
@@ -50,12 +50,15 @@ const workspace = Effect.gen(function* () {
   const root = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-scan-' });
   const at = (name: string) => path.join(root, name);
   /** Writes the GGUF `name` (its folders made) and gives its path. */
-  const write = (name: string, kv: Record<string, KvValue> = LLAMA, tensors: FakeTensor[] = TENSORS) =>
-    Effect.gen(function* () {
-      yield* fs.makeDirectory(path.dirname(at(name)), { recursive: true });
-      yield* Effect.promise(() => writeGguf(at(name), kv, tensors));
-      return at(name);
-    });
+  const write = Effect.fnUntraced(function* (
+    name: string,
+    kv: Record<string, KvValue> = LLAMA,
+    tensors: FakeTensor[] = TENSORS,
+  ) {
+    yield* fs.makeDirectory(path.dirname(at(name)), { recursive: true });
+    yield* Effect.promise(() => writeGguf(at(name), kv, tensors));
+    return at(name);
+  });
   /** The reads counted so far, and the counter reset. */
   const takeReads = Effect.gen(function* () {
     const reads = yield* Reads;
@@ -232,8 +235,7 @@ describe('scan', () => {
 });
 
 /** Whether `model_cache` has a row for each path. */
-const cached = (paths: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    const repo = yield* ModelCacheRepo;
-    return yield* Effect.forEach(paths, (path) => repo.get(path).pipe(Effect.map(Option.isSome)));
-  });
+const cached = Effect.fnUntraced(function* (paths: ReadonlyArray<string>) {
+  const repo = yield* ModelCacheRepo;
+  return yield* Effect.forEach(paths, (path) => repo.get(path).pipe(Effect.map(Option.isSome)));
+});

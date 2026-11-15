@@ -102,13 +102,12 @@ const workspace = Effect.gen(function* () {
   const path = yield* Path.Path;
   const fake = yield* FAKE;
   const dir = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-nvml-' });
-  const lines = (name: string) =>
-    Effect.gen(function* () {
-      const file = path.join(dir, name);
-      if (!(yield* fs.exists(file))) return [];
-      const text = yield* fs.readFileString(file);
-      return Arr.filter(Str.split(text, '\n'), Str.isNonEmpty);
-    }).pipe(Effect.orDie);
+  const lines = Effect.fnUntraced(function* (name: string) {
+    const file = path.join(dir, name);
+    if (!(yield* fs.exists(file))) return [];
+    const text = yield* fs.readFileString(file);
+    return Arr.filter(Str.split(text, '\n'), Str.isNonEmpty);
+  }, Effect.orDie);
   const command = (behaviour: string) => ({ cmd: process.execPath, args: [fake, behaviour, dir] });
   /** The real sampler, its pid recorded as the fake's (`exec` keeps it). */
   const realWorker = {

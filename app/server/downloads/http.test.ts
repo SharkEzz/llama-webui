@@ -87,18 +87,17 @@ const parseJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknow
 const toJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** The status and (when it is JSON) the value of a raw request; `body` is sent as JSON. */
-const send = (method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown) =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const base = HttpClientRequest.make(method)(path);
-    const text = body === undefined ? undefined : yield* toJson(body);
-    const request = text === undefined ? base : HttpClientRequest.bodyText(base, text, 'application/json');
-    const res = yield* client.execute(request);
-    const answer = yield* res.text;
-    const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
-    const json: unknown = isJson && Str.isNonEmpty(answer) ? yield* parseJson(answer) : undefined;
-    return { status: res.status, json };
-  });
+const send = Effect.fnUntraced(function* (method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown) {
+  const client = yield* HttpClient.HttpClient;
+  const base = HttpClientRequest.make(method)(path);
+  const text = body === undefined ? undefined : yield* toJson(body);
+  const request = text === undefined ? base : HttpClientRequest.bodyText(base, text, 'application/json');
+  const res = yield* client.execute(request);
+  const answer = yield* res.text;
+  const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
+  const json: unknown = isJson && Str.isNonEmpty(answer) ? yield* parseJson(answer) : undefined;
+  return { status: res.status, json };
+});
 
 /** A JSON reply as the schema reads it: a reply of another shape fails the test. */
 const as = <A, I>(schema: Schema.Codec<A, I>, json: unknown) => Schema.decodeUnknownEffect(schema)(json);
@@ -124,12 +123,11 @@ const post = (keys: ReadonlyArray<string>) =>
   Effect.flatMap(request(keys), (body) => send('POST', '/api/downloads', body));
 
 /** Posts a download of `keys` of `org/repo`: the items queued. */
-const download = (keys: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    const reply = yield* post(keys);
-    assert.strictEqual(reply.status, 202);
-    return (yield* as(Created, reply.json)).items;
-  });
+const download = Effect.fnUntraced(function* (keys: ReadonlyArray<string>) {
+  const reply = yield* post(keys);
+  assert.strictEqual(reply.status, 202);
+  return (yield* as(Created, reply.json)).items;
+});
 
 /** The queue as `GET /api/downloads` answers it. */
 const list = Effect.gen(function* () {
@@ -151,12 +149,11 @@ const settled = (id: number, status: DownloadItem['status']) =>
   );
 
 /** The file `rel` of `org/repo` under the test's models folder. */
-const inRepo = (rel: string) =>
-  Effect.gen(function* () {
-    const home = yield* Home;
-    const path = yield* Path.Path;
-    return path.join(home, 'models', 'org', 'repo', rel);
-  });
+const inRepo = Effect.fnUntraced(function* (rel: string) {
+  const home = yield* Home;
+  const path = yield* Path.Path;
+  return path.join(home, 'models', 'org', 'repo', rel);
+});
 
 /** A `/ws` client of the test's server, closed with the test's scope. */
 const wsClient = Effect.gen(function* () {

@@ -25,17 +25,16 @@ export const parseDiskstats = (text: string): Map<string, Counters> => {
 };
 
 /** Whole physical disks: the `/sys/block` entries backed by a device, minus loop, ram and zram. */
-export const physicalDisks = (sysBlockRoot = '/sys/block') =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const entries = yield* fs.readDirectory(sysBlockRoot).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
-    const real = Arr.filter(entries, (entry) => !/^(loop|ram|zram)\d/.test(entry));
-    const backed = yield* Effect.filter(real, (entry) =>
-      fs.stat(path.join(sysBlockRoot, entry, 'device')).pipe(Effect.isSuccess),
-    );
-    return Arr.sort(backed, Order.String);
-  });
+export const physicalDisks = Effect.fn('disk.physicalDisks')(function* (sysBlockRoot = '/sys/block') {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const entries = yield* fs.readDirectory(sysBlockRoot).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
+  const real = Arr.filter(entries, (entry) => !/^(loop|ram|zram)\d/.test(entry));
+  const backed = yield* Effect.filter(real, (entry) =>
+    fs.stat(path.join(sysBlockRoot, entry, 'device')).pipe(Effect.isSuccess),
+  );
+  return Arr.sort(backed, Order.String);
+});
 
 /** glibc `gnu_dev_major` and `gnu_dev_minor`. */
 export const devMajorMinor = (dev: bigint): readonly [number, number] => {

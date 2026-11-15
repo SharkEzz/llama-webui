@@ -63,13 +63,12 @@ const workspace = Effect.gen(function* () {
 });
 
 /** The catalogue with `binary` as the setting. */
-const catalogOf = (binary: string) =>
-  Effect.gen(function* () {
-    const settings = yield* SettingsRepo;
-    yield* settings.patch({ binary });
-    const flags = yield* Flags;
-    return yield* flags.catalog;
-  });
+const catalogOf = Effect.fnUntraced(function* (binary: string) {
+  const settings = yield* SettingsRepo;
+  yield* settings.patch({ binary });
+  const flags = yield* Flags;
+  return yield* flags.catalog;
+});
 
 /** A script that counts its runs in `count`, then answers as the fake llama-server. */
 const counting = (count: string, before = '') => `${before}\necho run >> "$DIR/${count}"\nexec "$FAKE" "$@"`;

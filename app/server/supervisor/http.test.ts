@@ -29,44 +29,40 @@ const Served = serve(ApiRoutes).pipe(
 const parseJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** The status and (when it is JSON) the value of a raw reply. */
-const send = (method: 'GET' | 'POST' | 'DELETE', path: string, body?: string) =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const base = HttpClientRequest.make(method)(path);
-    const request = body === undefined ? base : HttpClientRequest.bodyText(base, body, 'application/json');
-    const res = yield* client.execute(request);
-    const text = yield* res.text;
-    const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
-    const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
-    return { status: res.status, text, json };
-  });
+const send = Effect.fnUntraced(function* (method: 'GET' | 'POST' | 'DELETE', path: string, body?: string) {
+  const client = yield* HttpClient.HttpClient;
+  const base = HttpClientRequest.make(method)(path);
+  const request = body === undefined ? base : HttpClientRequest.bodyText(base, body, 'application/json');
+  const res = yield* client.execute(request);
+  const text = yield* res.text;
+  const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
+  const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
+  return { status: res.status, text, json };
+});
 
 /** A launch of `profileId` through `/api/server/<what>`: its status and its view. */
-const launch = (what: 'start' | 'switch', profileId: number) =>
-  Effect.gen(function* () {
-    const reply = yield* send('POST', `/api/server/${what}`, `{"profileId":${profileId}}`);
-    return { status: reply.status, json: reply.json };
-  });
+const launch = Effect.fnUntraced(function* (what: 'start' | 'switch', profileId: number) {
+  const reply = yield* send('POST', `/api/server/${what}`, `{"profileId":${profileId}}`);
+  return { status: reply.status, json: reply.json };
+});
 
 const viewOf = (json: unknown) => Schema.decodeUnknownEffect(ServerView)(json);
 
 /** A profile of the fake on a free port (or `port`), its `env` holding the `FAKE_*` variables. */
-const profileOf = (name: string, more: Partial<ProfileInput> = {}) =>
-  Effect.gen(function* () {
-    const repo = yield* ProfilesRepo;
-    const port = more.port ?? (yield* freePort);
-    return yield* repo.create({ name, model: 'm.gguf', args: [], env: {}, ...more, port });
-  });
+const profileOf = Effect.fnUntraced(function* (name: string, more: Partial<ProfileInput> = {}) {
+  const repo = yield* ProfilesRepo;
+  const port = more.port ?? (yield* freePort);
+  return yield* repo.create({ name, model: 'm.gguf', args: [], env: {}, ...more, port });
+});
 
 /** The state, once `ok` holds (looked at every 10 ms, for 5 s at most). */
-const stateWhen = (ok: (state: ServerState) => boolean) =>
-  Effect.gen(function* () {
-    const supervisor = yield* Supervisor;
-    return yield* supervisor.state.pipe(
-      Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: ok }),
-      Effect.timeout('5 seconds'),
-    );
-  });
+const stateWhen = Effect.fnUntraced(function* (ok: (state: ServerState) => boolean) {
+  const supervisor = yield* Supervisor;
+  return yield* supervisor.state.pipe(
+    Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: ok }),
+    Effect.timeout('5 seconds'),
+  );
+});
 
 const kindIs = (kind: ServerState['kind']) => (state: ServerState) => state.kind === kind;
 

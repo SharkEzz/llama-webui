@@ -15,12 +15,11 @@ const recorded = Arr.map(Record.keys(MIGRATIONS), (key) => {
   return { migration_id: Number(id), name: Arr.join(name, '_') };
 });
 
-const tableExists = (name: string) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-    const rows = yield* sql`SELECT 1 AS found FROM sqlite_schema WHERE type = 'table' AND name = ${name}`;
-    return Arr.isReadonlyArrayNonEmpty(rows);
-  });
+const tableExists = Effect.fnUntraced(function* (name: string) {
+  const sql = yield* SqlClient.SqlClient;
+  const rows = yield* sql`SELECT 1 AS found FROM sqlite_schema WHERE type = 'table' AND name = ${name}`;
+  return Arr.isReadonlyArrayNonEmpty(rows);
+});
 
 /**
  * A database of the Nitro server (a `schema_version` table, no `effect_sql_migrations`): the migrations it ran, 1 to

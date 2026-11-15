@@ -39,9 +39,9 @@ const RecordingHub = Layer.effect(
   Effect.gen(function* () {
     const published = yield* Published;
     return {
-      publish: (message: WsMessage) => Ref.update(published, Arr.append(message)),
+      publish: Effect.fn((message: WsMessage) => Ref.update(published, Arr.append(message))),
       size: Effect.succeed(0),
-      attach: () => Effect.void,
+      attach: Effect.fn(() => Effect.void),
     };
   }),
 );
@@ -90,56 +90,52 @@ interface Launch {
 }
 
 /** The command of a profile that runs the fake on a free port, its `env` holding the `FAKE_*` variables. */
-const launchOf = (options: Launch = {}) =>
-  Effect.gen(function* () {
-    const port = options.port ?? (yield* freePort);
-    const profile: Profile = {
-      id: nextId++,
-      name: options.name ?? 'fake',
-      model: 'm.gguf',
-      args: [],
-      env: { ...options.env },
-      port,
-      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-      source: 'ui',
-      createdAt: 0,
-      updatedAt: 0,
-    };
-    const settings = {
-      ...DEFAULT_SETTINGS,
-      binary: FAKE,
-      host: options.host ?? '127.0.0.1',
-      env: { ...options.settingsEnv },
-    };
-    return yield* buildCommand({ profile, settings });
-  });
+const launchOf = Effect.fnUntraced(function* (options: Launch = {}) {
+  const port = options.port ?? (yield* freePort);
+  const profile: Profile = {
+    id: nextId++,
+    name: options.name ?? 'fake',
+    model: 'm.gguf',
+    args: [],
+    env: { ...options.env },
+    port,
+    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    source: 'ui',
+    createdAt: 0,
+    updatedAt: 0,
+  };
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    binary: FAKE,
+    host: options.host ?? '127.0.0.1',
+    env: { ...options.settingsEnv },
+  };
+  return yield* buildCommand({ profile, settings });
+});
 
 /** Starts the fake of `options`: its command. */
-const startFake = (options: Launch = {}) =>
-  Effect.gen(function* () {
-    const supervisor = yield* Supervisor;
-    const cmd = yield* launchOf(options);
-    yield* supervisor.start(cmd);
-    return cmd;
-  });
+const startFake = Effect.fnUntraced(function* (options: Launch = {}) {
+  const supervisor = yield* Supervisor;
+  const cmd = yield* launchOf(options);
+  yield* supervisor.start(cmd);
+  return cmd;
+});
 
 /** The start of the fake of `options` fails: its error. */
-const refusedStart = (options: Launch = {}) =>
-  Effect.gen(function* () {
-    const supervisor = yield* Supervisor;
-    const cmd = yield* launchOf(options);
-    return yield* Effect.flip(supervisor.start(cmd));
-  });
+const refusedStart = Effect.fnUntraced(function* (options: Launch = {}) {
+  const supervisor = yield* Supervisor;
+  const cmd = yield* launchOf(options);
+  return yield* Effect.flip(supervisor.start(cmd));
+});
 
 /** The state, once `ok` holds (looked at every 10 ms, for 5 s at most). */
-const stateWhen = (ok: (state: ServerState) => boolean) =>
-  Effect.gen(function* () {
-    const supervisor = yield* Supervisor;
-    return yield* supervisor.state.pipe(
-      Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: ok }),
-      Effect.timeout('5 seconds'),
-    );
-  });
+const stateWhen = Effect.fnUntraced(function* (ok: (state: ServerState) => boolean) {
+  const supervisor = yield* Supervisor;
+  return yield* supervisor.state.pipe(
+    Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: ok }),
+    Effect.timeout('5 seconds'),
+  );
+});
 
 const kindIs =
   (...kinds: ReadonlyArray<ServerState['kind']>) =>
@@ -153,13 +149,12 @@ const pidOf = (state: ServerState): number => ('pid' in state && state.pid !== n
 const profileOf = (state: ServerState): string | null => ('profile' in state ? state.profile : null);
 
 /** The state now, which must include `expected`. */
-const assertState = (expected: Readonly<Record<string, unknown>>) =>
-  Effect.gen(function* () {
-    const supervisor = yield* Supervisor;
-    const state = yield* supervisor.state;
-    assert.deepInclude(state, expected);
-    return state;
-  });
+const assertState = Effect.fnUntraced(function* (expected: Readonly<Record<string, unknown>>) {
+  const supervisor = yield* Supervisor;
+  const state = yield* supervisor.state;
+  assert.deepInclude(state, expected);
+  return state;
+});
 
 const assertAlive = (pid: number) => Effect.map(isAlive(pid), (alive) => assert.isTrue(pid > 0 && alive, `${pid}`));
 
@@ -197,14 +192,13 @@ const publishedKinds = Effect.map(
 );
 
 /** A folder made like `/proc`, naming `pid` as a `llama-server` on `port`. */
-const procNaming = (pid: number, port: number) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const root = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-proc-' });
-    yield* fs.makeDirectory(`${root}/${pid}`);
-    yield* fs.writeFileString(`${root}/${pid}/cmdline`, `llama-server\0--port\0${port}\0`);
-    return root;
-  });
+const procNaming = Effect.fnUntraced(function* (pid: number, port: number) {
+  const fs = yield* FileSystem.FileSystem;
+  const root = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-proc-' });
+  yield* fs.makeDirectory(`${root}/${pid}`);
+  yield* fs.writeFileString(`${root}/${pid}/cmdline`, `llama-server\0--port\0${port}\0`);
+  return root;
+});
 
 /** `cmd` with its binary replaced by one that does not exist. */
 const withMissingBinary = (cmd: BuiltCommand): BuiltCommand => ({

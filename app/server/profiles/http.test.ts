@@ -24,17 +24,16 @@ const Served = serve(ApiRoutes).pipe(Layer.provideMerge(ServicesTest), Layer.pro
 const parseJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** The status, the headers, the text and (when it is JSON) the value of a raw reply. */
-const send = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: string) =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const base = HttpClientRequest.make(method)(path);
-    const request = body === undefined ? base : HttpClientRequest.bodyText(base, body, 'application/json');
-    const res = yield* client.execute(request);
-    const text = yield* res.text;
-    const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
-    const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
-    return { status: res.status, headers: res.headers, text, json };
-  });
+const send = Effect.fnUntraced(function* (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, body?: string) {
+  const client = yield* HttpClient.HttpClient;
+  const base = HttpClientRequest.make(method)(path);
+  const request = body === undefined ? base : HttpClientRequest.bodyText(base, body, 'application/json');
+  const res = yield* client.execute(request);
+  const text = yield* res.text;
+  const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
+  const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
+  return { status: res.status, headers: res.headers, text, json };
+});
 
 /** A JSON reply as the schema reads it: a reply of another shape fails the test. */
 const as = <A, I>(schema: Schema.Codec<A, I>, json: unknown) => Schema.decodeUnknownEffect(schema)(json);
@@ -291,13 +290,12 @@ describe('ProfilesApi', () => {
             _tag: 'ProfileRunning',
             message: 'This profile belongs to the running server: stop it first',
           };
-          const refused = (kind: ServerState['kind']) =>
-            Effect.gen(function* () {
-              const state = yield* supervisor.state;
-              const reply = yield* send('DELETE', `/api/profiles/${profile.id}`);
-              assert.strictEqual(state.kind, kind);
-              assert.deepStrictEqual([reply.status, reply.json], [409, running], kind);
-            });
+          const refused = Effect.fnUntraced(function* (kind: ServerState['kind']) {
+            const state = yield* supervisor.state;
+            const reply = yield* send('DELETE', `/api/profiles/${profile.id}`);
+            assert.strictEqual(state.kind, kind);
+            assert.deepStrictEqual([reply.status, reply.json], [409, running], kind);
+          });
           const started = yield* send('POST', '/api/server/start', `{"profileId":${profile.id}}`);
           assert.strictEqual(started.status, 202);
           yield* refused('starting');

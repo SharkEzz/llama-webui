@@ -44,12 +44,11 @@ export const minKnown: {
   return kb === null ? ka : Math.min(ka, kb);
 });
 
-const isBridge = (dir: string) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const cls = yield* readTrimmed(path.join(dir, 'class'));
-    return Str.startsWith('0x0604')(cls ?? '');
-  });
+const isBridge = Effect.fnUntraced(function* (dir: string) {
+  const path = yield* Path.Path;
+  const cls = yield* readTrimmed(path.join(dir, 'class'));
+  return Str.startsWith('0x0604')(cls ?? '');
+});
 
 /**
  * Recent Radeon cards sit behind a PCIe switch on the card itself: the GPU's own link goes to that switch
@@ -80,34 +79,31 @@ export const slotLink = Effect.fn('pci.slotLink')(function* (options: {
 });
 
 /** The `vendor` and `device` ids of a device directory (cached attributes, read without waking the card up). */
-const idsOf = (dir: string) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const [vendor, device] = yield* Effect.all([
-      readTrimmed(path.join(dir, 'vendor')),
-      readTrimmed(path.join(dir, 'device')),
-    ]);
-    return vendor === null || device === null ? Option.none() : Option.some({ vendor, device });
-  });
+const idsOf = Effect.fnUntraced(function* (dir: string) {
+  const path = yield* Path.Path;
+  const [vendor, device] = yield* Effect.all([
+    readTrimmed(path.join(dir, 'vendor')),
+    readTrimmed(path.join(dir, 'device')),
+  ]);
+  return vendor === null || device === null ? Option.none() : Option.some({ vendor, device });
+});
 
 /** The pci.ids entry of the device at `dir`, or none. */
-const entryAt = (dir: string) =>
-  Effect.gen(function* () {
-    const ids = yield* PciIds;
-    const found = yield* idsOf(dir);
-    if (Option.isNone(found)) return Option.none<string>();
-    return yield* ids.entry(found.value.vendor, found.value.device);
-  });
+const entryAt = Effect.fnUntraced(function* (dir: string) {
+  const ids = yield* PciIds;
+  const found = yield* idsOf(dir);
+  if (Option.isNone(found)) return Option.none<string>();
+  return yield* ids.entry(found.value.vendor, found.value.device);
+});
 
 /** The name of the device at `dir` in pci.ids, `fallback` when it has none. */
-const nameAt = (dir: string, fallback: string) =>
-  Effect.gen(function* () {
-    const ids = yield* PciIds;
-    const found = yield* idsOf(dir);
-    if (Option.isNone(found)) return fallback;
-    const name = yield* ids.name(found.value.vendor, found.value.device);
-    return Option.getOrElse(name, () => fallback);
-  });
+const nameAt = Effect.fnUntraced(function* (dir: string, fallback: string) {
+  const ids = yield* PciIds;
+  const found = yield* idsOf(dir);
+  if (Option.isNone(found)) return fallback;
+  const name = yield* ids.name(found.value.vendor, found.value.device);
+  return Option.getOrElse(name, () => fallback);
+});
 
 /**
  * The first bridge below a root port is the chipset if it comes from the platform vendor (the root port's:
@@ -116,17 +112,16 @@ const nameAt = (dir: string, fallback: string) =>
  * as the root port on Intel, aren't either: the kernel marks what sits below an external port “removable”,
  * and the full pci.ids name says so.
  */
-const isChipset = (up: string, root: string, entry: Option.Option<string>) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const [upVendor, rootVendor, removable] = yield* Effect.all([
-      readTrimmed(path.join(up, 'vendor')),
-      readTrimmed(path.join(root, 'vendor')),
-      readTrimmed(path.join(up, 'removable')),
-    ]);
-    if (upVendor === null || upVendor !== rootVendor) return false;
-    return removable !== 'removable' && !/thunderbolt|usb4/i.test(Option.getOrElse(entry, () => ''));
-  });
+const isChipset = Effect.fnUntraced(function* (up: string, root: string, entry: Option.Option<string>) {
+  const path = yield* Path.Path;
+  const [upVendor, rootVendor, removable] = yield* Effect.all([
+    readTrimmed(path.join(up, 'vendor')),
+    readTrimmed(path.join(root, 'vendor')),
+    readTrimmed(path.join(up, 'removable')),
+  ]);
+  if (upVendor === null || upVendor !== rootVendor) return false;
+  return removable !== 'removable' && !/thunderbolt|usb4/i.test(Option.getOrElse(entry, () => ''));
+});
 
 /** “600 Series Chipset PCIe Switch Upstream Port” → “600 Series Chipset”. */
 export function chipsetLabel(name: string | null): string {
@@ -162,37 +157,41 @@ const VENDORS: Readonly<Record<string, TopologyNode['vendor']>> = {
 };
 
 /** PCIe link `from → to` whose downstream side is `linkPath` and upstream port `portPath`; no link attributes: internal. */
-const pcieLink = (id: string, from: string, to: string, linkPath: string, portPath: string | null) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const speed = (dir: string | null, file: string) =>
-      Effect.gen(function* () {
-        const text = dir === null ? null : yield* readTrimmed(path.join(dir, file));
-        return text === null ? null : parseLinkSpeed(text);
-      });
-    const width = (dir: string | null, file: string) => readNum(dir === null ? null : path.join(dir, file));
-    const [genL, widthL, genP, widthP, genCur, widthCur] = yield* Effect.all([
-      speed(linkPath, 'max_link_speed'),
-      width(linkPath, 'max_link_width'),
-      speed(portPath, 'max_link_speed'),
-      width(portPath, 'max_link_width'),
-      speed(linkPath, 'current_link_speed'),
-      width(linkPath, 'current_link_width'),
-    ]);
-    // A suspended card (D3cold) may answer 0xFFFF to a config read: width “63”, to be ignored.
-    const sane = (w: number | null) => (w !== null && Number.isInteger(w) && w > 0 && w <= 32 ? w : null);
-    const genMax = minKnown(genL, genP);
-    return {
-      id,
-      from,
-      to,
-      kind: genMax === null && genCur === null ? 'internal' : 'pcie',
-      genMax,
-      widthMax: minKnown(sane(widthL), sane(widthP)),
-      genCur,
-      widthCur: sane(widthCur),
-    } satisfies TopologyLink;
+const pcieLink = Effect.fnUntraced(function* (
+  id: string,
+  from: string,
+  to: string,
+  linkPath: string,
+  portPath: string | null,
+) {
+  const path = yield* Path.Path;
+  const speed = Effect.fnUntraced(function* (dir: string | null, file: string) {
+    const text = dir === null ? null : yield* readTrimmed(path.join(dir, file));
+    return text === null ? null : parseLinkSpeed(text);
   });
+  const width = (dir: string | null, file: string) => readNum(dir === null ? null : path.join(dir, file));
+  const [genL, widthL, genP, widthP, genCur, widthCur] = yield* Effect.all([
+    speed(linkPath, 'max_link_speed'),
+    width(linkPath, 'max_link_width'),
+    speed(portPath, 'max_link_speed'),
+    width(portPath, 'max_link_width'),
+    speed(linkPath, 'current_link_speed'),
+    width(linkPath, 'current_link_width'),
+  ]);
+  // A suspended card (D3cold) may answer 0xFFFF to a config read: width “63”, to be ignored.
+  const sane = (w: number | null) => (w !== null && Number.isInteger(w) && w > 0 && w <= 32 ? w : null);
+  const genMax = minKnown(genL, genP);
+  return {
+    id,
+    from,
+    to,
+    kind: genMax === null && genCur === null ? 'internal' : 'pcie',
+    genMax,
+    widthMax: minKnown(sane(widthL), sane(widthP)),
+    genCur,
+    widthCur: sane(widthCur),
+  } satisfies TopologyLink;
+});
 
 interface BlockDev {
   readonly block: string;
@@ -202,55 +201,53 @@ interface BlockDev {
   readonly sizeBytes: number | null;
 }
 
-const blockDevices = (sysRoot: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const dir = path.join(sysRoot, 'block');
-    const disks = yield* physicalDisks(dir);
-    const found = yield* Effect.forEach(disks, (block) =>
-      Effect.gen(function* () {
-        const ctrlPath = yield* fs.realPath(path.join(dir, block, 'device')).pipe(Effect.option);
-        if (Option.isNone(ctrlPath)) return Option.none<BlockDev>();
-        const sectors = yield* readNum(path.join(dir, block, 'size'));
-        return Option.some({
-          block,
-          ctrlPath: ctrlPath.value,
-          model: yield* readTrimmed(path.join(ctrlPath.value, 'model')),
-          sizeBytes: sectors === null ? null : sectors * 512,
-        });
-      }),
-    );
-    return Arr.getSomes(found);
-  });
+const blockDevices = Effect.fnUntraced(function* (sysRoot: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const dir = path.join(sysRoot, 'block');
+  const disks = yield* physicalDisks(dir);
+  const found = yield* Effect.forEach(disks, (block) =>
+    Effect.gen(function* () {
+      const ctrlPath = yield* fs.realPath(path.join(dir, block, 'device')).pipe(Effect.option);
+      if (Option.isNone(ctrlPath)) return Option.none<BlockDev>();
+      const sectors = yield* readNum(path.join(dir, block, 'size'));
+      return Option.some({
+        block,
+        ctrlPath: ctrlPath.value,
+        model: yield* readTrimmed(path.join(ctrlPath.value, 'model')),
+        sizeBytes: sectors === null ? null : sectors * 512,
+      });
+    }),
+  );
+  return Arr.getSomes(found);
+});
 
-const ramNode = (sysRoot: string, procRoot: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const mem = yield* readTrimmed(path.join(procRoot, 'meminfo'));
-    const kb = Number(/^MemTotal:\s+(\d+)\s*kB/m.exec(mem ?? '')?.[1]);
-    const hwmon = path.join(sysRoot, 'class', 'hwmon');
-    const entries = yield* fs.readDirectory(hwmon).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
-    const readings = yield* Effect.forEach(entries, (entry) =>
-      Effect.gen(function* () {
-        if ((yield* readTrimmed(path.join(hwmon, entry, 'name'))) !== 'spd5118') return null;
-        const t = yield* readNum(path.join(hwmon, entry, 'temp1_input'));
-        return t === null ? null : t / 1000;
-      }),
-    );
-    const temps = Arr.filter(readings, (t): t is number => t !== null);
-    return {
-      id: 'ram',
-      kind: 'ram',
-      label: 'Memory',
-      detail: {
-        totalBytes: Number.isFinite(kb) ? kb * 1024 : null,
-        dimms: temps.length > 0 ? temps.length : null,
-        tempC: temps.length > 0 ? Math.max(...temps) : null,
-      },
-    } satisfies TopologyNode;
-  });
+const ramNode = Effect.fnUntraced(function* (sysRoot: string, procRoot: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const mem = yield* readTrimmed(path.join(procRoot, 'meminfo'));
+  const kb = Number(/^MemTotal:\s+(\d+)\s*kB/m.exec(mem ?? '')?.[1]);
+  const hwmon = path.join(sysRoot, 'class', 'hwmon');
+  const entries = yield* fs.readDirectory(hwmon).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
+  const readings = yield* Effect.forEach(entries, (entry) =>
+    Effect.gen(function* () {
+      if ((yield* readTrimmed(path.join(hwmon, entry, 'name'))) !== 'spd5118') return null;
+      const t = yield* readNum(path.join(hwmon, entry, 'temp1_input'));
+      return t === null ? null : t / 1000;
+    }),
+  );
+  const temps = Arr.filter(readings, (t): t is number => t !== null);
+  return {
+    id: 'ram',
+    kind: 'ram',
+    label: 'Memory',
+    detail: {
+      totalBytes: Number.isFinite(kb) ? kb * 1024 : null,
+      dimms: temps.length > 0 ? temps.length : null,
+      tempC: temps.length > 0 ? Math.max(...temps) : null,
+    },
+  } satisfies TopologyNode;
+});
 
 /**
  * Hardware graph: CPU, memory, then each GPU (class 0x03) and NVMe controller (0x0108) with its link to the CPU,

@@ -129,7 +129,7 @@ export class WsHub extends Context.Service<
         );
 
         return {
-          publish: (message) => PubSub.publish(pubsub, message).pipe(Effect.asVoid),
+          publish: Effect.fn((message) => PubSub.publish(pubsub, message).pipe(Effect.asVoid)),
           size: Ref.get(clients).pipe(Effect.map((set) => set.size)),
           attach,
         };

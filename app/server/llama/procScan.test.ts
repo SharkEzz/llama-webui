@@ -4,20 +4,19 @@ import { Array as Arr, Effect, FileSystem, Option, Path, Record } from 'effect';
 import { findLlamaServerPid, isAlive } from './procScan.ts';
 
 /** A folder made like `/proc`: one `<pid>/cmdline` per entry, its arguments separated by NUL. */
-const procOf = (processes: Readonly<Record<string, ReadonlyArray<string> | 'unreadable'>>) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const root = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-proc-' });
-    for (const [pid, argv] of Record.toEntries(processes)) {
-      const dir = path.join(root, pid);
-      yield* fs.makeDirectory(dir);
-      // A folder where the file should be: reading it fails.
-      if (argv === 'unreadable') yield* fs.makeDirectory(path.join(dir, 'cmdline'));
-      else yield* fs.writeFileString(path.join(dir, 'cmdline'), `${Arr.join(argv, '\0')}\0`);
-    }
-    return root;
-  });
+const procOf = Effect.fnUntraced(function* (processes: Readonly<Record<string, ReadonlyArray<string> | 'unreadable'>>) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const root = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-proc-' });
+  for (const [pid, argv] of Record.toEntries(processes)) {
+    const dir = path.join(root, pid);
+    yield* fs.makeDirectory(dir);
+    // A folder where the file should be: reading it fails.
+    if (argv === 'unreadable') yield* fs.makeDirectory(path.join(dir, 'cmdline'));
+    else yield* fs.writeFileString(path.join(dir, 'cmdline'), `${Arr.join(argv, '\0')}\0`);
+  }
+  return root;
+});
 
 layer(NodeServices.layer, { excludeTestServices: true })('procScan', (it) => {
   it.effect(

@@ -43,9 +43,9 @@ const RecordingHub = Layer.effect(
   Effect.gen(function* () {
     const published = yield* Published;
     return {
-      publish: (message: WsMessage) => Ref.update(published, Arr.append(message)),
+      publish: Effect.fn((message: WsMessage) => Ref.update(published, Arr.append(message))),
       size: Effect.succeed(0),
-      attach: () => Effect.void,
+      attach: Effect.fn(() => Effect.void),
     };
   }),
 );
@@ -84,23 +84,22 @@ const buildPlacement = Layer.build(Placement.layer).pipe(Effect.map(Context.get(
 let nextId = 1;
 
 /** Starts the fake on a free port, its `env` holding the `FAKE_*` variables. */
-const startFake = (env: Readonly<Record<string, string>> = {}) =>
-  Effect.gen(function* () {
-    const supervisor = yield* Supervisor;
-    const profile: Profile = {
-      id: nextId++,
-      name: 'fake',
-      model: 'm.gguf',
-      args: [],
-      env: { ...env },
-      port: yield* freePort,
-      source: 'ui',
-      createdAt: 0,
-      updatedAt: 0,
-    };
-    const cmd = yield* buildCommand({ profile, settings: { ...DEFAULT_SETTINGS, binary: FAKE } });
-    yield* supervisor.start(cmd);
-  });
+const startFake = Effect.fnUntraced(function* (env: Readonly<Record<string, string>> = {}) {
+  const supervisor = yield* Supervisor;
+  const profile: Profile = {
+    id: nextId++,
+    name: 'fake',
+    model: 'm.gguf',
+    args: [],
+    env: { ...env },
+    port: yield* freePort,
+    source: 'ui',
+    createdAt: 0,
+    updatedAt: 0,
+  };
+  const cmd = yield* buildCommand({ profile, settings: { ...DEFAULT_SETTINGS, binary: FAKE } });
+  yield* supervisor.start(cmd);
+});
 
 /** The lines of `testdata/llama-server-load.txt`, its launch line first. */
 const fixture = Effect.gen(function* () {
@@ -110,11 +109,10 @@ const fixture = Effect.gen(function* () {
   return Str.split(Str.trimEnd(text), '\n');
 });
 
-const pushAll = (texts: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    const ring = yield* LogRing;
-    yield* Effect.forEach(texts, ring.push, { discard: true });
-  });
+const pushAll = Effect.fnUntraced(function* (texts: ReadonlyArray<string>) {
+  const ring = yield* LogRing;
+  yield* Effect.forEach(texts, ring.push, { discard: true });
+});
 
 /** The placements published, in order. */
 const placements = Effect.gen(function* () {

@@ -48,15 +48,14 @@ const requestOf = (method: Method, path: string, body?: string) => {
 };
 
 /** The status, the headers, the text and (when it is JSON) the value of a raw reply. */
-const send = (method: Method, path: string, body?: string) =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const res = yield* client.execute(requestOf(method, path, body));
-    const text = yield* res.text;
-    const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
-    const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
-    return { status: res.status, headers: res.headers, text, json };
-  });
+const send = Effect.fnUntraced(function* (method: Method, path: string, body?: string) {
+  const client = yield* HttpClient.HttpClient;
+  const res = yield* client.execute(requestOf(method, path, body));
+  const text = yield* res.text;
+  const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
+  const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
+  return { status: res.status, headers: res.headers, text, json };
+});
 
 /** A JSON reply as the schema reads it: a reply of another shape fails the test. */
 const as = <A, I>(schema: Schema.Codec<A, I>, json: unknown) => Schema.decodeUnknownEffect(schema)(json);
@@ -79,17 +78,16 @@ const eventsOf = (res: HttpClientResponse.HttpClientResponse) =>
  * A streamed reply read in a fiber, its request in the scope of the caller (closing it is a client that leaves): the
  * reply, the events so far, and a wait for the first `n`.
  */
-const open = (method: Method, path: string, body?: string) =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const res = yield* HttpClient.withScope(client).execute(requestOf(method, path, body));
-    const events: Array<ChatEvent> = [];
-    const fiber = yield* eventsOf(res).pipe(
-      Stream.runForEach((event) => Effect.sync(() => events.push(event))),
-      Effect.forkScoped,
-    );
-    return { res, events, fiber, got: (n: number) => until(() => events.length >= n) };
-  });
+const open = Effect.fnUntraced(function* (method: Method, path: string, body?: string) {
+  const client = yield* HttpClient.HttpClient;
+  const res = yield* HttpClient.withScope(client).execute(requestOf(method, path, body));
+  const events: Array<ChatEvent> = [];
+  const fiber = yield* eventsOf(res).pipe(
+    Stream.runForEach((event) => Effect.sync(() => events.push(event))),
+    Effect.forkScoped,
+  );
+  return { res, events, fiber, got: (n: number) => until(() => events.length >= n) };
+});
 
 /** A conversation with no profile; its id. */
 const created = Effect.gen(function* () {
@@ -114,67 +112,62 @@ const doneOf = (events: ReadonlyArray<ChatEvent>): ChatMessage => {
   return last.value.message;
 };
 
-const assistantOf = (id: number) =>
-  Effect.gen(function* () {
-    const repo = yield* ConversationsRepo;
-    const messages = yield* repo.messages(id);
-    return yield* Effect.fromOption(Arr.findLast(messages, (m) => m.role === 'assistant')).pipe(Effect.orDie);
-  });
+const assistantOf = Effect.fnUntraced(function* (id: number) {
+  const repo = yield* ConversationsRepo;
+  const messages = yield* repo.messages(id);
+  return yield* Effect.fromOption(Arr.findLast(messages, (m) => m.role === 'assistant')).pipe(Effect.orDie);
+});
 
 /** Waits until the supervisor is in `kind` (looked at every 10 ms, for 5 s at most). */
-const stateWhen = (kind: ServerState['kind']) =>
-  Effect.gen(function* () {
-    const supervisor = yield* Supervisor;
-    return yield* supervisor.state.pipe(
-      Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (state) => state.kind === kind }),
-      Effect.timeout('5 seconds'),
-    );
-  });
+const stateWhen = Effect.fnUntraced(function* (kind: ServerState['kind']) {
+  const supervisor = yield* Supervisor;
+  return yield* supervisor.state.pipe(
+    Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (state) => state.kind === kind }),
+    Effect.timeout('5 seconds'),
+  );
+});
 
 /** The fake llama-server on a profile of its own (model `/m/a.gguf`), started through the API: the profile and pid. */
-const startFake = (env: Readonly<Record<string, string>> = {}) =>
-  Effect.gen(function* () {
-    const settings = yield* SettingsRepo;
-    const profiles = yield* ProfilesRepo;
-    yield* settings.patch({ binary: FAKE });
-    const port = yield* freePort;
-    const profile = yield* profiles.create({ name: 'A', model: '/m/a.gguf', port, args: [], env });
-    const started = yield* send('POST', '/api/server/start', `{"profileId":${profile.id}}`);
-    assert.strictEqual(started.status, 202);
-    const ready = yield* stateWhen('ready');
-    if (ready.kind !== 'ready') return assert.fail('llama-server is not ready');
-    return { profile, pid: ready.pid };
-  });
+const startFake = Effect.fnUntraced(function* (env: Readonly<Record<string, string>> = {}) {
+  const settings = yield* SettingsRepo;
+  const profiles = yield* ProfilesRepo;
+  yield* settings.patch({ binary: FAKE });
+  const port = yield* freePort;
+  const profile = yield* profiles.create({ name: 'A', model: '/m/a.gguf', port, args: [], env });
+  const started = yield* send('POST', '/api/server/start', `{"profileId":${profile.id}}`);
+  assert.strictEqual(started.status, 202);
+  const ready = yield* stateWhen('ready');
+  if (ready.kind !== 'ready') return assert.fail('llama-server is not ready');
+  return { profile, pid: ready.pid };
+});
 
 /** Stops the fake through the API and checks that it is gone. */
-const stopFake = (pid: number) =>
-  Effect.gen(function* () {
-    const stopped = yield* send('POST', '/api/server/stop');
-    assert.strictEqual(stopped.status, 200);
-    yield* until(() => !pidAlive(pid));
-  });
+const stopFake = Effect.fnUntraced(function* (pid: number) {
+  const stopped = yield* send('POST', '/api/server/stop');
+  assert.strictEqual(stopped.status, 200);
+  yield* until(() => !pidAlive(pid));
+});
 
 /**
  * Waits until the reply of `id` has read `content` (looked at every 10 ms, for 5 s at most): the text of the replay a
  * new follower gets, once the reply has written a delta.
  */
-const writtenWhen = (id: number, content: string) =>
-  Effect.gen(function* () {
-    const runs = yield* ChatRuns;
-    const written = Effect.gen(function* () {
-      const reply = yield* runs.live(id).pipe(Effect.flatMap(Effect.fromOption), Effect.orDie);
-      // The start, then the delta of what was written so far.
-      const replay = yield* reply.events.pipe(Stream.take(2), Stream.runCollect);
-      return Arr.findFirst(replay, (e) => e.type === 'delta').pipe(
-        Option.flatMap((e) => (e.type === 'delta' ? Option.fromNullishOr(e.content) : Option.none())),
-        Option.getOrElse(() => ''),
-      );
-    });
-    yield* written.pipe(
-      Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (text) => text === content }),
-      Effect.timeout('5 seconds'),
+const writtenWhen = Effect.fnUntraced(function* (id: number, content: string) {
+  const runs = yield* ChatRuns;
+  const written = Effect.gen(function* () {
+    const reply = yield* runs.live(id).pipe(Effect.flatMap(Effect.fromOption), Effect.orDie);
+    // The start, then the delta of what was written so far.
+    const replay = yield* reply.events.pipe(Stream.take(2), Stream.runCollect);
+    return Arr.findFirst(replay, (e) => e.type === 'delta').pipe(
+      Option.flatMap((e) => (e.type === 'delta' ? Option.fromNullishOr(e.content) : Option.none())),
+      Option.getOrElse(() => ''),
     );
   });
+  yield* written.pipe(
+    Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (text) => text === content }),
+    Effect.timeout('5 seconds'),
+  );
+});
 
 /** A detail without its messages and `live`: the conversation as stored. */
 const storedOf = ({ messages: _messages, live: _live, ...conversation }: ConversationDetail) => conversation;
@@ -490,12 +483,11 @@ describe('ChatApi', () => {
     it.effect('the requests are strict: a field of the wrong type or an unknown key is a 400 RequestInvalid', () =>
       Effect.gen(function* () {
         const id = yield* created;
-        const refused = (method: Method, path: string, body: string) =>
-          Effect.gen(function* () {
-            const reply = yield* send(method, path, body);
-            assert.strictEqual(reply.status, 400, `${method} ${path} ${body}`);
-            return yield* as(Refused, reply.json);
-          });
+        const refused = Effect.fnUntraced(function* (method: Method, path: string, body: string) {
+          const reply = yield* send(method, path, body);
+          assert.strictEqual(reply.status, 400, `${method} ${path} ${body}`);
+          return yield* as(Refused, reply.json);
+        });
         const messages = (r: typeof Refused.Type) => Arr.map(r.issues, (i) => [i.path, i.message]);
         yield* refused('POST', '/api/chat', '{"profileId":1.5}');
         yield* refused('POST', '/api/chat', '{"other":1}');

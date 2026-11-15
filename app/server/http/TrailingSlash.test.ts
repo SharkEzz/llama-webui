@@ -13,13 +13,12 @@ const TestApp = serve(Layer.mergeAll(ApiRoutes, PublicTest)).pipe(
 );
 
 /** The status, the location and the body of a reply. */
-const send = (request: HttpClientRequest.HttpClientRequest) =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const res = yield* client.execute(request);
-    const body = yield* res.text;
-    return { status: res.status, location: res.headers.location, body };
-  });
+const send = Effect.fnUntraced(function* (request: HttpClientRequest.HttpClientRequest) {
+  const client = yield* HttpClient.HttpClient;
+  const res = yield* client.execute(request);
+  const body = yield* res.text;
+  return { status: res.status, location: res.headers.location, body };
+});
 
 layer(TestApp)('TrailingSlash', (it) => {
   it.effect('an /api path with a trailing slash is a 308 to the path without it, query kept', () =>

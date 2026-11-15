@@ -217,25 +217,24 @@ export class Supervisor extends Context.Service<
           });
 
         /** A launch that ended before llama-server ran: the ring says why, the state is `crashed` with the message. */
-        const launchFailed = (cmd: BuiltCommand, message: string) =>
-          Effect.gen(function* () {
-            yield* ring.push(`[llama-webui] launch failed: ${message}`);
-            const at = yield* Clock.currentTimeMillis;
-            yield* change((now) =>
-              Option.some({
-                ...now,
-                state: {
-                  kind: 'crashed',
-                  profile: cmd.profileName,
-                  profileId: cmd.profileId,
-                  exitCode: null,
-                  signal: null,
-                  at,
-                  message,
-                },
-              }),
-            );
-          });
+        const launchFailed = Effect.fnUntraced(function* (cmd: BuiltCommand, message: string) {
+          yield* ring.push(`[llama-webui] launch failed: ${message}`);
+          const at = yield* Clock.currentTimeMillis;
+          yield* change((now) =>
+            Option.some({
+              ...now,
+              state: {
+                kind: 'crashed',
+                profile: cmd.profileName,
+                profileId: cmd.profileId,
+                exitCode: null,
+                signal: null,
+                at,
+                message,
+              },
+            }),
+          );
+        });
 
         /** What is written to a stream of the process, line by line, into the ring (the idle noise left out). */
         const read = (bytes: Stream.Stream<Uint8Array, unknown>) =>
@@ -271,27 +270,24 @@ export class Supervisor extends Context.Service<
           );
 
         /** The port of `cmd` answers already: whose it is. */
-        const portTaken = (cmd: BuiltCommand) =>
-          Effect.gen(function* () {
-            const target = { host: cmd.host, port: cmd.port };
-            if (!(yield* isLlamaServer(target))) {
-              return PortInUse.make({
-                message: `port ${cmd.port} is in use by another service`,
-                port: cmd.port,
-                by: 'other',
-                pid: null,
-              });
-            }
-            const pid = yield* findLlamaServerPid({ port: cmd.port, root: procRoot }).pipe(
-              Effect.map(Option.getOrNull),
-            );
-            yield* change((now) =>
-              Option.isNone(now.proc) && (now.state.kind === 'idle' || now.state.kind === 'crashed')
-                ? Option.some({ ...now, state: { kind: 'external', pid, port: cmd.port } })
-                : Option.none(),
-            );
-            return externalError(cmd.port, pid);
-          }).pipe(Effect.provideContext(context));
+        const portTaken = Effect.fnUntraced(function* (cmd: BuiltCommand) {
+          const target = { host: cmd.host, port: cmd.port };
+          if (!(yield* isLlamaServer(target))) {
+            return PortInUse.make({
+              message: `port ${cmd.port} is in use by another service`,
+              port: cmd.port,
+              by: 'other',
+              pid: null,
+            });
+          }
+          const pid = yield* findLlamaServerPid({ port: cmd.port, root: procRoot }).pipe(Effect.map(Option.getOrNull));
+          yield* change((now) =>
+            Option.isNone(now.proc) && (now.state.kind === 'idle' || now.state.kind === 'crashed')
+              ? Option.some({ ...now, state: { kind: 'external', pid, port: cmd.port } })
+              : Option.none(),
+          );
+          return externalError(cmd.port, pid);
+        }, Effect.provideContext(context));
 
         const externalError = (port: number, pid: number | null) =>
           PortInUse.make({
@@ -301,68 +297,66 @@ export class Supervisor extends Context.Service<
             pid,
           });
 
-        const doStart = (cmd: BuiltCommand) =>
-          Effect.gen(function* () {
-            const before = yield* SynchronizedRef.get(held);
-            if (before.state.kind === 'external') {
-              const external = before.state;
-              // The external server may have been stopped since it was seen.
-              const answers = yield* health({ port: external.port });
-              if (Option.isSome(answers)) {
-                return yield* externalError(external.port, external.pid);
-              }
-              yield* change((now) =>
-                now.state === external ? Option.some({ ...now, state: { kind: 'idle' } }) : Option.none(),
-              );
+        const doStart = Effect.fnUntraced(function* (cmd: BuiltCommand) {
+          const before = yield* SynchronizedRef.get(held);
+          if (before.state.kind === 'external') {
+            const external = before.state;
+            // The external server may have been stopped since it was seen.
+            const answers = yield* health({ port: external.port });
+            if (Option.isSome(answers)) {
+              return yield* externalError(external.port, external.pid);
             }
-            if (Option.isSome(before.proc)) {
-              return yield* ServerAlreadyRunning.make({ message: 'a server is already running' });
-            }
-            const taken = yield* health({ host: cmd.host, port: cmd.port });
-            if (Option.isSome(taken)) {
-              const error = yield* portTaken(cmd);
-              return yield* error;
-            }
+            yield* change((now) =>
+              now.state === external ? Option.some({ ...now, state: { kind: 'idle' } }) : Option.none(),
+            );
+          }
+          if (Option.isSome(before.proc)) {
+            return yield* ServerAlreadyRunning.make({ message: 'a server is already running' });
+          }
+          const taken = yield* health({ host: cmd.host, port: cmd.port });
+          if (Option.isSome(taken)) {
+            const error = yield* portTaken(cmd);
+            return yield* error;
+          }
 
-            yield* SynchronizedRef.update(held, (now) => ({ ...now, last: Option.some(cmd) }));
-            if (!(yield* fs.exists(cmd.cwd).pipe(Effect.orElseSucceed(() => false)))) {
-              return yield* launchFailed(cmd, `directory not found: ${cmd.cwd}`);
-            }
-            const [binary = '', ...args] = cmd.argv;
-            const spawned = yield* followProgram({
-              command: ChildProcess.make(binary, args, {
-                cwd: cmd.cwd,
-                env: { ...cmd.env },
-                extendEnv: true,
-                stdin: 'ignore',
-                forceKillAfter: FORCE_KILL_AFTER,
-              }),
-              parent: ops,
-              name: 'llama-server',
-              // The state names the process before its output is read and its exit watched: an exit seen at once
-              // still finds it.
-              onSpawn: (program) =>
-                Effect.gen(function* () {
-                  const { handle } = program;
-                  livePid = handle.pid;
-                  const running: Running = { program, cmd };
-                  yield* Effect.forEach(launchLines(cmd), ring.push, { discard: true });
-                  const since = yield* Clock.currentTimeMillis;
-                  yield* change((now) =>
-                    Option.some({
-                      ...now,
-                      proc: Option.some(running),
-                      state: { kind: 'starting', ...launchedOf(cmd, handle.pid), since },
-                    }),
-                  );
-                  yield* pollHealth(running).pipe(Effect.forkIn(program.scope));
+          yield* SynchronizedRef.update(held, (now) => ({ ...now, last: Option.some(cmd) }));
+          if (!(yield* fs.exists(cmd.cwd).pipe(Effect.orElseSucceed(() => false)))) {
+            return yield* launchFailed(cmd, `directory not found: ${cmd.cwd}`);
+          }
+          const [binary = '', ...args] = cmd.argv;
+          const spawned = yield* followProgram({
+            command: ChildProcess.make(binary, args, {
+              cwd: cmd.cwd,
+              env: { ...cmd.env },
+              extendEnv: true,
+              stdin: 'ignore',
+              forceKillAfter: FORCE_KILL_AFTER,
+            }),
+            parent: ops,
+            name: 'llama-server',
+            // The state names the process before its output is read and its exit watched: an exit seen at once
+            // still finds it.
+            onSpawn: Effect.fnUntraced(function* (program) {
+              const { handle } = program;
+              livePid = handle.pid;
+              const running: Running = { program, cmd };
+              yield* Effect.forEach(launchLines(cmd), ring.push, { discard: true });
+              const since = yield* Clock.currentTimeMillis;
+              yield* change((now) =>
+                Option.some({
+                  ...now,
+                  proc: Option.some(running),
+                  state: { kind: 'starting', ...launchedOf(cmd, handle.pid), since },
                 }),
-              read: ({ handle }) =>
-                Effect.all([read(handle.stdout), read(handle.stderr)], { concurrency: 2, discard: true }),
-              onExit: (ended, program) => exited({ program, cmd }, endingOf(ended)),
-            }).pipe(Effect.result);
-            if (spawned._tag === 'Failure') return yield* launchFailed(cmd, causeMessage(spawned.failure));
-          }).pipe(Effect.provideContext(context));
+              );
+              yield* pollHealth(running).pipe(Effect.forkIn(program.scope));
+            }),
+            read: ({ handle }) =>
+              Effect.all([read(handle.stdout), read(handle.stderr)], { concurrency: 2, discard: true }),
+            onExit: (ended, program) => exited({ program, cmd }, endingOf(ended)),
+          }).pipe(Effect.result);
+          if (spawned._tag === 'Failure') return yield* launchFailed(cmd, causeMessage(spawned.failure));
+        }, Effect.provideContext(context));
 
         const doStop = Effect.gen(function* () {
           const now = yield* SynchronizedRef.get(held);

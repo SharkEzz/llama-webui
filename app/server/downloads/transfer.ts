@@ -157,33 +157,32 @@ export const transferWith = (options: {
        * The hash of the first `offset` bytes of `part`: the last attempt's when it covers exactly them, else read again
        * from the disk in 1 MiB chunks (`verifying`: after a restart, or a write that failed half-way).
        */
-      const hashOf = (file: DownloadFile, part: string, offset: number, base: number) =>
-        Effect.gen(function* () {
-          const last = yield* Ref.get(kept);
-          if (Option.isSome(last) && last.value.path === file.path && last.value.bytes === offset) return last.value;
-          yield* Ref.set(kept, Option.none());
-          const hash: HashState = { path: file.path, hasher: sha256(), bytes: 0 };
-          if (offset > 0) {
-            yield* report({
-              phase: 'verifying',
-              file: file.path,
-              bytesDone: base + offset,
-              retryAt: null,
-              throttled: false,
-            });
-            yield* fs.stream(part, { chunkSize: MiB, bytesToRead: offset }).pipe(
-              Stream.runForEach((chunk) =>
-                Effect.sync(() => {
-                  hash.hasher.update(chunk);
-                  hash.bytes += chunk.byteLength;
-                }),
-              ),
-              Effect.mapError(localFailure),
-            );
-          }
-          yield* Ref.set(kept, Option.some(hash));
-          return hash;
-        });
+      const hashOf = Effect.fnUntraced(function* (file: DownloadFile, part: string, offset: number, base: number) {
+        const last = yield* Ref.get(kept);
+        if (Option.isSome(last) && last.value.path === file.path && last.value.bytes === offset) return last.value;
+        yield* Ref.set(kept, Option.none());
+        const hash: HashState = { path: file.path, hasher: sha256(), bytes: 0 };
+        if (offset > 0) {
+          yield* report({
+            phase: 'verifying',
+            file: file.path,
+            bytesDone: base + offset,
+            retryAt: null,
+            throttled: false,
+          });
+          yield* fs.stream(part, { chunkSize: MiB, bytesToRead: offset }).pipe(
+            Stream.runForEach((chunk) =>
+              Effect.sync(() => {
+                hash.hasher.update(chunk);
+                hash.bytes += chunk.byteLength;
+              }),
+            ),
+            Effect.mapError(localFailure),
+          );
+        }
+        yield* Ref.set(kept, Option.some(hash));
+        return hash;
+      });
 
       /**
        * The GET of `file` from `offset`, its redirects followed: the answer when it is 200 or 206. A 416 deletes the
@@ -328,43 +327,42 @@ export const transferWith = (options: {
         });
 
       /** The attempts at `file`, a transient failure logged, published `retrying` and paused for before the next. */
-      const withRetries = (file: DownloadFile, base: number) =>
-        Effect.gen(function* () {
-          let failures = 0;
-          while (true) {
-            yield* Ref.set(progressed, false);
-            const failure = yield* attempt(file, base).pipe(
-              Effect.as(Option.none<Retryable>()),
-              Effect.catchTag('Retryable', Effect.succeedSome),
-            );
-            if (Option.isNone(failure)) return;
-            const { message } = failure.value;
-            if (yield* Ref.get(progressed)) failures = 0;
-            const delay = Arr.get(delays, failures);
-            failures++;
-            if (Option.isNone(delay)) {
-              return yield* TransferFailed.make({ message, code: 'hf-unreachable', status: 502 });
-            }
-            yield* Effect.logWarning(`[llama-webui] download ${item.repo}/${file.path}: ${message}, retrying`);
-            const now = yield* Clock.currentTimeMillis;
-            const dest = yield* Effect.orDie(fileDest(item.dir, file.path));
-            const part = yield* sizeAt(partPath(dest));
-            const bytesDone =
-              base +
-              Math.min(
-                Option.getOrElse(part, () => 0),
-                file.size,
-              );
-            yield* report({
-              phase: 'retrying',
-              file: file.path,
-              bytesDone,
-              retryAt: now + delay.value,
-              throttled: false,
-            });
-            yield* Effect.sleep(Duration.millis(delay.value));
+      const withRetries = Effect.fnUntraced(function* (file: DownloadFile, base: number) {
+        let failures = 0;
+        while (true) {
+          yield* Ref.set(progressed, false);
+          const failure = yield* attempt(file, base).pipe(
+            Effect.as(Option.none<Retryable>()),
+            Effect.catchTag('Retryable', Effect.succeedSome),
+          );
+          if (Option.isNone(failure)) return;
+          const { message } = failure.value;
+          if (yield* Ref.get(progressed)) failures = 0;
+          const delay = Arr.get(delays, failures);
+          failures++;
+          if (Option.isNone(delay)) {
+            return yield* TransferFailed.make({ message, code: 'hf-unreachable', status: 502 });
           }
-        });
+          yield* Effect.logWarning(`[llama-webui] download ${item.repo}/${file.path}: ${message}, retrying`);
+          const now = yield* Clock.currentTimeMillis;
+          const dest = yield* Effect.orDie(fileDest(item.dir, file.path));
+          const part = yield* sizeAt(partPath(dest));
+          const bytesDone =
+            base +
+            Math.min(
+              Option.getOrElse(part, () => 0),
+              file.size,
+            );
+          yield* report({
+            phase: 'retrying',
+            file: file.path,
+            bytesDone,
+            retryAt: now + delay.value,
+            throttled: false,
+          });
+          yield* Effect.sleep(Duration.millis(delay.value));
+        }
+      });
 
       let current = item;
       for (const file of item.files) {

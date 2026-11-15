@@ -130,39 +130,37 @@ export const discoverAmdCards = Effect.fn('amdgpu.discoverAmdCards')(function* (
   return found as ReadonlyArray<AmdCard>;
 });
 
-const readWith = <T>(file: string | null, parse: (text: string) => T) =>
-  Effect.gen(function* () {
-    if (file === null) return null;
-    const text = yield* readTrimmed(file);
-    return text === null ? null : parse(text);
-  });
+const readWith = Effect.fnUntraced(function* <T>(file: string | null, parse: (text: string) => T) {
+  if (file === null) return null;
+  const text = yield* readTrimmed(file);
+  return text === null ? null : parse(text);
+});
 
 /**
  * The link's maximum: at most what both of its ends support. Capabilities never change, so it is kept on
  * the card once every one is known; until then (a port powered down or failing its read at startup) it is
  * read again on each poll.
  */
-const linkMax = (card: AmdCard, link: string) =>
-  Effect.gen(function* () {
-    if (card.linkMax !== undefined) return card.linkMax;
-    const path = yield* Path.Path;
-    const port = card.portPath ?? null;
-    const [gen, width, portGen, portWidth] = yield* Effect.all(
-      [
-        readWith(path.join(link, 'max_link_speed'), parseLinkSpeed),
-        readNum(path.join(link, 'max_link_width')),
-        readWith(port === null ? null : path.join(port, 'max_link_speed'), parseLinkSpeed),
-        readNum(port === null ? null : path.join(port, 'max_link_width')),
-      ],
-      { concurrency: 'unbounded' },
-    );
-    const max = { gen: minKnown(gen, portGen), width: minKnown(width, portWidth) };
-    const ends = port === null ? [gen, width] : [gen, width, portGen, portWidth];
-    if (Arr.every(ends, (v) => v !== null && v > 0) && max.gen !== null && max.width !== null) {
-      card.linkMax = { gen: max.gen, width: max.width };
-    }
-    return max;
-  });
+const linkMax = Effect.fnUntraced(function* (card: AmdCard, link: string) {
+  if (card.linkMax !== undefined) return card.linkMax;
+  const path = yield* Path.Path;
+  const port = card.portPath ?? null;
+  const [gen, width, portGen, portWidth] = yield* Effect.all(
+    [
+      readWith(path.join(link, 'max_link_speed'), parseLinkSpeed),
+      readNum(path.join(link, 'max_link_width')),
+      readWith(port === null ? null : path.join(port, 'max_link_speed'), parseLinkSpeed),
+      readNum(port === null ? null : path.join(port, 'max_link_width')),
+    ],
+    { concurrency: 'unbounded' },
+  );
+  const max = { gen: minKnown(gen, portGen), width: minKnown(width, portWidth) };
+  const ends = port === null ? [gen, width] : [gen, width, portGen, portWidth];
+  if (Arr.every(ends, (v) => v !== null && v > 0) && max.gen !== null && max.width !== null) {
+    card.linkMax = { gen: max.gen, width: max.width };
+  }
+  return max;
+});
 
 /** `pp_dpm_sclk` / `pp_dpm_mclk`: the current level is marked with "*". */
 export function parseDpm(text: string): { curMhz: number | null; maxMhz: number | null } {

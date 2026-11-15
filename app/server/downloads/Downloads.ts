@@ -187,29 +187,28 @@ export class Downloads extends Context.Service<
           });
 
         /** The files of `files` not in place yet (same size), and the bytes they still need (a `.part` counts). */
-        const remaining = <F extends { readonly path: string; readonly size: number }>(
+        const remaining = Effect.fnUntraced(function* <F extends { readonly path: string; readonly size: number }>(
           dir: string,
           files: ReadonlyArray<F>,
-        ) =>
-          Effect.gen(function* () {
-            const left: Array<F> = [];
-            let bytes = 0;
-            for (const file of files) {
-              // Checked when the variant was read from the Hub: a path that leaves the folder never gets here.
-              const dest = yield* Effect.orDie(fileDest(dir, file.path));
-              const placed = yield* sizeAt(dest);
-              if (Option.contains(placed, file.size)) continue;
-              left.push(file);
-              const part = yield* sizeAt(partPath(dest));
-              bytes +=
-                file.size -
-                Math.min(
-                  Option.getOrElse(part, () => 0),
-                  file.size,
-                );
-            }
-            return { files: left, bytes };
-          });
+        ) {
+          const left: Array<F> = [];
+          let bytes = 0;
+          for (const file of files) {
+            // Checked when the variant was read from the Hub: a path that leaves the folder never gets here.
+            const dest = yield* Effect.orDie(fileDest(dir, file.path));
+            const placed = yield* sizeAt(dest);
+            if (Option.contains(placed, file.size)) continue;
+            left.push(file);
+            const part = yield* sizeAt(partPath(dest));
+            bytes +=
+              file.size -
+              Math.min(
+                Option.getOrElse(part, () => 0),
+                file.size,
+              );
+          }
+          return { files: left, bytes };
+        });
 
         /** Refuses `need` bytes more when they do not fit next to what the queue still has to write. */
         const checkSpace = Effect.fnUntraced(function* (dir: string, need: number) {
@@ -325,27 +324,28 @@ export class Downloads extends Context.Service<
             );
 
         /** Runs the transfer until it ends or the item is canceled; a cancel waits for the transfer to stop. */
-        const process = (item: DownloadItem, canceled: Deferred.Deferred<void>) =>
-          Effect.gen(function* () {
-            const fiber = yield* Effect.forkChild(transfer(item, report(item.id)).pipe(Effect.provideContext(context)));
-            const outcome = yield* Effect.raceFirst(
-              Effect.map(Fiber.await(fiber), outcomeOf),
-              Effect.as(Deferred.await(canceled), { _tag: 'canceled' } as const),
-            ).pipe(Effect.onInterrupt(() => Fiber.interrupt(fiber)));
-            if (outcome._tag === 'canceled') yield* Fiber.interrupt(fiber);
-            return outcome;
-          });
+        const process = Effect.fnUntraced(function* (item: DownloadItem, canceled: Deferred.Deferred<void>) {
+          const fiber = yield* Effect.forkChild(transfer(item, report(item.id)).pipe(Effect.provideContext(context)));
+          const outcome = yield* Effect.raceFirst(
+            Effect.map(Fiber.await(fiber), outcomeOf),
+            Effect.as(Deferred.await(canceled), { _tag: 'canceled' } as const),
+          ).pipe(Effect.onInterrupt(() => Fiber.interrupt(fiber)));
+          if (outcome._tag === 'canceled') yield* Fiber.interrupt(fiber);
+          return outcome;
+        });
 
         /** A transfer that gave up: logged (a defect with its cause), the item saved `error`. */
-        const failed = (item: DownloadItem, outcome: Extract<Outcome, { readonly _tag: 'error' }>) =>
-          Effect.gen(function* () {
-            const line = `[llama-webui] download ${item.repo}/${item.key} failed: ${outcome.message}`;
-            yield* Option.match(outcome.defect, {
-              onNone: () => Effect.logError(line),
-              onSome: (cause) => Effect.logError(line, cause),
-            });
-            return yield* repo.setStatus(item.id, 'error', { error: outcome.message, code: outcome.code });
+        const failed = Effect.fnUntraced(function* (
+          item: DownloadItem,
+          outcome: Extract<Outcome, { readonly _tag: 'error' }>,
+        ) {
+          const line = `[llama-webui] download ${item.repo}/${item.key} failed: ${outcome.message}`;
+          yield* Option.match(outcome.defect, {
+            onNone: () => Effect.logError(line),
+            onSome: (cause) => Effect.logError(line, cause),
           });
+          return yield* repo.setStatus(item.id, 'error', { error: outcome.message, code: outcome.code });
+        });
 
         /** Under the lock: the item saved and published with how it ended, nothing running any more. */
         const finish = (id: number, canceled: Deferred.Deferred<void>, outcome: Outcome) =>
@@ -383,17 +383,16 @@ export class Downloads extends Context.Service<
          * A failure that gets out (the database failing…) is logged, and nothing runs any more: the item stays as it
          * was (`downloading`), taken first by the next start, at once when work was added since the loop last looked.
          */
-        const stopped = (cause: Cause.Cause<unknown>) =>
-          Effect.gen(function* () {
-            yield* Effect.logError('[llama-webui] download queue stopped:', cause);
-            yield* SynchronizedRef.updateEffect(state, (s) =>
-              Effect.gen(function* () {
-                if (Option.isSome(s.running)) yield* hub.publish({ type: 'download-progress', payload: null });
-                const idle: State = { loop: Option.none(), running: Option.none() };
-                return (yield* Ref.get(dirty)) ? yield* kicked(idle) : idle;
-              }),
-            );
-          });
+        const stopped = Effect.fnUntraced(function* (cause: Cause.Cause<unknown>) {
+          yield* Effect.logError('[llama-webui] download queue stopped:', cause);
+          yield* SynchronizedRef.updateEffect(state, (s) =>
+            Effect.gen(function* () {
+              if (Option.isSome(s.running)) yield* hub.publish({ type: 'download-progress', payload: null });
+              const idle: State = { loop: Option.none(), running: Option.none() };
+              return (yield* Ref.get(dirty)) ? yield* kicked(idle) : idle;
+            }),
+          );
+        });
 
         /** One item after the other, until none is left. */
         const loop: Effect.Effect<void> = Effect.gen(function* () {

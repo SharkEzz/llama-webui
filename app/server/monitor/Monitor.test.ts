@@ -54,10 +54,11 @@ const RecordingHub = Layer.effect(
   Effect.gen(function* () {
     const published = yield* Published;
     return {
-      publish: (message: WsMessage) =>
+      publish: Effect.fn((message: WsMessage) =>
         message.type === 'snapshot' ? Effect.asVoid(Queue.offer(published, message.payload)) : Effect.void,
+      ),
       size: Effect.succeed(0),
-      attach: () => Effect.void,
+      attach: Effect.fn(() => Effect.void),
     };
   }),
 );
@@ -109,48 +110,49 @@ const patchOf = (options: Options) => ({
 });
 
 /** The monitor on collectors that find no program, the settings of `options` stored first. */
-const monitorLayer = (options: Options) =>
-  Effect.gen(function* () {
-    const repo = yield* SettingsRepo;
-    const settings = yield* repo.patch(patchOf(options));
-    const platform = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const found = Collectors.layerWith({
-      initial: settings,
-      nvmlLib: Option.some(`${MISSING}/libnvidia-ml.so.1`),
-      nvidiaSmi: MISSING,
-      perfBin: MISSING,
-      ...(options.nvmlCommand === undefined ? {} : { nvmlCommand: options.nvmlCommand }),
-      ...(options.readyTimeout === undefined ? {} : { readyTimeout: options.readyTimeout }),
-    }).pipe(Layer.provide(Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, options.spawner ?? platform)));
-    const change = options.collectors;
-    const changed =
-      change === undefined
-        ? found
-        : Layer.effect(
-            Collectors,
-            Collectors.use((original) => Effect.succeed(change(original))),
-          ).pipe(Layer.provide(found));
-    const delay = options.buildDelay;
-    const collectors = delay === undefined ? changed : Layer.unwrap(Effect.as(Effect.sleep(delay), changed));
-    const layer = Monitor.layerWith({
-      modelDiskRetry: '30 seconds',
-      appsEvery: 5,
-      collectors,
-      ...(options.collectorsWait === undefined ? {} : { collectorsWait: options.collectorsWait }),
-    });
-    return { layer, settings };
+const monitorLayer = Effect.fnUntraced(function* (options: Options) {
+  const repo = yield* SettingsRepo;
+  const settings = yield* repo.patch(patchOf(options));
+  const platform = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const found = Collectors.layerWith({
+    initial: settings,
+    nvmlLib: Option.some(`${MISSING}/libnvidia-ml.so.1`),
+    nvidiaSmi: MISSING,
+    perfBin: MISSING,
+    ...(options.nvmlCommand === undefined ? {} : { nvmlCommand: options.nvmlCommand }),
+    ...(options.readyTimeout === undefined ? {} : { readyTimeout: options.readyTimeout }),
+  }).pipe(Layer.provide(Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, options.spawner ?? platform)));
+  const change = options.collectors;
+  const changed =
+    change === undefined
+      ? found
+      : Layer.effect(
+          Collectors,
+          Collectors.use((original) => Effect.succeed(change(original))),
+        ).pipe(Layer.provide(found));
+  const delay = options.buildDelay;
+  const collectors = delay === undefined ? changed : Layer.unwrap(Effect.as(Effect.sleep(delay), changed));
+  const layer = Monitor.layerWith({
+    modelDiskRetry: '30 seconds',
+    appsEvery: 5,
+    collectors,
+    ...(options.collectorsWait === undefined ? {} : { collectorsWait: options.collectorsWait }),
   });
+  return { layer, settings };
+});
 
 /** `test` with a monitor on collectors that find no program, the settings of `options` stored first. */
-const withMonitor = <A, E>(
-  options: Options,
-  test: (monitor: Monitor['Service'], settings: Settings) => Effect.Effect<A, E, Services>,
-) =>
-  Effect.gen(function* () {
+const withMonitor = Effect.fnUntraced(
+  function* <A, E>(
+    options: Options,
+    test: (monitor: Monitor['Service'], settings: Settings) => Effect.Effect<A, E, Services>,
+  ) {
     const { layer, settings } = yield* monitorLayer(options);
     const context = yield* Layer.build(layer);
     return yield* test(Context.get(context, Monitor), settings);
-  }).pipe(Effect.scoped);
+  },
+  (_) => Effect.scoped(_),
+);
 
 /** The next published snapshot, `within` at most. */
 const next = (within: Duration.Input = '2 seconds') =>
@@ -176,12 +178,11 @@ const startFake = Effect.gen(function* () {
 });
 
 /** Stops the fake: its process is gone. */
-const stopFake = (pid: number) =>
-  Effect.gen(function* () {
-    yield* Supervisor.use((supervisor) => supervisor.stop);
-    const alive = yield* isAlive(pid);
-    assert.isFalse(alive);
-  });
+const stopFake = Effect.fnUntraced(function* (pid: number) {
+  yield* Supervisor.use((supervisor) => supervisor.stop);
+  const alive = yield* isAlive(pid);
+  assert.isFalse(alive);
+});
 
 layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) => {
   it.effect('the first snapshot is published and served by latest', () =>

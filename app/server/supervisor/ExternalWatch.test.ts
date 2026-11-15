@@ -14,9 +14,9 @@ import { Supervisor } from './Supervisor.ts';
 
 /** A hub with no client. */
 const SilentHub = Layer.succeed(WsHub, {
-  publish: () => Effect.void,
+  publish: Effect.fn(() => Effect.void),
   size: Effect.succeed(0),
-  attach: () => Effect.void,
+  attach: Effect.fn(() => Effect.void),
 });
 
 /** The supervisor (pids read from `procRoot`) and the settings on a new database. */
@@ -32,50 +32,46 @@ const servicesWith = (procRoot: string) =>
 const watching = Layer.build(ExternalWatch.layerWith({ interval: '100 millis' }));
 
 /** A folder made like `/proc`, naming `pid` as a `llama-server` on `port`. */
-const procNaming = (pid: number, port: number) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const root = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-proc-' });
-    yield* fs.makeDirectory(`${root}/${pid}`);
-    yield* fs.writeFileString(`${root}/${pid}/cmdline`, `llama-server\0--port\0${port}\0`);
-    return root;
-  });
+const procNaming = Effect.fnUntraced(function* (pid: number, port: number) {
+  const fs = yield* FileSystem.FileSystem;
+  const root = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-proc-' });
+  yield* fs.makeDirectory(`${root}/${pid}`);
+  yield* fs.writeFileString(`${root}/${pid}/cmdline`, `llama-server\0--port\0${port}\0`);
+  return root;
+});
 
 /** The state, once `ok` holds (looked at every 10 ms, for 5 s at most). */
-const stateWhen = (ok: (state: ServerState) => boolean) =>
-  Effect.gen(function* () {
-    const supervisor = yield* Supervisor;
-    return yield* supervisor.state.pipe(
-      Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: ok }),
-      Effect.timeout('5 seconds'),
-    );
-  });
+const stateWhen = Effect.fnUntraced(function* (ok: (state: ServerState) => boolean) {
+  const supervisor = yield* Supervisor;
+  return yield* supervisor.state.pipe(
+    Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: ok }),
+    Effect.timeout('5 seconds'),
+  );
+});
 
 /** The `port` setting set to `port`. */
-const portSetting = (port: number) =>
-  Effect.gen(function* () {
-    const settings = yield* SettingsRepo;
-    yield* settings.patch({ port });
-  });
+const portSetting = Effect.fnUntraced(function* (port: number) {
+  const settings = yield* SettingsRepo;
+  yield* settings.patch({ port });
+});
 
 /** Starts the fake on `port` under the supervisor, its `env` holding the `FAKE_*` variables. */
-const startFake = (port: number, env: Readonly<Record<string, string>> = {}) =>
-  Effect.gen(function* () {
-    const supervisor = yield* Supervisor;
-    const profile: Profile = {
-      id: 1,
-      name: 'fake',
-      model: 'm.gguf',
-      args: [],
-      env: { ...env },
-      port,
-      source: 'ui',
-      createdAt: 0,
-      updatedAt: 0,
-    };
-    const cmd = yield* buildCommand({ profile, settings: { ...DEFAULT_SETTINGS, binary: FAKE } });
-    yield* supervisor.start(cmd);
-  });
+const startFake = Effect.fnUntraced(function* (port: number, env: Readonly<Record<string, string>> = {}) {
+  const supervisor = yield* Supervisor;
+  const profile: Profile = {
+    id: 1,
+    name: 'fake',
+    model: 'm.gguf',
+    args: [],
+    env: { ...env },
+    port,
+    source: 'ui',
+    createdAt: 0,
+    updatedAt: 0,
+  };
+  const cmd = yield* buildCommand({ profile, settings: { ...DEFAULT_SETTINGS, binary: FAKE } });
+  yield* supervisor.start(cmd);
+});
 
 layer(NodeServices.layer, { excludeTestServices: true })('ExternalWatch', (it) => {
   it.effect('a llama-server on the settings port is detected at the start, then gone once it stops', () =>

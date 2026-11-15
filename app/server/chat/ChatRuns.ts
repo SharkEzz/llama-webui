@@ -340,46 +340,45 @@ export class ChatRuns extends Context.Service<
          * The rest of a start, under the runs' lock: the conversation takes the target's model when it has none, the
          * reply is stored `streaming` with the target's model, and its run is forked and registered.
          */
-        const begin = (now: ReadonlyMap<number, Run>, start: Start) =>
-          Effect.gen(function* () {
-            const { conversation, target: to, user } = start;
-            const { id } = conversation;
-            // The conversation keeps the model it started with; each reply records its own.
-            if (conversation.modelPath === null && to.modelPath !== null) {
-              yield* repo.setModel(id, to.profileId, to.modelPath);
-            }
-            const history = yield* repo.messages(id);
-            const assistant = yield* repo.addMessage(id, {
-              role: 'assistant',
-              content: '',
-              status: 'streaming',
-              model: to.modelPath,
-            });
-            const started = yield* Clock.currentTimeMillis;
-            const run: Run = {
-              conversationId: id,
-              user,
-              assistant,
-              written: yield* SynchronizedRef.make<Written>({
-                content: '',
-                reasoning: '',
-                writtenAt: started,
-                final: Option.none(),
-              }),
-              events: yield* PubSub.unbounded<ChatEvent>(),
-              stopped: yield* Deferred.make<void>(),
-              ended: yield* Deferred.make<void>(),
-            };
-            const body = buildChatRequest(conversation, history);
-            // A span of its own: the reply outlives the request that started it.
-            yield* Effect.forkIn(
-              consume(run, probeUrl(to.host, to.port), body, started).pipe(
-                Effect.withSpan('ChatRuns.reply', { root: true, attributes: { conversationId: id } }),
-              ),
-              scope,
-            );
-            return [replyOf(run), new Map(now).set(id, run)] as const;
+        const begin = Effect.fnUntraced(function* (now: ReadonlyMap<number, Run>, start: Start) {
+          const { conversation, target: to, user } = start;
+          const { id } = conversation;
+          // The conversation keeps the model it started with; each reply records its own.
+          if (conversation.modelPath === null && to.modelPath !== null) {
+            yield* repo.setModel(id, to.profileId, to.modelPath);
+          }
+          const history = yield* repo.messages(id);
+          const assistant = yield* repo.addMessage(id, {
+            role: 'assistant',
+            content: '',
+            status: 'streaming',
+            model: to.modelPath,
           });
+          const started = yield* Clock.currentTimeMillis;
+          const run: Run = {
+            conversationId: id,
+            user,
+            assistant,
+            written: yield* SynchronizedRef.make<Written>({
+              content: '',
+              reasoning: '',
+              writtenAt: started,
+              final: Option.none(),
+            }),
+            events: yield* PubSub.unbounded<ChatEvent>(),
+            stopped: yield* Deferred.make<void>(),
+            ended: yield* Deferred.make<void>(),
+          };
+          const body = buildChatRequest(conversation, history);
+          // A span of its own: the reply outlives the request that started it.
+          yield* Effect.forkIn(
+            consume(run, probeUrl(to.host, to.port), body, started).pipe(
+              Effect.withSpan('ChatRuns.reply', { root: true, attributes: { conversationId: id } }),
+            ),
+            scope,
+          );
+          return [replyOf(run), new Map(now).set(id, run)] as const;
+        });
 
         /**
          * `prepare` and the start in one step under the runs' lock, uninterrupted: the conversation exists, no run is

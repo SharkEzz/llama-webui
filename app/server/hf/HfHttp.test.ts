@@ -17,15 +17,14 @@ const withHfHttp =
     );
 
 /** The text of a GET of `url`, or the tag of its failure's reason. */
-const textOf = (url: string) =>
-  Effect.gen(function* () {
-    const client = yield* HfHttp;
-    return yield* client.get(url).pipe(
-      Effect.flatMap((res) => res.text),
-      Effect.scoped,
-      Effect.catchTag('HttpClientError', (error) => Effect.succeed(error.reason._tag)),
-    );
-  });
+const textOf = Effect.fnUntraced(function* (url: string) {
+  const client = yield* HfHttp;
+  return yield* client.get(url).pipe(
+    Effect.flatMap((res) => res.text),
+    Effect.scoped,
+    Effect.catchTag('HttpClientError', (error) => Effect.succeed(error.reason._tag)),
+  );
+});
 
 describe('HfHttp', () => {
   it.live('a redirect is the response, with its location, not followed', () =>

@@ -55,8 +55,8 @@ const program = Effect.gen(function* () {
   const started = yield* Ref.make(false);
 
   /** Samples forever; each wait is the interval minus the round's time. A reading that fails ends it. */
-  const sampling = (nvml: Effect.Success<ReturnType<typeof open>>) =>
-    Effect.gen(function* () {
+  const sampling = Effect.fnUntraced(
+    function* (nvml: Effect.Success<ReturnType<typeof open>>) {
       const t0 = yield* Clock.currentTimeMillis;
       const { needs } = yield* Ref.get(config);
       const snapshot = yield* Effect.try({ try: () => readNvml(nvml.lib, nvml.handles, needs), catch: failed });
@@ -64,7 +64,10 @@ const program = Effect.gen(function* () {
       const { intervalMs } = yield* Ref.get(config);
       const t1 = yield* Clock.currentTimeMillis;
       yield* Effect.sleep(Math.max(0, intervalMs - (t1 - t0)));
-    }).pipe(Effect.forever);
+    },
+    // Not `Effect.forever` itself: it would take the function's argument for its options.
+    (effect) => Effect.forever(effect),
+  );
 
   const start = Effect.fnUntraced(
     function* (command: Extract<ToSampler, { readonly type: 'start' }>) {

@@ -15,40 +15,35 @@ import {
 
 const NO_IDS = PciIds.layerWith({ files: [] }).pipe(Layer.provideMerge(NodeServices.layer));
 
-const fx = (name: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    return yield* fs.readFileString(path.resolve(import.meta.dirname, '../../../testdata', name));
-  });
+const fx = Effect.fnUntraced(function* (name: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  return yield* fs.readFileString(path.resolve(import.meta.dirname, '../../../testdata', name));
+});
 
 /** Writes `text` at `file`, creating its folders. */
-const write = (file: string, text: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    yield* fs.makeDirectory(path.dirname(file), { recursive: true });
-    yield* fs.writeFileString(file, text);
-  });
+const write = Effect.fnUntraced(function* (file: string, text: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+  yield* fs.writeFileString(file, text);
+});
 
-const mkdir = (dir: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    yield* fs.makeDirectory(dir, { recursive: true });
-  });
+const mkdir = Effect.fnUntraced(function* (dir: string) {
+  const fs = yield* FileSystem.FileSystem;
+  yield* fs.makeDirectory(dir, { recursive: true });
+});
 
-const link = (target: string, file: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    yield* fs.symlink(target, file);
-  });
+const link = Effect.fnUntraced(function* (target: string, file: string) {
+  const fs = yield* FileSystem.FileSystem;
+  yield* fs.symlink(target, file);
+});
 
 /** A fresh temporary folder, removed with the scope. */
-const tmp = (prefix: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    return yield* fs.makeTempDirectoryScoped({ prefix });
-  });
+const tmp = Effect.fnUntraced(function* (prefix: string) {
+  const fs = yield* FileSystem.FileSystem;
+  return yield* fs.makeTempDirectoryScoped({ prefix });
+});
 
 const drmTree = Effect.fn('drmTree')(function* (full: boolean = false) {
   const path = yield* Path.Path;
@@ -112,13 +107,12 @@ const pciNode = (root: string) =>
   });
 
 /** Exposes `gpu` as drm `card`, the way /sys/class/drm/cardN/device links to the PCI device. */
-const drmCard = (root: string, card: string, gpu: string) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    yield* mkdir(path.join(root, 'drm', card));
-    yield* link(gpu, path.join(root, 'drm', card, 'device'));
-    return path.join(root, 'drm');
-  });
+const drmCard = Effect.fnUntraced(function* (root: string, card: string, gpu: string) {
+  const path = yield* Path.Path;
+  yield* mkdir(path.join(root, 'drm', card));
+  yield* link(gpu, path.join(root, 'drm', card, 'device'));
+  return path.join(root, 'drm');
+});
 
 /**
  * RX 9070 XT behind the chipset, as on the real machine: root port 00:01.1 → chipset upstream 04:00.0 →

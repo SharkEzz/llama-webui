@@ -38,12 +38,11 @@ layer(NodeServices.layer, { excludeTestServices: true })('followProgram', (it) =
             Stream.runForEach((line) => Ref.update(lines, Arr.append(line))),
             Effect.ignore,
           ),
-        onExit: (ended) =>
-          Effect.gen(function* () {
-            const read = yield* Ref.get(lines);
-            yield* Ref.set(seen, read);
-            yield* Ref.set(code, Result.isSuccess(ended) ? ended.success : null);
-          }),
+        onExit: Effect.fnUntraced(function* (ended) {
+          const read = yield* Ref.get(lines);
+          yield* Ref.set(seen, read);
+          yield* Ref.set(code, Result.isSuccess(ended) ? ended.success : null);
+        }),
       });
       yield* program.ended.pipe(Effect.timeout('3 seconds'));
       const seenAtExit = yield* Ref.get(seen);

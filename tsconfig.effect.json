@@ -9,6 +9,9 @@
     "plugins": [
       {
         "name": "@effect/language-service",
+        "extendedKeyDetection": true,
+        "effectFn": ["span", "untraced"],
+        "inlays": true,
         "diagnosticSeverity": {
           "abortControllerInEffect": "error",
           "acquireReleaseDisposable": "error",
@@ -146,7 +149,20 @@
           "unsafeEffectTypeAssertion": "warning",
           // Allowed: most of Effect beyond the core (http, sql, platform…) is still tagged `@stability unstable`
           "unstableApiUsage": "off",
-          "yieldInCallArgument": "warning"
+          "yieldInCallArgument": "warning",
+          "missingReturnYieldStar": "error",
+          "missingStarInYieldEffectGen": "error",
+          "nonObjectEffectServiceType": "warning",
+          "missingLayerContext": "error",
+          "classSelfMismatch": "error",
+          "missingEffectError": "error",
+          "effectFnImplicitAny": "error",
+          "floatingEffect": "warning",
+          "floatingEffectInVitest": "warning",
+          "missingEffectContext": "error",
+          "schemaOpaqueInstanceMember": "warning",
+          "overriddenSchemaConstructor": "warning",
+          "schemaLiteralNonFinite": "warning"
         },
         // Globs are relative to this file; a later entry wins over an earlier one.
         "overrides": [

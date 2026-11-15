@@ -126,11 +126,13 @@ export class DownloadsRepo extends Context.Service<
         );
 
       /** Writes the files of `id` and the size of those done. */
-      const writeFiles = (id: number, files: ReadonlyArray<DownloadFile>) =>
-        Effect.gen(function* () {
-          const json = yield* encodeFiles(files);
-          yield* sql`UPDATE downloads SET ${sql.update({ files_json: json, bytes_done: doneBytes(files) })} WHERE id = ${id}`;
-        });
+      const writeFiles = Effect.fn('DownloadsRepo.writeFiles')(function* (
+        id: number,
+        files: ReadonlyArray<DownloadFile>,
+      ) {
+        const json = yield* encodeFiles(files);
+        yield* sql`UPDATE downloads SET ${sql.update({ files_json: json, bytes_done: doneBytes(files) })} WHERE id = ${id}`;
+      });
 
       const create = Effect.fn('DownloadsRepo.create')(
         function* (input: NewDownload) {

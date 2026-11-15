@@ -6,13 +6,12 @@ import { devMajorMinor, makeDiskSampler, physicalDisks, resolveModelDisk } from 
 import { makeProcSampler } from './proc.ts';
 import { makeSystemSampler } from './system.ts';
 
-const write = (file: string, text: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    yield* fs.makeDirectory(path.dirname(file), { recursive: true });
-    yield* fs.writeFileString(file, text);
-  });
+const write = Effect.fnUntraced(function* (file: string, text: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+  yield* fs.writeFileString(file, text);
+});
 
 const tmp = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;

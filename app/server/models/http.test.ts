@@ -72,7 +72,7 @@ const StuckFs = Layer.effect(
     const paths = yield* Path.Path;
     return FileSystem.FileSystem.of({
       ...fs,
-      remove: (file, options) =>
+      remove: Effect.fn((file, options) =>
         paths.basename(file) === STUCK
           ? Effect.fail(
               PlatformError.systemError({
@@ -83,6 +83,7 @@ const StuckFs = Layer.effect(
               }),
             )
           : fs.remove(file, options),
+      ),
     });
   }),
 );
@@ -132,17 +133,16 @@ const parseJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknow
 const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 /** The status and (when it is JSON) the value of a raw reply. */
-const send = (method: 'GET' | 'POST' | 'DELETE', path: string, body?: string) =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient;
-    const base = HttpClientRequest.make(method)(path);
-    const request = body === undefined ? base : HttpClientRequest.bodyText(base, body, 'application/json');
-    const res = yield* client.execute(request);
-    const text = yield* res.text;
-    const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
-    const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
-    return { status: res.status, json };
-  });
+const send = Effect.fnUntraced(function* (method: 'GET' | 'POST' | 'DELETE', path: string, body?: string) {
+  const client = yield* HttpClient.HttpClient;
+  const base = HttpClientRequest.make(method)(path);
+  const request = body === undefined ? base : HttpClientRequest.bodyText(base, body, 'application/json');
+  const res = yield* client.execute(request);
+  const text = yield* res.text;
+  const isJson = Option.exists(Option.fromNullishOr(res.headers['content-type']), Str.startsWith('application/json'));
+  const json: unknown = isJson && Str.isNonEmpty(text) ? yield* parseJson(text) : undefined;
+  return { status: res.status, json };
+});
 
 /** A JSON reply as the schema reads it: a reply of another shape fails the test. */
 const as = <A, I>(schema: Schema.Codec<A, I>, json: unknown) => Schema.decodeUnknownEffect(schema)(json);
@@ -166,19 +166,21 @@ const workspace = Effect.gen(function* () {
   const models = paths.join(home, 'models');
   const at = (rel: string) => paths.join(models, rel);
   /** Writes a GGUF at `file` (its folders made) and gives its path. */
-  const writeAt = (file: string, kv: Record<string, KvValue> = LLAMA, tensors: FakeTensor[] = TENSORS) =>
-    Effect.gen(function* () {
-      yield* fs.makeDirectory(paths.dirname(file), { recursive: true });
-      yield* Effect.promise(() => writeGguf(file, kv, tensors));
-      return file;
-    });
+  const writeAt = Effect.fnUntraced(function* (
+    file: string,
+    kv: Record<string, KvValue> = LLAMA,
+    tensors: FakeTensor[] = TENSORS,
+  ) {
+    yield* fs.makeDirectory(paths.dirname(file), { recursive: true });
+    yield* Effect.promise(() => writeGguf(file, kv, tensors));
+    return file;
+  });
   const write = (rel: string, kv?: Record<string, KvValue>) => writeAt(at(rel), kv);
-  const writeText = (file: string, text: string) =>
-    Effect.gen(function* () {
-      yield* fs.makeDirectory(paths.dirname(file), { recursive: true });
-      yield* fs.writeFileString(file, text);
-      return file;
-    });
+  const writeText = Effect.fnUntraced(function* (file: string, text: string) {
+    yield* fs.makeDirectory(paths.dirname(file), { recursive: true });
+    yield* fs.writeFileString(file, text);
+    return file;
+  });
   const seed = Effect.gen(function* () {
     const big = [yield* write('org/Big/Big-00001-of-00002.gguf'), yield* write('org/Big/Big-00002-of-00002.gguf')];
     const small = yield* write('small.gguf');
