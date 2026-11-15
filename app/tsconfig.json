@@ -1,8 +1,6 @@
 {
   // The client (`src/`, DOM) and the build scripts (`build/`, `vite.config.ts`, Node). The server has its own project
-  // (`server/tsconfig.json`, Node only), which `typecheck` runs as well. During the Effect rewrite, only what the app
-  // loads is checked: `main.tsx` and what it reaches, and the tests; the pages not ported yet stay as they are, and a
-  // test that reaches one of them is excluded until its page is routed again at its milestone (Vitest still runs it).
+  // (`server/tsconfig.json`, Node only), which `typecheck` runs as well.
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
@@ -13,5 +11,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/main.tsx", "src/*.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "build", "vite.config.ts"]
+  "include": ["src", "build", "vite.config.ts"]
 }
