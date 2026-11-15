@@ -23,7 +23,7 @@ function setupProblem(r: SetupReport): string | null {
 
 /** Home once set up: every profile, started in one click. */
 export function Launchpad() {
-  const [entries, setEntries] = useState<LaunchpadEntry[] | null>(null);
+  const [entries, setEntries] = useState<ReadonlyArray<LaunchpadEntry> | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const view = useServer((s) => s.view);
   const busy = useServer((s) => s.busy);

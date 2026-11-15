@@ -3,10 +3,10 @@ title: Web app
 description: How the React app in app/src is organized, how its zustand stores are fed by REST and the WebSocket, and its conventions for errors, numbers and theming.
 ---
 
-The web app is a React 19 single-page app in `app/src/`, served by the same Nitro server as the API (see
+The web app is a React 19 single-page app in `app/src/`, served by the same server as the API (see
 [Serving the UI](/developers/architecture/#serving-the-ui)): Vite with HMR in development, the output of `vite build`
-(`app/.output/public/`, `index.html` embedded in the server) in production. Its entry is `app/index.html`, which loads
-`app/src/main.tsx`. It imports types, schemas and pure functions from `@llama-webui/shared` and never talks to
+(`app/.output/public/`, read from disk by the server) in production. Its entry is `app/index.html`, which loads
+`app/src/main.tsx`. It imports the API definition, schemas and pure functions from `@llama-webui/shared`, nothing from `app/server/`, and never talks to
 `llama-server` directly: everything goes through the llama-webui API.
 
 ## Structure
@@ -16,8 +16,9 @@ The web app is a React 19 single-page app in `app/src/`, served by the same Nitr
   - `index.html` HTML entry; an inline script applies the theme before the first paint
   - `components.json` shadcn configuration (`base-nova` style)
   - `tsconfig.json` the client and its tests (`src/`, plus `build/` and `vite.config.ts`): DOM and Node types, the `@/*` → `src/*` alias
-  - `vite.config.ts` the client and the Nitro server, one config ([Architecture](/developers/architecture/#serving-the-ui))
-  - `server/` the server, Nitro's `serverDir`: route files, middlewares, and the business code in `lib/`
+  - `vite.config.ts` the client, and the plugin that runs the server in development ([Architecture](/developers/architecture/#serving-the-ui))
+  - `build/` the server's build (`server.ts`, Rolldown), the development server plugin (`devServer.ts`), the licenses
+  - `server/` the server, one folder per domain ([Architecture](/developers/architecture/))
   - `src/`
     - `main.tsx` starts the store syncs and the WebSocket, renders the router
     - `index.css` Tailwind, theme tokens for light and dark, Shiki colors
@@ -31,7 +32,7 @@ The web app is a React 19 single-page app in `app/src/`, served by the same Nitr
       - `home/` Home: `launchpad/` and the first-run `setup/` checklist
       - `dashboard/`, `server/`, `profiles/`, `logs/`, `system/`, `topology/`, `models/` (with `hf/` for downloads), `chat/`, `bench/`, `tuning/`, `settings/`
       - `_placeholder/` the page shown for an unknown path
-    - `lib/` API client, WebSocket client, one zustand store per domain, formatting
+    - `lib/` the typed API client, WebSocket client, one zustand store per domain, formatting
     - `components/` components shared by several pages
       - `glass/` the glass look: `GLASS`, `GlassCard`, `StatTile`, `Gauge`, `AuroraBackground`, tones
       - `charts/` `TimeSeriesChart` (uPlot) and its theme
@@ -58,12 +59,15 @@ trigger, at least as wide as it), and `GlassCard` puts the glass look on the sha
 ```tsx title="app/src/main.tsx"
 startThemeSync();
 startServerSync();
-startMonitorSync();
 startLogsSync();
+startMonitorSync();
 startTopologySync();
-startDownloadsSync();
+startDownloadsSync({ navigate: (to) => void router.navigate(to) });
 useWs.getState().connect();
 ```
+
+`startDownloadsSync` takes the router's navigation, which the Details button of a finished download's toast uses to
+open the model on the Models page: the store does not import the router (which imports the pages).
 
 The benchmark and tuning stores start their own sync the first time their page mounts (`startBenchSync()` in
 `BenchPage`, `startTuningSync()` in `TuningPage`).
@@ -152,10 +156,10 @@ appended afterwards.
 
 ### Chat streaming
 
-`useChat` sends a message with `POST /api/chat/:id/messages` and reads the SSE response with `readSse()`, which feeds
-the shared `SseParser`. `delta` events accumulate and are pushed to the store once per animation frame. Opening a
+`useChat` sends a message with `POST /api/chat/:id/messages` and reads the SSE response with `callStream()`, which
+decodes each event with the endpoint's schema. `delta` events accumulate and are pushed to the store once per animation frame. Opening a
 conversation whose reply is still running (`live: true`) attaches to it with `GET /api/chat/:id/stream`. Switching to
-another conversation aborts the fetch, which only unsubscribes: the generation goes on on the server (see
+another conversation aborts the stream, which only unsubscribes: the generation goes on on the server (see
 [Chat runs](/developers/server/chat/)).
 
 ## WebSocket client
@@ -170,15 +174,16 @@ another conversation aborts the fetch, which only unsubscribes: the generation g
 - **Heartbeat.** The client answers every `ping` with a `pong`. The server sends one every 15 seconds and closes a
   connection that missed two (see [WebSocket](/developers/api/websocket/)).
 - **Dispatch.** `onWs(type, fn)` registers a typed listener for one message type and returns its unsubscribe
-  function. Messages are dispatched by `type`; a message that is not valid JSON is ignored.
+  function. Each frame is decoded with the shared `WsMessage` schema and dispatched by `type`; a frame that does not decode
+(not JSON, an unknown type) is ignored.
 - **HMR.** In development, `import.meta.hot.dispose` closes the socket and clears the retry timer, so a hot update
   of the client does not leave ghost sockets behind.
 
 ### Resynchronizing with bootId
 
 The server sends `hello` with its `bootId` first on every connection. The `bootId` identifies the llama-webui runtime
-and changes when it restarts (in development, when a save of business code under `app/server/lib/` or `packages/`
-rebuilds it), so it tells a reconnection apart from a restart:
+and changes when it restarts (in development, when a save of a file the server imports, under `app/server/` or `packages/`,
+restarts it), so it tells a reconnection apart from a restart:
 
 - `useLogs` ties its lines to the boot (`LogView.bootId`). Log line numbers restart from 0 on every boot, so on a new
   `bootId`, `onBoot()` drops the old lines and the "clear view" marker. The replay on connection asks for
@@ -188,52 +193,51 @@ rebuilds it), so it tells a reconnection apart from a restart:
 
 ## API client and errors
 
-Every API call goes through `api()` (`app/src/lib/api.ts`), which takes the route as `'METHOD /api/path'` and returns
-the reply's body with the type the route declares (see [Typed client](/developers/api/overview/#typed-client)):
+Every API call goes through `call()` (`app/src/lib/api.ts`), the client Effect derives from `Api`, the
+[shared API definition](/developers/shared/#the-api-definition). It takes a function that picks the endpoint and
+returns the reply decoded with the endpoint's schema (see [Typed client](/developers/api/overview/#typed-client)):
 
 ```ts title="app/src/lib/models.ts"
-export const modelUsage = (path: string) => api('GET /api/models/usage', { query: { path } });
+usage: (path) => call((api) => api.models.usage({ query: { path } })),
 ```
 
-The routes, their replies and their inputs come from `Api`, the type map of the generated `app/server/api.gen.ts`, so
-a misspelled route or a missing option does not compile. `params` fills the route's `:id` (a number), `query` takes
-the keys the route file declares, `body` the JSON body: the client sets `content-type: application/json`, which the
-server's guard requires on a write with a body, and sends no body at all when there is no `body`. `signal` aborts the
-request. A route that answers raw JSON, like `/api/server/props`, is typed `unknown` and narrowed with guards
-(`app/src/lib/props.ts`), never with a cast. No code of the web app calls `fetch('/api…')` by hand.
+The groups, the endpoints and their inputs are those of `Api`, so a misspelled endpoint or a missing option does not
+compile. `params` fills the path's `:id`, `query` the query string, `payload` the JSON body; the client encodes the
+payload with the endpoint's schema before sending it, and sets `content-type: application/json`, which the server's
+guard requires on a write with a body. `{ signal }`, the second argument, aborts the request. A reply that is raw
+JSON, like `/api/server/props`, is `unknown` and narrowed with guards (`app/src/lib/props.ts`), never with a cast. No
+code of the web app calls `fetch('/api…')` by hand. A reply that streams, the chat's SSE, goes through
+`callStream(f, onEvent, { signal })`, which decodes each event with the endpoint's schema.
 
-`api()` reads the body as text, parses it when it is JSON (an empty body is `undefined`, as for a `204`) and throws
-an `ApiError` for any status outside 2xx, built by `apiError(status, body)`. The chat's SSE requests,
-`openStream()` in `app/src/lib/chat.ts`, go through `request()`, the same client returning the raw `Response`, and
-build their errors with `apiError()` too; the stream itself is read by `readSse()`:
+A call rejects with:
 
-| Field | Content |
+| Error | When |
 | --- | --- |
-| `status` | The HTTP status, or `0` when the server is unreachable (message `llama-webui server unreachable`). |
-| `message` | The body's `error`, else `HTTP error <status>`. |
-| `issues` | The zod issues of a `400` (`path` and `message`), used to show errors next to their field. |
-| `code` | The body's machine-readable `code`, or `null`. |
+| The endpoint's tagged error | The server answered one of the errors the endpoint declares (`ProfileNameTaken`, `HfGated`, `ServerRunning`…), or a shared one (`RequestInvalid` with its `issues`, `RequestRefused`, `RouteNotFound`). |
+| `RequestInvalid` | Also when the client refuses to send a payload its schema does not encode: the same error the server would answer. |
+| `ApiUnreachable` | The request got no answer (message `llama-webui server unreachable`), or a stream broke off. |
+| `ApiReplyInvalid` | An event of a stream does not decode; the cause is logged to the console. |
 
-The `code` comes from the server's `HttpError(status, message, code)` (`app/server/lib/http.ts`). The rule is that the web app
-never compares the text of a server message: it branches on `status`, `code` or a shared helper. For example, when a
-benchmark would stop the running server, the server answers `409` with `code: "server-running"` and the client asks for
-confirmation:
+The rule is that the web app never compares the text of a server message: it branches on the error's `_tag`
+(`errorTag(e)`, `app/src/lib/api.ts`) or a shared helper. For example, when a benchmark would stop the running
+server, the server answers `409` `ServerRunning` and the client asks for confirmation:
 
 ```ts title="app/src/lib/bench.ts"
-if (e instanceof ApiError && e.code === 'server-running') return 'confirm';
+if (errorTag(e) === 'ServerRunning') return 'confirm';
 ```
 
-Other codes the UI branches on include `name-taken` (a profile name already used) and `hf-gated` or `hf-not-found`
-(Hugging Face). For text stored in the database, shared helpers do the comparison in one place, including the wording
-of earlier versions still present in existing databases:
+Other tags the UI branches on include `ProfileNameTaken` (a profile name already used) and `HfGated` or `HfNotFound`
+(Hugging Face). A type error in a reply is fixed in the shared schema, not with a cast. For text stored in the
+database, shared helpers do the comparison in one place, including the wording of earlier versions still present in
+existing databases:
 
 - `isOomError(error)` (`packages/webui-shared/src/bench.ts`): a benchmark run failed for lack of memory (`OOM_ERROR = 'Out of memory'`
   prefix).
 - `isDefaultTitle(title)` (`packages/webui-shared/src/chat.ts`): a conversation still has its default title
   (`DEFAULT_TITLE = 'New conversation'`) and can be titled automatically.
 
-Validation errors come back field by field: the profile form and the settings editor map `issues[i].path[0]` to their
-fields, and other errors become toasts.
+Validation errors come back field by field: the profile form and the settings editor map the `issues` of a
+`RequestInvalid` (`issues[i].path[0]`) to their fields, and other errors become toasts.
 
 ## Formatting numbers and dates
 

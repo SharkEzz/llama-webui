@@ -9,21 +9,12 @@ catalog:
   tailwindcss: ^4.3.5
   "@tailwindcss/vite": ^4.3.5
   vite: ^8.3.8
-  zod: ^4.6.7
   shiki: ^4.6.0
   "@types/node": ^26.6.6
-minimumReleaseAgeExclude:
-  - "@biomejs/biome@2.6.7"
-  - "@biomejs/cli-android-arm64@2.6.7"
-  - "@biomejs/cli-android-x64@2.6.7"
-  - "@biomejs/cli-darwin-arm64@2.6.7"
-  - "@biomejs/cli-darwin-x64@2.6.7"
-  - "@biomejs/cli-linux-arm64-musl@2.6.7"
-  - "@biomejs/cli-linux-arm64@2.6.7"
-  - "@biomejs/cli-linux-x64-musl@2.6.7"
-  - "@biomejs/cli-linux-x64@2.6.7"
-  - "@biomejs/cli-win32-arm64@2.6.7"
-  - "@biomejs/cli-win32-x64@2.6.7"
-  - lucide-react@1.72.0
-  - hono@4.13.18
-  - "@hono/node-server@2.1.7"
+  # Effect: same version as the vendored reference (repos/effect), every @effect/* package moves with it
+  effect: 4.1.4
+  "@effect/platform-node": 4.1.4
+  "@effect/sql-sqlite-node": 4.1.4
+  "@effect/vitest": 4.1.4
+
+minimumReleaseAge: 60

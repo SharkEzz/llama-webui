@@ -1,6 +1,6 @@
 import { defer, type HistoryDump, type Snapshot } from '@llama-webui/shared';
 import { create } from 'zustand';
-import { api } from './api';
+import { call } from './api';
 import { onWs, useWs } from './ws';
 
 /**
@@ -30,12 +30,13 @@ export function useSeries(key: string): (number | null)[] | undefined {
   return useMonitor.getState().history.series.get(key);
 }
 
+/** A history of the client's own: each series is copied into a mutable array, which `append` grows. */
 function fromDump(d: HistoryDump): ClientHistory {
   return {
     intervalMs: d.intervalMs,
     capacity: d.capacity,
     times: d.times.map((t) => t / 1000),
-    series: new Map(Object.entries(d.series)),
+    series: new Map(Object.entries(d.series).map(([key, values]) => [key, [...values]])),
   };
 }
 
@@ -70,7 +71,7 @@ export async function reloadHistory() {
     pending = [];
   });
   try {
-    const d = await api('GET /api/monitor/history');
+    const d = await call((api) => api.monitor.history());
     const h = fromDump(d);
     for (const s of pending) append(h, s);
     useMonitor.setState((st) => ({ history: h, version: st.version + 1 }));

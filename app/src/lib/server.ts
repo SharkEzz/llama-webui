@@ -1,7 +1,7 @@
 import { defer, type ServerView } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { ApiError, api } from './api';
+import { call } from './api';
 import { onWs, useWs } from './ws';
 
 interface ServerStore {
@@ -14,7 +14,7 @@ export const useServer = create<ServerStore>()(() => ({ view: null, busy: false 
 
 async function refresh() {
   try {
-    const st = await api('GET /api/state');
+    const st = await call((api) => api.server.snapshot());
     useServer.setState({ view: st.server });
   } catch {
     // the WS is open but the API does not answer: the next reconnect will retry
@@ -40,16 +40,17 @@ async function action(send: () => Promise<ServerView>): Promise<boolean> {
     useServer.setState({ view });
     return true;
   } catch (e) {
-    toast.error(e instanceof ApiError ? e.message : String(e));
+    toast.error(e instanceof Error ? e.message : String(e));
     return false;
   }
 }
 
-export const startProfile = (profileId: number) => action(() => api('POST /api/server/start', { body: { profileId } }));
+export const startProfile = (profileId: number) =>
+  action(() => call((api) => api.server.start({ payload: { profileId } })));
 export const switchProfile = (profileId: number) =>
-  action(() => api('POST /api/server/switch', { body: { profileId } }));
-export const restartServer = () => action(() => api('POST /api/server/restart'));
-export const stopServer = () => action(() => api('POST /api/server/stop'));
+  action(() => call((api) => api.server.switch({ payload: { profileId } })));
+export const restartServer = () => action(() => call((api) => api.server.restart()));
+export const stopServer = () => action(() => call((api) => api.server.stop()));
 
 /** The (managed) server is running: it can be stopped, restarted or switched. */
 export const isRunning = (v: ServerView | null) => v?.state.kind === 'starting' || v?.state.kind === 'ready';

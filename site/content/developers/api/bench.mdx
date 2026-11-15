@@ -1,23 +1,24 @@
 ---
 title: Benchmarks
-description: Routes that start, list, cancel and delete benchmark runs with llama-bench or llama-server, turn runs into profiles and list the devices.
+description: Endpoints that start, list, cancel and delete benchmark runs with llama-bench or llama-server, turn runs into profiles and list the devices.
 ---
 
-The benchmark routes run one measurement at a time with `llama-bench` or with a `llama-server` started for the
-purpose, and keep every run in the `bench_runs` table. They live in `app/server/routes/api/bench/`; the spec schema, the
-types and the flag translation are in `packages/webui-shared/src/bench.ts`, the runner, the executor and the server gate in
-`app/server/lib/bench/` (see [Benchmarks and sweeps](/developers/server/bench/)). The user side is described on the
-[Benchmark](/docs/benchmark/) page. Sweep items are runs too: their routes are on the [Sweeps](/developers/api/sweeps/)
+The benchmark endpoints run one measurement at a time with `llama-bench` or with a `llama-server` started for the
+purpose, and keep every run in the `bench_runs` table (`BenchRunsRepo`, `app/server/bench/BenchRunsRepo.ts`). They are
+declared in `BenchApi` (`packages/webui-shared/src/api/BenchApi.ts`) and handled in `app/server/bench/http.ts`; the
+spec schema, the types and the flag translation are in `packages/webui-shared/src/bench.ts`, the runner, the executor
+and the server gate in `app/server/bench/` (see [Benchmarks and sweeps](/developers/server/bench/)). The user side is described on the
+[Benchmark](/docs/benchmark/) page. Sweep items are runs too: their endpoints are on the [Sweeps](/developers/api/sweeps/)
 page.
 
-The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
+The guard, the error shape and the `400` `RequestInvalid` follow the common rules of the [API overview](/developers/api/overview/).
 
 ## Runs and the server gate
 
-`BenchRunner` (`app/server/lib/bench/runner.ts`) accepts one run or one sweep at a time. A run needs the GPUs to itself, so it
-takes the server gate (`BenchGate`, `app/server/lib/bench/gate.ts`): the managed `llama-server` is stopped once when the gate is
-taken and restarted once when it is released. While the gate is held, the server control routes are refused with
-`409 A benchmark is running` (see [Server, state and logs](/developers/api/server/)).
+`BenchRunner` (`app/server/bench/BenchRunner.ts`) accepts one run or one sweep at a time. A run needs the GPUs to
+itself, so it takes the server gate (`makeGate()`, `app/server/bench/gate.ts`, built on the `Supervisor`): the managed `llama-server` is stopped once when the gate is
+taken and restarted once when it is released. While the gate is held, the server control endpoints are refused with
+`409` `BenchRunning` `A benchmark is running` (see [Server, state and logs](/developers/api/server/)).
 
 A run is created with status `running` and executes in the background. Its progress goes over the
 [WebSocket](/developers/api/websocket/):
@@ -30,14 +31,18 @@ A run is created with status `running` and executes in the background. Its progr
 
 ### Gate errors
 
-`BenchRunner` and `BenchGate.acquire()` refuse to start, with a `409`, in these cases. They apply to
-`POST /api/bench/run` and to the routes that start a sweep.
+`BenchRunner` and the gate refuse to start, with a `409`, in these cases (`BenchStartErrors` of `BenchApi`, with
+`BenchFileMissing`). They apply to `POST /api/bench/run` and to the endpoints that start a sweep.
 
-| Message                                                                                         | `code`           | When                                                                   |
-| ----------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------- |
-| `A benchmark is running`                                                                        |                  | A run or a sweep is already running, or the gate is still held.        |
-| `llama-server is running (profile <name>): it will be stopped during the benchmark, then restarted` | `server-running` | The managed server is `starting` or `ready` and the request did not send `stopServer: true`. |
-| `An external llama-server is running on port <port>: stop it first`                             |                  | A `llama-server` that llama-webui did not start holds the port.        |
+| `_tag`                  | Message                                                                                         | When                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `BenchRunning`          | `A benchmark is running`                                                                        | A run or a sweep is already running, or the gate is still held.        |
+| `ServerRunning`         | `llama-server is running (profile <name>): it will be stopped during the benchmark, then restarted` | The managed server is `starting` or `ready` and the request did not send `stopServer: true`. |
+| `ExternalServerRunning` | `An external llama-server is running on port <port>: stop it first`                             | A `llama-server` that llama-webui did not start holds the port.        |
+| `ServerStopTooSlow`     | `llama-server is taking too long to stop: try again`                                            | A stop of `llama-server` already in progress does not end in time.     |
+
+The web app tells them apart by `_tag`: `ServerRunning` asks to confirm, then sends the request again with
+`stopServer: true`.
 | `llama-server is taking too long to stop: try again`                                            |                  | A stop already in progress has lasted more than 60 seconds.            |
 
 `server-running` is a confirmation request: the web app asks the user, then sends the same request again with
@@ -88,7 +93,7 @@ offending index.
 
 ### What each tool runs
 
-`RunExecutor.commandOf()` (`app/server/lib/bench/execute.ts`) builds the command, saved in the run as `command`:
+`commandOf()` (`app/server/bench/execute.ts`) builds the command, saved in the run as `command`:
 
 - **`bench`**: `llama-bench -m <model> -o json --progress -r <r> -p <p> -n <n>` followed by the `params` flags, in the
   source profile's environment. `mmprojPath` and `serverArgs` are not passed: `ignoredByBench()` lists the profile
@@ -153,15 +158,15 @@ status `running` and starts it in the background.
 
 | Field        | Type        | Required | Description                                                                      |
 | ------------ | ----------- | -------- | -------------------------------------------------------------------------------- |
-| `spec`       | `BenchSpec` | yes      | [The run spec](#the-run-spec). Its zod issues have paths relative to `spec`.     |
+| `spec`       | `BenchSpec` | yes      | [The run spec](#the-run-spec). Its issues have paths that start with `spec`.     |
 | `stopServer` | boolean     | no       | `true` allows stopping the managed server for the run (restarted at the end).    |
 
 **Response**: `202` with the created `BenchRun`. The result arrives with the `bench-run` message at the end, or with
 `GET /api/bench/runs`.
 
-**Errors**: `400` `JSON object expected` or an invalid spec; `400` `Model not found: <path>` or
-`Projector not found: <path>`; the
-[gate errors](#gate-errors).
+**Errors**: `400` `RequestInvalid` (no body, or an invalid spec); `403` `ModelPathRefused` `Outside the models folder
+and not used by a profile` (see [Security](/developers/server/security/#paths-the-api-reads-and-writes)); `404`
+`BenchFileMissing` `Model not found: <path>` or `Projector not found: <path>`; the [gate errors](#gate-errors).
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/bench/run \
@@ -238,7 +243,7 @@ Deletes the one-off runs that ended `failed`, `cancelled` or `interrupted`. Swee
 
 **Response**: `200` with `{ deleted: number }`. A `bench-deleted` message lists the ids when there is at least one.
 
-**Errors**: `400` `?failed=1 expected`.
+**Errors**: `400` `RequestInvalid` `Invalid data: ?failed=1 expected (failed)`.
 
 ```bash title="Terminal"
 curl -X DELETE 'http://127.0.0.1:7860/api/bench/runs?failed=1'
@@ -252,7 +257,7 @@ Deletes one run, one-off or sweep item, and broadcasts `bench-deleted`.
 
 **Response**: `204`.
 
-**Errors**: `404` unknown run; `409` `This run is still running: cancel it first`.
+**Errors**: `404` `RunNotFound` `Run not found`; `409` `RunStillRunning` `This run is still running: cancel it first`.
 
 ```bash title="Terminal"
 curl -X DELETE http://127.0.0.1:7860/api/bench/57
@@ -268,8 +273,8 @@ sweep, use [`POST /api/sweeps/:id/cancel`](/developers/api/sweeps/#cancel-a-swee
 
 **Response**: `204`.
 
-**Errors**: `409` `This run is not running` (another run is running, it is already cancelled, or its result is already
-saved).
+**Errors**: `404` `RunNotFound`; `409` `RunNotRunning` `This run is not running` (another run is running, it is
+already cancelled, or its result is already saved).
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/bench/57/cancel
@@ -289,7 +294,7 @@ in `serverArgs`, in their order. A value that does not parse also stays in `serv
 **Response**: `200` with part of a `BenchSpec`: `modelPath`, `mmprojPath`, `profileId`, `params` and `serverArgs`. Add
 `kind` (and `p`, `n`, `r` if needed) to send it to `POST /api/bench/run`.
 
-**Errors**: `404` unknown profile.
+**Errors**: `404` `ProfileNotFound`.
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/bench/from-profile/3
@@ -325,7 +330,7 @@ Any run that is not running can be turned into a profile, sweep items included.
 
 **Response**: `201` with the created `Profile` (see [Profiles](/developers/api/profiles/)).
 
-**Errors**: `404` unknown run; `409` `This run is still running`.
+**Errors**: `404` `RunNotFound`; `409` `RunStillRunning` `This run is still running`.
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/bench/57/to-profile

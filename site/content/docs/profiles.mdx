@@ -142,8 +142,8 @@ saved changes (running requests are interrupted), **Later** keeps it as it is. Y
 
 ## Import and export
 
-**Export all** downloads a file with every profile; **Export** in the editor downloads one. The format is the one
-llama-tui uses for its profiles:
+**Export all** downloads a file with every profile; **Export** in the editor downloads one. The format is a JSON object with
+a `profiles` list:
 
 ```json title="profiles.json"
 {
@@ -163,8 +163,8 @@ llama-tui uses for its profiles:
 
 Only `name` and `model` are required; `mmproj`, `cwd`, `host`, `port`, `args` and `env` are optional.
 
-**Import** accepts a file in that format, a whole llama-tui configuration file (its other settings are ignored), a
-plain array of profiles, or a single profile. Each profile is checked on its own:
+**Import** accepts a file in that format (other top-level keys are ignored), a plain array of profiles, or a single
+profile. Each profile is checked on its own:
 
 - Valid profiles are added.
 - A profile whose name already exists is skipped: an import never overwrites a profile.
@@ -173,10 +173,3 @@ plain array of profiles, or a single profile. Each profile is checked on its own
 
 A notification sums up the result, for example `2 profiles imported, 1 skipped`, and lists the skipped profiles with
 their reasons.
-
-### Import from llama-tui
-
-When you have no profile yet and a llama-tui configuration exists (`~/.config/llama-tui/config.json`, or under
-`$XDG_CONFIG_HOME`), the Profiles page shows a **llama-tui profiles found** card with the names it contains. Click
-**Import** to add them all, with the same rules as a file import. If llama-tui had a default profile and you have
-not started any profile yet, it becomes the one preselected on the Server page. **Dismiss** hides the card for good.

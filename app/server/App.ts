@@ -1,0 +1,126 @@
+import { NodeSocket } from '@effect/platform-node';
+import { Effect, Layer, Schema, String as Str } from 'effect';
+import { DevTools } from 'effect/devtools';
+import { BenchHardware } from './bench/BenchHardware.ts';
+import { BenchRunner } from './bench/BenchRunner.ts';
+import { BenchRunsRepo } from './bench/BenchRunsRepo.ts';
+import { SweepsRepo } from './bench/SweepsRepo.ts';
+import { ChatRuns } from './chat/ChatRuns.ts';
+import { ConversationsRepo } from './chat/ConversationsRepo.ts';
+import { AppConfig } from './config/AppConfig.ts';
+import { AppInfo } from './config/AppInfo.ts';
+import * as Db from './db/Db.ts';
+import { Downloads } from './downloads/Downloads.ts';
+import { DownloadsRepo } from './downloads/DownloadsRepo.ts';
+import { Flags } from './flags/Flags.ts';
+import { PciIds } from './hardware/PciIds.ts';
+import { HfClient } from './hf/HfClient.ts';
+import { HfHttp } from './hf/HfHttp.ts';
+import { HttpLive } from './http/HttpLive.ts';
+import { LlamaHttp } from './llama/LlamaHttp.ts';
+import { LogRing } from './logs/LogRing.ts';
+import { ActiveWrites } from './models/ActiveWrites.ts';
+import { GgufReader } from './models/GgufReader.ts';
+import { ModelCacheRepo } from './models/ModelCacheRepo.ts';
+import { Monitor } from './monitor/Monitor.ts';
+import { Placement } from './monitor/Placement.ts';
+import { ProfilesRepo } from './profiles/ProfilesRepo.ts';
+import { Shutdown } from './runtime/Shutdown.ts';
+import { SettingsRepo } from './settings/SettingsRepo.ts';
+import { ExternalWatch } from './supervisor/ExternalWatch.ts';
+import { Supervisor } from './supervisor/Supervisor.ts';
+import { TuningHardware } from './tuning/TuningHardware.ts';
+import { TuningMemo } from './tuning/TuningMemo.ts';
+import { WsHub } from './ws/WsHub.ts';
+
+/**
+ * The services the routes use, built before the HTTP server opens its port and undone after it closed: the database is
+ * opened (and brought up to date) first. The watch of a server started by hand is built last and undone first: no look
+ * runs while the rest stops; it skips its looks while the bench runner is busy (a benchmark owns the port). The bench
+ * runner is under it, and over what it reads (the monitor's last snapshot, the supervisor): its runs are interrupted
+ * and saved `interrupted` before the rest stops, without restarting llama-server. The monitor, the placement, the chat's replies and the download queue are under it: they
+ * end, the collectors' programs with the monitor, the replies saved and the running transfer stopped (its `.part` kept,
+ * its row left `downloading` for the next start), before the supervisor stops llama-server, while the ring, the hub
+ * they write to and the database are still up. Their shutdown steps (`Shutdown.before`) are registered after the hub's,
+ * so they run before it flushes its last messages. The models are scanned and read on each request (the summaries
+ * cached in the database, the last GGUFs read in memory); the Hub is reached through its own client (`HfClient` on
+ * `HfHttp`, beside `LlamaHttp`), the queue's transfers through `HfHttp`; the downloads a model must not be deleted
+ * under are the queued and running rows of the `downloads` table (`ActiveWrites.layer`). The tuning's hardware sits
+ * beside the bench runner, over the monitor and the bench's hardware it reads; its memos (the last estimate and disk
+ * measure of each model) live with the runtime.
+ */
+const Services = ExternalWatch.layer.pipe(
+  Layer.provideMerge(Layer.mergeAll(BenchRunner.layer, TuningHardware.layer, TuningMemo.layer)),
+  Layer.provideMerge(Layer.mergeAll(Monitor.layer, Placement.layer, ChatRuns.layer, Downloads.layer)),
+  Layer.provideMerge(Supervisor.layer),
+  Layer.provideMerge(Layer.mergeAll(Flags.layer, BenchHardware.layer)),
+  Layer.provideMerge(
+    Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer, HfClient.layer.pipe(Layer.provideMerge(HfHttp.layer))),
+  ),
+  Layer.provideMerge(
+    Layer.mergeAll(
+      WsHub.layer,
+      SettingsRepo.layer,
+      ProfilesRepo.layer,
+      ConversationsRepo.layer,
+      ModelCacheRepo.layer,
+      GgufReader.layer,
+      ActiveWrites.layer.pipe(Layer.provideMerge(DownloadsRepo.layer)),
+      BenchRunsRepo.layer,
+      SweepsRepo.layer,
+    ),
+  ),
+  Layer.provideMerge(AppInfo.layer),
+  Layer.provideMerge(Db.layer),
+);
+
+/** The HTTP server on the services it uses. */
+const Http = HttpLive.pipe(Layer.provide(Services));
+
+/** How long the dev start waits to learn whether the DevTools listen: a refused connection on loopback answers at once. */
+const PROBE_TIMEOUT = '200 millis';
+
+/** Whether something accepts a TCP connection at the host and port of the WebSocket URL `url`. */
+const accepts = (url: string) =>
+  Schema.decodeEffect(Schema.URLFromString)(url).pipe(
+    Effect.flatMap(({ hostname, port, protocol }) =>
+      NodeSocket.makeNet({
+        // `[::1]` is how a URL writes an IPv6 host: a connection takes it without the brackets.
+        host: Str.replace(/^\[(.*)\]$/, '$1')(hostname),
+        port: port === '' ? (protocol === 'wss:' ? 443 : 80) : Number(port),
+        openTimeout: PROBE_TIMEOUT,
+      }),
+    ),
+    Effect.flatMap((socket) => socket.reader),
+    Effect.scoped,
+    Effect.timeout(PROBE_TIMEOUT),
+    Effect.isSuccess,
+  );
+
+/**
+ * In dev (`LLAMA_WEBUI_DEV=1`, set by `vite dev`), the spans go to the Effect DevTools when they run: the DevTools
+ * client waits a second for a first connection, which nothing listening would add to each restart. A production
+ * start never adds them, nor looks for them.
+ */
+const DevToolsInDev = Layer.unwrap(
+  Effect.gen(function* () {
+    const { dev, devToolsUrl } = yield* AppConfig;
+    if (!dev) return Layer.empty;
+    if (yield* accepts(devToolsUrl)) {
+      yield* Effect.logInfo(`Effect DevTools connected (${devToolsUrl})`);
+      return DevTools.layer(devToolsUrl);
+    }
+    yield* Effect.logInfo(`no Effect DevTools at ${devToolsUrl}: start them, then save a server file`);
+    return Layer.empty;
+  }),
+);
+
+/**
+ * The whole application but its configuration. `Shutdown.layerRunner` is built last, so its finalizer is the first
+ * to run when the app stops: the shutdown steps run while the HTTP server still serves and clients are connected.
+ */
+export const App = Shutdown.layerRunner.pipe(
+  Layer.provide(Http),
+  Layer.provide(Shutdown.layer),
+  Layer.provide(DevToolsInDev),
+);

@@ -439,7 +439,7 @@ function TankFill({ id, size, live, color, colors, smoother }: TankFillProps) {
   }, [live]);
   // The model keeps the block's full tone, its KV cache and compute buffers lighter shades; the rest is neutral.
   const shades = useMemo(
-    () => [
+    (): readonly [Color, Color, Color, Color] => [
       color.clone().lerp(WHITE, LAYER_TINT.model),
       color.clone().lerp(WHITE, LAYER_TINT.kv),
       color.clone().lerp(WHITE, LAYER_TINT.compute),
@@ -504,7 +504,7 @@ function TankFill({ id, size, live, color, colors, smoother }: TankFillProps) {
 
 interface CoreGridProps {
   size: Vec3;
-  cores: number[];
+  cores: readonly number[];
   colors: SceneColors;
 }
 

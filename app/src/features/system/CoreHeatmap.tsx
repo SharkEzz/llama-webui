@@ -8,7 +8,7 @@ const STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -
  * One cell per logical core, filled bottom-up (--chart-1) by its load. Each cell is a button (the tooltip also opens from the
  * keyboard), with a roving tabindex: a single Tab stop for the whole grid, arrows and Home/End move through it.
  */
-export function CoreHeatmap({ cores }: { cores: number[] }) {
+export function CoreHeatmap({ cores }: { cores: readonly number[] }) {
   const [active, setActive] = useState(0);
   const list = useRef<HTMLUListElement>(null);
   const current = Math.min(active, Math.max(0, cores.length - 1));

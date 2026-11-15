@@ -1,4 +1,4 @@
-import { api } from './api';
+import { call } from './api';
 
-export const getSetup = () => api('GET /api/setup');
-export const getLaunchpad = () => api('GET /api/launchpad');
+export const getSetup = () => call((api) => api.setup.setup());
+export const getLaunchpad = () => call((api) => api.setup.launchpad());

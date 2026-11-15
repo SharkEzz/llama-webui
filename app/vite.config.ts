@@ -1,72 +1,36 @@
-// The whole app: the web client (`src/`) and the server (`server/`, Nitro's `serverDir`: `routes/`, `middleware/`,
-// `plugins/`; the business code in `server/lib/`). `vite dev` serves both on one port (the server in Nitro's dev worker,
-// reloaded on each save), `vite build` writes `.output/` (`node_server` preset: `.output/server/index.mjs`, client in
-// `.output/public`). Vitest reads the root `vitest.config.ts`, not this file.
-import { execFileSync } from 'node:child_process';
+// The web client (`src/`). `vite build` writes it to `.output/public`, then `build/server.ts` bundles the Effect server
+// (`server/main.ts`) next to it. `vite dev` is the whole dev loop: the UI with HMR, and the server from source under
+// `node --watch` behind `/api` and `/ws` (`build/devServer.ts`). Vitest reads the root `vitest.config.ts`, not this file.
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { nitro } from 'nitro/vite';
-import { build as rolldown } from 'rolldown';
 import { defineConfig } from 'vite';
-import { apiTypes } from './build/apiTypes.ts';
-import { licenses } from './build/licenses.ts';
-import { loadDotEnv } from './server/lib/env.ts';
+import { devServer } from './build/devServer.ts';
+import { applyDotEnv } from './server/config/DotEnv.ts';
 
 const r = (p: string) => resolve(import.meta.dirname, p);
 
-// Development reads `.env` like the production launcher does (the environment wins).
-loadDotEnv();
-
-/** Version shown by `/api/health` and the status bar: the tag, else the short hash, else package.json's version. */
-function version(): string {
+/** `.env` of the current folder, as the production entry reads it: the environment wins (unless it asks otherwise). */
+function readDotEnv(): string | undefined {
   try {
-    return execFileSync('git', ['describe', '--tags', '--always', '--dirty'], { cwd: r('.'), encoding: 'utf8' }).trim();
+    return readFileSync('.env', 'utf8');
   } catch {
-    return (JSON.parse(readFileSync(r('package.json'), 'utf8')) as { version: string }).version;
+    return undefined;
   }
 }
+const dotEnv = readDotEnv();
+// Before the address is read below; the server child inherits the result.
+if (dotEnv !== undefined) applyDotEnv(process.env, dotEnv);
 
-// `server/api.gen.ts` (the route map the web's client is typed by), from Nitro's route scan: at dev start and every
-// build, then on every save under `server/routes/api/`.
-const routeTypes = apiTypes();
-// The licenses of the npm code bundled into the server: collected from Nitro's bundle, written next to it.
-const thirdParty = licenses();
-
-export default defineConfig(({ command }) => ({
-  plugins: [routeTypes.plugin, thirdParty.plugin, react(), tailwindcss(), nitro()],
+export default defineConfig({
+  plugins: [react(), tailwindcss(), devServer()],
   resolve: { alias: { '@': r('src') } },
-  // Build only: `dev` from source keeps its `dev` version.
-  define: command === 'build' ? { LLAMA_WEBUI_VERSION: JSON.stringify(version()) } : {},
-  // Same defaults as the CLI (`server/lib/cli.ts`): local only, port 7860.
+  build: { outDir: '.output/public', emptyOutDir: true },
+  // Same defaults as the server: local only, port 7860.
   server: {
     host: process.env.LLAMA_WEBUI_HOST ?? '127.0.0.1',
     port: Number(process.env.LLAMA_WEBUI_PORT ?? 7860),
     strictPort: true,
   },
-  nitro: {
-    serverDir: './server',
-    preset: 'node_server',
-    features: { websocket: true },
-    errorHandler: './server/error.ts',
-    // `server/lib/` is business code: not scanned for handlers.
-    ignore: ['lib/**'],
-    hooks: {
-      ...routeTypes.hooks,
-      // Two files of their own next to Nitro's server: the NVML sampler, run in a forked child
-      // (`server/lib/collectors/nvml/sampler.ts`, `workerUrl()` resolves it from the chunk `monitor.ts` lands in), and
-      // the launcher (`bin/llama-webui.ts`: the CLI, then `server/index.mjs`). Then `THIRD-PARTY-LICENSES.md`.
-      async compiled(nitro) {
-        const { dir, serverDir } = nitro.options.output;
-        const files = [
-          ['./server/lib/collectors/nvml/worker.ts', join(serverDir, 'nvml-worker.mjs')],
-          ['./bin/llama-webui.ts', join(dir, 'llama-webui.mjs')],
-        ];
-        for (const [input, file] of files)
-          await rolldown({ input, platform: 'node', write: true, output: { file, codeSplitting: false } });
-        thirdParty.write(serverDir);
-      },
-    },
-  },
-}));
+});

@@ -2,7 +2,7 @@
 
 const SAFE = /^[A-Za-z0-9_\-.,:/=@%+]+$/;
 
-export function shellQuote(args: string[]): string {
+export function shellQuote(args: ReadonlyArray<string>): string {
   return args.map((a) => (SAFE.test(a) ? a : `'${a.replaceAll("'", `'\\''`)}'`)).join(' ');
 }
 

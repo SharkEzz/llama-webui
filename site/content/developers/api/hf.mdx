@@ -1,33 +1,38 @@
 ---
 title: Hugging Face
-description: Routes that search the Hugging Face Hub, describe a repository's GGUF variants and run the download queue.
+description: Endpoints that search the Hugging Face Hub, describe a repository's GGUF variants and run the download queue.
 ---
 
-These routes back the download sheet of the [Models](/docs/models/) page: the Hub token status, the search, a
-repository's GGUF variants with what is already on disk, and the download queue. They live in `app/server/routes/api/hf/`;
-the types and the request schema are in `packages/webui-shared/src/hf.ts`, the Hub client and the queue in `app/server/lib/hf/` (see
+These endpoints back the download sheet of the [Models](/docs/models/) page: the Hub token status, the search, a
+repository's GGUF variants with what is already on disk, and the download queue. They are declared
+in `HfApi` and `DownloadsApi` (`packages/webui-shared/src/api/`) and handled in `app/server/hf/http.ts` and
+`app/server/downloads/http.ts`; the types and the request schema are in `packages/webui-shared/src/hf.ts`, the Hub
+client in `app/server/hf/` (`HfClient`, on `HfHttp`) and the queue in `app/server/downloads/` (see
 [Hugging Face downloads](/developers/server/hugging-face/)). The user side is described on the
 [Hugging Face](/docs/hugging-face/) page.
 
-The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
+The guard, the error shape and the `400` `RequestInvalid` follow the common rules of the [API overview](/developers/api/overview/).
 
 ## Hub errors
 
-The Hub client (`app/server/lib/hf/client.ts`) turns every failed Hub call into an `HttpError` with a `code`
-(`hfHttpError()`): it reads the `X-Error-Code` header first, then the status. These codes can come back from
-`GET /api/hf/search`, `GET /api/hf/repo` and `POST /api/downloads`, and they are stored in `DownloadItem.code` when a
-download fails.
+The Hub client (`HfClient`, `app/server/hf/HfClient.ts`) turns every failed Hub call into one of these errors
+(`hubError()`): it reads the `X-Error-Code` header first, then the status. They can come back from
+`GET /api/hf/search`, `GET /api/hf/repo` and `POST /api/downloads` (`HubErrors` of `HfApi`). When a download fails,
+the item keeps the reason as a string in `DownloadItem.code` (the right column).
 
-| Status | `code`             | When                                                                                         |
-| ------ | ------------------ | -------------------------------------------------------------------------------------------- |
-| `403`  | `hf-gated`         | `GatedRepo`, or a `403`: the license of the repository was not accepted on Hugging Face.     |
-| `404`  | `hf-not-found`     | `RepoNotFound`, `RevisionNotFound`, `EntryNotFound`, or a `404` (also a private repository). |
-| `401`  | `hf-unauthorized`  | Hugging Face rejected the token.                                                             |
-| `429`  | `hf-rate-limited`  | Hugging Face rate limit.                                                                     |
-| `502`  | `hf-unreachable`   | Network failure, timeout, any other status, or a response that is not JSON.                  |
+| Status | `_tag`           | `DownloadItem.code` | When                                                                                         |
+| ------ | ---------------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| `403`  | `HfGated`        | `hf-gated`          | `GatedRepo`, or a `403`: the license of the repository was not accepted on Hugging Face.     |
+| `404`  | `HfNotFound`     | `hf-not-found`      | `RepoNotFound`, `RevisionNotFound`, `EntryNotFound`, or a `404` (also a private repository). |
+| `401`  | `HfUnauthorized` | `hf-unauthorized`   | Hugging Face rejected the token.                                                             |
+| `429`  | `HfRateLimited`  |                     | Hugging Face rate limit (a download retries instead).                                       |
+| `502`  | `HfUnreachable`  | `hf-unreachable`    | Network failure, timeout, any other status, or a response that is not JSON.                  |
 
-Each Hub API call times out after 10 seconds. The search and the repository routes pass the client's request signal
-to the Hub call: a client that goes away (a closed sheet, a new keystroke) cancels it.
+Without a token, the messages of `HfGated` and `HfNotFound` say where to set one. Under
+`LLAMA_WEBUI_TEST_OFFLINE=1`, every Hub call fails with `HfUnreachable` `Hugging Face unreachable: fetch failed`.
+
+Each Hub API call times out after 10 seconds. The search and the repository endpoints run their Hub call in the request's fiber: a client
+that goes away (a closed sheet, a new keystroke) interrupts it.
 
 ## Hub
 
@@ -36,7 +41,7 @@ to the Hub call: a client that goes away (a closed sheet, a new keystroke) cance
 <Endpoint method="GET" path="/api/hf/status" />
 
 Says which Hugging Face token llama-webui uses and whose account it is. The token is resolved on every call with the
-rules of the `hf` CLI (`app/server/lib/hf/token.ts`): `HF_TOKEN` (or the legacy `HUGGING_FACE_HUB_TOKEN`), otherwise the file
+rules of the `hf` CLI (`app/server/hf/token.ts`): `HF_TOKEN` (or the legacy `HUGGING_FACE_HUB_TOKEN`), otherwise the file
 `hf auth login` writes (`HF_TOKEN_PATH`, else `$HF_HOME/token`, else `$XDG_CACHE_HOME/huggingface/token`, default
 `~/.cache/huggingface/token`). A login made
 while llama-webui runs is picked up.
@@ -83,7 +88,8 @@ Searches the Hub's model repositories that hold GGUF files (`filter=gguf`), most
 | `lastModified` | string \| null | ISO date of the last change.                     |
 | `gated`        | boolean        | The repository requires accepting a license.     |
 
-**Errors**: `400` `Search text expected (200 characters at most)` when `q` is missing, blank or too long; the
+**Errors**: `400` `RequestInvalid` `Invalid data: Search text expected (200 characters at most) (q)` when `q` is
+missing, blank or too long; the
 [Hub errors](#hub-errors).
 
 ```bash title="Terminal"
@@ -95,9 +101,9 @@ curl 'http://127.0.0.1:7860/api/hf/search?q=qwen3%208b'
 <Endpoint method="GET" path="/api/hf/repo" />
 
 Lists the GGUF files of a repository at a revision, grouped into downloadable variants (`describeRepo()` in
-`app/server/lib/hf/repo.ts`), and checks which ones are already in the models folder.
+`app/server/hf/repo.ts`), and checks which ones are already in the models folder.
 
-Grouping (`groupRepoFiles()` in `app/server/lib/hf/variants.ts`): one variant per `.gguf` file, or one per shard set
+Grouping (`groupRepoFiles()` in `app/server/hf/variants.ts`): one variant per `.gguf` file, or one per shard set
 (`…-00001-of-00003.gguf`, possibly in a subfolder). Files with `mmproj` in their name go to `projectors`; other files
 (README, safetensors, imatrix…) are ignored. Both lists are sorted smallest first.
 
@@ -132,7 +138,9 @@ Grouping (`groupRepoFiles()` in `app/server/lib/hf/variants.ts`): one variant pe
 | `totalBytes` | number                                    | Sum of the file sizes.                                                   |
 | `present`    | `"none"` \| `"partial"` \| `"complete"`     | Local state: all files with the right size, some of them (or a `.part`), or none. |
 
-**Errors**: `400` `Invalid repository id` when `id` is missing or malformed; the [Hub errors](#hub-errors).
+**Errors**: `400` `RequestInvalid` `Invalid data: Invalid repository id: <id> (id)` when `id` is missing or
+malformed; `400` `HfInvalidPath` when a file path of the repository would leave its folder; the
+[Hub errors](#hub-errors).
 
 ```bash title="Terminal"
 curl 'http://127.0.0.1:7860/api/hf/repo?id=unsloth/Qwen3-8B-GGUF'
@@ -168,9 +176,10 @@ curl 'http://127.0.0.1:7860/api/hf/repo?id=unsloth/Qwen3-8B-GGUF'
 
 ## Download queue
 
-The queue (`DownloadQueue` in `app/server/lib/hf/downloader.ts`) downloads one item at a time. Each file goes to
+The queue (`Downloads` in `app/server/downloads/Downloads.ts`, the transfer in `transfer.ts`) downloads one item at a
+time. Each file goes to
 `<file>.part`, is resumed with a `Range` request after an error or a restart, is checked against its sha256, then is
-renamed into place. Items are rows of the `downloads` table, so the queue survives a restart of llama-webui.
+renamed into place. Items are rows of the `downloads` table (`DownloadsRepo`), so the queue survives a restart of llama-webui.
 
 Every change is pushed over the [WebSocket](/developers/api/websocket/):
 
@@ -234,7 +243,7 @@ Queues one or more variants of a repository. The server lists the repository aga
 size are left out, and a variant with nothing left to download is skipped: the response can hold fewer items than
 `keys`, or none.
 
-**Body**: `DownloadRequest` (`DownloadRequestSchema`, `packages/webui-shared/src/hf.ts`), strict.
+**Body**: `DownloadRequest` (`packages/webui-shared/src/hf.ts`), strict.
 
 | Field      | Type     | Required | Description                                                                     |
 | ---------- | -------- | -------- | ------------------------------------------------------------------------------- |
@@ -249,10 +258,13 @@ to write, and refuses the request when the free space of the destination is belo
 
 **Errors**:
 
-- `400`: invalid body; a key listed twice; a file path that would leave the repository folder.
-- `404` `hf-not-found`: a key is not a GGUF of the repository, or the repository or commit does not exist.
-- `409` `already-queued`: one of the variants is already queued or downloading.
-- `507` `disk-full`: not enough free space.
+- `400`: `RequestInvalid` (invalid body); `ListedTwice` `<name> is listed twice`; `HfInvalidPath`, a file path that
+  would leave the repository folder.
+- `404` `HfNotFound`: a key is not a GGUF of the repository (`No GGUF “<key>” in <repo>`), or the repository or
+  commit does not exist.
+- `409` `AlreadyQueued` `<name> is already in the download queue`: one of the variants is already queued or
+  downloading.
+- `507` `DiskFull` `Not enough disk space: <need> to download (plus 1.0 GiB margin), <free> free`.
 - The other [Hub errors](#hub-errors).
 
 ```bash title="Terminal"
@@ -287,7 +299,7 @@ Depends on the item's status:
 
 **Response**: `204`.
 
-**Errors**: `404` unknown item.
+**Errors**: `404` `DownloadNotFound` `Download not found`.
 
 ```bash title="Terminal"
 curl -X DELETE http://127.0.0.1:7860/api/downloads/12
@@ -302,8 +314,8 @@ when the item runs, and those still in place are kept. The disk check is the sam
 
 **Response**: `202` with the requeued `DownloadItem` (status `queued`).
 
-**Errors**: `404` unknown item; `409` `not-finished` (the item is not `error` or `canceled`); `409` `already-queued`
-(the same variant is in the queue again); `507` `disk-full`.
+**Errors**: `404` `DownloadNotFound`; `409` `NotFinished` `Only a failed or canceled download can be retried`; `409`
+`AlreadyQueued` (the same variant is in the queue again); `507` `DiskFull`.
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/downloads/12/retry

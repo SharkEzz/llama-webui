@@ -15,8 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ApiError } from '@/lib/api';
-import { getHfRepo, useDownloads } from '@/lib/downloads';
+import { errorTag } from '@/lib/api';
+import { useDownloads } from '@/lib/downloads';
 import { formatBytes } from '@/lib/format';
 import { useMonitor } from '@/lib/monitor';
 import { cn } from '@/lib/utils';
@@ -45,13 +45,19 @@ function FitBadge({ fit }: { fit: VramFit }) {
 }
 
 /** Projector suggested with a model: F16, else BF16, else the smallest. */
-const preferredProjector = (ps: HfVariant[]) =>
+const preferredProjector = (ps: ReadonlyArray<HfVariant>) =>
   ps.find((p) => p.quant === 'F16') ?? ps.find((p) => p.quant === 'BF16') ?? ps[0] ?? null;
 
 /** Total VRAM of the visible GPUs (0 without a GPU or before the first snapshot). */
 function useVramBytes(): number {
   const gpus = useMonitor((s) => s.snapshot?.allGpus);
   return (gpus ?? []).filter((g) => !g.hidden).reduce((a, g) => a + g.vramTotalBytes, 0);
+}
+
+/** A failed read of the repository: its message, and the tag that tells a gated or an unknown repository. */
+interface RepoError {
+  readonly message: string;
+  readonly tag: string | undefined;
 }
 
 export interface RepoHint {
@@ -79,7 +85,7 @@ export function RepoView({
   notFound?: ReactNode;
 }) {
   const [repo, setRepo] = useState<HfRepo | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
+  const [error, setError] = useState<RepoError | null>(null);
   const [withProjector, setWithProjector] = useState(true);
   const [busy, setBusy] = useState(false);
   const items = useDownloads((s) => s.items);
@@ -100,15 +106,19 @@ export function RepoView({
     const t = setTimeout(
       () => {
         firstLoad.current = false;
-        getHfRepo(id, ac.signal).then(
-          (r) => {
-            setRepo(r);
-            setError(null);
-          },
-          (e: unknown) => {
-            if (!ac.signal.aborted) setError(e instanceof ApiError ? e : new ApiError(0, String(e)));
-          },
-        );
+        useDownloads
+          .getState()
+          .repo(id, ac.signal)
+          .then(
+            (r) => {
+              setRepo(r);
+              setError(null);
+            },
+            (e: unknown) => {
+              if (ac.signal.aborted) return;
+              setError({ message: e instanceof Error ? e.message : String(e), tag: errorTag(e) });
+            },
+          );
       },
       firstLoad.current ? delayMs : 0,
     );
@@ -133,7 +143,7 @@ export function RepoView({
           <AlertTitle>{id}</AlertTitle>
           <AlertDescription>
             <p>{error.message}</p>
-            {error.code === 'hf-gated' && (
+            {error.tag === 'HfGated' && (
               <a
                 className="inline-flex items-center gap-1 underline underline-offset-2"
                 href={`${endpoint}/${id}`}
@@ -145,7 +155,7 @@ export function RepoView({
             )}
           </AlertDescription>
         </Alert>
-        {error.code === 'hf-not-found' && notFound}
+        {error.tag === 'HfNotFound' && notFound}
       </div>
     );
   if (!repo)

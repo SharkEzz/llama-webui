@@ -116,7 +116,8 @@ and power limit, clocks, fan speed, the PCIe link and its traffic, and the VRAM 
 
 If NVML cannot be loaded, or if you turn off **NVML for NVIDIA GPUs** in [Settings](/docs/settings/#monitoring),
 llama-webui polls `nvidia-smi` instead. That fallback reads utilization, VRAM, temperature, power and per-process VRAM,
-but not the PCIe traffic, clocks or fans. The choice between the two is made when llama-webui starts.
+but not the PCIe traffic, clocks or fans. NVML is tried when llama-webui starts. If it stops working later,
+llama-webui starts it again, up to three times in a row, then switches to `nvidia-smi` until the next start.
 
   </Tab>
   <Tab title="AMD">

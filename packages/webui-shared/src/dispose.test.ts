@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { expect, test } from 'vitest';
-import { defer } from './dispose';
+import { defer } from './dispose.ts';
 
 test('defer runs at the end of the block, after a return or a throw, in reverse order', () => {
   const calls: string[] = [];

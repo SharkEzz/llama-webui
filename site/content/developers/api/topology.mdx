@@ -4,9 +4,9 @@ description: The route that returns the machine's PCIe graph read from sysfs and
 ---
 
 `GET /api/topology` returns what the [Topology](/docs/topology/) page draws: the hardware graph (CPU, memory, GPUs,
-NVMe drives, chipsets and their PCIe links) and how the loaded model is split across devices. The route lives in
-`app/server/routes/api/topology.get.ts`; the types and the pure helpers are in `packages/webui-shared/src/topology.ts`, the graph reader in
-`app/server/lib/hardware/pci.ts`, the placement tracker in `app/server/lib/monitor/placement.ts`.
+NVMe drives, chipsets and their PCIe links) and how the loaded model is split across devices. The endpoint is declared
+in `MonitorApi` (`packages/webui-shared/src/api/MonitorApi.ts`) and handled in `app/server/monitor/http.ts`; the types and the pure helpers are in `packages/webui-shared/src/topology.ts`, the graph reader in
+`app/server/hardware/pci.ts`, the placement tracker `Placement` in `app/server/monitor/Placement.ts`.
 
 The guard and the error shape follow the common rules of the [API overview](/developers/api/overview/).
 
@@ -124,7 +124,7 @@ suspended card can answer `0xFFFF` to a config read) is treated as unknown.
 ## The model placement
 
 `ModelPlacement` comes from `llama-server`'s startup logs, since `llama-server` does not expose these figures through
-its API (`parsePlacement()` in `app/server/lib/monitor/placement.ts`). The tracker reads the log ring from the last
+its API (`parsePlacement()` in `app/server/monitor/placementLog.ts`). The tracker reads the log ring from the last
 `[llama-webui] launch:` line: the `using device … (<busId>)` lines, the `… model|KV|RS|compute buffer size = N MiB`
 lines and `offloaded N/M layers to GPU`. A second `offloaded` line opens the draft model and ends the reading of the
 buffers; the projector's buffers and the fitting probes of `-fit` are skipped. NCCL's lines, written with

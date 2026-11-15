@@ -2,7 +2,7 @@ import type { TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/sha
 import { expect, test } from 'vitest';
 import { CLEARANCE, fitCamera, layoutGraph, pathPoint, peerPath, project } from './layout';
 
-const node = (id: string, kind: TopologyNode['kind'], busId?: string): TopologyNode => ({
+const node = (id: string, kind: TopologyNode['kind'], busId?: string | undefined): TopologyNode => ({
   id,
   kind,
   label: id,

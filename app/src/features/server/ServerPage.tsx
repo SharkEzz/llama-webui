@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LogRow } from '@/features/logs/LogRow';
-import { api } from '@/lib/api';
+import { call } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatDuration, formatInt } from '@/lib/format';
 import { useLogs } from '@/lib/logs';
@@ -44,7 +44,7 @@ export function ServerPage() {
 
   useEffect(() => {
     void reload().catch(() => {});
-    void api('GET /api/settings').then(
+    void call((api) => api.settings.get()).then(
       (s) => setDefaultId(s.defaultProfileId),
       () => {},
     );

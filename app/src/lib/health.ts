@@ -1,11 +1,16 @@
 import { create } from 'zustand';
-import { getHealth, type Health } from './api';
+import { call } from './api';
+
+/** The reply of `GET /api/health`. */
+export type Health = Awaited<ReturnType<typeof getHealth>>;
+
+const getHealth = () => call((api) => api.health.get());
 
 interface HealthState {
   health?: Health;
   /** Date.now() when the response arrived, to advance the uptime locally. */
   fetchedAt?: number;
-  error?: string;
+  error?: string | undefined;
   refresh(): Promise<void>;
 }
 

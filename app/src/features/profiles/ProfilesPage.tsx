@@ -1,5 +1,4 @@
-import type { Settings } from '@llama-webui/shared';
-import { profileModelPath } from '@llama-webui/shared';
+import { profileModelPath, type Settings } from '@llama-webui/shared';
 import { Download, Plus, SlidersHorizontal, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -9,13 +8,13 @@ import { GLASS } from '@/components/glass/glass';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/lib/api';
-import { matchingProjector, stem, useModels } from '@/lib/models';
+import { call } from '@/lib/api';
+import { matchingProjector, useModels } from '@/lib/models';
 import { importProfiles, importSummary, useProfiles } from '@/lib/profiles';
 import { isRunning, useServer } from '@/lib/server';
+import { stem } from '@/lib/stem';
 import { cn } from '@/lib/utils';
 import type { Draft } from './draft';
-import { ImportBanner } from './ImportBanner';
 import { ProfileForm } from './ProfileForm';
 
 const basename = (p: string) => p.split('/').pop() ?? p;
@@ -29,10 +28,11 @@ export function ProfilesPage() {
 
   useEffect(() => {
     void reload().catch((e: Error) => toast.error(e.message));
-    api('GET /api/settings').then(setSettings, () => {});
+    call((api) => api.settings.get()).then(setSettings, () => {});
   }, [reload]);
 
   const creating = params.get('new') === '1';
+  // “Create profile” of a model's detail (`?new=1&model=<path>`): the new profile is prefilled from the scanned list.
   const fromModel = creating ? params.get('model') : null;
   const models = useModels((s) => s.list);
   const refreshModels = useModels((s) => s.refresh);
@@ -118,15 +118,13 @@ export function ProfilesPage() {
         />
       </header>
 
-      {loaded && <ImportBanner profileCount={profiles.length} onImported={() => void reload()} />}
-
       {loaded && profiles.length === 0 && !creating ? (
         <Alert className={GLASS}>
           <SlidersHorizontal />
           <AlertTitle>No profiles</AlertTitle>
           <AlertDescription>
             A profile combines the model to load and the llama-server arguments: create one, or import a JSON file
-            exported from llama-webui or llama-tui.
+            exported from llama-webui.
           </AlertDescription>
         </Alert>
       ) : (

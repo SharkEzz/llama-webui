@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
-import { ctxFromArgs } from './bench';
-import { isLoopback } from './setup';
-import { isSetupCheck } from './tuning';
+import { ctxFromArgs } from './bench.ts';
+import { isLoopback } from './setup.ts';
+import { isSetupCheck } from './tuning.ts';
 
 test('isSetupCheck: keeps machine checks, drops those needing a model or a running server', () => {
   for (const id of [

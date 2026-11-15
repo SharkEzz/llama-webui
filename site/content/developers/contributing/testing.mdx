@@ -1,12 +1,15 @@
 ---
 title: Testing
-description: Run the tests (Vitest, node:test) and the type check (tsc), write a test, and use the captured outputs, fake llama-server and llama-bench, fixtures and site checks.
+description: Run the tests (Vitest, @effect/vitest, node:test) and the type check (tsc and the Effect diagnostics), write a test, and use the captured outputs, fake llama-server and llama-bench, fixtures, the contract suite and site checks.
 ---
 
 Tests run on Node with [Vitest](https://vitest.dev) and sit next to the code they test, except those of
 [llamacpp-js](/developers/llamacpp-js/), which use Node's own runner, `node:test`
-([Tests of llamacpp-js](#tests-of-llamacpp-js)). They cover logic rather than screens: parsers fed with real captured outputs from `testdata/`, the estimator, the repositories against SQLite, and the
-benchmark runner driving fake `llama-server` and `llama-bench` binaries.
+([Tests of llamacpp-js](#tests-of-llamacpp-js)). The server's tests are effects, run by
+[`@effect/vitest`](https://effect.website) on the services of the app with an in-memory database. They cover logic
+rather than screens: parsers fed with real captured outputs from `testdata/`, the estimator, the repositories on
+SQLite, the endpoints over HTTP, the supervisor and the benchmark runner driving fake `llama-server` and `llama-bench`
+binaries, and the production build started as a user starts it.
 
 ## Run the tests
 
@@ -25,38 +28,39 @@ It runs two suites one after the other, and is the command CI runs:
 
 `vitest.config.ts` at the root defines one Vitest project per code base: `server` (`app/server/`, `app/build/` and
 `scripts/`), `shared`, `web` (`app/src/`, with the `@/` alias to it) and `site` (with its own `@/` alias). Imports are
-explicit (`import { expect, test } from 'vitest'`), and `oxc.target` is `esnext` so that `using` stays native.
+explicit (`import { expect, test } from 'vitest'`, or `@effect/vitest` for an effect), and `oxc.target` is `esnext` so
+that `using` stays native.
 
-The `server` project has a `globalSetup`, `app/server/lib/testing/build.ts`: before its first test, it runs one
+The `server` project has a `globalSetup`, `app/server/testing/build.ts`: before its first test, it runs one
 production build (`pnpm run build`, into `app/.output`), which the suites that start the app share (contract,
 lifecycle, build output). `LLAMA_WEBUI_TEST_BUILD=0` skips it and reuses the build already there, to rerun a test
 quickly after a change that does not touch the build.
 
 | Command                                            | Runs                                                 |
 | -------------------------------------------------- | ---------------------------------------------------- |
-| `pnpm exec vitest run app/server/lib/bench`        | Test files whose path contains `app/server/lib/bench` |
+| `pnpm exec vitest run app/server/bench`            | Test files whose path contains `app/server/bench`    |
 | `LLAMA_WEBUI_TEST_BUILD=0 pnpm exec vitest run app/server/lifecycle.test.ts` | One file, on the existing build |
 | `pnpm exec vitest run --project web`               | The tests of one project                             |
 | `pnpm exec vitest run -t 'sweep'`                  | Tests whose name matches the regular expression      |
 | `pnpm exec vitest`                                 | Watch mode: reruns the tests a change affects        |
 
-A test has 5 seconds by default. Tests that spawn processes or start the app pass a longer timeout as the third
-argument of `test()` or `beforeAll()` (`}, 20_000);` in `app/server/lib/bench/runner.test.ts`, `90_000` for a
-`vite dev` of `app/server/dev.test.ts`).
+A test has 5 seconds by default. The tests that start `vite dev` pass a longer timeout as the last argument of
+`test()` (`}, 90_000);` in `app/server/dev.test.ts`); an effect that waits bounds its own wait with `Effect.timeout`.
 
 ## Where tests live
 
-A test file sits next to its module: `app/server/lib/bench/parse.test.ts` tests `app/server/lib/bench/parse.ts`. The library
-`llamacpp-js` keeps its tests apart, in `packages/llamacpp-js/tests/` (`tests/metrics.test.ts` tests
-`src/metrics.ts`), so that `src/` holds only what a published package ships.
+A test file sits next to its module: `app/server/bench/parse.test.ts` tests `app/server/bench/parse.ts`, and
+`app/server/<domain>/http.test.ts` the endpoints of a domain. The library `llamacpp-js` keeps its tests apart, in
+`packages/llamacpp-js/tests/` (`tests/metrics.test.ts` tests `src/metrics.ts`), so that `src/` holds only what a
+published package ships.
 
 | Folder     | What the tests cover                                                                                                                                                                      |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/server/`  | Parsers (`nvidia-smi`, AMD sysfs and fdinfo, `perf`, startup logs, PCI topology), GGUF reading and the model scan, `llama-server` command lines, external-server detection, tuning, repositories, the bench runner and gate, chat runs, Hugging Face downloads, the security guard, CLI flags, the setup report, route files, the HTTP contract, the production build, shutdown and the development loop |
-| `app/build/`   | The build plugin that writes `THIRD-PARTY-LICENSES.md` (`licenses.test.ts`); the route map's plugin is tested by `app/server/api.gen.test.ts` |
-| `packages/webui-shared/`  | Pure logic used on both sides: benchmark parameters, profile import, sweeps, chat stats and titles, logs, topology, models, setup checks, Hugging Face inputs, `defer` |
+| `app/server/`  | Parsers (`nvidia-smi`, AMD sysfs and fdinfo, `perf`, startup logs, PCI topology), GGUF reading and the model scan, `llama-server` command lines, the supervisor and external-server detection, tuning, repositories and migrations, the bench runner and gate, chat runs, Hugging Face downloads, the guard and request errors, the configuration and command line, the setup report, the endpoints of each domain, the HTTP contract, the production build, shutdown and the development loop |
+| `app/build/`   | The build plugin that writes `THIRD-PARTY-LICENSES.md` (`licenses.test.ts`) |
+| `packages/webui-shared/`  | Pure logic used on both sides: benchmark parameters, profile import, sweeps, chat stats and titles, logs, topology, models, setup checks, Hugging Face inputs, `defer`; and the schemas (settings, profiles, the messages of `/ws`) |
 | `packages/llamacpp-js/`  | The llama.cpp client: flags from `--help`, the SSE parser, `/metrics` and `/slots`, `llama-bench` output, the health probes, `/props` and the streamed chat completion, `/proc` discovery, and the package's own contract (`tests/package.test.ts`: no app import, `.ts` import paths, one export per module, tree-shaking) |
-| `app/src/` | Pure UI logic: the Topology page's flows, layout, pacing and smoothing (`app/src/features/topology/`), the benchmark form mapping (`app/src/lib/bench.ts`)                                 |
+| `app/src/` | Pure UI logic: the typed client (`app/src/lib/api.ts`), the Topology page's flows, layout, pacing and smoothing (`app/src/features/topology/`), the benchmark form mapping (`app/src/lib/bench.ts`), the profile draft and the error texts of a page |
 | `site/`    | The link checker helpers, the sidebar and content routes, the landing page's telemetry simulation                                                                                         |
 
 `scripts/` holds the tests of the repository itself: the published package's fields (`package.test.ts`) and the
@@ -67,87 +71,103 @@ a plain module next to the page, as `flows.ts` does for the Topology page.
 
 ## Write a test
 
-```ts title="app/server/lib/db/settings.test.ts"
-test('settings: defaults, then a persisted patch', () => {
-  using dir = tempDir('lw-');
-  using db = openDb(join(dir.path, 'sub', 't.sqlite')); // missing subdirectory
-  const repo = new SettingsRepo(db);
-  expect(repo.get()).toEqual(DEFAULT_SETTINGS);
-  expect(repo.patch({ port: 9000 }).port).toBe(9000);
-  expect(new SettingsRepo(db).get().port).toBe(9000);
-  expect(() => repo.patch({ pollIntervalMs: 10 })).toThrow();
-});
+A server test is an effect. `it.effect` of `@effect/vitest` runs it, with its services provided by a layer, and
+asserts with `assert` from the same package:
+
+```ts title="app/server/settings/SettingsRepo.test.ts"
+/** A repository on a new in-memory database, with its client for what the test stores itself. */
+const Fresh = SettingsRepo.layer.pipe(Layer.provideMerge(Db.layerAt(':memory:')));
+
+/** `test` on its own new database. */
+const fresh = <A, E>(test: Effect.Effect<A, E, SettingsRepo | SqlClient.SqlClient>) =>
+  Layer.build(Fresh).pipe(
+    Effect.flatMap((context) => Effect.provideContext(test, context)),
+    Effect.scoped,
+  );
+
+describe('SettingsRepo', () => {
+  it.effect('settings: defaults, then a persisted patch', () =>
+    fresh(
+      Effect.gen(function* () {
+        const repo = yield* SettingsRepo;
+        const initial = yield* repo.get;
+        assert.deepStrictEqual(initial, DEFAULT_SETTINGS);
+        const patched = yield* repo.patch({ port: 9000 });
+        assert.strictEqual(patched.port, 9000);
+        const read = yield* repo.get;
+        assert.strictEqual(read.port, 9000);
+        const refused = yield* Effect.flip(repo.patch({ pollIntervalMs: 10 }));
+        assert.strictEqual(refused._tag, 'SettingsInvalid');
+      }),
+    ),
+  );
 ```
 
-- **Names** are English sentences that state the behavior: `a deleted run's id is never handed out again`,
-  `isOomError recognizes the current and the legacy out-of-memory errors`. A prefix (`setup: …`) or a `describe` block
-  groups the tests of one function.
-- **Temporary directories** come from `tempDir(prefix)` (`app/server/lib/testing/tempDir.ts`). With `using`, the directory is
-  deleted when the test ends, even when it fails. At module level, where `using` would release it before the tests run,
-  call `afterAll(() => dir[Symbol.dispose]())`.
-- **Files** are written with `writeFileDeep(path, data)` (`app/server/lib/testing/write.ts`), which creates the parent
-  directories (fake `/proc` and `/sys` trees), and read with `node:fs/promises`; `writeFileAtomic(path, text)` (same
-  file) replaces a file in one step, as an editor's safe write does. Pauses are `setTimeout` from
-  `node:timers/promises`.
-- **HTTP servers**: `listen(server)` (`app/server/lib/testing/listen.ts`) binds a `node:http` server to a free loopback port
-  and resolves its base URL (a fake `llama-server` endpoint, for example).
-- **Databases**: `openDb(':memory:')` gives a fresh database with every migration applied; `openDb()` on a path in a
-  temporary directory tests a real file.
-- **Dependencies are injected.** Server classes and builders take their collaborators as arguments, so a test passes
-  fakes instead of mocking modules (`vi.fn()` only records callbacks, in `app/server/lib/hf/downloader.test.ts`):
-
-  | Code                              | Injected in tests                                                  |
-  | --------------------------------- | ------------------------------------------------------------------ |
-  | `ChatRuns` (`app/server/lib/chat/runs.ts`) | `fetch`: a fake `llama-server` stream the test feeds chunk by chunk |
-  | `HfClient`, `DownloadQueue` (`app/server/lib/hf/`) | `fetch`: a fake Hub and CDN with `Range` support and scripted failures |
-  | `NvidiaMonitor` (`app/server/lib/collectors/nvidia.ts`) | `spawn`: canned `nvidia-smi` output                        |
-  | `BenchGate` (`app/server/lib/bench/gate.ts`) | A `ServerControl` that records stops and restarts               |
-  | `buildSetupReport`, `buildLaunchpad` (`app/server/lib/setup.ts`) | A `SetupDeps` object                                |
-
-- **`/proc` and `/sys` readers** take the root to read from, so a test writes a small tree in a temporary directory:
-  `readProcAmdVram(pid, root)` reads `<root>/<pid>/fdinfo/*`.
-- **Route files** are tested without a server: `routeApp([[method, path, handler], …])`
-  (`app/server/lib/testing/routes.ts`) mounts the default exports of route files on an h3 app of their own, with the
-  app's error replies (`errorResponse()`), and `app.request(path, init)` answers a `Response`. The handlers read
-  their objects with `deps()`: `provideDeps(deps)` (`app/server/lib/context.ts`, with `using`) makes it answer the
-  test's doubles until the block ends, without building a runtime. `app/server/lib/routes.test.ts` does this for
-  chat, settings and `/props`, and `app/server/lib/bench/runner.test.ts` for `POST /api/sweeps/:id/validate`.
-- **Environment variables** a test sets (the `FAKE_*` switches below) are deleted in an `afterEach`.
-- **Promises** are awaited: `await expect(p).rejects.toThrow()`. Vitest fails a test that leaves a `.resolves` or
-  `.rejects` assertion unawaited.
+- **Names** are English sentences that state the behavior: `a deleted profile's id is never given to a new profile
+  (#38)`, `isOomError recognizes the current and the legacy out-of-memory errors`. A `describe` block, or the name a
+  `layer(…)` gives its tests, groups the tests of one module.
+- **The services** come from layers, never from a mocked module. `layer(L)('Name', (it) => { … })` builds `L` once
+  for the tests of its block and runs its finalizers after them; a test that needs its own state builds its layer
+  inside the test (`fresh` above). `ServicesTest` (`app/server/testing/services.ts`) is the app's services as
+  `App.ts` builds them, on an in-memory database, with the stub monitor (no collector, no snapshot) and shorter
+  durations through each service's `layerWith`; `ServicesWithoutBench` and `ServicesWithoutQueue` are its lower
+  tiers, for a test that builds its own runner or download queue on them.
+- **Time**: `it.effect` runs on the `TestClock`, where a `sleep` waits until the test moves the clock
+  (`TestClock.adjust`). A test on real time (a process, a socket, a schedule) takes `it.live`, or
+  `layer(L, { excludeTestServices: true })` for a whole block.
+- **Errors** are asserted by their tag: `Effect.flip` turns the failure into the value, then
+  `assert.strictEqual(error._tag, 'ProfileNotFound')`.
+- **Endpoints** are tested over real HTTP: `serve(ApiRoutes)` on `ServicesTest` and `ServerTest`
+  (`app/server/testing/http.ts`: a Node server on `127.0.0.1` and a free port, with a client bound to it), through the
+  typed client (`HttpApiTest.groups(Api, ['<group>'])`) or raw requests for what the client would never send
+  ([Add an endpoint](/developers/contributing/how-to/#add-an-endpoint)).
+- **Temporary folders and files** come from `FileSystem` (`fs.makeTempDirectoryScoped({ prefix })`, deleted with the
+  test's scope). Outside an effect, `tempDir(prefix)` (`app/server/testing/tempDir.ts`) with `using` does the same.
+- **`/proc` and `/sys` readers** take the root to read from, so a test writes a small tree in a temporary folder:
+  `readProcAmdVram(pid, { procRoot, skipNodes })` reads `<procRoot>/<pid>/fdinfo/*`.
+- **Programs and HTTP peers**: `app/server/testing/llama.ts` gives the paths of the fake binaries (`FAKE`,
+  `FAKE_BENCH`), `freePort`, `pidAlive(pid)`, `httpStub` (a `node:http` server that answers what the test says),
+  `chatStub` (a fake `llama-server` stream the test feeds chunk by chunk) and `fakeOutside` (a `llama-server` started
+  by someone else). `app/server/testing/hub.ts` is a fake Hugging Face Hub and CDN, with `Range` support and scripted
+  faults. A test that starts a process checks that it is dead at the end.
+- **Ports**: a test takes a free port, never 7860, 7861 or 8080 (where the user's own app and `llama-server` run).
+- **Environment variables** a test sets are owned by its scope (`ownVariable(name, value)`), so they are restored
+  when it ends.
+- **Promises**, in a plain Vitest test, are awaited: `await expect(p).rejects.toThrow()`. Vitest fails a test that
+  leaves a `.resolves` or `.rejects` assertion unawaited.
 
 ### Build, shutdown and development loop
 
 The tests that need the whole app start the production build in a process of its own, as a user does:
-`launch({ dataDir, port?, env? })` (`app/server/lib/testing/launch.ts`) runs `app/.output/llama-webui.mjs` with
-`--host 127.0.0.1`, a free port and the data directory, without the `CI`, `TEST` and `NODE_ENV` variables that a user
-never sets (srvx installs no signal handler under the first two), waits for `/api/health`, and stops it with
-`SIGTERM` when disposed (`await using`). `app/server/lib/testing/seed.ts` prepares what they drive:
-`seedDataDir(dataDir)` writes settings that run the fake `llama-server` and one profile on a tiny GGUF,
-`startLlama(base, profileId)` starts it and resolves its PID, `bootId(base)` reads the `bootId` of the WebSocket's
-`hello`, and `isAlive(pid)` tells whether a process still runs. These files run under Vitest like the others:
+`launch({ dataDir, port?, env? })` (`app/server/testing/launch.ts`) runs `app/.output/llama-webui.mjs` with
+`--host 127.0.0.1`, a free port and the data directory, from the data directory, without the `CI`, `TEST`,
+`NODE_ENV` and `LLAMA_WEBUI_DEV` variables that a user never sets. A data directory without a database gets one whose
+`port` setting is a free port (`seedWatchPort`, `app/server/testing/seed.ts`), so the build never looks at 8080. It
+waits for `/api/health`, and stops the app with `SIGTERM` when disposed (`await using`). These files are plain Vitest
+tests:
 
-- `app/server/lifecycle.test.ts`: a `SIGTERM` with the UI's WebSocket open and a chat reply streaming stops the
-  process in under 2 seconds, `llama-server` included; a second instance on a taken port exits with code 1 and names
-  the port, and leaves alone the streaming reply of a first instance on the same data directory; a missing asset is a
-  `404`, not a `500`; pages are revalidated (`cache-control: no-cache`), hashed assets are immutable, and the API sets no cache
-  header.
-- `app/server/build.test.ts` reads the build of the `globalSetup`: the client is split per page, three.js is only in
-  the Topology chunks, no client chunk imports a `node:` module, a deep URL finds every file its page references,
-  the server imports nothing but Node built-ins (the build is self-contained), `THIRD-PARTY-LICENSES.md` ships next
-  to it, and `nvml-worker.mjs` sits next to the module that names it (where `workerUrl()` looks) and starts from the
-  bundle.
-- `app/server/api.gen.test.ts`: the route map of `app/server/api.gen.ts` is Nitro's own scan (70 routes), the
-  `Body` and `Query` types of each file are read, and in development a route file added or deleted updates the map.
-- `app/server/lib/collectors/nvml/monitor.test.ts` starts the real NVML sampler: with a missing library it resolves `null` at
-  once (the `nvidia-smi` fallback); on a machine with an NVIDIA driver (`/proc/driver/nvidia/version`; skipped in
-  CI) it reads every card; and a sampler stuck in a native call (libc's `sleep()` through `node:ffi`) does not hold
-  the exit of the process that stops it.
+- `app/server/lifecycle.test.ts`:
+  - a second instance on a taken port exits with code 1 and names the port, without touching the data directory of
+    a first instance on the same folder;
+  - `.env` sets a variable, the environment wins over it, and `--env-override` lets `.env` win;
+  - a `SIGTERM` stops the app in under 2 seconds with the UI open (close code 1001), with `llama-server` running
+    (stopped), with a chat reply streaming (ended with `done`, saved `stopped`), during a benchmark (saved
+    `interrupted`, `llama-bench` killed) and during a download (its `.part` kept, resumed by the next start);
+  - an exit without its finalizers leaves no `llama-server`;
+  - a data directory of the Nitro server opens untouched, and the build never connects to the Effect DevTools.
+- `app/server/build.test.ts` reads the build of the `globalSetup`: the launcher starts from an empty folder outside
+  the repository, the server requires nothing but Node built-ins (the build is self-contained), the client imports no
+  `node:` module and each page is a chunk of its own, a deep URL gets the shell, `THIRD-PARTY-LICENSES.md` ships next
+  to the server, and `nvml-worker.mjs` sits next to the module that names it and starts from the bundle.
+- `app/server/collectors/nvml/Nvml.test.ts` drives the NVML sampler: its readings, a sampler that never answers (given
+  up after the ready timeout and killed), one stuck in a native call, one that exits, and the real worker with a
+  missing library (`null`, the `nvidia-smi` fallback).
 - `app/server/dev.test.ts` starts `vite dev` on a free port, in a copy of `app/` under the repository's `.cache/`
-  (ignored by git; its own Nitro and Vite caches, `node_modules` linked entry by entry), so the checkout's files and
-  a `pnpm dev` you run meanwhile are left alone: saving a route file keeps `llama-server` and the `bootId`, saving
-  business code rebuilds the runtime and stops the old `llama-server`, one `SIGINT` (and a quick double one) stops
-  `vite dev` and `llama-server`, with a page open (`/ws`) too and without the worker force-closed after 5 seconds, `.env.local` is read in development, and `.env` wins over it.
+  (ignored by git; `node_modules` linked entry by entry, `devCopy()` of `app/server/testing/devCopy.ts`), so the
+  checkout's files and a `pnpm dev` you run meanwhile are left alone: saving a server file restarts the server (a new
+  `bootId`), saving a web file keeps it, one `SIGINT` (with a page open too), two quick ones and a `SIGHUP` stop
+  `vite dev` and the server, `.env` is read and the environment wins over it, and the server connects to the
+  DevTools address in development only.
 
 ### Tests of llamacpp-js
 
@@ -181,6 +201,7 @@ describe('parseSlots', () => {
   `llamacpp-js`) for the browser: tree-shaking keeps only what one function needs, and the browser-safe modules pull no
   Node built-in. Without an install, as in the Node 24 job, they pass `{ skip }` and Node reports them as skipped.
 
+
 ## Captured outputs
 
 `testdata/` holds real outputs captured from `llama-server`, `llama-bench`, `nvidia-smi` and the kernel. Parsers are
@@ -188,21 +209,25 @@ tested against them rather than against hand-written strings. Biome does not che
 
 | File                                                   | What it is                                               | Read by                                 |
 | ------------------------------------------------------ | -------------------------------------------------------- | --------------------------------------- |
-| `llama-server-help.txt`                                | `llama-server --help`                                    | `packages/llamacpp-js/tests/flags.test.ts`              |
-| `llama-server-load.txt`, `llama-server-load-mtp.txt`, `llama-server-load-mtp-lv5.txt`, `llama-server-load-tensor.txt` | Startup logs (with MTP, at `-lv 5`, and the `Meta()` buffers of `-sm tensor`) | `app/server/lib/monitor/placement.test.ts` |
+| `llama-server-help.txt`                                | `llama-server --help`                                    | `packages/llamacpp-js/tests/flags.test.ts`, `node.test.ts` |
+| `llama-server-load.txt`, `llama-server-load-mtp.txt`, `llama-server-load-mtp-lv5.txt`, `llama-server-load-tensor.txt` | Startup logs (with MTP, at `-lv 5`, and the `Meta()` buffers of `-sm tensor`) | `app/server/monitor/placementLog.test.ts`, `Placement.test.ts` |
 | `metrics-idle.txt`, `metrics-after.txt`                | Prometheus `/metrics`, idle and after generating tokens  | `packages/llamacpp-js/tests/metrics.test.ts` |
 | `slots-idle.json`, `slots-busy.json`                   | `/slots`, idle and busy                                  | `packages/llamacpp-js/tests/metrics.test.ts` |
-| `nvidia-gpu.csv`, `nvidia-apps.csv`                    | `nvidia-smi` CSV queries (GPUs, compute apps)            | `app/server/lib/collectors/nvidia.test.ts`      |
-| `fdinfo-amd-vram.txt`, `fdinfo-amd-igpu.txt`, `fdinfo-other.txt` | `/proc/<pid>/fdinfo` entries (AMD card, AMD iGPU, another driver) | `app/server/lib/collectors/amdgpu.test.ts` |
-| `llama-tui-config.json`                                | A llama-tui configuration to import                      | `packages/webui-shared/src/profile.test.ts`            |
-| `llama-bench/ok.json`, `oom-stdout.json`, `oom-stderr.txt` | `llama-bench -o json` output, and an out-of-memory failure | `packages/llamacpp-js/tests/bench.test.ts`, `app/server/lib/bench/parse.test.ts`, the fake `llama-bench` |
+| `nvidia-gpu.csv`, `nvidia-apps.csv`                    | `nvidia-smi` CSV queries (GPUs, compute apps)            | `app/server/collectors/nvidia.test.ts`      |
+| `fdinfo-amd-vram.txt`, `fdinfo-amd-igpu.txt`, `fdinfo-other.txt` | `/proc/<pid>/fdinfo` entries (AMD card, AMD iGPU, another driver) | `app/server/collectors/amdgpu.test.ts` |
+| `llama-tui-config.json`                                | A file of profiles with other top-level keys, to import  | `packages/webui-shared/src/profile.test.ts`            |
+| `llama-bench/ok.json`, `oom-stdout.json`, `oom-stderr.txt` | `llama-bench -o json` output, and an out-of-memory failure | `packages/llamacpp-js/tests/bench.test.ts`, `app/server/bench/parse.test.ts`, the fake `llama-bench` |
 | `llama-bench/list-devices.txt`                         | `llama-bench --list-devices`                             | `packages/llamacpp-js/tests/bench.test.ts`, the fake `llama-bench` |
 | `fake/`                                                | The fake binaries and the files they serve               | See below                               |
 
 Tests read these files relative to their own location:
 
-```ts title="app/server/lib/collectors/nvidia.test.ts"
-const fx = (n: string) => readFile(`${import.meta.dirname}/../../testdata/${n}`, 'utf8');
+```ts title="app/server/collectors/nvidia.test.ts"
+const fx = Effect.fnUntraced(function* (name: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  return yield* fs.readFileString(path.resolve(import.meta.dirname, '../../../testdata', name));
+});
 ```
 
 The tests of `llamacpp-js` call `fixture(path)` from `packages/llamacpp-js/tests/helpers.ts`, which does the same
@@ -212,7 +237,8 @@ relative to `testdata/`.
 
 `testdata/fake/` holds two stand-ins for the llama.cpp binaries. Each is a shell script that runs its TypeScript
 counterpart with `node` from the `PATH` (a plain Node script: erasable TypeScript, `node:*` APIs only), so a test can
-use it wherever the app expects a binary path.
+use it wherever the app expects a binary path. `app/server/testing/llama.ts` exports their paths, `FAKE` and
+`FAKE_BENCH`.
 
 ### Fake llama-server
 
@@ -226,8 +252,8 @@ it was given:
 - `/slots`, `/metrics` and `/props` serve `slots-busy.json`, `metrics-after.txt` and `props.json` from `testdata/fake/`.
 - `--version` prints a fake build line and exits; `--help` prints a one-flag catalogue and exits.
 
-The bench runner and the parser tests use it (`app/server/lib/bench/runner.test.ts`), as the binary setting of a fake
-configuration.
+The supervisor, the bench runner, the profiles' endpoints, the contract suite and the lifecycle tests use it, as the
+`binary` setting.
 
 Environment variables shape its behavior:
 
@@ -237,6 +263,8 @@ Environment variables shape its behavior:
 | `FAKE_SLOW_ARG`, `FAKE_SLOW_MS`           | A longer load (default 5000 ms) when that argument is present          |
 | `FAKE_FAIL_ARG`                           | Logs a CUDA out-of-memory and exits with 1 when that argument is present |
 | `FAKE_EXIT_LINES`                         | Logs these `\|`-separated lines, then exits with 1                     |
+| `FAKE_TAIL`                               | Writes this last line without its newline                             |
+| `FAKE_ECHO_ENV`                           | `A,B`: logs one line per variable, with its value as the fake sees it |
 | `FAKE_CRASH_ON_PREDICT`                   | Dies mid-request on a `/completion` with that `n_predict`             |
 | `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`        | Reported prompt and generation speeds, draft statistics when `1`      |
 | `FAKE_N_CTX`                              | Simulated context size (default 40192 tokens)                         |
@@ -261,130 +289,141 @@ Environment variables shape its behavior:
 
 ### Use them in a test
 
-The bench runner tests point the `binary` setting at the fake server. Variables set in `process.env` reach the
-spawned fakes; a run can also get them from the profile's environment
-(`profile: () => ({ env: { FAKE_BENCH_OOM: '1' } })`).
+A test points the `binary` setting at the fake server, on a free port. The `env` setting (or a profile's) reaches the
+spawned fakes, as it reaches the real binaries:
 
-```ts title="app/server/lib/bench/runner.test.ts"
-const FAKE = resolve(import.meta.dirname, '../../testdata/fake/fake-llama-server');
-// …
-const executor = new RunExecutor({
-  settings: () => ({ ...DEFAULT_SETTINGS, binary: FAKE, port }),
-  logs,
-  gpus: () => [],
-  disk: () => null,
-  ...deps,
+```ts title="app/server/bench/BenchRunner.test.ts"
+/** The fake as llama-server (llama-bench next to it), with these variables; the trial's port is free. */
+const useFake = Effect.fn(function* (env: Record<string, string> = {}) {
+  const settings = yield* SettingsRepo;
+  const port = yield* freePort;
+  yield* settings.patch({ binary: FAKE, host: '127.0.0.1', port, env }).pipe(Effect.orDie);
 });
+// …
+      yield* useFake({ FAKE_BENCH_OOM: '1' });
 ```
 
-The tests that start server runs (`kind: 'server'`) give each one its own port (`18089` to `18091`).
+Such a test runs on real time (`it.live`), waits for a state with a bounded `Effect.repeat`, and checks that the
+processes it started are gone at the end (`pidAlive`).
 
 ## Fixtures
 
-Two modules build inputs in code, for tests that need a model or a machine:
+Modules and files that build inputs for the tests that need a model, a machine or an old database:
 
-- **`app/server/lib/tuning/fixtures.ts`**
+- **`app/server/testing/tuning.ts`**
   - `fakeModel(o)` returns a complete `ModelInfo`, tensors included, with the sizes you pass: 48 layers by default, an
     embedding and an output of 300 MiB, 100 MiB of attention per layer, and expert tensors (`ffn_gate_exps`,
     `ffn_up_exps`, `ffn_down_exps`, 300 MiB per layer) when `experts` is above 0.
   - `hw3(o)` returns a `TuningHardware`: two 16 GiB CUDA cards, an RX 9070 XT on Vulkan, an iGPU, the Vulkan duplicates of
     the NVIDIA cards and BLAS, with 61 GiB of RAM (55 GiB available unless `ramAvailableGiB` says otherwise).
   - The estimator, placement, system checks and setup tests use them.
-- **`app/server/lib/models/gguf.fixture.ts`**: `writeGguf(path, kv, tensors)` writes a real GGUF v3 file: header, typed key/value
+- **`app/server/testing/gguf.ts`**: `writeGguf(path, kv, tensors)` writes a real GGUF v3 file: header, typed key/value
   pairs (`u32`, `u64`, `f32`, `string`, `u32[]`), tensor infos aligned on 32 bytes, then zero bytes for each tensor. The
-  GGUF reader and model scan tests parse these files instead of shipping models.
+  GGUF reader, model scan and contract tests parse these files instead of shipping models.
+- **`app/server/testing/bench.ts`**: `benchSpec()` and `sweepSpec()`, valid specs to override field by field.
+- **`app/server/testing/fixtures/`**: small programs a test runs with `node` to watch a process from outside: an app
+  whose stop is slow (`slowStop.ts`) or that fails with a tagged error (`fails.ts`), a fake NVML sampler that speaks
+  its protocol (`fakeNvml.ts`), and a process that exits without its finalizers while it runs the fake
+  `llama-server` (`exitWithServer.ts`).
+- **`app/server/db/fixtures/`**: two databases written by the Nitro server, described in its `README.md`
+  ([Migrations on old data](#migrations-on-old-data)).
 
 ## HTTP contract suite
 
-`app/server/lib/contract/` records what the API answers, over real HTTP, so that a change of server framework or runtime has
-to give the same replies. `contract.test.ts` seeds a temporary data directory (the fake `llama-server` as the `binary`
-setting, two profiles, conversations, runs and sweeps), then starts the production build on it with `launch()`. Two
-test settings, read by `boot()` (`app/server/lib/boot.ts`), replace what depends on the machine:
-`LLAMA_WEBUI_TEST_MONITOR=stub` gives a monitor without collectors, and `LLAMA_WEBUI_TEST_OFFLINE=1` a `fetch` that
-fails as offline for Hugging Face. It sends every case, then compares each reply with
-`app/server/lib/contract/golden.json`.
+`app/server/contract/` records what the API answers, over real HTTP, so that a change of server framework or runtime
+has to give the same replies. `contract.test.ts` prepares a temporary data directory (a home of its own with one
+small model, the fake `llama-server` as the `binary` setting), then starts the production build on it with
+`launch()`. Two test settings, read by the services, replace what depends on the machine:
+`LLAMA_WEBUI_TEST_MONITOR=stub` gives a monitor without collectors (`Monitor.layer`), and
+`LLAMA_WEBUI_TEST_OFFLINE=1` makes every Hugging Face request fail as offline (`HfHttp.layer`), hence the `502`
+`HfUnreachable` of the Hub's routes. It sends every case, then compares each reply with
+`app/server/contract/golden.json`.
 
 <FileTree>
-- `app/server/lib/contract/`
-  - `wire.ts`: raw HTTP/1.1 client on `node:net` (`request`, `readSse`): a request without body carries the headers
-    a browser sends, not the ones a `fetch` implementation adds
-  - `cases.ts`: the route table (`ROUTES`), the generated cases, `normalize()`, `runContract()` and `runStreams()`
-  - `contract.test.ts`: seeds the data, launches the build, runs the cases, compares with the golden
+- `app/server/contract/`
+  - `wire.ts`: raw HTTP/1.1 client on `node:net` (`request`, `readSse`): a request carries the headers a browser
+    sends, not the ones a `fetch` implementation adds
+  - `cases.ts`: the cases (`cases()`, with the matrix of the API definition), `normalize()`, `runContract()` and
+    `runStreams()`
+  - `contract.test.ts`: prepares the data, launches the build, runs the cases, compares with the golden
   - `golden.json`: the recorded replies, one entry per case, in run order
 </FileTree>
 
-The cases, generated from `ROUTES`:
+The cases come in three parts:
 
-- every method a path lacks, which must be a 405 with an `Allow` header, and `HEAD` on every path;
-- the reads (`GET`) of every route;
-- an `:id` that is not a number (`x`) and one no row has (`999999`);
-- for each route that reads a JSON body:
-  - malformed JSON;
-  - a JSON value that is not an object;
-  - no body, with and without `Content-Type: application/json`;
-  - a `text/plain` body (415);
-  - one body that breaks the route's schema;
-- a foreign `Origin`, a foreign `Host`, `/api/nope`, a deep SPA URL, `/ws` without an upgrade (426);
-- the calls the web sends without a body (`DELETE`, `POST` with `Content-Length: 0`) or with `{}`;
-- a WebSocket (`hello`, then `ping` → `pong`);
-- a chat reply streamed from the fake server (headers, the first event, and the name of the last one).
+- **the matrix**, generated from the API definition (`HttpApi.reflect(Api, …)`):
+  - every method a path lacks (a `404` `RouteNotFound`: there is no `405`);
+  - for each `:param`, an id that is not a number (`abc`) and one no row has (`999999`);
+  - for each endpoint that reads a body: malformed JSON, a JSON value that is not an object, no body with and without
+    `Content-Type: application/json`, and a `text/plain` body;
+- **the cases written by hand**, each with its kind: `read` and `write` (an endpoint used as the web uses it,
+  llama-server's commands, the settings, the profiles, the flag catalogue, the bench, the Hub and the downloads, the
+  chat, the models folder, the tuning), `violation` (a payload that breaks the schema), `refusal` (a valid request the
+  domain refuses), `guard` (a foreign `Origin` or `Host`, a malformed `Host`), `other` (an unknown path, `/ws`
+  without an upgrade, a trailing slash) and `web` (the UI's files: a deep URL, a hashed asset, a missing one);
+- **the streams** (`runStreams`): `/ws` (`hello`, then `ping` → `pong`), a profile started on the fake
+  `llama-server`, and a chat reply streamed from it, read by `readSse` (headers, the first event, the name of the last
+  one).
 
-The calls that change rows run last, on rows seeded for them.
+The calls that change rows run after the reads, on rows the cases made for them. A test checks that a case covers
+every endpoint of the API definition: a new endpoint fails it until it has a case (the matrix reaches every endpoint
+with a `:param` or a body; write a success for the others). Another checks that no `violation`, `body`, `guard` or `refusal`
+case succeeds.
 
 A reply is recorded with:
 - its status;
-- its `content-type`, `allow`, `cache-control` and `content-disposition` headers;
+- its `content-type`, `allow`, `cache-control`, `content-disposition` and `location` headers;
 - its body (JSON parsed, otherwise text).
 
 Values that change from one run to the next become placeholders: the temporary directory (`<tmp>`), the home
 directory (`<home>`), the repository (`<repo>`), ports (`<port>`), timestamps (`<time>`), UUIDs (`<uuid>`), the content
 hash of a built asset (`/assets/index-<hash>.js`, which changes with any change to the client), and `bootId`,
-`version`, `uptimeMs`, `pid`. A route whose answer depends on the machine (`/api/system/info`, `/api/topology`,
-`/api/tuning/hardware`, `/api/tuning/checks`, `/api/setup`, `/api/launchpad`, `/api/bench/devices`, `/api/flags`)
-records the names of its top-level fields, not their values.
-
-A test also checks that `ROUTES` lists every path of the `ROUTES` that `app/server/api.gen.ts` generates from Nitro's
-scan. A new route file fails it until its path is added to the table, with a `body` entry (methods and one
-schema-breaking body) when it reads JSON.
+`version`, `uptimeMs`, `pid`. An endpoint whose answer depends on the machine (its CPU, its PCI devices) records the
+names of its top-level fields, not their values.
 
 When a change of behaviour is intended, regenerate the golden and read its diff before committing it:
 
 ```bash title="Terminal"
-UPDATE_GOLDEN=1 pnpm exec vitest run app/server/lib/contract/contract.test.ts
-git diff app/server/lib/contract/golden.json
+UPDATE_GOLDEN=1 pnpm exec vitest run app/server/contract/contract.test.ts
+git diff app/server/contract/golden.json
 ```
 
-A failure lists the names of the cases whose reply changed, with the diff of those replies only. Three replies differ
-from those of the Hono server the suite was first recorded on, on purpose: `Host: a b` gets the guard's JSON `400`, the
-pages are the real `index.html` (`text/html; charset=utf-8`), and the chat stream carries h3's own `cache-control`. `golden.json` is written by the test
-and left out of Biome's formatter, so a regeneration changes only the entries that moved.
+A failure lists the names of the cases whose reply changed, with the diff of those replies only. `golden.json` is
+written by the test and left out of Biome, so a regeneration changes only the entries that moved. The suite was
+recorded on the Nitro server and replayed on the Effect server; the replies that changed on purpose are listed in
+`docs/superpowers/poc-effect/behaviours.md` of the repository.
 
 <Callout type="note">
-The golden pins no Hugging Face success (the suite has no network) and no value of the machine-dependent routes: check
-those screens in the running app after a change of framework or runtime.
+The golden pins no Hugging Face success (the suite has no network) and no value of the machine-dependent endpoints:
+check those screens in the running app after a change of framework or runtime.
 </Callout>
 
 ## Migrations on old data
 
-A migration that rewrites existing data gets a test on a database at the schema it starts from, built in the test: no
-local file, so it runs in CI and on a fresh clone. `runMigrations(db, n)` stops at version `n`; the test fills that
-old schema, then `openDb()` applies the rest, as on a user's machine:
+A migration that rewrites existing data gets a test on a database at the schema it starts from. The databases of the
+Nitro server are files of `app/server/db/fixtures/` (`legacy-v16.sqlite`, `legacy-v17.sqlite`, their rows listed in
+its `README.md`), written once by that server's own code: no local file of a user, so the tests run in CI and on a
+fresh clone. A test opens a copy, never the fixture itself, with `Db.layerAt(file)`, which applies what is missing, as
+on a user's machine:
 
-```ts title="app/server/lib/db/sweeps.test.ts"
-test('the migration keeps every run of a J5 database: ids, values and the next id', () => {
-  using dir = tempDir('lw-mig-');
-  const file = join(dir.path, 'db.sqlite');
-  {
-    using j5 = new Database(file);
-    runMigrations(j5, 8); // before sweeps (9) and the AUTOINCREMENT rebuild of bench_runs (10 to 14)
-    // … insert runs, delete one to leave a gap in the ids
-  }
-  using db = openDb(file);
-  // … the same ids and values, the schema version, and the next id after the highest
-});
+```ts title="app/server/db/Db.test.ts"
+  it.effect('an older database is brought up to date: profiles keep their ids and every link to them (#38)', () =>
+    Effect.gen(function* () {
+      const file = yield* tempFile('legacy-v16.sqlite');
+      yield* withDb(file, (sql) =>
+        Effect.gen(function* () {
+          const version = yield* sql`SELECT version FROM schema_version`;
+          assert.deepStrictEqual(version, [{ version: 17 }]);
+          // … the same ids, every link to them, no foreign key violation, and the next id after the highest
+        }),
+      );
+    }),
+  );
 ```
 
-`migrations.test.ts` does the same for the rebuild of `profiles` (version 16), with the links that point to them.
+`Db.test.ts` also checks that a new database gets the schema of the Nitro server, that a database of the Nitro server
+is recognised without replaying anything, that it still opens with the Nitro server afterwards, and that a table
+rebuild that breaks a link fails and is rolled back.
 
 ## Type checking
 
@@ -395,36 +434,52 @@ pnpm check
 The `check` script is `pnpm -r --parallel --include-workspace-root typecheck`: it runs the `typecheck` script of
 every workspace package at the same time. That script is `tsc` in `packages/*`, `tsc && tsc -p server` in `app/`
 (its two projects), `tsc -p scripts` in the root package and `react-router typegen && tsc` in `site/`. One package alone:
-`pnpm --filter <name> typecheck`.
+`pnpm --filter <name> typecheck`. `tsc` is TypeScript 7, the native compiler.
 
 There is no root `tsconfig.json` and no TypeScript project reference: each code base has its own `tsconfig.json`,
-which extends `tsconfig.base.json` (the shared options, `noEmit` among them) and adds its types and its files.
+which extends `tsconfig.base.json` (the shared options, `noEmit` among them), directly or through
+`tsconfig.effect.json`, and adds its types and its files.
 
 | Project                               | Covers                                     | Types                                       |
 | ------------------------------------- | ------------------------------------------ | ------------------------------------------- |
-| `packages/llamacpp-js/tsconfig.json`  | The library's sources and its tests (`tests/`), as a Node user compiles them: `erasableSyntaxOnly`, `exactOptionalPropertyTypes`, NodeNext resolution | Node only (no DOM): a browser-only API fails here |
-| `packages/webui-shared/tsconfig.json` | `@llama-webui/shared` and its tests        | Node, no DOM: a browser-only API fails here |
-| `app/server/tsconfig.json`            | `app/server/` (route files, middlewares, plugins, `lib/`), tests included | Node              |
+| `packages/llamacpp-js/tsconfig.json`  | The library's sources and its tests (`tests/`), as a Node user compiles them: NodeNext resolution | Node only (no DOM): a browser-only API fails here |
+| `packages/webui-shared/tsconfig.json` | `@llama-webui/shared` and its tests, with the Effect diagnostics | Node, no DOM: a browser-only API fails here |
+| `app/server/tsconfig.json`            | `app/server/` and its tests, with the Effect diagnostics | Node              |
 | `scripts/tsconfig.json`               | `scripts/`                                 | Node                                        |
 | `app/tsconfig.json`                   | `app/src/` (tests included), `app/build/` and `app/vite.config.ts` | DOM and Node        |
 | `site/tsconfig.json`                  | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types | DOM and Node |
 
 A project that imports another package checks the sources it reaches with its own options: the server those of
-`llamacpp-js` and `webui-shared`, and `app/tsconfig.json` those of the server that the client reaches through the
-types of `app/server/api.gen.ts` (`import type` only: the client never imports server code at runtime), and those
-`app/vite.config.ts` imports. That is why the client project has Node's types next to the DOM's, so a Node API type
-checks in the client's code. The production build test
-(`app/server/build.test.ts`) checks that no chunk of the client bundle imports a `node:` module. The projects do not
-enable the same options:
+`llamacpp-js` and `webui-shared`, and `app/tsconfig.json` those of `webui-shared`, whose API definition the typed
+client is derived from (the client never imports server code), and those `app/vite.config.ts` imports. That is why
+the client project has Node's types next to the DOM's. The production build test (`app/server/build.test.ts`) checks
+that no chunk of the client bundle imports a `node:` module. The projects do not enable the same options:
 
 | Option                                                          | `tsconfig.base.json` (packages, `app/server/`, `scripts/`) | `app/` | `site/` |
 | --------------------------------------------------------------- | --------------------------- | ------ | ------- |
 | `strict`, `verbatimModuleSyntax`, `noFallthroughCasesInSwitch`  | yes                         | yes    | yes     |
 | `noUncheckedIndexedAccess`                                      | yes                         | yes    | yes     |
 | `noImplicitOverride`                                            | yes                         | yes    | no      |
+| `exactOptionalPropertyTypes`, `erasableSyntaxOnly`              | yes                         | yes    | no      |
 | `noUnusedLocals`, `noUnusedParameters`                          | no                          | yes    | yes     |
 
-With `verbatimModuleSyntax`, type-only imports must use `import type`.
+With `verbatimModuleSyntax`, type-only imports must use `import type`. With `exactOptionalPropertyTypes`, an optional
+property (`x?: T`) takes no `undefined`: write `x?: T | undefined` (or `Schema.optional`) where a caller passes one on,
+or leave the key out. `erasableSyntaxOnly` refuses what Node cannot strip (`enum`, `namespace`, constructor parameter
+properties); relative imports keep their `.ts` extension (`rewriteRelativeImportExtensions`, `allowImportingTsExtensions`
+in `site/`).
+
+### Effect diagnostics
+
+The projects that hold Effect code (the server and `packages/webui-shared`) extend `tsconfig.effect.json`, which
+loads the Effect language service (`@effect/tsgo`, patched into the `tsc` of `node_modules` by the root `prepare`
+script at each `pnpm install`). Its diagnostics come out of `tsc` as `effect(<rule>)` lines, with the severities of
+`diagnosticSeverity`: they are blocking, warnings included, so `pnpm check` prints no `effect(` line. Among them, the
+platform rules refuse `node:*` imports, `fetch`, timers, `JSON` and `process.env` in the server; the few `node:*`
+imports it keeps carry a directive and their reason. The test helpers and the suites that drive the build from outside
+(`testing/`, `contract/`, `lifecycle.test.ts`, `build.test.ts`, `dev.test.ts`) are exempt from those rules, and the
+pure logic of the shared package stays plain TypeScript. `unstableApiUsage` and `apiStabilityLeak` are off: nearly
+every Effect module beyond the core is `@stability unstable`, which is why the Effect version is pinned exactly.
 
 The `.mdx` pages are not type checked; the site build compiles them.
 

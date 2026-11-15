@@ -30,7 +30,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   const [dismissed, setDismissed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   // cmdk assigns the list and option ids itself: read them back for aria-controls / aria-activedescendant.
-  const [aria, setAria] = useState<{ list?: string; active?: string }>({});
+  const [aria, setAria] = useState<{ list?: string | undefined; active?: string | undefined }>({});
 
   const parsed = useMemo(() => parseArgs(value), [value]);
   const at = wordAt(value, cursor);

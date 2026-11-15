@@ -94,7 +94,7 @@ export interface NodeLive {
   /** Tank contents from the bottom up; their sum is the measured fill. Empty: not a tank, or nothing known. */
   layers: TankLayer[];
   /** Load of each CPU thread (0..100); empty for other blocks or without a sample. */
-  cores: number[];
+  cores: readonly number[];
   /** Hidden or suspended card: dimmed, no values. */
   dim: boolean;
   /** Figure shown under the name; null = the name alone. */

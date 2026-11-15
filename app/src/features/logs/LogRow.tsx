@@ -25,7 +25,7 @@ export function LogRow({ line, query, className }: { line: LogLine; query?: stri
   );
 }
 
-function Highlight({ text, query }: { text: string; query?: string }) {
+function Highlight({ text, query }: { text: string; query?: string | undefined }) {
   if (!query) return text;
   const i = text.toLowerCase().indexOf(query.toLowerCase());
   if (i < 0) return text;

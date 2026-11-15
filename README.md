@@ -56,7 +56,7 @@ one dashboard designed for a **single machine you own**:
 - **Profiles** store a model, an optional multimodal projector, a working directory, `llama-server` arguments and
   environment variables. The argument editor has syntax highlighting, **flag autocompletion and inline help** parsed
   from your own `llama-server --help`.
-- Import/export profiles as JSON, including a one-click import of existing llama-tui profiles.
+- Import/export profiles as JSON.
 - The server page shows the **effective command line**, `/props` info (quantization, context, slots, modalities,
   llama.cpp build) and the latest logs.
 - The child process is tied to llama-webui (`setpriv --pdeathsig`), so it never outlives it.
