@@ -635,6 +635,16 @@ Found while porting E8, accepted with its result:
 - The contract cases of the routes that read the machine (hardware, checks, estimate, plan, setup, launchpad) are
   `machine: true` (the golden records the names of their fields, not the body), as `GET /api/system/info`.
 
+Found by the review pass of E8 (against its plan and `behaviours.md` § E8):
+
+- Every task of the plan is done: the legacy files of the domain are deleted (`lib/tuning/`, `lib/setup.ts`,
+  `lib/bench/hardware.ts`, the routes `tuning/*`, `setup.get.ts`, `launchpad.get.ts`, `sweeps/index.post.ts`, their
+  tests); `/` and `/tuning` are in `PORTED`, `/setup` is its route, `MILESTONE_BY_PATH` is empty; the Checks card and
+  "Run setup again" are back; the contract replays the 8 endpoints with their `violation` and `refusal` cases.
+- The handlers keep the legacy order where it shows: the disk measure checks the runner before it reads the model; the
+  creation loads the GGUF, then claims the runner, whose `check` refuses an empty plan.
+- `behaviours.md` said `/setup` was in `PORTED`: it is `/tuning`. Fixed. No code change.
+
 ## Measures (`e<N>.json`)
 
 The startup and shutdown medians of `scripts/poc/measure.ts` depend on the machine's load at the time: `e5.json`
