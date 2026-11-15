@@ -337,10 +337,13 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
   step. It publishes the last event itself (`done`), so the clients' streams end before the HTTP server closes.
 - **A /ws message**: a `Schema.Struct({ type: Schema.Literal('…'), payload })` in `packages/webui-shared/src/ws.ts`,
   added to the `WsMessage` union, sent with `WsHub.publish`.
-- **A contract case**: an `add(kind, name, req)` in `cases()` of `app/server/contract/cases.ts` for each endpoint of the
-  group (the coverage test fails without one: `covers(endpoint, req)` matches a `:param` with any non-empty segment),
-  a `violation`, `body` or `guard` case for what the edge refuses and a `refusal` case for what the domain refuses
-  (a 404 of a missing row, a 409), then `UPDATE_GOLDEN=1` and read the diff of `golden.json`. A case that needs a
+- **A contract case**: the matrix of `cases.ts` (`matrix()`, from `HttpApi.reflect`) already gives every endpoint
+  the methods its path lacks, a bad and an unknown id of each `:param` (an endpoint with a payload sends `{}`) and the
+  five broken bodies of a payload: nothing to write for those. By hand, an `add(kind, name, req)` in `cases()` of
+  `app/server/contract/cases.ts`: a success for an endpoint the matrix does not reach (the coverage test fails
+  without a case: `covers(endpoint, req)` matches a `:param` with any non-empty segment), a `violation` for a body the
+  schema refuses, a `refusal` for what the domain refuses beyond an unknown id (a 409, a missing file), a `guard`
+  case for the guard; then `UPDATE_GOLDEN=1` and read the diff of `golden.json`. A case that needs a
   setting sets it with a `PATCH /api/settings` case just before it; a file or a program it needs comes through the
   context of `cases()` (`Binaries`: the fake llama-server of `testdata/fake/`, a path in the run's temporary folder),
   and its paths are recorded as `<repo>`, `<tmp>` or `<home>`, never as they are on this machine. A reply that depends

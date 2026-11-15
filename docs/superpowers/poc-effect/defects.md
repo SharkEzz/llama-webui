@@ -673,6 +673,15 @@ Decided (the E9 plan):
   smoke, the tarball smoke, the site's build and links; the `llamacpp-js` job under Node 24.22.3 on a copy without
   `node_modules` (63 pass, the 2 bundling checks skipped).
 
+Found by the review pass of E9 (against its plan and the spec's row):
+
+- Every task of the plan is done; every `ported` or `rewritten` entry of the inventory names a test that exists.
+- The coverage test counts the matrix's cases: nine endpoints (the downloads' delete and retry, the bench's
+  `from-profile`, cancel and `to-profile`, a sweep's get, delete, cancel and resume) are covered by their unknown id
+  only, as before E9, when that was their one hand-written case. Kept: a success of theirs needs a finished run, a
+  sweep or a download, which the black-box contract does not set up (their unit tests do). `conventions.md` now says
+  what the matrix gives and what is still written by hand.
+
 ## Measures (`e<N>.json`)
 
 The startup and shutdown medians of `scripts/poc/measure.ts` depend on the machine's load at the time: `e5.json`
