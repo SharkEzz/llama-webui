@@ -140,8 +140,8 @@ requirement of this plan).
   - `checks.ts`: `runChecks`, `summarize`.
 - [ ] Multi-parameter exports take one options object or `dual` (`missingPipeableSignature`).
 - [ ] Port their legacy tests (estimate 13, placement 9, match 3, checks 4, from the inventory) as plain
-  `describe`/`it` tests (conventions, "A pure step"). Add tests for the lines of "Not covered by a test" that are
-  pure:
+      `describe`/`it` tests (conventions, "A pure step"). Add tests for the lines of "Not covered by a test" that are
+      pure:
   - `--mlock`, `--numa`, the `slow generation` and `everything in RAM` warnings, `model too large`;
   - `invalid -ot pattern`, and the KV of MTP, recurrent and sliding-window layers;
   - hidden and suspended cards, `retainedBusIds` without devices;
@@ -154,12 +154,12 @@ requirement of this plan).
   - a runner that imports both sides, generates the grid, reads the GGUF headers of the local models through the
     new `GgufReader` (the same `ModelInfo` feeds both sides), and compares `JSON` of each output.
 - [ ] Any difference is either a bug of the port (fixed, with a test) or a Call 6 deviation (listed). Record the
-  counts (inputs, outputs equal, deviations).
+      counts (inputs, outputs equal, deviations).
 
 ### Task 4: The reads and the services
 
 - [ ] `tuning/models.ts`: `loadModel(path)` (the 400, 404 and 422 of Call 3, through `GgufReader.read`) and
-  `mmprojBytes(path | null)` (0, the size, or 404).
+      `mmprojBytes(path | null)` (0, the size, or 404).
 - [ ] `tuning/disk.ts`: `measureDiskSpeed({ path, fileBytes, offsetFraction? })`:
   - up to 1 GiB from a random offset, refused under 64 MiB;
   - read by `fs.stream(path, { offset, bytesToRead, chunkSize: 1 MiB })` and timed with `Clock`;
@@ -216,19 +216,19 @@ requirement of this plan).
 ### Task 6: The web
 
 - [ ] `app/src/lib/tuning.ts` and `app/src/lib/setup.ts` move to `call((api) => …)`. An error is told by its `_tag`
-  (`ServerRunning` → confirm, as in `lib/bench.ts`). `tuning.test.ts` comes out of the `exclude` of
-  `app/tsconfig.json`.
+      (`ServerRunning` → confirm, as in `lib/bench.ts`). `tuning.test.ts` comes out of the `exclude` of
+      `app/tsconfig.json`.
 - [ ] `features/tuning/*`, `features/home/**` and `features/system/ChecksCard.tsx` follow the store; `ModelCard.tsx`
-  reads `@/lib/models`.
+      reads `@/lib/models`.
 - [ ] `/` and `/tuning` go into `PORTED` and out of `MILESTONE_BY_PATH`. The Checks card goes back into `SystemPage.tsx`,
-  and "Run setup again" back into Settings.
+      and "Run setup again" back into Settings.
 - [ ] Check the look against the master build (Playwright, as at E7), on a scratch instance with the fakes.
 
 ### Task 7: Close the milestone
 
 - [ ] `behaviours.md` § E8: every line ticked, or a deviation recorded. `defects.md`: Call 6, and a "Found while
-  porting" list. Update `test-inventory.json` and the "Changed by the Effect server" lines.
+      porting" list. Update `test-inventory.json` and the "Changed by the Effect server" lines.
 - [ ] `CLAUDE.md`: an E8 paragraph (tuning folder, memo service, `POST /api/sweeps` on the runner).
 - [ ] `docs/superpowers/poc-effect/e8.json`, measured like `e7.json`.
 - [ ] `pnpm lint`, `pnpm check` (0 `effect(`), `pnpm test`. Commit by task, then a review pass against this plan and
-  `behaviours.md`, recorded in `defects.md`.
+      `behaviours.md`, recorded in `defects.md`.
