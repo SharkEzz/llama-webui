@@ -122,7 +122,7 @@ export interface ExecutedRun {
  * Executes a run (llama-bench or a trial llama-server) already saved as `running`, in the caller's scope, and returns
  * its result without writing it. Does not touch the managed server: that is the gate's. `spec` is the requested one
  * (the saved run loses a profile id whose profile is gone). `onLive` gets every change of the phase, the step and the
- * last lines (the runner throttles them). `cancel`, once completed, stops the program: SIGTERM, then
+ * last lines, with `lines` true when only new lines changed it (the runner throttles those). `cancel`, once completed, stops the program: SIGTERM, then
  * `[llama-webui] not stopped after <ms> ms, SIGKILL` and SIGKILL after `killTimeout`; the result is then `cancelled`.
  * `gpus` and `disk` are the monitor's: the VRAM peak is what each card holds above its value at the start (the fast
  * probe, then the monitor's snapshots as a fallback), the disk peak the model disk's read bandwidth.
@@ -131,7 +131,7 @@ export const execute = Effect.fn('execute.execute')(function* (options: {
   readonly run: ExecutedRun;
   readonly spec: BenchSpec;
   readonly startedAt: number;
-  readonly onLive: (live: BenchLive) => Effect.Effect<void>;
+  readonly onLive: (live: BenchLive, lines: boolean) => Effect.Effect<void>;
   readonly killTimeout: Duration.Input;
   readonly cancel: Deferred.Deferred<void>;
   readonly gpus: Effect.Effect<ReadonlyArray<GpuSample>>;
@@ -166,8 +166,8 @@ export const execute = Effect.fn('execute.execute')(function* (options: {
   const cancelled = yield* Ref.make(false);
   const current = yield* Ref.make(Option.none<Followed>());
 
-  const setLive = (patch: Partial<Pick<BenchLive, 'phase' | 'step'>>) =>
-    Ref.updateAndGet(live, (l) => ({ ...l, ...patch })).pipe(Effect.flatMap(options.onLive));
+  const setLive = (patch: Partial<Pick<BenchLive, 'phase' | 'step'>>, lines = false) =>
+    Ref.updateAndGet(live, (l) => ({ ...l, ...patch })).pipe(Effect.flatMap((l) => options.onLive(l, lines)));
   const line = Effect.fnUntraced(function* (text: string) {
     yield* ring.push(`[bench] ${text}`);
     const lines = yield* Ref.updateAndGet(tail, (t) => Arr.takeRight(Arr.append(t, text), TAIL));
@@ -262,7 +262,7 @@ export const execute = Effect.fn('execute.execute')(function* (options: {
                 Effect.gen(function* () {
                   yield* line(text);
                   const progress = parseBenchProgress(text);
-                  if (progress === null) return yield* setLive({});
+                  if (progress === null) return yield* setLive({}, true);
                   const runs = progress.runs ?? spec.r;
                   yield* setLive({
                     phase: progress.phase,
@@ -305,7 +305,7 @@ export const execute = Effect.fn('execute.execute')(function* (options: {
       n: spec.n,
       r: spec.r,
       onPhase: (phase, step) => setLive({ phase, step }),
-      onLine: (text) => line(text).pipe(Effect.andThen(setLive({}))),
+      onLine: (text) => line(text).pipe(Effect.andThen(setLive({}, true))),
       onSpawn: spawned,
       say,
       killTimeout: options.killTimeout,

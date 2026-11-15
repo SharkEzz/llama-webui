@@ -31,6 +31,8 @@ export class RestartFailed extends Schema.TaggedError<RestartFailed, { readonly 
 /** The managed llama-server during benchmarks: stopped once when the gate is taken, restarted once when it is released. */
 export interface Gate {
   readonly held: Effect.Effect<boolean>;
+  /** Whether the stop `acquire` started is still in progress. */
+  readonly stopping: Effect.Effect<boolean>;
   /** The command of the server the gate stopped, to restart; none when it stopped none. */
   readonly stoppedCommand: Effect.Effect<Option.Option<BuiltCommand>>;
   /**
@@ -83,6 +85,9 @@ export const makeGate = Effect.fn('makeGate')(function* (options: {
 
   const held = Effect.map(Ref.get(state), (s) => s.held);
   const stoppedCommand = Effect.map(Ref.get(state), (s) => s.stopped);
+  const stopping = Effect.map(Ref.get(state), (s) =>
+    Option.exists(s.stopping, (fiber) => fiber.pollUnsafe() === undefined),
+  );
 
   const acquire = Effect.fn('Gate.acquire')(function* (request: { readonly stopServer: boolean }) {
     const now = yield* supervisor.state.pipe(
@@ -166,6 +171,6 @@ export const makeGate = Effect.fn('makeGate')(function* (options: {
     );
   });
 
-  const gate: Gate = { held, stoppedCommand, acquire, ready, release };
+  const gate: Gate = { held, stopping, stoppedCommand, acquire, ready, release };
   return gate;
 });
