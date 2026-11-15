@@ -1,7 +1,8 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, layer } from '@effect/vitest';
 import { DEFAULT_SETTINGS, type Profile, type ServerState } from '@llama-webui/shared';
-import { Effect, Exit, Fiber, FileSystem, Layer, Schedule, Scope } from 'effect';
+import { Context, Effect, Exit, Fiber, FileSystem, Layer, Ref, Schedule, Scope } from 'effect';
+import { BenchRunner } from '../bench/BenchRunner.ts';
 import * as Db from '../db/Db.ts';
 import { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { LogRing } from '../logs/LogRing.ts';
@@ -19,9 +20,36 @@ const SilentHub = Layer.succeed(WsHub, {
   attach: Effect.fn(() => Effect.void),
 });
 
-/** The supervisor (pids read from `procRoot`) and the settings on a new database. */
+/** Whether the bench runner says it is busy, as the test sets it. */
+class Busy extends Context.Service<Busy, Ref.Ref<boolean>>()(
+  '@llama-webui/app/server/supervisor/ExternalWatch.test/Busy',
+) {}
+
+/** A bench runner that only answers `busy`, from `Busy`. */
+const BusyRunner = Layer.effect(
+  BenchRunner,
+  Effect.gen(function* () {
+    const busy = yield* Busy;
+    const unused = Effect.die('not used by the watch');
+    return BenchRunner.of({
+      busy: Ref.get(busy),
+      live: unused,
+      sweepLive: unused,
+      files: unused,
+      start: () => unused,
+      startSweep: () => unused,
+      resume: () => unused,
+      validate: () => unused,
+      cancel: () => unused,
+      cancelSweep: () => unused,
+    });
+  }),
+).pipe(Layer.provideMerge(Layer.effect(Busy, Ref.make(false))));
+
+/** The supervisor (pids read from `procRoot`), the settings on a new database and a bench runner of `Busy`. */
 const servicesWith = (procRoot: string) =>
   Supervisor.layerWith({ killTimeout: '300 millis', healthPoll: '50 millis', procRoot }).pipe(
+    Layer.provideMerge(BusyRunner),
     Layer.provideMerge(Layer.mergeAll(LogRing.layer, LlamaHttp.layer, SettingsRepo.layer)),
     Layer.provideMerge(SilentHub),
     Layer.provideMerge(Db.layerAt(':memory:')),
@@ -132,6 +160,29 @@ layer(NodeServices.layer, { excludeTestServices: true })('ExternalWatch', (it) =
         const requests = stub.requests();
         yield* Fiber.join(stopping);
         assert.strictEqual(requests, 0);
+      }).pipe(Effect.provideContext(services));
+    }),
+  );
+
+  it.effect('no external server is detected while a benchmark owns the port', () =>
+    Effect.gen(function* () {
+      const port = yield* freePort;
+      const fake = yield* fakeOutside({ port });
+      const procRoot = yield* procNaming(fake.pid, port);
+      const services = yield* Layer.build(servicesWith(procRoot));
+      yield* Effect.gen(function* () {
+        const supervisor = yield* Supervisor;
+        const busy = yield* Busy;
+        yield* Ref.set(busy, true);
+        yield* portSetting(port);
+        yield* watching;
+        // Three looks of the watch at least.
+        yield* Effect.sleep('350 millis');
+        const meanwhile = yield* supervisor.state;
+        assert.strictEqual(meanwhile.kind, 'idle');
+        yield* Ref.set(busy, false);
+        const external = yield* stateWhen((state) => state.kind === 'external');
+        assert.deepStrictEqual(external, { kind: 'external', pid: fake.pid, port });
       }).pipe(Effect.provideContext(services));
     }),
   );

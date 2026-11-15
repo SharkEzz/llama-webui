@@ -21,15 +21,15 @@ import { LogRing } from '../logs/LogRing.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { FAKE, freePort } from '../testing/llama.ts';
-import { ServicesWithoutQueue } from '../testing/services.ts';
+import { ServicesWithoutBench } from '../testing/services.ts';
 import { commandOf, type ExecResult, execute } from './execute.ts';
 import { WARMUP_PROMPT } from './prompt.ts';
 
 /** `test` on the services of the routes, an empty model file in a folder of its own. */
 const fresh = <A, E>(
-  test: (model: string) => Effect.Effect<A, E, Layer.Success<typeof ServicesWithoutQueue> | Scope.Scope>,
+  test: (model: string) => Effect.Effect<A, E, Layer.Success<typeof ServicesWithoutBench> | Scope.Scope>,
 ) =>
-  Layer.build(ServicesWithoutQueue).pipe(
+  Layer.build(ServicesWithoutBench).pipe(
     Effect.flatMap((context) =>
       Effect.provideContext(
         Effect.gen(function* () {

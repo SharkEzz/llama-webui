@@ -1,7 +1,8 @@
-import { Api, NoProfileToRestart, ServerNotReady, stateHost } from '@llama-webui/shared';
+import { Api, BenchRunning, NoProfileToRestart, ServerNotReady, stateHost } from '@llama-webui/shared';
 import { Effect, type Path } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import { probeUrl } from 'llamacpp-js/client';
+import { BenchRunner } from '../bench/BenchRunner.ts';
 import { AppInfo } from '../config/AppInfo.ts';
 import type { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { props } from '../llama/probes.ts';
@@ -17,6 +18,7 @@ export const ServerHandlers = HttpApiBuilder.group(
   'server',
   Effect.fn(function* (handlers) {
     const supervisor = yield* Supervisor;
+    const runner = yield* BenchRunner;
     const profiles = yield* ProfilesRepo;
     const settings = yield* SettingsRepo;
     const ring = yield* LogRing;
@@ -31,6 +33,11 @@ export const ServerHandlers = HttpApiBuilder.group(
       return yield* buildCommand({ profile, settings: current }).pipe(Effect.provideContext(services));
     });
 
+    /** Refused while a benchmark holds llama-server (a request, a run, a sweep or the gate). */
+    const notBenchmarking = Effect.gen(function* () {
+      if (yield* runner.busy) return yield* BenchRunning.make({ message: 'A benchmark is running' });
+    });
+
     /** The profile just launched becomes the default one (after a launch that ended `crashed` too). */
     const remember = Effect.fn('ServerHandlers.remember')(function* (cmd: BuiltCommand) {
       const current = yield* settings.get;
@@ -41,6 +48,7 @@ export const ServerHandlers = HttpApiBuilder.group(
 
     const start = Effect.fn('ServerHandlers.start')(function* (id: number) {
       const cmd = yield* commandFor(id);
+      yield* notBenchmarking;
       yield* supervisor.start(cmd);
       yield* remember(cmd);
       return yield* supervisor.view;
@@ -48,6 +56,7 @@ export const ServerHandlers = HttpApiBuilder.group(
 
     const switchTo = Effect.fn('ServerHandlers.switch')(function* (id: number) {
       const cmd = yield* commandFor(id);
+      yield* notBenchmarking;
       yield* supervisor.switchTo(cmd);
       yield* remember(cmd);
       return yield* supervisor.view;
@@ -55,6 +64,7 @@ export const ServerHandlers = HttpApiBuilder.group(
 
     /** The profile of the view relaunched, its command read again (its edits taken); the default profile kept. */
     const restart = Effect.gen(function* () {
+      yield* notBenchmarking;
       const { profileId } = yield* supervisor.view;
       if (profileId === null) return yield* NoProfileToRestart.make({ message: 'No profile to restart' });
       const cmd = yield* commandFor(profileId);
@@ -76,7 +86,7 @@ export const ServerHandlers = HttpApiBuilder.group(
       .handle('start', ({ payload }) => start(payload.profileId))
       .handle('switch', ({ payload }) => switchTo(payload.profileId))
       .handle('restart', () => restart)
-      .handle('stop', () => Effect.andThen(supervisor.stop, supervisor.view))
+      .handle('stop', () => notBenchmarking.pipe(Effect.andThen(supervisor.stop), Effect.andThen(supervisor.view)))
       .handle('props', () => serverProps)
       .handle('snapshot', () =>
         Effect.all({ server: supervisor.view, logSeq: ring.seq, bootId: Effect.succeed(bootId) }),

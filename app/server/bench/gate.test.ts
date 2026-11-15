@@ -7,13 +7,13 @@ import { LogRing } from '../logs/LogRing.ts';
 import { type BuiltCommand, buildCommand } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
 import { FAKE, fakeOutside, freePort, httpStub } from '../testing/llama.ts';
-import { ServicesWithoutQueue } from '../testing/services.ts';
+import { ServicesWithoutBench } from '../testing/services.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { makeGate } from './gate.ts';
 
 /** `test` on the services of the routes, whose end stops the managed server. */
-const fresh = <A, E>(test: Effect.Effect<A, E, Layer.Success<typeof ServicesWithoutQueue> | Scope.Scope>) =>
-  Layer.build(ServicesWithoutQueue).pipe(
+const fresh = <A, E>(test: Effect.Effect<A, E, Layer.Success<typeof ServicesWithoutBench> | Scope.Scope>) =>
+  Layer.build(ServicesWithoutBench).pipe(
     Effect.flatMap((context) => Effect.provideContext(test, context)),
     Effect.scoped,
   );

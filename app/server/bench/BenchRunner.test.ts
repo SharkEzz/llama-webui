@@ -36,7 +36,7 @@ import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { buildCommand } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
 import { FAKE, freePort, httpStub } from '../testing/llama.ts';
-import { ServicesWithoutQueue } from '../testing/services.ts';
+import { ServicesWithoutBench } from '../testing/services.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { BenchHardware } from './BenchHardware.ts';
 import { BenchRunner, makeThrottle } from './BenchRunner.ts';
@@ -48,12 +48,10 @@ class Published extends Context.Service<Published, Ref.Ref<ReadonlyArray<WsMessa
   '@llama-webui/app/server/bench/BenchRunner.test/Published',
 ) {}
 
-/** The services of the routes, the bench's repositories, the recorder and an empty model file in a folder of its own. */
-const Base = Layer.mergeAll(
-  BenchRunsRepo.layer,
-  SweepsRepo.layer,
-  Layer.effect(Published, Ref.make<ReadonlyArray<WsMessage>>([])),
-).pipe(Layer.provideMerge(ServicesWithoutQueue));
+/** The services of the routes but the runner (each test builds its own), and the recorder. */
+const Base = Layer.effect(Published, Ref.make<ReadonlyArray<WsMessage>>([])).pipe(
+  Layer.provideMerge(ServicesWithoutBench),
+);
 
 class Model extends Context.Service<Model, string>()('@llama-webui/app/server/bench/BenchRunner.test/Model') {}
 

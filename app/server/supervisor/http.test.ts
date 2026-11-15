@@ -1,7 +1,20 @@
 import { assert, layer } from '@effect/vitest';
 import { type ProfileInput, type ServerState, ServerView } from '@llama-webui/shared';
-import { Effect, Exit, Layer, Option, Schedule, Schema, Scope, String as Str } from 'effect';
+import {
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  FileSystem,
+  Layer,
+  Option,
+  Schedule,
+  Schema,
+  Scope,
+  String as Str,
+} from 'effect';
 import { HttpClient, HttpClientRequest } from 'effect/http';
+import { BenchRunner } from '../bench/BenchRunner.ts';
 import { AppInfo } from '../config/AppInfo.ts';
 import { ApiRoutes, serve } from '../http/HttpLive.ts';
 import { isAlive } from '../llama/procScan.ts';
@@ -300,6 +313,44 @@ layer(Served, { excludeTestServices: true, buildPerTest: true })('ServerApi over
       const snapshot = yield* send('GET', '/api/state');
       assert.strictEqual(snapshot.status, 200);
       assert.deepStrictEqual(snapshot.json, { server: view, logSeq: 1, bootId });
+    }),
+  );
+
+  it.effect('the server routes answer 409 A benchmark is running while the runner is busy', () =>
+    Effect.gen(function* () {
+      const runner = yield* BenchRunner;
+      const fs = yield* FileSystem.FileSystem;
+      const model = yield* fs.makeTempFileScoped({ suffix: '.gguf' });
+      const a = yield* profileOf('A');
+      // A sweep request held in its check: the runner is claimed, nothing is stopped.
+      const checked = yield* Deferred.make<void>();
+      const request = yield* Effect.forkChild(
+        runner.startSweep({
+          files: { modelPath: model, mmprojPath: null },
+          stopServer: true,
+          check: Deferred.succeed(checked, undefined).pipe(Effect.andThen(Effect.never)),
+          prepare: Effect.die('not reached'),
+        }),
+      );
+      yield* Deferred.await(checked);
+      const busy = { _tag: 'BenchRunning', message: 'A benchmark is running' };
+      const unknown = { _tag: 'ProfileNotFound', message: 'Profile not found' };
+      for (const what of ['start', 'switch'] as const) {
+        const missing = yield* launch(what, 999);
+        assert.deepStrictEqual(missing, { status: 404, json: unknown });
+        const refused = yield* launch(what, a.id);
+        assert.deepStrictEqual(refused, { status: 409, json: busy });
+      }
+      for (const what of ['restart', 'stop'] as const) {
+        const refused = yield* send('POST', `/api/server/${what}`);
+        assert.deepStrictEqual([refused.status, refused.json], [409, busy]);
+      }
+      const state = yield* (yield* Supervisor).state;
+      assert.strictEqual(state.kind, 'idle');
+      yield* Fiber.interrupt(request);
+      const started = yield* launch('start', a.id);
+      assert.strictEqual(started.status, 202);
+      yield* stateWhen(kindIs('ready'));
     }),
   );
 });

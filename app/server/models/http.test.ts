@@ -1,6 +1,14 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, describe, layer } from '@effect/vitest';
-import { type DownloadItem, ModelDetail, ModelList, type ModelUsage, type ServerState } from '@llama-webui/shared';
+import {
+  BenchSpec,
+  type DownloadItem,
+  ModelDetail,
+  ModelList,
+  type ModelUsage,
+  type ServerState,
+  SweepSpec,
+} from '@llama-webui/shared';
 import {
   Array as Arr,
   Clock,
@@ -18,6 +26,9 @@ import {
   String as Str,
 } from 'effect';
 import { HttpClient, HttpClientRequest } from 'effect/http';
+import { BenchRunner } from '../bench/BenchRunner.ts';
+import { BenchRunsRepo } from '../bench/BenchRunsRepo.ts';
+import { SweepsRepo } from '../bench/SweepsRepo.ts';
 import { ApiRoutes, serve } from '../http/HttpLive.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
@@ -460,6 +471,72 @@ describe('ModelsApi', () => {
 
         yield* Ref.set(writes, []);
         assert.strictEqual((yield* remove(at('small.gguf'), false)).status, 200);
+      }),
+    );
+
+    it.effect('a model a benchmark or a running sweep opens is blocked, and its deletion a 409', () =>
+      Effect.gen(function* () {
+        const { fs, seed } = yield* workspace;
+        const { big, small, mm } = yield* seed;
+        const settings = yield* SettingsRepo;
+        const runner = yield* BenchRunner;
+        const runs = yield* BenchRunsRepo;
+        const sweeps = yield* SweepsRepo;
+        // A slow llama-bench: each run lasts long enough to look at the models meanwhile.
+        const port = yield* freePort;
+        yield* settings.patch({ binary: FAKE, port, env: { FAKE_BENCH_STEP_MS: '400' } });
+        const idle = Effect.flatMap(runner.busy, (busy) => (busy ? Effect.fail('busy') : Effect.void)).pipe(
+          Effect.retry(Schedule.spaced('10 millis')),
+          Effect.timeout('10 seconds'),
+        );
+        const benchmarking = 'A benchmark in progress uses it';
+        /** That the usage of `path` is blocked by `expected`. */
+        const blockedBy = (path: string, expected: string | null) =>
+          Effect.map(usageOf(path), (reply) => assert.strictEqual((reply.json as ModelUsage).blocked, expected));
+
+        // A one-off run of `small` with the projector `mm`: both are blocked, another model is not.
+        const spec = yield* Schema.decodeEffect(BenchSpec)({ kind: 'bench', modelPath: small, mmprojPath: mm });
+        const run = yield* runner.start(spec, { stopServer: false });
+        yield* blockedBy(small, benchmarking);
+        yield* blockedBy(mm, benchmarking);
+        yield* blockedBy(big[0] ?? '', null);
+        const refused = yield* remove(small, false);
+        assert.deepStrictEqual(refused, { status: 409, json: { _tag: 'ModelInUse', message: benchmarking } });
+        const kept = yield* fs.exists(small);
+        assert.isTrue(kept);
+        yield* runner.cancel(run.id);
+        yield* idle;
+        yield* blockedBy(small, null);
+
+        // A sweep of the split model: blocked while it runs, between its items too.
+        const first = big[0] ?? '';
+        const sweepSpec = yield* Schema.decodeEffect(SweepSpec)({
+          name: 's',
+          modelPath: first,
+          preset: 'chat',
+          r: 1,
+          space: { ncmoe: [1, 2] },
+        });
+        const item = yield* Schema.decodeEffect(BenchSpec)({ kind: 'bench', modelPath: first, r: 1 });
+        const sweep = yield* runner.startSweep({
+          files: { modelPath: first, mmprojPath: null },
+          stopServer: false,
+          prepare: Effect.gen(function* () {
+            const created = yield* sweeps.create(sweepSpec);
+            yield* runs.enqueue(created.id, [
+              { spec: { ...item, params: { ncmoe: 1 } }, label: '-ncmoe 1', fit: 'fits' },
+              { spec: { ...item, params: { ncmoe: 2 } }, label: '-ncmoe 2', fit: 'fits' },
+            ]);
+            return created.id;
+          }),
+        });
+        yield* blockedBy(first, benchmarking);
+        const sweepRefused = yield* remove(first, false);
+        assert.deepStrictEqual(sweepRefused, { status: 409, json: { _tag: 'ModelInUse', message: benchmarking } });
+        yield* runner.cancelSweep(sweep.id);
+        yield* idle;
+        const deleted = yield* remove(first, false);
+        assert.strictEqual(deleted.status, 200);
       }),
     );
 

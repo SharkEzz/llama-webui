@@ -4,11 +4,11 @@ import { Effect, Layer, Option, type Scope } from 'effect';
 import { health } from '../llama/probes.ts';
 import { buildCommand } from '../supervisor/command.ts';
 import { FAKE, fakeOutside, freePort } from '../testing/llama.ts';
-import { ServicesWithoutQueue } from '../testing/services.ts';
+import { ServicesWithoutBench } from '../testing/services.ts';
 import { runTrial } from './trial.ts';
 
-const fresh = <A, E>(test: Effect.Effect<A, E, Layer.Success<typeof ServicesWithoutQueue> | Scope.Scope>) =>
-  Layer.build(ServicesWithoutQueue).pipe(
+const fresh = <A, E>(test: Effect.Effect<A, E, Layer.Success<typeof ServicesWithoutBench> | Scope.Scope>) =>
+  Layer.build(ServicesWithoutBench).pipe(
     Effect.flatMap((context) => Effect.provideContext(test, context)),
     Effect.scoped,
   );

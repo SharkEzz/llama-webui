@@ -10,6 +10,7 @@ import {
   type ProfileRunning,
 } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Option, Order, Path, String as Str } from 'effect';
+import { BenchRunner } from '../bench/BenchRunner.ts';
 import { homeDir } from '../config/Home.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { removeProfile } from '../profiles/removeProfile.ts';
@@ -47,14 +48,19 @@ const destOf = (paths: Path.Path, dir: string, file: string): Option.Option<stri
 
 /**
  * What deleting the model would remove (its files, the profiles that open it, as their model checked first, then as
- * their projector) and why it is refused now (`blocked`): the server llama-webui runs opens it, or a download in
- * progress writes one of its files.
+ * their projector) and why it is refused now (`blocked`), in this order: the server llama-webui runs opens it, a
+ * benchmark in progress (a run or a running sweep) opens it, or a download in progress writes one of its files.
  */
 export const modelUsage = Effect.fn('models.modelUsage')(function* (
   entry: ModelEntry,
-): Effect.fn.Return<ModelUsage, never, ProfilesRepo | Supervisor | ActiveWrites | FileSystem.FileSystem | Path.Path> {
+): Effect.fn.Return<
+  ModelUsage,
+  never,
+  ProfilesRepo | Supervisor | BenchRunner | ActiveWrites | FileSystem.FileSystem | Path.Path
+> {
   const profiles = yield* ProfilesRepo;
   const supervisor = yield* Supervisor;
+  const runner = yield* BenchRunner;
   const writes = yield* ActiveWrites;
   const paths = yield* Path.Path;
   const home = yield* homeDir;
@@ -78,18 +84,25 @@ export const modelUsage = Effect.fn('models.modelUsage')(function* (
   const state = yield* supervisor.state;
   const activeId = activeProfileId(state);
   // The profile of the server llama-webui runs, when it opens the model.
-  const runner = yield* Effect.filter(
+  const running = yield* Effect.filter(
     Arr.filter(opened, ({ profile }) => profile.id === activeId),
     ({ model, mmproj }) => usesAny([model, mmproj]),
   );
-  const items = yield* writes.active;
-  const dests = Arr.flatMap(items, (item) =>
-    Arr.getSomes(Arr.map(item.files, (file) => destOf(paths, item.dir, file.path))),
-  );
-  const written = Arr.isReadonlyArrayNonEmpty(runner) ? false : yield* usesAny(dests);
-  const blocked = Arr.match(runner, {
-    onEmpty: () => (written ? 'A download in progress writes it' : null),
-    onNonEmpty: ([{ profile }]) => `The running server uses it (profile “${profile.name}”): stop it first`,
+  /** Without the running server: a benchmark in progress first, then a download. */
+  const otherUse = Effect.gen(function* () {
+    const benchFiles = yield* runner.files;
+    if (yield* usesAny(benchFiles)) return 'A benchmark in progress uses it';
+    const items = yield* writes.active;
+    const dests = Arr.flatMap(items, (item) =>
+      Arr.getSomes(Arr.map(item.files, (file) => destOf(paths, item.dir, file.path))),
+    );
+    const written = yield* usesAny(dests);
+    return written ? 'A download in progress writes it' : null;
+  });
+  const blocked = yield* Arr.match(running, {
+    onEmpty: () => otherUse,
+    onNonEmpty: ([{ profile }]) =>
+      Effect.succeed(`The running server uses it (profile “${profile.name}”): stop it first`),
   });
 
   return {
@@ -151,7 +164,7 @@ export const deleteModel = Effect.fn('models.deleteModel')(function* (options: {
 }): Effect.fn.Return<
   ModelDeleted,
   ModelInUse | ProfileRunning,
-  ProfilesRepo | SettingsRepo | Supervisor | ActiveWrites | FileSystem.FileSystem | Path.Path
+  ProfilesRepo | SettingsRepo | Supervisor | BenchRunner | ActiveWrites | FileSystem.FileSystem | Path.Path
 > {
   const { entry, root, deleteProfiles } = options;
   const fs = yield* FileSystem.FileSystem;

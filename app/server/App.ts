@@ -1,6 +1,10 @@
 import { NodeSocket } from '@effect/platform-node';
 import { Effect, Layer, Schema, String as Str } from 'effect';
 import { DevTools } from 'effect/devtools';
+import { BenchHardware } from './bench/BenchHardware.ts';
+import { BenchRunner } from './bench/BenchRunner.ts';
+import { BenchRunsRepo } from './bench/BenchRunsRepo.ts';
+import { SweepsRepo } from './bench/SweepsRepo.ts';
 import { ChatRuns } from './chat/ChatRuns.ts';
 import { ConversationsRepo } from './chat/ConversationsRepo.ts';
 import { AppConfig } from './config/AppConfig.ts';
@@ -30,7 +34,9 @@ import { WsHub } from './ws/WsHub.ts';
 /**
  * The services the routes use, built before the HTTP server opens its port and undone after it closed: the database is
  * opened (and brought up to date) first. The watch of a server started by hand is built last and undone first: no look
- * runs while the rest stops. The monitor, the placement, the chat's replies and the download queue are under it: they
+ * runs while the rest stops; it skips its looks while the bench runner is busy (a benchmark owns the port). The bench
+ * runner is under it, and over what it reads (the monitor's last snapshot, the supervisor): its runs are interrupted
+ * and saved `interrupted` before the rest stops, without restarting llama-server. The monitor, the placement, the chat's replies and the download queue are under it: they
  * end, the collectors' programs with the monitor, the replies saved and the running transfer stopped (its `.part` kept,
  * its row left `downloading` for the next start), before the supervisor stops llama-server, while the ring, the hub
  * they write to and the database are still up. Their shutdown steps (`Shutdown.before`) are registered after the hub's,
@@ -40,9 +46,10 @@ import { WsHub } from './ws/WsHub.ts';
  * under are the queued and running rows of the `downloads` table (`ActiveWrites.layer`).
  */
 const Services = ExternalWatch.layer.pipe(
+  Layer.provideMerge(BenchRunner.layer),
   Layer.provideMerge(Layer.mergeAll(Monitor.layer, Placement.layer, ChatRuns.layer, Downloads.layer)),
   Layer.provideMerge(Supervisor.layer),
-  Layer.provideMerge(Flags.layer),
+  Layer.provideMerge(Layer.mergeAll(Flags.layer, BenchHardware.layer)),
   Layer.provideMerge(
     Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer, HfClient.layer.pipe(Layer.provideMerge(HfHttp.layer))),
   ),
@@ -55,6 +62,8 @@ const Services = ExternalWatch.layer.pipe(
       ModelCacheRepo.layer,
       GgufReader.layer,
       ActiveWrites.layer.pipe(Layer.provideMerge(DownloadsRepo.layer)),
+      BenchRunsRepo.layer,
+      SweepsRepo.layer,
     ),
   ),
   Layer.provideMerge(AppInfo.layer),
