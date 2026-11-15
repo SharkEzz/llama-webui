@@ -1,7 +1,7 @@
 import { Schema } from 'effect';
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { errorTag, makeCall, makeCallStream } from './api';
+import { errorMessage, errorTag, makeCall, makeCallStream } from './api';
 
 class TestNotFound extends Schema.TaggedError<TestNotFound>()(
   'TestNotFound',
@@ -80,6 +80,15 @@ test('call() rejects with the tagged error of the endpoint', async () => {
   const error = await call((api) => api.t.get({ params: { id: 7 }, query: {} })).catch((e: unknown) => e);
   expect(errorTag(error)).toBe('TestNotFound');
   expect((error as Error).message).toBe('No item 7');
+  expect(errorMessage(error)).toBe('No item 7');
+});
+
+test('errorMessage() is the message of an error, of an object that carries one, else the value as text', () => {
+  expect(errorMessage(new TypeError('fetch failed'))).toBe('fetch failed');
+  expect(errorMessage({ _tag: 'Refused', message: 'Not here' })).toBe('Not here');
+  expect(errorMessage('plain')).toBe('plain');
+  expect(errorMessage({ message: 7 })).toBe('[object Object]');
+  expect(errorMessage(undefined)).toBe('undefined');
 });
 
 test('call() rejects with ApiUnreachable when fetch rejects', async () => {

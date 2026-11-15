@@ -4,7 +4,10 @@ import {
   type CacheType,
   type Estimate,
   type Fit,
+  fmtBytes,
+  GiB,
   gpuDevices,
+  MiB,
   type PresetId,
   presetOf,
   type Recommendation,
@@ -14,7 +17,7 @@ import {
 import { Array as Arr, Number as Num, Option, Predicate, String as Str } from 'effect';
 import type { ModelInfo } from '../models/gguf.ts';
 import { EXPERTS } from '../models/sizes.ts';
-import { budgetBytes, computeBytes, fmtBytes, GiB, type KvTypes, MiB } from './memory.ts';
+import { budgetBytes, computeBytes, type KvTypes } from './memory.ts';
 import { fitOf, measurePlacement, type PlacementInput, type PlacementMeasure } from './placement.ts';
 
 export interface EstimateInput {

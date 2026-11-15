@@ -9,9 +9,9 @@ import type {
   GpuSample,
   MemInfo,
 } from '@llama-webui/shared';
+import { fmtBytes, GiB } from '@llama-webui/shared';
 import { Array as Arr, Option, Predicate, String as Str } from 'effect';
 import type { ModelInfo } from '../models/gguf.ts';
-import { fmtBytes, GiB } from './memory.ts';
 
 /** What the checks read from the machine (`readSys`); every reading is tolerant. */
 export interface SysReadings {

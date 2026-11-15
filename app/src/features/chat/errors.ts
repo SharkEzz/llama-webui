@@ -1,5 +1,5 @@
 import { describeIssue, RequestInvalid } from '@llama-webui/shared';
-import { errorTag } from '@/lib/api';
+import { errorMessage, errorTag } from '@/lib/api';
 import { SAMPLING_FIELDS } from './fields';
 
 /** A field of the conversation settings that shows an error: a sampling field of the panel, or the system prompt. */
@@ -25,5 +25,5 @@ export function fieldErrors(error: unknown, saved: Field): FieldErrors {
     }
     return Object.keys(out).length > 0 ? out : { [saved]: error.message };
   }
-  return { [saved]: error instanceof Error ? error.message : String(error) };
+  return { [saved]: errorMessage(error) };
 }

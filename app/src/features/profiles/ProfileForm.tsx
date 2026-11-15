@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
 import { ModelPicker } from '@/features/models/ModelPicker';
+import { errorMessage } from '@/lib/api';
 import { useModels } from '@/lib/models';
 import { createProfile, deleteProfile, duplicateProfile, type NewProfile, updateProfile } from '@/lib/profiles';
 import { isRunning, restartServer, startProfile, useServer } from '@/lib/server';
@@ -81,7 +82,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
       onSaved(saved);
     } catch (e) {
       setErrors(fieldErrors(e));
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(errorMessage(e));
     }
   };
 

@@ -46,8 +46,8 @@ const fromRow = (row: typeof Row.Type): DownloadItem => ({
 
 const encodeFiles = Schema.encodeEffect(Files);
 
-/** The size of the files done. */
-const doneBytes = (files: ReadonlyArray<DownloadFile>) =>
+/** The size of the files done: what `bytesDone` of an item holds. */
+export const doneBytes = (files: ReadonlyArray<DownloadFile>) =>
   Arr.reduce(files, 0, (sum, file) => (file.done ? sum + file.size : sum));
 
 /** A status the item does not leave by itself: it has a `finishedAt`. */

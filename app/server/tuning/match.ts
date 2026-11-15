@@ -1,8 +1,6 @@
-import { type BenchDevice, baseName, type GpuSample, gpuDevices } from '@llama-webui/shared';
+import { type BenchDevice, baseName, type GpuSample, gpuDevices, MiB } from '@llama-webui/shared';
 import { Array as Arr, Option, Order } from 'effect';
 import { dual } from 'effect/Function';
-
-const MiB = 1024 ** 2;
 
 const vendorOf = (d: BenchDevice): Option.Option<GpuSample['vendor']> => {
   if (d.backend === 'CUDA') return Option.some('nvidia');

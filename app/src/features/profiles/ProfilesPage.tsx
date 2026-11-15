@@ -8,7 +8,7 @@ import { GLASS } from '@/components/glass/glass';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { call } from '@/lib/api';
+import { call, errorMessage } from '@/lib/api';
 import { matchingProjector, useModels } from '@/lib/models';
 import { importProfiles, importSummary, useProfiles } from '@/lib/profiles';
 import { isRunning, useServer } from '@/lib/server';
@@ -83,7 +83,7 @@ export function ProfilesPage() {
       notify(importSummary(r), detail ? { description: detail } : undefined);
       if (r.imported[0]) select(r.imported[0].id);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(errorMessage(e));
     }
   };
 

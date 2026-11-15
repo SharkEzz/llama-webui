@@ -17,7 +17,7 @@ import {
 import { Result, Schema } from 'effect';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { errorTag, call as webCall } from './api';
+import { errorMessage, errorTag, call as webCall } from './api';
 import { plural } from './format';
 import { onWs, useWs } from './ws';
 
@@ -241,9 +241,7 @@ export interface BenchCalls {
   readonly call: typeof webCall;
 }
 
-const message = (e: unknown) =>
-  typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e);
-const fail = (e: unknown) => void toast.error(message(e));
+const fail = (e: unknown) => void toast.error(errorMessage(e));
 
 /** The bench's store, making its calls through `calls`. */
 export const makeBenchStore = ({ call }: BenchCalls) =>

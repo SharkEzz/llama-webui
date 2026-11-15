@@ -2,6 +2,7 @@ import { Api, type ModelDetail, ModelFileNotFound, type ModelList, ModelUnreadab
 import { Array as Arr, Clock, Effect, FileSystem, Number as Num, Option, type Path, String as Str } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import { homeDir } from '../config/Home.ts';
+import { withoutTrailingSlash } from '../config/paths.ts';
 import type { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import type { SettingsRepo } from '../settings/SettingsRepo.ts';
 import type { Supervisor } from '../supervisor/Supervisor.ts';
@@ -16,7 +17,7 @@ import { deleteModel, modelUsage } from './usage.ts';
 
 /** `path` relative to `dir` when it is inside it, else as it is (absolute). */
 const relativeTo = (path: string, dir: string): string => {
-  const base = dir.length > 1 ? Str.replace(/\/+$/, '')(dir) : dir;
+  const base = withoutTrailingSlash(dir);
   return Str.startsWith(`${base}/`)(path) ? Str.slice(base.length + 1)(path) : path;
 };
 

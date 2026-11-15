@@ -1,6 +1,7 @@
 import {
   LAUNCH_LOG_PREFIX,
   type LogLine,
+  MiB,
   type ModelPlacement,
   P2P_LOG_LINE,
   type P2pStatus,
@@ -14,8 +15,6 @@ import { Array as Arr, Option, String as Str } from 'effect';
  * doesn't expose these figures through its API, and only logs the buffer sizes from -lv 4 on: `buildCommand()` adds
  * `-lv 4` to a profile that sets no verbosity.
  */
-
-const MiB = 1024 ** 2;
 
 /** The line llama-webui writes before each launch: the placement is read from the lines after the last one. */
 export const LAUNCH_MARK = LAUNCH_LOG_PREFIX;

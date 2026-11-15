@@ -1,6 +1,7 @@
 import type { HfTokenSource } from '@llama-webui/shared';
 import { Array as Arr, Config, Effect, FileSystem, Option, String as Str } from 'effect';
 import { homeDir } from '../config/Home.ts';
+import { withoutTrailingSlash } from '../config/paths.ts';
 
 /** The Hugging Face token and where it came from (`env`, `file`, or none). */
 export type HfToken = { readonly token: string | null; readonly source: HfTokenSource };
@@ -16,14 +17,14 @@ const trimmed = (name: string): Config.Config<Option.Option<string>> =>
 
 /** The Hugging Face endpoint: `HF_ENDPOINT` (a mirror), else huggingface.co; without a trailing slash. */
 export const hfEndpoint: Effect.Effect<string> = trimmed('HF_ENDPOINT').pipe(
-  Config.map((endpoint) => Str.replace(/\/+$/, '')(Option.getOrElse(endpoint, () => DEFAULT_ENDPOINT))),
+  Config.map((endpoint) => withoutTrailingSlash(Option.getOrElse(endpoint, () => DEFAULT_ENDPOINT))),
   Effect.orDie,
   Effect.withSpan('token.hfEndpoint'),
 );
 
 /** `parts` under `dir`, as a path join puts them (a trailing slash of `dir` is not doubled). */
 const under = (dir: string, ...parts: ReadonlyArray<string>): string =>
-  Arr.join([Str.replace(/\/+$/, '')(dir), ...parts], '/');
+  Arr.join([withoutTrailingSlash(dir), ...parts], '/');
 
 /**
  * Where `hf auth login` writes the token: `HF_TOKEN_PATH`, else `$HF_HOME/token`, else

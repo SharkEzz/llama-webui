@@ -1,4 +1,4 @@
-import type { BenchDevice, CacheType } from '@llama-webui/shared';
+import { type BenchDevice, type CacheType, MiB } from '@llama-webui/shared';
 import { dual } from 'effect/Function';
 import type { ModelInfo } from '../models/gguf.ts';
 
@@ -15,9 +15,6 @@ export const KV_BYTES: Readonly<Record<CacheType, number>> = {
   q4_0: 0.5625,
   iq4_nl: 0.5625,
 };
-
-export const MiB = 1024 ** 2;
-export const GiB = 1024 ** 3;
 
 /** The K and V cache types of a configuration. */
 export interface KvTypes {
@@ -82,6 +79,3 @@ export const budgetBytes = (d: BenchDevice): number => {
   const total = d.totalMib * MiB;
   return Math.max(0, total - marginBytes(total) - (d.otherUsedMib ?? 0) * MiB);
 };
-
-export const fmtBytes = (n: number): string =>
-  n >= GiB ? `${(n / GiB).toFixed(1)} GiB` : `${Math.round(n / MiB)} MiB`;

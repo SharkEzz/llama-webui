@@ -110,7 +110,8 @@ The Effect language service (`tsconfig.effect.json`) is blocking, warnings inclu
 
 ## Programs and the home folder
 
-- A path a person wrote goes through `expandHome` of `app/server/config/Home.ts` (`~` and `~/…`, `HOME` read with
+- A path a person wrote goes through `expandHome` of `app/server/config/Home.ts` (`expandHomeIn` where the home and
+  the `Path` are already at hand, as in the command of a profile; `~` and `~/…`, `HOME` read with
   `Config`, else the system's home). Effect has no home directory of its own: the module imports `homedir` of `node:os`.
 - A program runs through `effect/process`: `ChildProcess.make(cmd, args, { stdin: 'ignore', stderr: 'ignore',
   forceKillAfter })` and `ChildProcessSpawner.spawn` in an `Effect.scoped`; the scope's end kills the process group

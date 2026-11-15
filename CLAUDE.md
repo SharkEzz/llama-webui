@@ -90,7 +90,7 @@ Biome (devDependency épinglée, config dans `biome.jsonc`) gère le format, le 
 
 ## Langue
 
-L'UI, les messages du serveur (erreurs, validations des schémas, logs, `--help`), les commentaires, les noms de tests, les messages de commit et les PR sont **en anglais**. Nombres, dates et unités passent par `app/src/lib/format.ts` (`LOCALE = 'en-US'` de `packages/webui-shared/src/format.ts`, `num`, `fmt`, `plural`, `formatBytes` en KiB/MiB/GiB…), côté serveur par `fmtInt` (`packages/webui-shared/src/format.ts`) : pas de locale codée en dur. Le web ne compare jamais un texte de message du serveur : utiliser le `_tag` de l'erreur ou un helper partagé (`isOomError`, `isDefaultTitle`).
+L'UI, les messages du serveur (erreurs, validations des schémas, logs, `--help`), les commentaires, les noms de tests, les messages de commit et les PR sont **en anglais**. Nombres, dates et unités passent par `app/src/lib/format.ts` (`LOCALE = 'en-US'` de `packages/webui-shared/src/format.ts`, `num`, `fmt`, `plural`, `formatBytes` en KiB/MiB/GiB…), côté serveur par `fmtInt` et, pour une taille, `fmtBytes` (`packages/webui-shared/src/format.ts`, avec `MiB` et `GiB`) : pas de locale codée en dur. Le web ne compare jamais un texte de message du serveur : utiliser le `_tag` de l'erreur ou un helper partagé (`isOomError`, `isDefaultTitle`).
 
 ## Packages (`packages/`)
 

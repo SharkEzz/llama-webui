@@ -104,9 +104,9 @@ The `llama-server` part of `argv` is assembled in this order:
 
 ```ts title="app/server/supervisor/command.ts"
 const server = [
-  expandHome(path, home, settings.binary),
+  expandHomeIn(settings.binary, home, path),
   '-m',
-  expandHome(path, home, profile.model),
+  expandHomeIn(profile.model, home, path),
   ...mmproj,
   ...profile.args,
   ...(setsVerbosity(profile.args, env) ? [] : ['-lv', DEFAULT_VERBOSITY]),
@@ -141,8 +141,8 @@ is what the Server page shows as the effective command and what the launch log l
 ### Paths and `~`
 
 `llama-server` runs without a shell, so nothing expands `~` for it. The command replaces a leading `~` or `~/` with
-the home folder and leaves every other path unchanged (elsewhere in the server, `expandHome` of
-`app/server/config/Home.ts` does the same).
+the home folder and leaves every other path unchanged (`expandHomeIn` of `app/server/config/Home.ts`, the pure half
+of the `expandHome` the rest of the server uses).
 
 - In `argv`, the model and projector are only `~`-expanded: a relative path stays relative, and `llama-server`
   resolves it against its own working folder.

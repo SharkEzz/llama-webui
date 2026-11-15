@@ -11,7 +11,7 @@ import { Effect, Stream } from 'effect';
 import type { HttpApiClient } from 'effect/http-api';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { errorTag, call as webCall, callStream as webCallStream } from './api';
+import { errorMessage, errorTag, call as webCall, callStream as webCallStream } from './api';
 
 /** Reply being written in the open conversation. */
 export interface Streaming {
@@ -39,8 +39,6 @@ interface ChatState {
 
 /** A reply as an endpoint streams it: the events of the reply, or the endpoint's error. */
 type ReplyCall = (api: HttpApiClient.ForApi<typeof Api>) => Effect.Effect<Stream.Stream<ChatEvent, unknown>, unknown>;
-
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 const replace = (messages: ReadonlyArray<ChatMessage>, m: ChatMessage) => messages.map((x) => (x.id === m.id ? m : x));
 
@@ -126,7 +124,7 @@ export const makeChatStore = ({ call, callStream }: ChatCalls) =>
           if (get().streaming?.conversationId === conversationId) set({ streaming: null });
           // Connection lost: reread the saved state. Anything else is the endpoint's refusal.
           if (errorTag(e) === 'ApiUnreachable') void get().open(conversationId);
-          else toast.error(message(e));
+          else toast.error(errorMessage(e));
         }
       }
     };
@@ -140,7 +138,7 @@ export const makeChatStore = ({ call, callStream }: ChatCalls) =>
         try {
           set({ list: await call((api) => api.chat.list()) });
         } catch (e) {
-          toast.error(message(e));
+          toast.error(errorMessage(e));
         }
       },
 
@@ -163,7 +161,7 @@ export const makeChatStore = ({ call, callStream }: ChatCalls) =>
             );
         } catch (e) {
           set({ current: null });
-          toast.error(message(e));
+          toast.error(errorMessage(e));
         }
       },
 
@@ -191,7 +189,7 @@ export const makeChatStore = ({ call, callStream }: ChatCalls) =>
           if (cur?.id === id) set({ current: { ...cur, title: c.title } });
           await get().loadList();
         } catch (e) {
-          toast.error(message(e));
+          toast.error(errorMessage(e));
         }
       },
 
@@ -219,7 +217,9 @@ export const makeChatStore = ({ call, callStream }: ChatCalls) =>
       stop: async () => {
         const cur = get().current;
         if (!cur) return;
-        await call((api) => api.chat.stop({ params: { id: cur.id } })).catch((e: unknown) => toast.error(message(e)));
+        await call((api) => api.chat.stop({ params: { id: cur.id } })).catch((e: unknown) =>
+          toast.error(errorMessage(e)),
+        );
       },
     };
   });

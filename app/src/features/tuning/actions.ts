@@ -8,7 +8,7 @@ import {
   profileModelPath,
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
-import { errorTag } from '@/lib/api';
+import { errorMessage, errorTag } from '@/lib/api';
 import { EMPTY_FORM, formFromSpec, useBench } from '@/lib/bench';
 import { useModels } from '@/lib/models';
 import { createProfile, useProfiles } from '@/lib/profiles';
@@ -58,7 +58,7 @@ export async function profileFromEstimate(e: Estimate): Promise<Profile | null> 
       return p;
     } catch (err) {
       if (errorTag(err) === 'ProfileNameTaken') continue;
-      toast.error(err instanceof Error ? err.message : String(err));
+      toast.error(errorMessage(err));
       return null;
     }
   }

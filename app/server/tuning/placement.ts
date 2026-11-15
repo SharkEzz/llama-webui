@@ -1,8 +1,16 @@
-import { type BenchDevice, type BenchParams, deviceRole, type Fit, gpuDevices } from '@llama-webui/shared';
+import {
+  type BenchDevice,
+  type BenchParams,
+  deviceRole,
+  type Fit,
+  fmtBytes,
+  gpuDevices,
+  MiB,
+} from '@llama-webui/shared';
 import { Array as Arr, Number as Num, Option, Predicate, String as Str } from 'effect';
 import type { ModelInfo } from '../models/gguf.ts';
 import { EXPERTS } from '../models/sizes.ts';
-import { budgetBytes, computeBytes, fmtBytes, type KvTypes, kvLayerBytes, MiB, recurrentBytes } from './memory.ts';
+import { budgetBytes, computeBytes, type KvTypes, kvLayerBytes, recurrentBytes } from './memory.ts';
 
 export interface PlacementInput {
   readonly model: ModelInfo;

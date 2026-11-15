@@ -1,5 +1,5 @@
 import { describeIssue, ProfileNameTaken, RequestInvalid } from '@llama-webui/shared';
-import { errorTag } from '@/lib/api';
+import { errorMessage, errorTag } from '@/lib/api';
 
 const FIELDS = ['name', 'model', 'mmproj', 'cwd', 'host', 'port', 'args', 'env'] as const;
 type Field = (typeof FIELDS)[number];
@@ -23,5 +23,5 @@ export function fieldErrors(error: unknown): FieldErrors {
     return Object.keys(out).length > 0 ? out : { form: error.message };
   }
   if (errorTag(error) === 'ProfileNameTaken' && error instanceof ProfileNameTaken) return { name: error.message };
-  return { form: error instanceof Error ? error.message : String(error) };
+  return { form: errorMessage(error) };
 }

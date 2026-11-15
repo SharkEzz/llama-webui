@@ -19,6 +19,9 @@ layer(Path.layer)('paths', (it) => {
       yield* equals(repoDir('m', 'o/r'), path.join(path.resolve('m'), 'o', 'r'));
       yield* equals(fileDest('/m/o/r', 'Q4_K_M/a-00001-of-00002.gguf'), '/m/o/r/Q4_K_M/a-00001-of-00002.gguf');
       yield* equals(fileDest('/m/o/r', './a/../b.gguf'), '/m/o/r/b.gguf');
+      // The folder's trailing slashes are not doubled, the root's neither.
+      yield* equals(fileDest('/m/o/r//', 'b.gguf'), '/m/o/r/b.gguf');
+      yield* equals(fileDest('/', 'b.gguf'), '/b.gguf');
       assert.strictEqual(partPath('/m/o/r/b.gguf'), '/m/o/r/b.gguf.part');
     }),
   );

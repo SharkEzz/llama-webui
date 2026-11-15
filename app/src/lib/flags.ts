@@ -1,7 +1,7 @@
 import { catalogFrom, type FlagCatalog } from '@llama-webui/shared';
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { call } from './api';
+import { call, errorMessage } from './api';
 
 interface FlagsStore {
   catalog: FlagCatalog | null;
@@ -24,7 +24,7 @@ export function useFlags(): FlagsStore {
         const flags = r.flags.map((f) => ({ ...f, names: [...f.names] }));
         useFlagsStore.setState({ catalog: catalogFrom(flags), loading: false });
       },
-      (e: unknown) => useFlagsStore.setState({ error: e instanceof Error ? e.message : String(e), loading: false }),
+      (e: unknown) => useFlagsStore.setState({ error: errorMessage(e), loading: false }),
     );
   }, []);
   return s;

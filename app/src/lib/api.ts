@@ -124,6 +124,13 @@ export const call = makeCall(Api);
 /** `callStream((api) => api.chat.send({ params, payload }), onEvent, { signal })` */
 export const callStream = makeCallStream(Api);
 
+/** The message of what a call rejected with (an endpoint's error, any other `Error`), else the value as text. */
+export function errorMessage(error: unknown): string {
+  return typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+    ? error.message
+    : String(error);
+}
+
 /** The `_tag` of what a call rejected with, if it has one. */
 export function errorTag(error: unknown): string | undefined {
   return typeof error === 'object' && error !== null && '_tag' in error && typeof error._tag === 'string'

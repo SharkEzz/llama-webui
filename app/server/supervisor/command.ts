@@ -1,6 +1,6 @@
 import { LAUNCH_LOG_PREFIX, P2P_LOG_LINE, type Profile, type Settings, shellQuote } from '@llama-webui/shared';
 import { Array as Arr, Config, ConfigProvider, Effect, Option, Path, Predicate, Record, String as Str } from 'effect';
-import { homeDir } from '../config/Home.ts';
+import { expandHomeIn, homeDir } from '../config/Home.ts';
 
 /** What the supervisor runs for a profile, and what it tells about it. */
 export interface BuiltCommand {
@@ -36,10 +36,6 @@ const flagName = (arg: string): string => Arr.headNonEmpty(Str.split(arg, '='));
 const setsVerbosity = (args: ReadonlyArray<string>, env: Readonly<Record<string, string>>): boolean =>
   Arr.some(args, (arg) => Arr.contains(VERBOSITY_FLAGS, flagName(arg))) || Record.has(env, 'LLAMA_ARG_LOG_VERBOSITY');
 
-/** `~` and `~/…` expanded to `home`; any other path as it is. */
-const expandHome = (path: Path.Path, home: string, file: string): string =>
-  file === '~' ? home : Str.startsWith('~/')(file) ? path.join(home, Str.slice(2)(file)) : file;
-
 /**
  * The files a profile opens, as llama-server will see them: `~` expanded everywhere, the model and the projector
  * resolved from the profile's folder, which defaults to `cwd` (llama-webui's own).
@@ -52,8 +48,10 @@ export const profilePaths = (options: {
 }): { readonly cwd: string; readonly model: string; readonly mmproj: string | null } => {
   const { profile, home, path } = options;
   const cwd =
-    Predicate.isUndefined(profile.cwd) || Str.isEmpty(profile.cwd) ? options.cwd : expandHome(path, home, profile.cwd);
-  const resolved = (file: string) => path.resolve(cwd, expandHome(path, home, file));
+    Predicate.isUndefined(profile.cwd) || Str.isEmpty(profile.cwd)
+      ? options.cwd
+      : expandHomeIn(profile.cwd, home, path);
+  const resolved = (file: string) => path.resolve(cwd, expandHomeIn(file, home, path));
   return {
     cwd,
     model: resolved(profile.model),
@@ -81,11 +79,11 @@ export const commandOf = (options: {
   const mmproj =
     Predicate.isUndefined(profile.mmproj) || Str.isEmpty(profile.mmproj)
       ? []
-      : ['-mm', expandHome(path, home, profile.mmproj)];
+      : ['-mm', expandHomeIn(profile.mmproj, home, path)];
   const server = [
-    expandHome(path, home, settings.binary),
+    expandHomeIn(settings.binary, home, path),
     '-m',
-    expandHome(path, home, profile.model),
+    expandHomeIn(profile.model, home, path),
     ...mmproj,
     ...profile.args,
     ...(setsVerbosity(profile.args, env) ? [] : ['-lv', DEFAULT_VERBOSITY]),

@@ -1,9 +1,7 @@
 import { HfInvalidPath } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Option, Path, String as Str } from 'effect';
 import { dual } from 'effect/Function';
-
-/** `dir` without its trailing slashes (`/` stays `/`). */
-const trimmed = (dir: string): string => (dir.length > 1 ? Str.replace(/\/+$/, '')(dir) : dir);
+import { withoutTrailingSlash } from '../config/paths.ts';
 
 /**
  * The local folder of a repository's downloads: `<modelsDir>/<org>/<name>`, the models folder resolved (from the
@@ -48,7 +46,7 @@ export const fileDest: {
   const parts = Str.startsWith('/')(path) ? Option.none() : normalized(path);
   return Option.match(Option.filter(parts, Arr.isReadonlyArrayNonEmpty), {
     onNone: () => Effect.fail(HfInvalidPath.make({ message: `Invalid file path in the repository: ${path}` })),
-    onSome: (segments) => Effect.succeed(`${trimmed(dir)}/${Arr.join(segments, '/')}`),
+    onSome: (segments) => Effect.succeed(`${withoutTrailingSlash(dir)}/${Arr.join(segments, '/')}`),
   });
 });
 

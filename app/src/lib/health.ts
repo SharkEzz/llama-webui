@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { call } from './api';
+import { call, errorMessage } from './api';
 
 /** The reply of `GET /api/health`. */
 export type Health = Awaited<ReturnType<typeof getHealth>>;
@@ -20,7 +20,7 @@ export const useHealth = create<HealthState>()((set) => ({
       const health = await getHealth();
       set({ health, fetchedAt: Date.now(), error: undefined });
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) });
+      set({ error: errorMessage(err) });
     }
   },
 }));

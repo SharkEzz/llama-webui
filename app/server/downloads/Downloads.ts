@@ -1,11 +1,12 @@
 import {
   AlreadyQueued,
   DiskFull,
-  type DownloadFile,
   type DownloadItem,
   type DownloadList,
   type DownloadLive,
   DownloadNotFound,
+  fmtBytes,
+  GiB,
   isDownloadActive,
   NotFinished,
 } from '@llama-webui/shared';
@@ -33,7 +34,7 @@ import type { NewDownload } from '../hf/repo.ts';
 import { removeEmptyFolders } from '../models/usage.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { WsHub } from '../ws/WsHub.ts';
-import { DownloadsRepo } from './DownloadsRepo.ts';
+import { DownloadsRepo, doneBytes } from './DownloadsRepo.ts';
 import { freeBytesOf } from './freeSpace.ts';
 import {
   RETRY_DELAYS,
@@ -43,12 +44,6 @@ import {
   type TransferProgress,
   transferWith,
 } from './transfer.ts';
-
-const MiB = 1024 * 1024;
-const GiB = 1024 * MiB;
-
-/** A size as the disk space refusal writes it: GiB with one decimal from 1 GiB, whole MiB below. */
-const fmtBytes = (n: number): string => (n >= GiB ? `${(n / GiB).toFixed(1)} GiB` : `${Math.round(n / MiB)} MiB`);
 
 /** The item the queue runs now. */
 interface Running {
@@ -90,10 +85,6 @@ const outcomeOf = (exit: Exit.Exit<void, TransferFailed>): Outcome => {
   const message = squashed instanceof Error ? squashed.message : String(squashed);
   return { _tag: 'error', message, code: 'download-failed', defect: Option.some(exit.cause) };
 };
-
-/** The size of the files done. */
-const doneBytes = (files: ReadonlyArray<DownloadFile>) =>
-  Arr.reduce(files, 0, (sum, file) => (file.done ? sum + file.size : sum));
 
 const alreadyQueued = (name: string) => AlreadyQueued.make({ message: `${name} is already in the download queue` });
 

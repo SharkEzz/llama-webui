@@ -220,7 +220,7 @@ A call rejects with:
 | `ApiReplyInvalid` | An event of a stream does not decode; the cause is logged to the console. |
 
 The rule is that the web app never compares the text of a server message: it branches on the error's `_tag`
-(`errorTag(e)`, `app/src/lib/api.ts`) or a shared helper. For example, when a benchmark would stop the running
+(`errorTag(e)`, `app/src/lib/api.ts`) or a shared helper; the text it shows is `errorMessage(e)` of the same file. For example, when a benchmark would stop the running
 server, the server answers `409` `ServerRunning` and the client asks for confirmation:
 
 ```ts title="app/src/lib/bench.ts"

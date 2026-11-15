@@ -1,4 +1,5 @@
 import type { GpuReading } from '@llama-webui/shared';
+import { MiB } from '@llama-webui/shared';
 import {
   Array as Arr,
   Deferred,
@@ -20,7 +21,6 @@ import { type NvidiaReader, normalizeBusId, procVramOf } from './gpu.ts';
  * `--query-compute-apps` query now and then for the VRAM of each process.
  */
 
-const MiB = 1024 ** 2;
 const QUERY = 'index,uuid,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,pci.bus_id';
 
 /** How long a caller of the compute-apps query waits past its timeout for the program to be gone. */

@@ -1,8 +1,7 @@
-import { type DiskSpeed, FileTooSmall, ModelFileNotFound } from '@llama-webui/shared';
+import { type DiskSpeed, FileTooSmall, MiB, ModelFileNotFound } from '@llama-webui/shared';
 import { Clock, Effect, FileSystem, Option, Random, Stream } from 'effect';
 import type { PlatformError } from 'effect/PlatformError';
 
-const MiB = 1024 ** 2;
 /** The most a measure reads: enough to get past the disk's own cache. */
 const MAX_BYTES = 1024 * MiB;
 /** Below this, the measure says nothing about the disk. */

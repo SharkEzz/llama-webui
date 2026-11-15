@@ -5,6 +5,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { errorMessage } from '@/lib/api';
 import { useDownloads } from '@/lib/downloads';
 import { fmt, formatInt } from '@/lib/format';
 import { QueueList } from './QueueList';
@@ -61,7 +62,7 @@ function SearchResults({ q, onPick }: { q: string; onPick(id: string): void }) {
             setHits(h);
             setError(null);
           },
-          (e: unknown) => !ac.signal.aborted && setError(e instanceof Error ? e.message : String(e)),
+          (e: unknown) => !ac.signal.aborted && setError(errorMessage(e)),
         );
     }, DEBOUNCE_MS);
     return () => {

@@ -20,7 +20,7 @@ import {
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { call, errorTag } from './api';
+import { call, errorMessage, errorTag } from './api';
 import { formatShortDate } from './format';
 import { onWs, useWs } from './ws';
 
@@ -80,9 +80,7 @@ interface TuningState {
   measureDisk(modelPath: string): Promise<void>;
 }
 
-const message = (e: unknown) =>
-  typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e);
-const fail = (e: unknown) => void toast.error(message(e));
+const fail = (e: unknown) => void toast.error(errorMessage(e));
 const DEBOUNCE_MS = 300;
 let estimateTimer: ReturnType<typeof setTimeout> | null = null;
 let planTimer: ReturnType<typeof setTimeout> | null = null;
@@ -163,7 +161,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       const estimate = await call((api) => api.tuning.estimate({ payload: { modelPath, mmprojPath, preset, pinned } }));
       if (seq === estimateSeq) set({ estimate, estimateError: null });
     } catch (e) {
-      if (seq === estimateSeq) set({ estimate: null, estimateError: message(e) });
+      if (seq === estimateSeq) set({ estimate: null, estimateError: errorMessage(e) });
     }
   };
   const specBody = (modelPath: string) => {
@@ -201,7 +199,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       const plan = await call((api) => api.tuning.plan({ payload: { spec: specBody(modelPath) } }));
       if (seq === planSeq) set({ plan, planError: null });
     } catch (e) {
-      if (seq === planSeq) set({ plan: null, planError: message(e) });
+      if (seq === planSeq) set({ plan: null, planError: errorMessage(e) });
     }
   };
   const refresh = () => {

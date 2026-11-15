@@ -1,7 +1,7 @@
 import { defer, type ServerView } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { call } from './api';
+import { call, errorMessage } from './api';
 import { onWs, useWs } from './ws';
 
 interface ServerStore {
@@ -40,7 +40,7 @@ async function action(send: () => Promise<ServerView>): Promise<boolean> {
     useServer.setState({ view });
     return true;
   } catch (e) {
-    toast.error(e instanceof Error ? e.message : String(e));
+    toast.error(errorMessage(e));
     return false;
   }
 }

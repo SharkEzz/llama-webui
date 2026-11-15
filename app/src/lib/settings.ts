@@ -1,11 +1,9 @@
 import { type Settings, SettingsInvalid } from '@llama-webui/shared';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { call, errorTag } from './api';
+import { call, errorMessage, errorTag } from './api';
 
 export type SettingsErrors = Partial<Record<keyof Settings, string>>;
-
-const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** The rejection of a patch, if it is `SettingsInvalid`: its fields' messages. */
 const invalid = (e: unknown): SettingsInvalid | undefined =>
@@ -20,7 +18,7 @@ export function useSettingsEditor() {
   const [errors, setErrors] = useState<SettingsErrors>({});
 
   useEffect(() => {
-    void call((api) => api.settings.get()).then(setSettings, (e: unknown) => toast.error(messageOf(e)));
+    void call((api) => api.settings.get()).then(setSettings, (e: unknown) => toast.error(errorMessage(e)));
   }, []);
 
   const save = async (patch: Partial<Settings>, o: { quiet?: boolean } = {}): Promise<boolean> => {
@@ -42,7 +40,7 @@ export function useSettingsEditor() {
         const next: SettingsErrors = {};
         for (const i of refused.issues) next[i.path[0] as keyof Settings] ??= i.message;
         setErrors((old) => ({ ...old, ...next }));
-      } else toast.error(messageOf(e));
+      } else toast.error(errorMessage(e));
       return false;
     }
   };

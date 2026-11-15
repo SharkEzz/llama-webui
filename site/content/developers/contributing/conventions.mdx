@@ -25,7 +25,8 @@ ring start with `[llama-webui]`.
 
 The web app formats every number, date and unit through `app/src/lib/format.ts`, with the `LOCALE = 'en-US'` of
 `packages/webui-shared/src/format.ts`. Do not hard-code a locale in a component: use a helper, or add one to that file. A server
-message that shows a number (an error, a log line) uses `fmtInt()` from `packages/webui-shared/src/format.ts` the same way.
+message that shows a number (an error, a log line) uses `fmtInt()` from `packages/webui-shared/src/format.ts` the same way,
+and `fmtBytes()` of the same file for a size (`12.3 GiB`, `512 MiB`; `MiB` and `GiB` are there too).
 
 | Helper                                       | Output                                                          |
 | -------------------------------------------- | --------------------------------------------------------------- |

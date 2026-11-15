@@ -7,7 +7,7 @@ import {
   type ModelUsage,
 } from '@llama-webui/shared';
 import { create } from 'zustand';
-import { call as webCall } from './api';
+import { errorMessage, call as webCall } from './api';
 import { stem } from './stem';
 
 interface ModelsState {
@@ -31,8 +31,6 @@ export interface ModelsCalls {
   readonly call: typeof webCall;
 }
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
 /** The models folder's store, making its calls through `calls`. */
 export const makeModelsStore = ({ call }: ModelsCalls) =>
   create<ModelsState>((set, get) => ({
@@ -46,7 +44,7 @@ export const makeModelsStore = ({ call }: ModelsCalls) =>
       try {
         set({ list: await call((api) => api.models.list()), error: null });
       } catch (e) {
-        set({ error: message(e) });
+        set({ error: errorMessage(e) });
       }
     },
     usage: (path) => call((api) => api.models.usage({ query: { path } })),

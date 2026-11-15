@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { errorTag } from '@/lib/api';
+import { errorMessage, errorTag } from '@/lib/api';
 import { useDownloads } from '@/lib/downloads';
 import { formatBytes } from '@/lib/format';
 import { useMonitor } from '@/lib/monitor';
@@ -116,7 +116,7 @@ export function RepoView({
             },
             (e: unknown) => {
               if (ac.signal.aborted) return;
-              setError({ message: e instanceof Error ? e.message : String(e), tag: errorTag(e) });
+              setError({ message: errorMessage(e), tag: errorTag(e) });
             },
           );
       },

@@ -9,7 +9,7 @@ import {
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { call as webCall } from './api';
+import { errorMessage, call as webCall } from './api';
 import { useModels } from './models';
 import { onWs, useWs } from './ws';
 
@@ -74,8 +74,7 @@ const merged = (items: ReadonlyArray<DownloadItem>, touched: Touched): ReadonlyA
   return [...kept, ...added];
 };
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const fail = (e: unknown) => void toast.error(message(e));
+const fail = (e: unknown) => void toast.error(errorMessage(e));
 
 /** `items` with `item` in place of the one with its id, or added at the end. */
 const upsert = (items: ReadonlyArray<DownloadItem>, item: DownloadItem) =>

@@ -1,4 +1,5 @@
 import type { DownloadFile, DownloadItem, DownloadLive, HfRateLimited } from '@llama-webui/shared';
+import { MiB } from '@llama-webui/shared';
 import {
   Array as Arr,
   Clock,
@@ -21,10 +22,8 @@ import { type HubError, hubError, reasonOf } from '../hf/HfClient.ts';
 import { HfHttp } from '../hf/HfHttp.ts';
 import { fileDest, partPath, sizeOf } from '../hf/paths.ts';
 import { hfEndpoint, hfToken, hubHeaders } from '../hf/token.ts';
-import { DownloadsRepo } from './DownloadsRepo.ts';
+import { DownloadsRepo, doneBytes } from './DownloadsRepo.ts';
 import { type Sha256, sha256 } from './hash.ts';
-
-const MiB = 1024 * 1024;
 
 /**
  * The pauses between the attempts at a file (after a transient failure), and the time without data after which an
@@ -116,10 +115,6 @@ const refused = (error: Exclude<HubError, HfRateLimited>): TransferFailed => {
       return TransferFailed.make({ message: error.message, code: 'hf-unreachable', status: 502 });
   }
 };
-
-/** The size of the files done. */
-const doneBytes = (files: ReadonlyArray<DownloadFile>) =>
-  Arr.reduce(files, 0, (sum, file) => (file.done ? sum + file.size : sum));
 
 /**
  * The transfer: each file from `<endpoint>/<repo>/resolve/<revision>/<path>` through `HfHttp`, its redirects followed

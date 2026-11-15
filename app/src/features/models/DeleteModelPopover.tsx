@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
+import { errorMessage } from '@/lib/api';
 import { formatBytes, plural } from '@/lib/format';
 import { useModels } from '@/lib/models';
 import { useProfiles } from '@/lib/profiles';
@@ -36,7 +37,7 @@ export function DeleteModelPopover({ path, onDeleted }: { path: string; onDelete
     useModels
       .getState()
       .usage(path)
-      .then(setUsage, (e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+      .then(setUsage, (e: unknown) => setError(errorMessage(e)));
   };
 
   const run = async (deleteProfiles: boolean) => {
@@ -50,7 +51,7 @@ export function DeleteModelPopover({ path, onDeleted }: { path: string; onDelete
       onDeleted();
       void useProfiles.getState().reload();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e));
+      toast.error(errorMessage(e));
     } finally {
       setBusy(false);
     }
