@@ -102,9 +102,36 @@ const hardwareLayer = (hardware: Effect.Effect<typeof HARDWARE> = Effect.succeed
     }),
   );
 
+/**
+ * The runs' repository of `fresh` for the runner only, whose `finish` dies `times` times: a defect in the runner's
+ * background work, as a failed SQL statement is.
+ */
+const dyingFinish = (times: number) =>
+  Layer.effect(
+    BenchRunsRepo,
+    Effect.gen(function* () {
+      const runs = yield* BenchRunsRepo;
+      const left = yield* Ref.make(times);
+      return BenchRunsRepo.of({
+        ...runs,
+        finish: (id, result) =>
+          Ref.getAndUpdate(left, (n) => Math.max(0, n - 1)).pipe(
+            Effect.flatMap((n) => (n > 0 ? Effect.die(new Error('disk I/O error')) : runs.finish(id, result))),
+          ),
+      });
+    }),
+  );
+
 /** `test` with a runner of its own on the services of `fresh`, undone at its end. */
 const withRunner =
-  (options: { readonly pause?: Duration.Input; readonly hardware?: Effect.Effect<typeof HARDWARE> } = {}) =>
+  (
+    options: {
+      readonly pause?: Duration.Input;
+      readonly hardware?: Effect.Effect<typeof HARDWARE>;
+      /** How many times the runner's `finish` dies before it works. */
+      readonly dyingFinish?: number;
+    } = {},
+  ) =>
   <A, E, R>(test: Effect.Effect<A, E, R>) =>
     Layer.build(
       BenchRunner.layerWith({
@@ -112,7 +139,11 @@ const withRunner =
         pause: options.pause ?? '10 millis',
         stoppingTimeout: '60 seconds',
         liveThrottle: '250 millis',
-      }).pipe(Layer.provide(Layer.mergeAll(RecordingHub, hardwareLayer(options.hardware)))),
+      }).pipe(
+        Layer.provide(
+          Layer.mergeAll(RecordingHub, hardwareLayer(options.hardware), dyingFinish(options.dyingFinish ?? 0)),
+        ),
+      ),
     ).pipe(
       Effect.flatMap((context) => Effect.provideContext(test, context)),
       Effect.scoped,
@@ -267,6 +298,57 @@ describe('BenchRunner', () => {
       assert.isFalse(busy);
       yield* stateWhen((s) => s.kind === 'ready');
     }).pipe(withRunner(), fresh),
+  );
+
+  it.live('a run that dies on a defect is saved failed, frees the runner and restarts llama-server', () =>
+    Effect.gen(function* () {
+      const runner = yield* BenchRunner;
+      yield* useFake();
+      yield* startA;
+      const run = yield* startBench;
+      yield* runEnded;
+      const last = yield* lastRun;
+      assert.deepStrictEqual([last.id, last.status, last.error], [run.id, 'failed', 'internal error: disk I/O error']);
+      yield* gateWas(STOP_AND_RESTART);
+      const busy = yield* runner.busy;
+      assert.isFalse(busy);
+      yield* stateWhen((s) => s.kind === 'ready');
+      // The runner works again: the next run goes to its end.
+      const before = (yield* progress).length;
+      const next = yield* startBench;
+      yield* until(
+        Effect.map(
+          progress,
+          (lives) => lives.length > before + 1 && Arr.last(lives).pipe(Option.exists((l) => l === null)),
+        ),
+      );
+      const ended = yield* lastRun;
+      assert.deepStrictEqual([ended.id, ended.status], [next.id, 'ok']);
+    }).pipe(withRunner({ dyingFinish: 1 }), fresh),
+  );
+
+  it.live('a sweep that dies on a defect is left interrupted, frees the runner and restarts llama-server', () =>
+    Effect.gen(function* () {
+      const runner = yield* BenchRunner;
+      yield* useFake({ FAKE_BENCH_STEP_MS: '5' });
+      yield* startA;
+      // The run cannot be saved at all: the rest of the end still happens.
+      const sweep = yield* startSweepOf([1, 2]);
+      yield* sweepEnded;
+      const final = yield* sweepOfId(sweep.id);
+      assert.strictEqual(final.status, 'interrupted');
+      const items = yield* itemsOf(sweep.id);
+      assert.deepStrictEqual(
+        Arr.map(items, (r) => r.status),
+        ['running', 'queued'],
+      );
+      const lives = yield* progress;
+      assert.isNull(Arr.last(lives).pipe(Option.getOrUndefined));
+      yield* gateWas(STOP_AND_RESTART);
+      const busy = yield* runner.busy;
+      assert.isFalse(busy);
+      yield* stateWhen((s) => s.kind === 'ready');
+    }).pipe(withRunner({ dyingFinish: Number.MAX_SAFE_INTEGER }), fresh),
   );
 
   it.live('a successful run stores pp/tg and refuses a second run meanwhile', () =>

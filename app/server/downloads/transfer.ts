@@ -303,6 +303,9 @@ export const transferWith = (options: {
           const hash =
             file.sha256 === null ? Option.none<HashState>() : yield* Effect.asSome(hashOf(file, part, offset, base));
           if (offset < file.size) yield* Effect.scoped(receive(file, part, offset, hash, base));
+          // An empty file has nothing to ask for: its `.part` is made here, for the checks and the rename below.
+          else if (Option.isNone(found))
+            yield* fs.writeFile(part, new Uint8Array(0)).pipe(Effect.mapError(writeFailure));
           const got = yield* sizeAt(part);
           const size = Option.getOrElse(got, () => 0);
           if (size !== file.size) {

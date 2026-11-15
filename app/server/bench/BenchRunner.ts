@@ -23,6 +23,7 @@ import {
 } from '@llama-webui/shared';
 import {
   Array as Arr,
+  Cause,
   Clock,
   Context,
   Deferred,
@@ -374,9 +375,59 @@ export class BenchRunner extends Context.Service<
           yield* SynchronizedRef.update(state, (s) => ({ ...s, work: Option.none() }));
         });
 
-        /** Forks `work` in the layer's scope and records it; done uninterruptibly with what made it. */
+        /**
+         * The end of a work that died on a defect (a failed SQL statement, a parser that throws), which nothing else
+         * would undo: logged, then the current run saved `failed`, the running sweep `interrupted` (its queue stays
+         * for a resume), the gate released (llama-server restarted, unless the app stops), the runner free, no live.
+         * Each step on its own: one that fails too is logged and the next ones still run.
+         */
+        const crashed = Effect.fnUntraced(function* (cause: Cause.Cause<never>) {
+          yield* Effect.logError('a benchmark stopped on a defect', cause);
+          const step = <A>(effect: Effect.Effect<A>) =>
+            effect.pipe(Effect.catchCause((failed) => Effect.logError('the end of a benchmark failed', failed)));
+          const s = yield* SynchronizedRef.get(state);
+          const defect = Cause.squash(cause);
+          const current = Option.filter(s.current, (c) => !c.finished);
+          if (Option.isSome(current)) {
+            const now = yield* Clock.currentTimeMillis;
+            yield* step(
+              runs
+                .finish(current.value.runId, {
+                  status: 'failed',
+                  error: `internal error: ${defect instanceof Error ? defect.message : String(defect)}`,
+                  durationMs: now - current.value.live.startedAt,
+                })
+                .pipe(Effect.flatMap((saved) => publish({ type: 'bench-run', payload: saved }))),
+            );
+          }
+          if (Option.isSome(s.sweep)) {
+            yield* step(
+              sweeps
+                .setStatus(s.sweep.value.id, 'interrupted')
+                .pipe(Effect.flatMap((sweep) => publish({ type: 'sweep', payload: sweep }))),
+            );
+          }
+          yield* step(abandon);
+          yield* SynchronizedRef.update(state, (st) => ({
+            ...st,
+            current: Option.none(),
+            sweep: Option.none(),
+            sweepLive: Option.none(),
+            work: Option.none(),
+          }));
+          if (Option.isSome(s.current)) yield* step(publishLive(null));
+          if (Option.isSome(s.sweepLive)) yield* step(publish({ type: 'sweep-progress', payload: null }));
+        });
+
+        /**
+         * Forks `work` in the layer's scope and records it; done uninterruptibly with what made it. A work that dies
+         * ends through `crashed`; an interrupted one is the shutdown step's, or the end of the layer.
+         */
         const fork = Effect.fnUntraced(function* (work: Effect.Effect<void>) {
-          const fiber = yield* Effect.forkIn(work, scope);
+          const guarded = work.pipe(
+            Effect.onError((cause) => (Cause.hasInterruptsOnly(cause) ? Effect.void : crashed(cause))),
+          );
+          const fiber = yield* Effect.forkIn(guarded, scope);
           yield* SynchronizedRef.update(state, (s) => ({ ...s, work: Option.some(fiber) }));
         });
 

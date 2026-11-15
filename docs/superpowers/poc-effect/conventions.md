@@ -166,7 +166,11 @@ The model is `app/server/supervisor/Supervisor.ts`.
   the row writes run under the claim, interruptible, so a client that leaves mid-way leaves no claim; an
   `Effect.onError` gives back what it took (the gate). The last step (the rows, the message, the fork) is
   `Effect.uninterruptible`, and the work is forked in the layer's scope (`Effect.forkIn(work, scope)`), which holds the
-  runner after the claim. `busy` reads all of it at once: a claim, a current run, a running sweep, the gate held.
+  runner after the claim. Nobody awaits that fiber, so the fork itself answers for a defect of the work
+  (`Effect.onError`, interrupts left alone): `crashed` logs it, saves the run `failed`, leaves the sweep `interrupted`,
+  releases the gate and frees the state, each step tried whatever the one before it did. A fiber that outlives its
+  request and holds something always has such an end; a periodic one logs the defect of a round and runs the next
+  (`Monitor`, `ExternalWatch`: `Effect.catchCauseIf(Predicate.not(Cause.hasInterruptsOnly), …)` inside the repeat). `busy` reads all of it at once: a claim, a current run, a running sweep, the gate held.
 - **A gate that holds another service for a while and gives it back** (`makeGate` of `app/server/bench/gate.ts`, a
   module of the runner on `Supervisor`, not a service): its state in a `Ref` (held, the command it stopped, the stop's
   fiber, the release in progress). `acquire` refuses (a server stopping too long, an external one, a running one
@@ -273,7 +277,8 @@ The model is `app/server/supervisor/Supervisor.ts`.
   (`packages/webui-shared/src/monitor.ts`, `topology.ts`): a reply carries no NaN or Infinity. `Int` is for what is
   integral by construction (times in ms, counts, ticks, PCIe gen and width); a measure or a gauge (an average such as
   `busySlots`) is `Finite`.
-- The hub drops a message that does not encode, silently: what a reading gives is made finite before it reaches a
+- The hub does not send a message that does not encode, and logs it as an error (`a <type> message does not encode:
+  not sent`, once per client): what a reading gives is made finite before it reaches a
   schema (`app/server/monitor/finite.ts`: `null` where the field allows it, else `0`; an `Int` field takes the integral
   part). The history keeps the raw values, and its dump writes a value that is not finite as `null`. A test feeds the
   step non-finite readings and encodes its result (`tick.test.ts`: a tick fed non-finite readings still encodes as a

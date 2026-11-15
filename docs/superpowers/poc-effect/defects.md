@@ -103,6 +103,16 @@ reviewing this list, done in E11: `docs/superpowers/plans/2026-11-15-effect-e11-
 - No test posts a valid download. `confirmed`, `fixed in E6`: `downloads/http.test.ts` (a valid download request
   stores the canonical repo id and the resolved sha and answers 202 with the items; a request naming a key the repo
   lacks is a 404 No GGUF; a key listed twice is a 400), on a fake Hub (`app/server/testing/hub.ts`).
+- Cancelling a download deletes every file it names that is in place at the right size, the copy another download
+  placed too: two variants of a repository queued together both list their shared projector, and cancelling the second
+  deleted the projector the first had finished with. `confirmed`, `fixed (review of the branch)`: a file another item
+  of the list names too (queued, running, done or failed) is left, its `.part` included (`downloads/Downloads.test.ts`:
+  cancel keeps a file another item of the list names too; cancel keeps the .part an item still queued will resume).
+  Once the other item's row is cleared from the list, nothing tells its files from the canceled item's: a cancel then
+  deletes the shared file, as before.
+- A file of zero bytes never gets a `.part` (nothing is requested for it), and the rename fails `ENOENT`: the item
+  ends `error`. `confirmed`, `fixed (review of the branch)`: its empty `.part` is created, then checked and renamed
+  like any other (`downloads/transfer.test.ts`: an empty file is put in place without a request).
 
 ### E7: bench and sweeps
 
@@ -219,8 +229,9 @@ Found while porting E3, accepted with its result:
 
 - A spawn failure is Node's own message (`spawn setpriv ENOENT`); the Nitro server's diagnosis of the `PATH` of the
   child's environment is dropped. A missing llama-server binary is a crash with code 127 (`setpriv` prints why).
-- `GGML_CUDA_P2P` in llama-webui's own environment is read through `Config`, where an empty value reads as absent; in
-  the `env` of the settings or of the profile any value counts, as before.
+- `GGML_CUDA_P2P` in llama-webui's own environment was read through `Config`, where an empty value reads as absent.
+  Fixed (review of the branch): it is read by a provider that keeps empty values (`p2pInEnvironment`), so any value
+  counts there too, as in the `env` of the settings or of the profile, and as llama.cpp reads it.
 - A `log` message carries what was pushed since the last turn of the ring's publishing fiber (was: one microtask).
 - `server-state` is published by the step that changes the state, under its lock: a step that leaves the state as it
   was publishes nothing, and a late answer (the health poll, the watch) never undoes a newer state.
@@ -698,6 +709,18 @@ Found by the review pass of E9 (against its plan and the spec's row):
   only, as before E9, when that was their one hand-written case. Kept: a success of theirs needs a finished run, a
   sweep or a download, which the black-box contract does not set up (their unit tests do). `conventions.md` now says
   what the matrix gives and what is still written by hand.
+
+Fixed (review of the branch), in what the Effect server added:
+
+- A defect in the fiber of a run or of a sweep (the database failing while a result is saved) ended it with nobody
+  told: the runner stayed busy, the gate held, llama-server stopped. The fork now answers for it: the run is saved
+  `failed` (`internal error: <message>`), the sweep left `interrupted`, the gate released and the runner freed
+  (`bench/BenchRunner.test.ts`: a run that dies on a defect is saved failed…; a sweep that dies on a defect is left
+  interrupted…).
+- A defect in one look of the external watch ended the watch for the life of the process: it is logged and the next
+  look runs (`supervisor/ExternalWatch.test.ts`: a look that dies on a defect does not end the watch).
+- The hub dropped a message that does not encode without a word, and the page a frame that does not decode: both are
+  logged (`ws/WsHub.test.ts`: a message that does not encode is logged with its type…; `app/src/lib/ws.test.ts`).
 
 ## Measures (`e<N>.json`)
 

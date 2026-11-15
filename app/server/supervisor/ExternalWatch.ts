@@ -1,4 +1,4 @@
-import { Array as Arr, type Duration, Effect, Layer, Option, Schedule } from 'effect';
+import { Array as Arr, Cause, type Duration, Effect, Layer, Option, Predicate, Schedule } from 'effect';
 import { BenchRunner } from '../bench/BenchRunner.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { Supervisor } from './Supervisor.ts';
@@ -25,12 +25,22 @@ const check = Effect.gen(function* () {
 
 /**
  * The watch of a llama-server started by hand (#39): a fiber of the layer's scope that looks once as soon as it is
- * built, without holding the start of the app, then every `interval`, one look at a time. It provides nothing.
+ * built, without holding the start of the app, then every `interval`, one look at a time. A look that dies on a
+ * defect (the database failing…) is logged and the next one runs: the watch lasts as long as the app. It provides
+ * nothing.
  */
 const layerWith = (options: {
   readonly interval: Duration.Input;
 }): Layer.Layer<never, never, Supervisor | SettingsRepo | BenchRunner> =>
-  Layer.effectDiscard(check.pipe(Effect.repeat(Schedule.spaced(options.interval)), Effect.forkScoped));
+  Layer.effectDiscard(
+    check.pipe(
+      Effect.catchCauseIf(Predicate.not(Cause.hasInterruptsOnly), (cause) =>
+        Effect.logError('a look for an external llama-server failed', cause),
+      ),
+      Effect.repeat(Schedule.spaced(options.interval)),
+      Effect.forkScoped,
+    ),
+  );
 
 export const ExternalWatch = {
   layerWith,

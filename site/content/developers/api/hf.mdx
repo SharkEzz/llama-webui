@@ -293,7 +293,8 @@ curl -X POST http://127.0.0.1:7860/api/downloads/clear
 Depends on the item's status:
 
 - **Queued or downloading**: cancels it. Its `.part` files and the files it already put in place are deleted, then the
-  folders left empty. For the running item, the transfer is aborted and the response comes back before the cleanup:
+  folders left empty; a file another item of the list names too (a projector shared by two variants) is kept. For the
+  running item, the transfer is aborted and the response comes back before the cleanup:
   the `download` message with status `canceled` follows.
 - **Finished** (`done`, `error`, `canceled`): removes it from the list (`download-deleted`). Its files stay.
 

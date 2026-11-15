@@ -78,7 +78,7 @@ on the [Models](/docs/models/) page, which is rescanned by itself, so you can go
 
 | Action                         | Where                           | Effect                                                                                     |
 | ------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------ |
-| Cancel (the cross)             | A queued or running item        | Stops it and deletes what it wrote: partial files, and files it had already completed.     |
+| Cancel (the cross)             | A queued or running item        | Stops it and deletes what it wrote: partial files, and files it had already completed. A file another download of the list also needs (a projector shared by two variants) is kept. |
 | Retry (the circular arrow)     | A failed or canceled item       | Puts it back in the queue. Files that are still complete on disk are kept.                 |
 | Remove from the list (the bin) | A finished, failed or canceled item | Removes the row only. Downloaded files stay.                                            |
 | **Clear finished**             | Above the list                  | Removes every finished, failed and canceled row. Downloaded files stay.                    |

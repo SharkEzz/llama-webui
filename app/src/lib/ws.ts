@@ -1,5 +1,5 @@
 import { WsMessage } from '@llama-webui/shared';
-import { Option, Schema } from 'effect';
+import { Option, Result, Schema } from 'effect';
 import { create } from 'zustand';
 
 export type WsStatus = 'connecting' | 'open' | 'closed';
@@ -13,8 +13,18 @@ interface WsState {
 const BACKOFF_START_MS = 500;
 const BACKOFF_MAX_MS = 10_000;
 
-/** A frame as a message of the push channel; what does not decode (not JSON, an unknown type) is none. */
-const decodeFrame = Schema.decodeUnknownOption(Schema.fromJsonString(WsMessage));
+const decode = Schema.decodeUnknownResult(Schema.fromJsonString(WsMessage));
+
+/**
+ * A frame as a message of the push channel. What does not decode (not JSON, a type or a field this page does not
+ * know: a page and a server of two versions) is none, and logged: a page that stops updating says nothing of why.
+ */
+export const decodeFrame = (frame: string): Option.Option<WsMessage> => {
+  const decoded = decode(frame);
+  if (Result.isSuccess(decoded)) return Option.some(decoded.success);
+  console.error('llama-webui: a message of the server does not decode', decoded.failure);
+  return Option.none();
+};
 
 type Listener = (msg: WsMessage) => void;
 const listeners = new Map<WsMessage['type'], Set<Listener>>();

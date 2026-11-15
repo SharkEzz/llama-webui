@@ -150,7 +150,8 @@ the oldest queued one. For each file not yet done, an attempt:
 
 A destination file with the expected size counts as done (renamed into place just before a stop, before the row
 recorded it). Otherwise the offset is the size of the `.part`; a `.part`
-larger than the file cannot be this file and is deleted.
+larger than the file cannot be this file and is deleted. An empty file has nothing to ask the Hub for: its empty
+`.part` is created on the spot, then checked and renamed like any other.
 
   </Step>
   <Step title="Prepare the checksum">
@@ -219,7 +220,10 @@ also saves the item `error` with `download-failed`, its cause logged. The item k
   (its transfer interrupted, then what it wrote deleted), a queued one is canceled at once (marked `canceled` first,
   so the loop cannot pick it up while its files are deleted), and a finished one is taken out of the list with its
   files kept. Deleting removes the `.part` files, the files it had already put in place, then the folders left empty,
-  deepest first, up to the organization's folder.
+  deepest first, up to the organization's folder. A file another item of the list names too (queued, running, done or
+  failed, not a canceled one) is left as it is, its `.part` included: two variants of a repository share their
+  projector, and the copy one of them placed, or the `.part` the next one will resume, is not the canceled item's to
+  delete.
 - `retry(id)` puts a failed or canceled item back in the queue (`409` `NotFinished` `Only a failed or canceled
   download can be retried` otherwise), with the same duplicate and disk space checks as a new download. No file is
   trusted as done any more: each one is checked on disk again, and those still in place are kept.

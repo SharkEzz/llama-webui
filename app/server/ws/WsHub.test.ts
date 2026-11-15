@@ -10,6 +10,7 @@ import {
   Exit,
   Fiber,
   Layer,
+  Logger,
   Schedule,
   Schema,
   Scope,
@@ -105,6 +106,26 @@ it.live('a published message reaches every client', () =>
     assert.strictEqual(size, 2);
   }),
 );
+
+it.live('a message that does not encode is logged with its type, not sent, and the next one arrives', () => {
+  const errors: Array<ReadonlyArray<unknown>> = [];
+  const logger = Logger.make<unknown, void>(({ logLevel, message }) => {
+    if (logLevel === 'Error') errors.push(Arr.ensure(message));
+  });
+  return Effect.gen(function* () {
+    const app = yield* start();
+    const a = yield* app.open();
+    yield* next(a, 'hello');
+    // An id that is no integer: the type allows it, the schema does not.
+    yield* app.hub.publish({ type: 'download-deleted', payload: { ids: [Number.NaN] } });
+    yield* app.hub.publish({ type: 'download-deleted', payload: { ids: [7] } });
+    const got = yield* next(a, 'download-deleted');
+    assert.deepStrictEqual(got, { type: 'download-deleted', payload: { ids: [7] } });
+    const [logged] = errors;
+    assert.strictEqual(errors.length, 1);
+    assert.strictEqual(logged?.[0], 'a download-deleted message does not encode: not sent');
+  }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
+});
 
 it.live('a client ping is answered with pong', () =>
   Effect.gen(function* () {

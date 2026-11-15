@@ -78,8 +78,15 @@ export class WsHub extends Context.Service<
             // The handshake answer leaves when the reader is acquired: before the first write.
             const pull = yield* Socket.readerString(socket);
             const { write } = yield* socket.writer;
-            // A write to a socket that just closed fails: the reader sees the close and ends the client.
-            const send = (message: WsMessage) => encode(message).pipe(Effect.flatMap(write), Effect.ignore);
+            // A message that does not encode (a number that is not finite…) is a bug of what published it: logged,
+            // and not sent. A write to a socket that just closed fails: the reader sees the close and ends the client.
+            const send = (message: WsMessage) =>
+              encode(message).pipe(
+                Effect.matchEffect({
+                  onFailure: (error) => Effect.logError(`a ${message.type} message does not encode: not sent`, error),
+                  onSuccess: (text) => Effect.ignore(write(text)),
+                }),
+              );
             // Subscribed before it is counted: a flush that waits for this client finds `Flush` in its queue.
             const messages = yield* PubSub.subscribe(pubsub);
             const flushed = yield* Deferred.make<void>();

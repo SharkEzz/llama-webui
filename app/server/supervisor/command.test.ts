@@ -1,7 +1,7 @@
 import { assert, layer } from '@effect/vitest';
 import { P2P_LOG_LINE, type Profile, type ProfileInput } from '@llama-webui/shared';
 import { Array as Arr, Effect, Path, String as Str } from 'effect';
-import { commandOf, launchLines, profilePaths } from './command.ts';
+import { commandOf, launchLines, p2pInEnvironment, profilePaths } from './command.ts';
 
 const settings = { binary: 'llama-server', host: '0.0.0.0', port: 8080, env: {} };
 const p = (input: Omit<ProfileInput, 'args' | 'env'> & Partial<Pick<ProfileInput, 'args' | 'env'>>): Profile => ({
@@ -148,6 +148,17 @@ layer(Path.layer)('command', (it) => {
       assert.strictEqual(built.argv[4], '/home/x/llama.cpp/build/bin/llama-server');
       assert.strictEqual(bare.argv[4], 'llama-server');
       assert.strictEqual(other.argv[4], '/home/x/b/llama-server');
+    }),
+  );
+
+  it.effect("GGML_CUDA_P2P counts in llama-webui's own environment whatever its value, an empty one too", () =>
+    Effect.gen(function* () {
+      for (const value of ['1', '0', '']) {
+        const set = yield* p2pInEnvironment({ GGML_CUDA_P2P: value });
+        assert.isTrue(set, `"${value}"`);
+      }
+      const other = yield* p2pInEnvironment({ GGML_CUDA_P2PX: '1', GGML: '1' });
+      assert.isFalse(other);
     }),
   );
 

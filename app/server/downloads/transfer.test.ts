@@ -491,6 +491,33 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('transfer', (it) 
     ),
   );
 
+  it.effect('an empty file is put in place without a request', () =>
+    withQueue(
+      Effect.gen(function* () {
+        const empty = new Uint8Array(0);
+        const body = data(3000);
+        const files: Files = [
+          ['empty.gguf', empty],
+          ['m.gguf', body],
+        ];
+        yield* serve(files);
+        const item = yield* Effect.flatMap(input('m.gguf', files), download);
+        assert.strictEqual(item.error, null);
+        assert.strictEqual(item.status, 'done');
+        yield* expectPlaced('empty.gguf', empty);
+        yield* expectPlaced('m.gguf', body);
+        const hub = yield* Hub;
+        yield* expectEqual(
+          Effect.map(
+            requestsOf('resolve'),
+            Arr.map((request) => request.url),
+          ),
+          [`/o/r/resolve/${hub.shaOf('o/r')}/m.gguf`],
+        );
+      }),
+    ),
+  );
+
   it.effect('retrying a canceled split model downloads again the shards the cancel deleted', () =>
     withQueue(
       Effect.gen(function* () {

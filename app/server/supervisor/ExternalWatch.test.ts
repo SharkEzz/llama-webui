@@ -20,8 +20,8 @@ const SilentHub = Layer.succeed(WsHub, {
   attach: Effect.fn(() => Effect.void),
 });
 
-/** Whether the bench runner says it is busy, as the test sets it. */
-class Busy extends Context.Service<Busy, Ref.Ref<boolean>>()(
+/** How the bench runner answers `busy`, as the test sets it. */
+class Busy extends Context.Service<Busy, Ref.Ref<Effect.Effect<boolean>>>()(
   '@llama-webui/app/server/supervisor/ExternalWatch.test/Busy',
 ) {}
 
@@ -32,7 +32,7 @@ const BusyRunner = Layer.effect(
     const busy = yield* Busy;
     const unused = Effect.die('not used by the watch');
     return BenchRunner.of({
-      busy: Ref.get(busy),
+      busy: Effect.flatten(Ref.get(busy)),
       live: unused,
       sweepLive: unused,
       files: unused,
@@ -44,7 +44,7 @@ const BusyRunner = Layer.effect(
       cancelSweep: () => unused,
     });
   }),
-).pipe(Layer.provideMerge(Layer.effect(Busy, Ref.make(false))));
+).pipe(Layer.provideMerge(Layer.effect(Busy, Ref.make(Effect.succeed(false)))));
 
 /** The supervisor (pids read from `procRoot`), the settings on a new database and a bench runner of `Busy`. */
 const servicesWith = (procRoot: string) =>
@@ -173,14 +173,34 @@ layer(NodeServices.layer, { excludeTestServices: true })('ExternalWatch', (it) =
       yield* Effect.gen(function* () {
         const supervisor = yield* Supervisor;
         const busy = yield* Busy;
-        yield* Ref.set(busy, true);
+        yield* Ref.set(busy, Effect.succeed(true));
         yield* portSetting(port);
         yield* watching;
         // Three looks of the watch at least.
         yield* Effect.sleep('350 millis');
         const meanwhile = yield* supervisor.state;
         assert.strictEqual(meanwhile.kind, 'idle');
-        yield* Ref.set(busy, false);
+        yield* Ref.set(busy, Effect.succeed(false));
+        const external = yield* stateWhen((state) => state.kind === 'external');
+        assert.deepStrictEqual(external, { kind: 'external', pid: fake.pid, port });
+      }).pipe(Effect.provideContext(services));
+    }),
+  );
+
+  it.effect('a look that dies on a defect does not end the watch', () =>
+    Effect.gen(function* () {
+      const port = yield* freePort;
+      const fake = yield* fakeOutside({ port });
+      const procRoot = yield* procNaming(fake.pid, port);
+      const services = yield* Layer.build(servicesWith(procRoot));
+      yield* Effect.gen(function* () {
+        const busy = yield* Busy;
+        yield* Ref.set(busy, Effect.die(new Error('database is locked')));
+        yield* portSetting(port);
+        yield* watching;
+        // Two looks of the watch at least, each one dying.
+        yield* Effect.sleep('250 millis');
+        yield* Ref.set(busy, Effect.succeed(false));
         const external = yield* stateWhen((state) => state.kind === 'external');
         assert.deepStrictEqual(external, { kind: 'external', pid: fake.pid, port });
       }).pipe(Effect.provideContext(services));

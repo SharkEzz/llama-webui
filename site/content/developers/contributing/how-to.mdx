@@ -295,7 +295,8 @@ The service that changes the state publishes the message on the hub, `WsHub.publ
             yield* hub.publish({ type: 'download-progress', payload: live });
 ```
 
-A message that does not encode is dropped: make a reading finite before it reaches a schema.
+A message that does not encode is not sent, and logged as an error (`a <type> message does not encode: not sent`):
+make a reading finite before it reaches a schema.
 
   </Step>
   <Step title="Receive it">

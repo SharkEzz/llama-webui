@@ -78,7 +78,8 @@ there is one.
 ## Building the command
 
 `buildCommand({ profile, settings })` in `command.ts` reads the home folder, llama-webui's working folder and whether
-`GGML_CUDA_P2P` is in its environment, then `commandOf()` turns the profile and the settings (`binary`, `host`,
+`GGML_CUDA_P2P` is in its environment (`p2pInEnvironment()`: whatever its value, an empty one too, since llama.cpp
+only looks for the variable and `llama-server` inherits it), then `commandOf()` turns the profile and the settings (`binary`, `host`,
 `port`, `env`) into a `BuiltCommand`:
 
 ```ts title="app/server/supervisor/command.ts"
@@ -269,6 +270,9 @@ holding the start of the app, then every 2 seconds, one look at a time:
   goes back to `idle`.
 - In any other state it does nothing.
 
+A look that dies on a defect (the database failing…) is logged (`a look for an external llama-server failed`) and the
+next one runs: the watch lasts as long as the app.
+
 `findLlamaServerPid({ port, root })` (`app/server/llama/procScan.ts`) reads `/proc/<pid>/cmdline` for every process
 and gives the first whose program is named `llama-server` and whose `--port` (or `--port=`, `8080` when absent) equals
 `port`. The PID is none when nothing matches, for example a server started under another name or in a container.
@@ -339,7 +343,7 @@ port). The gate (`app/server/bench/gate.ts`), made by the `BenchRunner`, coordin
   `llama-server` that loads then answers, one that crashes, one that ignores `SIGTERM`), the port checks, the launch
   failures, one operation at a time, the finalizer, and the external states.
 - `command.test.ts`: the argument order, the verbosity, `~`, the environment, `profilePaths()` and `launchLines()`.
-- `ExternalWatch.test.ts`: detection on both ports, the recheck, the pause during a benchmark.
+- `ExternalWatch.test.ts`: detection on both ports, the recheck, the pause during a benchmark, a look that dies.
 - `app/server/process/followed.test.ts`: the drain of the output, the exit handled once, the bounded close.
 - `app/server/supervisor/http.test.ts`: the endpoints and their errors.
 - `app/server/lifecycle.test.ts`, against the production build: `SIGTERM` with a `llama-server` running stops it in

@@ -473,6 +473,79 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Downloads', (it)
     ),
   );
 
+  it.effect('cancel keeps a file another item of the list names too: its copy in place and its .part', () =>
+    withQueue(
+      Effect.gen(function* () {
+        const downloads = yield* Downloads;
+        const transfers = yield* Transfers;
+        // Three variants of one repository, queued while their shared projector is not on disk: each lists it.
+        const [a, b, c] = yield* downloads.enqueue([
+          yield* input('a.gguf', [
+            ['a.gguf', 100],
+            ['mmproj.gguf', 50],
+          ]),
+          yield* input('b.gguf', [
+            ['b.gguf', 100],
+            ['mmproj.gguf', 50],
+          ]),
+          yield* input('c.gguf', [
+            ['mmproj.gguf', 50],
+            ['c.gguf', 100],
+          ]),
+        ]);
+        if (a === undefined || b === undefined || c === undefined) return assert.fail('no items');
+        yield* transfers.release(a.id);
+        yield* reaches(a.id, 'done');
+        // A queued item canceled: the projector the first one placed stays.
+        yield* downloads.remove(c.id);
+        yield* expectEqual(statusOf(c.id), Option.some('canceled' as const));
+        yield* expectTrue(exists('mmproj.gguf'));
+        // A running item canceled, which found the projector in place (marked done) and began its own file.
+        yield* transfers.release(b.id, (item) =>
+          Effect.flatMap(place({ ...item, files: Arr.drop(item.files, 1) }), () =>
+            hang(40)({ ...item, files: Arr.take(item.files, 1) }),
+          ),
+        );
+        yield* eventually(exists('b.gguf.part'));
+        yield* downloads.remove(b.id);
+        yield* reaches(b.id, 'canceled');
+        yield* expectFalse(exists('b.gguf.part'));
+        yield* expectTrue(exists('mmproj.gguf'));
+        yield* expectTrue(exists('a.gguf'));
+      }),
+    ),
+  );
+
+  it.effect('cancel keeps the .part an item still queued will resume, and deletes it with the last one', () =>
+    withQueue(
+      Effect.gen(function* () {
+        const downloads = yield* Downloads;
+        const transfers = yield* Transfers;
+        const [a, b] = yield* downloads.enqueue([
+          yield* input('a.gguf', [
+            ['mmproj.gguf', 50],
+            ['a.gguf', 100],
+          ]),
+          yield* input('b.gguf', [
+            ['mmproj.gguf', 50],
+            ['b.gguf', 100],
+          ]),
+        ]);
+        if (a === undefined || b === undefined) return assert.fail('no items');
+        yield* transfers.release(a.id, hang(20));
+        yield* eventually(exists('mmproj.gguf.part'));
+        yield* downloads.remove(a.id);
+        yield* reaches(a.id, 'canceled');
+        yield* expectTrue(exists('mmproj.gguf.part'));
+        // No other item names it any more: the last cancel deletes it.
+        yield* startedTimes(b.id);
+        yield* downloads.remove(b.id);
+        yield* reaches(b.id, 'canceled');
+        yield* expectFalse(exists('mmproj.gguf.part'));
+      }),
+    ),
+  );
+
   it.effect('an enqueue whose every file is on disk creates no row and answers an empty list', () =>
     withQueue(
       Effect.gen(function* () {

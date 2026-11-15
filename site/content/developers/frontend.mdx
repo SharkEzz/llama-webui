@@ -175,7 +175,8 @@ another conversation aborts the stream, which only unsubscribes: the generation 
   connection that missed two (see [WebSocket](/developers/api/websocket/)).
 - **Dispatch.** `onWs(type, fn)` registers a typed listener for one message type and returns its unsubscribe
   function. Each frame is decoded with the shared `WsMessage` schema and dispatched by `type`; a frame that does not decode
-(not JSON, an unknown type) is ignored.
+(not JSON, a type or a field the page does not know) is skipped and logged to the console (`decodeFrame()`:
+`llama-webui: a message of the server does not decode`, with the schema error).
 - **HMR.** In development, `import.meta.hot.dispose` closes the socket and clears the retry timer, so a hot update
   of the client does not leave ghost sockets behind.
 

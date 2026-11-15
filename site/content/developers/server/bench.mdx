@@ -139,6 +139,12 @@ The background part executes the run, saves its result with `BenchRunsRepo.finis
 server restarts, the live state shows the `restarting-server` phase; when everything is over, the live state becomes
 `null`.
 
+That fiber is not awaited by anyone, so a defect in it (the database failing while a result is saved…) is caught where
+it is forked (`crashed()`): it is logged (`a benchmark stopped on a defect`), the current run is saved `failed` with
+`internal error: <message>`, a running sweep is left `interrupted` (it can be resumed), the gate is released, so
+`llama-server` is restarted, and the runner is free again. Each of these steps is tried even when the one before it
+fails.
+
 `cancel(id)` only acts on the current run (`404` `RunNotFound`, `409` `RunNotRunning` otherwise). It completes the
 run's cancel signal, and `execute()` sends `SIGTERM`, then `SIGKILL` after 5 seconds (`killTimeout`); the saved
 status is `cancelled`. In a sweep, cancelling the current item
@@ -505,7 +511,9 @@ A client that connects late reads the current state over HTTP: `GET /api/bench/r
   `testdata/fake/fake-llama-bench`, which prints real `--progress` lines and JSON. Environment variables shape the
   fakes: `FAKE_BENCH_OOM`, `FAKE_BENCH_OOM_ARG` (out of memory when the argv contains a fragment), `FAKE_TG_BY_ARG`,
   `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`, `FAKE_LOAD_MS`, `FAKE_BENCH_STEP_MS`. A shutdown test checks that the shutdown
-  step saves the running sweep item and its sweep as `interrupted`, and publishes them, then no live.
+  step saves the running sweep item and its sweep as `interrupted`, and publishes them, then no live. Two tests make
+  `BenchRunsRepo.finish` die: the run is saved `failed`, the sweep left `interrupted`, the runner freed and
+  `llama-server` restarted.
 - `gate.test.ts`, `execute.test.ts`, `trial.test.ts`, `vram.test.ts`, `BenchHardware.test.ts`, `prompt.test.ts`,
   `which.test.ts`, `BenchRunsRepo.test.ts`, `SweepsRepo.test.ts` and `http.test.ts` cover each part;
   `packages/webui-shared/src/sweep.test.ts` the ranking and the space.

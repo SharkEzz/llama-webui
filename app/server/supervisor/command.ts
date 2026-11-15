@@ -1,5 +1,5 @@
 import { LAUNCH_LOG_PREFIX, P2P_LOG_LINE, type Profile, type Settings, shellQuote } from '@llama-webui/shared';
-import { Array as Arr, Config, Effect, Option, Path, Predicate, Record, String as Str } from 'effect';
+import { Array as Arr, Config, ConfigProvider, Effect, Option, Path, Predicate, Record, String as Str } from 'effect';
 import { homeDir } from '../config/Home.ts';
 
 /** What the supervisor runs for a profile, and what it tells about it. */
@@ -111,8 +111,21 @@ export const commandOf = (options: {
 };
 
 /**
+ * Whether `GGML_CUDA_P2P` is in `env` (llama-webui's own environment by default, which llama-server inherits),
+ * whatever its value: llama.cpp only looks for the variable, so an empty one enables peer-to-peer too. Read by a
+ * provider of its own: the default one reads an empty value as absent.
+ */
+export const p2pInEnvironment = (env?: Record<string, string>): Effect.Effect<boolean> =>
+  Effect.suspend(() =>
+    Config.option(Config.String(P2P_VARIABLE)).parse(ConfigProvider.fromEnv({ env, preserveEmptyStrings: true })),
+  ).pipe(
+    Effect.map(Option.isSome),
+    Effect.orElseSucceed(() => false),
+  );
+
+/**
  * The command of a profile, with the home folder, llama-webui's working directory, and whether `GGML_CUDA_P2P` is in
- * llama-webui's environment (read through `Config`, where an empty value reads as absent).
+ * llama-webui's environment.
  */
 export const buildCommand = Effect.fn('command.buildCommand')(function* (options: {
   readonly profile: Profile;
@@ -120,9 +133,9 @@ export const buildCommand = Effect.fn('command.buildCommand')(function* (options
 }) {
   const path = yield* Path.Path;
   const home = yield* homeDir;
-  const p2p = yield* Config.option(Config.String(P2P_VARIABLE)).pipe(Effect.orElseSucceed(Option.none<string>));
+  const p2p = yield* p2pInEnvironment();
   const cwd = path.resolve('.');
-  return commandOf({ ...options, home, cwd, p2pInEnvironment: Option.isSome(p2p), path });
+  return commandOf({ ...options, home, cwd, p2pInEnvironment: p2p, path });
 });
 
 /**
