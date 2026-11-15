@@ -229,8 +229,10 @@
               "packages/webui-shared/src/profile.ts",
               "packages/webui-shared/src/server.ts",
               "packages/webui-shared/src/settings.ts",
+              "packages/webui-shared/src/setup.ts",
               "packages/webui-shared/src/sweep.ts",
               "packages/webui-shared/src/topology.ts",
+              "packages/webui-shared/src/tuning.ts",
               "packages/webui-shared/src/ws.ts"
             ],
             "options": {

@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BenchRun } from '../bench.ts';
-import { Sweep, SweepLive } from '../sweep.ts';
+import { Sweep, SweepLive, SweepSpec } from '../sweep.ts';
 import { BenchStartErrors } from './BenchApi.ts';
 import { IdParam } from './params.ts';
 
@@ -38,6 +38,19 @@ export class NothingToValidate extends Schema.TaggedError<
   { readonly NothingToValidate: unique symbol }
 >()('NothingToValidate', { message: Schema.String }, { httpApiStatus: 409 }) {}
 
+/** A creation whose every item the estimator excludes: `No configuration to run: <n> excluded by the estimator`. */
+export class NothingToRun extends Schema.TaggedError<NothingToRun, { readonly NothingToRun: unique symbol }>()(
+  'NothingToRun',
+  { message: Schema.String },
+  { httpApiStatus: 409 },
+) {}
+
+/** A sweep asked for: its spec, and whether llama-server may be stopped for it (only `true` counts). */
+export const SweepRequest = Schema.Struct({
+  spec: SweepSpec,
+  stopServer: Schema.optionalKey(Schema.Boolean),
+}).annotate({ messageUnexpectedKey: 'unknown key' });
+
 /** A validation: the `n` best llama-bench items replayed on llama-server (1 to 5, 3 by default). */
 export const ValidateRequest = Schema.Struct({
   n: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 5 })).pipe(
@@ -48,7 +61,10 @@ export const ValidateRequest = Schema.Struct({
 
 const params = { id: IdParam };
 
-/** The sweeps: the list, one with its runs, its deletion, its cancel, its resume, its validation. */
+/**
+ * The sweeps: the list, the creation (the plan of `POST /api/tuning/plan`, then the runner), one with its runs, its
+ * deletion, its cancel, its resume, its validation.
+ */
 export class SweepsApi extends HttpApiGroup.make('sweeps').add(
   HttpApiEndpoint.get('list', '/api/sweeps', {
     success: Schema.Struct({ sweeps: Schema.Array(Sweep), live: Schema.NullOr(SweepLive) }),
