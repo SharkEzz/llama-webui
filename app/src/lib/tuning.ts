@@ -20,7 +20,7 @@ import {
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { ApiError, api } from './api';
+import { call, errorTag } from './api';
 import { formatShortDate } from './format';
 import { onWs, useWs } from './ws';
 
@@ -30,7 +30,7 @@ interface TuningState {
   mmprojPath: string | null;
   profileId: number | null;
   /** Profile server flags outside the measurable fields (-c, --spec-type…): carried over to the sweep and the created profile. */
-  serverArgs: string[];
+  serverArgs: ReadonlyArray<string>;
   /** Profile flags the estimator sets itself (-ngl, -ctk…): replaced by the recommendation unless pinned. */
   profileParams: BenchParams;
   preset: PresetId;
@@ -46,9 +46,9 @@ interface TuningState {
   planning: boolean;
   planError: string | null;
   launching: boolean;
-  sweeps: Sweep[];
+  sweeps: ReadonlyArray<Sweep>;
   sweepsLoaded: boolean;
-  current: { sweep: Sweep; runs: BenchRun[] } | null;
+  current: { sweep: Sweep; runs: ReadonlyArray<BenchRun> } | null;
   sweepLive: SweepLive | null;
   live: BenchLive | null;
   checks: ChecksReport | null;
@@ -80,7 +80,9 @@ interface TuningState {
   measureDisk(modelPath: string): Promise<void>;
 }
 
-const fail = (e: unknown) => toast.error(e instanceof Error ? e.message : String(e));
+const message = (e: unknown) =>
+  typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string' ? e.message : String(e);
+const fail = (e: unknown) => void toast.error(message(e));
 const DEBOUNCE_MS = 300;
 let estimateTimer: ReturnType<typeof setTimeout> | null = null;
 let planTimer: ReturnType<typeof setTimeout> | null = null;
@@ -93,13 +95,13 @@ const modelName = (p: string) =>
     .pop()!
     .replace(/\.gguf$/, '');
 
-/** An action that takes the gate: 409 “server-running” → the client asks for confirmation. */
+/** An action that takes the gate: a `ServerRunning` refusal → the client asks for confirmation. */
 async function guarded(fn: () => Promise<unknown>): Promise<'ok' | 'confirm' | 'error'> {
   try {
     await fn();
     return 'ok';
   } catch (e) {
-    if (e instanceof ApiError && e.code === 'server-running') return 'confirm';
+    if (errorTag(e) === 'ServerRunning') return 'confirm';
     fail(e);
     return 'error';
   }
@@ -117,13 +119,13 @@ export function replacedProfileParams(profile: BenchParams, pinned: Partial<Benc
 const OT_TO_CPU = ['exps=CPU', 'blk\\.(\\d|1\\d)\\.ffn_.*_exps=CPU', 'blk\\.[0-9]\\.ffn_.*_exps=CPU'];
 
 /** -ot suggestions: the RAM patterns, then the experts on each dedicated card of this machine (#23). */
-export function otSuggestions(devices: BenchDevice[]): string[] {
+export function otSuggestions(devices: ReadonlyArray<BenchDevice>): string[] {
   return [...OT_TO_CPU, ...gpuDevices(devices).map((d) => `ffn_.*_exps=${d.id}`)];
 }
 
 /** Space suggested around the recommendation: neighboring -ncmoe (MoE), GPU sets, -ub for the agent preset. */
 export function suggestedSpace(e: Estimate, hw: TuningHardware, preset: PresetId): SweepSpace {
-  const space: SweepSpace = {};
+  const space: { -readonly [K in keyof SweepSpace]: SweepSpace[K] } = {};
   const n = e.params.ncmoe;
   if (n !== undefined && n > 0) space.ncmoe = [...new Set([n - 8, n - 4, n, n + 4, n + 8].filter((x) => x >= 0))];
   const gpus = gpuDevices(hw.devices);
@@ -136,7 +138,8 @@ export function suggestedSpace(e: Estimate, hw: TuningHardware, preset: PresetId
   ];
   const seen = new Set<string>();
   const dev = sets.filter(
-    (s): s is string[] => !!s && s.length > 0 && s[0] !== 'none' && !seen.has(s.join()) && !!seen.add(s.join()),
+    (s): s is ReadonlyArray<string> =>
+      !!s && s.length > 0 && s[0] !== 'none' && !seen.has(s.join()) && !!seen.add(s.join()),
   );
   if (dev.length > 1) space.dev = dev;
   if (preset === 'agent') space.ub = [512, 2048];
@@ -157,19 +160,18 @@ export const useTuning = create<TuningState>()((set, get) => {
       if (seq === estimateSeq) set({ estimating: false });
     });
     try {
-      const estimate = await api('POST /api/tuning/estimate', { body: { modelPath, mmprojPath, preset, pinned } });
+      const estimate = await call((api) => api.tuning.estimate({ payload: { modelPath, mmprojPath, preset, pinned } }));
       if (seq === estimateSeq) set({ estimate, estimateError: null });
     } catch (e) {
-      if (seq === estimateSeq) set({ estimate: null, estimateError: e instanceof Error ? e.message : String(e) });
+      if (seq === estimateSeq) set({ estimate: null, estimateError: message(e) });
     }
   };
-  const specBody = () => {
+  const specBody = (modelPath: string) => {
     const s = get();
     return {
       name:
-        s.run.name.trim() ||
-        `${modelName(s.modelPath ?? 'model')} · ${presetOf(s.preset).label} · ${formatShortDate(new Date())}`,
-      modelPath: s.modelPath,
+        s.run.name.trim() || `${modelName(modelPath)} · ${presetOf(s.preset).label} · ${formatShortDate(new Date())}`,
+      modelPath,
       mmprojPath: s.mmprojPath,
       profileId: s.profileId,
       preset: s.preset,
@@ -188,17 +190,18 @@ export const useTuning = create<TuningState>()((set, get) => {
     planTimer = setTimeout(() => void runPlan(), DEBOUNCE_MS);
   };
   const runPlan = async () => {
-    if (!get().modelPath) return set({ plan: null, planError: null });
+    const { modelPath } = get();
+    if (!modelPath) return set({ plan: null, planError: null });
     const seq = ++planSeq;
     set({ planning: true });
     using _planning = defer(() => {
       if (seq === planSeq) set({ planning: false });
     });
     try {
-      const plan = await api('POST /api/tuning/plan', { body: { spec: specBody() } });
+      const plan = await call((api) => api.tuning.plan({ payload: { spec: specBody(modelPath) } }));
       if (seq === planSeq) set({ plan, planError: null });
     } catch (e) {
-      if (seq === planSeq) set({ plan: null, planError: e instanceof Error ? e.message : String(e) });
+      if (seq === planSeq) set({ plan: null, planError: message(e) });
     }
   };
   const refresh = () => {
@@ -239,7 +242,7 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     async loadHardware() {
       try {
-        set({ hardware: await api('GET /api/tuning/hardware') });
+        set({ hardware: await call((api) => api.tuning.hardware()) });
       } catch (e) {
         fail(e);
       }
@@ -253,7 +256,7 @@ export const useTuning = create<TuningState>()((set, get) => {
     async fromProfile(id) {
       if (id === null) return set({ profileId: null, serverArgs: [], profileParams: {} });
       try {
-        const d = await api('GET /api/bench/from-profile/:id', { params: { id: id } });
+        const d = await call((api) => api.bench.fromProfile({ params: { id } }));
         set({
           profileId: id,
           modelPath: d.modelPath,
@@ -320,8 +323,10 @@ export const useTuning = create<TuningState>()((set, get) => {
     async launch(stopServer = false) {
       set({ launching: true });
       using _launching = defer(() => set({ launching: false }));
+      const { modelPath } = get();
+      if (!modelPath) return 'error';
       return await guarded(async () => {
-        const r = await api('POST /api/sweeps', { body: { spec: specBody(), stopServer } });
+        const r = await call((api) => api.sweeps.create({ payload: { spec: specBody(modelPath), stopServer } }));
         set({ run: { ...get().run, name: '' } });
         await get().open(r.sweep.id);
       });
@@ -329,7 +334,7 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     async loadSweeps() {
       try {
-        const { sweeps, live } = await api('GET /api/sweeps');
+        const { sweeps, live } = await call((api) => api.sweeps.list());
         set({ sweeps, sweepLive: live, sweepsLoaded: true });
         const cur = get().current;
         if (cur) await get().open(cur.sweep.id);
@@ -341,30 +346,30 @@ export const useTuning = create<TuningState>()((set, get) => {
     async open(id) {
       if (id === null) return set({ current: null });
       try {
-        set({ current: await api('GET /api/sweeps/:id', { params: { id: id } }) });
+        set({ current: await call((api) => api.sweeps.get({ params: { id } })) });
       } catch (e) {
-        if (e instanceof ApiError && e.status === 404) set({ current: null });
+        if (errorTag(e) === 'SweepNotFound') set({ current: null });
         else fail(e);
       }
     },
 
     async cancelSweep(id) {
       try {
-        await api('POST /api/sweeps/:id/cancel', { params: { id: id } });
+        await call((api) => api.sweeps.cancel({ params: { id } }));
       } catch (e) {
         fail(e);
       }
     },
 
     resume: (id, stopServer = false) =>
-      guarded(() => api('POST /api/sweeps/:id/resume', { params: { id: id }, body: { stopServer } })),
+      guarded(() => call((api) => api.sweeps.resume({ params: { id }, payload: { stopServer } }))),
 
     validate: (id, n, stopServer = false) =>
-      guarded(() => api('POST /api/sweeps/:id/validate', { params: { id: id }, body: { n, stopServer } })),
+      guarded(() => call((api) => api.sweeps.validate({ params: { id }, payload: { n, stopServer } }))),
 
     async removeSweep(id) {
       try {
-        await api('DELETE /api/sweeps/:id', { params: { id: id } });
+        await call((api) => api.sweeps.remove({ params: { id } }));
         dropSweep(id);
       } catch (e) {
         fail(e);
@@ -373,7 +378,7 @@ export const useTuning = create<TuningState>()((set, get) => {
 
     async toProfile(runId) {
       try {
-        const p = await api('POST /api/bench/:id/to-profile', { params: { id: runId } });
+        const p = await call((api) => api.bench.toProfile({ params: { id: runId } }));
         toast.success(`Profile “${p.name}” created`);
         return p;
       } catch (e) {
@@ -386,7 +391,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       set({ checksLoading: true, checksModel: modelPath });
       using _loading = defer(() => set({ checksLoading: false }));
       try {
-        const checks = await api('GET /api/tuning/checks', { query: modelPath ? { model: modelPath } : {} });
+        const checks = await call((api) => api.tuning.checks({ query: modelPath ? { model: modelPath } : {} }));
         if (get().checksModel === modelPath) set({ checks });
       } catch (e) {
         fail(e);
@@ -397,7 +402,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       set({ measuring: true });
       using _measuring = defer(() => set({ measuring: false }));
       try {
-        const diskSpeed = await api('POST /api/tuning/disk-speed', { body: { modelPath } });
+        const diskSpeed = await call((api) => api.tuning.diskSpeed({ payload: { modelPath } }));
         set({ diskSpeed });
         await get().loadChecks(modelPath);
       } catch (e) {

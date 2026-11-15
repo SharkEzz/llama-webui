@@ -7,7 +7,7 @@ import {
   profileModelPath,
 } from '@llama-webui/shared';
 import { toast } from 'sonner';
-import { ApiError } from '@/lib/api';
+import { errorTag } from '@/lib/api';
 import { EMPTY_FORM, formFromSpec, useBench } from '@/lib/bench';
 import { useModels } from '@/lib/models';
 import { createProfile, useProfiles } from '@/lib/profiles';
@@ -15,7 +15,7 @@ import { stem } from '@/lib/stem';
 import { useTuning } from '@/lib/tuning';
 
 /** The profile's other flags minus those the estimate already sets (-c, --fit, --mlock, --numa…), values included. */
-export function mergeArgs(estimateArgs: string[], rest: string[]): string[] {
+export function mergeArgs(estimateArgs: ReadonlyArray<string>, rest: ReadonlyArray<string>): string[] {
   const fixed = new Set(estimateArgs.filter((a) => a.startsWith('-')));
   if (fixed.has('-c')) fixed.add('--ctx-size');
   const out: string[] = [];
@@ -56,7 +56,7 @@ export async function profileFromEstimate(e: Estimate): Promise<Profile | null> 
       void useProfiles.getState().reload();
       return p;
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409 && err.code === 'name-taken') continue;
+      if (errorTag(err) === 'ProfileNameTaken') continue;
       toast.error(err instanceof Error ? err.message : String(err));
       return null;
     }

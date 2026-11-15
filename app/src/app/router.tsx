@@ -31,6 +31,8 @@ const PORTED: Partial<Record<string, () => Promise<ComponentType>>> = {
   '/logs': async () => (await import('@/features/logs/LogsPage')).LogsPage,
   '/chat': chatPage,
   '/bench': async () => (await import('@/features/bench/BenchPage')).BenchPage,
+  '/': async () => (await import('@/features/home/HomePage')).HomePage,
+  '/tuning': async () => (await import('@/features/tuning/TuningPage')).TuningPage,
 };
 
 const pageOf = (r: AppRoute) => {
@@ -50,7 +52,7 @@ export const router = createBrowserRouter([
     hydrateFallbackElement: <AppLayout loading />,
     children: [
       ...pages,
-      { path: 'setup', ...placeholder('Setup', MILESTONE_BY_PATH['/']) },
+      { path: 'setup', lazy: { Component: async () => (await import('@/features/home/HomePage')).SetupPage } },
       { path: 'chat/:id', lazy: { Component: chatPage } },
       { path: '*', ...placeholder('Page not found') },
     ],

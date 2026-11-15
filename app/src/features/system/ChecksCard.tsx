@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/lib/api';
+import { call } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatBps, plural } from '@/lib/format';
 import { readable, useModels } from '@/lib/models';
@@ -67,7 +67,7 @@ export function ChecksCard() {
       if (first) setModel(first);
       return;
     }
-    void api('GET /api/bench/from-profile/:id', { params: { id: profileId } }).then(
+    void call((api) => api.bench.fromProfile({ params: { id: profileId } })).then(
       (d) => !gone && setModel(d.modelPath),
       () => !gone && first && setModel(first),
     );
@@ -179,7 +179,7 @@ export function ChecksCard() {
 }
 
 /** Checks grouped by family: issues first, passing ones folded. */
-export function CheckList({ checks }: { checks: Check[] }) {
+export function CheckList({ checks }: { checks: ReadonlyArray<Check> }) {
   const families = (Object.keys(FAMILY) as CheckFamily[])
     .map((f) => ({ family: f, checks: checks.filter((c) => c.family === f) }))
     .filter((g) => g.checks.length > 0);

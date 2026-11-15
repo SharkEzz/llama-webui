@@ -13,6 +13,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/main.tsx", "src/*.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "build", "vite.config.ts"],
-  "exclude": ["src/lib/tuning.test.ts"]
+  "include": ["src/main.tsx", "src/*.d.ts", "src/**/*.test.ts", "src/**/*.test.tsx", "build", "vite.config.ts"]
 }

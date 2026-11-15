@@ -52,7 +52,7 @@ const STATUS_VARIANT: Record<BenchStatus, 'secondary' | 'outline' | 'destructive
 };
 
 /** A sweep's ranking: exploration (llama-bench) and validation (server) kept apart, never mixed. */
-export function RankingTable({ sweep, runs }: { sweep: Sweep; runs: BenchRun[] }) {
+export function RankingTable({ sweep, runs }: { sweep: Sweep; runs: ReadonlyArray<BenchRun> }) {
   const ctx = sweepCtx(sweep.spec);
   const explore = rankRuns(
     runs.filter((r) => r.kind === 'bench'),

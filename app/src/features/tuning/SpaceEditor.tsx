@@ -209,10 +209,10 @@ function Suggestion({ label, onClick, mono }: { label: string; onClick(): void; 
 
 function ValuesRow<T>(props: {
   flag: string;
-  values: T[];
-  onChange(v: T[]): void;
+  values: ReadonlyArray<T>;
+  onChange(v: ReadonlyArray<T>): void;
   parse(text: string): T | string;
-  suggestions?: T[];
+  suggestions?: ReadonlyArray<T>;
   hint?: string;
   mono?: boolean;
   wide?: boolean;
@@ -275,8 +275,8 @@ function ToggleRow<T extends string>({
 }: {
   flag: string;
   options: readonly T[];
-  values: T[];
-  onChange(v: T[]): void;
+  values: ReadonlyArray<T>;
+  onChange(v: ReadonlyArray<T>): void;
 }) {
   return (
     <Row flag={flag}>
@@ -304,9 +304,9 @@ function DevRow({
   values,
   onChange,
 }: {
-  gpus: BenchDevice[];
-  values: string[][];
-  onChange(v: string[][]): void;
+  gpus: ReadonlyArray<BenchDevice>;
+  values: ReadonlyArray<ReadonlyArray<string>>;
+  onChange(v: ReadonlyArray<ReadonlyArray<string>>): void;
 }) {
   const [draft, setDraft] = useState<string[]>([]);
   const add = (...sets: string[][]) => {
