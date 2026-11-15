@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { request } from './wire.ts';
+import { readSse, request } from './wire.ts';
 
 let base = '';
 let seen: IncomingMessage['headers'] = {};
@@ -19,6 +19,11 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     }
     if (req.url === '/empty') return res.writeHead(204).end();
     if (req.url === '/head') return res.writeHead(200, { 'content-type': 'application/json' }).end('{"x":1}');
+    if (req.url === '/sse') {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.write('event: hello\ndata: {}\n\n');
+      return; // never ends
+    }
     res.writeHead(404).end();
   });
 });
@@ -65,4 +70,13 @@ test('a request without body sends neither content-length nor transfer-encoding;
   expect([seen.host, seen.origin]).toEqual(['evil.example', 'http://x']);
   await request(base, { method: 'POST', path: '/empty', headers: { 'Content-Length': '0' } });
   expect(seen['content-length']).toBe('0');
+});
+
+test('readSse stops at the condition on a stream that never ends', async () => {
+  const r = await readSse(base, { method: 'GET', path: '/sse' }, (t) => t.includes('\n\n'));
+  expect([r.status, r.headers['content-type'], r.body]).toEqual([
+    200,
+    'text/event-stream',
+    'event: hello\ndata: {}\n\n',
+  ]);
 });

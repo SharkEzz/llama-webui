@@ -138,6 +138,24 @@
       "message": "Profile not found"
     }
   },
+  "POST /api/server/switch (profileId a string)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected number (profileId)",
+      "issues": [
+        {
+          "path": [
+            "profileId"
+          ],
+          "message": "Expected number"
+        }
+      ]
+    }
+  },
   "POST /api/server/restart (nothing launched)": {
     "status": 409,
     "headers": {
@@ -256,6 +274,50 @@
       "message": "Host not allowed"
     }
   },
+  "GET /api/health (Host a b)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Invalid host"
+    }
+  },
+  "POST /api/profiles (foreign Origin)": {
+    "status": 403,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "Origin not allowed"
+    }
+  },
+  "GET /api/health (same Origin)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "ok": true,
+      "version": "<version>",
+      "uptimeMs": "<uptimeMs>",
+      "bootId": "<bootId>"
+    }
+  },
+  "GET /api/health (Host localhost)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "ok": true,
+      "version": "<version>",
+      "uptimeMs": "<uptimeMs>",
+      "bootId": "<bootId>"
+    }
+  },
   "GET /api/nope": {
     "status": 404,
     "headers": {
@@ -278,7 +340,21 @@
       "location": "/api/settings?x=1"
     }
   },
-  "DELETE /api/health (a method the path lacks)": {
+  "GET /ws (no upgrade)": {
+    "status": 426,
+    "headers": {
+      "content-type": "text/plain;charset=utf-8"
+    },
+    "body": "WebSocket upgrade expected"
+  },
+  "POST /ws (no upgrade)": {
+    "status": 426,
+    "headers": {
+      "content-type": "text/plain;charset=utf-8"
+    },
+    "body": "WebSocket upgrade expected"
+  },
+  "POST /api/nope": {
     "status": 404,
     "headers": {
       "content-type": "application/json"
@@ -287,19 +363,6 @@
       "_tag": "RouteNotFound",
       "message": "Unknown route"
     }
-  },
-  "HEAD /api/health": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    }
-  },
-  "GET /ws (no upgrade)": {
-    "status": 426,
-    "headers": {
-      "content-type": "text/plain;charset=utf-8"
-    },
-    "body": "WebSocket upgrade expected"
   },
   "GET / (the app)": {
     "status": 200,
@@ -317,6 +380,14 @@
     },
     "body": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon-<hash>.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>llama-webui</title>\n    <script>\n      // Theme applied before rendering (no flash); same key as src/lib/theme.ts.\n      try {\n        const m = localStorage.getItem('llama-webui:theme');\n        const dark = m === 'dark' || (m !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);\n        document.documentElement.classList.toggle('dark', dark);\n        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';\n      } catch {\n        // localStorage unavailable: default theme\n      }\n    </script>\n    <script type=\"module\" crossorigin src=\"/assets/index-<hash>.js\"></script>\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/createLucideIcon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/button-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/hooks-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/ws-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/activity-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/boxes-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/cpu-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/wand-sparkles-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usingCtx-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/check-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/stem-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useOpenInteractionType-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/safePolygon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usePopupHandleStore-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useFocus-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/CompositeList-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/getPseudoElementBounds-<hash>.js\">\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-<hash>.css\">\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>\n"
   },
+  "GET /chat/12 (Host evil.example)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-cache"
+    },
+    "body": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/assets/favicon-<hash>.svg\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>llama-webui</title>\n    <script>\n      // Theme applied before rendering (no flash); same key as src/lib/theme.ts.\n      try {\n        const m = localStorage.getItem('llama-webui:theme');\n        const dark = m === 'dark' || (m !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);\n        document.documentElement.classList.toggle('dark', dark);\n        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';\n      } catch {\n        // localStorage unavailable: default theme\n      }\n    </script>\n    <script type=\"module\" crossorigin src=\"/assets/index-<hash>.js\"></script>\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/createLucideIcon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/button-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/hooks-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/ws-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/activity-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/boxes-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/cpu-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/wand-sparkles-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usingCtx-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/check-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/stem-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useOpenInteractionType-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/safePolygon-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/usePopupHandleStore-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/useFocus-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/CompositeList-<hash>.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/getPseudoElementBounds-<hash>.js\">\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-<hash>.css\">\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>\n"
+  },
   "GET /assets/index-<hash>.js (hashed asset)": {
     "status": 200,
     "headers": {
@@ -327,32 +398,6 @@
   "GET /assets/index-00000000.js (missing asset)": {
     "status": 404,
     "headers": {}
-  },
-  "PATCH /api/settings (text/plain)": {
-    "status": 415,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "RequestRefused",
-      "message": "JSON body expected (content-type: application/json)"
-    }
-  },
-  "PATCH /api/settings (malformed JSON)": {
-    "status": 400,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "RequestInvalid",
-      "message": "Invalid data: Expected a valid JSON body",
-      "issues": [
-        {
-          "path": [],
-          "message": "Expected a valid JSON body"
-        }
-      ]
-    }
   },
   "PATCH /api/settings (schema violation)": {
     "status": 400,
@@ -462,22 +507,6 @@
       ]
     }
   },
-  "POST /api/profiles (malformed JSON)": {
-    "status": 400,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "RequestInvalid",
-      "message": "Invalid data: Expected a valid JSON body",
-      "issues": [
-        {
-          "path": [],
-          "message": "Expected a valid JSON body"
-        }
-      ]
-    }
-  },
   "POST /api/profiles (name taken)": {
     "status": 409,
     "headers": {
@@ -508,26 +537,6 @@
       "source": "ui",
       "createdAt": "<time>",
       "updatedAt": "<time>"
-    }
-  },
-  "GET /api/profiles/999 (no such profile)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "ProfileNotFound",
-      "message": "Profile not found"
-    }
-  },
-  "GET /api/profiles/abc (id that is not a number)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "RouteNotFound",
-      "message": "Unknown route"
     }
   },
   "PUT /api/profiles/1": {
@@ -635,16 +644,6 @@
   "DELETE /api/profiles/2": {
     "status": 204,
     "headers": {}
-  },
-  "DELETE /api/profiles/999 (no such profile)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "ProfileNotFound",
-      "message": "Profile not found"
-    }
   },
   "GET /api/profiles (after the writes)": {
     "status": 200,
@@ -778,44 +777,22 @@
       "live": null
     }
   },
-  "GET /api/bench/from-profile/999999 (no such profile)": {
-    "status": 404,
+  "POST /api/sweeps/:id/validate (unknown key)": {
+    "status": 400,
     "headers": {
       "content-type": "application/json"
     },
     "body": {
-      "_tag": "ProfileNotFound",
-      "message": "Profile not found"
-    }
-  },
-  "DELETE /api/bench/999999 (no such run)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "RunNotFound",
-      "message": "Run not found"
-    }
-  },
-  "POST /api/bench/999999/cancel (no such run)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "RunNotFound",
-      "message": "Run not found"
-    }
-  },
-  "POST /api/bench/999999/to-profile (no such run)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "RunNotFound",
-      "message": "Run not found"
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: unknown key (x)",
+      "issues": [
+        {
+          "path": [
+            "x"
+          ],
+          "message": "unknown key"
+        }
+      ]
     }
   },
   "DELETE /api/bench/runs (no failed=1)": {
@@ -871,56 +848,6 @@
     "body": {
       "_tag": "BenchFileMissing",
       "message": "Model not found: <tmp>/no-such-model.gguf"
-    }
-  },
-  "GET /api/sweeps/999999 (no such sweep)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "SweepNotFound",
-      "message": "Sweep not found"
-    }
-  },
-  "DELETE /api/sweeps/999999 (no such sweep)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "SweepNotFound",
-      "message": "Sweep not found"
-    }
-  },
-  "POST /api/sweeps/999999/cancel (no such sweep)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "SweepNotFound",
-      "message": "Sweep not found"
-    }
-  },
-  "POST /api/sweeps/999999/resume (no such sweep)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "SweepNotFound",
-      "message": "Sweep not found"
-    }
-  },
-  "POST /api/sweeps/999999/validate (no such sweep)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "SweepNotFound",
-      "message": "Sweep not found"
     }
   },
   "GET /api/chat (none yet)": {
@@ -986,22 +913,6 @@
       ]
     }
   },
-  "POST /api/chat (malformed JSON)": {
-    "status": 400,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "RequestInvalid",
-      "message": "Invalid data: Expected a valid JSON body",
-      "issues": [
-        {
-          "path": [],
-          "message": "Expected a valid JSON body"
-        }
-      ]
-    }
-  },
   "POST /api/chat (no such profile)": {
     "status": 404,
     "headers": {
@@ -1029,16 +940,6 @@
       "updatedAt": "<time>",
       "messages": [],
       "live": false
-    }
-  },
-  "GET /api/chat/999 (no such conversation)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "ConversationNotFound",
-      "message": "Conversation not found"
     }
   },
   "PATCH /api/chat/1": {
@@ -1112,16 +1013,6 @@
     "status": 204,
     "headers": {}
   },
-  "GET /api/chat/999/stream (no such conversation)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "ConversationNotFound",
-      "message": "Conversation not found"
-    }
-  },
   "POST /api/chat/1/messages (llama-server not ready)": {
     "status": 409,
     "headers": {
@@ -1180,27 +1071,7 @@
       "message": "llama-server is not ready"
     }
   },
-  "POST /api/chat/999/regenerate (no such conversation)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "ConversationNotFound",
-      "message": "Conversation not found"
-    }
-  },
   "POST /api/chat/1/stop (no reply in progress)": {
-    "status": 409,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "NoReplyInProgress",
-      "message": "No reply in progress"
-    }
-  },
-  "POST /api/chat/999/stop (no such conversation: no reply in progress)": {
     "status": 409,
     "headers": {
       "content-type": "application/json"
@@ -1213,16 +1084,6 @@
   "DELETE /api/chat/2": {
     "status": 204,
     "headers": {}
-  },
-  "DELETE /api/chat/999 (no such conversation)": {
-    "status": 404,
-    "headers": {
-      "content-type": "application/json"
-    },
-    "body": {
-      "_tag": "ConversationNotFound",
-      "message": "Conversation not found"
-    }
   },
   "GET /api/chat (after the writes)": {
     "status": 200,
@@ -1805,6 +1666,3702 @@
       ]
     }
   },
+  "POST /api/downloads/clear (nothing to clear)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "deleted": 0
+    }
+  },
+  "GET /api/downloads (after the writes)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "items": [],
+      "live": null
+    }
+  },
+  "HEAD /api/health (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/health (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/health (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/health (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/health (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/settings (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/settings (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/settings (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/settings (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/profiles (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/profiles (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/profiles (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/profiles (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/profiles/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/profiles/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/profiles/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/profiles/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/profiles/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/profiles/import (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/profiles/import (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/profiles/import (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/profiles/import (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/profiles/import (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/profiles/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/profiles/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/profiles/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/profiles/:id/duplicate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/profiles/:id/duplicate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/profiles/:id/duplicate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/profiles/:id/duplicate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/profiles/:id/duplicate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/profiles/:id/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/profiles/:id/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/profiles/:id/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/profiles/:id/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/profiles/:id/export (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/flags (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/flags (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/flags (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/flags (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/flags (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/logs (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/logs (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/logs (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/logs (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/logs (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/server/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/server/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/server/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/server/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/server/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/server/start (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/server/start (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/server/start (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/server/start (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/server/start (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/server/switch (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/server/switch (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/server/switch (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/server/switch (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/server/switch (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/server/restart (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/server/restart (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/server/restart (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/server/restart (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/server/restart (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/server/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/server/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/server/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/server/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/server/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/server/props (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/server/props (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/server/props (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/server/props (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/server/props (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/state (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/monitor/history (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/monitor/history (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/monitor/history (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/monitor/history (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/monitor/history (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/monitor/snapshot (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/monitor/snapshot (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/monitor/snapshot (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/monitor/snapshot (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/monitor/snapshot (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/system/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/system/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/system/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/system/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/system/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/topology (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/topology (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/topology (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/topology (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/topology (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/chat (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/chat (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/chat (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/chat (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/chat/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/chat/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/chat/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/chat/:id/messages (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/chat/:id/messages (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/chat/:id/messages (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/chat/:id/messages (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/chat/:id/messages (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/chat/:id/regenerate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/chat/:id/regenerate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/chat/:id/regenerate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/chat/:id/regenerate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/chat/:id/regenerate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/chat/:id/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/chat/:id/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/chat/:id/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/chat/:id/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/chat/:id/stop (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/chat/:id/stream (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/chat/:id/stream (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/chat/:id/stream (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/chat/:id/stream (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/chat/:id/stream (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/models (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/models (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/models (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/models (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/models/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/models/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/models/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/models/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/models/info (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/models/usage (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/models/usage (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/models/usage (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/models/usage (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/models/usage (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/hf/repo (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/hf/repo (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/hf/repo (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/hf/repo (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/hf/repo (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/hf/search (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/hf/search (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/hf/search (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/hf/search (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/hf/search (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/hf/status (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/hf/status (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/hf/status (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/hf/status (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/hf/status (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/downloads (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/downloads (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/downloads (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/downloads (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/downloads/clear (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/downloads/clear (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/downloads/clear (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/downloads/clear (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/downloads/clear (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/downloads/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/downloads/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/downloads/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/downloads/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/downloads/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/downloads/:id/retry (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/downloads/:id/retry (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/downloads/:id/retry (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/downloads/:id/retry (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/downloads/:id/retry (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/bench/devices (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/bench/devices (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/bench/devices (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/bench/devices (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/bench/devices (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/bench/from-profile/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/bench/from-profile/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/bench/from-profile/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/bench/from-profile/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/bench/from-profile/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/bench/runs (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/bench/runs (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/bench/runs (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/bench/runs (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/bench/run (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/bench/run (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/bench/run (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/bench/run (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/bench/run (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/bench/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/bench/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/bench/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/bench/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/bench/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/bench/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/bench/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/bench/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/bench/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/bench/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/bench/:id/to-profile (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/bench/:id/to-profile (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/bench/:id/to-profile (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/bench/:id/to-profile (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/bench/:id/to-profile (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/sweeps (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/sweeps (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/sweeps (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/sweeps (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/sweeps/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/sweeps/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/sweeps/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/sweeps/:id (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/sweeps/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/sweeps/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/sweeps/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/sweeps/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/sweeps/:id/cancel (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/sweeps/:id/resume (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/sweeps/:id/resume (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/sweeps/:id/resume (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/sweeps/:id/resume (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/sweeps/:id/resume (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/sweeps/:id/validate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/sweeps/:id/validate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/sweeps/:id/validate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/sweeps/:id/validate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/sweeps/:id/validate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/tuning/checks (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/tuning/checks (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/tuning/checks (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/tuning/checks (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/tuning/checks (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/tuning/hardware (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/tuning/hardware (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/tuning/hardware (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/tuning/hardware (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/tuning/hardware (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/tuning/disk-speed (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/tuning/disk-speed (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/tuning/disk-speed (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/tuning/disk-speed (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/tuning/disk-speed (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/tuning/estimate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/tuning/estimate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/tuning/estimate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/tuning/estimate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/tuning/estimate (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/tuning/plan (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/tuning/plan (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "PUT /api/tuning/plan (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/tuning/plan (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/tuning/plan (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/setup (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/setup (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/setup (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/setup (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/setup (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "HEAD /api/launchpad (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    }
+  },
+  "POST /api/launchpad (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/launchpad (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/launchpad (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/launchpad (not an endpoint)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/profiles/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/profiles/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "PUT /api/profiles/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PUT /api/profiles/:id (unknown id)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: required (name)",
+      "issues": [
+        {
+          "path": [
+            "name"
+          ],
+          "message": "required"
+        },
+        {
+          "path": [
+            "model"
+          ],
+          "message": "required"
+        }
+      ]
+    }
+  },
+  "DELETE /api/profiles/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/profiles/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "POST /api/profiles/:id/duplicate (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/profiles/:id/duplicate (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "GET /api/profiles/:id/export (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/profiles/:id/export (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "GET /api/chat/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/chat/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "PATCH /api/chat/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "PATCH /api/chat/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "DELETE /api/chat/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/chat/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "POST /api/chat/:id/messages (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/chat/:id/messages (unknown id)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Missing key (content)",
+      "issues": [
+        {
+          "path": [
+            "content"
+          ],
+          "message": "Missing key"
+        }
+      ]
+    }
+  },
+  "POST /api/chat/:id/regenerate (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/chat/:id/regenerate (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "POST /api/chat/:id/stop (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/chat/:id/stop (unknown id)": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "NoReplyInProgress",
+      "message": "No reply in progress"
+    }
+  },
+  "GET /api/chat/:id/stream (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/chat/:id/stream (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ConversationNotFound",
+      "message": "Conversation not found"
+    }
+  },
+  "DELETE /api/downloads/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/downloads/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "DownloadNotFound",
+      "message": "Download not found"
+    }
+  },
+  "POST /api/downloads/:id/retry (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/downloads/:id/retry (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "DownloadNotFound",
+      "message": "Download not found"
+    }
+  },
+  "GET /api/bench/from-profile/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/bench/from-profile/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "ProfileNotFound",
+      "message": "Profile not found"
+    }
+  },
+  "DELETE /api/bench/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/bench/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RunNotFound",
+      "message": "Run not found"
+    }
+  },
+  "POST /api/bench/:id/cancel (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/bench/:id/cancel (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RunNotFound",
+      "message": "Run not found"
+    }
+  },
+  "POST /api/bench/:id/to-profile (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/bench/:id/to-profile (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RunNotFound",
+      "message": "Run not found"
+    }
+  },
+  "GET /api/sweeps/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "GET /api/sweeps/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
+  "DELETE /api/sweeps/:id (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "DELETE /api/sweeps/:id (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/:id/cancel (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/sweeps/:id/cancel (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/:id/resume (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/sweeps/:id/resume (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
+  "POST /api/sweeps/:id/validate (bad id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RouteNotFound",
+      "message": "Unknown route"
+    }
+  },
+  "POST /api/sweeps/:id/validate (unknown id)": {
+    "status": 404,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "SweepNotFound",
+      "message": "Sweep not found"
+    }
+  },
+  "PATCH /api/settings (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "PATCH /api/settings (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "PATCH /api/settings (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "PATCH /api/settings (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "PATCH /api/settings (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/profiles (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/profiles/import (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles/import (JSON that is not an object)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "imported": [],
+      "skipped": [
+        {
+          "name": "(file)",
+          "reason": "no profile found in this JSON"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles/import (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected JSON value",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected JSON value"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles/import (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected JSON value",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected JSON value"
+        }
+      ]
+    }
+  },
+  "POST /api/profiles/import (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "PUT /api/profiles/:id (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "PUT /api/profiles/:id (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "PUT /api/profiles/:id (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "PUT /api/profiles/:id (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "PUT /api/profiles/:id (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/server/start (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/server/start (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/server/start (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/server/start (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/server/start (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/server/switch (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/server/switch (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/server/switch (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/server/switch (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/server/switch (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/chat (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/chat (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/chat (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/chat (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/chat (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "PATCH /api/chat/:id (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "PATCH /api/chat/:id (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "PATCH /api/chat/:id (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "PATCH /api/chat/:id (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "PATCH /api/chat/:id (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/chat/:id/messages (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/chat/:id/messages (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/chat/:id/messages (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/chat/:id/messages (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/chat/:id/messages (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "DELETE /api/models (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "DELETE /api/models (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "DELETE /api/models (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "DELETE /api/models (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "DELETE /api/models (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
   "POST /api/downloads (malformed JSON)": {
     "status": 400,
     "headers": {
@@ -1821,43 +5378,749 @@
       ]
     }
   },
-  "POST /api/downloads/clear (nothing to clear)": {
+  "POST /api/downloads (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/downloads (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/downloads (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/downloads (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/bench/run (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/bench/run (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/bench/run (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/bench/run (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/bench/run (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/sweeps (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/sweeps/:id/resume (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps/:id/resume (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps/:id/resume (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps/:id/resume (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps/:id/resume (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/sweeps/:id/validate (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps/:id/validate (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps/:id/validate (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps/:id/validate (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/sweeps/:id/validate (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/tuning/disk-speed (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/disk-speed (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/disk-speed (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/disk-speed (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/disk-speed (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/tuning/estimate (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/estimate (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/estimate (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/estimate (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/estimate (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "POST /api/tuning/plan (malformed JSON)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected a valid JSON body",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected a valid JSON body"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/plan (JSON that is not an object)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/plan (no body, no content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/plan (no body, JSON content type)": {
+    "status": 400,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestInvalid",
+      "message": "Invalid data: Expected object",
+      "issues": [
+        {
+          "path": [],
+          "message": "Expected object"
+        }
+      ]
+    }
+  },
+  "POST /api/tuning/plan (text/plain)": {
+    "status": 415,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "_tag": "RequestRefused",
+      "message": "JSON body expected (content-type: application/json)"
+    }
+  },
+  "WS /ws (hello)": {
+    "status": 101,
+    "headers": {},
+    "body": {
+      "type": "hello",
+      "payload": {
+        "serverTime": "<time>",
+        "bootId": "<bootId>"
+      }
+    }
+  },
+  "WS /ws (ping → pong)": {
+    "status": 101,
+    "headers": {},
+    "body": {
+      "type": "pong"
+    }
+  },
+  "PATCH /api/settings (binary: the fake llama-server, for the live cases)": {
     "status": 200,
     "headers": {
       "content-type": "application/json"
     },
     "body": {
-      "deleted": 0
+      "binary": "<repo>/testdata/fake/fake-llama-server",
+      "host": "127.0.0.1",
+      "port": "<port>",
+      "modelsDir": "~/models",
+      "pollIntervalMs": 2000,
+      "historySeconds": 300,
+      "hiddenGpus": [],
+      "defaultProfileId": null,
+      "onboardingDone": false,
+      "collectors": {
+        "nvml": true,
+        "system": true,
+        "disk": true
+      },
+      "theme": "system",
+      "env": {}
     }
   },
-  "DELETE /api/downloads/999 (no such download)": {
-    "status": 404,
+  "POST /api/profiles (the live profile)": {
+    "status": 201,
     "headers": {
       "content-type": "application/json"
     },
     "body": {
-      "_tag": "DownloadNotFound",
-      "message": "Download not found"
+      "id": 5,
+      "name": "Live",
+      "model": "<home>/models/m.gguf",
+      "port": "<port>",
+      "args": [],
+      "env": {},
+      "source": "ui",
+      "createdAt": "<time>",
+      "updatedAt": "<time>"
     }
   },
-  "POST /api/downloads/999/retry (no such download)": {
-    "status": 404,
+  "POST /api/server/start (the fake llama-server)": {
+    "status": 202,
     "headers": {
       "content-type": "application/json"
     },
     "body": {
-      "_tag": "DownloadNotFound",
-      "message": "Download not found"
+      "state": {
+        "kind": "starting",
+        "profile": "Live",
+        "profileId": 5,
+        "pid": "<pid>",
+        "host": "127.0.0.1",
+        "port": "<port>",
+        "since": "<time>"
+      },
+      "command": "<repo>/testdata/fake/fake-llama-server -m <home>/models/m.gguf -lv 4 --host 127.0.0.1 --port <port> --metrics --slots --props",
+      "profileId": 5
     }
   },
-  "GET /api/downloads (after the writes)": {
+  "GET /api/server/state (the fake llama-server ready)": {
     "status": 200,
     "headers": {
       "content-type": "application/json"
     },
     "body": {
-      "items": [],
-      "live": null
+      "state": {
+        "kind": "ready",
+        "profile": "Live",
+        "profileId": 5,
+        "pid": "<pid>",
+        "host": "127.0.0.1",
+        "port": "<port>",
+        "since": "<time>"
+      },
+      "command": "<repo>/testdata/fake/fake-llama-server -m <home>/models/m.gguf -lv 4 --host 127.0.0.1 --port <port> --metrics --slots --props",
+      "profileId": 5
+    }
+  },
+  "POST /api/chat (on the live profile)": {
+    "status": 201,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": 2,
+      "title": "New conversation",
+      "profileId": 5,
+      "modelPath": "<home>/models/m.gguf",
+      "systemPrompt": "",
+      "sampling": {},
+      "thinking": true,
+      "createdAt": "<time>",
+      "updatedAt": "<time>",
+      "messages": [],
+      "live": false
+    }
+  },
+  "POST /api/chat/:id/messages (the SSE reply)": {
+    "status": 200,
+    "headers": {
+      "content-type": "text/event-stream",
+      "cache-control": "private, no-cache, no-store, no-transform, must-revalidate, max-age=0"
+    },
+    "body": {
+      "first": {
+        "event": "start",
+        "data": {
+          "type": "start",
+          "user": {
+            "id": 1,
+            "conversationId": 2,
+            "role": "user",
+            "content": "Hello",
+            "reasoning": "",
+            "status": "done",
+            "error": null,
+            "stats": null,
+            "model": null,
+            "createdAt": "<time>"
+          },
+          "assistant": {
+            "id": 2,
+            "conversationId": 2,
+            "role": "assistant",
+            "content": "",
+            "reasoning": "",
+            "status": "streaming",
+            "error": null,
+            "stats": null,
+            "model": "<home>/models/m.gguf",
+            "createdAt": "<time>"
+          }
+        }
+      },
+      "last": "done"
+    }
+  },
+  "POST /api/server/stop (running)": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "state": {
+        "kind": "idle"
+      },
+      "command": "<repo>/testdata/fake/fake-llama-server -m <home>/models/m.gguf -lv 4 --host 127.0.0.1 --port <port> --metrics --slots --props",
+      "profileId": 5
     }
   }
 }

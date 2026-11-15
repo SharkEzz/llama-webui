@@ -3,7 +3,7 @@
 // cases of the endpoints it ports; `contract.test.ts` fails while an endpoint of the API definition has none.
 import { Api } from '@llama-webui/shared';
 import { HttpApi } from 'effect/http-api';
-import { request, type WireRequest, type WireResponse } from './wire.ts';
+import { readSse, request, type WireRequest, type WireResponse } from './wire.ts';
 
 /**
  * - `read`, `write`: an endpoint used as the web uses it;
@@ -24,14 +24,27 @@ export interface Case {
   machine?: boolean;
 }
 
-/** Each endpoint of the API definition, as `METHOD /path`. */
-export function endpoints(): string[] {
-  const out: string[] = [];
+/** An endpoint of the API definition: its method, its path (`:param` segments) and whether it takes a body. */
+export interface Shape {
+  method: string;
+  path: string;
+  payload: boolean;
+}
+
+/** Each endpoint of the API definition, in its order. */
+export function shapes(): Shape[] {
+  const out: Shape[] = [];
   HttpApi.reflect(Api, {
     onGroup: () => {},
-    onEndpoint: ({ endpoint }) => out.push(`${endpoint.method} ${endpoint.path}`),
+    onEndpoint: ({ endpoint }) =>
+      out.push({ method: endpoint.method, path: endpoint.path, payload: endpoint.payload.size > 0 }),
   });
   return out;
+}
+
+/** Each endpoint of the API definition, as `METHOD /path`. */
+export function endpoints(): string[] {
+  return shapes().map((s) => `${s.method} ${s.path}`);
 }
 
 /**
@@ -54,10 +67,10 @@ function bare(method: string, path: string, headers: Record<string, string> = {}
   return { method, path, headers: empty ? { ...headers, 'Content-Length': '0' } : headers };
 }
 
-const json = (method: string, path: string, body: string): WireRequest => ({
+const json = (method: string, path: string, body: string, headers: Record<string, string> = {}): WireRequest => ({
   method,
   path,
-  headers: JSON_TYPE,
+  headers: { ...JSON_TYPE, ...headers },
   body,
 });
 
@@ -83,12 +96,60 @@ export interface ModelFiles {
 /** What the cases name on the disk of the run. */
 export type Fixtures = Binaries & ModelFiles;
 
+/** An id no row has: the cases that use it change nothing. */
+const UNKNOWN = '999999';
+const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
+/** `path` with each `:param` segment replaced by `value`. */
+const at = (path: string, value: string) =>
+  path
+    .split('/')
+    .map((seg) => (seg.startsWith(':') ? value : seg))
+    .join('/');
+
 /**
- * Every HTTP case, in run order: reads first (llama-server's commands among them), then what changes the settings, then the profiles, then the flag
- * catalogue of a fake llama-server and of one that is not there (so the reply does not depend on the machine's
- * `PATH`), then the chat, then the models folder. `asset` is the path of a hashed file of the build (`ASSET`).
+ * The cases every endpoint gets, from the API definition: each method a path lacks; a bad and an unknown id of each
+ * `:param` (an endpoint with a body sends `{}`); the broken bodies of each endpoint that takes one (on an unknown id).
  */
-export function cases(ctx: { asset: string } & Fixtures): Case[] {
+function matrix(add: (kind: CaseKind, name: string, req: WireRequest) => void) {
+  const all = shapes();
+  for (const path of new Set(all.map((s) => s.path))) {
+    const has = new Set(all.filter((s) => s.path === path).map((s) => s.method));
+    for (const method of METHODS) {
+      if (!has.has(method)) add('other', `${method} ${path} (not an endpoint)`, bare(method, at(path, UNKNOWN)));
+    }
+  }
+  for (const s of all) {
+    if (!s.path.includes('/:')) continue;
+    const req = (id: string) => (s.payload ? json(s.method, at(s.path, id), '{}') : bare(s.method, at(s.path, id)));
+    add('violation', `${s.method} ${s.path} (bad id)`, req('abc'));
+    add('refusal', `${s.method} ${s.path} (unknown id)`, req(UNKNOWN));
+  }
+  for (const s of all) {
+    if (!s.payload) continue;
+    const path = at(s.path, UNKNOWN);
+    const name = (what: string) => `${s.method} ${s.path} (${what})`;
+    add('body', name('malformed JSON'), json(s.method, path, '{'));
+    // The import takes any JSON (a file of another shape is reported, not refused).
+    const anyJson = `${s.method} ${s.path}` === 'POST /api/profiles/import';
+    add(anyJson ? 'write' : 'body', name('JSON that is not an object'), json(s.method, path, '1'));
+    add('body', name('no body, no content type'), { method: s.method, path, headers: { 'Content-Length': '0' } });
+    add('body', name('no body, JSON content type'), {
+      method: s.method,
+      path,
+      headers: { ...JSON_TYPE, 'Content-Length': '0' },
+    });
+    add('body', name('text/plain'), { method: s.method, path, headers: { 'Content-Type': 'text/plain' }, body: '{}' });
+  }
+}
+
+/**
+ * Every HTTP case, in run order: reads first (llama-server's commands among them), then what changes the settings, then
+ * the profiles, then the flag catalogue of a fake llama-server and of one that is not there (so the reply does not
+ * depend on the machine's `PATH`), then the bench, the Hub and the downloads, the chat, the models folder, the tuning,
+ * and last the matrix of the API definition. `base` is the app's URL, `asset` a hashed file of the build (`ASSET`).
+ */
+export function cases(ctx: { base: string; asset: string } & Fixtures): Case[] {
   const out: Case[] = [];
   const add = (kind: CaseKind, name: string, req: WireRequest, flags: { headOnly?: true; machine?: true } = {}) =>
     out.push({ kind, name, req, ...flags });
@@ -105,6 +166,11 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
   add('write', 'POST /api/server/stop (nothing runs)', bare('POST', '/api/server/stop'));
   add('refusal', 'POST /api/server/start (no such profile)', json('POST', '/api/server/start', '{"profileId":999}'));
   add('refusal', 'POST /api/server/switch (no such profile)', json('POST', '/api/server/switch', '{"profileId":999}'));
+  add(
+    'violation',
+    'POST /api/server/switch (profileId a string)',
+    json('POST', '/api/server/switch', '{"profileId":"1"}'),
+  );
   add('refusal', 'POST /api/server/restart (nothing launched)', bare('POST', '/api/server/restart'));
   add('refusal', 'GET /api/server/props (not ready)', bare('GET', '/api/server/props'));
   add('violation', 'POST /api/server/start (no profileId)', json('POST', '/api/server/start', '{}'));
@@ -123,29 +189,32 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
   // The guard: DNS rebinding (a domain as Host) and another site's page.
   add('guard', 'GET /api/health (foreign Origin)', bare('GET', '/api/health', { Origin: 'http://evil.example' }));
   add('guard', 'GET /api/health (Host evil.example)', bare('GET', '/api/health', { Host: 'evil.example' }));
+  add('guard', 'GET /api/health (Host a b)', bare('GET', '/api/health', { Host: 'a b' }));
+  add(
+    'guard',
+    'POST /api/profiles (foreign Origin)',
+    json('POST', '/api/profiles', '{"name":"Evil","model":"m"}', { Origin: 'http://evil.example' }),
+  );
+  // What the guard lets through: the app's own page, a loopback name.
+  add('read', 'GET /api/health (same Origin)', bare('GET', '/api/health', { Origin: new URL(ctx.base).origin }));
+  add('read', 'GET /api/health (Host localhost)', bare('GET', '/api/health', { Host: 'localhost' }));
 
   // Outside the API definition.
   add('other', 'GET /api/nope', bare('GET', '/api/nope'));
   add('other', 'GET /api/settings/ (trailing slash)', bare('GET', '/api/settings/'));
   add('other', 'GET /api/settings/?x=1 (trailing slash, query)', bare('GET', '/api/settings/?x=1'));
-  add('other', 'DELETE /api/health (a method the path lacks)', bare('DELETE', '/api/health'));
-  add('other', 'HEAD /api/health', bare('HEAD', '/api/health'));
   add('other', 'GET /ws (no upgrade)', bare('GET', '/ws'));
+  add('other', 'POST /ws (no upgrade)', bare('POST', '/ws'));
+  add('other', 'POST /api/nope', bare('POST', '/api/nope'));
 
   // The UI: the app, a deep URL of it, a hashed file and one that is not there (a stale tab after an upgrade).
   add('web', 'GET / (the app)', bare('GET', '/'));
   add('web', 'GET /chat/12 (deep URL)', bare('GET', '/chat/12'));
+  add('web', 'GET /chat/12 (Host evil.example)', bare('GET', '/chat/12', { Host: 'evil.example' }));
   add('web', 'GET /assets/index-<hash>.js (hashed asset)', bare('GET', ctx.asset), { headOnly: true });
   add('web', 'GET /assets/index-00000000.js (missing asset)', bare('GET', '/assets/index-00000000.js'));
 
   // Writes, last: what a broken payload gets, then a patch that applies.
-  add('body', 'PATCH /api/settings (text/plain)', {
-    method: 'PATCH',
-    path: '/api/settings',
-    headers: { 'Content-Type': 'text/plain' },
-    body: '{}',
-  });
-  add('body', 'PATCH /api/settings (malformed JSON)', json('PATCH', '/api/settings', '{'));
   add('violation', 'PATCH /api/settings (schema violation)', json('PATCH', '/api/settings', '{"pollIntervalMs":10}'));
   add('write', 'PATCH /api/settings', json('PATCH', '/api/settings', '{"pollIntervalMs":2000}'));
 
@@ -165,11 +234,8 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
     'POST /api/profiles (schema violation)',
     json('POST', '/api/profiles', '{"name":"","model":"m","port":70000,"args":["--port","1"],"extra":1}'),
   );
-  add('body', 'POST /api/profiles (malformed JSON)', json('POST', '/api/profiles', '{'));
   add('refusal', 'POST /api/profiles (name taken)', json('POST', '/api/profiles', '{"name":"Alpha","model":"m"}'));
   add('read', 'GET /api/profiles/1', bare('GET', '/api/profiles/1'));
-  add('refusal', 'GET /api/profiles/999 (no such profile)', bare('GET', '/api/profiles/999'));
-  add('other', 'GET /api/profiles/abc (id that is not a number)', bare('GET', '/api/profiles/abc'));
   add('write', 'PUT /api/profiles/1', json('PUT', '/api/profiles/1', '{"name":"Alpha 2","model":"/models/a.gguf"}'));
   add('write', 'POST /api/profiles/1/duplicate', bare('POST', '/api/profiles/1/duplicate'));
   add('read', 'GET /api/profiles/1/export', bare('GET', '/api/profiles/1/export'));
@@ -184,7 +250,6 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
     ),
   );
   add('write', 'DELETE /api/profiles/2', bare('DELETE', '/api/profiles/2'));
-  add('refusal', 'DELETE /api/profiles/999 (no such profile)', bare('DELETE', '/api/profiles/999'));
   add('read', 'GET /api/profiles (after the writes)', bare('GET', '/api/profiles'));
 
   // The flag catalogue: of the fake, then of a binary that is not there.
@@ -199,10 +264,11 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
   add('read', 'GET /api/bench/devices (llama-bench not there)', bare('GET', '/api/bench/devices'));
   add('read', 'GET /api/bench/runs', bare('GET', '/api/bench/runs'));
   add('read', 'GET /api/sweeps', bare('GET', '/api/sweeps'));
-  add('refusal', 'GET /api/bench/from-profile/999999 (no such profile)', bare('GET', '/api/bench/from-profile/999999'));
-  add('refusal', 'DELETE /api/bench/999999 (no such run)', bare('DELETE', '/api/bench/999999'));
-  add('refusal', 'POST /api/bench/999999/cancel (no such run)', bare('POST', '/api/bench/999999/cancel'));
-  add('refusal', 'POST /api/bench/999999/to-profile (no such run)', bare('POST', '/api/bench/999999/to-profile'));
+  add(
+    'violation',
+    'POST /api/sweeps/:id/validate (unknown key)',
+    json('POST', '/api/sweeps/999999/validate', '{"x":1}'),
+  );
   add('violation', 'DELETE /api/bench/runs (no failed=1)', bare('DELETE', '/api/bench/runs'));
   add('write', 'DELETE /api/bench/runs?failed=1 (none)', bare('DELETE', '/api/bench/runs?failed=1'));
   add('violation', 'POST /api/bench/run (no spec)', json('POST', '/api/bench/run', '{}'));
@@ -222,11 +288,6 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
     'POST /api/bench/run (the model is not there)',
     json('POST', '/api/bench/run', JSON.stringify({ spec })),
   );
-  add('refusal', 'GET /api/sweeps/999999 (no such sweep)', bare('GET', '/api/sweeps/999999'));
-  add('refusal', 'DELETE /api/sweeps/999999 (no such sweep)', bare('DELETE', '/api/sweeps/999999'));
-  add('refusal', 'POST /api/sweeps/999999/cancel (no such sweep)', bare('POST', '/api/sweeps/999999/cancel'));
-  add('refusal', 'POST /api/sweeps/999999/resume (no such sweep)', json('POST', '/api/sweeps/999999/resume', '{}'));
-  add('refusal', 'POST /api/sweeps/999999/validate (no such sweep)', json('POST', '/api/sweeps/999999/validate', '{}'));
 
   // The chat: no llama-server runs (a reply is refused before any is asked for). Conversations 1 (no profile: none
   // runs) and 2 (on profile 1), then 2 deleted.
@@ -234,10 +295,8 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
   add('write', 'POST /api/chat (no profile: none runs)', json('POST', '/api/chat', '{}'));
   add('write', 'POST /api/chat (profile 1)', json('POST', '/api/chat', '{"profileId":1}'));
   add('violation', 'POST /api/chat (profileId a string)', json('POST', '/api/chat', '{"profileId":"1"}'));
-  add('body', 'POST /api/chat (malformed JSON)', json('POST', '/api/chat', '{'));
   add('refusal', 'POST /api/chat (no such profile)', json('POST', '/api/chat', '{"profileId":999}'));
   add('read', 'GET /api/chat/1', bare('GET', '/api/chat/1'));
-  add('refusal', 'GET /api/chat/999 (no such conversation)', bare('GET', '/api/chat/999'));
   add(
     'write',
     'PATCH /api/chat/1',
@@ -251,7 +310,6 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
   add('violation', 'PATCH /api/chat/1 (title a number)', json('PATCH', '/api/chat/1', '{"title":5}'));
   add('refusal', 'PATCH /api/chat/999 (no such conversation)', json('PATCH', '/api/chat/999', '{"title":"x"}'));
   add('read', 'GET /api/chat/1/stream (no reply in progress)', bare('GET', '/api/chat/1/stream'));
-  add('refusal', 'GET /api/chat/999/stream (no such conversation)', bare('GET', '/api/chat/999/stream'));
   add(
     'refusal',
     'POST /api/chat/1/messages (llama-server not ready)',
@@ -269,15 +327,8 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
     json('POST', '/api/chat/999/messages', '{"content":"Hi"}'),
   );
   add('refusal', 'POST /api/chat/1/regenerate (llama-server not ready)', bare('POST', '/api/chat/1/regenerate'));
-  add('refusal', 'POST /api/chat/999/regenerate (no such conversation)', bare('POST', '/api/chat/999/regenerate'));
   add('refusal', 'POST /api/chat/1/stop (no reply in progress)', bare('POST', '/api/chat/1/stop'));
-  add(
-    'refusal',
-    'POST /api/chat/999/stop (no such conversation: no reply in progress)',
-    bare('POST', '/api/chat/999/stop'),
-  );
   add('write', 'DELETE /api/chat/2', bare('DELETE', '/api/chat/2'));
-  add('refusal', 'DELETE /api/chat/999 (no such conversation)', bare('DELETE', '/api/chat/999'));
   add('read', 'GET /api/chat (after the writes)', bare('GET', '/api/chat'));
 
   // The models folder holds one GGUF (`ctx.model`); a profile that opens it, then its usage. Nothing is deleted.
@@ -379,11 +430,12 @@ export function cases(ctx: { asset: string } & Fixtures): Case[] {
   add('read', 'GET /api/downloads (empty)', bare('GET', '/api/downloads'));
   add('refusal', 'POST /api/downloads (offline)', json('POST', '/api/downloads', download));
   add('violation', 'POST /api/downloads (empty repo)', json('POST', '/api/downloads', '{"repo":""}'));
-  add('body', 'POST /api/downloads (malformed JSON)', json('POST', '/api/downloads', '{'));
   add('write', 'POST /api/downloads/clear (nothing to clear)', bare('POST', '/api/downloads/clear'));
-  add('refusal', 'DELETE /api/downloads/999 (no such download)', bare('DELETE', '/api/downloads/999'));
-  add('refusal', 'POST /api/downloads/999/retry (no such download)', bare('POST', '/api/downloads/999/retry'));
   add('read', 'GET /api/downloads (after the writes)', bare('GET', '/api/downloads'));
+
+  // Last: the matrix of the API definition (a body the edge refuses must not reach a domain, so nothing it records
+  // depends on what ran before).
+  matrix(add);
 
   const names = new Set<string>();
   for (const c of out) {
@@ -494,7 +546,136 @@ export async function runContract(
   fixtures: Fixtures,
 ): Promise<Record<string, Outcome>> {
   const out: Record<string, Outcome> = {};
-  for (const c of cases({ asset: await assetOf(base), ...fixtures }))
+  for (const c of cases({ base, asset: await assetOf(base), ...fixtures }))
     out[c.name] = record(await request(base, c.req), ctx, c);
+  return out;
+}
+
+/** One server-sent event: its name and its data (JSON when it parses). */
+function sseEvent(block: string, ctx: NormalizeCtx): { event: string | null; data: unknown } {
+  const field = (name: string) =>
+    block
+      .split('\n')
+      .filter((l) => l.startsWith(`${name}: `))
+      .map((l) => l.slice(name.length + 2))
+      .join('\n');
+  const raw = field('data');
+  let data: unknown = raw;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    // kept as text
+  }
+  return { event: field('event') || null, data: normalize(data, ctx) };
+}
+
+async function withTimeout<T>(what: string, p: Promise<T>, ms = 15_000): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`contract: ${what} timed out`)), ms);
+  });
+  try {
+    return await Promise.race([p, late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The WebSocket's first frame (hello) and its answer to a ping. */
+async function webSocketFrames(base: string): Promise<unknown[]> {
+  const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/ws`);
+  const frames: unknown[] = [];
+  try {
+    await withTimeout(
+      'the WebSocket hello and pong',
+      new Promise<void>((resolve, reject) => {
+        ws.onerror = () => reject(new Error('contract: WebSocket error'));
+        ws.onmessage = (e) => {
+          const frame = JSON.parse(String(e.data)) as { type?: string };
+          // A server ping may come between the two: only the hello and the pong are recorded.
+          if (frame.type === 'ping') return;
+          frames.push(frame);
+          if (frames.length === 1) ws.send(JSON.stringify({ type: 'ping' }));
+          else resolve();
+        };
+      }),
+    );
+  } finally {
+    ws.close();
+  }
+  return frames;
+}
+
+/** The `id` of a reply's JSON body (`path` names the object that holds it). */
+function idOf(res: WireResponse, ...path: string[]): number {
+  let v: unknown = JSON.parse(res.body);
+  for (const key of path) v = (v as Record<string, unknown>)[key];
+  const id = (v as { id?: unknown }).id;
+  if (typeof id !== 'number') throw new Error(`contract: no id in ${res.status} ${res.body}`);
+  return id;
+}
+
+/**
+ * The cases that hold a connection, after the HTTP cases: the WebSocket (hello, ping → pong), then a profile on the
+ * folder's model and `livePort`, started on the fake llama-server, its ready state, a conversation on it, the chat's
+ * SSE reply (its first event and the name of its last: the deltas depend on timing), and the stop.
+ */
+export async function runStreams(
+  base: string,
+  ctx: NormalizeCtx,
+  fixtures: Fixtures & { livePort: number },
+): Promise<Record<string, Outcome>> {
+  const out: Record<string, Outcome> = {};
+  const [hello, pong] = await webSocketFrames(base);
+  out['WS /ws (hello)'] = { status: 101, headers: {}, body: normalize(hello, ctx) };
+  out['WS /ws (ping → pong)'] = { status: 101, headers: {}, body: normalize(pong, ctx) };
+
+  const send = async (name: string, req: WireRequest) => {
+    const res = await request(base, req);
+    out[name] = record(res, ctx);
+    return res;
+  };
+  await send(
+    'PATCH /api/settings (binary: the fake llama-server, for the live cases)',
+    json('PATCH', '/api/settings', JSON.stringify({ binary: fixtures.fake })),
+  );
+  const profile = await send(
+    'POST /api/profiles (the live profile)',
+    json('POST', '/api/profiles', JSON.stringify({ name: 'Live', model: fixtures.model, port: fixtures.livePort })),
+  );
+  const profileId = idOf(profile);
+  await send(
+    'POST /api/server/start (the fake llama-server)',
+    json('POST', '/api/server/start', JSON.stringify({ profileId })),
+  );
+  const ready = await withTimeout(
+    'the fake llama-server start',
+    (async () => {
+      for (;;) {
+        const res = await request(base, bare('GET', '/api/server/state'));
+        const kind = (JSON.parse(res.body) as { state: { kind: string } }).state.kind;
+        if (kind !== 'starting') return res;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    })(),
+  );
+  out['GET /api/server/state (the fake llama-server ready)'] = record(ready, ctx);
+  const conversation = await send(
+    'POST /api/chat (on the live profile)',
+    json('POST', '/api/chat', JSON.stringify({ profileId })),
+  );
+  const chatId = idOf(conversation);
+  const stream = await withTimeout(
+    'the chat SSE reply',
+    readSse(base, json('POST', `/api/chat/${chatId}/messages`, '{"content":"Hello"}'), (t) =>
+      t.includes('event: done'),
+    ),
+  );
+  const blocks = stream.body.split('\n\n').filter((b) => b.trim() !== '');
+  out['POST /api/chat/:id/messages (the SSE reply)'] = {
+    ...record({ ...stream, body: '' }, ctx),
+    body: { first: sseEvent(blocks[0] ?? '', ctx), last: sseEvent(blocks.at(-1) ?? '', ctx).event },
+  };
+  await send('POST /api/server/stop (running)', bare('POST', '/api/server/stop'));
   return out;
 }

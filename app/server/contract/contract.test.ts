@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { writeGguf } from '../testing/gguf.ts';
-import { type Launched, launch } from '../testing/launch.ts';
+import { freePort, type Launched, launch } from '../testing/launch.ts';
 import { type TempDir, tempDir } from '../testing/tempDir.ts';
 import {
   assetOf,
@@ -18,6 +18,7 @@ import {
   type NormalizeCtx,
   type Outcome,
   runContract,
+  runStreams,
 } from './cases.ts';
 
 const GOLDEN = resolve(import.meta.dirname, process.env.GOLDEN ?? 'golden.json');
@@ -26,7 +27,7 @@ const REPO = resolve(import.meta.dirname, '../../..');
 let dir: TempDir;
 let app: Launched;
 let ctx: NormalizeCtx;
-let fixtures: Fixtures;
+let fixtures: Fixtures & { livePort: number };
 let outcomes: Record<string, Outcome> = {};
 
 beforeAll(async () => {
@@ -70,14 +71,18 @@ beforeAll(async () => {
       HF_ENDPOINT: 'https://huggingface.co',
     },
   });
-  ctx = { tmp: dir.path, repo: REPO, home, ports: app.watchPort === null ? [app.port] : [app.port, app.watchPort] };
+  // The port of the live profile (the fake llama-server of `runStreams`): free, never llama-server's default.
+  const livePort = await freePort();
+  const ports = app.watchPort === null ? [app.port] : [app.port, app.watchPort];
+  ctx = { tmp: dir.path, repo: REPO, home, ports: [...ports, livePort] };
   fixtures = {
     fake: join(REPO, 'testdata/fake/fake-llama-server'),
     missing: join(dir.path, 'no-such-llama-server'),
     model,
     noModel: join(dir.path, 'no-such-model.gguf'),
+    livePort,
   };
-  outcomes = await runContract(app.base, ctx, fixtures);
+  outcomes = { ...(await runContract(app.base, ctx, fixtures)), ...(await runStreams(app.base, ctx, fixtures)) };
 }, 60_000);
 afterAll(async () => {
   await app?.[Symbol.asyncDispose]();
@@ -85,12 +90,14 @@ afterAll(async () => {
 });
 
 test('the cases cover every endpoint of the API definition', async () => {
-  const all = cases({ asset: await assetOf(app.base), ...fixtures });
+  const all = cases({ base: app.base, asset: await assetOf(app.base), ...fixtures });
   expect(endpoints().filter((endpoint) => !all.some((c) => covers(endpoint, c.req)))).toEqual([]);
 });
 
 test('no case that breaks a payload or the guard, or that the domain refuses, succeeds', async () => {
-  const kinds = new Map(cases({ asset: await assetOf(app.base), ...fixtures }).map((c) => [c.name, c.kind]));
+  const kinds = new Map(
+    cases({ base: app.base, asset: await assetOf(app.base), ...fixtures }).map((c) => [c.name, c.kind]),
+  );
   const breaking = new Set(['violation', 'refusal', 'body', 'guard']);
   const wrong = Object.entries(outcomes).filter(([name, o]) => breaking.has(kinds.get(name) ?? '') && o.status < 400);
   expect(wrong.map(([name, o]) => `${name} → ${o.status}`)).toEqual([]);

@@ -78,20 +78,41 @@ function body(method: string, head: Head, data: Buffer): string {
   return (length === undefined ? rest : rest.subarray(0, Number(length))).toString('utf8');
 }
 
-/** One request on its own connection (`Connection: close`); resolves once the server closes it. */
-export function request(base: string, r: WireRequest): Promise<WireResponse> {
+function exchange(base: string, r: WireRequest, until?: (text: string) => boolean): Promise<WireResponse> {
   const url = new URL(base);
   return new Promise((resolve, reject) => {
     const socket = connect({ host: url.hostname, port: Number(url.port) });
     const received: Buffer[] = [];
+    let settled = false;
+    const finish = (data: Buffer, head: Head) => {
+      settled = true;
+      socket.destroy();
+      resolve({ status: head.status, headers: head.headers, body: body(r.method, head, data) });
+    };
     socket.on('connect', () => socket.write(encode(base, r)));
-    socket.on('data', (chunk: Buffer) => received.push(chunk));
-    socket.on('error', reject);
-    socket.on('close', () => {
+    socket.on('data', (chunk: Buffer) => {
+      received.push(chunk);
+      if (!until || settled) return;
       const data = Buffer.concat(received);
       const head = parseHead(data);
-      if (head) resolve({ status: head.status, headers: head.headers, body: body(r.method, head, data) });
+      if (head && until(body(r.method, head, data))) finish(data, head);
+    });
+    socket.on('error', (err) => {
+      if (!settled) reject(err);
+    });
+    socket.on('close', () => {
+      if (settled) return;
+      const data = Buffer.concat(received);
+      const head = parseHead(data);
+      if (head) finish(data, head);
       else reject(new Error(`${r.method} ${r.path}: connection closed before a response`));
     });
   });
 }
+
+/** One request on its own connection (`Connection: close`); resolves once the server closes it. */
+export const request = (base: string, r: WireRequest): Promise<WireResponse> => exchange(base, r);
+
+/** A streamed reply, read until `until(body so far)` holds; then the connection is closed. */
+export const readSse = (base: string, r: WireRequest, until: (text: string) => boolean): Promise<WireResponse> =>
+  exchange(base, r, until);
