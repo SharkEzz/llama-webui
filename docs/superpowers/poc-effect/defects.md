@@ -15,10 +15,10 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 
 ## Confirmed
 
-| Where                                      | Defect                                                                                                                                                                                                   | Status    | Ported at |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | --------- |
-| `lib/tuning/memo.ts:16`                    | `benchBinary(settings.get().binary)` gets the setting without `~` expanded: with a `~/…` binary the device listing of Tuning fails, and with it `POST /api/sweeps`. `GET /api/bench/devices` expands it. | confirmed | E7, E8    |
-| `lib/setup.ts:61`, `lib/bench/hardware.ts` | The raw `binary` setting goes to `buildOf`, which does not expand `~` either: `version` is null in the setup report for a `~/…` binary.                                                                  | confirmed | E8        |
+| Where                                      | Defect                                                                                                                                                                                                   | Status                                 | Ported at |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------- |
+| `lib/tuning/memo.ts:16`                    | `benchBinary(settings.get().binary)` gets the setting without `~` expanded: with a `~/…` binary the device listing of Tuning fails, and with it `POST /api/sweeps`. `GET /api/bench/devices` expands it. | fixed in E7 (the bench), E8 (the memo) | E7, E8    |
+| `lib/setup.ts:61`, `lib/bench/hardware.ts` | The raw `binary` setting goes to `buildOf`, which does not expand `~` either: `version` is null in the setup report for a `~/…` binary.                                                                  | confirmed                              | E8        |
 
 ## Reported, to verify with the milestone's plan
 
@@ -102,13 +102,28 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 
 ### E7: bench and sweeps
 
-- Resume stops and restarts llama-server before it answers 409 `Nothing to resume`. `unverified`
+- Resume stops and restarts llama-server before it answers 409 `Nothing to resume`. `confirmed`, `fixed in E7`: the
+  check is `BenchRunner.startSweep`'s `check`, run under the claim before the gate (`bench/BenchRunner.test.ts`:
+  resuming a sweep with nothing to resume is a 409 and stops nothing).
 - In `runner.ts`, the `setLive` after the loop of a sweep is never reached: `restarting-server` is never broadcast
-  during a sweep. `unverified`
-- `POST /api/sweeps` answers 404 `Model not found` where run, resume and validate answer 400. `unverified`
-- Cancelling an unknown run id answers 409. `unverified`
-- `DELETE /api/sweeps/:id` broadcasts even when it deleted nothing. `unverified`
-- `dispose()` broadcasts nothing. `unverified`
+  during a sweep. `confirmed`, `fixed in E7`: the loop keeps the last item's live until the release, which publishes
+  `bench-progress` with phase `restarting-server` and step null, then null (`bench/BenchRunner.test.ts`: the end of a
+  sweep shows restarting-server while llama-server comes back).
+- `POST /api/sweeps` answers 404 `Model not found` where run, resume and validate answer 400. Moved to E8 with the
+  endpoint (`behaviours.md` E8, `From E7:`): E7 does not port the creation.
+- Cancelling an unknown run id answers 409. `confirmed`, `fixed in E7`: an id with no row is the 404 `RunNotFound`
+  `Run not found`, a row that is not the current run still the 409 `This run is not running`; a missing sweep is the
+  404 `Sweep not found`, as before (`bench/BenchRunner.test.ts`: cancelling an unknown run is a 404, a run that is not
+  current a 409).
+- `DELETE /api/sweeps/:id` broadcasts even when it deleted nothing. `confirmed`, `fixed in E7`: the delete is one
+  transaction that returns whether the row existed and the run ids it took; a sweep gone between the look-up and the
+  delete is a 404 with nothing published (`bench/SweepsRepo.test.ts`: deleting a sweep that is gone returns none;
+  `bench/http.test.ts`: a sweep's delete publishes its run ids, then the sweep, and a running one is a 409).
+- `dispose()` broadcasts nothing. `design choice`: the hub closes every client with 1001 right after the runner's
+  shutdown step, and a client that reconnects reads the rows (`interrupted`). Ported as it is.
+- `GET /api/bench/runs` reads its query leniently (an unknown `kind` or `status` ignored, an unknown `sweep` read as
+  the one-off runs, a bad `limit` as the default). `design choice` (the E7 plan's call): a strict query would turn
+  into 400s requests the page never sends; the query schema is optional strings, read by `runFilters`.
 
 ### E8: tuning, topology, launchpad
 
@@ -468,6 +483,84 @@ Found by the final review of E6, fixed with it:
 - The web's downloads store no longer imports the router lazily (the `INEFFECTIVE_DYNAMIC_IMPORT` warning of the
   build): `startDownloadsSync({ navigate })` takes the router's navigation from `main.tsx`, which a finished
   download's Details uses.
+
+Decided (the E7 plan):
+
+- `POST /api/sweeps` (the creation of a sweep) moves to E8 with its page (the user's decision, 2026-11-15): it needs
+  `planSweep`, the estimator and the tuning hardware. E7 ports the engine: `BenchRunner.startSweep({ files,
+  stopServer, check?, prepare })` is the one entry of a sweep run (resume, validate, and E8's create).
+- Cancelling an id with no row is the 404 `RunNotFound` (was 409); a row that is not the current run stays the 409.
+- `POST /api/sweeps/:id/resume` checks that there is something to resume before the gate: `Nothing to resume` no
+  longer stops and restarts llama-server.
+- The end of a sweep publishes `bench-progress` `restarting-server` (step null) while llama-server comes back, then
+  null; between items the live goes back to null only when another item follows.
+- `GET /api/bench/runs` stays lenient (optional strings, `runFilters`); `DELETE /api/bench/runs` takes `failed` as the
+  literal `'1'`: any other or missing value is the 400 `RequestInvalid` `Invalid data: ?failed=1 expected (failed)`
+  (was the bare message), as E6's queries.
+- Every `:id` is an `IdParam`: a bad id is the 404 `RouteNotFound` `Unknown route` (was `Run not found`, `Sweep not
+  found` or `Profile not found`). The payload is decoded before the handler: a bad body on an unknown or running sweep
+  (resume, validate) is a 400 where it was the 404 or 409 of the look-up.
+- `POST /api/bench/run` is strict `{ spec, stopServer? }`: its issue paths carry the `spec.` prefix, and a missing
+  `spec` reads `Invalid data: Missing key (spec)`. The resume body stays schema-less (a record; only `stopServer ===
+  true` counts); validate is strict `{ n: 1–5, default 3, stopServer? }`.
+- The errors are tagged (`BenchRunning`, `BenchFileMissing`, `ServerStopTooSlow`, `ExternalServerRunning`,
+  `ServerRunning`, `RunNotFound`, `RunNotRunning`, `RunStillRunning`, `SweepNotFound`, `SweepNotRunning`,
+  `SweepStillRunning`, `NothingToResume`, `NothingToValidate`), the messages word for word; the web tells
+  `ServerRunning` by its `_tag` (was the code `server-running`).
+- The claim of the runner is one `SynchronizedRef.modify`, released by `ensuring`; a client that leaves between its
+  claim and its fork leaves no claim, and the gate it took is released (llama-server back). The run or the loop is
+  forked in the layer's scope. `busy` = a claim, a current run, a running sweep, or the gate held.
+- The gate is a module of the runner (`makeGate`), on `Supervisor`: it forks the stop in the runner's scope
+  (`Supervisor.stop` waits for the stop, where the legacy gate started it without awaiting) and `ready` joins it.
+- The bench's processes are followed programs under `setpriv --pdeathsig KILL --`; a cancel sends SIGTERM, waits
+  `killTimeout` (5 s in the app, 1 s in the tests), then pushes `[llama-webui] not stopped after <ms> ms, SIGKILL` and
+  sends SIGKILL. The trial talks to its llama-server through `LlamaHttp`: `llamaFetch` is not ported.
+- The runner's shutdown is a `Shutdown.before` step: it sets `closing`, interrupts the run and the loop (the child
+  SIGKILLed through its scope), writes the run and its sweep `interrupted`, publishes nothing and does not release the
+  gate. The orphans of the last run are marked when the runner's layer is built, before any request is served.
+- Every bench binary (`--list-devices`, `--version`, the run) is the `binary` setting after `expandHome` (the bench
+  half of the `~` defect).
+
+Found while porting E7, accepted with its result:
+
+- The plan's Architecture says "sweeps (5 endpoints)"; its table lists six (list, get, remove, cancel, resume,
+  validate): 8 + 6 = 14 endpoints.
+- `BenchApi` and `SweepsApi` joined `Api` at Task 8 with their handlers, not at Task 1: a group without handlers does
+  not build the server (the E6 precedent). The test of the fourteen endpoints used a local `HttpApi` until then.
+- The schemas left zod: strict through the `STRICT` parse options and `messageUnexpectedKey: 'unknown key'` on each
+  strict struct. The stored twins (`StoredBenchParams`, `StoredBenchSpec`, `StoredSweepSpace`, `StoredSweepSpec`)
+  have no checks and no defaults; `ngl` keeps its one union message (`a number, “all” or “auto”`) for any miss, an out
+  of range number included. The measured numbers are `Finite`, the ids, times and counts `Int`.
+- Signatures changed by the `missingPipeableSignature` diagnostic: `withCtx`, `expandSpace`, `itemLabel` are `dual`
+  (data-first calls unchanged); `scoreOf(run, { preset, ctx })` and `rankRuns(runs, { preset, ctx })` take an options
+  object (was positional), `estimatedSweepSeconds({ items, fileBytes, r })`. The E8 page's `RankingTable.tsx` follows.
+  `benchFailure({ lines, exit, tool? })`, `measure({ values, tokens })`, `draftAcceptPct({ drafted, accepted })` take
+  an object; `parseSmiLine` returns an `Option`.
+- `endingOf` and `causeMessage` moved from `Supervisor.ts` to `app/server/process/ending.ts`, shared with the bench.
+- `which` checks the execute bits of a stat (`FileSystem` has no `X_OK`) and reads `PATH` through `Config`.
+- A timed-out device listing says `llama-bench --list-devices timed out after 15s` (was `killed by SIGKILL`). The
+  `--version` build is cached per binary file and modification time, for any outcome.
+- `RunFilters` holds `Option`s; `requeueInterrupted` is one statement (was a select and one update per row); counts
+  come from `RETURNING id`. A `stats_json` that does not decode reads as no results with a warning; a spec, hardware or
+  VRAM that does not decode is a defect.
+- `makeGate` takes `Supervisor`, `LogRing` and `Scope` from the context (the Task 4 interface; the plan's Calls wrote
+  `{ supervisor, ring }`). An idle or crashed server: the gate is taken and nothing is recorded to restart. A second
+  concurrent release awaits the first.
+- `execute` takes the run, its start time, a cancel `Deferred` and the monitor's GPUs and disk; its `onLive` says when
+  only the log lines changed, so the runner throttles those only (phase and step changes go out at once, as the
+  legacy executor). The throttle is leading-edge: a dropped line change is not resent (as before).
+- The gate says whether its stop still runs (`stopping`), so a run shows `stopping-server` meanwhile (not tested: the
+  fake stops in a few ms).
+- An interruption of the trial (llama-webui stopping) kills its llama-server at once through its scope, not SIGTERM
+  then the timeout. The trial's own SIGKILL line carries the `[llama-webui]` prefix (the legacy trial had none).
+- The shutdown step keeps an error the run already had (a cancel then a stop) instead of always writing `interrupted
+  (llama-webui stopped)`.
+- `validate` computes its best runs, and `NothingToValidate`, before the claim; the answers are the same.
+- `toProfile` writes `cwd` only when it is not empty (the same result: `profileModelPath` always gives one).
+- The web's Bench store decodes the form's spec with the schema before it sends it (the typed client encodes the
+  payload, so a loose spec would throw in the client): a refusal goes on its fields and nothing is sent. Its store is
+  `makeBenchStore({ call })`, the client injected.
+- The page look of Task 9 used the `puppeteer-core` of `site/` with the system Chromium: Playwright is not installed.
 
 ## Measures (`e<N>.json`)
 

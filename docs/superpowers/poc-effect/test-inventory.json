@@ -154,145 +154,199 @@
     "project": "server",
     "file": "app/server/lib/bench/gate.test.ts",
     "name": "the server stopped for a benchmark restarts with the profile as it is now (#39)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/gate.test.ts > gate on the supervisor > the server stopped for a benchmark restarts with the profile as it is now (#39)"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/gate.test.ts",
     "name": "without a rebuilt command (profile deleted), the recorded one is used (#39)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/gate.test.ts > gate on the supervisor > without a rebuilt command (profile deleted), the recorded one is used (#39)"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/hardware.test.ts",
     "name": "buildOf reads the version again after the binary is rebuilt",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchHardware.test.ts > BenchHardware > buildOf reads the version again after the binary is rebuilt"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/hardware.test.ts",
     "name": "a crashed device listing is not cached, and the last good list is kept (#15)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchHardware.test.ts > BenchHardware > a crashed device listing is not cached, and the last good list is kept (#15)"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/hardware.test.ts",
     "name": "a crash with no earlier list gives no devices and says why (#15)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchHardware.test.ts > BenchHardware > a crash with no earlier list gives no devices and says why (#15)"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/hardware.test.ts",
     "name": "a GPU listed with 0 MiB is not cached (#15)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchHardware.test.ts > BenchHardware > a GPU listed with 0 MiB is not cached (#15)"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/parse.test.ts",
     "name": "benchFailure reports an out-of-memory load",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/parse.test.ts > benchFailure reports an out-of-memory load"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "restarts the server it stopped even when llama-bench fails",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > restarts the server it stopped even when llama-bench fails"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "a successful run stores pp/tg and refuses a second run meanwhile",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > a successful run stores pp/tg and refuses a second run meanwhile"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "a server run measures r times and reports draft acceptance",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "rewritten",
+    "to": "app/server/bench/execute.test.ts > execute > a server run measures r times and reports draft acceptance",
+    "reason": "An executor-level test of the legacy runner: the executor is its own module now (`execute.ts`, `trial.ts`), tested without the runner"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "a missing model is refused before anything stops",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > a missing model is refused before anything stops"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "a failed restart is recorded on the run",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > a failed restart is recorded on the run"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "dispose (shutdown) saves the running sweep item and its sweep as interrupted",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > dispose (shutdown) saves the running sweep item and its sweep as interrupted"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "a bench run gets its profile's environment",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "rewritten",
+    "to": "app/server/bench/execute.test.ts > execute > a bench run gets its profile's environment",
+    "reason": "An executor-level test of the legacy runner: the executor is its own module now (`execute.ts`, `trial.ts`), tested without the runner"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "a server that dies of OOM is reported as OOM even when a long backtrace follows the allocation error",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "rewritten",
+    "to": "app/server/bench/execute.test.ts > execute > a server that dies of OOM is reported as OOM even when a long backtrace follows the allocation error",
+    "reason": "An executor-level test of the legacy runner: the executor is its own module now (`execute.ts`, `trial.ts`), tested without the runner"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "the warm-up prompt is a sentence: a 2-token prompt crashes llama-server with -sm tensor and an MTP draft",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "rewritten",
+    "to": "app/server/bench/execute.test.ts > execute > the warm-up prompt is a sentence: a 2-token prompt crashes llama-server with -sm tensor and an MTP draft",
+    "reason": "An executor-level test of the legacy runner: the executor is its own module now (`execute.ts`, `trial.ts`), tested without the runner"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "a server run runs in its profile's directory",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "rewritten",
+    "to": "app/server/bench/execute.test.ts > execute > a server run runs in its profile's directory",
+    "reason": "An executor-level test of the legacy runner: the executor is its own module now (`execute.ts`, `trial.ts`), tested without the runner"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "a sweep stops the server once, continues after an OOM item and restarts it once",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > a sweep stops the server once, continues after an OOM item and restarts it once"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "cancelSweep cancels the queue and releases the gate",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > cancelSweep cancels the queue and releases the gate"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "validating an interrupted sweep also finishes its interrupted items",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > validating an interrupted sweep also finishes its interrupted items"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "the VRAM sampler takes its last reading when the run ends, then stops",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "rewritten",
+    "to": "app/server/bench/execute.test.ts > execute > the VRAM sampler takes its last reading when the run ends, then stops",
+    "reason": "An executor-level test of the legacy runner: the executor is its own module now (`execute.ts`, `trial.ts`), tested without the runner"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "server validation runs get the sweep context when the profile sets no -c (#24)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > server validation runs get the sweep context when the profile sets no -c (#24)"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/runner.test.ts",
     "name": "resuming a sweep whose model was deleted is one 400, before anything stops (#37)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunner.test.ts > BenchRunner > resuming a sweep whose model was deleted is one 400, before anything stops (#37)"
   },
   {
     "project": "server",
     "file": "app/server/lib/bench/vram.test.ts",
     "name": "parseSmiLine reads nvidia-smi loop lines as monitor keys",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/vram.test.ts > vram > parseSmiLine reads nvidia-smi loop lines as monitor keys"
   },
   {
     "project": "server",
@@ -834,13 +888,17 @@
     "project": "server",
     "file": "app/server/lib/db/benchRuns.test.ts",
     "name": "a run whose profile no longer exists is created without it",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunsRepo.test.ts > BenchRunsRepo > a run whose profile no longer exists is created without it"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/benchRuns.test.ts",
     "name": "lastOkByProfile: the latest successful one-off run per profile; failures, sweep items and orphans ignored",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunsRepo.test.ts > BenchRunsRepo > lastOkByProfile: the latest successful one-off run per profile; failures, sweep items and orphans ignored"
   },
   {
     "project": "server",
@@ -976,25 +1034,33 @@
     "project": "server",
     "file": "app/server/lib/db/sweeps.test.ts",
     "name": "a deleted run's id is never handed out again",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunsRepo.test.ts > BenchRunsRepo > a deleted run's id is never handed out again"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sweeps.test.ts",
     "name": "the migration keeps every run of a J5 database: ids, values and the next id",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/BenchRunsRepo.test.ts > the migration keeps every run of a J5 database: ids, values and the next id"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sweeps.test.ts",
     "name": "a sweep counts its queued items, cascades on delete and forgets a deleted best run",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/SweepsRepo.test.ts > SweepsRepo > a sweep counts its queued items, cascades on delete and forgets a deleted best run"
   },
   {
     "project": "server",
     "file": "app/server/lib/db/sweeps.test.ts",
     "name": "stopOrphans interrupts running sweeps and their running item",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/SweepsRepo.test.ts > SweepsRepo > stopOrphans interrupts running sweeps and their running item"
   },
   {
     "project": "server",
@@ -1933,7 +1999,9 @@
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "which looks the binary up in the PATH",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/bench/which.test.ts > which looks the binary up in the PATH"
   },
   {
     "project": "server",
@@ -2033,7 +2101,10 @@
     "project": "server",
     "file": "app/server/lib/routes.test.ts",
     "name": "GET /api/bench/runs caps an explicit limit at the sweep default, 10,000 (#37)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "rewritten",
+    "to": "app/server/bench/BenchRunsRepo.test.ts > BenchRunsRepo > GET /api/bench/runs caps an explicit limit at the sweep default, 10,000 (#37); app/server/bench/http.test.ts > GET /api/bench/runs caps an explicit limit at the sweep default, 10,000 (#37)",
+    "reason": "The legacy route test checked the limit passed to the repository; now runFilters is a pure function tested with the repository, and the route answers every run over HTTP"
   },
   {
     "project": "server",
@@ -2257,7 +2328,9 @@
     "project": "server",
     "file": "app/server/lib/supervisor/external.test.ts",
     "name": "no external server is detected while a benchmark owns the port",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/server/supervisor/ExternalWatch.test.ts > no external server is detected while a benchmark owns the port"
   },
   {
     "project": "server",
@@ -2832,13 +2905,17 @@
     "project": "web",
     "file": "app/src/lib/bench.test.ts",
     "name": "a -ts without -dev survives the form",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/src/lib/bench.test.ts > a -ts without -dev survives the form"
   },
   {
     "project": "web",
     "file": "app/src/lib/bench.test.ts",
     "name": "a llama-bench run keeps the profile's projector",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "app/src/lib/bench.test.ts > a llama-bench run keeps the profile's projector"
   },
   {
     "project": "web",
@@ -2872,49 +2949,65 @@
     "project": "shared",
     "file": "packages/webui-shared/src/bench.test.ts",
     "name": "paramsFromServerArgs splits a real profile into fields and the rest",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/bench.test.ts > paramsFromServerArgs splits a real profile into fields and the rest"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/bench.test.ts",
     "name": "an unreadable value stays in the rest with its flag",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/bench.test.ts > an unreadable value stays in the rest with its flag"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/bench.test.ts",
     "name": "each tool gets its own separators",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/bench.test.ts > each tool gets its own separators"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/bench.test.ts",
     "name": "ignoredByBench flags every speculative flag, not only --spec-type (#30)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/bench.test.ts > ignoredByBench flags every speculative flag, not only --spec-type (#30)"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/bench.test.ts",
     "name": "ignoredByBench names context and speculative decoding",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/bench.test.ts > ignoredByBench names context and speculative decoding"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/bench.test.ts",
     "name": "BenchSpecSchema refuses managed flags in serverArgs at their index",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/bench.test.ts > BenchSpecSchema refuses managed flags in serverArgs at their index"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/bench.test.ts",
     "name": "isOomError recognizes the current and the legacy out-of-memory errors",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/bench.test.ts > isOomError recognizes the current and the legacy out-of-memory errors"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/bench.test.ts",
     "name": "the f8_e4m3 KV cache type is accepted by the schema and read from the server flags",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/bench.test.ts > the f8_e4m3 KV cache type is accepted by the schema and read from the server flags"
   },
   {
     "project": "shared",
@@ -3109,43 +3202,57 @@
     "project": "shared",
     "file": "packages/webui-shared/src/sweep.test.ts",
     "name": "expandSpace crosses the dimensions in field order and applies -ts only where it fits",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/sweep.test.ts > expandSpace crosses the dimensions in field order and applies -ts only where it fits"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/sweep.test.ts",
     "name": "expandSpace drops duplicates and a base -ts that no longer matches the devices",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/sweep.test.ts > expandSpace drops duplicates and a base -ts that no longer matches the devices"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/sweep.test.ts",
     "name": "itemLabel names only the varying dimensions",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/sweep.test.ts > itemLabel names only the varying dimensions"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/sweep.test.ts",
     "name": "rankRuns marks ties inside the noise band and leaves failures unranked",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/sweep.test.ts > rankRuns marks ties inside the noise band and leaves failures unranked"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/sweep.test.ts",
     "name": "SweepSpecSchema refuses an empty value list for a dimension",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/sweep.test.ts > SweepSpecSchema refuses an empty value list for a dimension"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/sweep.test.ts",
     "name": "sweepCtx reads -c= and the last -c, like ctxFromArgs (#24)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/sweep.test.ts > sweepCtx reads -c= and the last -c, like ctxFromArgs (#24)"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/sweep.test.ts",
     "name": "withCtx adds -c only when the flags set no context (#24)",
-    "milestone": "E7"
+    "milestone": "E7",
+    "status": "ported",
+    "to": "packages/webui-shared/src/sweep.test.ts > withCtx adds -c only when the flags set no context (#24)"
   },
   {
     "project": "shared",

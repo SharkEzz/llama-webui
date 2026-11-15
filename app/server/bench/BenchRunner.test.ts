@@ -716,4 +716,105 @@ describe('BenchRunner', () => {
       assert.isFalse(freed);
     }).pipe(withRunner(), fresh),
   );
+
+  it.live('a missing projector is refused like a missing model by a run, a resume and a validation', () =>
+    Effect.gen(function* () {
+      const runner = yield* BenchRunner;
+      const runs = yield* BenchRunsRepo;
+      const sweeps = yield* SweepsRepo;
+      const model = yield* Model;
+      yield* useFake();
+      yield* startA;
+      const missing = 'Projector not found: /nulle/mmproj.gguf';
+      const spec = yield* specOf({ kind: 'bench', modelPath: model, mmprojPath: '/nulle/mmproj.gguf', r: 1 });
+      const run = yield* Effect.flip(runner.start(spec, { stopServer: true }));
+      assert.deepStrictEqual([run._tag, run.message], ['BenchFileMissing', missing]);
+      const sweepSpec = yield* sweepSpecOf({
+        name: 's',
+        modelPath: model,
+        mmprojPath: '/nulle/mmproj.gguf',
+        preset: 'chat',
+        r: 1,
+        space: { ncmoe: [1, 2] },
+      });
+      const sweep = yield* sweeps.create(sweepSpec);
+      const [first] = yield* runs.enqueue(sweep.id, [
+        { spec, label: '-ncmoe 1', fit: 'fits' },
+        { spec, label: '-ncmoe 2', fit: 'fits' },
+      ]);
+      const measured = { tps: 100, stddev: 0, tokens: 10 };
+      if (first !== undefined) yield* runs.finish(first.id, { status: 'ok', pp: measured, tg: measured });
+      yield* sweeps.setStatus(sweep.id, 'interrupted');
+      const resumed = yield* Effect.flip(runner.resume(sweep.id, { stopServer: true }));
+      assert.deepStrictEqual([resumed._tag, resumed.message], ['BenchFileMissing', missing]);
+      const validated = yield* Effect.flip(runner.validate(sweep.id, { n: 1, stopServer: true }));
+      assert.deepStrictEqual([validated._tag, validated.message], ['BenchFileMissing', missing]);
+      yield* gateWas([]);
+      const state = yield* (yield* Supervisor).state;
+      assert.strictEqual(state.kind, 'ready');
+    }).pipe(withRunner(), fresh),
+  );
+
+  it.live('validating a sweep without a successful run is a 409 and stops nothing', () =>
+    Effect.gen(function* () {
+      const runner = yield* BenchRunner;
+      const runs = yield* BenchRunsRepo;
+      const sweeps = yield* SweepsRepo;
+      const model = yield* Model;
+      yield* useFake();
+      yield* startA;
+      const sweepSpec = yield* sweepSpecOf({
+        name: 's',
+        modelPath: model,
+        preset: 'chat',
+        r: 1,
+        space: { ncmoe: [1] },
+      });
+      const sweep = yield* sweeps.create(sweepSpec);
+      const spec = yield* specOf({ kind: 'bench', modelPath: model, r: 1 });
+      const [item] = yield* runs.enqueue(sweep.id, [{ spec, label: '-ncmoe 1', fit: 'fits' }]);
+      if (item !== undefined) yield* runs.finish(item.id, { status: 'failed', error: 'Out of memory' });
+      yield* sweeps.setStatus(sweep.id, 'done');
+      const refused = yield* Effect.flip(runner.validate(sweep.id, { n: 3, stopServer: true }));
+      assert.deepStrictEqual([refused._tag, refused.message], ['NothingToValidate', 'No successful run to validate']);
+      yield* gateWas([]);
+      const busy = yield* runner.busy;
+      assert.isFalse(busy);
+    }).pipe(withRunner(), fresh),
+  );
+
+  it.live('resuming an interrupted sweep runs its interrupted and queued items and ends it done', () =>
+    Effect.gen(function* () {
+      const runner = yield* BenchRunner;
+      const runs = yield* BenchRunsRepo;
+      const sweeps = yield* SweepsRepo;
+      yield* useFake({ FAKE_BENCH_STEP_MS: '5' });
+      const sweep = yield* startSweepOf([1, 2, 3]);
+      yield* sweepEnded;
+      // As after a Ctrl-C during item 2: item 2 interrupted, item 3 still queued.
+      const explored = yield* itemsOf(sweep.id);
+      const [, second, third] = explored;
+      if (second === undefined || third === undefined) return assert.fail('three items expected');
+      yield* runs.finish(second.id, { status: 'interrupted', error: 'interrupted (llama-webui stopped)' });
+      yield* runs.requeue(third.id);
+      yield* sweeps.setStatus(sweep.id, 'interrupted');
+      const before = (yield* sweepProgress).length;
+      const resumed = yield* runner.resume(sweep.id, { stopServer: true });
+      assert.strictEqual(resumed.status, 'running');
+      yield* until(
+        Effect.map(
+          sweepProgress,
+          (lives) => lives.length > before + 1 && Arr.last(lives).pipe(Option.exists((l) => l === null)),
+        ),
+      );
+      const items = yield* itemsOf(sweep.id);
+      assert.deepStrictEqual(
+        Arr.map(items, (r) => r.status),
+        ['ok', 'ok', 'ok'],
+      );
+      const final = yield* sweepOfId(sweep.id);
+      assert.strictEqual(final.status, 'done');
+      assert.isNotNull(final.finishedAt);
+    }).pipe(withRunner(), fresh),
+  );
 });

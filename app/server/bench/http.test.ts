@@ -142,6 +142,30 @@ layer(served, { excludeTestServices: true, buildPerTest: true })('over HTTP', (i
     }),
   );
 
+  it.effect('the runs query filters by kind, status, model and sweep, and ignores an unknown value', () =>
+    Effect.gen(function* () {
+      const sweeps = yield* SweepsRepo;
+      const sweep = yield* sweeps.create(sweepSpec());
+      const bench = yield* saved('ok');
+      const server = yield* saved('failed', { spec: benchSpec({ kind: 'server' }) });
+      const other = yield* saved('ok', { spec: benchSpec({ modelPath: '/models/other.gguf' }) });
+      const item = yield* saved('ok', { sweepId: sweep.id });
+      const cases: ReadonlyArray<readonly [string, string, ReadonlyArray<number>]> = [
+        ['one-off runs, newest first', '', [other, server, bench]],
+        ['kind server', '?kind=server', [server]],
+        ['status failed', '?status=failed', [server]],
+        ['one model', `?model=${encodeURIComponent('/models/other.gguf')}`, [other]],
+        ['every run', '?sweep=all', [item, other, server, bench]],
+        ['one sweep', `?sweep=${sweep.id}`, [item]],
+        ['an unknown kind, status and sweep', '?kind=nope&status=nope&sweep=nope', [other, server, bench]],
+      ];
+      for (const [name, query, expected] of cases) {
+        const ids = yield* listed(query);
+        assert.deepStrictEqual(ids, expected, name);
+      }
+    }),
+  );
+
   it.effect('DELETE /api/bench/runs is not read as a run id', () =>
     Effect.gen(function* () {
       const id = yield* saved('failed');

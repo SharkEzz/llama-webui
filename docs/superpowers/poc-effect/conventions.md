@@ -145,11 +145,31 @@ The model is `app/server/supervisor/Supervisor.ts`.
   `handle.kill({ killSignal: 'SIGTERM' }).pipe(Effect.interruptible, Effect.timeoutOption(timeout))`, then
   `kill({ killSignal: 'SIGKILL' })` on none. `Effect.interruptible` lets the timeout end the wait, in a finalizer
   too. `forceKillAfter` of `ChildProcess.make` is the backstop of a scope closed on a live process.
+- **A stop that a person asked for** (a cancel: `stopGently` of `app/server/bench/trial.ts`) is that stop in two
+  signals on a followed program, the wait an option (`killTimeout`: 5 s in the app, 1 s in the tests) and the
+  escalation told in the ring (`[llama-webui] not stopped after <ms> ms, SIGKILL`, as `Supervisor.ts`), then it
+  awaits `ended`. It is not `Followed.stop`: closing the scope sends the spawn's `killSignal` at once, which is what an
+  interruption (llama-webui stopping) does. A program spawned after the cancel is stopped at once (`onSpawn`).
 - **An operation that outlives its request** (a start, a stop) runs in a fiber of the layer's scope
   (`Effect.forkIn(operation, ops)`), and the caller joins it inside `Effect.uninterruptibleMask` with `restore`: a
   caller that goes away stops waiting, and the operation runs to its end. For one at a time, use `Semaphore.make(1)`:
   `Semaphore.takeIfAvailable` (released by `Effect.ensuring`) for an operation that is refused while another runs,
   `withPermits(1)` for one that waits.
+- **A claim that covers a request's work, then a fork that outlives it** (`app/server/bench/BenchRunner.ts`): the
+  claim is one `SynchronizedRef.modifyEffect` of the state (refused when closing, claimed, a run or a sweep current,
+  or the gate held), released by `Effect.ensuring` around the rest of the request: the checks, the gate, the reads and
+  the row writes run under the claim, interruptible, so a client that leaves mid-way leaves no claim; an
+  `Effect.onError` gives back what it took (the gate). The last step (the rows, the message, the fork) is
+  `Effect.uninterruptible`, and the work is forked in the layer's scope (`Effect.forkIn(work, scope)`), which holds the
+  runner after the claim. `busy` reads all of it at once: a claim, a current run, a running sweep, the gate held.
+- **A gate that holds another service for a while and gives it back** (`makeGate` of `app/server/bench/gate.ts`, a
+  module of the runner on `Supervisor`, not a service): its state in a `Ref` (held, the command it stopped, the stop's
+  fiber, the release in progress). `acquire` refuses (a server stopping too long, an external one, a running one
+  without leave) or takes it, forking the other service's stop in the owner's scope; `ready` joins that fiber.
+  `release(rebuild)` restarts with the command rebuilt as the profile is now (the recorded one when it is gone), under
+  `Effect.uninterruptibleMask`: the gate is freed by `Effect.onExit` however the restart ends, a second release awaits
+  the first one's `Deferred`, and a release without the gate held does nothing. The owner's shutdown step does not
+  release it (no restart while the app stops).
 - **State shared by several fibers** is one `SynchronizedRef` with one function that changes it. In `change(f)`, `f`
   sees what is held and answers the next value, or none. The new state is published inside
   `SynchronizedRef.modifyEffect`, so the messages leave in the order of the changes. `f` checks that the state is
@@ -202,8 +222,10 @@ The model is `app/server/supervisor/Supervisor.ts`.
 - **The tiers of `Services`** (`app/server/App.ts`): each `Layer.provideMerge` is a tier, built after the ones below
   it and undone before them.
   - From the bottom: the database, `AppInfo`, the hub and the repositories (`ConversationsRepo` with them), the ring,
-    `LlamaHttp` and `PciIds`, `Flags`, the supervisor, the monitor, the placement and the chat's `ChatRuns`, the watch.
-  - The watch ends first (no look while the rest stops). The monitor and `ChatRuns` end before the supervisor, the
+    `LlamaHttp` and `PciIds`, `Flags` (with `BenchHardware`), the supervisor, the monitor, the placement, the chat's
+    `ChatRuns` and the downloads, the bench's `BenchRunner`, the watch (the bench's repositories with the others).
+  - The watch ends first (no look while the rest stops), then the runner (its run and loop interrupted, their
+    programs killed). The monitor and `ChatRuns` end before the supervisor, the
     collectors' programs with the monitor, the replies left by the shutdown step interrupted with `ChatRuns`. The
     supervisor stops llama-server while the ring and the hub it writes to are still up. The database closes last.
   - All of it runs after the shutdown steps and after the HTTP server closed (`Shutdown.layerRunner`, E1).
