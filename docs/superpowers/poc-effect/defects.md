@@ -18,7 +18,7 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 | Where                                      | Defect                                                                                                                                                                                                   | Status                                 | Ported at |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------- |
 | `lib/tuning/memo.ts:16`                    | `benchBinary(settings.get().binary)` gets the setting without `~` expanded: with a `~/…` binary the device listing of Tuning fails, and with it `POST /api/sweeps`. `GET /api/bench/devices` expands it. | fixed in E7 (the bench), E8 (the memo) | E7, E8    |
-| `lib/setup.ts:61`, `lib/bench/hardware.ts` | The raw `binary` setting goes to `buildOf`, which does not expand `~` either: `version` is null in the setup report for a `~/…` binary.                                                                  | confirmed                              | E8        |
+| `lib/setup.ts:61`, `lib/bench/hardware.ts` | The raw `binary` setting goes to `buildOf`, which does not expand `~` either: `version` is null in the setup report for a `~/…` binary.                                                                  | fixed in E8                            | E8        |
 
 ## Reported, to verify with the milestone's plan
 
@@ -127,10 +127,23 @@ Status: `unverified` (reported by a reader of the code, not reproduced), `confir
 
 ### E8: tuning, topology, launchpad
 
-- The default of the V cache type differs: the plan uses `ctv ?? ctk ?? f16`, the estimator `ctv ?? f16`. `unverified`
-- The PCIe and Resizable BAR checks ignore whether the card is kept. `unverified`
-- `amd.rocm-gfx` is always `unknown`. `unverified`
-- A plan body without `spec` is never replayed by the contract suite. `unverified`
+- The default of the V cache type differs: the plan uses `ctv ?? ctk ?? f16`, the estimator `ctv ?? f16`. `confirmed`,
+  `fixed in E8`: llama.cpp gives `-ctv` f16 unless told otherwise, so an item pinned `-ctk q8_0` was planned with a
+  q8_0 V cache it does not get; the plan now measures with the estimator's `cacheOf` (`tuning/space.test.ts`: measures
+  an item with the V cache llama.cpp gives it: f16 when only -ctk is set). The 324 plan items of the differential run
+  that differ from Nitro's are all this fix.
+- The PCIe and Resizable BAR checks ignore whether the card is kept. `design choice`: the link and the BAR say
+  something about the machine whatever the profile uses. Ported as it is.
+- `amd.rocm-gfx` is always `unknown`. `design choice`: rocminfo is not run. Ported as it is.
+- A plan body without `spec` is never replayed by the contract suite. `confirmed`, `fixed in E8`: the body is decoded
+  at the edge, a missing `spec` is the 400 `RequestInvalid` on the path `spec`, and the contract sends `{"spec":{}}`;
+  `tuning/http.test.ts` sends a body without it (a plan without its spec is a 400 on the path spec; with one, its
+  items).
+- `POST /api/sweeps` answers 404 `Model not found` where run, resume and validate answer 400 (moved from E7).
+  `design choice` (Call 4 of the E8 plan): the creation loads the GGUF to plan, like `POST /api/tuning/plan`, and keeps
+  its errors; run, resume and validate parse no GGUF and keep the 400 `BenchFileMissing`.
+- The `git log` of the build date has no timeout. `confirmed`, `fixed in E8`: bounded to 5 s like every program of the
+  server, a timeout gives no build date (read, not tested: no test drives a slow git).
 
 ## Changed by the Effect server (not defects)
 
@@ -579,6 +592,48 @@ Found by the final review of E7, fixed with it:
     read. They are now `' '` (blank, trimmed to no token).
   - `Monitor.test.ts` listed the host's AMD cards. `Collectors.layerWith` takes a `drmRoot` (default
     `/sys/class/drm`), which the test points at a missing folder.
+
+Decided (the E8 plan):
+
+- The estimator is rewritten, not copied (the diagnostics refuse native array methods and implicit booleans). A
+  differential run, kept out of the tree, ran the legacy `lib/tuning/` (copied with `git show` into the session's
+  scratchpad, never imported) and the new modules on the same inputs: the fixtures of the legacy tests, a generated
+  grid (every preset, 0 to 3 cards across CUDA, Vulkan and ROCm, MoE and dense models, pinned `dev`, `ngl`, `ncmoe`,
+  `fa`, `ctk`, `ub` and `ctx`) and the GGUF headers of the models on this machine. 114,072 inputs, 113,748 equal; the
+  324 others are plan items with `-ctk q8_0`, all the V cache fix (the plan item's V cache, above). Against the legacy
+  patched to `ctv ?? f16`, every plan item is equal.
+- The memos are a service, `TuningMemo` (two `Ref`s of `HashMap`s keyed by model path); the CPU info is
+  `Effect.cached` inside `TuningHardware`; the `--list-devices` and `--version` caches stay `BenchHardware`'s. A route
+  reload no longer exists, so "the memos survive a route save" is moot.
+- The tuning hardware and the setup report read the `~`-expanded binary (the two `~` defects of the table, fixed).
+- New error tags: `ModelPathInvalid` 400 `Expected an absolute path to a .gguf file`, `ProjectorNotFound` 404
+  `Projector not found`, `FileTooSmall` 400 `File too small to measure (<n> MiB)`, `NothingToRun` 409 `No configuration
+  to run: <n> excluded by the estimator`; `ModelNotFound`, `ModelUnreadable` and `ModelFileNotFound` come from E6, and
+  the disk measure's `BenchRunning` keeps its own message (`A benchmark is running: the measurement would be skewed`).
+- `POST /api/sweeps` runs on `BenchRunner.startSweep`: the exclusions are its `check`, under the claim, so a busy runner
+  answers its 409 `A benchmark is running` before `No configuration to run`; `prepare` stores the sweep and its items in
+  one transaction. Its body and the plan's are decoded at the edge: an issue's path starts with `spec.`.
+- `git log` (the build date of the checks) is bounded to 5 s.
+- The legacy tests of `fileRange` become the tests of the disk measure's range read.
+
+Found while porting E8, accepted with its result:
+
+- The disk measure belongs to its request: a client that leaves interrupts it (the platform interrupts the handler's
+  fiber), its file closed by its scope and nothing memoized (was: it went on to the end).
+- The estimate cannot fail any more (a pure function on a hardware read without error): the launchpad's `fit` is null
+  only when llama-bench lists no device while the monitor sees GPUs. The legacy test `launchpad: a failing estimate
+  drops the fit badge only`, which injected a throwing estimate, maps to that case in the inventory.
+- A plan or sweep spec with a relative or non-`.gguf` `modelPath` is refused by the schema (400 `RequestInvalid`), as
+  Nitro's `SweepSpecSchema` did; only estimate and disk speed, whose `modelPath` is any non-empty string, answer the 400
+  `ModelPathInvalid` of `loadModel`.
+- Only a `no` verdict excludes a sweep item: a RAM overflow is `tight` (mmap reads the rest from disk), so an item that
+  only overflows RAM is still run. The `NothingToRun` test pins `-dev CUDA0` on a machine without devices.
+- The Checks card of the System page sits in the branch that has a monitor snapshot, as on `master`: with the stub
+  monitor (no snapshot) the page shows its skeletons and no card. The look of the card was taken from the Tuning page.
+- The web's tuning and setup stores call the typed client; they tell `ServerRunning`, `SweepNotFound` and
+  `ProfileNameTaken` by their `_tag`, and their props and state take the schemas' `ReadonlyArray`s.
+- The contract cases of the routes that read the machine (hardware, checks, estimate, plan, setup, launchpad) are
+  `machine: true` (the golden records the names of their fields, not the body), as `GET /api/system/info`.
 
 ## Measures (`e<N>.json`)
 

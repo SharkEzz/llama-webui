@@ -86,6 +86,18 @@ describe('tuning reads', () => {
     ),
   );
 
+  it.effect('fileRange reads in 1 MiB chunks, so the disk measure is not held back by the stream', () =>
+    fresh(
+      Effect.gen(function* () {
+        const { fs, at } = yield* workspace;
+        yield* fs.writeFile(at('f'), new Uint8Array(3 * MiB + 10));
+        const chunks = yield* fileRange({ path: at('f'), start: 10, end: 3 * MiB + 10 }).pipe(Stream.runCollect);
+        const sizes = Arr.map(Arr.fromIterable(chunks), (chunk) => chunk.byteLength);
+        assert.deepStrictEqual(sizes, [MiB, MiB, MiB]);
+      }),
+    ),
+  );
+
   it.effect('measureDiskSpeed: a missing path or a directory is a 404, a small file a 400', () =>
     fresh(
       Effect.gen(function* () {

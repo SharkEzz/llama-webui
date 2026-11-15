@@ -2007,13 +2007,17 @@
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads [start, end)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/reads.test.ts > tuning reads > fileRange reads [start, end)"
   },
   {
     "project": "server",
     "file": "app/server/lib/proc.test.ts",
     "name": "fileRange reads in 1 MiB chunks, so the disk speed check is not held back by the stream",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/reads.test.ts > tuning reads > fileRange reads in 1 MiB chunks, so the disk measure is not held back by the stream"
   },
   {
     "project": "server",
@@ -2159,49 +2163,66 @@
     "project": "server",
     "file": "app/server/lib/setup.test.ts",
     "name": "setup: binary not found and models folder missing → not ready",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/setup.test.ts > without a binary or a models folder, the report is not ready"
   },
   {
     "project": "server",
     "file": "app/server/lib/setup.test.ts",
     "name": "setup: an executable binary and an empty folder → ready, 0 models",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/setup.test.ts > the setup report reads the version of a ~/… binary, and its llama-bench devices"
   },
   {
     "project": "server",
     "file": "app/server/lib/setup.test.ts",
     "name": "setup: a non-executable file or a directory is not a binary",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/setup.test.ts > a file without an execute bit, or a directory, is not a binary"
   },
   {
     "project": "server",
     "file": "app/server/lib/setup.test.ts",
     "name": "setup: counts readable models only (projectors and unreadable files left out)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/setup.test.ts > the models folder counts the readable models only: no projector, no unreadable file"
   },
   {
     "project": "server",
     "file": "app/server/lib/setup.test.ts",
     "name": "readPerfParanoid: parsed value, null when unreadable",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/setup.test.ts > the telemetry gives the NVIDIA source and perf_event_paranoid (an integer, or null)"
   },
   {
     "project": "server",
     "file": "app/server/lib/setup.test.ts",
     "name": "launchpad: model, last bench and fit per profile; an unreadable model only sets modelError",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/setup.test.ts > the launchpad gives each profile its model, fit and last bench; an unreadable model only sets modelError"
   },
   {
     "project": "server",
     "file": "app/server/lib/setup.test.ts",
     "name": "launchpad: a failing estimate drops the fit badge only",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/setup.test.ts > buildLaunchpad > the fit is dropped when llama-bench sees no device but the monitor sees GPUs",
+    "reason": "The estimate and the hardware read cannot fail any more (pure estimator, TuningHardware.read without error): the fit is dropped only when llama-bench lists no device while the monitor sees GPUs"
   },
   {
     "project": "server",
     "file": "app/server/lib/setup.test.ts",
     "name": "setup: llama-server exposed on the network only when its host is not loopback (#27)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/setup.test.ts > llama-server is exposed on the network only when its host is not loopback (#27)"
   },
   {
     "project": "server",
@@ -2353,187 +2374,249 @@
     "project": "server",
     "file": "app/server/lib/tuning/checks.test.ts",
     "name": "a governor other than performance is a warning with the exact command",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/checks.test.ts > runChecks > a governor other than performance is a warning with the exact command"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/checks.test.ts",
     "name": "disk speed: unknown until measured, warning under 2 GiB/s",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/checks.test.ts > runChecks > disk speed: unknown until measured, warning under 2 GiB/s"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/checks.test.ts",
     "name": "only the cards of the estimate are retained: the others are not applicable (#36)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/checks.test.ts > runChecks > only the cards of the estimate are retained: the others are not applicable (#36)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/checks.test.ts",
     "name": "a PCIe link trained down while the card is idle is unknown, not a warning (#36)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/checks.test.ts > runChecks > a PCIe link trained down while the card is idle is unknown, not a warning (#36)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/disk.test.ts",
     "name": "measureDiskSpeed: a missing path or a directory is a 404, a small file a 400",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/reads.test.ts > tuning reads > measureDiskSpeed: a missing path or a directory is a 404, a small file a 400"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/disk.test.ts",
     "name": "measureDiskSpeed: reads the requested bytes and times them",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/reads.test.ts > tuning reads > measureDiskSpeed reads the requested bytes and times them"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "big preset puts experts on the CPU and uses the three cards",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > the big preset puts experts on the CPU and uses the three cards"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "a dense model that fits on one card gets -ngl all and one CUDA device",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > a dense model that fits on one card gets -ngl all and one CUDA device"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "a MoE that overflows one card is split before its experts go to RAM",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > a MoE that overflows one card is split before its experts go to RAM"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "pinned values are kept, and -ncmoe on a dense model warns",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > pinned values are kept, and -ncmoe on a dense model warns"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "planSweep crosses -ncmoe with device sets and drops what does not fit unless asked",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/space.test.ts > planSweep > crosses -ncmoe with device sets and drops what does not fit unless asked"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "a CUDA pair with margin beats a single card at the limit, and the AMD card alone comes after the CUDA pair",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > a CUDA pair with margin beats a single card at the limit, and the AMD card alone comes after the CUDA pair"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "pinned -fa and -ctk show up in the rows and the kv field, not the searched values (#36)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > pinned -fa and -ctk show up in the rows and the kv field, not the searched values (#36)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "an -ot rule to an unknown device is reported and does not fit (#36)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > an -ot rule to an unknown device is reported and does not fit (#36)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "when nothing fits because of RAM, the reason names RAM, not the all-GPU fallback (#25)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > when nothing fits because of RAM, the reason names RAM, not the all-GPU fallback (#25)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "with -fa off, an f8_e4m3 cache keeps the model on a CUDA card where f16 does not fit",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > with -fa off, an f8_e4m3 cache keeps the model on a CUDA card where f16 does not fit"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "with -fa off, the estimator never picks f8_e4m3 on a Vulkan card",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > with -fa off, the estimator never picks f8_e4m3 on a Vulkan card"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "with -fa off and the largest context, f8_e4m3 only wins when f16 cannot reach the model context",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > with -fa off and the largest context, f8_e4m3 only wins when f16 cannot reach the model context"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/estimate.test.ts",
     "name": "a pinned f8_e4m3 cache is not called quantized and warns on a Vulkan card",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/estimate.test.ts > estimate > a pinned f8_e4m3 cache is not called quantized and warns on a Vulkan card"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/match.test.ts",
     "name": "matchGpus pairs NVIDIA cards by name and AMD cards by VRAM size, the Vulkan copies included (#26)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/match.test.ts > matchGpus > pairs NVIDIA cards by name and AMD cards by VRAM size, the Vulkan copies included (#26)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/match.test.ts",
     "name": "VRAM used by another process shrinks the budget, the managed server’s own does not (#26)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/match.test.ts > withLiveMemory > VRAM used by another process shrinks the budget, the managed server’s own does not (#26)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/match.test.ts",
     "name": "a device the monitor does not know keeps the list values (#26)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/match.test.ts > withLiveMemory > a device the monitor does not know keeps the list values (#26)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/placement.test.ts",
     "name": "deviceRole skips the Vulkan copies of the CUDA cards and the iGPU",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/placement.test.ts > deviceRole > skips the Vulkan copies of the CUDA cards and the iGPU"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/placement.test.ts",
     "name": "deviceRole treats the ROCm iGPU as integrated and the Vulkan copy of a ROCm card as a duplicate (#22)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/placement.test.ts > deviceRole > treats the ROCm iGPU as integrated and the Vulkan copy of a ROCm card as a duplicate (#22)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/placement.test.ts",
     "name": "-ncmoe moves the experts of the first N layers to RAM",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/placement.test.ts > measurePlacement > -ncmoe moves the experts of the first N layers to RAM"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/placement.test.ts",
     "name": "-ot wins over -ngl and -ts splits the layers in order",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/placement.test.ts > measurePlacement > -ot wins over -ngl and -ts splits the layers in order"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/placement.test.ts",
     "name": "no -dev means the dedicated cards; no -ngl means every layer",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/placement.test.ts > measurePlacement > no -dev means the dedicated cards; no -ngl means every layer"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/placement.test.ts",
     "name": "fitOf says fits, tight, then no as the model grows",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/placement.test.ts > fitOf > says fits, tight, then no as the model grows"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/placement.test.ts",
     "name": "RAM overflow is tight, never no (mmap reads the rest from disk)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/placement.test.ts > fitOf > a RAM overflow is tight, never no (mmap reads the rest from disk)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/placement.test.ts",
     "name": "-ot to an unknown device is an issue, to a host buffer is RAM (#36)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/placement.test.ts > measurePlacement > -ot to an unknown device is an issue, to a host buffer is RAM (#36)"
   },
   {
     "project": "server",
     "file": "app/server/lib/tuning/placement.test.ts",
     "name": "an f8_e4m3 KV cache takes half the bytes of an f16 one",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/server/tuning/memory.test.ts > kvLayerBytes > an f8_e4m3 KV cache takes half the bytes of an f16 one"
   },
   {
     "project": "server",
@@ -2937,13 +3020,17 @@
     "project": "web",
     "file": "app/src/lib/tuning.test.ts",
     "name": "-ot suggestions name the dedicated cards of this machine, not a hard-coded device (#23)",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/src/lib/tuning.test.ts > -ot suggestions name the dedicated cards of this machine, not a hard-coded device (#23)"
   },
   {
     "project": "web",
     "file": "app/src/lib/tuning.test.ts",
     "name": "the profile flags replaced by the recommendation leave out those pinned to the same value",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "app/src/lib/tuning.test.ts > the profile flags replaced by the recommendation leave out those pinned to the same value"
   },
   {
     "project": "shared",
@@ -3184,19 +3271,25 @@
     "project": "shared",
     "file": "packages/webui-shared/src/setup.test.ts",
     "name": "isSetupCheck: keeps machine checks, drops those needing a model or a running server",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "packages/webui-shared/src/setup.test.ts > isSetupCheck: keeps machine checks, drops those needing a model or a running server"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/setup.test.ts",
     "name": "ctxFromArgs: short, long and = forms; the last one wins; absent or invalid is undefined",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "packages/webui-shared/src/setup.test.ts > ctxFromArgs: short, long and = forms; the last one wins; absent or invalid is undefined"
   },
   {
     "project": "shared",
     "file": "packages/webui-shared/src/setup.test.ts",
     "name": "isLoopback",
-    "milestone": "E8"
+    "milestone": "E8",
+    "status": "ported",
+    "to": "packages/webui-shared/src/setup.test.ts > isLoopback"
   },
   {
     "project": "shared",
