@@ -12,8 +12,7 @@
   },
   "dependencies": {
     "effect": "catalog:",
-    "llamacpp-js": "workspace:*",
-    "zod": "catalog:"
+    "llamacpp-js": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:"

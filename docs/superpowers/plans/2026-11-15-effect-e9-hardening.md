@@ -53,8 +53,8 @@
 
 ### Task 2: Remove the legacy folder and zod
 
-- [ ] Delete `app/server-legacy/`; Biome's exclusion; `CLAUDE.md`'s note on the folder.
-- [ ] zod out of `app/package.json`, `packages/webui-shared/package.json`, the catalog; `pnpm install`.
+- [x] Delete `app/server-legacy/`; Biome's exclusion; `CLAUDE.md`'s note on the folder.
+- [x] zod out of `app/package.json`, `packages/webui-shared/package.json`, the catalog; `pnpm install`.
 
 ### Task 3: The diagnostics settled
 

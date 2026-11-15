@@ -9,7 +9,6 @@ catalog:
   tailwindcss: ^4.3.5
   "@tailwindcss/vite": ^4.3.5
   vite: ^8.3.8
-  zod: ^4.6.7
   shiki: ^4.6.0
   "@types/node": ^26.6.6
   # Effect: same version as the vendored reference (repos/effect), every @effect/* package moves with it
