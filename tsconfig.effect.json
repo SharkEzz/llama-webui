@@ -122,7 +122,6 @@
           "returnEffectInGen": "error",
           "runEffectInsideEffect": "error",
           "runOfExitToRunExit": "error",
-          // POC: a warning until the server is migrated (the examples of `repos/effect/LLMS.md` have no brand)
           "schemaClassMissingBrand": "warning",
           "schemaClassObjectLiteral": "error",
           "schemaNumber": "error",
@@ -217,7 +216,7 @@
             }
           },
           {
-            // Its Effect modules follow the server's rules. Each milestone adds the modules it moves to Schema.
+            // Its Effect modules follow the server's rules: every module of the package that imports `effect` is listed here.
             "include": [
               "packages/webui-shared/src/api/**/*.ts",
               "packages/webui-shared/src/bench.ts",

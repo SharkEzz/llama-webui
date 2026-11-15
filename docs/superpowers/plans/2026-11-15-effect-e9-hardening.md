@@ -58,7 +58,7 @@
 
 ### Task 3: The diagnostics settled
 
-- [ ] `tsconfig.effect.json`: Call 6.
+- [x] `tsconfig.effect.json`: Call 6.
 
 ### Task 4: CI, close
 
