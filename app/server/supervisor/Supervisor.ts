@@ -16,10 +16,7 @@ import {
   Layer,
   Option,
   type Path,
-  type PlatformError,
-  Predicate,
   PubSub,
-  Result,
   Scope,
   Semaphore,
   Stream,
@@ -31,6 +28,7 @@ import { health, isLlamaServer } from '../llama/probes.ts';
 import { findLlamaServerPid, isAlive } from '../llama/procScan.ts';
 import { LogRing } from '../logs/LogRing.ts';
 import { isIdleNoise, linesOf } from '../logs/lines.ts';
+import { causeMessage, type Ending, endingOf } from '../process/ending.ts';
 import { FORCE_KILL_AFTER, type Followed, followProgram } from '../process/followed.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { type BuiltCommand, launchLines } from './command.ts';
@@ -48,31 +46,6 @@ interface Held {
   readonly last: Option.Option<BuiltCommand>;
   readonly proc: Option.Option<Running>;
 }
-
-/** How a process ended: its code, or the signal that ended it. */
-interface Ending {
-  readonly code: number | null;
-  readonly signal: string | null;
-}
-
-const SIGNAL = /signal: '([A-Z0-9]+)'/;
-
-/**
- * The code a process exited with, or the signal that ended it: `exitCode` fails when a signal did, with the signal's
- * name in its cause's message.
- */
-const endingOf = (ended: Result.Result<ChildProcessSpawner.ExitCode, PlatformError.PlatformError>): Ending =>
-  Result.match(ended, {
-    onSuccess: (code): Ending => ({ code, signal: null }),
-    onFailure: (error): Ending => ({
-      code: null,
-      signal: Option.fromNullishOr(SIGNAL.exec(causeMessage(error))?.[1]).pipe(Option.getOrNull),
-    }),
-  });
-
-/** The message of a platform error's cause (Node's own: `spawn setpriv ENOENT`), else its own. */
-const causeMessage = (error: { readonly message: string; readonly cause?: unknown }): string =>
-  Predicate.isError(error.cause) ? error.cause.message : error.message;
 
 const exitedLine = ({ code, signal }: Ending) =>
   `[llama-webui] llama-server exited (code ${code ?? '-'}${signal === null ? '' : `, ${signal}`})`;
