@@ -880,9 +880,9 @@
     "project": "server",
     "file": "app/server/lib/contract/wire.test.ts",
     "name": "readSse stops at the condition on a stream that never ends",
-    "milestone": "E5",
-    "status": "dropped",
-    "reason": "The contract records no SSE reply: a reply needs a ready llama-server, which the contract runner does not wait for (its chat cases are the refusals before any reply), so app/server/contract/wire.ts has no readSse; a reply over the wire is read by chat/http.test.ts (the typed client decodes a reply of llama-server, started by the supervisor, into its events) and lifecycle.test.ts (SIGTERM with the UI open and a reply streaming…)"
+    "milestone": "E9",
+    "status": "ported",
+    "to": "app/server/contract/wire.test.ts > readSse stops at the condition on a stream that never ends"
   },
   {
     "project": "server",

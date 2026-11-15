@@ -645,6 +645,34 @@ Found by the review pass of E8 (against its plan and `behaviours.md` § E8):
   creation loads the GGUF, then claims the runner, whose `check` refuses an empty plan.
 - `behaviours.md` said `/setup` was in `PORTED`: it is `/tuning`. Fixed. No code change.
 
+Decided (the E9 plan):
+
+- The golden is the matrix again, derived from the API definition (`HttpApi.reflect`) instead of a route table:
+  each method a path lacks (268 cases, all the 404 `RouteNotFound` of E1), the bad id (23, 404 `RouteNotFound`: the
+  router's `:id` takes digits only) and the unknown id (23) of each `:id` endpoint, and the five broken bodies of each
+  endpoint with a payload (18 × 5). With the guard's cases, the connection cases and the hand-written ones: 530 cases
+  (was 134; the legacy contract had 498).
+- The 21 hand-written cases the matrix holds are gone (a method a path lacks, `HEAD /api/health`, the unknown ids):
+  each one's reply is the matrix case's, byte for byte.
+- The legacy matrix's sixth body, `(schema violation)`, took a body written per route in its table; the new one
+  derives nothing per route, so the hand-written `violation` cases carry it. Two were missing and are added
+  (`POST /api/server/switch` with a string `profileId`, `POST /api/sweeps/:id/validate` with an unknown key); `resume`
+  takes any object and has none.
+- A JSON that is not an object is `1` (was `[1]`). The profile import takes any JSON (it reports a file of another
+  shape as skipped, as Nitro did): that case is a `write`, the others `body`.
+- The connection cases run after the HTTP cases, on the fake llama-server and a free port: the WebSocket's hello and
+  its answer to a ping (new: `pong`), a profile started and ready, a conversation, the SSE reply (its first event,
+  `start`, and the name of its last, `done`), the stop.
+- Against the legacy golden, a matrix reply differs in status only where a line above already says so: 405 and HEAD
+  become 404 (E1), `PUT /api/profiles/:id` on an unknown id with an invalid body is a 400 (E2), cancelling an unknown
+  run is a 404 (E7).
+- `app/server-legacy/` is deleted; the old server is read in git at `8f6fe3581^`. zod leaves both `package.json` and
+  the catalog; it stays in the lockfile only as a dependency of `shadcn`, the MCP SDK and `chromium-bidi`. The pages
+  of `site/content/developers/` still describe Nitro and zod: they are rewritten at E10.
+- The CI was replayed locally (Node 26.13.1): install from the lockfile, lint, check (0 `effect(` line), test, build,
+  smoke, the tarball smoke, the site's build and links; the `llamacpp-js` job under Node 24.22.3 on a copy without
+  `node_modules` (63 pass, the 2 bundling checks skipped).
+
 ## Measures (`e<N>.json`)
 
 The startup and shutdown medians of `scripts/poc/measure.ts` depend on the machine's load at the time: `e5.json`

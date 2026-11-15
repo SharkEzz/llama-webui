@@ -62,6 +62,6 @@
 
 ### Task 4: CI, close
 
-- [ ] The steps of `ci.yml`, locally.
-- [ ] `defects.md`: an E9 section; the inventory (`readSse` ported back); `CLAUDE.md`: an E9 paragraph.
-- [ ] `pnpm lint`, `pnpm check` (0 `effect(`), `pnpm test`; commit; `e9.json`; a review pass.
+- [x] The steps of `ci.yml`, locally.
+- [x] `defects.md`: an E9 section; the inventory (`readSse` ported back); `CLAUDE.md`: an E9 paragraph.
+- [x] `pnpm lint`, `pnpm check` (0 `effect(`), `pnpm test`; commit; `e9.json`; a review pass.
