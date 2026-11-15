@@ -3,10 +3,12 @@ title: Models
 description: Scan the models folder for GGUF files, read the header and weight breakdown of one GGUF, with every field of ModelSummary and ModelDetail, and delete a model.
 ---
 
-These routes list the GGUF files of the models folder, describe one of them, and delete one (`app/server/routes/api/models/`).
-The scan is `scanModels()` (`app/server/lib/models/scan.ts`), the GGUF reader `readModel()` (`app/server/lib/models/gguf.ts`), the
-weight breakdown `weightSizes()` (`app/server/lib/models/sizes.ts`), and the types `ModelList`, `ModelEntry`, `ModelSummary`
-and `ModelDetail` (`packages/webui-shared/src/models.ts`); deletion is in `app/server/lib/models/delete.ts`. The common rules are on the [API overview](/developers/api/overview/); the
+These endpoints list the GGUF files of the models folder, describe one of them, and delete one (`ModelsApi`,
+`packages/webui-shared/src/api/ModelsApi.ts`, handled in `app/server/models/http.ts`). The scan is `scanModels()`
+(`app/server/models/scan.ts`), the GGUF reader `GgufReader` (`app/server/models/GgufReader.ts`, on `parseModel()` of
+`app/server/models/gguf.ts`), the weight breakdown `weightSizes()` (`app/server/models/sizes.ts`), and the types
+`ModelList`, `ModelEntry`, `ModelSummary` and `ModelDetail` (`packages/webui-shared/src/models.ts`); the usage and the
+deletion are `modelUsage()` and `deleteModel()` (`app/server/models/usage.ts`). The common rules are on the [API overview](/developers/api/overview/); the
 Models page is described on [Models](/docs/models/).
 
 ## Scan the models folder
@@ -57,7 +59,7 @@ file:
 
 ### ModelSummary
 
-What the header of a GGUF says (`toSummary()`, `app/server/lib/models/scan.ts`). `<arch>` is the value of
+What the header of a GGUF says (`toSummary()`, `app/server/models/scan.ts`). `<arch>` is the value of
 `general.architecture`.
 
 | Field             | Type                     | Description                                                                                               |
@@ -161,8 +163,9 @@ All sizes are bytes. A tensor's size is the distance from its offset to the next
 (`tensorBytes()`), the last one ending at the end of the file. `relPath` is relative to the models folder when the file is inside it, otherwise
 the absolute path.
 
-**Errors**: `400` `Absolute path to a .gguf file expected` (a path that does not start with `/` or does not end with
-`.gguf`), `404` `File not found`, `422` with the reader's message when the file cannot be parsed (`unreadable GGUF: …`,
+**Errors**: `400` `RequestInvalid` `Invalid data: Absolute path to a .gguf file expected (path)` (a path that does not
+start with `/` or does not end with `.gguf`), `404` `ModelFileNotFound` `File not found`, `422` `ModelUnreadable` with
+the reader's message when the file cannot be parsed (`unreadable GGUF: …`,
 `file not found: <path>` for a missing part).
 
 ```bash title="Terminal"
@@ -224,7 +227,7 @@ refused while the files are in use:
 | `profiles`  | `ModelProfileUse[]`   | The profiles using it: `{ id, name, role }`, `role` being `model` or `mmproj`.      |
 | `blocked`   | string \| null        | Why the deletion is refused right now (the reason of the `409` below), else `null`. |
 
-**Errors**: `400` `path required`, `404` `Model not found`.
+**Errors**: `400` `RequestInvalid` `Invalid data: path required (path)`, `404` `ModelNotFound` `Model not found`.
 
 ```bash title="Terminal"
 curl -G http://127.0.0.1:7860/api/models/usage --data-urlencode 'path=/home/me/models/qwen3-32b-q4_k_m.gguf'
@@ -248,8 +251,8 @@ one of them). Benchmark runs, sweeps and conversations keep their `model_path` a
 
 **Response**: `200` with `{ deletedFiles: string[], deletedProfiles: number[] }`.
 
-**Errors**: `400` with `issues` for an invalid body, `404` `Model not found`, `409` with code `model-in-use` and the
-reason (`The running server uses it (profile “…”): stop it first`, `A benchmark in progress uses it`,
+**Errors**: `400` `RequestInvalid` for an invalid body, `404` `ModelNotFound` `Model not found`, `409` `ModelInUse`
+with the reason (`The running server uses it (profile “…”): stop it first`, `A benchmark in progress uses it`,
 `A download in progress writes it`). Nothing is deleted on an error.
 
 ```bash title="Terminal"

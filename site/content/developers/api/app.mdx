@@ -3,11 +3,11 @@ title: Health and settings
 description: The health check and the settings read and patch, with every field of the settings schema, plus the fallbacks for the other paths.
 ---
 
-The health check is `app/server/routes/api/health.get.ts`, the settings routes `settings.get.ts` and
-`settings.patch.ts` next to it; the fallbacks for the other paths come from the middlewares and from Nitro (see
-[Fallbacks](#fallbacks)). The settings schema is `SettingsSchema` (`packages/webui-shared/src/settings.ts`), stored
-by `SettingsRepo` (`app/server/lib/db/settings.ts`). The common rules (guard, error shape, `400` on invalid data) are on the
-[API overview](/developers/api/overview/).
+The health check is `HealthApi` (`packages/webui-shared/src/api/HealthApi.ts`, handler in `app/server/health/http.ts`),
+the settings `SettingsApi` (`packages/webui-shared/src/api/SettingsApi.ts`, handlers in `app/server/settings/http.ts`);
+the fallbacks for the other paths come from the HTTP server itself (see [Fallbacks](#fallbacks)). The settings schema
+is `Settings` (`packages/webui-shared/src/settings.ts`), stored by `SettingsRepo` (`app/server/settings/SettingsRepo.ts`).
+The common rules (guard, error shape, `400` on invalid data) are on the [API overview](/developers/api/overview/).
 
 ## Health
 
@@ -15,23 +15,24 @@ by `SettingsRepo` (`app/server/lib/db/settings.ts`). The common rules (guard, er
 
 <Endpoint method="GET" path="/api/health" />
 
-Answers once llama-webui has started, whatever the state of `llama-server`; until then, like every API route, it gets
-`503` `llama-webui is starting`. It goes through the guard like every API route.
+Answers whatever the state of `llama-server`: the port only opens once llama-webui has started. It goes through the
+guard like every API endpoint.
 
 **Response**: `200`
 
 | Field      | Type    | Description                                                                 |
 | ---------- | ------- | --------------------------------------------------------------------------- |
 | `ok`       | boolean | Always `true`.                                                              |
-| `version`  | string  | `APP_VERSION` (`app/server/lib/version.ts`): `dev` in development (`pnpm dev`); in a build (`pnpm build`), `git describe --tags --always --dirty` at build time (tag, else short commit hash), the `package.json` version without git. Shown in the status bar. |
-| `uptimeMs` | number  | Milliseconds since `app/server/routes/api/health.get.ts` was loaded (`startedAt`). |
+| `version`  | string  | `AppInfo` (`app/server/config/AppInfo.ts`): `dev` in development (`pnpm dev`); in a build (`pnpm build`), `git describe --tags --always --dirty` at build time (tag, else short commit hash), the `package.json` version without git. Shown in the status bar. |
+| `uptimeMs` | number  | Milliseconds since the services were built (`AppInfo`). |
+| `bootId`   | string  | The id of this start, the one `hello` sends (see [WebSocket](/developers/api/websocket/#hello-and-bootid)). |
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/health
 ```
 
 ```json
-{ "ok": true, "version": "fa823b5", "uptimeMs": 5234871 }
+{ "ok": true, "version": "fa823b5", "uptimeMs": 5234871, "bootId": "1b0f6c52-8a7e-4f4e-9d0b-3f2a5c7e9a14" }
 ```
 
 ## Settings
@@ -54,16 +55,15 @@ and are not part of this schema.
 | `historySeconds`          | integer                                       | `300`          | 30 to 1800             | How much monitor history the server keeps, in seconds.                                                                                                                       |
 | `hiddenGpus`              | string[]                                      | `[]`           |                        | PCI addresses (`0000:01:00.0`, the `busId` of `GpuSample`) of GPUs that are listed but not read.                                                                            |
 | `defaultProfileId`        | integer \| null                               | `null`         |                        | The last profile started, preselected on the Server page.                                                                                                                   |
-| `llamaTuiImportDismissed` | boolean                                       | `false`        |                        | The offer to import llama-tui profiles was dismissed.                                                                                                                       |
 | `onboardingDone`          | boolean                                       | `false`        |                        | The first-run setup checklist was completed: Home shows the launch pad.                                                                                                     |
 | `collectors`              | `{ nvml: boolean, system: boolean, disk: boolean }` | all `true` |                   | Monitor collectors: NVML for NVIDIA GPUs (otherwise `nvidia-smi`), CPU and memory (with the DRAM bandwidth), disks.                                                        |
 | `theme`                   | `'system' \| 'light' \| 'dark'`               | `system`       |                        | The web app's theme.                                                                                                                                                        |
 | `env`                     | `Record<string, string>`                      | `{}`           | names `[A-Za-z_][A-Za-z0-9_]*` | Environment variables of every `llama-server` launch and benchmark (`llama-bench` too), under the profile's own variables.                                                  |
 
 The server writes `defaultProfileId` on its own: [starting or switching](/developers/api/server/) to a profile stores
-its id, deleting that profile resets it to `null`, and the llama-tui import sets it from llama-tui's default profile
-when it is still `null` ([Profiles](/developers/api/profiles/)). The web app writes the other values without a field
-on the Settings page (`onboardingDone`, `llamaTuiImportDismissed`).
+its id, and deleting that profile resets it to `null` ([Profiles](/developers/api/profiles/)). The web app writes
+`onboardingDone`, which has no field on the Settings page. A key stored by an older version that is no longer a setting
+(`llamaTuiImportDismissed`) stays in the table and is ignored.
 
 ### Read the settings
 
@@ -88,7 +88,6 @@ curl http://127.0.0.1:7860/api/settings
   "historySeconds": 300,
   "hiddenGpus": [],
   "defaultProfileId": 3,
-  "llamaTuiImportDismissed": false,
   "onboardingDone": true,
   "collectors": { "nvml": true, "system": true, "disk": true },
   "theme": "system",
@@ -101,16 +100,17 @@ curl http://127.0.0.1:7860/api/settings
 <Endpoint method="PATCH" path="/api/settings" />
 
 Changes some settings and applies them. `SettingsRepo.patch()` merges the body over the current settings and validates
-the result with `SettingsSchema` as a whole: if one field is invalid, nothing is written. It then writes only the keys
+the result with `Settings` as a whole: if one field is invalid, nothing is written. It then writes only the keys
 present in the body, one row per key in the `settings` table (the value as JSON).
 
 **Body**: a JSON object with any subset of the [settings fields](#settings-fields).
 
-- Unknown keys are ignored, not refused.
+- Unknown keys are ignored, not refused (the payload is any JSON object, `Schema.Record`; the repository validates the
+  merge).
 - An object such as `collectors` is merged field by field: `{"collectors":{"nvml":false}}` leaves `system` and
   `disk` as they are. `env` is the exception: it is replaced as a whole, so a variable left out is removed.
 
-After the write, the route calls `Monitor.configure()` with the new settings:
+After the write, the handler calls `Monitor.configure` with the new settings:
 
 - `collectors.system`, `collectors.disk`, `hiddenGpus`, `pollIntervalMs` and `historySeconds` apply at once (the
   history is resized, the tick timer restarted).
@@ -122,12 +122,21 @@ No WebSocket message announces the change. Other clients see it on their next `G
 `pollIntervalMs` or `historySeconds` shows in the `history` field of the next
 [`snapshot`](/developers/api/websocket/#snapshot), which makes the web app reload its history.
 
-**Response**: `200` with the whole `Settings` after the change. When `Monitor.configure()` fails, the change is
+**Response**: `200` with the whole `Settings` after the change. When `Monitor.configure` fails, the change is
 saved all the same: the body then has a `warning` string as well (`Saved, but the monitor could not apply it: …`),
 which the web app shows as a warning toast, and the server logs it.
 
-**Errors**: `400` `JSON object expected` when the body is not an object, `400` with zod issues when a value is invalid
-(`Port between 1 and 65535`, `Between 250 and 60000 ms`, `Between 30 and 1800 s`, `Required`…).
+**Errors**: `400` `RequestInvalid` when the body is not a JSON object; `400` `SettingsInvalid` `Invalid settings` when
+a value of the merged settings is invalid, with one issue per field (`Port between 1 and 65535`,
+`Between 250 and 60000 ms`, `Between 30 and 1800 s`…):
+
+```json
+{
+  "_tag": "SettingsInvalid",
+  "message": "Invalid settings",
+  "issues": [{ "path": ["pollIntervalMs"], "message": "Between 250 and 60000 ms" }]
+}
+```
 
 ```bash title="Terminal"
 curl -X PATCH http://127.0.0.1:7860/api/settings \
@@ -137,13 +146,13 @@ curl -X PATCH http://127.0.0.1:7860/api/settings \
 
 ## Fallbacks
 
-Besides the route files, the middlewares of `app/server/middleware/` and Nitro handle:
+Besides the API's endpoints, the HTTP server (`app/server/http/HttpLive.ts`) handles:
 
-- `/api/*`: any other path under `/api/` gets `404` `{ "error": "Unknown route" }`; a method that a known path does
-  not define gets `405` with an `Allow` header (`01.guard.ts`, see
+- `/api/*`: any other path or method under `/api/` gets `404` `{ "_tag": "RouteNotFound", "message": "Unknown route" }`
+  (there is no `405`), and a path that ends with a slash a `308` to the path without it (see
   [How routes are registered](/developers/api/overview/#how-routes-are-registered)).
-- `/ws`: the WebSocket upgrade (`app/server/routes/ws.ts`; `426` without an upgrade). See
+- `/ws`: the WebSocket upgrade (`app/server/ws/WsHub.ts`; `426` without an upgrade). See
   [WebSocket](/developers/api/websocket/).
 - The web app for every other path: Vite with HMR in development; in production, the built files of
-  `app/.output/public/` and, for any other path, `index.html` from Nitro's renderer (see
+  `app/.output/public/` and, for any other `GET`, `index.html` (`app/server/http/Static.ts`, see
   [Serving the UI](/developers/architecture/#serving-the-ui)).

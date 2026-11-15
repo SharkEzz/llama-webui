@@ -18,6 +18,7 @@ takes no flags and reads the environment variables only:
 | `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR`     | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` | Folder of the database (see [Data directory](#data-directory)).                           |
 | `--env-override`    | `LLAMA_WEBUI_ENV_OVERRIDE` | off                                                             | Lets the `.env` file replace the variables the environment already sets (see below).      |
 | `-h`, `--help`      |                            |                                                                 | Prints the help and exits.                                                                |
+| `-v`, `--version`   |                            |                                                                 | Prints the version and exits.                                                             |
 
 ```bash title="Terminal"
 llama-webui --host 0.0.0.0 --port 8080
@@ -27,11 +28,10 @@ LLAMA_WEBUI_HOST=0.0.0.0 LLAMA_WEBUI_PORT=8080 llama-webui
 pnpm start --host 0.0.0.0 --port 8080
 ```
 
-Both `--port 8080` and `--port=8080` work. Once started, llama-webui prints its version, then the address to open:
+Both `--port 8080` and `--port=8080` work. Once started, llama-webui prints its version and the address to open:
 
 ```text
-[llama-webui] ready (v0.3.1)
-➜ Listening on: http://127.0.0.1:7860/
+[17:29:22.013] INFO (#1): ready (v0.3.1) on http://127.0.0.1:7860
 ```
 
 <Callout type="warning" title="Before using --host 0.0.0.0">
@@ -61,22 +61,20 @@ A command-line option still wins over both.
 Only `.env` is read: a `.env.local` or a per-mode file such as `.env.production` is not. Values are taken as written,
 so a `$VAR` reference is not expanded.
 
-<Callout type="note" title="Development reads more files">
+<Callout type="note" title="Development">
 
-`pnpm dev` runs in the `app/` folder of the clone and reads the files there: `.env`, then `.env.local`,
-`.env.development` and `.env.development.local`. They fill what the environment does not set; a variable already set
-in the environment, or in `.env`, is not replaced by the others. `pnpm start` and an installed `llama-webui` read
-`.env` only.
+`pnpm dev` runs in the `app/` folder of the clone and reads the `.env` there, with the same rules.
 
 </Callout>
 
 ### Invalid options
 
 An unknown option, a missing value, an empty value (`--host=`), an extra argument or a port outside 1 to 65535 stops
-llama-webui before it starts: it prints the error followed by the help, and exits with status 2.
+llama-webui before it starts: it prints the help followed by the error, and exits with status 1.
 
 ```text
-llama-webui: invalid --port: “70000” (integer from 1 to 65535)
+ERROR
+  Invalid value for flag --port: "70000". Expected: Schema validation failed: Expected a value between 1 and 65535
 ```
 
 ### The help
@@ -84,44 +82,43 @@ llama-webui: invalid --port: “70000” (integer from 1 to 65535)
 `llama-webui --help` (or `pnpm start --help`) prints:
 
 ```text
-llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Node.js process).
+DESCRIPTION
+  llama-webui: web UI to drive llama-server (API, WebSocket and UI in a single Node.js process).
 
-Usage:
-  llama-webui [options]   installed package (npm install -g llama-webui-<version>.tgz)
-  pnpm start [options]    production (builds, then runs app/.output/llama-webui.mjs), from the repository
-  pnpm dev                development (vite dev), from the repository: no options, the LLAMA_WEBUI_* variables
-                          of the environment or of app/.env* instead
+  Ways of running:
+    llama-webui [options]   installed package (npm install -g llama-webui-<version>.tgz)
+    pnpm start [options]    production (builds, then runs app/.output/llama-webui.mjs), from the repository
+    pnpm dev                development (vite dev), from the repository: no options, the LLAMA_WEBUI_* variables
+                            of the environment or of app/.env instead
 
-Options:
-  --host <address>       listen address (default: 127.0.0.1); 0.0.0.0 to open it to the local network
-                         (no authentication)
-                         env: LLAMA_WEBUI_HOST
-  --port <port>          HTTP port of the UI, API and WebSocket (default: 7860)
-                         env: LLAMA_WEBUI_PORT
-  --data-dir <path>      data directory (SQLite database); default: $XDG_DATA_HOME/llama-webui,
-                         else ~/.local/share/llama-webui
-                         env: LLAMA_WEBUI_DATA_DIR
-  --env-override         let .env (working directory, loaded at startup) replace the variables the environment
-                         already sets; without it, .env only fills those it does not set
-                         env: LLAMA_WEBUI_ENV_OVERRIDE=1 (in the environment or in .env)
-  -h, --help             show this help
+  A flag takes precedence over the matching environment variable.
 
-A flag takes precedence over the matching environment variable.
+  Hugging Face downloads (Models page):
+    HF_TOKEN               access token (gated or private repos, higher rate limits); without it, the token
+                           saved by `hf auth login` is used (HF_TOKEN_PATH, else $HF_HOME/token,
+                           default ~/.cache/huggingface/token)
+    HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
+    HTTPS_PROXY, HTTP_PROXY, NO_PROXY
+                           proxy for the requests to Hugging Face; localhost and loopback addresses are
+                           never proxied
 
-Hugging Face downloads (Models page):
-  HF_TOKEN               access token (gated or private repos, higher rate limits); without it, the token
-                         saved by `hf auth login` is used (HF_TOKEN_PATH, else $HF_HOME/token,
-                         default ~/.cache/huggingface/token)
-  HF_ENDPOINT            Hugging Face endpoint or mirror (default: https://huggingface.co)
-  HTTPS_PROXY, HTTP_PROXY, NO_PROXY
-                         proxy for the requests to Hugging Face; localhost and loopback addresses are
-                         never proxied
+USAGE
+  llama-webui [flags]
+
+FLAGS
+  --host address     listen address (default: 127.0.0.1); 0.0.0.0 to open it to the local network (no authentication). env: LLAMA_WEBUI_HOST
+  --port port        HTTP port of the UI, API and WebSocket (default: 7860). env: LLAMA_WEBUI_PORT
+  --data-dir path    data directory (SQLite database); default: $XDG_DATA_HOME/llama-webui, else ~/.local/share/llama-webui. env: LLAMA_WEBUI_DATA_DIR
+  --env-override     let .env (working directory, loaded at startup) replace the variables the environment already sets; without it, .env only fills those it does not set. env: LLAMA_WEBUI_ENV_OVERRIDE=1 (in the environment or in .env)
+
+GLOBAL FLAGS
+  --help, -h       Show help information
+  --version, -v    Show version information
 ```
 
 From a clone, `pnpm start` builds llama-webui, then starts it, and takes the same options as `llama-webui`.
 `pnpm dev` is meant for working on llama-webui itself: it updates the interface in place when a file of it changes,
-and reloads the server when a server file changes (`llama-server` keeps running unless the change touches the code
-that drives it). It takes its options from the environment variables, for example
+and restarts the server when a server file changes (which stops `llama-server`). It takes its options from the environment variables, for example
 `LLAMA_WEBUI_HOST=0.0.0.0 pnpm dev`.
 
 ### In a systemd service

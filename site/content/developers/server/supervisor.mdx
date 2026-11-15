@@ -3,323 +3,344 @@ title: Supervisor
 description: How llama-webui starts, watches and stops llama-server, the state machine behind it, external server detection, and how the process stops it on shutdown.
 ---
 
-The supervisor owns the one `llama-server` process llama-webui manages: it builds the command line, spawns it, follows
-it to readiness, stops it, and publishes its state to the rest of the server. It lives in `app/server/lib/supervisor/`, and its
-single instance lives in the runtime (`app/server/lib/runtime.ts`).
+The supervisor owns the one `llama-server` process llama-webui manages: it starts it from a built command, follows it
+to readiness, stops it, and publishes its state to the rest of the server. It is the `Supervisor` service
+(`app/server/supervisor/Supervisor.ts`), built once with the app's services and stopped when they are undone.
 
-| File                              | Role                                                                                      |
-| --------------------------------- | ----------------------------------------------------------------------------------------- |
-| `app/server/lib/supervisor/supervisor.ts` | `Supervisor`: the state machine, spawn, output piping, health polling, stop.              |
-| `app/server/lib/supervisor/args.ts`       | `buildCommand()`, `profilePaths()`, `expandHome()`: from a profile to a `BuiltCommand`.    |
-| `app/server/lib/supervisor/external.ts`   | `externalWatcher()`: detects a `llama-server` llama-webui did not start.                   |
-| `app/server/lib/supervisor/flags.ts`      | `getFlags()`: the flag catalog of a binary, cached per path.                              |
-| `app/server/lib/runtime.ts`               | `createRuntime()`: the supervisor, the log ring and the bench gate of the process.         |
-| `packages/webui-shared/src/server.ts`            | `ServerState` and `ServerView`, shared with the web app.                                   |
+| File | Role |
+| --- | --- |
+| `app/server/supervisor/Supervisor.ts` | `Supervisor`: the state machine, the launch, the output, the health poll, the stop. |
+| `app/server/supervisor/command.ts` | `buildCommand()`, `commandOf()`, `profilePaths()`, `launchLines()`: from a profile to a `BuiltCommand`. |
+| `app/server/supervisor/ExternalWatch.ts` | `ExternalWatch`: detects a `llama-server` llama-webui did not start. |
+| `app/server/supervisor/http.ts` | `ServerHandlers`: the `server` group (start, switch, restart, stop, state, props). |
+| `app/server/process/followed.ts` | `followProgram()`: a long-running program in a scope of its own, followed until it exits. |
+| `app/server/llama/probes.ts` | `health()`, `isLlamaServer()`, `props()`: requests to `llama-server` through `LlamaHttp`. |
+| `app/server/llama/procScan.ts` | `findLlamaServerPid()`: the PID of a `llama-server` read from `/proc`. |
+| `app/server/flags/Flags.ts` | `Flags`: the flag catalog of the binary, cached per path. |
+| `app/server/logs/LogRing.ts` | `LogRing`: the numbered lines of the server's output, published as `log` messages. |
+| `packages/webui-shared/src/server.ts` | `ServerState`, `ServerView`, `serverView()`, `activeProfileId()`, shared with the web app. |
 
-What talks to `llama-server` itself comes from [llamacpp-js](/developers/llamacpp-js/): `probeHealth()`,
-`probeLlamaServer()` and `probeUrl()` (`llamacpp-js/client`), `findLlamaServerPid()` and `loadFlags()`
-(`llamacpp-js/node`).
+`probeUrl()` (`llamacpp-js/client`) and `parseHelp()` (`llamacpp-js/flags`) come from
+[llamacpp-js](/developers/llamacpp-js/); the requests and the programs themselves are made by the app, through
+`LlamaHttp` and `effect/process`.
 
-The HTTP routes that drive it (`/api/server/start`, `/switch`, `/restart`, `/stop`) are in `app/server/routes/api/server/`
-and documented in [Server, state and logs](/developers/api/server/). The user-facing behavior is on the
-[Server page](/docs/server/).
+The HTTP endpoints that drive it (`/api/server/start`, `/switch`, `/restart`, `/stop`) are documented in
+[Server, state and logs](/developers/api/server/). The user-facing behavior is on the [Server page](/docs/server/).
 
 ## States
 
-The state is a discriminated union on `kind`, defined in `packages/webui-shared/src/server.ts` so that the web app reads the same
-type:
+The state is a union on `kind`, a schema of `packages/webui-shared/src/server.ts` that the web app decodes too:
 
 ```ts title="packages/webui-shared/src/server.ts"
-export type ServerState =
-  | { kind: 'idle' }
-  | { kind: 'starting'; profile: string; profileId: number; pid: number; host: string; port: number; since: number }
-  | { kind: 'ready'; profile: string; profileId: number; pid: number; host: string; port: number; since: number }
-  | { kind: 'stopping'; profile: string; profileId: number; pid: number; host: string; port: number }
-  | {
-      kind: 'crashed';
-      profile: string;
-      profileId: number;
-      exitCode: number | null;
-      signal: string | null;
-      at: number;
-      message?: string;
-    }
-  | { kind: 'external'; pid: number | null; port: number };
+export const ServerState = Schema.Union([
+  Schema.Struct({ kind: Schema.Literal('idle') }),
+  Schema.Struct({ kind: Schema.Literal('starting'), ...launched, since: Schema.Int }),
+  Schema.Struct({ kind: Schema.Literal('ready'), ...launched, since: Schema.Int }),
+  Schema.Struct({ kind: Schema.Literal('stopping'), ...launched }),
+  Schema.Struct({
+    kind: Schema.Literal('crashed'),
+    profile: Schema.String,
+    profileId: Schema.Int,
+    exitCode: Schema.NullOr(Schema.Int),
+    signal: Schema.NullOr(Schema.String),
+    at: Schema.Int,
+    message: Schema.optionalKey(Schema.String),
+  }),
+  Schema.Struct({ kind: Schema.Literal('external'), pid: Schema.NullOr(Schema.Int), port: Schema.Int }),
+]);
 ```
 
-`idle` is shown as **Stopped** in the interface. `since` and `at` are `Date.now()` timestamps. `message` is only set
-when the launch itself failed (the process never ran).
+`launched` is `{ profile, profileId, pid, host, port }`. `idle` is shown as **Stopped** in the interface. `since` and
+`at` are times in milliseconds, read from Effect's `Clock`. `message` is only set when the launch itself failed (the
+process never ran).
 
 ### Transitions
 
-| From                   | Event                                                                     | To         |
-| ---------------------- | ------------------------------------------------------------------------- | ---------- |
-| `idle`, `crashed`      | `start()`: the process is spawned                                         | `starting` |
-| `idle`, `crashed`      | `start()`: the profile's `cwd` does not exist, or `spawnProc` throws      | `crashed` (with `message`) |
-| `idle`, `crashed`      | `start()`: something already answers on the profile's port               | `external` (and `start()` rejects) |
-| `idle`                 | the external watcher finds something answering on the settings port      | `external` |
-| `starting`             | `/health` answers `200`                                                   | `ready`    |
-| `starting`, `ready`    | `stop()` or `switchTo()`                                                  | `stopping` |
-| `stopping`             | the process exits                                                         | `idle`     |
-| `starting`, `ready`    | the process exits without being asked to                                  | `crashed`  |
-| `crashed`              | `stop()`                                                                  | `idle`     |
-| `external`             | the recorded PID is dead or unknown, and the port no longer answers       | `idle`     |
-| `external`             | `start()`, and the port no longer answers                                 | `idle`, then the normal start |
+| From | Event | To |
+| --- | --- | --- |
+| `idle`, `crashed` | `start`: the process is spawned | `starting` |
+| `idle`, `crashed` | `start`: the profile's `cwd` does not exist, or the spawn fails | `crashed` (with `message`) |
+| `idle`, `crashed` | `start`: a `llama-server` already answers on the profile's port | `external` (and `start` fails) |
+| `idle`, `crashed` | the external watch finds a `llama-server` on the settings port or the last command's port | `external` |
+| `starting` | `/health` answers `200` | `ready` |
+| `starting`, `ready` | `stop` or `switchTo` | `stopping` |
+| `stopping` | the process exits | `idle` |
+| `starting`, `ready` | the process exits without being asked to | `crashed` |
+| `crashed` | `stop` | `idle` |
+| `external` | the recorded PID is dead or unknown, and the port no longer answers | `idle` |
+| `external` | `start`, and the port no longer answers | `idle`, then the normal start |
 
-Every transition goes through a private `set()`, which stores the state and calls every subscriber synchronously.
-Each exit is logged as `[llama-webui] llama-server exited (code …)` in the log ring, with the signal when there is one.
+Every transition goes through one `change()` under the lock of the state (a `SynchronizedRef`): it stores the state,
+publishes it as a `server-state` WebSocket message (the `ServerView`) and to the `changes` stream, in the order of the
+changes. Each exit is logged as `[llama-webui] llama-server exited (code …)` in the log ring, with the signal when
+there is one.
 
 ## Building the command
 
-`buildCommand(profile, settings)` in `args.ts` turns a `Profile` and three settings (`binary`, `host`, `port`) into a
-`BuiltCommand`:
+`buildCommand({ profile, settings })` in `command.ts` reads the home folder, llama-webui's working folder and whether
+`GGML_CUDA_P2P` is in its environment, then `commandOf()` turns the profile and the settings (`binary`, `host`,
+`port`, `env`) into a `BuiltCommand`:
 
-```ts title="app/server/lib/supervisor/args.ts"
+```ts title="app/server/supervisor/command.ts"
 export interface BuiltCommand {
-  argv: string[];
-  display: string;
-  cwd: string;
-  env: Record<string, string>;
-  host: string;
-  port: number;
-  profileName: string;
-  profileId: number;
+  /** `setpriv --pdeathsig KILL --`, then the server's command: llama-server dies with llama-webui. */
+  readonly argv: ReadonlyArray<string>;
+  /** The server's command, shell-quoted, without the `setpriv` prefix. */
+  readonly display: string;
+  readonly cwd: string;
+  /** The settings' variables, then the profile's: what is laid over llama-webui's own environment. */
+  readonly env: Readonly<Record<string, string>>;
+  /** `GGML_CUDA_P2P` is set, in `env` or in llama-webui's environment. */
+  readonly p2p: boolean;
+  readonly host: string;
+  readonly port: number;
+  readonly profileName: string;
+  readonly profileId: number;
 }
 ```
 
 The `llama-server` part of `argv` is assembled in this order:
 
-```ts title="app/server/lib/supervisor/args.ts"
+```ts title="app/server/supervisor/command.ts"
 const server = [
-  binaryPath(settings, home),
+  expandHome(path, home, settings.binary),
   '-m',
-  expandHome(profile.model, home),
-  ...(profile.mmproj ? ['-mm', expandHome(profile.mmproj, home)] : []),
+  expandHome(path, home, profile.model),
+  ...mmproj,
   ...profile.args,
-  ...(setsVerbosity(profile) ? [] : ['-lv', DEFAULT_VERBOSITY]),
+  ...(setsVerbosity(profile.args, env) ? [] : ['-lv', DEFAULT_VERBOSITY]),
   '--host',
   host,
   '--port',
-  String(port),
+  `${port}`,
   '--metrics',
   '--slots',
   '--props',
 ];
 ```
 
-- **Binary**: the `binary` setting (`llama-server` by default), `~` expanded by `binaryPath()`. Every caller that
-  runs it or `llama-bench` next to it (flags, setup, tuning, benchmarks) goes through `binaryPath()`.
+- **Binary**: the `binary` setting (`llama-server` by default), `~` expanded. Every caller that runs it or
+  `llama-bench` next to it (flags, setup, tuning, benchmarks) expands it the same way.
 - **Model and projector**: `-m` and, when the profile has one, `-mm`.
 - **Profile arguments**: `profile.args`, as stored, one array element per argument. They never go through a shell.
 - **Address**: `host` is `profile.host ?? settings.host` and `port` is `profile.port ?? settings.port`.
 - **Verbosity**: `-lv 4`, the first level at which `llama-server` logs the buffer sizes the
   [placement](/developers/server/monitor/#model-placement) reads, unless the profile sets its own (`-lv`,
-  `--verbosity`, `--log-verbosity`, `-v`, `--verbose`, `--log-verbose`, or `LLAMA_ARG_LOG_VERBOSITY` in `env`).
+  `--verbosity`, `--log-verbosity`, `-v`, `--verbose`, `--log-verbose`, or `LLAMA_ARG_LOG_VERBOSITY` in the settings'
+  or the profile's `env`).
 - **Flags llama-webui adds**: `--metrics`, `--slots` and `--props`, which the [monitor](/developers/server/monitor/)
   and the Server page read. A profile cannot set these, nor `--host`, `--port`, `-m`, `--model`, `-mm` or `--mmproj`:
-  `ProfileInputSchema` (`packages/webui-shared/src/profile.ts`) rejects them through `RESERVED_FLAGS`.
+  `ProfileInput` (`packages/webui-shared/src/profile.ts`) rejects them through `RESERVED_FLAGS`.
 
 The final `argv` prefixes that list with `setpriv --pdeathsig KILL --`. `setpriv` (util-linux) sets the parent-death
 signal and then executes `llama-server`, so the kernel kills `llama-server` if llama-webui dies without stopping it.
-`display` is the shell-quoted `llama-server` part only (`shellQuote()` from `packages/webui-shared/src/shell.ts`): it is what the
-Server page shows as the effective command and what the launch log line contains.
+`display` is the shell-quoted `llama-server` part only (`shellQuote()` from `packages/webui-shared/src/shell.ts`): it
+is what the Server page shows as the effective command and what the launch log line contains.
 
-### Paths and `expandHome`
+### Paths and `~`
 
-`llama-server` runs without a shell, so nothing expands `~` for it. `expandHome(p)` replaces a leading `~` or `~/` with
-the home directory and leaves every other path unchanged.
+`llama-server` runs without a shell, so nothing expands `~` for it. The command replaces a leading `~` or `~/` with
+the home folder and leaves every other path unchanged (elsewhere in the server, `expandHome` of
+`app/server/config/Home.ts` does the same).
 
 - In `argv`, the model and projector are only `~`-expanded: a relative path stays relative, and `llama-server`
-  resolves it against its own working directory.
-- `cwd` is the profile's `cwd`, `~`-expanded, or llama-webui's own `process.cwd()` when the profile has none.
-- `profilePaths(profile)` returns the same files as `llama-server` will open them: `cwd`, and `model` and `mmproj`
-  made absolute against that `cwd`. The rest of the server uses it whenever it needs the real file (chat model path,
-  model disk for the monitor, benchmarks, launch pad).
+  resolves it against its own working folder.
+- `cwd` is the profile's `cwd`, `~`-expanded, or llama-webui's own working folder when the profile has none.
+- `profilePaths({ profile, home, cwd, path })` returns the same files as `llama-server` will open them: `cwd`, and
+  `model` and `mmproj` made absolute against that `cwd`. The rest of the server uses it whenever it needs the real file
+  (chat model path, model disk for the monitor, benchmarks, launch pad, model usage).
 
 ### Environment
 
-`env` starts from a copy of llama-webui's own `process.env` (variables with a value), then `Object.assign`s the
-`env` setting (the global variables of Settings) and the profile's `env` over it, in that order: a profile variable
-overrides a global one, which overrides an inherited one. Nothing else is added. A `LLAMA_ARG_LOG_VERBOSITY` in the
-setting or the profile also stops `-lv 4` from being added.
+`env` is the `env` setting (the global variables of Settings) with the profile's `env` over it: a profile variable
+overrides a global one. The spawn lays it over llama-webui's own environment (`extendEnv: true`), so both override an
+inherited variable. Nothing else is added.
 
 ## Starting and readiness
 
-`start(cmd)` runs `doStart()` under the [operation lock](#one-operation-at-a-time):
+`start(cmd)` runs `doStart` as [one operation](#one-operation-at-a-time):
 
-1. If the state is `external`, it probes that port again. If it still answers, it rejects with
+1. If the state is `external`, it probes that port again. If it still answers, it fails with `PortInUse`
    `port in use by an external server (PID …)`; otherwise it goes back to `idle`.
-2. If it already has a process, it rejects with `a server is already running`.
-3. If something answers on `cmd.host`:`cmd.port`: when it is a `llama-server` (`probeLlamaServer()`), it switches to
-   `external` and rejects with the same "port in use" error; any other service rejects with
-   `port <port> is in use by another service`, the state unchanged.
-4. It records `cmd` as the last command, checks that `cmd.cwd` exists, and calls `spawnProc(cmd.argv, …)` with that
-   `cwd` and `env`; `stdout` and `stderr` are piped (the default), standard input is never given. `spawnProc` (`app/server/lib/proc.ts`, on
-   `node:child_process`) throws at once when the process cannot start: `spawn <binary> ENOENT` for a missing binary,
-   `spawn <binary> EACCES` for a file that is not executable. A missing directory or a spawn error logs
-   `[llama-webui] launch failed: …` and sets `crashed` with that message.
-5. It pushes the lines of `launchLines()` (`app/server/lib/supervisor/args.ts`) to the log ring: the launch line,
-   `LAUNCH_LOG_PREFIX` (`[llama-webui] launch:`) followed by `display`, then `P2P_LOG_LINE` when `GGML_CUDA_P2P` is in
-   `env`, whatever its value (llama.cpp only checks that it exists). The
-   [placement tracker](/developers/server/monitor/) looks for the prefix to find the start of the current load, and
-   for the second line to know that peer-to-peer was requested, which `llama-server` does not log.
-6. Both output streams are split into lines (`LineSplitter`, `app/server/lib/logs/lines.ts`) and pushed to the `LogBuffer`
-   (`app/server/lib/logs/buffer.ts`, 10,000 lines kept in memory).
-7. The state becomes `starting`, and a timer probes readiness every `healthPollMs` (500 ms).
+2. If it already has a process, it fails with `ServerAlreadyRunning` `a server is already running`.
+3. If something answers on `cmd.host`:`cmd.port`: when it is a `llama-server` (`isLlamaServer()`), it switches to
+   `external` and fails with the same `PortInUse`; any other service fails with `PortInUse`
+   `port <port> is in use by another service`, the state unchanged. All three are `409`.
+4. It records `cmd` as the last command and checks that `cmd.cwd` exists, then starts the program with
+   `followProgram()`: `ChildProcess.make(binary, args, { cwd, env, extendEnv: true, stdin: 'ignore' })`, its output
+   piped. A spawn that fails (`spawn setpriv ENOENT` when `setpriv` is not installed) or a missing folder logs
+   `[llama-webui] launch failed: …` and sets `crashed` with that message (`directory not found: <cwd>` for the
+   folder). A `llama-server` binary that is missing or not executable is reported by `setpriv` on its standard error,
+   which exits with an error code: the state is `crashed` with that code.
+5. Once spawned, before any output is read, it pushes the lines of `launchLines(cmd)` to the log ring: the launch
+   line, `LAUNCH_LOG_PREFIX` (`[llama-webui] launch:`) followed by `display`, then `P2P_LOG_LINE` when `cmd.p2p` is
+   set (llama.cpp enables peer-to-peer as soon as the variable exists, whatever its value, and logs nothing about it).
+   The [placement tracker](/developers/server/monitor/) looks for the prefix to find the start of the current load,
+   and for the second line to know that peer-to-peer was requested.
+6. Both output streams are split into lines (`linesOf()`, `app/server/logs/lines.ts`), the idle noise
+   (`update_slots: all slots are idle`) left out, and pushed to the `LogRing` (10,000 lines kept in memory).
+7. The state becomes `starting`, and a fiber of the program's scope probes readiness every `healthPoll` (500 ms).
 
-`start()` resolves once the process is spawned, not once it is ready: the routes answer `202` and the client follows
+`start` returns once the process is spawned, not once it is ready: the endpoints answer `202` and the client follows
 the state over the WebSocket.
 
-`probeHealth(port, fetch, host)` sends `GET <probeUrl(host, port)>/health` with a timeout of `PROBE_TIMEOUT_MS = 800`
-and returns the status code, or `null` when nothing answers in time. `probeUrl()` reaches the address the server
-listens on: loopback for a wildcard (`0.0.0.0` → `127.0.0.1`, `::` → `[::1]`) or no host, the address itself otherwise
-(a LAN address refuses loopback connections), with brackets for IPv6. The `starting`, `ready` and `stopping` states
-carry the `host`, so the monitor, `/api/server/props` and chat reach the server the same way (`stateHost()`); an
-external server is reached on loopback. `llama-server` answers `503` while it loads and `200` once the
-model is loaded. The first `200` while the state is still `starting` for the same process sets `ready` and stops the
-timer. There is no load timeout: a large model can stay in `starting` for minutes. The same function is the
-benchmark's rule for "a server is on the port" (any status) and "it is ready" (`200`).
+`health(target)` (`app/server/llama/probes.ts`) sends `GET <probeUrl(host, port)>/health` through `LlamaHttp` with a
+timeout of 800 ms and gives the status code, or none when nothing answers in time. `probeUrl()` reaches the address
+the server listens on: loopback for a wildcard (`0.0.0.0` → `127.0.0.1`, `::` → `[::1]`) or no host, the address
+itself otherwise (a LAN address refuses loopback connections), with brackets for IPv6. The `starting`, `ready` and
+`stopping` states carry the `host`, so the monitor, `/api/server/props` and chat reach the server the same way
+(`stateHost()`); an external server is reached on loopback. `llama-server` answers `503` while it loads and `200`
+once the model is loaded. The first `200` while the state is still `starting` for the same process sets `ready` and
+ends the poll. There is no load timeout: a large model can stay in `starting` for minutes. The benchmark uses the same
+probe for "a server is on the port" (any status) and "it is ready" (`200`).
+
+## Following a program
+
+`followProgram()` (`app/server/process/followed.ts`) is how every long-running program is run (`llama-server`,
+`llama-bench`, the benchmark's trial server, `nvidia-smi`, the NVML sampler). It spawns the command in a scope of its
+own, forked from the caller's (`parent`), and:
+
+- runs `onSpawn` first, so the caller names the process in its state before any output is read and an exit seen at
+  once still finds it;
+- reads its output (`read`) in the program's scope;
+- once it exits, waits for the readers (`DRAIN_TIMEOUT`, 1 s, so the last output is not lost), runs `onExit` with how
+  it ended (`endingOf()`: its code, or the signal that ended it), then closes its scope;
+- bounds every close: a scope closed on a live program sends `SIGKILL` 1 s after the first signal
+  (`FORCE_KILL_AFTER`), and the close waits 1 s at most for the program to be gone (`CLOSE_BOUND`, `closeWithin()`).
+  A program stuck in a driver call does not die on `SIGKILL` until the call returns: past the bound the close is
+  logged and goes on without it.
 
 ## Stopping
 
-`stop()` never touches an external server. It sets `stopping` (from `starting` or `ready`), stops the health timer,
-sends `SIGTERM`, and waits for the process to exit for up to `killTimeoutMs` (5,000 ms). After that it logs
-`[llama-webui] not stopped after 5000 ms, SIGKILL` and sends `SIGKILL`. Once the process has exited, the state becomes
-`idle`. Called without a process, `stop()` clears a `crashed` state to `idle` and does nothing otherwise.
+`stop` never touches an external server. It waits for the operation in progress, then sets `stopping` (from
+`starting` or `ready`), sends `SIGTERM`, and waits for the process to exit for up to `killTimeout` (5 s). After that
+it logs `[llama-webui] not stopped after 5000 ms, SIGKILL` and sends `SIGKILL`. Once the exit is handled, the state is
+`idle`. Called without a process, `stop` clears a `crashed` state to `idle` and does nothing otherwise. A stop runs in
+a fiber of the supervisor, not of the request: a client that goes away does not cut it short.
 
-`switchTo(cmd)` stops the current process and starts `cmd` as one locked operation. `POST /api/server/restart` is a
-`switchTo()` with the command rebuilt from the database, so profile edits saved since the last launch apply.
+`switchTo(cmd)` stops the current process and starts `cmd` as one operation. `POST /api/server/restart` is a
+`switchTo` with the command rebuilt from the database, so profile edits saved since the last launch apply
+(`NoProfileToRestart` when there is no last command, `ProfileNotFound` when its profile is gone).
 
 ### When llama-webui exits
 
-`boot()` (`app/server/lib/boot.ts`) registers `supervisor.stop()` on its shutdown stack right after `createRuntime()`.
-The Nitro plugin `app/server/plugins/runtime.ts` starts the runtime (`start()` of `app/server/lib/context.ts`) and
-undoes it through `stop()`, which logs `[llama-webui] stopping llama-server…` when a managed process runs, then
-disposes of the stack: running chat replies, the benchmark and the download are saved first, then the WebSocket hub
-(sockets closed `1001`), the placement tracker and the monitor stop, then `supervisor.stop()` is awaited, and the
-database closes last. The order is in [Architecture](/developers/architecture/#shutdown).
+The supervisor's layer has a finalizer: when the app's services are undone (a shutdown, or a restart in development),
+it takes the operation lock, logs `stopping llama-server…` when a managed process runs, and stops it as `stop` does.
+The services are undone in the reverse order of their construction, so the chat replies, the benchmark and the
+download are saved before it, and the database closes after it; the order is in
+[Architecture](/developers/architecture/#shutdown).
 
-- **In production**, the plugin installs its own `SIGINT` and `SIGTERM` handlers, registered before those of srvx
-  (Nitro's HTTP server): the runtime is undone first, so open WebSockets and streaming replies end at once, then
-  srvx closes the HTTP server without waiting out its grace delay. A second signal forces srvx's close.
-- **In development**, Ctrl+C makes Nitro close Vite, and its `close` hook (registered by the same plugin) calls
-  `stop()`. A double Ctrl+C stops `llama-server` too. The `close` hook is also the second call in production: a
-  no-op.
-- On `exit`, `app/server/lib/context.ts` calls `killNow()`, a synchronous `SIGKILL` as a last resort (an uncaught
-  error exits without the stack).
-- If llama-webui is killed outright, `setpriv`'s parent-death signal takes care of `llama-server`.
+- A second `SIGINT` or `SIGTERM` during the shutdown exits at once, and `setpriv`'s parent-death signal kills
+  `llama-server`.
+- An exit without the finalizers (an uncaught error) still kills it: the supervisor keeps the PID of the live process
+  in a plain variable, and a synchronous `exit` handler sends it `SIGKILL`.
+- If llama-webui is killed outright, the parent-death signal takes care of `llama-server`.
 
 ## One operation at a time
 
-Overlapping start, restart and switch operations could spawn two servers, so the supervisor keeps the promise of the
-operation in progress (`op`):
+Overlapping start, restart and switch operations could spawn two servers, so the supervisor holds a semaphore of one
+permit:
 
-- `start()` and `switchTo()` go through `exclusive()`, which rejects at once with `operation in progress, try again`
-  when an operation is running.
-- `stop()` does not reject: it waits for the running operation to settle, then runs its own.
+- `start` and `switchTo` go through `exclusive()`, which fails at once with `OperationInProgress`
+  `operation in progress, try again` (`409`) when the permit is taken. The operation runs in a fiber of the
+  supervisor, so it ends even when the request is interrupted.
+- `stop` and the layer's finalizer do not fail: they wait for the permit, then run.
 
-Errors raised by the supervisor are `SupervisorError` instances (`name = 'SupervisorError'`). `app/server/routes/api/server/`
-turns them into `409` responses (`e instanceof SupervisorError`).
+The errors are the tagged errors of `ServerApi` (`packages/webui-shared/src/api/ServerApi.ts`), which the handlers
+answer as they are. Before any of them, the handlers refuse with `BenchRunning` `A benchmark is running` (`409`) while
+the [bench runner](#benchmarks-and-the-gate) is busy.
 
 ## External servers
 
 An external server is a `llama-server` that answers on a port llama-webui would use, while llama-webui has no process
-of its own. `probeLlamaServer(port)` (`llamacpp-js/client`) tells it apart from any other HTTP service: its `/health` answers
-JSON, `{"status":"ok"}` once loaded or `{"error":{"type":"unavailable_error",…}}` while loading.
+of its own. `isLlamaServer(target)` tells it apart from any other HTTP service: its `/health` answers JSON,
+`{"status":"ok"}` once loaded or `{"error":{"type":"unavailable_error",…}}` while loading, within 800 ms.
 
-`externalWatcher()` (`external.ts`) returns a check function. `boot()` (`app/server/lib/boot.ts`) runs it once at startup, then every
-`EXTERNAL_CHECK_MS` (2,000 ms):
+`ExternalWatch` (`ExternalWatch.ts`) is a fiber of its layer's scope that looks once as soon as it is built, without
+holding the start of the app, then every 2 seconds, one look at a time:
 
-- In `idle` or `crashed`, it calls `detectExternal(port)` for the settings port, then the last started command's
-  port (`ports()` in `boot.ts`), and stops at the first hit: the state becomes `external`. After a crash, a
-  `llama-server` started by hand on the port is thus seen without waiting for another state change.
-- In `external`, it calls `recheckExternal()`: when the recorded PID is still alive (`process.kill(pid, 0)`) the state
-  stays, even if the port is silent (a hung server is still a server); when the PID is dead or unknown and the port no
-  longer answers, the state goes back to `idle`.
-- In any other state it does nothing. Overlapping checks are skipped, and the check is paused while a benchmark holds
-  the [bench gate](#benchmarks-and-the-gate).
+- While the bench runner is busy, it does nothing: the benchmark's own `llama-server` on the settings port is not an
+  external server.
+- In `idle` or `crashed`, it calls `detectExternal(port)` for the `port` setting, then for the last command's port,
+  and stops at the first hit: the state becomes `external`. After a crash, a `llama-server` started by hand on the
+  port is thus seen without waiting for another state change.
+- In `external`, it calls `recheckExternal`: when the recorded PID is still alive the state stays, even if the port is
+  silent (a hung server is still a server); when the PID is dead or unknown and the port no longer answers, the state
+  goes back to `idle`.
+- In any other state it does nothing.
 
-`findLlamaServerPid(port)` (`llamacpp-js/node`) reads `/proc/<pid>/cmdline` for every process and returns the first whose
-`argv[0]` has the basename `llama-server` and whose `--port` (or `--port=`, `8080` when absent) equals `port`. The
-PID is `null` when nothing matches, for example a server started under another name or in a container.
+`findLlamaServerPid({ port, root })` (`app/server/llama/procScan.ts`) reads `/proc/<pid>/cmdline` for every process
+and gives the first whose program is named `llama-server` and whose `--port` (or `--port=`, `8080` when absent) equals
+`port`. The PID is none when nothing matches, for example a server started under another name or in a container.
 
-An external server can be read (chat, monitoring, `/props`) but never stopped: `start()` refuses while it answers.
+An external server can be read (chat, monitoring, `/props`) but never stopped: `start` refuses while it answers.
 
 ## The flag catalog
 
-`flags.ts` reads what the installed `llama-server` accepts, for the profile editor's completion and warnings:
+`Flags` (`app/server/flags/Flags.ts`) reads what the installed `llama-server` accepts, for the profile editor's
+completion and warnings:
 
-- `loadFlags(binary, timeoutMs = 5000)` (`llamacpp-js/node`) runs `<binary> --help` with that timeout, and parses its standard output with
-  `parseHelp()` (`llamacpp-js/flags`). It returns `null` when the binary cannot run, exits with a non-zero code, or
-  lists no flag.
-- `getFlags(binary)` keeps one promise per binary path, so `--help` runs once per path. A failure is removed from the
-  cache, so the next call tries again.
+- `catalog` runs `<binary> --help` (the `binary` setting, `~` expanded) within 5 seconds, at most 16 MiB of output,
+  and parses its standard output with `parseHelp()` (`llamacpp-js/flags`). It fails with `FlagsUnavailable`
+  `llama-server --help failed (<binary>)` when the binary cannot run, exits with a non-zero code, or lists no flag.
+- The result is kept in a `Cache` per binary path for the life of the app; a failure is not kept, so the next call
+  runs `--help` again.
 
-`GET /api/flags` returns `{ flags }`, or `503` when `getFlags()` gives `null`. The catalog never blocks anything: an
-argument it does not know is only flagged in the editor.
+`GET /api/flags` returns `{ flags }`, or `503` `FlagsUnavailable`. The catalog never blocks anything: an argument it
+does not know is only flagged in the editor.
 
 ## Following the state
 
-`subscribe(fn)` registers a listener and returns its unsubscribe function. Listeners receive the new `ServerState` on
-every transition. Two modules subscribe:
+`changes` gives a `Stream` of every new state from the subscription on (a `PubSub`). The `Placement` tracker of the
+monitor subscribes to it to recompute the model placement. The `server-state` WebSocket message is published by the
+supervisor itself, on every change, with the `ServerView` as payload ([WebSocket](/developers/api/websocket/)).
 
-- `boot()` (`app/server/lib/boot.ts`) broadcasts a `server-state` WebSocket message with `serverView(supervisor)` as its payload
-  ([WebSocket](/developers/api/websocket/)).
-- `PlacementTracker` (`app/server/lib/monitor/placement.ts`) recomputes the model placement.
+Other services read `state` when they need it instead of subscribing: the monitor on every tick, `ChatRuns` to find
+the server to talk to, the bench gate, the external watch, and the endpoints.
 
-Other modules read `supervisor.state` when they need it instead of subscribing: the monitor on every tick, `ChatRuns`
-to find the server to talk to, the bench gate, the external watcher, and the routes.
+Two pure helpers of `packages/webui-shared/src/server.ts` read the state:
 
-`app/server/lib/runtime.ts` also provides two views:
+- `serverView({ state, last })`: the `ServerView` sent to clients, `{ state, command, profileId }` (the supervisor's
+  `view`). `command` is the last `display` (without the `setpriv` prefix). `profileId` comes from the state, or from
+  the last command after a stop.
+- `activeProfileId(state)`: the profile of the managed server while it is `starting`, `ready` or `stopping`, else
+  `null`. Deleting the running profile is refused with it (`ProfileRunning`), and the chat uses it as its default
+  profile.
 
-- `serverView(supervisor)`: the `ServerView` sent to clients, `{ state, command, profileId }`. `command` is the last
-  `display` (without the `setpriv` prefix). `profileId` comes from the state, or from the last command after a stop.
-- `activeProfileId(supervisor)`: the profile of the managed server while it is `starting`, `ready` or `stopping`, else
-  `null`. The profile routes use it to refuse deleting the running profile.
-
-## The runtime
-
-`createRuntime()` (`app/server/lib/runtime.ts`) builds the long-lived objects of the process once, called by `boot()`:
-
-```ts title="app/server/lib/runtime.ts"
-export interface Runtime {
-  supervisor: Supervisor;
-  logs: LogBuffer;
-  bootId: string;
-  monitor: Promise<Monitor> | null;
-  benchGate: BenchGate;
-}
-```
-
-`bootId` is a fresh `crypto.randomUUID()`: every runtime built gets a new one, and the client ties its log numbering
-to it. `monitor` is filled by `startMonitor()`. `createRuntime()` only builds: stopping these objects is left to the
-shutdown stack of `boot()`.
-
-In development (`pnpm dev`), the server runs in Nitro's dev worker and is evaluated again on each save, while the live
-runtime is kept on `globalThis` (`app/server/lib/context.ts`):
-
-- saving a route file (`app/server/routes/`) keeps the runtime: `llama-server` keeps running, same `bootId`;
-- saving business code that `boot.ts` reaches (`app/server/lib/`, `packages/`) undoes the old runtime, which stops
-  `llama-server` like any other shutdown, and builds a new one with a new `bootId`.
-
+The `bootId` of `/api/health` and of the WebSocket's `hello` is made by `AppInfo` (`app/server/config/AppInfo.ts`),
+a fresh UUID each time the services are built: the client ties its log numbering to it. In development, a save of a
+file the server imports restarts it (`node --watch`): the services are undone like at a shutdown, so `llama-server`
+stops, and built again with a new `bootId`. A save under `app/src/` is HMR and keeps both.
 [Architecture](/developers/architecture/#development-restarts) describes the development loop.
 
 ## Benchmarks and the gate
 
-A benchmark needs the GPUs to itself, and it does not use the supervisor to run its servers: `app/server/lib/bench/server.ts`
-spawns its own `llama-server` (on `127.0.0.1` and the settings port), and `app/server/lib/bench/execute.ts` its
-`llama-bench`. `BenchGate`
-(`app/server/lib/bench/gate.ts`), which lives in the runtime next to the supervisor, coordinates the two:
+A benchmark needs the GPUs to itself, and it does not use the supervisor to run its programs: `app/server/bench/`
+spawns its own `llama-bench` (`execute.ts`) and trial `llama-server` (`trial.ts`, on `127.0.0.1` and the settings
+port). The gate (`app/server/bench/gate.ts`), made by the `BenchRunner`, coordinates the two:
 
-- `acquire({ stopServer })` refuses with `409` when the gate is held (`A benchmark is running`), when the state is
-  `external`, or when the managed server is `starting` or `ready` and `stopServer` is false (code `server-running`,
-  so the client can ask for confirmation). It waits up to 60 seconds for a `stopping` state to finish. With
-  `stopServer`, it records `supervisor.lastCommand` and calls `supervisor.stop()`.
-- `release(rebuild)` restarts the stopped server with `supervisor.start()` and frees the gate. `rebuild` (given by
-  the `BenchRunner`, `rebuild` in `createDeps()`, `app/server/lib/deps.ts`) builds the command again from the profile as it is now, so edits
-  saved during the benchmark apply; the recorded command is used when the profile is gone or no `rebuild` is given. A failed restart is logged as `[bench] could not restart llama-server: …`.
-- While a benchmark runs, the server routes refuse every lifecycle call with `409 A benchmark is running`, and the
-  external watcher is paused: the benchmark's own `llama-server` on the settings port is not an external server.
+- `acquire({ stopServer })` refuses with `409` `ExternalServerRunning` when the state is `external`, and with `409`
+  `ServerRunning` (`llama-server is running (profile …): it will be stopped during the benchmark, then restarted`)
+  when the managed server is `starting` or `ready` and `stopServer` is false: the client asks for confirmation. It
+  waits up to 60 seconds for a `stopping` state to finish (`ServerStopTooSlow` after that). With `stopServer`, it
+  records the last command and forks the stop; `ready` waits for it.
+- `release(rebuild)` restarts the stopped server with `supervisor.start` and frees the gate, also when the restart
+  fails. `rebuild` (given by the runner) builds the command again from the profile as it is now, so edits saved during
+  the benchmark apply; the recorded command is used when it gives none. A failed restart is logged as
+  `could not restart llama-server: …`.
+- While the runner is busy, the server endpoints refuse every lifecycle call with `409 A benchmark is running`, and
+  the external watch is paused.
 
-The gate lives in the runtime, next to the supervisor it stops and restarts.
 [Benchmarks and sweeps](/developers/server/bench/) covers the runner.
+
+## Tests
+
+- `app/server/supervisor/Supervisor.test.ts`: the transitions against the fake programs of `testdata/fake/` (a
+  `llama-server` that loads then answers, one that crashes, one that ignores `SIGTERM`), the port checks, the launch
+  failures, one operation at a time, the finalizer, and the external states.
+- `command.test.ts`: the argument order, the verbosity, `~`, the environment, `profilePaths()` and `launchLines()`.
+- `ExternalWatch.test.ts`: detection on both ports, the recheck, the pause during a benchmark.
+- `app/server/process/followed.test.ts`: the drain of the output, the exit handled once, the bounded close.
+- `app/server/supervisor/http.test.ts`: the endpoints and their errors.
+- `app/server/lifecycle.test.ts`, against the production build: `SIGTERM` with a `llama-server` running stops it in
+  under 2 s, and an exit without the finalizers leaves no `llama-server`.

@@ -5,50 +5,51 @@ description: How the server gate, the runner and the executor measure with llama
 
 The benchmark module measures one configuration at a time with `llama-bench` or with a temporary `llama-server`, and
 runs sweeps: lists of `llama-bench` runs planned by the estimator, optionally validated on the server. It lives in
-`app/server/lib/bench/`, with its types in `packages/webui-shared/src/bench.ts` and `packages/webui-shared/src/sweep.ts` and its tables in
-`app/server/lib/db/benchRuns.ts` and `app/server/lib/db/sweeps.ts`. For what users see, read [Benchmark](/docs/benchmark/) and
+`app/server/bench/`, with its schemas in `packages/webui-shared/src/bench.ts` and `packages/webui-shared/src/sweep.ts`
+and its API groups in `packages/webui-shared/src/api/BenchApi.ts` and `SweepsApi.ts`. For what users see, read [Benchmark](/docs/benchmark/) and
 [Sweeps](/docs/sweeps/).
 
-| File                       | Role                                                                                            |
-| -------------------------- | ----------------------------------------------------------------------------------------------- |
-| `app/server/lib/bench/gate.ts`     | `BenchGate`: one holder at a time, stops the managed server once and restarts it once           |
-| `app/server/lib/bench/runner.ts`   | `BenchRunner`: one-off runs and sweeps, saves results, emits the live state                     |
-| `app/server/lib/bench/execute.ts`  | `RunExecutor`: builds the command, runs the tool, samples VRAM and disk, returns the result     |
-| `app/server/lib/bench/parse.ts`    | `benchFailure()`: why a run failed, from the tool's last lines                                  |
-| `llamacpp-js/bench`        | `llama-bench` JSON, `--progress` lines, `--list-devices`, failure lines ([llamacpp-js](/developers/llamacpp-js/)) |
-| `llamacpp-js/node`         | `benchBinary()`: `llama-bench` next to `llama-server`                                           |
-| `app/server/lib/bench/server.ts`   | `runServerTrial()`: a temporary `llama-server` measured through chat requests                  |
-| `app/server/lib/bench/prompt.ts`   | `promptOf()`: the fixed filler text of a server run                                             |
-| `app/server/lib/bench/vram.ts`     | `VramProbe`: VRAM sampled every 100 ms                                                          |
-| `app/server/lib/bench/hardware.ts` | Build number, the hardware frozen with each run, the `--list-devices` cache                     |
-| `app/server/lib/tuning/space.ts`   | `planSweep()`: a sweep's items, each with the estimator's verdict                               |
-| `packages/webui-shared/src/bench.ts`      | `BenchSpec`, `BenchParams`, `BenchRun`, `BenchLive`, flag translation for both tools            |
-| `packages/webui-shared/src/sweep.ts`      | `SweepSpec`, `Sweep`, `SweepLive`, `expandSpace()`, `rankRuns()`, `sweepCtx()`                  |
-| `app/server/lib/db/benchRuns.ts`   | `BenchRunsRepo`: the `bench_runs` table (one-off runs and sweep items)                          |
-| `app/server/lib/db/sweeps.ts`      | `SweepsRepo`: the `sweeps` table                                                                |
+| File | Role |
+| --- | --- |
+| `app/server/bench/BenchRunner.ts` | `BenchRunner`: one-off runs and sweeps, the rows, the live state, the shutdown step |
+| `app/server/bench/gate.ts` | The gate: stops the managed server once and restarts it once |
+| `app/server/bench/execute.ts` | `commandOf()` and `execute()`: the command, the tool, the VRAM and disk peaks, the result |
+| `app/server/bench/trial.ts` | `runTrial()`: a temporary `llama-server` measured through chat requests |
+| `app/server/bench/measure.ts` | `measure()` and `draftAcceptPct()` |
+| `app/server/bench/parse.ts` | `benchFailure()`: why a run failed, from the tool's last lines |
+| `app/server/bench/prompt.ts` | `promptOf()`, `WARMUP_PROMPT`: the fixed texts of a server run |
+| `app/server/bench/vram.ts` | `startVramProbe()`: VRAM sampled every 100 ms |
+| `app/server/bench/BenchHardware.ts` | `BenchHardware`: the build, the hardware frozen with each run, the `--list-devices` cache |
+| `app/server/bench/which.ts` | `which()`: a binary looked up in the `PATH` |
+| `app/server/bench/toProfile.ts` | `toProfile()` and `fromProfile()`: a run to a profile, a profile to a run's draft |
+| `app/server/bench/BenchRunsRepo.ts`, `SweepsRepo.ts` | The `bench_runs` table (one-off runs and sweep items) and the `sweeps` table |
+| `app/server/bench/http.ts` | `BenchHandlers` and `SweepsHandlers` |
+| `app/server/tuning/space.ts` | `planSweep()`: a sweep's items, each with the estimator's verdict |
+| `llamacpp-js/bench` | `llama-bench` JSON, `--progress` lines, `--list-devices`, failure lines ([llamacpp-js](/developers/llamacpp-js/)) |
+| `llamacpp-js/node` | `benchBinary()`: `llama-bench` next to `llama-server` |
+| `packages/webui-shared/src/bench.ts` | `BenchSpec`, `BenchParams`, `BenchRun`, `BenchLive`, flag translation for both tools |
+| `packages/webui-shared/src/sweep.ts` | `SweepSpec`, `Sweep`, `SweepLive`, `expandSpace()`, `rankRuns()`, `sweepCtx()` |
 
-The HTTP side is in `app/server/routes/api/bench/` and `app/server/routes/api/sweeps/`, documented in
-[Benchmarks](/developers/api/bench/) and [Sweeps](/developers/api/sweeps/).
+The endpoints are documented in [Benchmarks](/developers/api/bench/) and [Sweeps](/developers/api/sweeps/).
 
 ## How the pieces fit
 
-A request goes through three layers, each with one job:
+A request goes through three parts, each with one job:
 
 - **`BenchRunner`** decides what runs. It accepts one one-off run or one sweep at a time, creates and updates the rows,
-  and reports progress through four callbacks (`onLive`, `onRun`, `onSweep`, `onSweepLive`) that `createDeps()`
-  (`app/server/lib/deps.ts`) turns into WebSocket broadcasts.
-- **`BenchGate`** owns the managed `llama-server` for the duration: it stops it before the first measurement and
+  and publishes the progress on the WebSocket hub.
+- **The gate** owns the managed `llama-server` for the duration: it stops it before the first measurement and
   restarts it after the last one, once per one-off run or per sweep.
-- **`RunExecutor`** runs a single measurement. It never touches the managed server and never writes to the database:
-  it returns a `BenchFinish` that the runner saves.
+- **`execute()`** runs a single measurement. It never touches the managed server and never writes to the database:
+  it gives back a result that the runner saves.
 
-The gate lives in the runtime (`runtime.benchGate`, built by `createRuntime()` in `app/server/lib/runtime.ts`), next to the
-supervisor it stops and restarts. The runner and the executor are created by `createDeps()` (`app/server/lib/deps.ts`), and
-`boot()` (`app/server/lib/boot.ts`) disposes of the runner at shutdown (see [Shutdown and restarts](#shutdown-and-restarts)).
+The runner is a service of the app (`BenchRunner.layer`); it makes its gate on the supervisor when it is built, runs
+its work in fibers of its own scope, and registers a shutdown step (see
+[Shutdown and restarts](#shutdown-and-restarts)).
 
 ## Specs and parameters
 
-A run is described by a `BenchSpec` (`BenchSpecSchema` in `packages/webui-shared/src/bench.ts`):
+A run is described by a `BenchSpec` (`packages/webui-shared/src/bench.ts`):
 
 | Field        | Type                      | Default | Notes                                                                       |
 | ------------ | ------------------------- | ------- | --------------------------------------------------------------------------- |
@@ -77,34 +78,35 @@ profile's arguments into fields and the rest, in their original order (`GET /api
 
 ## The server gate
 
-`BenchGate` (`app/server/lib/bench/gate.ts`) has a single holder, a one-off run or a sweep. It remembers the command of the
+The gate (`app/server/bench/gate.ts`) has a single holder, a one-off run or a sweep. It remembers the command of the
 server it stopped (`stoppedCommand`), the stop in progress, and the release in progress.
 
 ### Acquire
 
-`acquire({ stopServer })` takes the gate, or refuses with a `409`:
+`acquire({ stopServer })` takes the gate, or refuses with a `409` (the runner has already refused a second benchmark
+with `BenchRunning` `A benchmark is running`):
 
-1. If the gate is already held: `A benchmark is running`.
-2. If the managed server is stopping, it waits for the stop, polling every `POLL_MS = 100` ms for up to 60 seconds
-   (`stoppingTimeoutMs`), then fails with `llama-server is taking too long to stop: try again`. A stop that someone
-   else started leaves nothing to restart.
-3. If an external server runs: `An external llama-server is running on port N: stop it first`.
-4. If the managed server is starting or ready and `stopServer` is false: a `409` with `code: "server-running"`. The
-   web app shows its confirmation dialog, then sends the same request again with `stopServer: true`.
-5. Otherwise it records `server.lastCommand`, logs `[bench] stopping llama-server for the benchmark`, and starts the
-   stop **without awaiting it**.
+1. If the managed server is stopping, it waits for the stop, polling every 100 ms for up to 60 seconds
+   (`stoppingTimeout`), then fails with `ServerStopTooSlow` `llama-server is taking too long to stop: try again`. A
+   stop that someone else started leaves nothing to restart.
+2. If an external server runs: `ExternalServerRunning` `An external llama-server is running on port N: stop it
+   first`.
+3. If the managed server is starting or ready and `stopServer` is false: `ServerRunning`. The web app tells it by its
+   `_tag`, shows its confirmation dialog, then sends the same request again with `stopServer: true`.
+4. Otherwise it records the supervisor's `lastCommand`, logs `[bench] stopping llama-server for the benchmark`, and
+   forks the stop in the runner's scope **without awaiting it**.
 
 The request therefore answers as soon as the gate is taken. The first run starts in the `stopping-server` phase, and
-the runner calls `ready()`, which awaits the stop, before it launches anything. If the stop fails, nothing is restarted
+the runner runs `ready`, which awaits the stop, before it launches anything. If the stop fails, nothing is restarted
 and the run fails with `could not stop llama-server: …`.
 
 ### Release
 
 `release(rebuild)` waits for the stop to finish, restarts the stopped server (logged as
 `[bench] restarting llama-server (<profile>)`), and frees the gate even when the restart fails. The command comes from
-`rebuild(stopped)`, the runner's `rebuild` dependency: `buildCommand()` on the profile as it is now, so edits saved
-during the benchmark apply. The recorded command is the fallback, when the profile was deleted. It is idempotent: a
-second call returns the same promise. A failed restart rejects with `could not restart llama-server: …`; the runner
+`rebuild(stopped)`, given by the runner: `buildCommand()` on the profile as it is now, so edits saved during the
+benchmark apply. The recorded command is the fallback, when the profile was deleted. Two releases at once are one (a
+`Deferred`). A failed restart fails with `could not restart llama-server: …` (also pushed to the log ring); the runner
 appends that message to the error of the run (the last item for a sweep), so it shows on the **Last run** card and in
 the history.
 
@@ -113,30 +115,33 @@ the history.
 `BenchRunner.busy` is true while a run is being accepted, while one runs, while a sweep runs, and while the gate is
 held. Other modules read it:
 
-- the server routes (`app/server/routes/api/server/`) refuse start, switch, restart and stop with `409 A benchmark is
-  running`;
+- the server endpoints (`app/server/supervisor/http.ts`) refuse start, switch, restart and stop with `409`
+  `BenchRunning` `A benchmark is running`;
 - `POST /api/tuning/disk-speed` refuses with `A benchmark is running: the measurement would be skewed`;
-- the external server watcher pauses (`paused` in `app/server/lib/boot.ts`): the temporary `llama-server` listens on the
-  settings port and would otherwise be seen as an external server.
+- the external watch (`ExternalWatch`) does nothing: the temporary `llama-server` listens on the settings port and
+  would otherwise be seen as an external server;
+- `files` gives the model and projector in use, which the model deletion refuses to delete.
 
 ## The runner
 
-`BenchRunner` (`app/server/lib/bench/runner.ts`) holds the current run (`current`) and the running sweep (`sweep`).
+`BenchRunner` (`app/server/bench/BenchRunner.ts`) holds, in one `SynchronizedRef`, the current run, the running
+sweep and the fiber of the work.
 
 ### One-off runs
 
-`start(spec, { stopServer })` checks, in this order, that nothing is running (`409 A benchmark is running`), that the
-model and the projector exist (`400 Model not found: …`, `400 Projector not found: …`), then takes the gate: a missing
-file is refused before anything is stopped. It reads the hardware, creates the row with status `running`, the command
-and the hardware frozen (`BenchRunsRepo.create`), emits it, and returns it while the run continues in the background:
-the route answers `202`.
+`start(spec, { stopServer })` claims the runner (`409` `BenchRunning` `A benchmark is running` when it is busy),
+checks that the model and the projector exist (`400` `BenchFileMissing` `Model not found: …`, `Projector not found:
+…`), then takes the gate: a missing file is refused before anything is stopped. It reads the hardware, creates the row
+with status `running`, the command and the hardware frozen (`BenchRunsRepo.create`), publishes it, and returns it while
+the run continues in a fiber of the runner: the endpoint answers `202`.
 
 The background part executes the run, saves its result with `BenchRunsRepo.finish`, then releases the gate. While the
 server restarts, the live state shows the `restarting-server` phase; when everything is over, the live state becomes
 `null`.
 
-`cancel(id)` only acts on the current run. It marks the run cancelled and calls `RunExecutor.cancel()`, which sends
-`SIGTERM` and then `SIGKILL` after 5 seconds; the saved status is `cancelled`. In a sweep, cancelling the current item
+`cancel(id)` only acts on the current run (`404` `RunNotFound`, `409` `RunNotRunning` otherwise). It completes the
+run's cancel signal, and `execute()` sends `SIGTERM`, then `SIGKILL` after 5 seconds (`killTimeout`); the saved
+status is `cancelled`. In a sweep, cancelling the current item
 moves on to the next one.
 
 A run's status (`BenchStatus`) is one of `queued` (a sweep item waiting its turn), `running`, `ok`, `failed`,
@@ -144,28 +149,44 @@ A run's status (`BenchStatus`) is one of `queued` (a sweep item waiting its turn
 
 ## The executor
 
-`RunExecutor` (`app/server/lib/bench/execute.ts`) runs one measurement at a time and returns its result, without saving it.
+`execute()` (`app/server/bench/execute.ts`) runs one measurement in the runner's scope and gives back its result,
+without saving it.
 
 ### The command
 
-`commandOf(spec)` returns the `argv`, the `display` string stored with the run, and for server runs the
+`commandOf(spec)` gives the `argv`, the `display` string stored with the run, and for server runs the
 `BuiltCommand`.
 
 <Tabs>
   <Tab title="llama-bench">
 
-`llama-bench` is looked for next to the `llama-server` binary from the settings (`benchBinary()`: the same directory,
-with `llama-server` replaced by `llama-bench` in the file name; a bare name stays bare and is looked up in the
-`PATH`). The child runs under `setpriv --pdeathsig KILL`, so it dies with llama-webui, and gets llama-webui's environment, then the
-`env` setting, then the source profile's environment (the same `CUDA_VISIBLE_DEVICES`, for example).
+`llama-bench` is looked for next to the `llama-server` binary from the settings, `~` expanded (`benchBinary()`: the
+same folder, with `llama-server` replaced by `llama-bench` in the file name; a bare name stays bare and is looked up
+in the `PATH`). The child runs under `setpriv --pdeathsig KILL`, so it dies with llama-webui, and gets llama-webui's
+environment, then the `env` setting, then the source profile's environment (the same `CUDA_VISIBLE_DEVICES`, for
+example).
 
-```ts title="app/server/lib/bench/execute.ts"
-const argv = [
-  'setpriv', '--pdeathsig', 'KILL', '--',
-  bin, '-m', spec.modelPath, '-o', 'json', '--progress',
-  '-r', String(spec.r), '-p', String(spec.p), '-n', String(spec.n),
+```ts title="app/server/bench/execute.ts"
+const bench = [
+  binary,
+  '-m',
+  spec.modelPath,
+  '-o',
+  'json',
+  '--progress',
+  '-r',
+  `${spec.r}`,
+  '-p',
+  `${spec.p}`,
+  '-n',
+  `${spec.n}`,
   ...benchArgs(spec.params),
 ];
+const command: RunCommand = {
+  argv: ['setpriv', '--pdeathsig', 'KILL', '--', ...bench],
+  display: shellQuote(bench),
+  server: Option.none(),
+};
 ```
 
 The displayed command leaves out the `setpriv` prefix.
@@ -173,10 +194,10 @@ The displayed command leaves out the `setpriv` prefix.
   </Tab>
   <Tab title="Server">
 
-A server run builds a throwaway profile named `bench` and passes it to the supervisor's `buildCommand()`: the model and
+A server run builds a throwaway profile named `bench` and passes it to `buildCommand()`: the model and
 projector, `serverArgs(params)` followed by `serverArgs`, host `127.0.0.1` and the port from the settings, plus the
 flags the supervisor always adds (`--metrics`, `--slots`, `--props`). The working directory and environment variables
-come from the source profile, because its flags may use relative paths; without one, the directory is the model's.
+come from the source profile, because its flags may use relative paths; without one, the folder is the model's.
 `buildCommand()` adds the `env` setting under the profile's variables, as for any launch.
 
   </Tab>
@@ -184,8 +205,8 @@ come from the source profile, because its flags may use relative paths; without 
 
 ### Running and reporting
 
-`run(run, { onLive, startedAt, spec })` refuses a second concurrent run, checks the model file again, then runs the
-tool. It returns a `BenchFinish` with:
+`execute({ run, spec, onLive, cancel, … })` runs the tool through `followProgram()` and gives back an `ExecResult`
+with:
 
 - `status`, `pp`, `tg` (each a `Measure`: `tps`, `stddev`, `tokens`) and, for server runs, `draftAcceptPct`;
 - `vramPeak`: one entry per card, in MiB, cards at 0 left out (see [Peak VRAM and disk](#peak-vram-and-disk));
@@ -194,7 +215,7 @@ tool. It returns a `BenchFinish` with:
 
 Every line of the tool also goes to the log ring with a `[bench]` prefix. The live state (`BenchLive`) carries the
 phase, the step (`index` of `total`), the start time and the last `LIVE_LINES = 20` lines. A phase change is reported
-at once; new lines at most every `LIVE_THROTTLE_MS = 250` ms, because `llama-server` writes hundreds of them while it
+at once; new lines at most every `liveThrottle` (250 ms, throttled by the runner), because `llama-server` writes hundreds of them while it
 loads.
 
 ### llama-bench runs
@@ -213,7 +234,7 @@ The run is `ok` when the JSON gives at least one of the two measures, `failed` o
 
 ### Server runs
 
-`runServerTrial()` (`app/server/lib/bench/server.ts`) measures a real `llama-server`:
+`runTrial()` (`app/server/bench/trial.ts`) measures a real `llama-server`:
 
 <Steps>
   <Step title="Check the port">
@@ -224,7 +245,7 @@ If something already answers `/health` on the port, the run fails with `port N i
   <Step title="Load">
 
 It spawns the server and polls `/health` every 500 ms until it answers `200`. It fails with `loading > 10 min` after
-10 minutes (`loadTimeoutMs`), or with the failure read from its output (see
+10 minutes (`loadTimeout`), or with the failure read from its output (see
 [Failure messages](#failure-messages)) if the process exits first.
 
   </Step>
@@ -241,14 +262,16 @@ prompt is a sentence on purpose: llama.cpp segfaults on a 2-token prompt with `-
 tokens, at 4 characters per token, the same on every run) followed by an instruction to write a new story. Each request
 asks for exactly `n` tokens (`max_tokens: n`, `ignore_eos: true`) with thinking disabled
 (`chat_template_kwargs: { enable_thinking: false }`). Every request also sends `cache_prompt: false`,
-`temperature: 0`, `seed: 42` and `stream: false`, and times out after 10 minutes (`requestTimeoutMs`). The requests
-go through `llamaFetch()` (`app/server/lib/llamaFetch.ts`), a `node:http` request with the signature of `fetch`: Node's own
-`fetch` gives up after 300 s without response headers, well before that timeout, and nothing in Node changes it.
+`temperature: 0`, `seed: 42` and `stream: false`, and times out after 10 minutes (`requestTimeout`). The requests
+go through `LlamaHttp` (`app/server/llama/LlamaHttp.ts`), `node:http` without a time limit on the headers or the body:
+Node's own `fetch` gives up after 300 s without response headers, well before that timeout, and nothing in Node
+changes it.
 
   </Step>
   <Step title="Stop">
 
-The server is always stopped, whatever happened (`await using`): `SIGTERM`, then `SIGKILL` after 5 seconds.
+The server is always stopped, whatever happened (`stopGently()`, in a finalizer of the trial's scope): `SIGTERM`,
+then `SIGKILL` after 5 seconds. An interruption (llama-webui stopping) kills it at once (`killSignal: 'SIGKILL'`).
 
   </Step>
 </Steps>
@@ -262,7 +285,7 @@ copy it, and speculative decoding (MTP) then accepts almost all its drafts, 95% 
 conversation.
 
 When the server dies during a request (a CUDA out of memory, for example), the socket closes before its output is read.
-The trial then waits up to `EXIT_GRACE_MS = 2000` ms for the process to exit, so that the error is the server's own
+The trial then waits up to `EXIT_GRACE` (2 seconds) for the process to exit, so that the error is the server's own
 line rather than the closed connection.
 
 A server trial keeps the last 10 lines that match `ERROR_LINE` apart from its 50-line tail, and passes both to
@@ -272,7 +295,7 @@ gdb backtrace after the `cudaMalloc failed: out of memory` line, and the run wou
 
 ### Failure messages
 
-`benchFailure(lines, exit, tool)` turns the last lines of a tool into the run's error:
+`benchFailure({ … })` turns the last lines of a tool into the run's error:
 
 - If any line matches `out of memory`, `failed to allocate` or `unable to allocate`, the run is an out of memory: the
   error is `OOM_ERROR` (`"Out of memory"`) followed by the last such line, for example
@@ -286,48 +309,50 @@ existing databases.
 
 ## Peak VRAM and disk
 
-During each run, `RunExecutor` measures what the run itself adds on each card:
+During each run, `execute()` measures what the run itself adds on each card:
 
 - **Starting point.** The VRAM used per card in the Monitor's latest snapshot when the run starts (`allGpus`: hidden
   cards included).
-- **Monitor samples.** Every `SAMPLE_MS = 500` ms it reads the latest snapshot again. The Monitor itself samples every
+- **Monitor samples.** Every 500 ms (`SAMPLE`) it reads the latest snapshot again. The Monitor itself samples every
   second by default, so a short peak can slip between two snapshots.
-- **Fast probe.** `VramProbe` (`app/server/lib/bench/vram.ts`) samples every 100 ms: one
+- **Fast probe.** `startVramProbe()` (`app/server/bench/vram.ts`) samples every 100 ms, in the run's scope: one
   `nvidia-smi --query-gpu=uuid,memory.used --format=csv,noheader,nounits -lms 100` process for NVIDIA cards
   (`parseSmiLine()` maps each UUID to the Monitor's `nvidia:<uuid>` key), and the sysfs file
   `/sys/bus/pci/devices/<busId>/mem_info_vram_used` for AMD cards. A source that fails is ignored.
 
-The peak of a card is the largest of the two measures, each taken as the maximum minus the starting value. The sampler
-is an `AsyncDisposable`: when the run exits, it takes a last sample, stops the probe (`SIGTERM` to `nvidia-smi`, then at
-most 500 ms of waiting) and merges the probe's peaks.
+The peak of a card is the largest of the two measures, each taken as the maximum minus the starting value. When the run
+exits, the executor takes a last sample, stops the probe (`stop`: its `nvidia-smi` and its sysfs fiber end with its
+scope) and merges the probe's peaks (`readings`).
 
 The same sampler keeps the highest read bandwidth of the model's disk reported by the Monitor (`disk.model.readBps`),
 saved as `diskReadPeakBps`.
 
 ## Hardware and the device list
 
-`app/server/lib/bench/hardware.ts` reads what a run records about the machine, and the devices llama.cpp sees.
+`BenchHardware` (`app/server/bench/BenchHardware.ts`) reads what a run records about the machine, and the devices
+llama.cpp sees.
 
-- `readHardware(binary, gpus)` returns a `BenchHardware`: the CPU model (read once per module), each GPU's name, bus id
-  and total VRAM, and the build. It is frozen in `hardware_json` when a one-off run is created or a sweep item starts.
-- `buildOf(binary)` runs `<binary> --version` and turns `build 12119, commit 6f1e65437` into `b12119 (6f1e65437)`. The
-  result is cached per binary path and modification time, so a rebuild is read again; `null` when unreadable.
-- `listDevices(benchBinary)` runs `llama-bench --list-devices` (15-second timeout) and parses it with
-  `parseDeviceList()` into `BenchDevice`s: `id` (`CUDA0`), `name`, `totalMib`, `freeMib`, and `backend` (the letters of
-  the id: `CUDA`, `Vulkan`, `BLAS`…).
+- `hardware(gpus)` gives the hardware of a run: the CPU model (read once), each GPU's name, bus id and total VRAM, and
+  the build. It is frozen in `hardware_json` when a one-off run is created or a sweep item starts.
+- `build(binary)` runs `<binary> --version` (5-second timeout) and turns `build 12119, commit 6f1e65437` into
+  `b12119 (6f1e65437)`. The result is cached per binary path and modification time, so a rebuild is read again;
+  `null` when unreadable.
+- `devices(benchBinary)` runs `llama-bench --list-devices` (15-second timeout) and parses it with
+  `parseDeviceList()` into `BenchDevice`s: `id` (`CUDA0`), `name`, `totalMib`, `freeMib`, and `backend` (the letters
+  of the id: `CUDA`, `Vulkan`, `BLAS`…). It gives `{ devices, error }`; `listDevices()` is its `devices`.
 
-`listDevicesResult(benchBinary)` returns `{ devices, error }`; `listDevices()` is its `devices`. The list is cached
-per binary path and modification time, so a rebuild is read again. A listing is not trusted, and not cached, when:
+The list is cached per binary path and modification time, so a rebuild is read again. A listing is not trusted, and
+not cached, when:
 
-- the tool is missing, exits with a non-zero code or is killed by a signal (`output()` rejects: recent builds crash
-  in `--list-devices` while llama-server holds the GPUs, after printing part of the list);
+- the tool is missing, exits with a non-zero code or is killed by a signal (recent builds crash in `--list-devices`
+  while llama-server holds the GPUs, after printing part of the list);
 - a GPU backend's device (CUDA, ROCm, Vulkan…) is listed with 0 MiB.
 
 `error` then says why, and `devices` is the last good list of that binary (`[]` if there was none). The free memory in
 the cached list is that of its first read: the estimator takes the live one from the Monitor (see
 [Live memory](/developers/server/tuning/#live-memory)).
 
-The list feeds `GET /api/bench/devices` (the device picker of the form), and through `readTuningHardware()` the
+The list feeds `GET /api/bench/devices` (the device picker of the form), and through `TuningHardware` the
 [Tuning](/developers/server/tuning/) estimator, sweep planning, and the launch pad's fit badges.
 
 ## Sweeps
@@ -338,7 +363,7 @@ for the whole sweep.
 
 ### The spec and the plan
 
-A `SweepSpec` (`SweepSpecSchema` in `packages/webui-shared/src/sweep.ts`) has the run fields of a `BenchSpec` (`modelPath`,
+A `SweepSpec` (`packages/webui-shared/src/sweep.ts`) has the run fields of a `BenchSpec` (`modelPath`,
 `mmprojPath`, `profileId`, `p`, `n`, `r`, `serverArgs`) plus:
 
 | Field          | Type                 | Default | Notes                                                    |
@@ -349,7 +374,7 @@ A `SweepSpec` (`SweepSpecSchema` in `packages/webui-shared/src/sweep.ts`) has th
 | `space`        | `SweepSpace`         | `{}`    | For each field, a non-empty list of values to try        |
 | `includeUnfit` | boolean              | `false` | Keep the items the estimator says do not fit             |
 
-`planSweep()` (`app/server/lib/tuning/space.ts`) turns the spec into items:
+`planSweep()` (`app/server/tuning/space.ts`) turns the spec into items:
 
 1. `expandSpace(base, space)` makes the cartesian product of the space over the base, in `FIELD_ORDER`. A `-ts` is kept
    only on items whose `-dev` lists the same number of devices, and more than one; `droppedTs` counts the ones dropped.
@@ -364,22 +389,22 @@ A `SweepSpec` (`SweepSpecSchema` in `packages/webui-shared/src/sweep.ts`) has th
 5. `estimatedSweepSeconds()` adds, per item, one model load at 1.5 GiB/s and 10 seconds per repetition.
 
 The same function answers `POST /api/tuning/plan` (the preview) and runs again in `POST /api/sweeps`, which refuses an
-empty plan with `409 No configuration to run: N excluded by the estimator`.
+empty plan with `409` `NothingToRun` `No configuration to run: N excluded by the estimator`.
 
 ### Exploration
 
-`POST /api/sweeps` calls `startSweep(create, { stopServer })`. `create` writes the `sweeps` row and enqueues one
-`bench_runs` row per item (`kind: "bench"`, status `queued`, its label and verdict). The runner calls it only once the
-gate is taken, so a `409` refusal writes nothing.
+`POST /api/sweeps` calls `startSweep({ files, stopServer, check, prepare })`. `prepare` writes the `sweeps` row and
+enqueues one `bench_runs` row per item (`kind: "bench"`, status `queued`, its label and verdict). The runner runs it
+only once the gate is taken, so a `409` refusal writes nothing; a failure of `prepare` releases the gate.
 
 The sweep loop then repeats until the queue is empty or the sweep is cancelled:
 
 1. Take the next queued item of the sweep (`nextQueued`: lowest id first).
-2. Emit a `SweepLive`: `sweepId`, `runId`, `index` (1-based), `total`, and `stage`, which is `validate` for a server
+2. Publish a `SweepLive`: `sweepId`, `runId`, `index` (1-based), `total`, and `stage`, which is `validate` for a server
    item and `explore` otherwise.
 3. Read the hardware, freeze the command and hardware on the row and set its date to now (`BenchRunsRepo.begin`), run
    it, save the result. A failure, out of memory included, does not stop the sweep.
-4. Emit the updated `Sweep` (its counters changed), then wait `pauseMs` (1 second) before the next item while the VRAM
+4. Publish the updated `Sweep` (its counters changed), then wait `pause` (1 second) before the next item while the VRAM
    is freed.
 
 At the end, the sweep becomes `done` (or `cancelled`) with its best run and `finishedAt`, and the gate is released:
@@ -401,8 +426,8 @@ exploration runs. The two kinds are never ranked together: `llama-bench` and `ll
 `POST /api/sweeps/:id/validate` takes the `n` best ranked exploration runs (1 to 5, 3 by default) and enqueues one
 server run for each: `kind: "server"`, the run's `params`, the sweep's `serverArgs`, `p`, `n` and `r`, the label
 `validation · <label>`, and the exploration run's verdict. It also puts the sweep's interrupted items back in the
-queue, since nothing else could finish them, then starts the sweep again through `startSweep()`. It is refused when no
-exploration run succeeded (`409 No successful run to validate`). See
+queue, since nothing else could finish them, then starts the sweep again. It is refused when no
+exploration run succeeded (`409` `NothingToValidate` `No successful run to validate`). See
 [Validate on the server](/docs/sweeps/#validate-on-the-server) for what the user sees.
 
 ### Persistence
@@ -413,20 +438,21 @@ Deleting a sweep deletes its runs (`ON DELETE CASCADE`). `bench_runs` ids use `A
 never handed out again: `best_run_id` relies on it.
 
 `SweepsRepo` computes `counts` (total and per status) from `bench_runs` on every read, and `best` (label, kind, prompt
-and generation speed) from the best run. `BenchRunsRepo.list()` only returns one-off runs by default (`sweepId:
-"none"`), and `lastOkByProfile()`, used by the launch pad, ignores sweep items: they test other settings than the
+and generation speed) from the best run. `BenchRunsRepo.list` only returns one-off runs by default (`sweepId:
+"none"`), and `lastOkByProfile`, used by the launch pad, ignores sweep items: they test other settings than the
 profile's own. The schema itself is on the [Database](/developers/server/database/) page.
 
 A sweep's status (`SweepStatus`) is `running`, `done`, `cancelled` or `interrupted`.
 
 ### Cancel and resume
 
-- `cancelSweep(id)` sets the queued items to `cancelled`, cancels the current item, and emits the sweep. The loop then
+- `cancelSweep(id)` sets the queued items to `cancelled`, cancels the current item, and publishes the sweep. The loop then
   ends with the status `cancelled` and releases the gate.
-- `POST /api/sweeps/:id/resume` puts the interrupted items back in the queue (`requeueInterrupted`) and starts the
-  sweep. With nothing queued afterwards, it answers `409 Nothing to resume: no interrupted or queued item`: a cancelled
-  sweep has no such item.
-- Resume, validate and delete refuse a running sweep with `409 This sweep is still running: cancel it first`.
+- `POST /api/sweeps/:id/resume` (`resume(id, { stopServer })`) checks first that the sweep has an interrupted or queued
+  item (`409` `NothingToResume` `Nothing to resume: no interrupted or queued item`: a cancelled sweep has none), then
+  takes the gate, puts the interrupted items back in the queue (`requeueInterrupted`) and starts the sweep.
+- Resume, validate and delete refuse a running sweep with `409` `SweepStillRunning` `This sweep is still running:
+  cancel it first`.
 
 ## Shutdown and restarts
 
@@ -435,26 +461,26 @@ A sweep's status (`SweepStatus`) is `running`, `done`, `cancelled` or `interrupt
 | Shutdown (`SIGINT`, `SIGTERM`)      | `interrupted`           | `interrupted`                            | `interrupted`               | Not restarted: llama-webui exits        |
 | Start after llama-webui was killed  | `interrupted`           | `interrupted`                            | `interrupted`               | Not restarted                           |
 
-In development, a save of business code (`app/server/lib/`, `packages/`) undoes the runtime and builds a new one: it
-is a shutdown like any other, and an interrupted sweep is resumed from the UI. Saving a route file keeps the runtime,
-and a running benchmark goes on.
+In development, a save of a file the server imports (`app/server/`, `packages/`) restarts it (`node --watch`): it is
+a shutdown like any other, and an interrupted sweep is resumed from the UI. A save under `app/src/` is HMR, and a
+running benchmark goes on.
 
 ### Shutdown and cold start
 
-On `SIGINT` or `SIGTERM`, the shutdown stack of `boot()` (`app/server/lib/boot.ts`) calls `benchRunner.dispose()` among its
-first steps, while `llama-server` still runs ([Architecture](/developers/architecture/#shutdown)). The executor kills
-the child at once with `SIGKILL` (`killNow()`), the current run (sweep item included) is saved as `interrupted` with
-the error `interrupted (llama-webui stopped)`, and so is the sweep. The gate is not released: llama-webui is exiting,
-and the supervisor stops with it.
+On `SIGINT` or `SIGTERM`, the shutdown step of the runner (`shutdown.before`) runs before the HTTP server closes and
+while `llama-server` still runs ([Architecture](/developers/architecture/#shutdown)). It sets `closing` (nothing is
+published after it), interrupts the work, which kills the child at once through its scope (`killSignal: 'SIGKILL'`),
+saves the current run (sweep item included) as `interrupted` with the error `interrupted (llama-webui stopped)`, and the
+sweep as `interrupted`. The gate is not released: llama-webui is exiting, and the supervisor stops with it.
 
-When llama-webui was killed without that chance, rows stay `running`. At the next start
-`boot()` runs `BenchRunsRepo.stopOrphans()` (running runs become `interrupted`, with the error
-`interrupted (llama-webui stopped)` when they had none) and `SweepsRepo.stopOrphans()` (running sweeps become
+When llama-webui was killed without that chance, rows stay `running`. When the runner's layer is built at the next
+start, it runs `BenchRunsRepo.stopOrphans` (running runs become `interrupted`, with the error
+`interrupted (llama-webui stopped)` when they had none) and `SweepsRepo.stopOrphans` (running sweeps become
 `interrupted`). The command of the stopped server was only in memory: llama-webui does not start the profile again.
 
 ## WebSocket messages
 
-The runner's callbacks become broadcasts in `createDeps()` (`app/server/lib/deps.ts`); the routes emit the deletions. The payload types are in
+The runner publishes these on the hub; the delete endpoints publish the deletions. The payload schemas are in
 `packages/webui-shared/src/ws.ts`; see [WebSocket](/developers/api/websocket/).
 
 | Message          | Payload             | When                                                                                                    |
@@ -471,16 +497,19 @@ A client that connects late reads the current state over HTTP: `GET /api/bench/r
 
 ## Tests
 
-- `app/server/lib/bench/runner.test.ts` drives the real runner, gate and executor with a fake `ServerControl` (it records stops
-  and restarts) and `testdata/fake/fake-llama-server` as the binary. `benchBinary()` maps it to
-  `testdata/fake/fake-llama-bench`, which prints real `--progress` lines and JSON. Environment variables shape the fakes:
-  `FAKE_BENCH_OOM`, `FAKE_BENCH_OOM_ARG` (out of memory when the argv contains a fragment), `FAKE_TG_BY_ARG`,
-  `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`, `FAKE_LOAD_MS`, `FAKE_BENCH_STEP_MS`. A shutdown test checks that `dispose()`
-  saves the running sweep item and its sweep as `interrupted`.
+- `app/server/bench/BenchRunner.test.ts` drives the real runner, gate and executor on `ServicesWithoutBench`
+  (`app/server/testing/services.ts`) with the runner built on it, `testdata/fake/fake-llama-server` as the binary and
+  the real supervisor. `benchBinary()` maps it to
+  `testdata/fake/fake-llama-bench`, which prints real `--progress` lines and JSON. Environment variables shape the
+  fakes: `FAKE_BENCH_OOM`, `FAKE_BENCH_OOM_ARG` (out of memory when the argv contains a fragment), `FAKE_TG_BY_ARG`,
+  `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`, `FAKE_LOAD_MS`, `FAKE_BENCH_STEP_MS`. A shutdown test checks that the shutdown
+  step saves the running sweep item and its sweep as `interrupted`.
+- `gate.test.ts`, `execute.test.ts`, `trial.test.ts`, `vram.test.ts`, `BenchHardware.test.ts`, `prompt.test.ts`,
+  `which.test.ts`, `BenchRunsRepo.test.ts`, `SweepsRepo.test.ts` and `http.test.ts` cover each part;
+  `packages/webui-shared/src/sweep.test.ts` the ranking and the space.
 - `packages/llamacpp-js/tests/bench.test.ts` parses outputs captured from real runs in `testdata/llama-bench/`
-  (`ok.json`, `oom-stdout.json`, `oom-stderr.txt`, `list-devices.txt`); `app/server/lib/bench/parse.test.ts` words an
+  (`ok.json`, `oom-stdout.json`, `oom-stderr.txt`, `list-devices.txt`); `app/server/bench/parse.test.ts` words an
   out-of-memory failure from them.
-- `app/server/lib/bench/vram.test.ts`, `app/server/lib/bench/hardware.test.ts`, `packages/webui-shared/src/sweep.test.ts`,
-  `app/server/lib/db/sweeps.test.ts` and `app/server/lib/db/benchRuns.test.ts` cover the rest.
+- `app/server/lifecycle.test.ts`: `SIGTERM` during a benchmark ends it `interrupted` and kills `llama-bench`.
 
 See [Testing](/developers/contributing/testing/) for how to run them.

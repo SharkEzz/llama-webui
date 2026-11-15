@@ -5,19 +5,19 @@ description: The threat model of an unauthenticated local API, the request guard
 
 llama-webui has no authentication: whoever can send it a request can do anything the interface can, including run a
 program of their choice (the **Binary** setting). Its protection is where it listens, plus one request guard that keeps
-other websites in the browser away from the API. The guard is `guard()` in `app/server/lib/security.ts`, applied by
-the Nitro middleware `app/server/middleware/01.guard.ts` to every API request and by the WebSocket route
-`app/server/routes/ws.ts` to every upgrade.
+other websites in the browser away from the API. The guard is `refusal()` in `app/server/http/Guard.ts`, run by the
+`guard` middleware of the HTTP server on every request to `/api/*` and `/ws`, before any route.
 
-| File                                 | Role                                                                                 |
-| ------------------------------------ | ------------------------------------------------------------------------------------ |
-| `app/server/lib/security.ts`         | `guard(req)`: the `Host`, `Origin` and content-type checks.                          |
-| `app/server/middleware/01.guard.ts`  | Runs `guard()` on `/api/*` and `/ws`, then the 405 table and the `404` of an unknown API route. |
-| `app/server/lib/http.ts`             | `HttpError`, `errorResponse()`, `notFound()`, `allowTable()`, the `idParam()`, `readBody()` and `readJson()` validators. |
-| `app/server/error.ts`                | Nitro's error handler: every thrown error answers with `errorResponse()`.            |
-| `app/server/lib/security.test.ts`    | Tests of each rule of the guard.                                                     |
-| `app/server/lib/cli.ts`              | `--host` (default `127.0.0.1`) and `--port` (default `7860`).                        |
-| `app/server/lib/hf/paths.ts`         | `repoDir()` and `fileDest()`: download paths kept inside the models folder.          |
+| File | Role |
+| --- | --- |
+| `app/server/http/Guard.ts` | `refusal(request)`: the `Host`, `Origin` and content-type checks; `guard`: the middleware that answers a refusal. |
+| `app/server/http/HttpLive.ts` | `serve()`: the middlewares around the routes (`guard`, then the trailing slash, then the defect log), `SERVER_OPTIONS`. |
+| `app/server/http/TrailingSlash.ts` | `noTrailingSlash`: the `308` of a trailing slash under `/api/` and `/ws/`. |
+| `app/server/http/RequestErrors.ts` | `RequestErrorsLive`: a request that does not decode becomes `RequestInvalid` (or `RouteNotFound` for a path parameter). |
+| `packages/webui-shared/src/api/errors.ts` | `RequestRefused`, `RouteNotFound`, `RequestInvalid`. |
+| `app/server/http/Guard.test.ts` | Tests of each rule of the guard. |
+| `app/server/config/Cli.ts`, `AppConfig.ts` | `--host` (default `127.0.0.1`) and `--port` (default `7860`). |
+| `app/server/hf/paths.ts` | `repoDir()` and `fileDest()`: download paths kept inside the models folder. |
 
 The user-facing version of this page is [Security](/docs/security/).
 
@@ -27,7 +27,7 @@ The user-facing version of this page is [Security](/docs/security/).
 | ------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
 | Programs and users on the same machine            | Everything                                             | Nothing: same trust as the user running llama-webui |
 | Devices on the network, once `--host` opens it    | Everything                                             | Nothing in llama-webui: the network and a firewall  |
-| Another website open in the browser               | Make the browser send requests to `127.0.0.1:7860`      | `guard()`                                           |
+| Another website open in the browser               | Make the browser send requests to `127.0.0.1:7860`      | The guard                                           |
 
 The guard handles three ways a web page can reach a local API:
 
@@ -42,23 +42,28 @@ llama-webui sends no CORS headers (`Access-Control-*`), so the browser never let
 
 ## The guard
 
-```ts title="app/server/lib/security.ts"
-/** Safe hostname: localhost or a literal IP address. A domain name can be rebound to 127.0.0.1. */
-function trustedHostname(hostname: string): boolean {
-  const h = hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  return h === 'localhost' || h.endsWith('.localhost') || isIP(h) !== 0;
-}
+```ts title="app/server/http/Guard.ts"
+/**
+ * Safe hostname: localhost or a literal IP address. A domain name can be rebound to 127.0.0.1. `hostname` comes from
+ * `URL`: lower case, IPv4 dotted, IPv6 in brackets (and valid, or `URL` would have refused it).
+ */
+const trustedHostname = (hostname: string): boolean =>
+  hostname === 'localhost' ||
+  Str.endsWith('.localhost')(hostname) ||
+  IPV4.test(hostname) ||
+  Str.startsWith('[')(hostname);
 ```
 
-`guard(req)` returns a `Response` that refuses the request, or `undefined` to let it through. The rules run in this
-order, and the first that fails answers:
+`refusal(request)` returns the status and message of a refusal, or `undefined` to let the request through. The rules
+run in this order, and the first that fails answers with a `RequestRefused` body, `{ "_tag": "RequestRefused",
+"message": … }`:
 
 | Rule                                                                                                                | Response                                                                     |
 | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| The request URL and the `Host` header (or the URL's host when there is none) parse as `http://<host>` (`Host: a b` does not) | `400` `{"error":"Invalid host"}` |
-| Its hostname is `localhost`, ends with `.localhost`, or is an IPv4 or IPv6 literal (brackets removed, any case)     | `403` `{"error":"Host not allowed"}`                                         |
-| When an `Origin` header is present, it equals `` `${url.protocol}//${host}` `` exactly                              | `403` `{"error":"Origin not allowed"}`                                       |
-| For `POST`, `PUT`, `PATCH` and `DELETE`: a `Content-Type`, when present, matches `/^application\/json\b/i`, and a request with a body has one | `415` `{"error":"JSON body expected (content-type: application/json)"}` |
+| A `Host` header is present and parses as `http://<host>` (`Host: a b` does not) | `400` `Invalid host` |
+| Its hostname (as `URL` gives it: lower case, IPv4 dotted) is `localhost`, ends with `.localhost`, or is an IPv4 or IPv6 literal | `403` `Host not allowed` |
+| When an `Origin` header is present, it equals `` `http://${host}` `` exactly | `403` `Origin not allowed` |
+| For `POST`, `PUT`, `PATCH` and `DELETE`: a `Content-Type`, when present, matches `/^application\/json\b/i`, and a request with a body has one | `415` `JSON body expected (content-type: application/json)` |
 
 What follows from these rules:
 
@@ -68,7 +73,8 @@ What follows from these rules:
   `http://localhost:7860` calling `http://127.0.0.1:7860` is refused, even though both reach the same server.
 - A request without `Origin` passes the `Origin` rule: `curl` sends none, and browsers omit it on many same-origin
   requests.
-- Behind a reverse proxy that terminates TLS, `url.protocol` is `http:` while the browser's `Origin` is `https://…`:
+- The server speaks plain HTTP, so the page's own origin is `http://<Host>`. Behind a reverse proxy that terminates
+  TLS, the browser's `Origin` is `https://…`:
   every write and the WebSocket get `403`. The guard does not read `X-Forwarded-Proto`, which any client can set, so
   this setup is not supported; trusting it would need an explicit setting naming the proxy.
 - `application/json; charset=utf-8` passes the content-type rule. A write without a body and without a
@@ -79,55 +85,46 @@ What follows from these rules:
 
 ## Where it applies
 
-Nitro runs the files of `app/server/middleware/` in the order of their names, before any route. `00.ready.ts` makes
-the API and `/ws` wait for startup (`503` `llama-webui is starting` when the runtime cannot answer), then
-`01.guard.ts` runs the guard on every API request, before the 405 table and the routes:
+`serve()` (`app/server/http/HttpLive.ts`) puts the middlewares around every route of the server, the guard outermost:
 
-```ts title="app/server/middleware/01.guard.ts"
-if (path !== '/api' && !path.startsWith('/api/')) return;
-return guard(event.req) ?? allow(event.req.method, path);
+```ts title="app/server/http/HttpLive.ts"
+export const serve = <A, E, R>(routes: Layer.Layer<A, E, R>) =>
+  HttpRouter.serve(routes, {
+    disableLogger: true,
+    disableListenLog: true,
+    middleware: (app) => app.pipe(noTrailingSlash, logDefects, guard),
+  });
 ```
 
-Whatever a validator or a handler throws afterwards reaches Nitro's error handler (`app/server/error.ts`), which
-answers with `errorResponse()` (h3 wraps the thrown error, the handler passes its `cause`).
+The guard judges the path of the request target (without its query) and lets anything else through.
 
-- Every `/api/*` request goes through it, routes and the `404` `{"error":"Unknown route"}` alike: the middleware is
-  not tied to a route file, so a new route is guarded without doing anything.
-- The WebSocket endpoint is guarded too: the `upgrade` hook of `app/server/routes/ws.ts` runs `guard()` on a `/ws`
-  upgrade request, so another site cannot open the socket (browsers always send `Origin` on a WebSocket handshake).
-  A refusal is thrown as the guard's response, with `Connection: close` so the server closes the socket even when
-  the client keeps its side open. A request to `/ws` that is not an upgrade goes through the guard in
-  `01.guard.ts`, then gets `426` `WebSocket upgrade expected`. An accepted client can send messages of 4,096 bytes
-  at most: a larger one closes the connection with code `1009`.
-- The web interface itself (the HTML page, its hashed assets and the SPA fallback that Nitro's renderer answers for
-  every other path) is not guarded: it is static and holds no data. That is why a page opened through a host name
-  loads, then has all its API calls refused with `Host not allowed`.
+- Every `/api/*` request goes through it, the routes of `Api` and the `404` `RouteNotFound` `Unknown route` alike: the
+  middleware is not tied to an endpoint, so a new endpoint is guarded without doing anything. A refused request with
+  a trailing slash gets the refusal, not the `308`.
+- The WebSocket endpoint is guarded too: another site cannot open the socket (browsers always send `Origin` on a
+  WebSocket handshake). A refused upgrade gets `Connection: close`, so the server closes the socket even when the
+  client keeps its side open. A request to `/ws` that is not an upgrade passes the guard, then gets `426`
+  `WebSocket upgrade expected`. An accepted client can send messages of 4,096 bytes at most (`SERVER_OPTIONS`): a
+  larger one closes the connection with code `1009`.
+- The web interface itself (`index.html`, its hashed assets, served by `app/server/http/Static.ts`) is not guarded: it
+  is static and holds no data. That is why a page opened through a host name loads, then has all its API calls
+  refused with `Host not allowed`.
 
-## Errors and `HttpError`
+## Errors
 
-Every error an `/api` route returns is a JSON object with an `error` string, and sometimes more:
-
-| Thrown                                 | Status          | Body                                                             |
-| -------------------------------------- | --------------- | ---------------------------------------------------------------- |
-| `new HttpError(status, message)`       | `status`        | `{ "error": message }`                                           |
-| `new HttpError(status, message, code)` | `status`        | `{ "error": message, "code": code }`                             |
-| A `ZodError`                           | `400`           | `{ "error": "Invalid data: <first issue> (<path>)", "issues": [...] }`, the path only when the issue has one |
-| A `SyntaxError` (an empty or malformed body read by `readJson()`) | `400` | `{ "error": "Invalid JSON" }` |
-| An h3 `HTTPError` below `500`          | its status      | `{ "error": message }`                                           |
-| Anything else                          | `500`           | `{ "error": "Internal error" }`, and the error is logged         |
-
-The helpers in `app/server/lib/http.ts` build the common cases: `notFound(what)` is a `404` `<what> not found`,
-`idParam()` a `404` for an `:id` that is not a positive integer, `readBody()` a `400` `Invalid JSON` for a body that
-is not JSON, and `object(body)` (used by `readBody()` before the schema's message and by `readJson(event, object)`) a
-`400` `JSON object expected` for a body that is not a JSON object. `code` is the machine-readable reason (`server-running`, `name-taken`, `hf-gated`…): the
-web app reads it instead of the message text. [API overview](/developers/api/overview/) lists the conventions for
-clients.
+Every error an `/api` route returns is a tagged error of the API definition, encoded as a JSON object with its `_tag`
+and its `message`, and its own fields (`issues` for a validation): the guard's `RequestRefused`, the `RequestInvalid`
+of a body, query or header that does not decode, the `RouteNotFound` of an unknown path or of a path parameter that
+does not decode, and the errors each endpoint declares (`ServerRunning`, `ProfileNameTaken`, `HfGated`…). The web app
+reads the `_tag`, never the message text. A defect of a handler is logged with its cause (`logDefects`), and the
+client gets a `500` without its message. [API overview](/developers/api/overview/#errors) lists the tags and the
+status codes.
 
 ## What `--host` changes
 
-The launcher (`app/bin/llama-webui.ts`) passes `--host` (or `LLAMA_WEBUI_HOST`, default `DEFAULT_HOST = '127.0.0.1'`) to
-Nitro's server as `NITRO_HOST`, the address it listens on; `pnpm dev` gives `LLAMA_WEBUI_HOST` to Vite's
-`server.host` (`app/vite.config.ts`).
+`--host` (or `LLAMA_WEBUI_HOST`, default `127.0.0.1`) is read by `config/Cli.ts` and `config/AppConfig.ts`, and the
+Node server listens on it (`HttpLive.ts`); `pnpm dev` gives `LLAMA_WEBUI_HOST` to Vite's `server.host`
+(`app/vite.config.ts`), and the server started by Vite listens on loopback behind it.
 That decides who can connect, and nothing else: the guard applies the same rules on every address, and no
 authentication appears. With a non-loopback address, `GET /api/setup` reports `listen.exposed: true` (from
 `isLoopback()`, `packages/webui-shared/src/setup.ts`), and the setup checklist shows a network access reminder.
@@ -139,16 +136,18 @@ profile, else from the `host` and `port` settings, whose defaults are `127.0.0.1
 (`packages/webui-shared/src/settings.ts`): `llama-server` stays local, like llama-webui, unless a user opens it. `GET /api/setup`
 reports `llamaListen: { host, exposed }` for the `host` setting, and the setup checklist, the Settings field and the
 Server page's command card warn when it is not loopback. The benchmark's temporary `llama-server` always gets
-`host: '127.0.0.1'` (`app/server/lib/bench/execute.ts`). llama-webui talks to `llama-server` on the address it listens on
-(`probeUrl()`: loopback for a wildcard address).
+`host: '127.0.0.1'` (`app/server/bench/execute.ts`). llama-webui talks to `llama-server` on the address it listens on
+(`probeUrl()` of `llamacpp-js/client`: loopback for a wildcard address).
 
 [How llama-server is exposed](/docs/security/#how-llama-server-is-exposed) gives users the settings to change.
 
 ## Processes and arguments
 
-Every process llama-webui starts (`llama-server`, `llama-bench`, `nvidia-smi`, `perf`…) goes through `spawnProc`
-(`app/server/lib/proc.ts`, `node:child_process` without `shell`) with an argument array, never through a shell. A profile
-argument such as `$(whoami)` reaches `llama-server` as a literal string. `shellQuote()` only builds the displayed command.
+Every program llama-webui starts (`llama-server`, `llama-bench`, `nvidia-smi`, `perf`, the NVML sampler…) goes through
+Effect's `ChildProcess` (`effect/process`, the long-running ones through `followProgram()` in
+`app/server/process/followed.ts`) with an argument array, never through a shell. A profile argument such as
+`$(whoami)` reaches `llama-server` as a literal string. `shellQuote()` (`packages/webui-shared/src/shell.ts`) only
+builds the displayed command.
 
 That does not make the API safe to expose: the `binary` setting can name any program, and profiles set its arguments
 (except the reserved flags in `RESERVED_FLAGS`, see [Supervisor](/developers/server/supervisor/#building-the-command))
@@ -162,27 +161,29 @@ The API reads files where the user points it, by design: there is no allowlist o
   `*.gguf` files, skipping names that start with `.` and not following directory symlinks (a symlinked `.gguf` file is
   followed).
 - **GGUF info**: `GET /api/models/info?path=` reads the header of any absolute path that ends in `.gguf` and is a
-  regular file: `400` `Absolute path to a .gguf file expected` otherwise, `404` `File not found` when it does not
-  exist, `422` when the file does not parse. It is not limited to the models folder.
+  file: `400` `RequestInvalid` `Invalid data: Absolute path to a .gguf file expected (path)` otherwise, `404`
+  `ModelFileNotFound` `File not found` when it does not exist, `422` `ModelUnreadable` when the file does not parse. It is not limited to the models folder.
 - **Profile paths**: a profile's model, projector and working directory can be anywhere. `profilePaths()` resolves
   them the way `llama-server` will (`~` expanded, relative to the profile's `cwd`) wherever llama-webui reads the
   model itself, for example for the launch pad and benchmarks.
-- **llama-tui import**: reads only `$XDG_CONFIG_HOME/llama-tui/config.json` (else `~/.config/llama-tui/config.json`);
-  the request cannot choose the path.
 - **Hugging Face downloads** are the only writes into a user-chosen folder, and they are confined. `repoDir()` accepts
-  only an `org/name` repository ID matching `HF_REPO_RE` (`400` `Invalid repository id: …`) and maps it to
+  only an `org/name` repository ID matching `HF_REPO_RE` (checked by the request's schema: `400` `RequestInvalid`
+`Invalid data: Invalid repository id: …`) and maps it to
   `<modelsDir>/<org>/<name>`. `fileDest()` refuses a file path that is absolute or resolves outside that folder
-  (`400` `Invalid file path in the repository: …`).
+  (`400` `HfInvalidPath` `Invalid file path in the repository: …`).
 
 ## Tests
 
-`app/server/lib/security.test.ts` calls `guard()` on plain `Request` objects:
+`app/server/http/Guard.test.ts` calls `refusal()` on plain requests:
 
 - `127.0.0.1`, `localhost`, a LAN IP and `[::1]` are accepted as `Host`, and `evil.example` gets `403`;
 - an `Origin` from another site gets `403`, the same origin passes, and `http://localhost:7860` is refused for a
   request to `127.0.0.1:7860`;
 - a `PATCH` with `text/plain` and a `POST` with a body and no `Content-Type` get `415`;
-  `application/json; charset=utf-8` passes, and so does a `POST` without a body.
+  `application/json; charset=utf-8` passes, and so does a `POST` without a body;
+- the body is judged from `content-length` and `transfer-encoding`, and a `Host` that is not an authority is a `400`.
 
-`app/server/lib/hf/hf.test.ts` checks that `repoDir()` and `fileDest()` refuse `..`, absolute and empty paths, and
-`packages/webui-shared/src/profile.test.ts` that an import with a reserved flag is rejected.
+The contract suite (`app/server/contract/cases.ts`) replays the guard against the production build: a domain as
+`Host`, a `Host` that is not an authority, a foreign `Origin`, and the broken bodies of each payload. `app/server/hf/paths.test.ts` checks that
+`repoDir()` and `fileDest()` refuse `..`, absolute and empty paths, and `packages/webui-shared/src/profile.test.ts`
+that an import with a reserved flag is rejected.

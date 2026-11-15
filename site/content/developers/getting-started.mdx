@@ -31,9 +31,14 @@ pnpm install
 
 `pnpm install` installs the whole pnpm workspace, declared in `pnpm-workspace.yaml`: `packages/*` (`webui-shared`,
 `llamacpp-js`), the app, `app/`, and the website, `site/`, all from one `pnpm-lock.yaml`. The same file holds the
-`catalog:` of the versions that move together (React, Vite, TypeScript, zod…): change a version there, not in a
+`catalog:` of the versions that move together (React, Vite, TypeScript, Effect…): change a version there, not in a
 `package.json`. A dependency change commits its `pnpm-lock.yaml`; CI installs with
 `--frozen-lockfile`.
+
+`effect` and the `@effect/*` packages are pinned to one exact version, the version of the reference copy in
+`repos/effect` (a shallow Git submodule: `git submodule update --init` after a clone). A version bump moves both
+together, on its own, with every suite green. The root `prepare` script (`effect-tsgo patch`) installs Effect's
+language service into the `tsc` of `node_modules` on every `pnpm install`, so `pnpm check` reports its diagnostics.
 
 ## Run llama-webui
 
@@ -44,14 +49,20 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` runs `vite dev` in `app/`: one Node.js process, one port. Vite serves the UI with hot module replacement,
-and Nitro's Vite plugin runs the server in its dev worker, on the same port. Saving a route file keeps the runtime and
-`llama-server`; saving business code under `app/server/lib/` or `packages/` rebuilds the runtime, `llama-server`
-included ([Development restarts](/developers/architecture/#development-restarts)). Once the runtime is up, it prints:
+`pnpm dev` runs `vite dev` in `app/`. Vite keeps the public address (7860 by default, `strictPort`) and serves the UI
+with hot module replacement. Its plugin, `app/build/devServer.ts`, starts the Effect server from the sources
+(`node --watch server/main.ts`, with `LLAMA_WEBUI_DEV=1`) on a free loopback port, in its own process group, and
+proxies `/api` and `/ws` to it. A save of a file the server imports (`app/server/`, `packages/`) restarts it, which
+stops `llama-server`; a save under `app/src/` stays HMR, and the server and `llama-server` are kept
+([Development restarts](/developers/architecture/#development-restarts)). Once the server is up, it prints its version
+and its own address:
 
 ```text
-[llama-webui] ready (dev)
+[17:18:53.589] INFO (#1): ready (dev) on http://127.0.0.1:41833
 ```
+
+Stopping Vite (`Ctrl+C`, `SIGTERM`, `SIGHUP`) sends `SIGTERM` to the server and waits for its shutdown; a second signal
+kills it.
 
   </Tab>
   <Tab title="Production">
@@ -60,31 +71,36 @@ included ([Development restarts](/developers/architecture/#development-restarts)
 pnpm start
 ```
 
-`pnpm start` is `pnpm build && node app/.output/llama-webui.mjs`. `vite build` writes Nitro's output to
-`app/.output/`: the UI, split per page, in `public/`, the server, every dependency bundled, in `server/`, and the
-launcher, `llama-webui.mjs`. It has no HMR and no file watching. It prints its version,
-`git describe --tags --always --dirty` at build time:
+`pnpm start` is `pnpm build && node app/.output/llama-webui.mjs`. `pnpm build` runs `vite build` (the UI, split per
+page, in `app/.output/public/`), then `node build/server.ts` (Rolldown: the server in one file,
+`app/.output/server/index.mjs`, that imports nothing but `node:*`, the NVML sampler next to it, and the launcher,
+`llama-webui.mjs`). It has no HMR and no file watching. It prints its version, `git describe --tags --always --dirty`
+at build time:
 
 ```text
-[llama-webui] ready (v0.3.1-23-gc5e88eb)
+[17:18:53.589] INFO (#1): ready (v0.3.1-196-g74d0f4dd7) on http://127.0.0.1:7860
 ```
 
   </Tab>
 </Tabs>
 
-The production launcher takes the launch options (`--host`, `--port`, `--data-dir`, or their `LLAMA_WEBUI_*`
-variables), listed by `pnpm start --help` and documented in [Launch options](/docs/configuration/), and reads the
-`.env` file of the repository's root. `pnpm dev` does not read the launch flags: it takes the same variables from the environment, or
-from `.env`, `.env.local`, `.env.development` and `.env.development.local` in `app/`, its working directory. Two
-habits keep development away from your everyday instance:
+The server takes the launch options (`--host`, `--port`, `--data-dir`, `--env-override`, or their `LLAMA_WEBUI_*`
+variables; `app/server/config/Cli.ts`), listed by `node app/.output/llama-webui.mjs --help` and documented in
+[Launch options](/docs/configuration/). It reads the `.env` file of its working directory before its configuration
+(`app/server/config/DotEnv.ts`): the repository's root for `pnpm start`. `pnpm dev` takes no launch flags: it reads
+the same variables from the environment, or from `app/.env` (`vite dev` runs in `app/`), which `vite.config.ts`
+applies the same way, and the server it starts inherits them. Only `.env` is read: no `.env.local`, no `$VAR`
+expansion. Two habits keep development away from your everyday instance:
 
 - Use a separate data directory. `data/` and `*.sqlite` are ignored by Git, so `LLAMA_WEBUI_DATA_DIR=$PWD/data pnpm dev`
   keeps a development database inside the clone.
 - Use another port if an instance already runs on 7860: `LLAMA_WEBUI_PORT=7861 pnpm dev`.
 
-A save of business code stops the `llama-server` that `pnpm dev` manages, and a running sweep ends as `interrupted`
-(Resume button). Edit the server's business code between benchmarks rather than during one; a route file can be edited
-at any time.
+A save of server code stops the `llama-server` that `pnpm dev` manages, and a running sweep ends as `interrupted`
+(Resume button). Edit the server between benchmarks rather than during one; the web app can be edited at any time.
+
+In development, the server also sends its spans to the [Effect DevTools](https://effect.website/docs/getting-started/devtools/)
+when they listen (`LLAMA_WEBUI_DEVTOOLS_URL`, `ws://localhost:34437` by default).
 
 ### The package
 
@@ -106,8 +122,8 @@ The root `package.json` defines the app's scripts; the website has its own, in `
 
 | Script | Runs | What it does |
 | --- | --- | --- |
-| `pnpm dev` | `pnpm --filter @llama-webui/app dev` | `vite dev` in `app/`: the UI with HMR and the server in Nitro's dev worker; a save of business code rebuilds the runtime. |
-| `pnpm build` | `pnpm --filter @llama-webui/app build` | `vite build` in `app/`: the UI in `app/.output/public/`, the server in `app/.output/server/` (with the NVML sampler, `nvml-worker.mjs`), the launcher `app/.output/llama-webui.mjs`. |
+| `pnpm dev` | `pnpm --filter @llama-webui/app dev` | `vite dev` in `app/`: the UI with HMR, the server from the sources under `node --watch`, restarted by a save of a file it imports. |
+| `pnpm build` | `pnpm --filter @llama-webui/app build` | `vite build && node build/server.ts` in `app/`: the UI in `app/.output/public/`, the server in `app/.output/server/index.mjs` (with the NVML sampler, `nvml-worker.mjs`, and `THIRD-PARTY-LICENSES.md`), the launcher `app/.output/llama-webui.mjs`. |
 | `pnpm start` | `pnpm build && node app/.output/llama-webui.mjs` | Builds, then runs the production server. |
 | `pnpm test` | `pnpm test:unit && pnpm --filter llamacpp-js test` | Every Vitest project (`server` with `app/build/` and `scripts/`, which starts with one production build, then `shared`, `web`, `site`), then the `llamacpp-js` tests on `node --test`. |
 | `pnpm test:unit` | `vitest run` | The Vitest projects only. |
@@ -121,60 +137,53 @@ The root `package.json` defines the app's scripts; the website has its own, in `
 | `pnpm site:build` | `pnpm --filter llama-webui-site build` | Prerenders the website into `site/dist/`. |
 | `pnpm site:preview` | `pnpm --filter llama-webui-site preview` | Serves `site/dist/` the way GitHub Pages does, on port 4173. |
 
-`pnpm pack` also runs `prepack` (`node scripts/prepack.ts`), which refuses to pack without a build. The website has
+`pnpm install` runs `prepare` (`effect-tsgo patch`, see [Install](#install)). `pnpm pack` also runs `prepack`
+(`node scripts/prepack.ts`), which refuses to pack without a build. The website has
 more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typecheck`), run with
 `pnpm --dir site <script>`; [Docs, commits and PRs](/developers/contributing/workflow/) covers them.
 
 ## Repository layout
 
 <FileTree>
-- `app/` the app: the React client and the Nitro server (workspace `@llama-webui/app`)
+- `app/` the app: the React client and the Effect server (workspace `@llama-webui/app`)
   - `index.html` HTML entry, applies the theme before the first paint
-  - `vite.config.ts` the client and the server: React, Tailwind, `nitro()` (preset `node_server`, WebSocket), the version, the NVML sampler and launcher builds
+  - `vite.config.ts` the client (React, Tailwind, alias `@`), the `.env` file, and the dev server plugin
   - `tsconfig.json` the client project (`src/`, `build/`, `vite.config.ts`: DOM and Node types)
   - `bin/`
-    - `llama-webui.ts` the production launcher: `.env`, the launch options, then Nitro's server
+    - `llama-webui.ts` the production launcher: imports `./server/index.mjs`, which reads the command line
   - `build/`
-    - `apiTypes.ts` writes `server/api.gen.ts` from Nitro's route scan
+    - `server.ts` the server bundle, the NVML sampler and the launcher (Rolldown), after `vite build`
+    - `devServer.ts` the Vite plugin of `pnpm dev`: the server under `node --watch`, the `/api` and `/ws` proxy
     - `licenses.ts` `THIRD-PARTY-LICENSES.md` next to the server bundle
-  - `server/` Nitro's `serverDir`
-    - `routes/` `api/**`, one file per route (`profiles/[id]/index.put.ts` → `PUT /api/profiles/:id`), and `ws.ts`, the `/ws` WebSocket
-    - `middleware/` `00.ready.ts` (wait for startup), `01.guard.ts` (guard, `405`, `404`, `426`), `02.cache.ts` (`no-cache` on pages)
-    - `plugins/`
-      - `runtime.ts` starts the runtime with the server, stops it on `close` (and on a signal in production)
-    - `error.ts` every thrown error as the API's JSON error
-    - `api.gen.ts` generated: `ROUTES` and the `Api` type map of the typed client
-    - `tsconfig.json` the server project (Node types)
-    - `lib/` the business code, not scanned by Nitro
-      - `boot.ts` `boot()`: opens the database, builds the services, wires their events to the WebSocket, all on one `AsyncDisposableStack`
-      - `context.ts` the live runtime on `globalThis`: `start()`, `stop()`, `ready()`, `deps()`, `provideDeps()`
-      - `deps.ts` `createDeps()`: constructs the services and wires them together, without starting any work
-      - `runtime.ts` `createRuntime()`: the supervisor, log ring, boot id and bench gate
-      - `cli.ts` launch options and `--help`; `env.ts` the `.env` file and the proxy variables
-      - `paths.ts` data directory and database path; `version.ts` the version the build sets
-      - `http.ts` `HttpError`, `reply()`, JSON error responses, the `405` table and the validators (`idParam`, `readBody`, `readJson`, `queryOf`)
-      - `apiTypes.ts` the types `api.gen.ts` is built from (a route's reply, body and query)
-      - `proc.ts` child processes and file reads on `node:*` (`spawnProc`, `readText`, `fileExists`, `fileRange`, `which`)
-      - `llamaFetch.ts` `fetch` over `node:http(s)`: `llamaFetch` for the requests to llama-server that outlast `fetch`'s
-        300 s limits, `downloadFetch` for the model downloads (HTTP/1.1, not `fetch`'s capped HTTP/2)
-      - `security.ts` the request guard (Host, Origin, JSON-only writes)
-      - `setup.ts` first-run report and launch pad
-      - `llamatui.ts` llama-tui config import
-      - `supervisor/` the managed `llama-server`: command line, health, external server detection, `--help` flags
-      - `monitor/` the sampling tick, history ring, model placement
-      - `collectors/` NVML (in `nvml/`, through `node:ffi` in a child process), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
-      - `chat/` server-owned chat generations and their SSE stream
-      - `bench/` the bench gate, runner, executor and output parsers
-      - `tuning/` memory estimator, sweep space, system checks
-      - `hf/` Hugging Face client and download queue
-      - `models/` models folder scan and GGUF header reading
-      - `profiles/`, `sweeps/` route logic shared by several route files (deleting a profile, the sweep lookups)
-      - `hardware/` PCIe topology and CPU info from sysfs and `/proc`
-      - `db/` `node:sqlite` wrapper, connection, migrations, one repository per table
-      - `logs/` the log ring buffer and line splitter
-      - `ws/` the WebSocket hub
-      - `testing/` test helpers (`launch`, `routeApp`, `tempDir`, `writeFileDeep`, the build of the test run)
-      - `contract/` the HTTP contract suite: raw HTTP client, cases, golden record
+  - `server/` the Effect server ([Architecture](/developers/architecture/))
+    - `main.ts` the entry: `.env`, the command line, the address check, then `Layer.launch(App)`
+    - `App.ts` the services, built in stages, and the HTTP server on top
+    - `tsconfig.json` the server project (Node types, Effect's language service)
+    - `config/` `.env`, command line and configuration, version and boot id, `~` expansion
+    - `runtime/` `runApp` (signals, exit codes) and `Shutdown` (the shutdown steps)
+    - `http/` the HTTP server: routes, guard, trailing slash, request errors, static files, SSE, the address check
+    - `db/` the SQLite connection and the migrations
+    - `ws/` the `/ws` hub
+    - `process/` `followProgram()`: a program that lasts, its lines and its end
+    - `llama/` `LlamaHttp`, the probes of a llama-server, the `/proc` scan, the chat stream
+    - `supervisor/` the managed `llama-server`: command line, states, external server watch
+    - `flags/` the `--help` flag catalog
+    - `monitor/` the sampling tick, history ring, model placement
+    - `collectors/` NVML (`nvml/`, a child program on `node:ffi`), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
+    - `chat/` server-owned chat replies and their SSE stream, conversations
+    - `bench/` the bench runner, gate, executor, sweeps
+    - `tuning/` memory estimator, sweep space, system checks, first run and launch pad
+    - `hf/` the Hugging Face client (`HfHttp`, `HfClient`)
+    - `downloads/` the download queue and its transfers
+    - `models/` the models folder scan, GGUF reading, deletion
+    - `profiles/` the profiles repository and handlers
+    - `settings/` the settings repository and handlers
+    - `logs/` the log ring and its stream
+    - `health/` `GET /api/health`
+    - `hardware/` PCIe topology and CPU info from sysfs and `/proc`
+    - `testing/` test layers and helpers (`ServicesTest`, `launch`, the fake llama-server, the build of the test run)
+    - `contract/` the HTTP contract suite: cases, wire client, golden record
+    - `lifecycle.test.ts`, `build.test.ts`, `dev.test.ts` the black-box suites
   - `src/` the React client
     - `main.tsx` starts the stores and the WebSocket, renders the router
     - `app/` router, layout, sidebar, status bar
@@ -183,8 +192,9 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
     - `components/` shared components: `glass/`, `charts/`, and `ui/` (generated shadcn)
     - `index.css` Tailwind, theme tokens
 - `packages/` the monorepo's libraries, one folder per package
-  - `webui-shared/` types, zod schemas and pure functions (workspace `@llama-webui/shared`)
+  - `webui-shared/` schemas (Effect `Schema`), pure functions and the API definition (workspace `@llama-webui/shared`)
     - `src/` one module per domain, re-exported by `index.ts`
+    - `src/api/` `Api` and one group per domain, with the errors of each endpoint
   - `llamacpp-js/` the llama.cpp client: HTTP API, metrics, `--help`, `llama-bench` output (workspace `llamacpp-js`)
     - `src/` one module per subpath export, `node.ts` for the process and filesystem helpers
     - `tests/` its tests (`node:test`), run by `node --test`
@@ -196,12 +206,13 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
 - `testdata/` captured outputs used by the tests
   - `fake/` stand-ins for `llama-server` and `llama-bench`, with their fixtures
   - `llama-bench/` `llama-bench` JSON, stderr and `--list-devices` captures
+- `repos/` reference copies of external repositories (`effect`), read-only and never imported
 - `scripts/` `smoke.ts` (the build and the tarball smoke tests), `prepack.ts` (no pack without a build), `release.ts` (versions), and the tests of the package and the repository
 - `docs/` README assets and design plans
 - `package.json` the published package (`bin`, `files`, no dependencies) and the scripts
 - `pnpm-workspace.yaml` the workspace, its `catalog:` and pnpm's settings
 - `vitest.config.ts` one Vitest project per code base
-- `tsconfig.base.json` the options every project's `tsconfig.json` extends
+- `tsconfig.base.json` the options every project's `tsconfig.json` extends; `tsconfig.effect.json` adds Effect's language service
 - `biome.jsonc` format and lint rules
 </FileTree>
 
@@ -214,7 +225,7 @@ llama-webui runs on a machine without a GPU: the GPU collectors find no card, an
 still work. A few things help when you work on telemetry code:
 
 - The **collectors** switches in [Settings](/docs/settings/) turn NVML, the system sampler and the disk sampler on or
-  off.
+  off. `LLAMA_WEBUI_TEST_MONITOR=stub` starts the server with no collector at all (no snapshot, an empty history).
 - NVIDIA cards are read through NVML, with `nvidia-smi` as the fallback. `LLAMA_WEBUI_NVML_LIB` overrides the NVML
   library the worker opens and `LLAMA_WEBUI_NVIDIA_SMI` the `nvidia-smi` binary the fallback runs, which lets you test
   either one missing (`LLAMA_WEBUI_NVML_LIB=/nonexistent pnpm dev` reads NVIDIA cards through `nvidia-smi`).

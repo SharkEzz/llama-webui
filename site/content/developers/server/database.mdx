@@ -1,133 +1,130 @@
 ---
 title: Database
-description: The SQLite database behind llama-webui, where it lives, its pragmas, the append-only migrations, the repositories, settings storage and the GGUF cache.
+description: The SQLite database behind llama-webui, where it lives, how it is opened, the append-only migrations, the repositories, settings storage and the GGUF cache.
 ---
 
-llama-webui stores everything that must outlive a restart in one SQLite database, opened with `node:sqlite` through a
-small wrapper. The code lives in `app/server/lib/db/`: `sqlite.ts` wraps the driver, `open.ts` opens the file, `migrations.ts`
-creates and evolves the schema, and one repository class per table (or pair of tables) reads and writes it.
+llama-webui stores everything that must outlive a restart in one SQLite database, reached through the `SqlClient`
+of `@effect/sql-sqlite-node` (on `node:sqlite`). `app/server/db/` opens it and brings its schema up to date; each
+domain owns the repository of its tables, a `Context.Service` that takes the `SqlClient`.
 
-| File                          | Role                                                                          |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| `app/server/lib/db/sqlite.ts`         | `Database`: the wrapper around `node:sqlite` that every repository takes.     |
-| `app/server/lib/db/open.ts`           | `openDb(path)`: opens the file, sets the pragmas, runs the migrations.        |
-| `app/server/lib/db/migrations.ts`     | `MIGRATIONS` and `runMigrations()`.                                           |
-| `app/server/lib/db/settings.ts`       | `SettingsRepo`: the `settings` table.                                         |
-| `app/server/lib/db/profiles.ts`       | `ProfilesRepo`: the `profiles` table.                                         |
-| `app/server/lib/db/conversations.ts`  | `ConversationsRepo`: the `conversations` and `messages` tables.               |
-| `app/server/lib/db/benchRuns.ts`      | `BenchRunsRepo`: the `bench_runs` table (one-off runs and sweep items).       |
-| `app/server/lib/db/sweeps.ts`         | `SweepsRepo`: the `sweeps` table.                                             |
-| `app/server/lib/db/downloads.ts`      | `DownloadsRepo`: the `downloads` table (Hugging Face queue).                  |
-| `app/server/lib/db/modelCache.ts`     | `ModelCacheRepo`: the `model_cache` table.                                    |
-| `app/server/lib/paths.ts`             | `dataDir()` and `dbPath()`: where the file lives.                              |
-| `packages/webui-shared/src/settings.ts`      | `SettingsSchema` and `DEFAULT_SETTINGS`.                                       |
+| File | Role |
+| --- | --- |
+| `app/server/db/Db.ts` | `layer` (the file of the data directory) and `layerAt(filename)`: opens the database and runs the migrations. |
+| `app/server/db/migrations.ts` | `MIGRATIONS` (keyed `0001_<name>` … `0017_<name>`) and `rebuild()`, a table rebuild checked for broken links. |
+| `app/server/db/LegacyBridge.ts` | `recognise` and `keepSchemaVersion`: a database of an earlier version opens as it is, and still opens with it. |
+| `app/server/settings/SettingsRepo.ts` | `SettingsRepo`: the `settings` table. |
+| `app/server/profiles/ProfilesRepo.ts` | `ProfilesRepo`: the `profiles` table. |
+| `app/server/chat/ConversationsRepo.ts` | `ConversationsRepo`: the `conversations` and `messages` tables. |
+| `app/server/bench/BenchRunsRepo.ts` | `BenchRunsRepo`: the `bench_runs` table (one-off runs and sweep items). |
+| `app/server/bench/SweepsRepo.ts` | `SweepsRepo`: the `sweeps` table. |
+| `app/server/downloads/DownloadsRepo.ts` | `DownloadsRepo`: the `downloads` table (Hugging Face queue). |
+| `app/server/models/ModelCacheRepo.ts` | `ModelCacheRepo`: the `model_cache` table. |
+| `app/server/config/AppConfig.ts` | `AppConfig.dataDir`: where the file lives. |
+| `packages/webui-shared/src/settings.ts` | `Settings` and `DEFAULT_SETTINGS`. |
 
 Monitoring history and logs are not in the database: they live in memory (see
 [Monitor and collectors](/developers/server/monitor/)).
 
 ## Where the file lives
 
-`boot()` (`app/server/lib/boot.ts`) opens `dbPath(cli.dataDir)`, the options it parses from the environment (the
-launcher, `app/bin/llama-webui.ts`, turns `--data-dir` into `LLAMA_WEBUI_DATA_DIR`). `dataDir()` picks the first of:
+`Db.layer` opens `<dataDir>/llama-webui.sqlite`, creating the folder if needed. `AppConfig` (`app/server/config/AppConfig.ts`)
+picks `dataDir`, the first of:
 
-1. the `--data-dir` flag;
+1. the `--data-dir` option;
 2. `$LLAMA_WEBUI_DATA_DIR`;
 3. `$XDG_DATA_HOME/llama-webui`;
 4. `~/.local/share/llama-webui`.
 
-It creates the folder if needed, and `dbPath()` appends the file name, `llama-webui.sqlite`. Users set it as described
-in [Configuration](/docs/configuration/#data-directory).
+Users set it as described in [Configuration](/docs/configuration/#data-directory). `main.ts` checks that the address
+is free before it builds the services, so a second instance on a port already taken exits without touching the data
+directory of the first.
 
-## Opening and pragmas
+## Opening
 
-```ts title="app/server/lib/db/open.ts"
-export function openDb(path: string): Database {
-  mkdirSync(dirname(path), { recursive: true });
-  const db = new Database(path);
-  db.exec('PRAGMA journal_mode = WAL');
-  db.exec('PRAGMA foreign_keys = ON');
-  runMigrations(db);
-  return db;
-}
+`Db.layer` is the first stage of the services (`app/server/App.ts`): everything that reads or writes the database is
+built after it, and released before it at shutdown, so the database closes last
+([Architecture](/developers/architecture/#shutdown)).
+
+```ts title="app/server/db/Db.ts"
+const open = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`PRAGMA foreign_keys = OFF`;
+  yield* recognise;
+  yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(MIGRATIONS) });
+  yield* sql`PRAGMA foreign_keys = ON`;
+  yield* keepSchemaVersion;
+}).pipe(Effect.withSpan('Db.open'));
+
+export const layerAt = (filename: string) =>
+  Layer.effectDiscard(open).pipe(Layer.provideMerge(SqliteClient.layer({ filename })));
 ```
 
-- `journal_mode = WAL`: SQLite's write-ahead log, so `llama-webui.sqlite-wal` and `llama-webui.sqlite-shm` sit next
-  to the database while it is open.
-- `foreign_keys = ON`: SQLite does not enforce foreign keys without it, and the schema relies on `ON DELETE CASCADE`
-  and `ON DELETE SET NULL` (see [Tables](#tables)).
+- `SqliteClient` opens one serialized connection in WAL mode (`llama-webui.sqlite-wal` and `llama-webui.sqlite-shm`
+  sit next to the database while it is open), with a 5-second busy timeout, and caches its prepared statements.
+- Foreign keys are on once the database is open: the schema relies on `ON DELETE CASCADE` and `ON DELETE SET NULL`
+  (see [Tables](#tables)). They are off while the migrations run (see [Migrations](#migrations)).
+- A number bound to an `INTEGER` column is stored as an integer, a boolean as `1` or `0`.
+- Queries are tagged templates (`` sql`SELECT … WHERE id = ${id}` ``): every value is bound, never spliced into the
+  SQL text. `sql.withTransaction(effect)` runs an effect in a transaction (nested, in a savepoint), rolled back when
+  it fails.
 
-The database handle is not kept in the runtime. `boot()` (`app/server/lib/boot.ts`) opens it first and registers it on its
-shutdown stack (`stack.use(db)`, through `Symbol.dispose`), so it is closed last, after everything that writes to it
-has stopped ([Architecture](/developers/architecture/#shutdown)). Tests open a migrated database in memory with `openDb(':memory:')`.
-
-## The `Database` wrapper
-
-`Database` (`app/server/lib/db/sqlite.ts`) wraps `DatabaseSync` from `node:sqlite` with the surface the repositories use,
-where it differs from `DatabaseSync`:
-
-| Call                             | Behaviour                                                                                                      |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `query<Row, Params>(sql)`        | A statement cached by its SQL text, with `get()`, `all()` and `run()`. `get()` returns `null` when no row matches. `sql` holds one statement: several throw. |
-| `run(sql, params?)`              | `query(sql).run(...params)`: `{ changes, lastInsertRowid }` of one statement.                                  |
-| `exec(sql)`                      | Runs every statement of `sql`, without parameters nor result: migrations, pragmas.                             |
-| `transaction(fn)`                | Returns a function that runs `fn` in a transaction and returns its value; nested, it uses a savepoint.         |
-| `close()`, `using`               | Closes the handle; a second `close()` does nothing.                                                            |
-
-- Values: an integral number binds as `INTEGER` (`node:sqlite` alone binds every number as `REAL`), `true` and `false`
-  as `1` and `0`, `undefined` as `NULL`. A statement given more or fewer values than it has `?` placeholders throws
-  `SQLite query expected N values, received M` (`node:sqlite` alone would bind the missing ones as `NULL`). Only
-  positional `?` placeholders are supported.
-- A transaction whose function throws is rolled back and the error rethrown; when SQLite has already rolled back
-  itself (an `OR ROLLBACK` conflict), the original error is the one thrown.
-- Foreign keys are off on a new handle; `openDb()` turns them on. `{ readonly: true }` opens a
-  file read-only.
-- Rows are objects without a prototype: compare them with `toEqual`, not `instanceof Object`.
-
-`app/server/lib/db/sqlite.test.ts` covers each of these points.
+Tests open a migrated database in memory with `Db.layerAt(':memory:')`, which `ServicesTest`
+(`app/server/testing/services.ts`) provides.
 
 ## Migrations
 
-`MIGRATIONS` has one entry per schema version: an SQL string, or a `Rebuild` (`{ rebuild: string[] }`) for a table
-rebuild. The rule is written above it:
+`MIGRATIONS` has one entry per schema version, keyed `0001_<name>` … `0017_<name>` for `SqliteMigrator.fromRecord`,
+each an effect that runs its statements. The rule is written above it:
 
-```ts title="app/server/lib/db/migrations.ts"
-/** One entry per schema version; never change a migration that has shipped, add a new one. */
-export const MIGRATIONS: Migration[] = [
+```ts title="app/server/db/migrations.ts"
+/**
+ * The 17 migrations of the Nitro server, one for one, keyed `0001_<name>` … `0017_<name>` for `Migrator.fromRecord`,
+ * the SQL text unchanged (`sqlite_schema` keeps it as written). Never change a migration that has shipped, add one.
+ */
+export const MIGRATIONS: Record<string, Migration> = {
   // 1 — key/value settings
-  `CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL);`,
+  '0001_settings': statements(`CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL);`),
   // …
-];
+};
 ```
 
-`runMigrations(db)` keeps the current version in a one-row `schema_version` table (created, with version `0`, on a new
-database). It applies each entry after the current version in order, each in its own transaction together with the
-version update, so a failed migration leaves the database at the previous version. There are 17 entries: a database
-created by the current code is at version 17.
+`SqliteMigrator.run` records the migrations it ran in `effect_sql_migrations` and runs the ones after the last, in one
+transaction: a failed migration leaves the database as it was. A database created by the current code has run the 17
+entries.
 
-A `Rebuild` runs its statements in one transaction with the foreign keys off (`runRebuild()`). With them on, the
+A table rebuild is a `rebuild({ version, sqls })` entry (entry 17, for `profiles`). It runs with the foreign keys off,
+which `Db` sets around the migrator (`PRAGMA foreign_keys` has no effect inside a transaction): with them on, the
 `DROP TABLE` of a parent table deletes its rows first, and every `ON DELETE SET NULL` link to it would be emptied.
-`PRAGMA foreign_keys` has no effect inside a transaction, so the runner turns it off before and back on after. Before
-committing, it runs `PRAGMA foreign_key_check` and aborts the migration if the rebuild broke a link that was not
-already broken. `runMigrations(db, upTo)` stops at version `upTo`: tests use it to fill an older schema, then migrate.
+After its statements, it runs `PRAGMA foreign_key_check` and fails with `BrokenForeignKeys` if the rebuild broke a
+link that was not already broken, which rolls the migration back.
+
+### Databases of earlier versions
+
+Versions before the Effect server kept their schema version in a one-row `schema_version` table. `recognise` reads
+it on a database that has no `effect_sql_migrations` yet and records the migrations 1 to that version as run, so the
+migrator replays none of them and runs only the newer ones. After the migrations, `keepSchemaVersion` writes the last
+one back into `schema_version`, so the same data directory still opens with an earlier version.
+`app/server/lifecycle.test.ts` opens a data directory of the earlier server as it is.
 
 ### Write a migration
 
-1. Append an entry at the end of `MIGRATIONS`, with a comment giving its number and purpose (`// 18 — …`), like the
-   existing ones. A string entry holds a single SQL statement.
+1. Add an entry at the end of `MIGRATIONS`, keyed with the next number (`'0018_<name>'`) and a comment giving its
+   purpose (`// 18 — …`), like the existing ones: `statements(…)` for SQL, `rebuild(…)` for a table rebuild.
 2. Never edit, reorder or remove an entry that has shipped: databases that already ran it would never see the change,
    and new ones would diverge from them.
 3. For a change `ALTER TABLE` cannot make, rebuild the table: create the new table, copy the rows, drop the old one,
-   rename the new one, then recreate its indexes. Use a `Rebuild` entry, as entry 17 does for `profiles`, whenever
-   other tables reference the one rebuilt (entries 10 to 14, for `bench_runs`, predate it).
-4. Update the repository that owns the table, and its tests.
+   rename the new one, then recreate its indexes. Use `rebuild()`, as entry 17 does for `profiles`, whenever other
+   tables reference the one rebuilt (entries 10 to 14, for `bench_runs`, predate it).
+4. Update the repository that owns the table, and its tests (`app/server/db/Db.test.ts` covers the migrations
+   themselves).
 
-The migration runs at the next start. In development (`pnpm dev`), saving the file rebuilds the runtime, which
-opens the database again and runs it.
+The migration runs at the next start. In development (`pnpm dev`), saving the file restarts the server, which opens
+the database again and runs it.
 
 ## Tables
 
 Columns are `snake_case`. Columns ending in `_json` hold JSON text that the repository parses; timestamps are
-`Date.now()` milliseconds in `INTEGER` columns.
+milliseconds since the epoch in `INTEGER` columns.
 
 | Table           | Repository          | Main columns                                                                                                                 |
 | --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -161,69 +158,77 @@ Indexes: `messages_by_conversation` on `messages(conversation_id, id)`, `bench_r
 
 ## Repositories
 
-Each repository takes the `Database` and, except `SettingsRepo`, an optional `now` function (default `Date.now`)
-for tests. `createDeps()` (`app/server/lib/deps.ts`) creates them once, at startup; `ModelCacheRepo` is created by the models and setup
-routes. They convert rows to the shared types (`Profile`, `Conversation`, `ChatMessage`, `BenchRun`, `Sweep`,
-`DownloadItem`) and back, and some validate their input:
+Each repository is a `Context.Service` with a `layer` that takes the `SqlClient`; it is built once with the other
+services (`app/server/App.ts`) and replaced in tests by the same layer on the in-memory database. Timestamps come
+from Effect's `Clock`, so a test on the `TestClock` controls them. The repositories convert rows to the shared types
+(`Profile`, `Conversation`, `ChatMessage`, `BenchRun`, `Sweep`, `DownloadItem`) and back, decoding the `_json`
+columns with `Schema.fromJsonString`; they fail with the domain's tagged errors:
 
-- `ProfilesRepo.create()` and `update()` parse the input with `ProfileInputSchema` (a `ZodError` becomes a `400`) and
-  refuse a name already in use with `409`, code `name-taken`. `importMany()` skips names that exist instead of
-  overwriting them.
-- `ConversationsRepo.patch()` parses `ConversationPatchSchema`. `addMessage()` and `updateMessage()` also refresh the
-  conversation's `updated_at`; `deleteFrom()` deletes a message and every later one (regeneration).
+- `ProfilesRepo.create()` and `update()` refuse a name already in use with `ProfileNameTaken`; `importMany()` creates
+  every input in one transaction and skips names that exist (reason `already exists`) instead of overwriting them.
+  The input itself was decoded by the endpoint (`ProfileInput`).
+- `ConversationsRepo.patch()` takes a decoded `ConversationPatch`. `addMessage()` and `updateMessage()` also refresh
+  the conversation's `updated_at`; `deleteFrom()` deletes a message and every later one (regeneration).
 - `BenchRunsRepo` covers both one-off runs and sweep items: `enqueue()` adds a sweep's items as `queued`, `begin()`
-  freezes the command and hardware of an item when it starts, `requeue()` puts an item back in the queue with its results cleared (`requeueInterrupted()`, for a resumed sweep), and
-  `list()` returns one-off runs by default (`sweepId: 'none'`), 200 at most.
+  freezes the command and hardware of an item when it starts, `requeue()` puts an item back in the queue with its
+  results cleared (`requeueInterrupted()`, for a resumed sweep), and `list()` returns one-off runs by default
+  (`sweep: 'none'`), 200 at most. A stored spec is decoded with `StoredBenchSpec`, the lenient form that still reads
+  the rows of earlier versions; stats that do not decode are dropped with a warning.
 - `SweepsRepo` computes each sweep's item counts and best run from `bench_runs` when it reads it.
-- `DownloadsRepo.next()` returns an item left `downloading` (interrupted) before the oldest `queued` one.
+- `DownloadsRepo.next` returns an item left `downloading` (stopped by a restart) before the oldest `queued` one.
 
 ### Interrupted work at startup
 
-A row can be left in a running state if llama-webui was killed. On startup `boot()` (`app/server/lib/boot.ts`) resets them:
+A row can be left in a running state if llama-webui was killed. The services that own them reset them when their
+layer is built:
 
-- `ConversationsRepo.stopOrphans()`: messages left `streaming` become `stopped`.
-- `BenchRunsRepo.stopOrphans()`: runs left `running` become `interrupted`, with the error
-  `interrupted (llama-webui stopped)` unless they had one.
-- `SweepsRepo.stopOrphans()`: sweeps left `running` become `interrupted` (the Sweeps page offers to resume them).
+- `ChatRuns` runs `ConversationsRepo.stopOrphans`: messages left `streaming` become `stopped`.
+- `BenchRunner` runs `BenchRunsRepo.stopOrphans`: runs left `running` become `interrupted`, with the error
+  `interrupted (llama-webui stopped)` unless they had one; then `SweepsRepo.stopOrphans`: sweeps left `running`
+  become `interrupted` (the Sweeps page offers to resume them).
 
 An interrupted sweep is resumed from the UI (see [Benchmarks and sweeps](/developers/server/bench/)). Downloads left
 `downloading` are resumed by the download queue rather than reset.
 
 ## Settings
 
-Settings are one row per key in `settings`, the value stored as JSON. The keys and their defaults come from
-`SettingsSchema` (`packages/webui-shared/src/settings.ts`), and `DEFAULT_SETTINGS` is `SettingsSchema.parse({})`:
+Settings are one row per key in `settings`, the value stored as JSON. The keys and their defaults come from the
+`Settings` schema (`packages/webui-shared/src/settings.ts`): each field has its default as a decoding default
+(`withDecodingDefaultKey`), so a missing key decodes to it, and `DEFAULT_SETTINGS` holds them all:
 
-| Key                       | Default                                     | Constraint                       |
-| ------------------------- | ------------------------------------------- | -------------------------------- |
-| `binary`                  | `'llama-server'`                            | non-empty                        |
-| `host`                    | `'127.0.0.1'`                               | non-empty                        |
-| `port`                    | `8080`                                      | integer, 1 to 65535              |
-| `modelsDir`               | `'~/models'`                                | non-empty                        |
-| `pollIntervalMs`          | `1000`                                      | integer, at least 250            |
-| `historySeconds`          | `300`                                       | integer, 30 to 1800              |
-| `hiddenGpus`              | `[]`                                        | PCI bus IDs                      |
-| `defaultProfileId`        | `null`                                      | integer or `null`                |
-| `llamaTuiImportDismissed` | `false`                                     | boolean                          |
-| `onboardingDone`          | `false`                                     | boolean                          |
-| `collectors`              | `{ nvml: true, system: true, disk: true }`  | three booleans                   |
-| `theme`                   | `'system'`                                  | `system`, `light` or `dark`      |
+| Key | Default | Constraint |
+| --- | --- | --- |
+| `binary` | `'llama-server'` | non-empty |
+| `host` | `'127.0.0.1'` | non-empty |
+| `port` | `8080` | integer, 1 to 65535 |
+| `modelsDir` | `'~/models'` | non-empty |
+| `pollIntervalMs` | `1000` | integer, 250 to 60000 |
+| `historySeconds` | `300` | integer, 30 to 1800 |
+| `hiddenGpus` | `[]` | PCI bus IDs |
+| `defaultProfileId` | `null` | integer or `null` |
+| `onboardingDone` | `false` | boolean |
+| `collectors` | `{ nvml: true, system: true, disk: true }` | three booleans, each defaulted on its own |
+| `theme` | `'system'` | `system`, `light` or `dark` |
+| `env` | `{}` | variables added to the environment of what llama-webui starts; each name a shell name (`ENV_NAME`) |
 
 `host` and `port` are the defaults for `llama-server`, not llama-webui's own address (that comes from the command
 line, see [Configuration](/docs/configuration/)).
 
-`SettingsRepo.get()` starts from `DEFAULT_SETTINGS` and overlays the stored rows. A row whose key the schema does not
-know is ignored. A row whose JSON does not parse, or whose value no longer passes its field's schema (a rule became
-stricter), is skipped with a console warning, so that key falls back to its default.
+`SettingsRepo.get` reads the rows and decodes them with `Settings`. A row whose key the schema does not know is
+ignored. A row whose JSON does not parse, or whose value no longer passes its field's schema (a rule became stricter),
+is skipped with a logged warning (`setting “<key>” invalid, using the default value`), so that key falls back to its
+default.
 
-`SettingsRepo.patch(partial)` validates the whole merged object with `SettingsSchema.parse()` (a `ZodError` becomes a
-`400`), then writes only the keys present in `partial`, in one transaction. Keys a user never changed have no row,
-so a new default in the schema applies to them on the next read. Users see these settings on the
-[Settings page](/docs/settings/).
+`SettingsRepo.patch(partial)` runs in one transaction from the read to the writes, so two patches at once do not lose
+each other's fields. It merges `partial` over the current settings (objects field by field, as `collectors`, except
+`env`, replaced as a whole), decodes the whole merged object with `Settings`, reporting every issue (a failure is a
+`400` `SettingsInvalid` with its `issues`), then writes only the keys present in `partial`. Keys a user never
+changed have no row, so a new default in the schema applies to them on the next read. Users see these settings on
+the [Settings page](/docs/settings/).
 
 ## The model cache
 
-`scanModels()` (`app/server/lib/models/scan.ts`) keeps the summary of each GGUF it reads in `model_cache`, so a scan of the
+The models scan (`app/server/models/scan.ts`) keeps the summary of each GGUF it reads in `model_cache`, so a scan of the
 models folder does not parse unchanged files again:
 
 - `path` is the absolute path of the model's main file (the first part of a split model).

@@ -1,22 +1,25 @@
 ---
 title: Conventions
-description: Language, number formatting, Biome rules, React and built-in API idioms, generated shadcn components and the development restarts every change goes through.
+description: Language, number formatting, tagged errors, Biome rules, React idioms, the platform and Effect idioms of the server, generated shadcn components and the development restarts every change goes through.
 ---
 
 These rules apply to `app/`, `packages/` and `site/`. They come from `CLAUDE.md` at the root of the repository
-(written in French); `biome.jsonc`, the `tsconfig*.json` files and CI enforce the mechanical ones.
+(written in French); `biome.jsonc`, the `tsconfig*.json` files, the Effect diagnostics and CI enforce the mechanical
+ones. The server's own rules, each with its example (where each part of a domain goes, requests and replies, programs,
+long processes, SQL, caches), are in `docs/superpowers/poc-effect/conventions.md`.
 
 ## Language
 
 Everything is in English (en-US):
 
 - the UI and the website;
-- server messages: HTTP errors, zod validation messages, logs and `--help`;
+- server messages: HTTP errors, the messages of the schemas' checks, logs and `--help`;
 - code comments and test names;
 - commit messages and pull requests.
 
-Comments explain why rather than what: exported functions and non-obvious choices carry a `/** … */` comment. Most
-console messages from the server start with `[llama-webui]`.
+Comments explain why rather than what: exported functions and non-obvious choices carry a `/** … */` comment. The
+server logs through `Effect.log` and its levels (`Effect.logWarning`…); the lines it adds to `llama-server`'s log
+ring start with `[llama-webui]`.
 
 ### Numbers, dates and units
 
@@ -40,18 +43,21 @@ Missing values (`null`, `undefined`, not finite) render as “—” in the help
 
 ### Never compare a server message
 
-The web app never branches on the text of a server message. When the UI must react to a specific refusal, the server
-gives it a machine-readable `code`:
+The web app never branches on the text of a server message. Each error an endpoint answers is a
+`Schema.TaggedError` of the API definition, with its status, and its body is `{ "_tag": "…", "message": "…" }`:
 
-```ts title="app/server/lib/db/profiles.ts"
-const conflict = (name: string) => new HttpError(409, `A profile named “${name}” already exists`, 'name-taken');
+```ts title="packages/webui-shared/src/api/ProfilesApi.ts"
+export class ProfileNameTaken extends Schema.TaggedError<
+  ProfileNameTaken,
+  { readonly ProfileNameTaken: unique symbol }
+>()('ProfileNameTaken', { message: Schema.String }, { httpApiStatus: 409 }) {}
 ```
 
-`HttpError(status, message, code)` (`app/server/lib/http.ts`) becomes `{ "error": "…", "code": "name-taken" }`, and the web
-client's `ApiError` (`app/src/lib/api.ts`) exposes it as `code`:
+The server builds it with its message (`ProfileNameTaken.make({ message: … })`, never `new`), and the typed client
+of the web (`app/src/lib/api.ts`) rejects with it; the UI reads its tag with `errorTag()`:
 
 ```ts title="app/src/lib/bench.ts"
-if (e instanceof ApiError && e.code === 'server-running') return 'confirm';
+        if (errorTag(e) === 'ServerRunning') return 'confirm';
 ```
 
 Text stored in the database that the UI has to recognize goes through a helper in `packages/webui-shared/`, which also knows the
@@ -76,13 +82,15 @@ configured in `biome.jsonc`.
 | Lint rules    | The `recommended` preset, with `style/noNonNullAssertion` turned off (`x!` is allowed)     |
 | Domains       | `tailwind`, `test`, `project` (module graph) and `types` (type inference), `recommended`  |
 | React         | The `react` domain, turned on for `app/src/**` and `site/**` (not detected from `catalog:`) |
+| Server        | `correctness/useYield` off for `app/server/**`: a generator of `Effect.gen` or `Effect.fn` does not always yield |
 | Assists       | `organizeImports` (sorted imports) and `useSortedPackageJson` (sorted `package.json` keys) |
 | CSS           | Parsed with Tailwind directives                                                           |
 
 Biome checks TypeScript, JSON and CSS in every package. It skips files ignored by Git, `node_modules`, `testdata`,
-`dist`, Nitro's build output (`.output`), the site's build output (`site/build`, `site/dist`, `site/.react-router`), the
-generated files `app/server/api.gen.ts` and `app/server/lib/contract/golden.json`, the `.mdx` pages (not supported) and
-the generated shadcn components (see [Generated shadcn components](#generated-shadcn-components)).
+`dist`, the app's build output (`.output`), the site's build output (`site/build`, `site/dist`, `site/.react-router`),
+the generated `app/server/contract/golden.json`, the `.mdx` pages (not supported), the generated shadcn components
+(see [Generated shadcn components](#generated-shadcn-components)) and `repos/`, the reference copies of other
+repositories (`!!`: not even indexed).
 
 | Command            | Runs                       | Effect                                     |
 | ------------------ | -------------------------- | ------------------------------------------ |
@@ -142,59 +150,59 @@ The web app uses React 19. Three rules cover most effect-related lint reports:
   return <SamplingForm key={current.id} current={current} props={props} />;
   ```
 
-## Built-ins first
+## The platform and Effect
 
-The app runs on Node.js (26.13 or later) and uses built-in APIs rather than npm packages that do the same job: files,
-processes, timers, hashes and SQLite go through `node:*`. The few packages it adds are listed here:
+The app runs on Node.js (26.13 or later). The server is written with [Effect](https://effect.website) (`effect`
+and its `@effect/*` packages, pinned to one exact version), and reaches the platform through Effect's services rather
+than through `node:*` or other npm packages:
 
 | Need                          | Used                                  | Where                                                      |
 | ----------------------------- | ------------------------------------- | ---------------------------------------------------------- |
-| HTTP server                   | [Nitro](https://nitro.build) v3 (`node_server` preset, its server is srvx) | `app/vite.config.ts`, `app/server/plugins/runtime.ts` |
-| HTTP routes                   | Nitro file routes, h3 v2 handlers (`defineHandler`) | `app/server/routes/api/**`, `app/server/middleware/`, `app/server/lib/http.ts` |
-| WebSocket                     | crossws, through Nitro (`features.websocket`, `defineWebSocketHandler`) | `app/server/routes/ws.ts`, `app/server/lib/ws/hub.ts` |
-| Long requests to llama-server | `llamaFetch` (`node:http`)            | `app/server/lib/llamaFetch.ts`: chat stream, benchmark requests    |
-| Model downloads               | `downloadFetch` (`node:https`)        | `app/server/lib/llamaFetch.ts`: Hugging Face downloads (HTTP/1.1)  |
-| SQLite                        | `Database` (`node:sqlite`)            | `app/server/lib/db/sqlite.ts`: every repository                    |
-| Reading files                 | `readText`, `fileExists`, `fileRange` | `app/server/lib/proc.ts` (`node:fs`): collectors, hardware readers |
-| Child processes               | `spawnProc`, `which`                  | `app/server/lib/proc.ts` (`node:child_process`): supervisor, bench |
-| Front end, server bundle      | Vite with Nitro's plugin (`vite dev`, `vite build`), Rolldown for the launcher and the NVML sampler | `app/vite.config.ts`, `app/bin/llama-webui.ts` |
-| NVML                          | `node:ffi` in a child process (`fork`)  | `app/server/lib/collectors/nvml/`  |
-| Checksums                     | `createHash` (`node:crypto`)          | `app/server/lib/hf/downloader.ts`                                  |
-| Pauses                        | `setTimeout` (`node:timers/promises`) | Supervisor, benchmarks, tests                              |
-| Tests                         | Vitest                                | Every `*.test.ts` but those of `packages/llamacpp-js/`     |
+| HTTP server and routes        | `HttpApi` of `effect/http-api` on `NodeHttpServer` (`node:http`) | `packages/webui-shared/src/api/`, `app/server/<domain>/http.ts`, `app/server/http/` |
+| WebSocket                     | The upgrade of `effect/http` (`Socket`) | `app/server/ws/WsHub.ts`                                  |
+| Requests to llama-server      | `LlamaHttp` (`node:http` through `@effect/platform-node`, no time limit on headers or body) | `app/server/llama/LlamaHttp.ts`: chat stream, benchmark trials, `/props` |
+| Requests to Hugging Face      | `HfHttp` (HTTP/1.1 on its own agents, the environment's proxy) | `app/server/hf/HfHttp.ts`: the Hub's API and the downloads |
+| SQLite                        | `SqlClient` of `@effect/sql-sqlite-node` (`node:sqlite`) | `app/server/db/Db.ts`, the `*Repo.ts` of each domain |
+| Files and paths               | `FileSystem` and `Path`               | Collectors, hardware readers, models, downloads            |
+| Programs                      | `ChildProcess` of `effect/process`, `followProgram()` for one that lasts | `app/server/process/`: supervisor, bench, `nvidia-smi`, the NVML sampler |
+| NVML                          | `node:ffi` in an Effect program run as a child process | `app/server/collectors/nvml/`  |
+| Configuration                 | `Config` (`AppConfig`), `.env` parsed by `parseEnv()` of `node:util` | `app/server/config/`  |
+| Pauses and repeats            | `Effect.sleep`, `Schedule`, `Effect.timeout` | Everywhere: never a timer                           |
+| Front end, server bundle      | Vite (`vite dev`, `vite build`), Rolldown for the server and the NVML sampler | `app/vite.config.ts`, `app/build/server.ts` |
+| Tests                         | Vitest, `@effect/vitest` for effects  | Every `*.test.ts` but those of `packages/llamacpp-js/`     |
 
-Directories and file handles go through `node:fs` or `node:fs/promises` (`readdir`, `stat`, `realpath`, `open`,
-`statfs`); tests write files with `writeFileDeep()` (`app/server/lib/testing/write.ts`), which creates the parent directories.
-There is no Express, Hono, `better-sqlite3`, `execa` or `dotenv` (`app/server/lib/env.ts` parses `.env` with Node's
-`parseEnv()` from `node:util`), and no Jest. Nitro bundles every package the server imports: the build needs no
-`node_modules` at run time. Two exceptions: `site/` is built with Vite and React Router (its scripts, run by
-Node, follow the same rules); `packages/llamacpp-js/` targets Node 24 or later, so its sources use
-only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), and its tests use
+The language service of Effect enforces it: `pnpm check` refuses a `node:*` import, `fetch`, a timer, `JSON` or
+`process.env` in the server ([Effect diagnostics](/developers/contributing/testing/#effect-diagnostics)). Four `node:*`
+imports remain, each with a directive and its reason: `node:http` (the server factory `NodeHttpServer` takes),
+`node:crypto` (a model's hash as it streams), and `node:fs/promises` twice (`statfs` and `rmdir`, which `FileSystem`
+lacks). There is no Express, Hono, `better-sqlite3`, `execa`, `dotenv` or zod, and no Jest. The build bundles every
+package the server imports: it needs no `node_modules` at run time. Two exceptions: `site/` is built with Vite and
+React Router (its scripts, run by Node, use `node:*`); `packages/llamacpp-js/` targets Node 24 or later, so its
+sources use only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), and its tests use
 `node:test` with no dependency ([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
 
 ### Code idioms
 
-- **A deadline does not hold the process.** A pause that only bounds a wait (`Promise.race([proc.exited, sleep(ms)])`)
-  is `sleep(ms, undefined, { ref: false })`: once the other side wins, the pending timer must not keep Node running.
-- **`packages/webui-shared/` stays portable.** The browser bundle imports it, so its modules import nothing but `zod`,
-  the browser-safe modules of `llamacpp-js` and each other: no Node API. The server and the web import it as
-  `@llama-webui/shared`; inside `app/` and `site/`, `@/` points to their own `src/` (the client's, not the server's).
-- **Cleanup with `using`.** `defer(fn)` (`packages/webui-shared/src/dispose.ts`) returns a `Disposable`, so
-  `using _busy = defer(() => (busy = false));` replaces a `try`/`finally`. Tests release temporary directories and
-  databases the same way.
-- **Dependencies as arguments.** Server classes and builders take their collaborators (`fetch`, `spawn`, repositories,
-  settings getters) as a deps object, which is what lets tests pass fakes (see [Testing](/developers/contributing/testing/)).
-- **The helpers of `app/server/lib/http.ts` for HTTP.** A route file is a `defineHandler()` of `nitro`. It answers
-  with `reply<T>(data, status)` (JSON, typed for the client), `noContent()` (`204`) or `attachment(filename, body)`,
-  and fails by throwing `HttpError(status, message, code?)` or `notFound('Profile')`. It reads its input with the
-  validators, which keep the API's messages and their order: `idParam(event, 'Profile')` (a positive integer `:id`,
-  else `404`, before any body), `readBody(event, Schema)` (zod: `Invalid JSON`, `JSON object expected`, then
-  `Invalid data: …` with `issues`), `readJson(event, check)` (a check of its own, `object` or `passthrough`) and
-  `queryOf(event, 'key', …)` (the first value of each key). A file that reads a body or a query exports its type as
-  `export type Body` or `export type Query`: that is what the generated `app/server/api.gen.ts` types the client
-  with. SSE goes through h3's `createEventStream()` (`app/server/lib/chat/sse.ts`). A plain `Response.json()` stays
-  where the body has no type to give (`/api/server/props`, llama-server's own JSON) and in the middlewares (the
-  guard, the 405 table).
+- **A domain has a fixed layout.** Its schemas in `packages/webui-shared/src/<domain>.ts`, its endpoints and errors
+  in `packages/webui-shared/src/api/<Domain>Api.ts`, its service in `app/server/<domain>/<Name>.ts`, its handlers in
+  `app/server/<domain>/http.ts` ([How-to guides](/developers/contributing/how-to/#add-an-endpoint)).
+- **A service is a `Context.Service` class** keyed by its path (`'@llama-webui/app/server/settings/SettingsRepo'`),
+  with its layers as statics (`layer`, `layerWith(options)` for the durations a test shortens). What it starts runs
+  in the scope of its layer, so the app undoes it when it stops: there is no `dispose()` to call.
+- **Functions are `Effect.fn`.** A named `Effect.fn('Service.method')(function* (…) { … })` traces its span; a
+  helper that needs no span is `Effect.fnUntraced`.
+- **Errors are typed.** A failure the caller can act on is a `Schema.TaggedError` in the error channel; a broken
+  invariant is a defect (`Effect.orDie`). An endpoint's handler returns the service's error when it is one of the
+  endpoint's errors; a defect is logged and answers `500` without its message.
+- **Inputs are schemas.** A handler never reads a body, a parameter or a query itself: the endpoint declares them, and
+  `Api` decodes them strictly. A number is `Schema.Finite` or `Schema.Int`, never `Schema.Number`.
+- **`packages/webui-shared/` stays portable.** The browser bundle imports it, so its modules import nothing but
+  `effect`, the browser-safe modules of `llamacpp-js` and each other: no Node API. The server and the web import it
+  as `@llama-webui/shared`; inside `app/` and `site/`, `@/` points to their own `src/`. The web imports nothing from
+  `app/server/`.
+- **Cleanup with `using` in the web app.** `defer(fn)` (`packages/webui-shared/src/dispose.ts`) returns a
+  `Disposable`, so `using _saving = defer(() => setSaving(false));` replaces a `try`/`finally`. The server releases
+  through scopes (`Effect.acquireRelease`, `Effect.ensuring`).
 
 ## Generated shadcn components
 
@@ -206,23 +214,18 @@ indexed, so the `project` and `types` rules still resolve the imports of `@/comp
 
 ## Development restarts
 
-`pnpm dev` (`vite dev` in `app/`) serves the UI with HMR and runs the server in Nitro's dev worker, which evaluates
-the changed files again on every save. The runtime (the supervisor, the database, the monitor…) is kept on
-`globalThis` by `app/server/lib/context.ts`, so what a save does depends on the file:
+`pnpm dev` (`vite dev` in `app/`) serves the UI with HMR, and runs the server from its sources in a child process,
+`node --watch server/main.ts` (`app/build/devServer.ts`). What a save does depends on the file:
 
-- A save of a route file (`app/server/routes/`, `middleware/`, `plugins/`) keeps the runtime: `llama-server`, a
-  running reply and a benchmark go on, with the same `bootId`.
-- A save of business code that `app/server/lib/boot.ts` reaches (under `app/server/lib/`) undoes the old
-  runtime and builds a new one, as any stop does: the managed `llama-server` stops, a running chat reply is saved as
-  `stopped`, a benchmark run and its sweep as `interrupted` (Resume button), a download resumes from its `.part`.
-  Edit the business code between benchmarks rather than during one.
-- State a route needs across requests lives in `lib/` (for example `app/server/lib/tuning/memo.ts`), not in the route
-  file, which a reload evaluates again.
-- A reload evaluates the saved module again, with the modules that import it. Errors are recognized with
-  `instanceof` (`SupervisorError`, `HttpError`); the `Llama*Error` classes of `llamacpp-js` also have a fixed `name`,
-  for callers that load the package twice.
-- What a part of the server starts, it registers on the `AsyncDisposableStack` of `boot()` (`app/server/lib/boot.ts`),
-  which undoes everything at shutdown.
+- A save of a file the server imports (`app/server/`, `packages/`) restarts the server process, as any stop does:
+  the managed `llama-server` stops, a running chat reply is saved as `stopped`, a benchmark run and its sweep as
+  `interrupted` (Resume button), a download resumes from its `.part`. The new process has a new `bootId`. Edit the
+  server between benchmarks rather than during one.
+- A save under `app/src/` is a hot module replacement of the UI: the server and `llama-server` are kept.
+- Nothing survives a restart but the database and the files: state across requests lives in a service, built again
+  with the process.
+- What a part of the server starts, it starts in the scope of its layer, and what it must save before the stop, it
+  registers as a shutdown step (`Shutdown.before`).
 - Vite plugins are declared once, in `app/vite.config.ts`: development and `pnpm build` both use them.
 
 [Architecture](/developers/architecture/#development-restarts) describes the restart and the shutdown order.
