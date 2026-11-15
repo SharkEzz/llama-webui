@@ -1,6 +1,7 @@
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { ServerView } from '../server.ts';
+import { BenchRunning } from './BenchApi.ts';
 import { ProfileNotFound } from './ProfilesApi.ts';
 
 /** Another lifecycle operation holds the server: `operation in progress, try again`. */
@@ -63,18 +64,18 @@ export class ServerApi extends HttpApiGroup.make('server').add(
   HttpApiEndpoint.post('start', '/api/server/start', {
     payload: Launch,
     success: Accepted,
-    error: [ProfileNotFound, OperationInProgress, ServerAlreadyRunning, PortInUse],
+    error: [ProfileNotFound, BenchRunning, OperationInProgress, ServerAlreadyRunning, PortInUse],
   }),
   HttpApiEndpoint.post('switch', '/api/server/switch', {
     payload: Launch,
     success: Accepted,
-    error: [ProfileNotFound, OperationInProgress, PortInUse],
+    error: [ProfileNotFound, BenchRunning, OperationInProgress, PortInUse],
   }),
   HttpApiEndpoint.post('restart', '/api/server/restart', {
     success: Accepted,
-    error: [NoProfileToRestart, ProfileNotFound, OperationInProgress, PortInUse],
+    error: [BenchRunning, NoProfileToRestart, ProfileNotFound, OperationInProgress, PortInUse],
   }),
-  HttpApiEndpoint.post('stop', '/api/server/stop', { success: ServerView }),
+  HttpApiEndpoint.post('stop', '/api/server/stop', { success: ServerView, error: BenchRunning }),
   // llama-server's own JSON, passed as it is.
   HttpApiEndpoint.get('props', '/api/server/props', {
     success: Schema.Unknown,

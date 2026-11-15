@@ -24,8 +24,8 @@ export class ModelUnreadable extends Schema.TaggedError<ModelUnreadable, { reado
 ) {}
 
 /**
- * A deletion of a model something uses: `The running server uses it (profile “<name>”): stop it first` or
- * `A download in progress writes it`.
+ * A deletion of a model something uses: `The running server uses it (profile “<name>”): stop it first`,
+ * `A download in progress writes it` or `A benchmark in progress uses it`.
  */
 export class ModelInUse extends Schema.TaggedError<ModelInUse, { readonly ModelInUse: unique symbol }>()(
   'ModelInUse',

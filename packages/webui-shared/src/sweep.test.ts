@@ -1,7 +1,10 @@
+import { Exit, Schema } from 'effect';
 import { expect, test } from 'vitest';
+import { issuesOf } from './api/errors.ts';
 import type { BenchRun, Measure } from './bench.ts';
 import { withCtx } from './bench.ts';
-import { expandSpace, itemLabel, rankRuns, SweepSpecSchema, sweepCtx } from './sweep.ts';
+import { STRICT } from './profile.ts';
+import { expandSpace, itemLabel, rankRuns, SweepSpec, sweepCtx } from './sweep.ts';
 import { presetOf } from './tuning.ts';
 
 test('expandSpace crosses the dimensions in field order and applies -ts only where it fits', () => {
@@ -42,19 +45,29 @@ const run = (id: number, tg: number | null, status: BenchRun['status'] = 'ok') =
   ({ id, status, kind: 'bench', pp: tg === null ? null : m(1000), tg: tg === null ? null : m(tg) }) as BenchRun;
 
 test('rankRuns marks ties inside the noise band and leaves failures unranked', () => {
-  const ranked = rankRuns([run(1, 44), run(2, null, 'failed'), run(3, 50), run(4, 49.2)], 'chat', 8192);
+  const ranked = rankRuns([run(1, 44), run(2, null, 'failed'), run(3, 50), run(4, 49.2)], {
+    preset: 'chat',
+    ctx: 8192,
+  });
   expect(ranked.map((r) => [r.run.id, r.rank, r.tie])).toEqual([
     [3, 1, true],
     [4, 2, true],
     [1, 3, false],
     [2, null, false],
   ]);
-  expect(rankRuns([run(1, 50), run(2, 40)], 'chat', 8192)[0]!.tie).toBe(false);
+  expect(rankRuns([run(1, 50), run(2, 40)], { preset: 'chat', ctx: 8192 })[0]!.tie).toBe(false);
 });
 
 test('SweepSpecSchema refuses an empty value list for a dimension', () => {
-  const r = SweepSpecSchema.safeParse({ name: 's', modelPath: '/m.gguf', preset: 'chat', space: { ncmoe: [] } });
-  expect(r.success).toBe(false);
+  const exit = Schema.decodeExit(
+    SweepSpec,
+    STRICT,
+  )({ name: 's', modelPath: '/m.gguf', preset: 'chat', space: { ncmoe: [] } });
+  expect(Exit.isFailure(exit)).toBe(true);
+  const error = Exit.findErrorOption(exit);
+  expect(error._tag === 'Some' && issuesOf(error.value.issue)).toEqual([
+    { path: ['space', 'ncmoe'], message: 'at least one value' },
+  ]);
 });
 
 test('sweepCtx reads -c= and the last -c, like ctxFromArgs (#24)', () => {

@@ -1,7 +1,9 @@
+import { Exit, Schema } from 'effect';
 import { expect, test } from 'vitest';
+import { issuesOf } from './api/errors.ts';
 import {
-  type BenchParams,
-  BenchSpecSchema,
+  BenchParams,
+  BenchSpec,
   benchArgs,
   ignoredByBench,
   isOomError,
@@ -9,6 +11,7 @@ import {
   paramsFromServerArgs,
   serverArgs,
 } from './bench.ts';
+import { STRICT } from './profile.ts';
 
 test('paramsFromServerArgs splits a real profile into fields and the rest', () => {
   expect(
@@ -102,7 +105,10 @@ test('ignoredByBench names context and speculative decoding', () => {
 });
 
 test('BenchSpecSchema refuses managed flags in serverArgs at their index', () => {
-  const r = BenchSpecSchema.safeParse({
+  const exit = Schema.decodeExit(
+    BenchSpec,
+    STRICT,
+  )({
     kind: 'server',
     modelPath: '/m/a.gguf',
     mmprojPath: null,
@@ -110,12 +116,11 @@ test('BenchSpecSchema refuses managed flags in serverArgs at their index', () =>
     params: {},
     serverArgs: ['--jinja', '-ngl', '20', '--port', '9'],
   });
-  expect(r.success).toBe(false);
-  expect(r.error!.issues.map((i) => i.path)).toEqual([
-    ['serverArgs', 1],
-    ['serverArgs', 3],
+  const error = Exit.findErrorOption(exit);
+  expect(error._tag === 'Some' && issuesOf(error.value.issue)).toEqual([
+    { path: ['serverArgs', '1'], message: '-ngl: use the -ngl field' },
+    { path: ['serverArgs', '3'], message: '--port is managed by llama-webui (use the profile fields)' },
   ]);
-  expect(r.error!.issues[0]!.message).toBe('-ngl: use the -ngl field');
 });
 
 test('isOomError recognizes the current and the legacy out-of-memory errors', () => {
@@ -131,4 +136,7 @@ test('the f8_e4m3 KV cache type is accepted by the schema and read from the serv
     ctv: 'f8_e4m3',
   });
   expect(benchArgs({ ctk: 'f8_e4m3', ctv: 'f8_e4m3' })).toEqual(['-ctk', 'f8_e4m3', '-ctv', 'f8_e4m3']);
+  expect(Schema.decodeExit(BenchParams, STRICT)({ ctk: 'f8_e4m3', ctv: 'f8_e4m3' })).toEqual(
+    Exit.succeed({ ctk: 'f8_e4m3', ctv: 'f8_e4m3' }),
+  );
 });

@@ -4,6 +4,20 @@ export { type SseEvent, SseParser } from 'llamacpp-js/sse';
 // The HTTP API (Effect `HttpApi`): served by the server, its client derived by the web.
 export { Api } from './api/Api.ts';
 export {
+  BenchApi,
+  BenchFileMissing,
+  BenchRunning,
+  BenchRunRequest,
+  BenchStartErrors,
+  ExternalServerRunning,
+  RunNotFound,
+  RunNotRunning,
+  RunStillRunning,
+  RunsQuery,
+  ServerRunning,
+  ServerStopTooSlow,
+} from './api/BenchApi.ts';
+export {
   ChatApi,
   ChatSseEvent,
   ConversationNotFound,
@@ -64,6 +78,15 @@ export {
   ServerNotReady,
 } from './api/ServerApi.ts';
 export { SettingsApi, SettingsInvalid, SettingsPatched } from './api/SettingsApi.ts';
+export {
+  NothingToResume,
+  NothingToValidate,
+  SweepNotFound,
+  SweepNotRunning,
+  SweepStillRunning,
+  SweepsApi,
+  ValidateRequest,
+} from './api/SweepsApi.ts';
 export * from './bench.ts';
 export * from './chat.ts';
 export * from './dispose.ts';

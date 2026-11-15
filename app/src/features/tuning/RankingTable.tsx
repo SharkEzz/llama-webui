@@ -56,13 +56,11 @@ export function RankingTable({ sweep, runs }: { sweep: Sweep; runs: BenchRun[] }
   const ctx = sweepCtx(sweep.spec);
   const explore = rankRuns(
     runs.filter((r) => r.kind === 'bench'),
-    sweep.spec.preset,
-    ctx,
+    { preset: sweep.spec.preset, ctx },
   );
   const validate = rankRuns(
     runs.filter((r) => r.kind === 'server'),
-    sweep.spec.preset,
-    ctx,
+    { preset: sweep.spec.preset, ctx },
   );
   // The saved best, otherwise (deleted from Benchmark) the one from the displayed ranking.
   const bestId =
