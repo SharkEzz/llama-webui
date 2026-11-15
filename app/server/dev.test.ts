@@ -229,11 +229,18 @@ test('in dev, without Effect DevTools, a restart does not wait for them', async 
       dev,
     ),
   );
-  // From the line `node --watch` prints when it restarts the server to the first answer of the new one.
-  const restarting = dev.chunks.slice(from).find((chunk) => chunk.text.includes('Restarting'));
-  if (restarting === undefined) throw new Error(`no Restarting line\n${dev.output()}`);
-  expect(bootedAt - restarting.at).toBeLessThan(1000);
+  const restart = dev.chunks.slice(from).filter((chunk) => chunk.at <= bootedAt);
+  // Restoring the file is a second save, a second restart: settled before any assertion, so that a failure here does
+  // not leave the next test a server that restarts.
   await until('the boot after the restore', async () => (await bootId(dev.base)) !== booted, 30_000, dev);
+  // The restarted server probed the DevTools and found none: it did not add their layer.
+  const restarting = restart.find((chunk) => chunk.text.includes('Restarting'));
+  if (restarting === undefined) throw new Error(`no Restarting line\n${dev.output()}`);
+  const probed = restart.find((chunk) => chunk.at >= restarting.at && chunk.text.includes('no Effect DevTools at'));
+  if (probed === undefined) throw new Error(`no DevTools probe after the restart\n${dev.output()}`);
+  // From that probe to the first answer of the new server: the second the DevTools client waits would show here. Not
+  // from the `Restarting` line, which adds the module loading of `node --watch` (well over a second on a CI runner).
+  expect(bootedAt - probed.at).toBeLessThan(1000);
 }, 90_000);
 
 test('one SIGINT stops vite dev and the server', async () => {
