@@ -144,8 +144,12 @@ layer(NodeServices.layer)('machine samplers', (it) => {
   it.effect('resolveModelDisk resolves a partition to its disk', () =>
     Effect.scoped(
       Effect.gen(function* () {
-        const { root, sys, path, fs } = yield* tmp;
-        const model = path.join(root, 'model.gguf');
+        const { sys, path, fs } = yield* tmp;
+        // On a block device: a file under /tmp (tmpfs) has a device major of 0, which names no disk.
+        const cache = path.join(import.meta.dirname, '../../../.cache');
+        yield* fs.makeDirectory(cache, { recursive: true });
+        const onDisk = yield* fs.makeTempDirectoryScoped({ directory: cache, prefix: 'lw-machine-' });
+        const model = path.join(onDisk, 'model.gguf');
         yield* write(model, 'GGUF');
         const [major, minor] = devMajorMinor((yield* fs.stat(model)).dev);
         const disk = path.join(sys, 'devices/pci0000:00/nvme/nvme0n1');
@@ -159,7 +163,7 @@ layer(NodeServices.layer)('machine samplers', (it) => {
         yield* fs.symlink(disk, path.join(sys, 'dev/block', `${major}:${minor}`));
         const viaDisk = yield* resolveModelDisk(model, { sysRoot: sys });
         assert.deepStrictEqual(viaDisk, Option.some('nvme0n1'));
-        const missing = yield* resolveModelDisk(path.join(root, 'missing'), { sysRoot: sys });
+        const missing = yield* resolveModelDisk(path.join(onDisk, 'missing'), { sysRoot: sys });
         assert.isTrue(Option.isNone(missing));
       }),
     ),

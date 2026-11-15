@@ -562,6 +562,24 @@ Found while porting E7, accepted with its result:
   `makeBenchStore({ call })`, the client injected.
 - The page look of Task 9 used the `puppeteer-core` of `site/` with the system Chromium: Playwright is not installed.
 
+Found by the final review of E7, fixed with it:
+
+- `start` and `startSweep` set `abandon` (the gate's release on a start that does not go through) only after
+  `gate.acquire` returned: an interruption landing between the two left the gate held, so the runner busy until the
+  app restarts. `abandon` now covers the acquire (its own refusals leave the gate free, and a release of a free gate
+  does nothing). Read, not tested: the window is between two steps of one fiber.
+- `abandon` restarted llama-server even while the app stopped: a request interrupted by the shutdown (its HTTP fiber
+  ends after the shutdown steps) restarted the server it had stopped. It now does nothing once the runner is
+  `closing`. Test `a request interrupted by the shutdown restarts nothing` (fails without the guard).
+- Three tests read the machine they ran on, and failed on this one (they predate E7):
+  - `resolveModelDisk resolves a partition to its disk` wrote its model under `/tmp`, a tmpfs whose device major is 0,
+    which names no disk. Its model now goes under the repository's `.cache/` (a block device).
+  - The `hf/http.test.ts` configuration set `HF_TOKEN` and `HUGGING_FACE_HUB_TOKEN` to `''` over the environment
+    (`ConfigProvider.layerAdd`, `asPrimary`): an empty value counts as unset, so a token in the shell's environment was
+    read. They are now `' '` (blank, trimmed to no token).
+  - `Monitor.test.ts` listed the host's AMD cards. `Collectors.layerWith` takes a `drmRoot` (default
+    `/sys/class/drm`), which the test points at a missing folder.
+
 ## Measures (`e<N>.json`)
 
 The startup and shutdown medians of `scripts/poc/measure.ts` depend on the machine's load at the time: `e5.json`

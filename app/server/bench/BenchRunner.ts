@@ -284,8 +284,13 @@ export class BenchRunner extends Context.Service<
             return yield* BenchFileMissing.make({ message: `Projector not found: ${files.mmprojPath}` });
         });
 
-        /** Frees the gate after a start that did not go through, restarting a server it began to stop. */
-        const abandon = gate.release(rebuild).pipe(Effect.ignore);
+        /**
+         * Frees the gate after a start that did not go through, restarting a server it began to stop; not while the app
+         * stops (a request interrupted by the shutdown restarts nothing).
+         */
+        const abandon = Effect.flatMap(closing, (stopping) => (stopping ? Effect.void : gate.release(rebuild))).pipe(
+          Effect.ignore,
+        );
 
         /** A run becomes the current one: its live published at once. */
         const begin = Effect.fnUntraced(function* (run: BenchRun, sweepId: number | null, files: RunFiles) {
@@ -382,8 +387,9 @@ export class BenchRunner extends Context.Service<
           yield* claim;
           return yield* Effect.gen(function* () {
             yield* checkFiles(spec);
-            yield* gate.acquire({ stopServer: request.stopServer });
+            // `abandon` covers the acquire itself: an interruption right after the gate is taken still frees it.
             return yield* Effect.gen(function* () {
+              yield* gate.acquire({ stopServer: request.stopServer });
               const command = yield* commandOf(spec).pipe(Effect.provideContext(context));
               const hardware = yield* hardwareNow;
               return yield* Effect.uninterruptible(
@@ -485,8 +491,8 @@ export class BenchRunner extends Context.Service<
               Effect.gen(function* () {
                 yield* checkFiles(request.files);
                 if (request.check !== undefined) yield* request.check;
-                yield* gate.acquire({ stopServer: request.stopServer });
                 return yield* Effect.gen(function* () {
+                  yield* gate.acquire({ stopServer: request.stopServer });
                   const id = yield* request.prepare;
                   return yield* Effect.uninterruptible(
                     Effect.gen(function* () {

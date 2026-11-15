@@ -118,6 +118,8 @@ export class Collectors extends Context.Service<
     readonly readyTimeout?: Duration.Input;
     readonly appsTimeout?: Duration.Input;
     readonly perfRetryAfter?: Duration.Input;
+    /** Where the AMD cards are looked for (`/sys/class/drm` by default). */
+    readonly drmRoot?: string;
   }): Layer.Layer<
     Collectors,
     never,
@@ -157,7 +159,7 @@ export class Collectors extends Context.Service<
             ),
         });
 
-        const cards = yield* discoverAmdCards();
+        const cards = yield* discoverAmdCards(options.drmRoot === undefined ? {} : { drmRoot: options.drmRoot });
         const procSampler = yield* makeProcSampler();
         const held = yield* Ref.make<Held>({ system: Option.none(), disk: Option.none() });
         const lock = yield* Semaphore.make(1);

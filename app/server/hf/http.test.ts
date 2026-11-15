@@ -49,8 +49,9 @@ const HubConfig = ConfigProvider.layerAdd(
     return ConfigProvider.fromUnknown({
       HOME: home,
       HF_ENDPOINT: hub.url,
-      HF_TOKEN: '',
-      HUGGING_FACE_HUB_TOKEN: '',
+      // Blank, not empty: an empty value counts as unset, and the environment's token would be read.
+      HF_TOKEN: ' ',
+      HUGGING_FACE_HUB_TOKEN: ' ',
       HF_TOKEN_PATH: `${home}/no-token`,
     });
   }),

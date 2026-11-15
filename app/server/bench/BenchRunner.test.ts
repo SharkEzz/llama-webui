@@ -519,6 +519,24 @@ describe('BenchRunner', () => {
     }).pipe(withRunner({ hardware: Effect.never }), fresh),
   );
 
+  it.live('a request interrupted by the shutdown restarts nothing', () =>
+    Effect.gen(function* () {
+      const shutdown = yield* Shutdown;
+      yield* useFake();
+      yield* startA;
+      const request = yield* Effect.forkChild(startBench);
+      // The gate is taken and the server stopping; the hardware read never ends.
+      yield* until(Effect.map(gateLines, (lines) => lines.length === 1));
+      yield* stateWhen((s) => s.kind === 'idle');
+      yield* shutdown.run;
+      yield* Fiber.interrupt(request);
+      yield* gateWas(['[bench] stopping llama-server for the benchmark']);
+      const supervisor = yield* Supervisor;
+      const after = yield* supervisor.state;
+      assert.strictEqual(after.kind, 'idle');
+    }).pipe(withRunner({ hardware: Effect.never }), fresh),
+  );
+
   it.live('resuming a sweep with nothing to resume is a 409 and stops nothing', () =>
     Effect.gen(function* () {
       const runner = yield* BenchRunner;

@@ -119,6 +119,8 @@ const monitorLayer = Effect.fnUntraced(function* (options: Options) {
     nvmlLib: Option.some(`${MISSING}/libnvidia-ml.so.1`),
     nvidiaSmi: MISSING,
     perfBin: MISSING,
+    // No AMD card: the host's own would show in the snapshots.
+    drmRoot: MISSING,
     ...(options.nvmlCommand === undefined ? {} : { nvmlCommand: options.nvmlCommand }),
     ...(options.readyTimeout === undefined ? {} : { readyTimeout: options.readyTimeout }),
   }).pipe(Layer.provide(Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, options.spawner ?? platform)));
