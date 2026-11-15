@@ -1,0 +1,74 @@
+import { assert, describe, it } from '@effect/vitest';
+import { DEFAULT_SETTINGS, type Profile } from '@llama-webui/shared';
+import { Effect, Layer, Option, type Scope } from 'effect';
+import { health } from '../llama/probes.ts';
+import { buildCommand } from '../supervisor/command.ts';
+import { FAKE, fakeOutside, freePort } from '../testing/llama.ts';
+import { ServicesWithoutQueue } from '../testing/services.ts';
+import { runTrial } from './trial.ts';
+
+const fresh = <A, E>(test: Effect.Effect<A, E, Layer.Success<typeof ServicesWithoutQueue> | Scope.Scope>) =>
+  Layer.build(ServicesWithoutQueue).pipe(
+    Effect.flatMap((context) => Effect.provideContext(test, context)),
+    Effect.scoped,
+  );
+
+/** The command of the fake on `port`, with these variables. */
+const fakeOn = (port: number, env: Record<string, string>) => {
+  const profile: Profile = {
+    id: 0,
+    name: 'bench',
+    model: 'm.gguf',
+    args: [],
+    env,
+    host: '127.0.0.1',
+    port,
+    source: 'ui',
+    createdAt: 0,
+    updatedAt: 0,
+  };
+  return buildCommand({ profile, settings: { ...DEFAULT_SETTINGS, binary: FAKE } });
+};
+
+const trialOf = (cmd: Effect.Success<ReturnType<typeof fakeOn>>) =>
+  runTrial({
+    cmd,
+    p: 16,
+    n: 4,
+    r: 1,
+    onPhase: () => Effect.void,
+    onLine: () => Effect.void,
+    onSpawn: () => Effect.void,
+    say: () => Effect.void,
+    killTimeout: '1 second',
+    healthPoll: '50 millis',
+  });
+
+describe('trial', () => {
+  it.live('a trial on a port already in use fails with port <port> is used by another server', () =>
+    fresh(
+      Effect.gen(function* () {
+        const port = yield* freePort;
+        yield* fakeOutside({ port });
+        const cmd = yield* fakeOn(port, { FAKE_LOAD_MS: '50' });
+        const failed = yield* Effect.flip(trialOf(cmd));
+        assert.strictEqual(failed.message, `port ${port} is used by another server`);
+      }),
+    ),
+  );
+
+  it.live('a request that gets another status fails with <path> responded <status>', () =>
+    fresh(
+      Effect.gen(function* () {
+        const port = yield* freePort;
+        // A context of 10 tokens: the measured chat request is refused with a 400.
+        const cmd = yield* fakeOn(port, { FAKE_LOAD_MS: '50', FAKE_N_CTX: '10' });
+        const failed = yield* Effect.flip(trialOf(cmd));
+        assert.strictEqual(failed.message, '/v1/chat/completions responded 400');
+        // Stopped at the end.
+        const after = yield* health({ host: '127.0.0.1', port });
+        assert.deepStrictEqual(after, Option.none());
+      }),
+    ),
+  );
+});
