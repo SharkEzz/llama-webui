@@ -1,3 +1,4 @@
+import type { CSSProperties, PointerEvent } from 'react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { GLASS } from './glass';
@@ -14,12 +15,32 @@ interface StatTileProps {
   className?: string | undefined;
 }
 
-/** Number tile: label, value in tabular mono, optional unit and hint. */
+/** Number tile: frosted glass, tone-tinted cursor spotlight, glowing tone dot, tabular value, unit and hint. */
 export function StatTile({ label, value, unit, hint, tone = 'blue', mono = true, className }: StatTileProps) {
+  const color = TONE_VAR[tone];
+  const style = { '--card-tone': color } as CSSProperties;
+
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse') return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty('--mx', `${e.clientX - rect.left}px`);
+    e.currentTarget.style.setProperty('--my', `${e.clientY - rect.top}px`);
+  };
+
   return (
-    <Card size="sm" className={cn(GLASS, 'min-w-0 gap-2 rounded-md px-4 py-4', className)}>
+    <Card
+      size="sm"
+      onPointerMove={onPointerMove}
+      style={style}
+      className={cn(GLASS, 'app-spotlight min-w-0 gap-2 rounded-xl px-4 py-4', className)}
+    >
+      <div className="spotlight-layer" aria-hidden="true" />
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span className="size-1.5 shrink-0 rounded-full" style={{ background: TONE_VAR[tone] }} aria-hidden="true" />
+        <span
+          className="size-2 shrink-0 rounded-full"
+          style={{ background: color, boxShadow: `0 0 10px color-mix(in oklch, ${color} 70%, transparent)` }}
+          aria-hidden="true"
+        />
         <span className="truncate">{label}</span>
       </div>
       <div className="flex items-baseline gap-1.5">

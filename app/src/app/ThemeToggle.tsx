@@ -25,7 +25,11 @@ export function ThemeToggle() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Theme: ${current.label}`} />}>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" className="rounded-full" aria-label={`Theme: ${current.label}`} />
+        }
+      >
         <current.Icon />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-36">

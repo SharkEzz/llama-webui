@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
  * The app's glass card without the backdrop blur: inside the hero window the page behind is static, and dozens of
  * blurred layers under a 3D transform would cost frames for no visible difference.
  */
-export const PANEL = 'rounded-lg bg-card shadow-surface inset-shadow-highlight ring-1 ring-surface-border';
+export const PANEL = 'rounded-xl bg-card shadow-surface inset-shadow-highlight ring-1 ring-surface-border';
 
 export function Panel({
   title,
@@ -50,9 +50,12 @@ export function StatTile({
   tone: string;
 }) {
   return (
-    <div className={cn(PANEL, 'flex min-w-0 flex-col gap-2 rounded-md px-4 py-4')}>
+    <div className={cn(PANEL, 'flex min-w-0 flex-col gap-2 rounded-xl px-4 py-4')}>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span className="size-1.5 shrink-0 rounded-full" style={{ background: tone }} />
+        <span
+          className="size-2 shrink-0 rounded-full"
+          style={{ background: tone, boxShadow: `0 0 10px color-mix(in oklch, ${tone} 70%, transparent)` }}
+        />
         <span className="truncate">{label}</span>
       </div>
       <div className="flex items-baseline gap-1.5">

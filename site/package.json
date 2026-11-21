@@ -17,6 +17,7 @@
     "@base-ui/react": "^1.9.0",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@llama-webui/theme": "workspace:*",
     "@mdx-js/react": "^3.1.1",
     "@react-router/node": "^8.5.2",
     "class-variance-authority": "^0.7.1",

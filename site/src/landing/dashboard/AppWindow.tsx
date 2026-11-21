@@ -79,29 +79,29 @@ export function AppWindow({ children }: { children: React.ReactNode }) {
         </span>
       </div>
       <div className="flex">
-        <aside className="m-3 mr-0 hidden w-14 shrink-0 flex-col rounded-lg border border-sidebar-border bg-sidebar p-2 shadow-surface inset-shadow-highlight @3xl:flex @5xl:w-48 @5xl:p-3">
+        <aside className="m-3 mr-0 hidden w-14 shrink-0 flex-col rounded-xl border border-surface-border-bright/70 bg-sidebar p-2 shadow-surface inset-shadow-highlight backdrop-blur-(--surface-blur) @3xl:flex @5xl:w-48 @5xl:p-3">
           <div className="flex h-10 items-center gap-2.5 px-2">
             <LogoMark />
             <span className="hidden text-[0.9375rem] font-semibold tracking-tight @5xl:inline">llama-webui</span>
           </div>
-          <div className="mt-4 flex flex-1 flex-col gap-0.5">
+          <div className="mt-4 flex flex-1 flex-col gap-1.5">
             {NAV.map((group, i) => (
               <Fragment key={group[0]![0]}>
-                {i > 0 && <div className="mx-2 my-2 h-px shrink-0 bg-sidebar-border" />}
+                {i > 0 && <div className="mx-2 my-1.5 h-px shrink-0 bg-sidebar-border" />}
                 {group.map(([label, icon]) => (
                   <NavItem key={label} label={label} icon={icon} active={label === 'Dashboard'} />
                 ))}
               </Fragment>
             ))}
           </div>
-          <div className="mt-6 flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
+          <div className="mt-6 flex flex-col gap-1.5 border-t border-sidebar-border pt-3">
             {/* The app's collapse button; like the app on a narrow window, the icon-only sidebar has none. */}
             <NavItem label="Collapse" icon={PanelLeftClose} className="hidden @5xl:flex" />
             <NavItem label="Settings" icon={Settings} />
           </div>
         </aside>
         <div className="flex min-w-0 flex-1 flex-col gap-3 p-3 @3xl:px-5 @3xl:pt-3 @3xl:pb-5">
-          <div className="flex h-8 items-center gap-4 text-sm">
+          <div className="flex h-9 items-center gap-3 rounded-full border border-surface-border-bright/80 bg-surface-strong px-3.5 text-sm shadow-surface inset-shadow-highlight">
             <span className="mr-auto flex min-w-0 items-center gap-2">
               <span className="text-muted-foreground">llama-server</span>
               <StateBadge />

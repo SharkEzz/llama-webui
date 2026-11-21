@@ -19,11 +19,11 @@ export function StatusBar() {
   const server = useServer((s) => s.view?.state);
 
   return (
-    <div className="flex h-10 items-center justify-end gap-4 text-sm">
+    <div className="flex h-10 items-center justify-end gap-3 rounded-full border border-surface-border-bright/80 bg-surface-strong px-3.5 text-sm shadow-surface inset-shadow-highlight backdrop-blur-(--surface-blur) backdrop-saturate-150">
       {server && status === 'open' && (
         <Link
           to="/server"
-          className="mr-auto flex min-w-0 items-center gap-2 rounded-md px-2 py-1 hover:bg-accent"
+          className="mr-auto flex min-w-0 items-center gap-2 rounded-full px-2.5 py-1 transition-colors hover:bg-accent"
           title="View server"
         >
           <span className="text-muted-foreground">llama-server</span>

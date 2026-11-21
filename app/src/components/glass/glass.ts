@@ -1,3 +1,3 @@
-/** Glass applied to a shadcn Card or a panel: translucent --card, border, top inner highlight, theme shadow, blur. */
+/** Obsidian Aurora glass applied to a shadcn Card or panel: frosted --card, specular highlight, blur + saturate. */
 export const GLASS =
-  'overflow-visible rounded-lg bg-card shadow-surface inset-shadow-highlight ring-1 ring-surface-border backdrop-blur-(--surface-blur)';
+  'overflow-visible rounded-xl bg-card shadow-surface inset-shadow-highlight ring-1 ring-surface-border backdrop-blur-(--surface-blur) backdrop-saturate-150';

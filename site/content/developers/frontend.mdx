@@ -275,9 +275,10 @@ The theme is `system`, `light` or `dark`, stored in two places:
   `PATCH /api/settings`. At startup, `startThemeSync()` reads the settings and the database wins, so a choice made in
   another browser applies here too. In `system` mode it follows `prefers-color-scheme` changes.
 
-The colors are CSS variables in `app/src/index.css`: `:root` for light, `.dark` for dark, exposed to Tailwind through
-`@theme inline`. Components only use these semantic classes, never raw colors. The four tones of the glass components
-and the charts are `blue`, `teal`, `amber` and `rose` (`components/glass/tones.ts`).
+The colors are CSS variables defined in the shared `@llama-webui/theme` package (`packages/webui-theme/theme.css`) and
+imported by both `app/src/index.css` and `site/src/styles/app.css`: `:root` for light, `.dark` for dark, exposed to
+Tailwind through `@theme inline`. Components only use these semantic classes, never raw colors. The four tones of the
+glass components and the charts are `blue`, `teal`, `amber` and `rose` (`components/glass/tones.ts`).
 
 ## Charts
 
