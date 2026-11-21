@@ -6,6 +6,7 @@ import { HttpClient } from 'effect/http';
 import { BenchHardware } from '../bench/BenchHardware.ts';
 import { BenchRunsRepo } from '../bench/BenchRunsRepo.ts';
 import * as Db from '../db/Db.ts';
+import { CpuInfo } from '../hardware/CpuInfo.ts';
 import { ApiRoutes, serve } from '../http/HttpLive.ts';
 import { GgufReader } from '../models/GgufReader.ts';
 import { Monitor } from '../monitor/Monitor.ts';
@@ -295,7 +296,7 @@ const monitorWithGpu = Layer.effect(
 /** The launchpad's services on a new database, the monitor seeing a GPU, HOME the test's. */
 const launchpadLayer = TuningHardware.layer.pipe(
   Layer.provideMerge(Layer.mergeAll(BenchHardware.layer, monitorWithGpu, GgufReader.layer)),
-  Layer.provideMerge(Layer.mergeAll(SettingsRepo.layer, ProfilesRepo.layer, BenchRunsRepo.layer)),
+  Layer.provideMerge(Layer.mergeAll(SettingsRepo.layer, ProfilesRepo.layer, BenchRunsRepo.layer, CpuInfo.layer)),
   Layer.provideMerge(Db.layerAt(':memory:')),
   Layer.provideMerge(homeConfig),
   Layer.provideMerge(NodeServices.layer),

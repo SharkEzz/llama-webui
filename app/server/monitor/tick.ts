@@ -92,10 +92,8 @@ export interface TickReading {
   readonly memBw: MemBandwidth | null;
 }
 
-type Recorder = HistoryRecorder;
-
 /** The series of every card in the machine, whether the server uses it or not. */
-const pushGpus = (r: Recorder, gpus: ReadonlyArray<GpuSample>) => {
+const pushGpus = (r: HistoryRecorder, gpus: ReadonlyArray<GpuSample>) => {
   for (const g of gpus) {
     r.push(SERIES.gpuUtil(g.key), g.suspended === true || g.hidden === true ? Number.NaN : (g.utilPct ?? 0));
     r.known(SERIES.gpuVramPct(g.key), g.vramTotalBytes > 0 ? (100 * g.vramUsedBytes) / g.vramTotalBytes : null);
@@ -107,7 +105,7 @@ const pushGpus = (r: Recorder, gpus: ReadonlyArray<GpuSample>) => {
 };
 
 /** CPU, memory and the disks with their series: a collector off feeds none of them (its series get gaps). */
-const pushMachine = (r: Recorder, reading: TickReading) => {
+const pushMachine = (r: HistoryRecorder, reading: TickReading) => {
   const system = Option.map(reading.system, (s) => (s === null ? null : { ...s, memBw: reading.memBw }));
   if (Option.isSome(system)) {
     const s = system.value;
@@ -142,7 +140,7 @@ export const endTick: {
   (memory: TickMemory, history: History, reading: TickReading): { memory: TickMemory; snapshot: Snapshot };
 } = dual(3, (memory: TickMemory, history: History, reading: TickReading) => {
   history.tick(reading.at);
-  const r = history.beginTick();
+  const r = history.recorder();
   pushGpus(r, reading.allGpus);
   const machine = pushMachine(r, reading);
 

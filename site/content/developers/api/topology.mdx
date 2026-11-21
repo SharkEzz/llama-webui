@@ -6,7 +6,7 @@ description: The route that returns the machine's PCIe graph read from sysfs and
 `GET /api/topology` returns what the [Topology](/docs/topology/) page draws: the hardware graph (CPU, memory, GPUs,
 NVMe drives, chipsets and their PCIe links) and how the loaded model is split across devices. The endpoint is declared
 in `MonitorApi` (`packages/webui-shared/src/api/MonitorApi.ts`) and handled in `app/server/monitor/http.ts`; the types and the pure helpers are in `packages/webui-shared/src/topology.ts`, the graph reader in
-`app/server/hardware/pci.ts`, the placement tracker `Placement` in `app/server/monitor/Placement.ts`.
+`app/server/hardware/pci.ts` (the links' speeds read by `pcieLink.ts`, the device names by `pciLabels.ts`), the placement tracker `Placement` in `app/server/monitor/Placement.ts`.
 
 The guard and the error shape follow the common rules of the [API overview](/developers/api/overview/).
 

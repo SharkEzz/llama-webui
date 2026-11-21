@@ -232,7 +232,7 @@ The model is `app/server/supervisor/Supervisor.ts`.
 - **The tiers of `Services`** (`app/server/App.ts`): each `Layer.provideMerge` is a tier, built after the ones below
   it and undone before them.
   - From the bottom: the database, `AppInfo`, the hub and the repositories (`ConversationsRepo` with them), the ring,
-    `LlamaHttp` and `PciIds`, `Flags` (with `BenchHardware`), the supervisor, the monitor, the placement, the chat's
+    `LlamaHttp`, `CpuInfo` and `PciIds`, `Flags` (with `BenchHardware`), the supervisor, the monitor, the placement, the chat's
     `ChatRuns` and the downloads, the bench's `BenchRunner`, the watch (the bench's repositories with the others).
   - The watch ends first (no look while the rest stops), then the runner (its run and loop interrupted, their
     programs killed). The monitor and `ChatRuns` end before the supervisor, the

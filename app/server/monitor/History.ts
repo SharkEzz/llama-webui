@@ -105,8 +105,8 @@ export class History {
     return Array.from(this.rings.keys());
   }
 
-  /** Starts recording one tick into this history; call `finish()` once every series for the tick has been fed. */
-  beginTick(): HistoryRecorder {
+  /** A recorder for one tick of this history; call `finish()` once every series for the tick has been fed. */
+  recorder(): HistoryRecorder {
     const points: Record<string, number | null> = {};
     const push = (key: string, v: number) => {
       this.series(key).push(v);

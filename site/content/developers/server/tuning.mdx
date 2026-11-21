@@ -23,7 +23,7 @@ searches for the placement a preset prefers. It also reviews the system settings
 | `app/server/tuning/disk.ts` | `measureDiskSpeed()`: sequential read speed of the model's disk |
 | `app/server/tuning/TuningMemo.ts` | `TuningMemo`: the last estimate and disk measurement of each model, for the checks |
 | `app/server/tuning/http.ts`, `setup.ts` | `TuningHandlers`; `SetupHandlers` and `buildLaunchpad` |
-| `app/server/hardware/cpu.ts` | `readCpuInfo()`: model, cores, threads, flags, NUMA nodes |
+| `app/server/hardware/CpuInfo.ts`, `cpu.ts` | `CpuInfo` on `readCpuInfo()`: model, cores, threads, flags, NUMA nodes |
 | `app/server/models/GgufReader.ts`, `gguf.ts` | `GgufReader`: GGUF header to `ModelInfo`, cached |
 | `app/server/models/sizes.ts` | `tensorBytes()`, `EXPERTS` |
 | `app/server/testing/tuning.ts` | `fakeModel()` and `hw3()`, for tests |
@@ -81,7 +81,8 @@ and at least one tensor matches.
   Monitor's `allGpus` (see below).
 - `devicesError`: why the list is not trusted (`llama-bench --list-devices` crashed, a GPU listed without memory),
   `null` otherwise; the devices are then the last good list.
-- `cpu`: `readCpuInfo()` (`app/server/hardware/cpu.ts`), read once per layer: model, physical cores (distinct
+- `cpu`: `CpuInfo` (`app/server/hardware/CpuInfo.ts`, on `readCpuInfo()`), read once for the server, shared with the
+  System page and the bench: model, physical cores (distinct
   physical id and core id pairs in `/proc/cpuinfo`), logical threads, flags, and NUMA nodes
   (`/sys/devices/system/node/node*`, 1 when unreadable).
 - `ramTotalBytes`, `ramAvailableBytes`: from the Monitor's latest snapshot, otherwise `/proc/meminfo` (`MemAvailable`,
