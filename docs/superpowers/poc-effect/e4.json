@@ -1,0 +1,68 @@
+{
+  "commit": "7b607b9",
+  "date": "2026-11-14T11:05:30.972Z",
+  "node": "v26.13.1",
+  "code": {
+    "server": {
+      "files": 64,
+      "lines": 7001
+    },
+    "serverTests": {
+      "files": 69,
+      "lines": 10586
+    },
+    "shared": {
+      "files": 29,
+      "lines": 2479
+    },
+    "sharedTests": {
+      "files": 18,
+      "lines": 995
+    },
+    "web": {
+      "files": 128,
+      "lines": 14135
+    },
+    "webTests": {
+      "files": 13,
+      "lines": 1106
+    },
+    "build": {
+      "files": 6,
+      "lines": 343
+    }
+  },
+  "webClientLayer": {
+    "files": 2,
+    "lines": 161
+  },
+  "dependencies": {
+    "app": {
+      "dependencies": 30,
+      "devDependencies": 10
+    },
+    "bundledIntoServer": [
+      "@effect/platform-node",
+      "@effect/platform-node-shared",
+      "@effect/sql-sqlite-node",
+      "effect",
+      "ws"
+    ]
+  },
+  "output": {
+    "totalBytes": 4833586,
+    "serverBytes": 2340921,
+    "clientBytes": 2492605,
+    "clientGzipBytes": 657730
+  },
+  "startupMs": {
+    "runs": [290, 276, 311, 291, 256, 258, 257],
+    "median": 276
+  },
+  "shutdownMs": {
+    "runs": [24, 31, 29, 20, 20, 23, 22],
+    "median": 23
+  },
+  "durationsMs": null,
+  "workarounds": []
+}

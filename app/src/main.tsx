@@ -13,10 +13,10 @@ import { useWs } from './lib/ws';
 
 startThemeSync();
 startServerSync();
-startMonitorSync();
 startLogsSync();
+startMonitorSync();
 startTopologySync();
-startDownloadsSync();
+startDownloadsSync({ navigate: (to) => void router.navigate(to) });
 useWs.getState().connect();
 
 createRoot(document.getElementById('root')!).render(

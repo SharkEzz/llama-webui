@@ -117,4 +117,6 @@ To have flags chosen for your hardware instead of writing them yourself, pick th
   deletes them too, **Delete model only** keeps them. A kept profile cannot start until you pick another file in it.
 
 Deleting is refused while the file is in use: by the running server (stop it first), by a benchmark or sweep in
-progress, or by a Hugging Face download still writing it. Benchmark runs, sweeps and conversations keep their history.
+progress, or by a Hugging Face download still writing it. If a file cannot be removed (its folder is read-only, for
+example), the deletion stops with an error and the profiles are kept. Benchmark runs, sweeps and conversations keep
+their history.

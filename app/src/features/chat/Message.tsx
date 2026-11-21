@@ -11,7 +11,7 @@ import { Reasoning } from './Reasoning';
 interface MessageProps {
   message: ChatMessage;
   /** Text being written (streaming reply). */
-  live?: { content: string; reasoning: string };
+  live?: { content: string; reasoning: string } | undefined;
   canRegenerate: boolean;
   onRegenerate(): void;
 }

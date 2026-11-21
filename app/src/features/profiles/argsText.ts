@@ -3,7 +3,7 @@ import { shellQuote, shellSplit } from '@llama-webui/shared';
 const isFlag = (a: string) => a.length > 1 && a.startsWith('-') && !/^-\d/.test(a);
 
 /** One line per flag and its values, shell-quoted. */
-export function formatArgs(args: string[]): string {
+export function formatArgs(args: readonly string[]): string {
   const lines: string[][] = [];
   for (const a of args) {
     if (isFlag(a) || lines.length === 0) lines.push([a]);
@@ -30,7 +30,7 @@ export function wordAt(text: string, cursor: number): { word: string; start: num
   return { word: text.slice(start, end), start, end, previous: text.slice(ps, p) };
 }
 
-export function formatEnv(env: Record<string, string>): string {
+export function formatEnv(env: Readonly<Record<string, string>>): string {
   return Object.entries(env)
     .map(([k, v]) => `${k}=${v}`)
     .join('\n');

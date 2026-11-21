@@ -1,18 +1,7 @@
 import { isSetupCheck, type Settings, type SetupReport } from '@llama-webui/shared';
-import {
-  Boxes,
-  Cpu,
-  ExternalLink,
-  Gauge,
-  Import,
-  ListChecks,
-  Server,
-  ShieldAlert,
-  SlidersHorizontal,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Boxes, Cpu, ExternalLink, Gauge, ListChecks, Server, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router';
-import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,7 +9,7 @@ import { GpuSwitches, TextField } from '@/features/settings/fields';
 import { CheckList } from '@/features/system/ChecksCard';
 import { formatBytes, plural } from '@/lib/format';
 import { useMonitor } from '@/lib/monitor';
-import { importLlamaTui, importSummary, type LlamaTuiStatus, llamaTuiStatus, useProfiles } from '@/lib/profiles';
+import { useProfiles } from '@/lib/profiles';
 import type { SettingsErrors } from '@/lib/settings';
 import { useTuning } from '@/lib/tuning';
 import { Command, Step } from './Step';
@@ -258,22 +247,10 @@ export function MachineStep() {
 export function ProfileStep() {
   const profiles = useProfiles((s) => s.profiles);
   const loaded = useProfiles((s) => s.loaded);
-  const [tui, setTui] = useState<LlamaTuiStatus | null>(null);
 
   useEffect(() => {
     void useProfiles.getState().reload();
-    llamaTuiStatus().then(setTui, () => {});
   }, []);
-
-  const offer = tui?.exists && tui.names.length > 0 && profiles.length === 0;
-  const runImport = () =>
-    importLlamaTui().then(
-      (r) => {
-        toast.success(importSummary(r));
-        void useProfiles.getState().reload();
-      },
-      (e: Error) => toast.error(e.message),
-    );
 
   return (
     <Step
@@ -287,17 +264,6 @@ export function ProfileStep() {
           ? `${profiles.length} ${plural(profiles.length, 'profile')}: ${profiles.map((p) => p.name).join(', ')}.`
           : 'A profile is a model plus its llama-server arguments, started in one click from Home.'}
       </p>
-      {offer && tui && (
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-border p-3">
-          <p className="min-w-0 flex-1 text-muted-foreground">
-            {tui.names.length} llama-tui {plural(tui.names.length, 'profile')} found in <Path>{tui.path}</Path>:{' '}
-            {tui.names.join(', ')}.
-          </p>
-          <Button size="sm" onClick={() => void runImport()}>
-            <Import /> Import
-          </Button>
-        </div>
-      )}
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/profiles" />}>
           Create a profile

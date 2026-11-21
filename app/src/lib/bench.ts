@@ -4,16 +4,20 @@ import {
   type BenchLive,
   type BenchParams,
   type BenchRun,
-  type BenchSpec,
+  BenchSpec,
   type BenchStatus,
   defer,
   type Profile,
+  requestInvalid,
+  STRICT,
   shellQuote,
   shellSplit,
+  type WsMessage,
 } from '@llama-webui/shared';
+import { Result, Schema } from 'effect';
 import { toast } from 'sonner';
 import { create } from 'zustand';
-import { ApiError, api } from './api';
+import { errorMessage, errorTag, call as webCall } from './api';
 import { plural } from './format';
 import { onWs, useWs } from './ws';
 
@@ -28,7 +32,7 @@ export interface BenchForm {
   t: string;
   b: string;
   ub: string;
-  dev: string[];
+  dev: ReadonlyArray<string>;
   /** Split per checked device. */
   ts: Record<string, string>;
   /** -ts without a checked device (“57,50”): splits in the tool's device order. */
@@ -172,12 +176,24 @@ export function specFromForm(f: BenchForm): { spec: Record<string, unknown> } | 
   };
 }
 
-/** Form field targeted by a zod error path of the spec (`["params", "ngl"]` → “ngl”, `["serverArgs", 2]` → “serverArgs”). */
-function fieldOf(path: (string | number)[]): FormField {
-  const [a, b] = path;
+/**
+ * Form field targeted by an issue path of the spec (`["params", "ngl"]` → “ngl”, `["serverArgs", "2"]` →
+ * “serverArgs”); a path of the request body (`["spec", …]`) is read from the spec down.
+ */
+function fieldOf(path: ReadonlyArray<string | number>): FormField {
+  const [a, b] = path[0] === 'spec' ? path.slice(1) : path;
   if (a === 'params' && typeof b === 'string') return b as FormField;
   return (typeof a === 'string' ? a : 'modelPath') as FormField;
 }
+
+/** The spec as the server decodes it (strict, every issue): the form's typed values checked before any request. */
+const decodeSpec = Schema.decodeUnknownResult(BenchSpec, STRICT);
+
+/** The issues of a `RequestInvalid` refusal, none for another error. */
+const issuesOf = (e: unknown): ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly message: string }> =>
+  errorTag(e) === 'RequestInvalid' && typeof e === 'object' && e !== null && 'issues' in e && Array.isArray(e.issues)
+    ? e.issues
+    : [];
 
 export interface BenchFilters {
   kind: BenchKind | 'all';
@@ -213,159 +229,202 @@ interface BenchState {
   removeFailed(): Promise<void>;
   toProfile(id: number): Promise<Profile | null>;
   toggle(id: number): void;
+  /** A message of the runs (`bench-run`, `bench-progress`, `bench-deleted`). */
+  receive(m: BenchMessage): void;
 }
 
-const fail = (e: unknown) => toast.error(e instanceof Error ? e.message : String(e));
+/** The messages of the runs on the push channel. */
+type BenchMessage = Extract<WsMessage, { type: 'bench-run' | 'bench-progress' | 'bench-deleted' }>;
 
-export const useBench = create<BenchState>()((set, get) => ({
-  runs: [],
-  live: null,
-  loaded: false,
-  devices: null,
-  filters: { kind: 'all', model: 'all', status: 'all', sweeps: 'none' },
-  form: EMPTY_FORM,
-  errors: {},
-  selected: [],
-  launching: false,
+/** The calls the store makes: the web's, or in a test the same calls on a fake `fetch` (`makeCall(Api, fetchImpl)`). */
+export interface BenchCalls {
+  readonly call: typeof webCall;
+}
 
-  async load() {
-    try {
-      const { runs, live } = await api('GET /api/bench/runs', {
-        query: { sweep: get().filters.sweeps, limit: String(HISTORY_LIMIT) },
-      });
-      set({ runs, live, loaded: true, selected: get().selected.filter((id) => runs.some((r) => r.id === id)) });
-    } catch (e) {
-      fail(e);
-    }
-  },
+const fail = (e: unknown) => void toast.error(errorMessage(e));
 
-  async loadDevices() {
-    try {
-      set({ devices: await api('GET /api/bench/devices') });
-    } catch {
-      set({ devices: [] });
-    }
-  },
+/** The bench's store, making its calls through `calls`. */
+export const makeBenchStore = ({ call }: BenchCalls) =>
+  create<BenchState>()((set, get) => ({
+    runs: [],
+    live: null,
+    loaded: false,
+    devices: null,
+    filters: { kind: 'all', model: 'all', status: 'all', sweeps: 'none' },
+    form: EMPTY_FORM,
+    errors: {},
+    selected: [],
+    launching: false,
 
-  setFilters(f) {
-    const prev = get().filters;
-    set({ filters: { ...prev, ...f } });
-    if (f.sweeps && f.sweeps !== prev.sweeps) void get().load();
-  },
+    async load() {
+      try {
+        const { runs: listed, live } = await call((api) =>
+          api.bench.runs({ query: { sweep: get().filters.sweeps, limit: String(HISTORY_LIMIT) } }),
+        );
+        const runs = [...listed];
+        set({ runs, live, loaded: true, selected: get().selected.filter((id) => runs.some((r) => r.id === id)) });
+      } catch (e) {
+        fail(e);
+      }
+    },
 
-  setForm(patch) {
-    const errors = { ...get().errors };
-    for (const k of Object.keys(patch) as FormField[]) delete errors[k];
-    set({ form: { ...get().form, ...patch }, errors });
-  },
+    async loadDevices() {
+      try {
+        set({ devices: [...(await call((api) => api.bench.devices()))] });
+      } catch {
+        set({ devices: [] });
+      }
+    },
 
-  async fromProfile(id) {
-    const { form } = get();
-    if (id === null) {
-      set({ form: { ...form, profileId: null }, errors: {} });
-      return;
-    }
-    try {
-      const draft = await api('GET /api/bench/from-profile/:id', { params: { id: id } });
-      set({
-        form: formFromSpec(draft, { ...EMPTY_FORM, kind: form.kind, p: form.p, n: form.n, r: form.r }),
-        errors: {},
-      });
-    } catch (e) {
-      fail(e);
-    }
-  },
+    setFilters(f) {
+      const prev = get().filters;
+      set({ filters: { ...prev, ...f } });
+      if (f.sweeps && f.sweeps !== prev.sweeps) void get().load();
+    },
 
-  rerun(run) {
-    set({ form: formFromSpec(run.spec), errors: {} });
-  },
+    setForm(patch) {
+      const errors = { ...get().errors };
+      for (const k of Object.keys(patch) as FormField[]) delete errors[k];
+      set({ form: { ...get().form, ...patch }, errors });
+    },
 
-  async launch(stopServer = false) {
-    const built = specFromForm(get().form);
-    if ('error' in built) {
-      set({ errors: { [built.field]: built.error } });
-      return 'error';
-    }
-    set({ launching: true });
-    using _launching = defer(() => set({ launching: false }));
-    try {
-      await api('POST /api/bench/run', { body: { spec: built.spec, stopServer } });
-      set({ errors: {} });
-      return 'ok';
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'server-running') return 'confirm';
-      if (e instanceof ApiError && e.issues.length > 0) {
+    async fromProfile(id) {
+      const { form } = get();
+      if (id === null) {
+        set({ form: { ...form, profileId: null }, errors: {} });
+        return;
+      }
+      try {
+        const draft = await call((api) => api.bench.fromProfile({ params: { id } }));
+        set({
+          form: formFromSpec(draft, { ...EMPTY_FORM, kind: form.kind, p: form.p, n: form.n, r: form.r }),
+          errors: {},
+        });
+      } catch (e) {
+        fail(e);
+      }
+    },
+
+    rerun(run) {
+      set({ form: formFromSpec(run.spec), errors: {} });
+    },
+
+    async launch(stopServer = false) {
+      const built = specFromForm(get().form);
+      if ('error' in built) {
+        set({ errors: { [built.field]: built.error } });
+        return 'error';
+      }
+      /** Each issue on the field it names, the first one kept. */
+      const showIssues = (
+        issues: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly message: string }>,
+      ) => {
         const errors: Partial<Record<FormField, string>> = {};
-        for (const i of e.issues) errors[fieldOf(i.path)] ??= i.message;
+        for (const i of issues) errors[fieldOf(i.path)] ??= i.message;
         set({ errors });
-      } else fail(e);
-      return 'error';
-    }
-  },
+      };
+      const decoded = decodeSpec(built.spec);
+      if (Result.isFailure(decoded)) {
+        showIssues(requestInvalid(decoded.failure.issue).issues);
+        return 'error';
+      }
+      const spec = decoded.success;
+      set({ launching: true });
+      using _launching = defer(() => set({ launching: false }));
+      try {
+        const run = await call((api) => api.bench.run({ payload: { spec, stopServer } }));
+        // The run's `bench-run` message may have come first: added only when it is not listed yet.
+        const { runs, filters } = get();
+        const listed = runs.some((r) => r.id === run.id) || (run.sweepId !== null && filters.sweeps === 'none');
+        set({ errors: {}, runs: listed ? runs : [run, ...runs] });
+        return 'ok';
+      } catch (e) {
+        if (errorTag(e) === 'ServerRunning') return 'confirm';
+        const issues = issuesOf(e);
+        if (issues.length > 0) showIssues(issues);
+        else fail(e);
+        return 'error';
+      }
+    },
 
-  async cancel() {
-    const live = get().live;
-    if (!live) return;
-    try {
-      await api('POST /api/bench/:id/cancel', { params: { id: live.runId } });
-    } catch (e) {
-      fail(e);
-    }
-  },
+    async cancel() {
+      const live = get().live;
+      if (!live) return;
+      try {
+        await call((api) => api.bench.cancel({ params: { id: live.runId } }));
+      } catch (e) {
+        fail(e);
+      }
+    },
 
-  async remove(id) {
-    try {
-      await api('DELETE /api/bench/:id', { params: { id: id } });
-      set({ runs: get().runs.filter((r) => r.id !== id), selected: get().selected.filter((s) => s !== id) });
-    } catch (e) {
-      fail(e);
-    }
-  },
+    async remove(id) {
+      try {
+        await call((api) => api.bench.remove({ params: { id } }));
+        set({ runs: get().runs.filter((r) => r.id !== id), selected: get().selected.filter((s) => s !== id) });
+      } catch (e) {
+        fail(e);
+      }
+    },
 
-  async removeFailed() {
-    try {
-      const { deleted } = await api('DELETE /api/bench/runs', { query: { failed: '1' } });
-      toast.success(deleted === 0 ? 'No failed runs' : `${deleted} ${plural(deleted, 'run')} deleted`);
-      await get().load();
-    } catch (e) {
-      fail(e);
-    }
-  },
+    async removeFailed() {
+      try {
+        const { deleted } = await call((api) => api.bench.deleteFailed({ query: { failed: '1' } }));
+        toast.success(deleted === 0 ? 'No failed runs' : `${deleted} ${plural(deleted, 'run')} deleted`);
+        await get().load();
+      } catch (e) {
+        fail(e);
+      }
+    },
 
-  async toProfile(id) {
-    try {
-      const p = await api('POST /api/bench/:id/to-profile', { params: { id: id } });
-      toast.success(`Profile “${p.name}” created`);
-      return p;
-    } catch (e) {
-      fail(e);
-      return null;
-    }
-  },
+    async toProfile(id) {
+      try {
+        const p = await call((api) => api.bench.toProfile({ params: { id } }));
+        toast.success(`Profile “${p.name}” created`);
+        return p;
+      } catch (e) {
+        fail(e);
+        return null;
+      }
+    },
 
-  toggle(id) {
-    const s = get().selected;
-    set({ selected: s.includes(id) ? s.filter((x) => x !== id) : [...s, id] });
-  },
-}));
+    toggle(id) {
+      const s = get().selected;
+      set({ selected: s.includes(id) ? s.filter((x) => x !== id) : [...s, id] });
+    },
+
+    receive(m) {
+      switch (m.type) {
+        case 'bench-progress':
+          set({ live: m.payload });
+          return;
+        case 'bench-run': {
+          const run = m.payload;
+          const { runs, filters } = get();
+          if (run.sweepId !== null && filters.sweeps === 'none') return;
+          const i = runs.findIndex((r) => r.id === run.id);
+          set({ runs: i === -1 ? [run, ...runs] : runs.map((r) => (r.id === run.id ? run : r)) });
+          return;
+        }
+        case 'bench-deleted': {
+          const gone = new Set(m.payload.ids);
+          const { runs, selected } = get();
+          set({ runs: runs.filter((r) => !gone.has(r.id)), selected: selected.filter((id) => !gone.has(id)) });
+        }
+      }
+    },
+  }));
+
+export const useBench = makeBenchStore({ call: webCall });
 
 let started = false;
 /** WS subscription (once): progress, created or finished runs; reload on every (re)connect. */
 export function startBenchSync(): void {
   if (started) return;
   started = true;
-  onWs('bench-progress', (m) => useBench.setState({ live: m.payload }));
-  onWs('bench-run', ({ payload: run }) => {
-    const { runs, filters } = useBench.getState();
-    if (run.sweepId !== null && filters.sweeps === 'none') return;
-    const i = runs.findIndex((r) => r.id === run.id);
-    useBench.setState({ runs: i === -1 ? [run, ...runs] : runs.map((r) => (r.id === run.id ? run : r)) });
-  });
-  onWs('bench-deleted', ({ payload: { ids } }) => {
-    const gone = new Set(ids);
-    const { runs, selected } = useBench.getState();
-    useBench.setState({ runs: runs.filter((r) => !gone.has(r.id)), selected: selected.filter((id) => !gone.has(id)) });
-  });
+  const receive = (m: BenchMessage) => useBench.getState().receive(m);
+  onWs('bench-progress', receive);
+  onWs('bench-run', receive);
+  onWs('bench-deleted', receive);
   useWs.subscribe((s, prev) => {
     if (s.status === 'open' && prev.status !== 'open') void useBench.getState().load();
   });

@@ -1,4 +1,4 @@
-import { api } from './api';
+import { call } from './api';
 
 /** A JSON object (not an array, not null). */
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -26,6 +26,6 @@ export function serverPropsOf(raw: unknown): ServerProps {
 
 /** GET /api/server/props: llama-server's own JSON, untyped (an object, otherwise empty). */
 export const getServerProps = async (): Promise<Record<string, unknown>> => {
-  const raw: unknown = await api('GET /api/server/props');
+  const raw: unknown = await call((api) => api.server.props());
   return isRecord(raw) ? raw : {};
 };

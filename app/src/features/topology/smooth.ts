@@ -10,9 +10,12 @@ export const MAX_DT = 0.1;
 export class Smoother {
   private v = new Map<string, number>();
   private moving = false;
+  private readonly tau: number;
 
   /** `tau`: time constant (s); after `tau`, 63% of the way to the target is covered. */
-  constructor(private readonly tau = 0.35) {}
+  constructor(tau = 0.35) {
+    this.tau = tau;
+  }
 
   step(key: string, target: number | null, dt: number): number {
     const t = target ?? 0;

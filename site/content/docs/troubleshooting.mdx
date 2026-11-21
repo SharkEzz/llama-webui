@@ -68,13 +68,13 @@ says why. `missing shard: …` means a part of a split model is absent: download
 `No GPU detected: llama-server will run on the CPU.`
 
 **Cause:** llama-webui reads NVIDIA cards through NVML, the driver's `libnvidia-ml.so.1`. When that library cannot be
-loaded at startup, it falls back to `nvidia-smi`. If neither works, no NVIDIA card is listed. **NVIDIA source**, next
+loaded at startup, or keeps failing after it was loaded, it falls back to `nvidia-smi`. If neither works, no NVIDIA card is listed. **NVIDIA source**, next
 to the System page title, shows which one is in use; with `nvidia-smi`, PCIe traffic is not measured.
 
 **Fix:**
 
 1. Check that `nvidia-smi` works in a terminal. If it does not, install or repair the NVIDIA driver.
-2. Restart llama-webui: the choice between NVML and `nvidia-smi` is made once, at startup.
+2. Restart llama-webui: NVML is only tried again at startup once llama-webui has switched to `nvidia-smi`.
 3. On the **Monitoring** tab of Settings, check that **NVML for NVIDIA GPUs** is on (it takes effect on the next
    start), and that the card is not switched off under **Displayed GPUs**. A hidden card stays listed with a **hidden**
    badge and no readings.

@@ -1,0 +1,42 @@
+import { HttpApi } from 'effect/http-api';
+import { BenchApi } from './BenchApi.ts';
+import { ChatApi } from './ChatApi.ts';
+import { DownloadsApi } from './DownloadsApi.ts';
+import { FlagsApi } from './FlagsApi.ts';
+import { HealthApi } from './HealthApi.ts';
+import { HfApi } from './HfApi.ts';
+import { LogsApi } from './LogsApi.ts';
+import { ModelsApi } from './ModelsApi.ts';
+import { MonitorApi } from './MonitorApi.ts';
+import { ProfilesApi } from './ProfilesApi.ts';
+import { RequestErrors } from './RequestErrors.ts';
+import { ServerApi } from './ServerApi.ts';
+import { SettingsApi } from './SettingsApi.ts';
+import { SetupApi } from './SetupApi.ts';
+import { SweepsApi } from './SweepsApi.ts';
+import { TuningApi } from './TuningApi.ts';
+
+/**
+ * The HTTP API of llama-webui: the server implements it (`app/server/`), the web derives its client from it. One group
+ * per domain; every milestone adds its groups here, with `.add(…)` above the two last lines: the middleware only
+ * reaches the groups added before it. A payload is decoded strictly (an unknown key is an issue, every issue is
+ * reported), and a request that does not decode is answered by `RequestErrors`.
+ */
+export class Api extends HttpApi.make('llama-webui')
+  .add(HealthApi)
+  .add(SettingsApi)
+  .add(ProfilesApi)
+  .add(FlagsApi)
+  .add(LogsApi)
+  .add(ServerApi)
+  .add(MonitorApi)
+  .add(ChatApi)
+  .add(ModelsApi)
+  .add(HfApi)
+  .add(DownloadsApi)
+  .add(BenchApi)
+  .add(SweepsApi)
+  .add(TuningApi)
+  .add(SetupApi)
+  .annotate(HttpApi.PayloadParseOptions, { onExcessProperty: 'error', errors: 'all' })
+  .middleware(RequestErrors) {}

@@ -1,140 +1,113 @@
 ---
 title: Architecture
-description: The single Node.js process behind llama-webui, a Nitro server, its startup and shutdown, the REST, WebSocket and SSE channels, UI serving, and how development reloads it.
+description: The single Node.js process behind llama-webui, an Effect server, its startup and shutdown, the REST, WebSocket and SSE channels, UI serving, and how development restarts it.
 ---
 
-llama-webui is one Node.js process (Node 26.13 or later): a [Nitro](https://nitro.build) 3 server built from the
-`app/` package. Nitro's HTTP server serves the web UI, the REST API under `/api/*` (one file per route, in
-`app/server/routes/api/`) and the `/ws` WebSocket on one port (7860 by default). The business code lives in
-`app/server/lib/`: `boot()` (`app/server/lib/boot.ts`) builds it, and the same process supervises one
+llama-webui is one Node.js process (Node 26.13 or later): a server written with [Effect](https://effect.website),
+built from the `app/` package. Its HTTP server serves the web UI, the REST API under `/api/*` and the `/ws` WebSocket
+on one port (7860 by default). The API is declared once, in `packages/webui-shared/src/api/` (`Api`, one group per
+domain), and both the server and the web client are built on that declaration. The same process supervises one
 `llama-server`, samples the hardware, runs benchmarks and relays chat generations.
 
 <ArchitectureDiagram />
 
 ## Startup sequence
 
-A Nitro plugin, `app/server/plugins/runtime.ts`, starts the runtime with the server, in `pnpm dev` and `pnpm start`
-alike: it calls `start()` of `app/server/lib/context.ts`, which runs `boot()` and keeps the result on `globalThis`
-(see [Development restarts](#development-restarts)). Nitro waits for no plugin: the server listens at once, and the
-middleware `app/server/middleware/00.ready.ts` holds every `/api/*` request and the `/ws` upgrade until the runtime
-is ready. The UI does not wait. While the runtime cannot answer (its startup failed, or it is stopping), those
-requests get `503` with the plain-text body `llama-webui is starting`.
+The server's entry point is `app/server/main.ts`, run from source in development and bundled to
+`app/.output/server/index.mjs` in production. In order, it:
 
-In production, the launcher `app/bin/llama-webui.ts` (built to `app/.output/llama-webui.mjs`) runs before Nitro. It
-loads `.env` from the working directory (`loadDotEnv()`, `app/server/lib/env.ts`): its variables fill what the
-environment lacks, and replace it too with `--env-override` (read from the arguments before they are parsed) or
-`LLAMA_WEBUI_ENV_OVERRIDE=1`. Only that file is read, and `parseEnv()` does not expand `$VAR` references. The
-launcher then parses the launch options with `cliOptionsOrExit()` (see [Launch options](#launch-options)), writes them
-to `NITRO_HOST` and `NITRO_PORT`, the address Nitro listens on, and to `LLAMA_WEBUI_HOST`, `LLAMA_WEBUI_PORT` and
-`LLAMA_WEBUI_DATA_DIR`, which `boot()` reads, sets `NODE_ENV` to `production` if it is unset, and imports Nitro's
-server, `server/index.mjs` next to it. Nitro also reads `PORT`: since the launcher sets `NITRO_PORT` from the
-parsed options, a `PORT` in the environment never wins over `--port`. In development there is no
-launcher: `vite dev` reads the environment files (see [Development](#development)).
+1. Applies `.env` from the working directory (`loadDotEnv()`, `app/server/config/DotEnv.ts`): its variables fill
+   what the environment lacks, and replace it too with `--env-override` or `LLAMA_WEBUI_ENV_OVERRIDE=1` (or `true`,
+   in the environment or in the file). Only that file is read, and `parseEnv()` of `node:util` does not expand `$VAR`
+   references. This comes first: Effect's configuration takes its snapshot of the environment the first time it is
+   read.
+2. Parses the command line (`cli()`, `app/server/config/Cli.ts`, see [Launch options](#launch-options)).
+3. Checks the address (`assertFree`, `app/server/http/Address.ts`): it listens on the configured host and port for a
+   moment, exclusively, then lets go. A port already taken ends the process with code 1 and
+   `llama-webui: cannot listen on 127.0.0.1:7860: the port is already in use`, before anything touches the data
+   directory: a second instance on the same folder would otherwise mark the first one's streaming reply `stopped` or
+   take over its download.
+4. Builds the app (`Layer.launch(App)`, `app/server/App.ts`): the services, then the HTTP server on them.
 
-`boot()` takes its options from the environment only (`parseCli([])`): Nitro's dev worker has no arguments. In order,
-it:
+The services are layers, built in tiers (`Services` in `app/server/App.ts`), each tier after the ones below it:
 
-1. Opens an `AsyncDisposableStack` with `await using`. Each step below registers what undoes it on that stack as soon
-   as it has built it (see [Shutdown](#shutdown)).
-2. Calls `useEnvProxy()` (`app/server/lib/env.ts`): with `HTTP_PROXY` or `HTTPS_PROXY` set, `fetch` goes through that
-   proxy, loopback excepted (see [Hugging Face](/developers/server/hugging-face/)). The stack restores the original
-   `fetch` last.
-3. Opens the database with `openDb(dbPath(cli.dataDir))`: creates the data directory, opens
-   `llama-webui.sqlite` with `node:sqlite`, sets `journal_mode = WAL` and `foreign_keys = ON`, and runs the migrations.
-4. Creates the runtime with `createRuntime()` (`app/server/lib/runtime.ts`): the supervisor, the log ring of 10,000
-   lines, the boot id (`crypto.randomUUID()`) and the bench gate. It only builds them.
-5. Starts the monitor with `startMonitor()`. With `LLAMA_WEBUI_TEST_MONITOR=stub`, a setting of the contract suite, a
-   stub monitor without collectors takes its place.
-6. Calls `createDeps()` (`app/server/lib/deps.ts`), which only constructs and wires the services, without starting any
-   work: the `WsHub` with the runtime's `bootId`; the settings, profiles, conversations, bench run, sweep and download
-   repositories; `ChatRuns`, whose `target()` sends generations to the managed server when it is `ready`, or to an
-   external server; the `RunExecutor` and the `BenchRunner`; the Hugging Face client and the `DownloadQueue`; and the
-   `PlacementTracker`, which replays the log ring to find the loaded model's placement.
-7. Marks the chat replies left `streaming` by the previous process as `stopped` (`conversations.stopOrphans()`), and
-   the runs and sweeps it left `running` as `interrupted`.
-8. Gives the monitor the profile → model path resolver it uses for the model's disk.
-9. Calls `downloads.resume()` to pick up the items left queued or downloading.
-10. Subscribes the WebSocket hub to the services (table below) and starts the external server watcher.
-11. Takes the stack out of the `await using` (`stack.move()`) and returns it with the services.
+| Tier | Layers | What their build does |
+| --- | --- | --- |
+| 1 | `Db.layer` | Creates the data directory, opens `llama-webui.sqlite` (`@effect/sql-sqlite-node`, on `node:sqlite`) in WAL mode with foreign keys on, and runs the migrations (`app/server/db/migrations.ts`). |
+| 2 | `AppInfo` | The version and the boot id (a random UUID), the start time `/api/health` counts from. |
+| 3 | `WsHub`, the repositories, `GgufReader`, `ActiveWrites` | The WebSocket hub; the settings, profiles, conversations, model cache, downloads, bench run and sweep repositories. |
+| 4 | `LogRing`, `LlamaHttp`, `PciIds`, `HfClient` on `HfHttp` | The ring of the last 10,000 log lines; the HTTP clients of llama-server and of Hugging Face. |
+| 5 | `Flags`, `BenchHardware` | The flag catalogue of `llama-server --help` and the bench's device listing, both read on demand and cached. |
+| 6 | `Supervisor` | The supervisor of `llama-server`; nothing runs until a start. |
+| 7 | `Monitor`, `Placement`, `ChatRuns`, `Downloads` | The monitor starts its collectors in a fiber (`LLAMA_WEBUI_TEST_MONITOR=stub`, a setting of the contract suite, gives a monitor without them); the placement follows the log ring; `ChatRuns` marks the replies left `streaming` by the previous process `stopped`; the download queue picks up the items left queued or downloading. |
+| 8 | `BenchRunner`, `TuningHardware`, `TuningMemo` | The runner marks the runs and sweeps left `running` `interrupted`. |
+| 9 | `ExternalWatch` | Looks for a `llama-server` started by hand at once, then every 2 seconds, one look at a time; it skips its looks while the bench runner is busy, since the `llama-server` a benchmark starts on the settings port is not an external server. |
 
-If a step throws, the `await using` undoes what was already built. In production, the plugin then ends the process
-with code 1; in development, the error stays in the terminal and the next save tries again.
+Only then is the port bound (`HttpLive`, `app/server/http/HttpLive.ts`), and the server prints
+`ready (<version>) on http://127.0.0.1:7860`: `dev` from source, the build's version in production. There is no
+"starting" window: a request always finds every service built. A layer that fails ends the process with code 1 and
+`llama-webui: <message>` (`runApp`, `app/server/runtime/runApp.ts`).
 
-Once the runtime is ready, `start()` prints `[llama-webui] ready (<version>)`: `dev` in development, the build's
-version in production. The first `start()` of the process also installs a `process.on('exit')` last resort that
-kills the managed server.
+A service that others follow exposes its changes as a stream (`changes` of the supervisor, `batches` of the log ring),
+and a service publishes its own `/ws` messages with `WsHub.publish`, in the step that changes its state, so the
+messages leave in the order of the changes:
 
-Route handlers reach the services through `deps()` (`app/server/lib/context.ts`), which returns the live runtime's
-objects: `00.ready.ts` has already waited for it. The services do not know about the WebSocket: `boot()` and
-`createDeps()` pass them callbacks or subscribe to them, and broadcast each event as a `WsMessage` to every client.
-The benchmark and sweep routes also broadcast directly when they delete runs.
-
-| Source | Messages |
+| Publisher | Messages |
 | --- | --- |
-| `supervisor.subscribe()` | `server-state` |
-| `logs.onLines()` | `log` |
-| `monitor.onSnapshot()` | `snapshot` |
-| `placement.onChange()` | `placement` |
-| `BenchRunner` callbacks | `bench-progress`, `bench-run`, `sweep`, `sweep-progress` |
-| `DownloadQueue` callbacks | `download`, `download-progress`, `download-deleted` |
-| `app/server/routes/api/bench/`, `app/server/routes/api/sweeps/` | `bench-deleted`, `sweep-deleted` |
+| `Supervisor` | `server-state` |
+| `LogRing` | `log` (one batch per turn of its fiber) |
+| `Monitor` | `snapshot` |
+| `Placement` | `placement` |
+| `BenchRunner` | `bench-progress`, `bench-run`, `bench-deleted`, `sweep`, `sweep-progress`, `sweep-deleted` |
+| `Downloads` | `download`, `download-progress`, `download-deleted` |
 
-The external server watcher (`externalWatcher()` in `app/server/lib/supervisor/external.ts`) runs at startup, then
-every `EXTERNAL_CHECK_MS = 2000` ms. It is paused while the bench gate is held or the bench runner is busy, because
-the `llama-server` a benchmark starts on the settings port is not an external server.
+## Requests
 
-## Routes
+`HttpLive` serves, on `NodeHttpServer` (the server of `node:http`):
 
-Nitro scans `app/server/`, its `serverDir` (`app/server/lib/` is left out with `ignore: ['lib/**']`), and serves:
+- the API: `HttpApiBuilder.layer(Api)`, with each group's handlers (`app/server/<domain>/http.ts`, merged in
+  `ApiRoutes`): 68 endpoints in all. Any other path under `/api`, whatever its method, is a `404`
+  `{ "_tag": "RouteNotFound", "message": "Unknown route" }`, a method a path lacks too (there is no `405`);
+- `/ws`: the WebSocket (see [WebSocket](#websocket)); a request without an upgrade gets `426`
+  `WebSocket upgrade expected`;
+- the UI: the built files of `app/.output/public/`, and `index.html` for every other `GET`, so reloading `/chat/12`
+  serves the app (see [Serving the UI](#serving-the-ui)).
 
-- `routes/api/**`: one file per route, the method in the file name. `profiles/[id]/index.put.ts` is
-  `PUT /api/profiles/:id`, `bench/runs.delete.ts` is `DELETE /api/bench/runs`: 70 routes in all;
-- `routes/ws.ts`: the `/ws` WebSocket (see [WebSocket](#websocket));
-- the UI: the built files from `app/.output/public/`, and Nitro's renderer, which answers `index.html` for every other
-  path (the SPA fallback), so reloading `/chat/12` serves the app.
+A request to a route of the API or of `/ws` goes through that route's middlewares (`Guarded`,
+`app/server/http/Guard.ts`), in this order, whatever the spelling of the path the router matched:
 
-Every request first goes through the middlewares of `app/server/middleware/`, in the order of their file names:
+1. The guard: the `Host`, the `Origin` and the content type of a write (see
+   [Security](/developers/server/security/)). A refusal is JSON, `RequestRefused`.
+2. A path that ends with a slash is a `308` to the path without it (`app/server/http/TrailingSlash.ts`).
 
-1. `00.ready.ts`: the API and `/ws` wait for startup (see [Startup sequence](#startup-sequence)).
-2. `01.guard.ts`: on `/api` and `/api/*`, the request guard (`guard()`, `app/server/lib/security.ts`), then the `405`
-   table and the `404` `{ "error": "Unknown route" }` of an unknown API path (`allowTable()` of
-   `app/server/lib/http.ts`, over the `ROUTES` of `app/server/api.gen.ts`). Nitro cannot give either answer itself:
-   its renderer would answer both with the app's HTML. On `/ws` without an `Upgrade` header: the guard, then `426`
-   `WebSocket upgrade expected`.
-3. `02.cache.ts`: `Cache-Control: no-cache` on the HTML pages (see [Production](#production)).
+Around every route, the UI's included, a defect of a handler (an exception, not an error the endpoint declares) is
+logged with its cause, and the client gets a `500` without its message.
 
-A route file default-exports a handler made with `defineHandler()` of `nitro`. It gets h3's `H3Event`: the web
-`Request` in `event.req`, its abort signal in `event.req.signal`. It reaches the services with `deps()`, and reads and
-answers with the helpers of `app/server/lib/http.ts`:
+An endpoint declares what it reads as schemas, `params`, `payload` and `query`, and what it answers: its `success`
+schema and its errors, each a `Schema.TaggedError` with its `httpApiStatus`. The handler never parses anything
+itself:
 
-```ts title="app/server/routes/api/profiles/[id]/index.put.ts"
-import { defineHandler } from 'nitro';
-import { deps } from '../../../../lib/context.ts';
-import { idParam, passthrough, readJson, reply } from '../../../../lib/http.ts';
-
-export type Body = unknown;
-
-/** The repo looks the profile up before parsing the body (404 beats 400): the body is passed as sent. */
-export default defineHandler(async (event) => {
-  const id = idParam(event, 'Profile');
-  return reply(deps().profiles.update(id, await readJson(event, passthrough)));
-});
+```ts title="app/server/profiles/http.ts"
+export const ProfilesHandlers = HttpApiBuilder.group(
+  Api,
+  'profiles',
+  Effect.fn(function* (handlers) {
+    const repo = yield* ProfilesRepo;
+    return handlers
+      .handle('list', () => repo.list)
+      .handle('get', ({ params }) => repo.get(params.id))
+      .handle('update', ({ params, payload }) => repo.update(params.id, payload))
+      // …
+  }),
+);
 ```
 
-`reply<T>(data, status = 200)` answers JSON typed for the web's client, `noContent()` a `204`, `attachment(filename,
-body)` a JSON download. `idParam()`, `readBody()`, `readJson()` and `queryOf()` read the path id, the body and the
-query (the [API overview](/developers/api/overview/#how-routes-are-registered) lists their answers), and a handler
-refuses a request by throwing `HttpError(status, message, code?)` or `notFound(what)`. The `Body` and `Query` types a
-route file exports are what the generated `app/server/api.gen.ts` types the client with.
-
-Whatever a handler throws reaches the error handler `app/server/error.ts` (`defineErrorHandler()`), which answers
-`appError(error)`: the original error when it comes wrapped (its `cause` is an `Error`), never the details object h3
-keeps in the `cause` of its own `HTTPError` (a missing asset stays a `404`). `errorResponse()`
-(`app/server/lib/http.ts`) turns an exception into a JSON response: an `HttpError` keeps its status and returns
-`{ error, code? }`, a `ZodError` becomes a `400` with the zod `issues`, invalid JSON a `400`, an error of h3's own
-below `500` keeps its status and message, and anything else is a `500` with `Internal error`. The
-[API overview](/developers/api/overview/) documents the error shape and the order of the checks, the
-[Security](/developers/server/security/) page the guard.
+A body that does not decode (malformed JSON, a missing or unknown key, a value a check refuses) never reaches the
+handler: `RequestErrorsLive` (`app/server/http/RequestErrors.ts`) answers it with a `400`
+`{ "_tag": "RequestInvalid", "message": "Invalid data: <first issue> (<path>)", "issues": [...] }`, and a path
+parameter that does not decode (`/api/profiles/abc`) with the `404` `RouteNotFound`. An error the handler fails with
+is answered with its own status and `{ _tag, message }`, plus its other fields. The
+[API overview](/developers/api/overview/) documents the shapes and the order of the checks.
 
 ## Channels to the browser
 
@@ -148,74 +121,78 @@ The browser talks to llama-webui over three channels, all on the same port.
 
 ### WebSocket
 
-`app/server/routes/ws.ts` is a `defineWebSocketHandler()` of Nitro, on [crossws](https://crossws.h3.dev)
-(`features.websocket` in `app/vite.config.ts`). Its `upgrade` hook runs the same `guard()` as the API (a refusal is
-thrown as its response, with `Connection: close`) and waits for startup; `open` attaches the connection to the hub,
-`message` hands it the client's text, `close` detaches it. A client message over 4,096 bytes (the protocol only has
-`ping` and `pong`) closes the socket with code `1009`. Each connection remembers the hub it was attached to: a
-development reload of business code builds a new hub while the old one closes its sockets.
+`GET /ws` is a route of `WsHub` (`app/server/ws/WsHub.ts`). The guard has judged the upgrade before it; the hub then
+runs one fiber per client. A client message over 4,096 bytes closes the socket with code `1009`.
 
-There is one hub (`app/server/lib/ws/hub.ts`) and one connection per tab. The hub sends `hello` with the `bootId` and
-the server time when a client connects, then broadcasts every message to every client: there are no subscriptions,
-the client dispatches by `type`. Every `PING_INTERVAL_MS = 15_000` ms the hub sends `ping`; a client that leaves
-`MAX_MISSED_PINGS = 2` pings unanswered is closed with code `4000`. The messages are the `WsMessage` union of
+There is one hub and one connection per tab. The hub sends `hello` with the `bootId` and the server time when a
+client connects, then broadcasts every message to every client: there are no subscriptions, the client dispatches by
+`type`. Every 15 seconds the hub sends `ping`; a client that leaves two pings unanswered is closed with code `4000`
+`heartbeat`. A client's `ping` is answered with `pong`. Every message is encoded with the `WsMessage` union of
 `packages/webui-shared/src/ws.ts`, listed on the [WebSocket](/developers/api/websocket/) page.
 
 The WebSocket only carries changes. After every (re)connection, the web app reads the current state again over REST,
-and the `bootId` tells it whether the runtime restarted in between ([Web app](/developers/frontend/) describes the
+and the `bootId` tells it whether the server restarted in between ([Web app](/developers/frontend/) describes the
 client).
 
 ### SSE for chat
 
 A chat generation belongs to the server, not to the HTTP request (see [Chat runs](/developers/server/chat/)). The SSE
 response only subscribes to the run: events `start`, `delta` and `done` (`ChatEvent` in
-`packages/webui-shared/src/chat.ts`, written by h3's `createEventStream()` in `sse()`, `app/server/lib/chat/sse.ts`),
-plus a `: ping` comment every `PING_MS = 15_000` ms: a long prompt can be processed without sending anything, and a
-proxy may drop a silent connection. The response sends `Connection: close`, so the browser does not keep the
-connection open once the stream ends (it would hold the shutdown). A client that leaves only unsubscribes; the
-generation goes on, and `GET /api/chat/:id/stream` attaches to it again.
+`packages/webui-shared/src/chat.ts`). The endpoint's success is `HttpApiSchema.StreamSse`, and its handler answers
+`sseResponse` (`app/server/http/Sse.ts`), which adds a `: ping` comment after 15 seconds of silence: a long prompt can
+be processed without sending anything, and a proxy may drop a silent connection. The response sends
+`Connection: close`, so the browser does not keep the connection open once the stream ends (it would hold the
+shutdown). A client that leaves only unsubscribes; the generation goes on, and `GET /api/chat/:id/stream` attaches to
+it again.
 
 ## Serving the UI
 
-`app/vite.config.ts` describes the whole app: the web client (`app/index.html` and `app/src/`, with
-`@vitejs/plugin-react`, `@tailwindcss/vite` and the `@` → `src` alias) and the server, through the `nitro()` plugin of
-`nitro/vite` (`serverDir: './server'`, preset `node_server`, `features.websocket`, `errorHandler: './server/error.ts'`).
+`app/vite.config.ts` builds the web client (`app/index.html` and `app/src/`, with `@vitejs/plugin-react`,
+`@tailwindcss/vite` and the `@` → `src` alias). The server is not a Vite plugin: `app/build/server.ts` bundles it with
+Rolldown, and in development Vite only starts it and forwards `/api` and `/ws` to it.
 
 ### Development
 
-`pnpm dev` runs `vite dev` in `app/`. Vite serves the UI with hot module replacement, and Nitro's Vite plugin runs the
-server in its dev worker (a worker thread) on the same port: the API, the `/ws` WebSocket and the UI, with Vite's own
-HMR WebSocket, all on `LLAMA_WEBUI_PORT` (7860 by default, `strictPort`) of `LLAMA_WEBUI_HOST` (`127.0.0.1` by
-default), the `server` options of `app/vite.config.ts`. Each save re-evaluates the changed server modules in the
-worker (see [Development restarts](#development-restarts)).
+`pnpm dev` runs `vite dev` in `app/`. Vite serves the UI with hot module replacement on `LLAMA_WEBUI_PORT` (7860 by
+default, `strictPort`) of `LLAMA_WEBUI_HOST` (`127.0.0.1` by default). Its plugin `app/build/devServer.ts` starts the
+server from source, `node --watch server/main.ts`, on a free loopback port and in its own process group, with
+`LLAMA_WEBUI_DEV=1`, and proxies `/api` and `/ws` to it without changing the `Host` (the guard reads what the browser
+sent). While the server starts or restarts, an API request waits for it rather than failing in the proxy: the plugin
+keeps one idle connection open to the server (`serverLink()`), which says it is up without a probe per request and
+closes when the server stops (Node also closes it after a minute without a request; the next API request takes a new
+one). A server that still accepts nothing after 10 seconds is logged
+(`API not reachable on "<url>"…`) and the proxy answers for it.
 
-Development reads more environment files than production: Nitro's Vite plugin loads `.env`, `.env.local`,
-`.env.development` and `.env.development.local` from `app/`, the working directory of `vite dev` (the list is fixed in
-the plugin), and `app/vite.config.ts` loads `.env` itself so that its `server` options see it. The environment wins
-over the files.
+`app/vite.config.ts` applies `.env` the way `main.ts` does, before it reads the address, and the server inherits the
+result. No other environment file is read.
+
+In development, the server sends its spans to the [Effect DevTools](https://effect.website/docs/getting-started/devtools/)
+when they listen, at `LLAMA_WEBUI_DEVTOOLS_URL` (`ws://localhost:34437` by default); it says in the terminal whether it
+connected. A build never connects to them.
 
 ### Production
 
-`pnpm start` runs `pnpm build`, then `node app/.output/llama-webui.mjs`. `vite build` in `app/` writes `app/.output/`:
+`pnpm start` runs `pnpm build`, then `node app/.output/llama-webui.mjs`. `pnpm build` runs `vite build`, then
+`node build/server.ts`, in `app/`, and writes `app/.output/`:
 
-- `public/assets/`: the client, split per page: each page loads only its own chunks, so the Topology page's three.js
-  (about 1 MB) stays out of the others. The file names are content-hashed;
-- `server/index.mjs` and its chunks: Nitro's server, every dependency bundled (it imports only `node:*`), with
-  `index.html` embedded for the renderer;
-- `server/nvml-worker.mjs`: the NVML sampler, built from `app/server/lib/collectors/nvml/worker.ts` by Rolldown in
-  Nitro's `compiled` hook, and started as a child process. Development runs the worker's sources as is;
-- `llama-webui.mjs`: the launcher, built from `app/bin/llama-webui.ts` in the same hook, which starts with
-  `#!/usr/bin/env node`;
-- `server/THIRD-PARTY-LICENSES.md`: the licenses of the npm code bundled into the server (`app/build/licenses.ts`).
+- `public/`: the client, split per page: each page loads only its own chunks, so the Topology page's three.js (about
+  1 MB) stays out of the others. The files of `public/assets/` are content-hashed;
+- `server/index.mjs`: the server, one file with every dependency bundled (it imports only `node:*`);
+- `server/nvml-worker.mjs`: the NVML sampler, built from `app/server/collectors/nvml/worker.ts`, and started as a
+  child process. Development runs its sources as they are;
+- `llama-webui.mjs`: the launcher, built from `app/bin/llama-webui.ts`, which starts with `#!/usr/bin/env node` and
+  imports `./server/index.mjs`;
+- `server/THIRD-PARTY-LICENSES.md`: the licenses of the npm code bundled into the server and the sampler
+  (`app/build/licenses.ts`).
 
-The build also replaces `LLAMA_WEBUI_VERSION` (a `define` in `app/vite.config.ts`) with
-`git describe --tags --always --dirty`, or the version of `package.json` without git. It becomes `APP_VERSION`
-(`app/server/lib/version.ts`), which `/api/health` reports and the status bar shows: the tag, else the short commit
-hash. In development, it is `dev`.
+The build also replaces `LLAMA_WEBUI_VERSION` with `git describe --tags --always --dirty`, or the version of
+`package.json` without git. `AppInfo` (`app/server/config/AppInfo.ts`) reports it in `/api/health`, `--version`
+prints it, and the status bar shows it: the tag, else the short commit hash. From source, it is `dev`.
 
-Nitro serves the hashed assets with `Cache-Control: public, max-age=31536000, immutable`. Every other path gets
-`index.html` (`text/html; charset=utf-8`), to which `02.cache.ts` adds `Cache-Control: no-cache`, since it points to
-the current chunks. The API sets no cache header.
+`app/server/http/Static.ts` serves the UI next to the bundle (`<bundle folder>/../public`): `/assets/*` with
+`Cache-Control: public, max-age=31536000, immutable`, and a missing asset is a `404` (a stale tab after an upgrade
+asks for the old names). Every other `GET` is a file of `public/` when there is one, `index.html` otherwise, both
+with `Cache-Control: no-cache`, since `index.html` points to the current chunks. The API sets no cache header.
 
 ### Distribution
 
@@ -228,7 +205,7 @@ The root `package.json` is the packed one:
 - `files` ships `app/.output`, plus the `README.md`, `LICENSE` and `package.json` npm always adds; `os` is `linux`
   and `engines` asks for Node.js 26.13. `.output` is ignored by the root `.gitignore`, not by one in `app/`, which
   npm would have applied to the package too.
-- There are no `dependencies`: Nitro's build bundles every library and workspace package, so an install from the
+- There are no `dependencies`: the build bundles every library and workspace package, so an install from the
   tarball fetches nothing else.
 
 `node scripts/smoke.ts` checks the build: `--help`, then a run on a free port with an empty data directory (the API,
@@ -241,95 +218,65 @@ builds: `pnpm pack` runs `scripts/prepack.ts` first, which refuses without `app/
 written; run `pnpm build` before it. CI runs both on every pull request, and `release.yml` runs the tarball check on
 the tarball it publishes.
 
-Up to v0.2.1, llama-webui ran on Bun and shipped as a standalone executable. The port to Node.js, then the move from
-Hono to Nitro, kept the API's answers: the contract suite replays each route against a golden record
-([Testing](/developers/contributing/testing/)). The move to Nitro changed three on purpose: a `Host` header that does
-not parse (`Host: a b`) gets the guard's JSON `400` `Invalid host` instead of a `400` without a body, the pages are
-served as `text/html; charset=utf-8`, and the chat's SSE responses carry h3's own `Cache-Control`.
+Up to v0.2.1, llama-webui ran on Bun and shipped as a standalone executable. It then moved to Node.js and Nitro, and
+from Nitro to Effect. Each move kept the API's answers or recorded each change: the contract suite replays every
+endpoint against a golden record ([Testing](/developers/contributing/testing/)). The move to Effect changed, on
+purpose, the error bodies (`{ _tag, message }` instead of `{ error, code }`), the answer to a method a path lacks (a
+`404` instead of a `405` with `Allow`), the validation messages, and a few refusals that are now stricter (an id
+written `"1"`, an unknown key in a body); the [API overview](/developers/api/overview/) lists them.
 
 ## Launch options
 
-`app/server/lib/cli.ts` reads three options, each from a flag, else its environment variable, else a default. An
-empty variable counts as unset.
+`app/server/config/Cli.ts` declares the command line (`effect/cli`). Each option comes from its flag, else its
+environment variable, else a default (`AppConfig`, `app/server/config/AppConfig.ts`). An empty variable counts as
+unset.
 
 | Flag | Variable | Default |
 | --- | --- | --- |
-| `--host <address>` | `LLAMA_WEBUI_HOST` | `DEFAULT_HOST = '127.0.0.1'` |
-| `--port <port>` | `LLAMA_WEBUI_PORT` | `DEFAULT_PORT = 7860` (an integer from 1 to 65535) |
-| `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR` | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` (`dataDir()` in `app/server/lib/paths.ts`) |
+| `--host <address>` | `LLAMA_WEBUI_HOST` | `127.0.0.1` |
+| `--port <port>` | `LLAMA_WEBUI_PORT` | `7860` (an integer from 1 to 65535) |
+| `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR` | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` |
+| `--env-override` | `LLAMA_WEBUI_ENV_OVERRIDE=1` | off: `.env` only fills what the environment lacks |
 
-`parseCli()` is pure: it takes the arguments and the environment and returns `run`, `help` or `error`, which keeps it
-testable. `cliOptionsOrExit()`, called by the production launcher, prints `HELP_TEXT` and exits with code 0 for
-`-h`/`--help`, or prints the error and the help and exits with code 2. The flags exist only in production: in
-development, `vite dev` takes the variables, from the environment or the `.env` files. User-facing details are on
-[Launch options](/docs/configuration/).
+`-h`/`--help` prints the help and exits with code 0, `-v`/`--version` prints `llama-webui v<version>`. An unknown flag
+or an invalid value prints the help, then the error, and exits with code 1. In development, `vite dev` starts the
+server with `--host 127.0.0.1` and a port of its own; the public address comes from the variables, in the environment
+or in `.env`. User-facing details are on [Launch options](/docs/configuration/).
 
 ## Shutdown
 
-`boot()` builds everything on one `AsyncDisposableStack`: each part registers what undoes it (`stack.use(db)`,
-`stack.defer(…)`) right after it is created, and the stack undoes them in reverse order. `stop()`
-(`app/server/lib/context.ts`) disposes of it, and the order of construction therefore sets the order of the shutdown:
+`SIGINT` or `SIGTERM` interrupts the app (`runApp`, `app/server/runtime/runApp.ts`), which undoes in this order:
 
-1. The external server watcher's interval is cleared, so no check runs while the rest stops.
-2. `chatRuns.dispose()` saves each running reply as `stopped` and closes its SSE streams.
-3. `benchRunner.dispose()` kills the running benchmark and marks it (and its sweep) `interrupted`, with the error
-   `interrupted (llama-webui stopped)`. The gate is not released: `llama-server` stops right after.
-4. `downloads.dispose()` stops the running download, keeping its `.part` file and its row for the next start.
-5. `hub.dispose()` closes every WebSocket with code `1001` (a client that has not answered within 500 ms is dropped),
-   and `placement.dispose()` unsubscribes the tracker.
-6. `monitor.stop()` stops the sampling and its collectors.
-7. `supervisor.stop()` stops the managed `llama-server` (`SIGTERM`, then `SIGKILL` after 5 seconds).
-8. The database is closed, and the original `fetch` is restored.
+1. **The shutdown steps** (`Shutdown`, `app/server/runtime/Shutdown.ts`), while the clients are still connected, last
+   registered first: `ChatRuns` saves each running reply as `stopped` and ends its SSE streams with `done`; the bench
+   runner interrupts its work and saves the current run and the running sweep `interrupted`, with the error
+   `interrupted (llama-webui stopped)` (the gate is not released: `llama-server` is about to stop); the download queue
+   stops its loop, the running item keeping its row and its `.part` file for the next start; then the hub flushes the
+   last messages to its clients, 500 ms at most.
+2. **The HTTP server** stops serving: every WebSocket is closed with code `1001`, and open connections get 500 ms
+   before they are cut.
+3. **The services**, in the reverse order of their tiers: the external watch first (no look while the rest stops),
+   then the bench runner (its programs killed), the monitor (its collectors' programs), the chat runs and the
+   downloads, then the supervisor stops the managed `llama-server` (`SIGTERM`, then `SIGKILL` after 5 seconds) while
+   the log ring and the hub it writes to are still up, and the database closes last.
 
-The replies, the benchmark and the download come first, while `llama-server` still runs: a reply would otherwise see
-the disconnection and end as an error.
+The process then exits with code 0, in well under 2 seconds with a page open and a reply streaming
+(`app/server/lifecycle.test.ts`). A second signal while it stops exits at once.
 
-`stop()` prints `[llama-webui] stopping llama-server…` when a managed server runs. It undoes the runtime once: a later
-call waits for the same undo. The plugin calls it from two Nitro hooks, and in development on the dev worker's
-`shutdown` message. In production, `shutdown` runs as the server starts closing, while connections drain: the runtime is undone
-there (WebSockets closed with `1001`, a streaming reply saved as `stopped`, `llama-server` stopped), so srvx, Nitro's
-HTTP server, closes at once. Nitro runs `close` only once every connection has ended: an open tab or a streaming reply
-would otherwise hold srvx's graceful close for its whole grace delay (5 seconds); with `shutdown`, the process stops in
-under 2 seconds. Nitro 3.0.261103-rc does not call `shutdown` yet (nitrojs/nitro#5099, unreleased): until a release
-does, the plugin declares the hook and emits it from its own `SIGINT` and `SIGTERM` handlers, registered before those
-of srvx, waiting for its work up to 5 seconds as Nitro will. A second signal forces srvx's close, and the `close`
-hook's call of `stop()` is then a no-op. In development, Ctrl+C stops `vite dev`: Nitro closes Vite and sends the
-dev worker a `shutdown` message, and the
-process exits with code 130; a double Ctrl+C stops `llama-server` too. Nitro 3.0.261103-rc sends that message without a
-timeout (nitrojs/nitro#5133): the worker waits for every connection to end before it runs the `close` hooks, and the
-upstream socket of an open page's `/ws` (proxied by the Vite process, whose browser side is already gone) never ends on
-its own, so Nitro would force-close the worker after 5 seconds (`Dev worker did not shut down in time`) without the
-runtime undone. The plugin therefore listens for that message itself (`parentPort`, one listener per worker) and calls
-`stop()` right away; the hub drops the socket that does not answer its close, and the worker exits within a second. Once
-a Nitro release fixes #5133, the listener goes if the dev tests pass without it.
-
-The `process.on('exit')` handler kills the managed server with `SIGKILL` as a last resort (`killNow()`). If the
-process dies without running any handler, `setpriv --pdeathsig KILL` makes the kernel kill `llama-server` and
-`llama-bench` with it. On the next start, the orphan cleanup of the [startup sequence](#startup-sequence) settles
-whatever was left `streaming` or `running`.
-
-A second instance started on a port already taken exits with code 1 and a message that names the port. The launcher
-checks the address before it imports the server: the runtime starts alongside the listen, and its startup would
-otherwise mark the first instance's streaming reply `stopped` or resume its download, when both share a data
-directory.
+If the process dies without running any of this (`SIGKILL`), `setpriv --pdeathsig KILL` makes the kernel kill
+`llama-server` and `llama-bench` with it. On the next start, the layers of the [startup sequence](#startup-sequence)
+settle whatever was left `streaming` or `running`.
 
 ## Development restarts
 
-`pnpm dev` keeps one process for the whole session. On each save, Nitro's dev worker re-evaluates the changed module
-and the modules that import it, and runs the plugin again, but the runtime lives on `globalThis` (a registry of
-`app/server/lib/context.ts`), so what a save restarts depends on what it changed:
+Under `pnpm dev`, the server is a child of Vite run by `node --watch`, which restarts it whenever a file it imports
+changes (under `app/server/` or `packages/`). A restart is a [shutdown](#shutdown) then a [startup](#startup-sequence):
+`llama-server` is stopped, a running sweep becomes `interrupted` (the Resume button continues it), a chat reply is
+saved as `stopped`, and a download resumes from its `.part` file. The new process has a new `bootId`: open tabs see
+it in `hello` when they reconnect, and read the state again. A server that fails to start prints its error and
+`node --watch` waits for the next save.
 
-- **A route file** (under `app/server/routes/`, or a middleware): `context.ts` is not re-evaluated, `start()` keeps the live
-  runtime, and `llama-server` keeps running with the same `bootId`.
-- **Business code** (a module of `app/server/lib/` that `boot.ts` reaches): `context.ts` is
-  re-evaluated with it, and `start()` undoes the old runtime (the [shutdown](#shutdown) above) before it builds a new
-  one. `llama-server` is stopped, a running sweep becomes `interrupted` (the Resume button continues it), a chat reply
-  is saved as `stopped`, and a download resumes from its `.part` file. The new runtime has a new `bootId`: open tabs
-  see it in `hello` when they reconnect, and read the state again.
+A save under `app/src/` is a hot module replacement of the UI and leaves the server, and `llama-server`, alone.
 
-A save under `app/src/` is a hot module replacement of the UI and leaves the server alone. A save under
-`app/server/routes/api/` also rewrites `app/server/api.gen.ts`, the route map the client is typed by: at once for a
-changed file, once Nitro has rescanned for an added or deleted one (`app/build/apiTypes.ts`).
-
-A runtime that fails to start (an error thrown by `boot()`, an import of a missing file) prints the error and leaves
-`vite dev` running: the API answers `503` until a save, the next one of any server file, starts it again.
+Stopping Vite (Ctrl+C, `SIGTERM`, or the terminal closed) sends the server `SIGTERM` and waits for it, so an open
+page gets its `1001` and `llama-server` stops; a second Ctrl+C kills the server and exits at once.

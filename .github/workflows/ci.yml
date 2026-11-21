@@ -13,6 +13,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0 # tags and history: the build's version comes from `git describe`
+          submodules: recursive
       # pnpm installs (version from `packageManager`) and runs the gate, on Node.
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v5
@@ -38,6 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v5
         with:
           node-version: 24

@@ -13,6 +13,13 @@ What is llama-webui's own choice stays in the app: the [supervisor](/developers/
 logs, profiles), `buildCommand()`, the benchmark runner and gate, tuning, and the wording of errors shown to the user
 (`llamaErrorMessage()`, `benchFailure()`).
 
+The llama-webui server uses the package's pure parts: the parsers (`parseSlots()`, `parsePrometheus()`,
+`parseHelp()`, `parseBenchJson()`, `parseDeviceList()`, `parseLlamaError()`…), `probeUrl()`, `parseCmdline()`,
+`portFromArgv()` and `benchBinary()`. It does its own I/O with Effect: the requests to `llama-server` go through
+`LlamaHttp` (`app/server/llama/`), the programs through `effect/process`, so it calls neither the `fetch`-based
+functions nor `loadFlags()` and `findLlamaServerPid()`. Those stay for the package's other users, and its tests cover
+them.
+
 ## Entry points
 
 Each module has its own subpath export, and the root re-exports every module that runs anywhere:
@@ -78,7 +85,7 @@ The errors are classes with a fixed `name`, so a caller can test them with `inst
 
 A `fetch` that fails before any response (nothing listens, a timeout) throws its own error unchanged. Node's `fetch`
 has timeouts of its own (300 s without response headers, 300 s between two chunks): for a request that can stay
-silent longer, pass another `fetch`, as llama-webui does with `llamaFetch()` (`app/server/lib/llamaFetch.ts`). The probes and
+silent longer, pass another `fetch` (llama-webui's `LlamaHttp` has no such limit: it uses `node:http`). The probes and
 `fetchLlama()` never throw: a server that does not answer is `null`, `false` or `health: 'down'`.
 `contextOverflow(error)` reads the prompt and context sizes of an `exceed_context_size_error`, from its fields or, on
 builds that only put them in the message, from its text.

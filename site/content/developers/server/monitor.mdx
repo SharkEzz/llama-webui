@@ -5,59 +5,63 @@ description: The always-on sampling loop, the Snapshot it builds on every tick, 
 
 The monitor samples `llama-server` and the machine on a fixed interval, whether a browser is connected or not. Each
 tick produces a `Snapshot`, appends one point to every history series, and is broadcast over the WebSocket. The loop
-lives in `app/server/lib/monitor/`, the readers of each data source in `app/server/lib/collectors/`.
+lives in `app/server/monitor/`, the readers of each data source in `app/server/collectors/`.
 
-| File                               | Role                                                                                         |
-| ---------------------------------- | -------------------------------------------------------------------------------------------- |
-| `app/server/lib/monitor/monitor.ts`        | `Monitor`: the tick loop, the `Snapshot`, the series it feeds.                               |
-| `app/server/lib/monitor/history.ts`        | `History` (named rings plus timestamps) and `historyPoints()`.                               |
-| `app/server/lib/monitor/ring.ts`           | `Ring`, a fixed-capacity numeric ring buffer.                                                |
-| `app/server/lib/monitor/placement.ts`      | `PlacementTracker` and `parsePlacement()`: how the model is split across devices, from the logs. |
-| `app/server/lib/collectors/registry.ts`    | `Collectors`: creates the collectors and follows the settings.                               |
-| `app/server/lib/collectors/needs.ts`       | `GpuNeeds`: what the GPU readers must read.                                                  |
-| `llamacpp-js/client`, `llamacpp-js/metrics` | `fetchLlama()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)). |
-| `app/server/lib/collectors/nvml/`          | NVIDIA through NVML (`node:ffi`) in a child process (`nvml/sampler.ts`).                     |
-| `app/server/lib/collectors/nvidia.ts`      | `NvidiaMonitor`, the `nvidia-smi` fallback.                                                  |
-| `app/server/lib/collectors/amdgpu.ts`      | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                          |
-| `app/server/lib/collectors/gpu.ts`         | Shared GPU helpers: `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`.              |
-| `app/server/lib/collectors/proc.ts`        | `ProcSampler`: CPU and RSS of the `llama-server` process.                                    |
-| `app/server/lib/collectors/system.ts`      | `SystemSampler`: machine CPU, memory, load, frequency, temperature.                          |
-| `app/server/lib/collectors/disk.ts`        | `DiskSampler` and `resolveModelDisk()`.                                                       |
-| `app/server/lib/collectors/membw.ts`       | `MemBandwidthSampler`: DRAM bandwidth through `perf stat`.                                    |
-| `packages/webui-shared/src/monitor.ts`            | `Snapshot`, `HistoryDump`, `GpuSample`, `SERIES` and the other monitoring types.              |
+| File | Role |
+| --- | --- |
+| `app/server/monitor/Monitor.ts` | `Monitor`: the service of the ticks, its latest `Snapshot` and the history. |
+| `app/server/monitor/tick.ts` | `beginTick()` and `endTick()`: what a tick derives from its readings, the series it feeds, the snapshot. |
+| `app/server/monitor/gpus.ts` | `collectGpus()`: every card, with `llama-server`'s VRAM on it. |
+| `app/server/monitor/History.ts` | `History` (named rings plus timestamps), `Ring` and `historyPoints()`. |
+| `app/server/monitor/Placement.ts`, `placementLog.ts` | `Placement` and `parsePlacement()`: how the model is split across devices, from the logs. |
+| `app/server/llama/probes.ts` | `readLlama()`: `/health`, `/slots` and `/metrics` of a `llama-server`, through `LlamaHttp`. |
+| `llamacpp-js/metrics` | `parseSlots()`, `parsePrometheus()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)). |
+| `app/server/collectors/Collectors.ts` | `Collectors`: builds the readers and follows the settings. |
+| `app/server/collectors/gpu.ts` | `GpuNeeds`, `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`. |
+| `app/server/collectors/nvml/` | NVIDIA through NVML (`node:ffi`), in a program of its own (`worker.ts`, `Nvml.ts`, `protocol.ts`). |
+| `app/server/collectors/nvidia.ts` | The `nvidia-smi` fallback. |
+| `app/server/collectors/amdgpu.ts` | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`. |
+| `app/server/collectors/proc.ts` | `makeProcSampler()`: CPU and RSS of the `llama-server` process. |
+| `app/server/collectors/system.ts` | `makeSystemSampler()`: machine CPU, memory, load, frequency, temperature. |
+| `app/server/collectors/disk.ts` | `makeDiskSampler()`, `physicalDisks()` and `resolveModelDisk()`. |
+| `app/server/collectors/membw.ts` | DRAM bandwidth through `perf stat`. |
+| `packages/webui-shared/src/monitor.ts` | `Snapshot`, `HistoryDump`, `GpuSample`, `SERIES` and the other monitoring schemas. |
 
 The user-facing pages are the [Dashboard](/docs/dashboard/), [System](/docs/system/) and
 [Topology](/docs/topology/); the routes are in [Monitor and system](/developers/api/monitor/).
 
 ## The tick loop
 
-`startMonitor(runtime, settings)` (`app/server/lib/runtime.ts`) creates the monitor once per process with
-`Monitor.start()`, which starts the collectors, runs a first tick at once, then one every `pollIntervalMs`
-(1,000 ms by default, at least 250 ms). The `Monitor` lives in the runtime; `boot()` (`app/server/lib/boot.ts`) stops it at
-shutdown, after the WebSocket hub and before `llama-server` ([Architecture](/developers/architecture/#shutdown)).
+`Monitor.layer` builds the monitor with the other services (`app/server/App.ts`). Building it returns at once, so
+the API is ready before any snapshot exists: a fiber of the layer's scope builds the collectors, in a scope of their
+own, then runs the ticks. A failure to build them is logged and leaves the monitor without snapshots. At shutdown,
+the end of the layer closes the collectors' scope, which stops their programs at once (1 s at most for one stuck in a
+driver call), before `llama-server` stops ([Architecture](/developers/architecture/#shutdown)).
 
-A tick that is still running when the next one is due makes that one skip (`inFlight`), so a slow source never
-stacks ticks. `tick()` catches everything: an error is logged as `[llama-webui] monitoring tick:` and the next tick
-runs normally; a subscriber that throws is logged and the others still get the snapshot.
+Each tick comes `pollIntervalMs` (1,000 ms by default, 250 to 60,000 ms) after the start of the previous one, at once
+when the previous one took longer: one tick at a time, so a slow source never stacks ticks. A tick that fails is
+logged (`monitoring tick`) and the next one still comes; a reader that fails gives its fallback (`null` or an empty
+list) and leaves the rest of the tick intact.
 
-Each tick (`doTick()`):
+Each tick (`Monitor.tick`):
 
 1. Reads `supervisor.state`. A server is active in `starting`, `ready`, `stopping` and `external`; its PID comes from
    the state (it can be `null` for an external server).
-2. When the PID differs from the previous tick (restart, other profile, stop), resets everything derived from the
-   previous process: the last `/slots` and `/metrics` readings, `lastRequest`, `spec`, `recentRequests`. Counters
-   are never diffed across two processes.
-3. Starts the machine sampling (CPU and memory, disks) in parallel, and passes the PID to the DRAM bandwidth sampler.
-4. With no active server, reads every GPU without process VRAM and pushes `0` to the `llama-server` series and to
-   `proc.cpuPct` (the draft acceptance keeps its last value).
-5. With an active server, reads in parallel `fetchLlama('http://127.0.0.1:<port>')`, the GPUs with the process VRAM of
-   the PID, and `/proc/<pid>`; then derives rates, request stats and queue figures.
-6. `finish()` pushes a gap to every existing series that was not fed on this tick, and attaches `points` and the
-   history shape.
+2. `beginTick()`: when the PID differs from the previous tick (restart, other profile, stop), resets everything
+   derived from the previous process: the last `/slots` and `/metrics` readings, `lastRequest`, `spec`,
+   `recentRequests`. Counters are never diffed across two processes.
+3. Reads, all at once: `readLlama()` on the active server, every card with the process VRAM of the PID
+   (`collectGpus()`), `/proc/<pid>`, the DRAM bandwidth, the machine's CPU and memory, and the disks.
+4. `endTick()`: derives rates, request stats and queue figures, pushes one point per series into the history (`0`
+   to the `llama-server` series and to `proc.cpuPct` with no active server; a gap to every series not fed), and
+   builds the snapshot, every number in it finite.
+5. Publishes the snapshot as a `snapshot` message on the WebSocket hub.
 
-`configure(settings)` is called by `PATCH /api/settings`. It reconfigures the collectors, resizes the history when
-`historySeconds` or `pollIntervalMs` changes (the most recent points are kept), and restarts the timer when the
-interval changes.
+`configure` is called after `PATCH /api/settings` saved a change. It reads the stored settings under a lock, so two
+changes saved at once end on the last one; the collectors apply them first, and only then do they become current:
+the history is resized when `historySeconds` or `pollIntervalMs` changes (the most recent points are kept), and the
+wait for the next tick follows the new interval. A change refused by the collectors answers `CollectorsNotApplied`
+(the settings stay saved).
 
 ## The Snapshot
 
@@ -98,15 +102,17 @@ Details worth knowing:
 
 `History` keeps one `Ring` per series key, all with the same capacity, plus a ring of the tick timestamps:
 
-```ts title="app/server/lib/monitor/history.ts"
-export const historyPoints = (historySeconds: number, intervalMs: number) =>
-  Math.ceil((historySeconds * 1000) / intervalMs);
+```ts title="app/server/monitor/History.ts"
+export const historyPoints: {
+  (intervalMs: number): (historySeconds: number) => number;
+  (historySeconds: number, intervalMs: number): number;
+} = dual(2, (historySeconds: number, intervalMs: number): number => Math.ceil((historySeconds * 1000) / intervalMs));
 ```
 
 With the defaults (`historySeconds = 300`, `pollIntervalMs = 1000`) a series holds 300 points. The settings schema
 bounds `historySeconds` to 30 to 1,800 and `pollIntervalMs` to at least 250, so a series holds at most 7,200 points.
-The history is only in memory: it is lost when llama-webui stops, and in development when a save of business code
-rebuilds the runtime.
+The history is only in memory: it is lost when llama-webui stops, and in development when a save of a file the
+server imports restarts it.
 
 The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`):
 
@@ -121,10 +127,10 @@ The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`):
 
 Two rules keep the series aligned on the timestamps:
 
-- A series fed through `known()` starts at its first known value: `known()` pushes a value only if it is a finite
-  number or the series already exists. A machine without a CPU sensor never gets a `sys.tempC` series. The others
-  (`push()`) exist from the first tick.
-- Once it exists, a series moves one point per tick. An unknown value is stored as `NaN`, and `finish()` pushes `NaN`
+- Some series start at their first known value: they are pushed only when the value is a finite number or the
+  series already exists. A machine without a CPU sensor never gets a `sys.tempC` series. The others exist from the
+  first tick.
+- Once it exists, a series moves one point per tick. An unknown value is stored as `NaN`, and `endTick()` pushes `NaN`
   to any series not fed on the tick. `NaN` becomes `null` in `points` and in the dump.
 
 `dump()` returns a `HistoryDump`: `intervalMs`, `capacity`, `at`, `times` and one array per series, padded on the
@@ -132,7 +138,7 @@ left with `null` for a series that started after the oldest timestamp.
 
 ## How snapshots reach the browser
 
-`boot()` (`app/server/lib/boot.ts`) subscribes with `monitor.onSnapshot()` and broadcasts each snapshot as a `snapshot` WebSocket
+The monitor publishes each snapshot on the hub (`WsHub`, `app/server/ws/WsHub.ts`) as a `snapshot` WebSocket
 message ([WebSocket](/developers/api/websocket/)). The web app (`app/src/lib/monitor.ts`):
 
 - reads `GET /api/monitor/history` when the WebSocket opens, and replays the snapshots that arrived during that
@@ -146,22 +152,26 @@ message ([WebSocket](/developers/api/websocket/)). The web app (`app/src/lib/mon
 
 ## Collectors
 
-`Collectors.start(settings)` (`registry.ts`) builds every collector once:
+`Collectors` (`app/server/collectors/Collectors.ts`) builds every reader once, from the stored settings:
 
-- **NVIDIA**: `NvmlMonitor` when the `collectors.nvml` setting is on and NVML starts, otherwise `NvidiaMonitor`
-  (`nvidia-smi`). This choice is made once at startup; `nvidiaSource` reports it (`nvml` or `nvidia-smi`).
+- **NVIDIA**: NVML when the `collectors.nvml` setting is on and its sampler comes up, otherwise `nvidia-smi`. A
+  sampler that dies later is started again, and after three failed restarts `nvidia-smi` takes over for good (see
+  [NVIDIA through NVML](#nvidia-through-nvml)); `nvidiaSource` reports the source of the moment (`nvml` or
+  `nvidia-smi`).
 - **AMD**: the cards found by `discoverAmdCards()` at startup.
-- **Process**: one `ProcSampler`.
-- **CPU and memory**, **DRAM bandwidth**, **disks**: created by `configure()` according to `collectors.system` and
-  `collectors.disk`, and dropped when their switch is turned off. `configure()` calls are serialized.
+- **Process**: one process sampler.
+- **CPU and memory**, **DRAM bandwidth**, **disks**: started by `configure()` according to `collectors.system` and
+  `collectors.disk`, each in a scope of its own, closed (its programs stopped) when its switch is turned off.
 
-A failure degrades to `null` (or an empty list), never to a failed tick: the readers catch their own errors, and the
-monitor adds a `.catch()` around each call. A missing file, tool or permission removes a figure.
+Every program a reader starts (the NVML sampler, `nvidia-smi`, `perf`) goes through `followProgram`
+(`app/server/process/followed.ts`) on `effect/process`, in the layer's scope: the end of the layer stops them all.
+A failure degrades to `null` (or an empty list), never to a failed tick: a missing file, tool or permission removes a
+figure.
 
 ### `llama-server`: `/health`, `/slots`, `/metrics`
 
-`fetchLlama(baseUrl)` (`llamacpp-js/client`) requests `/health`, then `/slots` and `/metrics` in parallel, each with a timeout of
-800 ms. `parseSlots()` (`llamacpp-js/metrics`) maps the `/slots` JSON to `SlotView`. `parsePrometheus()` reads the `/metrics` text format into
+`readLlama(target)` (`app/server/llama/probes.ts`) requests `/health` through `LlamaHttp`, then, when it answered
+`200`, `/slots` and `/metrics` in parallel, each with a timeout of 800 ms. `parseSlots()` (`llamacpp-js/metrics`) maps the `/slots` JSON to `SlotView`. `parsePrometheus()` reads the `/metrics` text format into
 a `Map` keyed by the metric name with its labels verbatim (for example
 `llamacpp:spec_decode_num_accepted_tokens_per_pos_total{position="0"}`), skipping comments and non-numeric values. The
 managed server always has these endpoints, since `buildCommand()` adds `--metrics` and `--slots` (see
@@ -169,48 +179,51 @@ managed server always has these endpoints, since `buildCommand()` adds `--metric
 
 ### NVIDIA through NVML
 
-`nvml/worker.ts` runs the sampling loop off the server's thread, because reading the PCIe throughput counters blocks
-about 50 ms per GPU. It runs in a child process (`sampler()`, `nvml/sampler.ts`: `fork()` with an IPC channel), not
-a worker thread: Node's exit waits for every thread, so one stuck in an NVML call (a driver fault) would hold the
-server forever, Ctrl-C included, while a child process is killed (`SIGKILL`) whatever it is doing. It opens `libnvidia-ml.so.1` (or `$LLAMA_WEBUI_NVML_LIB` when set,
-to test the library missing) with `dlopen()` from `node:ffi` (`nvml/symbols.ts`), calls `nvmlInit_v2`, then posts one
-`sample` per interval (100 ms at least). The protocol:
+The NVML sampler (`app/server/collectors/nvml/worker.ts`) is an Effect program of its own, because reading the PCIe
+throughput counters blocks about 50 ms per GPU, and a call stuck in the driver must not hold the server: the server
+kills the program (`SIGKILL`) whatever it is doing. It opens `libnvidia-ml.so.1` (or `$LLAMA_WEBUI_NVML_LIB` when
+set, to test the library missing) with `dlopen()` from `node:ffi` (`nvml/symbols.ts`), calls `nvmlInit_v2`, then
+writes one `sample` per interval (100 ms at least). The server speaks to it in NDJSON, one JSON value per line, on
+its stdin and stdout, and both sides decode the lines with the schemas of `nvml/protocol.ts`:
 
-| Direction         | Message                                          |
-| ----------------- | ------------------------------------------------ |
-| server to sampler | `{ type: 'start', intervalMs, needs, lib? }`, then `{ type: 'configure', intervalMs, needs }` |
-| sampler to server | `{ type: 'ready' }`, `{ type: 'error', message }`, `{ type: 'sample', snapshot }`       |
+| Direction | Message |
+| --- | --- |
+| server to sampler (`ToSampler`) | `{ type: 'start', intervalMs, needs, lib? }`, then `{ type: 'configure', intervalMs, needs }` |
+| sampler to server (`FromSampler`) | `{ type: 'ready' }`, `{ type: 'error', message }`, `{ type: 'sample', snapshot }` |
 
-`readNvml()` (`nvml/read.ts`) reads, per card: name, UUID, bus ID, utilization, memory utilization, VRAM, temperature,
-power and power limits, persistence mode, clocks, fan, current and maximum PCIe link, PCIe throughput, the compute
-processes, and the driver and CUDA driver versions. Device handles are pointers, kept as `bigint`; out-parameters are
-`Buffer`s. The typed `dlopen()` checks the `NvmlSymbols` interface against the symbol definitions.
+`nvml/read.ts` reads, per card: name, UUID, bus ID, utilization, memory utilization, VRAM, temperature, power and
+power limits, persistence mode, clocks, fan, current and maximum PCIe link, PCIe throughput, the compute processes,
+and the driver and CUDA driver versions. Device handles are pointers, kept as `bigint`; out-parameters are buffers.
+The typed `dlopen()` checks the `NvmlSymbols` interface against the symbol definitions.
 
 `node:ffi` is experimental in Node 26: the sampler starts with `--disable-warning=ExperimentalWarning`, so its warning
-does not print on every start. `workerUrl()` (`nvml/monitor.ts`) finds its module next to the one that starts it:
+does not print on every start. `workerPath()` (`nvml/Nvml.ts`) finds its module next to the one that starts it:
 
-| Run                                   | Sampler                                                                                 |
-| ------------------------------------- | --------------------------------------------------------------------------------------- |
-| `pnpm dev`, unit tests                | `nvml/worker.ts`, run as is by Node (type stripping: its imports keep their `.ts` extension) |
-| `node app/.output/llama-webui.mjs`    | `app/.output/server/nvml-worker.mjs`, built by Rolldown in the `compiled` hook of `app/vite.config.ts` |
+| Run | Sampler |
+| --- | --- |
+| `pnpm dev`, unit tests | `nvml/worker.ts`, run as is by Node (type stripping: its imports keep their `.ts` extension) |
+| `node app/.output/llama-webui.mjs` | `app/.output/server/nvml-worker.mjs`, built by Rolldown in `app/build/server.ts` |
 
-The child and its channel are `unref()`'d: they never keep the server alive. `stop()` kills the child, a sampler that
-cannot load or crashes exits (the same failure as an `error`: `null` at startup, cleared readings later), and a
-sampler whose server is gone, even killed, exits on the channel's `disconnect`. It costs a process of its own, about
-116 MiB of RSS with NVML loaded.
+The sampler ends at the end of its stdin, so a sampler whose server is gone, even killed, exits. It costs a process
+of its own, about 116 MiB of RSS with NVML loaded.
 
-On the main side, `NvmlMonitor.start()` resolves `null` when the worker reports an error or is not ready within
-3 seconds, and `Collectors` falls back to `nvidia-smi`. A sample older than three intervals is ignored: a worker stuck
-in an NVML call must not pass old numbers off as live ones. When NVML cannot report a process's memory
-(`NVML_VALUE_NOT_AVAILABLE`, for example with MIG), the card's VRAM in use is counted instead, as an upper bound.
+On the server's side, `startNvml()` (`nvml/Nvml.ts`) answers none when the sampler reports an error, exits, or is
+not ready within 3 seconds, and `Collectors` falls back to `nvidia-smi`. After `ready`, an `error`, an exit or a line
+that is not a message clears its readings and kills it, and its `died` returns. `Collectors` then starts a new sampler,
+with the last interval and hidden cards, after a pause of 1 s, then 5 s, then 30 s (`nvmlRestartDelays`), and logs a
+warning at each one. A sampler that sampled for 5 minutes (`nvmlHealthyAfter`) gives the three restarts back. When
+they are spent, `nvidia-smi` is started and stays the source until llama-webui restarts. The `nvidia` reader of
+`Collectors` is a facade on the source of the moment, so the monitor sees a switch at its next tick. A sample older than three intervals is ignored (`isFresh()`): a sampler stuck in an NVML call
+must not pass old numbers off as live ones. When NVML cannot report a process's memory (`NVML_VALUE_NOT_AVAILABLE`,
+for example with MIG), the card's VRAM in use is counted instead, as an upper bound.
 
 ### NVIDIA through nvidia-smi
 
-`NvidiaMonitor` keeps one long-running `nvidia-smi --query-gpu=… --format=csv,noheader,nounits -lms <interval>`
+The `nvidia-smi` reader keeps one long-running `nvidia-smi --query-gpu=… --format=csv,noheader,nounits -lms <interval>`
 stream for utilization, VRAM, temperature, power and bus ID: no PCIe throughput, clocks or fans. The process list
 comes from a separate `nvidia-smi --query-compute-apps=pid,gpu_uuid,used_memory` call, one at a time, killed after
-3 seconds. The monitor awaits it on the first tick of a new PID, then runs it in the background every 5 ticks
-(`APPS_EVERY`). The binary is `nvidia-smi`, or `$LLAMA_WEBUI_NVIDIA_SMI` when set (to test the tool missing).
+3 seconds (the timeout kills it). The monitor awaits it on the first tick of a new PID, then runs it in the
+background every 5 ticks (`appsEvery` of `Monitor.layerWith`). The binary is `nvidia-smi`, or `$LLAMA_WEBUI_NVIDIA_SMI` when set (to test the tool missing).
 
 ### AMD through amdgpu
 
@@ -226,27 +239,27 @@ link speed and width, `pp_dpm_sclk` and `pp_dpm_mclk`, and from hwmon the temper
 
 ### `/proc`: process, CPU and memory
 
-- `ProcSampler.sample(pid)` reads `utime` and `stime` from `/proc/<pid>/stat` (100 ticks per second) and `VmRSS` from
+- The process sampler reads `utime` and `stime` from `/proc/<pid>/stat` (100 ticks per second) and `VmRSS` from
   `/proc/<pid>/status`. `cpuPct` is the CPU time used since the previous sample over the elapsed time, so it exceeds
   100 when several cores work.
-- `SystemSampler.sample()` reads `/proc/stat` (total and per-core usage), `/proc/meminfo`, `/proc/loadavg`, the
+- The system sampler reads `/proc/stat` (total and per-core usage), `/proc/meminfo`, `/proc/loadavg`, the
   average `scaling_cur_freq` of the cores, and the CPU temperature from the first hwmon named `k10temp` or `coretemp`.
 
 ### Disks
 
 `physicalDisks()` lists `/sys/block` entries backed by a device, without `loop`, `ram` and `zram`, once when the disk
-collector is turned on. `DiskSampler` reads `/proc/diskstats` (sectors of 512 bytes) and returns the read and write
+collector is turned on. The disk sampler reads `/proc/diskstats` (sectors of 512 bytes) and returns the read and write
 rates per disk and in total.
 
 The disk that holds the model is found by `resolveModelDisk(path)`: it maps the file's device number to
 `/sys/dev/block/<major>:<minor>`, and from a partition to its parent disk. It returns `null` when the disk is unknown
-(tmpfs, btrfs, NFS, missing file). The monitor runs that lookup in the background, once per profile, and retries a
-failed one every 30 seconds (`MODEL_DISK_RETRY_MS`): a `stat` on a dead network mount must never block a tick. The
-model path comes from a resolver that `boot()` (`app/server/lib/boot.ts`) sets at startup (`setModelPathResolver()`).
+(tmpfs, btrfs, NFS, missing file). The monitor runs that lookup in a fiber of its own, never awaited, once per
+profile, and retries a failed one after 30 seconds (`modelDiskRetry` of `Monitor.layerWith`): a `stat` on a dead
+network mount must never block a tick. The model path is the profile's, from `profilePaths()`.
 
 ### DRAM bandwidth (perf)
 
-`MemBandwidthSampler` (`membw.ts`) runs two `perf stat -I <interval> -x , --log-fd 1` processes:
+The DRAM bandwidth sampler (`membw.ts`) runs two `perf stat -I <interval> -x , --log-fd 1` processes:
 
 - machine-wide, `-a -e umc_cas_cmd.rd,umc_cas_cmd.wr`: the AMD memory controller's CAS commands, which count every
   access to DRAM (CPU, GPU DMA over PCIe, NVMe);
@@ -254,34 +267,32 @@ model path comes from a resolver that `boot()` (`app/server/lib/boot.ts`) sets a
 
 Each event counts 64 bytes (`BYTES_PER_EVENT`). It works without root when `perf_event_paranoid` is at most 0, or with
 `CAP_PERFMON` on `perf`. When `perf` is missing, refuses the event, or exits, the figure becomes unknown and the
-stream is retried no sooner than `RETRY_MS` (60 seconds) later. A PID `perf` could never attach to is not retried. A
+stream is retried no sooner than 60 seconds later. A PID `perf` could never attach to is not retried. A
 rate older than three intervals counts as unknown. The sampler follows the CPU and memory switch.
 [Monitor DRAM bandwidth](/docs/guides/dram-bandwidth/) explains the setup for users.
 
-## What `needs.ts` declares
+## What the GPU readers read
 
-`GpuNeeds` tells the GPU readers what to read:
+`GpuNeeds` (`app/server/collectors/gpu.ts`) tells the GPU readers what to read:
 
-```ts title="app/server/lib/collectors/needs.ts"
+```ts title="app/server/collectors/gpu.ts"
 export interface GpuNeeds {
-  /** false: no card is read. */
-  gpus: boolean;
-  /** PCIe bandwidth (NVML blocks ~50 ms per GPU to read it). */
-  pcie: boolean;
-  /** Hidden cards (PCI bus): not read. */
-  skipGpus: string[];
+  /** PCIe bandwidth (NVML blocks about 50 ms per GPU to read it). */
+  readonly pcie: boolean;
+  /** Hidden cards (PCI bus ids): not read. */
+  readonly skipGpus: ReadonlyArray<string>;
 }
 ```
 
-`gpuNeeds(hiddenGpus)` currently always measures every card and the PCIe throughput, and skips the hidden ones.
-`gpuSkipped(needs, busId)` is the single test the NVML worker and the monitor apply: a skipped card is only identified
+`gpuNeeds(hiddenGpus)` currently always measures the PCIe throughput, and skips the hidden cards.
+`gpuSkipped(needs, busId)` is the single test the NVML sampler and the monitor apply: a skipped card is only identified
 (key, vendor, name, bus ID).
 
 ## Model placement
 
-`PlacementTracker` reads how the loaded model is split across devices from `llama-server`'s startup log lines, which
+`Placement` (`app/server/monitor/Placement.ts`) reads how the loaded model is split across devices from `llama-server`'s startup log lines, which
 the API does not expose: `using device … (<bus id>)`, `<device> model|KV|RS|compute buffer size = … MiB`,
-`offloaded N/M layers to GPU`. `parsePlacement()` starts from the last launch line (`LAUNCH_LOG_PREFIX`) in the log
+`offloaded N/M layers to GPU`. `parsePlacement()` (`placementLog.ts`) starts from the last launch line (`LAUNCH_LOG_PREFIX`) in the log
 ring, skips the `-fit` probes, counts compute buffers per context, and stops at the second "offloaded" line, which
 belongs to a draft model. `llama-server` logs the buffer sizes from `-lv 4` on, which `buildCommand()` adds to a
 profile without a verbosity of its own.
@@ -303,24 +314,23 @@ context, after the lines of a draft model):
   give the address of `CUDA<N>` as hex digits (`3000` is `0000:03:00.0`). An address from a `using device` line wins;
   with `-sm tensor`, which only logs the `Meta()` device, this is the only one.
 
-`createDeps()` (`app/server/lib/deps.ts`) creates the tracker: it replays the log ring at construction, and keeps the last
-placement it read with the PID of its server, so once the launch lines have left the ring it still knows the placement
-of the same PID. It subscribes to new log lines (only those that
-can change the result) and to the supervisor, and `boot()` broadcasts each change as a `placement` message.
+`Placement` reads the log ring when its layer is built, and keeps the last placement it read with the PID of its
+server, so once the launch lines have left the ring it still knows the placement of the same PID. It follows the new
+log lines (only those that can change the result, `RELEVANT`) and the supervisor's state, and publishes each change
+as a `placement` message.
 An external server has no placement: it writes nothing to the ring.
 
 ## Add a collector
 
-1. Write the reader in `app/server/lib/collectors/<name>.ts`: pure parse functions for the raw text, and a sampler whose
-   roots (`procRoot`, `sysRoot`) and side effects (`spawn`, `now`) can be injected, so tests run on fixtures. It
-   returns `null` on any failure.
-2. Add its type to `packages/webui-shared/src/monitor.ts` as an optional or nullable field of `Snapshot` (or of `SystemSample`), and
-   its series keys to `SERIES`.
-3. Create it in `Collectors` (`registry.ts`): in `start()` if it is always on, in `configure()` if a switch in
-   `collectors` (`packages/webui-shared/src/settings.ts`) controls it.
-4. Call it from `Monitor.doTick()` or `sampleMachine()`, push its series with `push()` or `known()`, and put its value
-   in the snapshot.
-5. Save: `pnpm dev` rebuilds the runtime, and the new collector runs from the first tick.
+1. Write the reader in `app/server/collectors/<name>.ts`: pure parse functions for the raw text, and a sampler made
+   by an effect (`make<Name>Sampler()`) that reads through `FileSystem`, with its roots (`procRoot`, `sysRoot`) as
+   options so tests run on fixtures. A program goes through `followProgram`. It gives `null` on any failure.
+2. Add its schema to `packages/webui-shared/src/monitor.ts` as an optional or nullable field of `Snapshot` (or of
+   `SystemSample`), and its series keys to `SERIES`.
+3. Build it in `Collectors`: at its construction if it is always on, in `configure()` if a switch in `collectors`
+   (`packages/webui-shared/src/settings.ts`) controls it.
+4. Read it in `Monitor.tick`, and push its series and put its value in the snapshot in `endTick()` (`tick.ts`).
+5. Save: `pnpm dev` restarts the server, and the new collector runs from the first tick.
 
 The pages that show the new figure ([System](/docs/system/), [Dashboard](/docs/dashboard/)) change in the same pull
 request, with this page. See also [How-to guides](/developers/contributing/how-to/).

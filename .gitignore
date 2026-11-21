@@ -38,10 +38,15 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # local data
 *.sqlite
 *.sqlite-*
+# …but the databases the tests open as fixtures are committed
+!app/server/db/fixtures/*.sqlite
 data/
 
 # Cache Superdesign (maquettes, contexte de design)
 .superdesign/
 
-.agents/
-.claude/
+.agents/skills
+.claude/*.lock
+.claude/*.local.*
+.claude/skills
+.vscode/

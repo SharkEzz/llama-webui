@@ -1,6 +1,5 @@
 {
-  // The client (`src/`, DOM). It imports the server's route types (`server/api.gen.ts`), so the server sources it
-  // reaches are checked here too, hence Node's types next to the DOM's. The server has its own project
+  // The client (`src/`, DOM) and the build scripts (`build/`, `vite.config.ts`, Node). The server has its own project
   // (`server/tsconfig.json`, Node only), which `typecheck` runs as well.
   "extends": "../tsconfig.base.json",
   "compilerOptions": {

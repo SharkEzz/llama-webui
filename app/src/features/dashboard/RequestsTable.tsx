@@ -8,7 +8,7 @@ const MAX_ROWS = 20;
 const dec = (v: number | null, digits = 1) => (v === null || !Number.isFinite(v) ? '—' : num(digits).format(v));
 
 /** Latest requests, rebuilt tick by tick from the /metrics counters (approximate with several slots). */
-export function RequestsTable({ requests }: { requests: RequestRecord[] }) {
+export function RequestsTable({ requests }: { requests: readonly RequestRecord[] }) {
   const rows = requests.slice(0, MAX_ROWS);
   return (
     <GlassCard title="Recent requests" icon={ListOrdered}>

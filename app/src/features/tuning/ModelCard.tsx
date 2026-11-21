@@ -8,7 +8,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ModelPicker } from '@/features/models/ModelPicker';
-import { api } from '@/lib/api';
+import { call, errorMessage } from '@/lib/api';
 import { formatBytes, formatInt, formatParams } from '@/lib/format';
 import { useProfiles } from '@/lib/profiles';
 import { replacedProfileParams, useTuning } from '@/lib/tuning';
@@ -42,9 +42,9 @@ export function ModelCard() {
     setInfoError(null);
     if (!modelPath) return;
     let gone = false;
-    void api('GET /api/models/info', { query: { path: modelPath } }).then(
+    void call((api) => api.models.info({ query: { path: modelPath } })).then(
       (d) => !gone && setInfo(d),
-      (e: Error) => !gone && setInfoError(e.message),
+      (e: unknown) => !gone && setInfoError(errorMessage(e)),
     );
     return () => {
       gone = true;

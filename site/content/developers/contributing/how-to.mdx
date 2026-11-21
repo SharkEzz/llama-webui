@@ -1,12 +1,13 @@
 ---
 title: How-to guides
-description: Step-by-step changes and the files they touch, for a web page, an API route, a WebSocket message, a migration, a collector and a setting.
+description: Step-by-step changes and the files they touch, for a web page, an endpoint, a service, a shutdown step, a WebSocket message, a migration, a collector and a setting.
 ---
 
 Each guide lists the files a common change touches, in the order you usually write them, and ends with the
 documentation pages to update in the same pull request ([Keep the docs in sync](/developers/contributing/workflow/#keep-the-docs-in-sync)).
 [Conventions](/developers/contributing/conventions/) and [Testing](/developers/contributing/testing/) apply to all of
-them.
+them. The server's own rules, with an example of each, are in `docs/superpowers/poc-effect/conventions.md` of the
+repository: read it before writing server code.
 
 ## Add a page to the web app
 
@@ -28,8 +29,8 @@ its own chunk, loaded on first visit:
 ```
 
 Keep the `import()` literal: the bundler can only split a chunk it can see. The server answers every path that is not
-an API route with the app (Nitro's renderer serves `index.html`), so a reload on the new URL works without a server
-change.
+under `/api`, `/ws` or `/assets` with the app's `index.html` (`app/server/http/Static.ts`), so a reload on the new URL
+works without a server change.
 
   </Step>
   <Step title="Add it to the sidebar">
@@ -43,8 +44,8 @@ contiguous.
   </Step>
   <Step title="Load its data">
 
-Put the API calls and the store of the page's domain in `app/src/lib/<domain>.ts` (a zustand store, `api(…)` from
-`app/src/lib/api.ts`). If the page follows WebSocket messages that only it needs, start their subscription when it
+Put the API calls and the store of the page's domain in `app/src/lib/<domain>.ts`: a zustand store, and calls through
+`call()` of `app/src/lib/api.ts` (see [Typed client](/developers/api/overview/#typed-client)). If the page follows WebSocket messages that only it needs, start their subscription when it
 mounts, as `BenchPage` does with `startBenchSync()`.
 
   </Step>
@@ -60,157 +61,261 @@ mounts, as `BenchPage` does with `startBenchSync()`.
 (an entry in `site/scripts/shots.ts`, then a capture, see [Screenshots](/developers/contributing/workflow/#screenshots)),
 and the [Web app](/developers/frontend/) page for the router and sidebar.
 
-## Add an API route
+## Add an endpoint
 
 <Steps>
   <Step title="Define the shapes">
 
-A request body or a response the web app also builds or reads gets a zod schema and its type in
-`packages/webui-shared/src/<domain>.ts` (a new module is re-exported from `packages/webui-shared/src/index.ts`). Validation messages are in English.
-A shape only the route reads can stay in the route file, like `EstimateRequest` in `app/server/routes/api/tuning/estimate.post.ts`.
-`z.strictObject` rejects unknown fields.
+The data an endpoint reads or answers gets an Effect `Schema` in `packages/webui-shared/src/<domain>.ts`, shared by the
+server and the web (a new module is re-exported from `packages/webui-shared/src/index.ts`). A field's message is the
+`message` of its check, in English. A payload's schema carries the input rules; the reply's schema has the same fields
+without them, because a reply carries what is stored, and a stored row that a newer rule refuses must still be listed
+(`ProfileInput` and `Profile` of `packages/webui-shared/src/profile.ts`). A number is `Schema.Finite` or `Schema.Int`,
+never `Schema.Number`.
 
-```ts title="packages/webui-shared/src/hf.ts"
-export const DownloadRequestSchema = z.strictObject({
-  repo: z.string().regex(HF_REPO_RE, 'Repository id expected (org/name)'),
-  revision: z.string().regex(/^[0-9a-f]{40}$/, 'Commit sha expected'),
-  /** Keys of the variants to download (HfVariant.key). */
-  keys: z.array(z.string().min(1).max(1024)).min(1).max(16),
-});
-export type DownloadRequest = z.infer<typeof DownloadRequestSchema>;
+```ts title="packages/webui-shared/src/profile.ts"
+export const ProfileInput = Schema.Struct({
+  name: Required,
+  model: Required,
+  mmproj: Schema.optionalKey(Schema.String),
+  cwd: Schema.optionalKey(Schema.String),
+  host: Schema.optionalKey(Schema.String),
+  port: Schema.optionalKey(Port),
+  args: Args.pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  env: Schema.Record(Schema.String, Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
+}).annotate({ messageUnexpectedKey: 'unknown key' });
 ```
 
   </Step>
-  <Step title="Write the route file">
+  <Step title="Declare the endpoint and its errors">
 
-Nitro maps each file under `app/server/routes/api/` to a route, one file per method: the path comes from the folders,
-`[id]` is a parameter, and the suffix is the method (`profiles/[id]/index.put.ts` is `PUT /api/profiles/:id`). The
-file's default export is a `defineHandler()` of `nitro`; it reads the app's objects with `deps()`
-(`app/server/lib/context.ts`), which the middleware `00.ready.ts` makes available once startup is done. The guard, the
-`405` table, the `404` of an unknown route and the error responses are applied to every route by
-`app/server/middleware/01.guard.ts` and `app/server/error.ts`: there is nothing to wrap.
+The endpoint goes into its domain's group, `packages/webui-shared/src/api/<Domain>Api.ts`, with everything it reads
+as schemas: `params` (an id is `IdParam` of `api/params.ts`), `payload`, `query`, and its `success` and `error`. An
+error it answers is a `Schema.TaggedError` with its status (`httpApiStatus`), exported from the package's index; the
+web tells it by its `_tag`.
 
-```ts title="app/server/routes/api/topology.get.ts"
-export default defineHandler(async () =>
-  reply({ graph: await readPciTopology(), placement: deps().placement.current }),
-);
+```ts title="packages/webui-shared/src/api/ProfilesApi.ts"
+export class ProfileNotFound extends Schema.TaggedError<ProfileNotFound, { readonly ProfileNotFound: unique symbol }>()(
+  'ProfileNotFound',
+  { message: Schema.String },
+  { httpApiStatus: 404 },
+) {}
+
+const Created = Profile.pipe(HttpApiSchema.status(201));
+const params = { id: IdParam };
+
+  HttpApiEndpoint.post('duplicate', '/api/profiles/:id/duplicate', {
+    params,
+    success: Created,
+    error: ProfileNotFound,
+  }),
 ```
 
-Nitro's router matches a static segment before a `[param]` one, whatever the order of the files:
-`downloads/clear.post.ts` is never taken for `downloads/[id]/`.
+An endpoint without `success` answers `204`. A file to download is `success: <its schema>` with `attachment(schema)`
+of `app/server/http/attachment.ts`; a stream of server-sent events is `HttpApiSchema.StreamSse` with `sseResponse` of
+`app/server/http/Sse.ts`. A new group is added to `Api` (`packages/webui-shared/src/api/Api.ts`) above its last two
+lines: the `RequestErrors` middleware only reaches the groups added before it.
 
-The helpers of `app/server/lib/http.ts` cover the usual cases:
-
-| Helper                                      | Use                                                                        |
-| ------------------------------------------- | -------------------------------------------------------------------------- |
-| `reply<T>(data, status = 200)`              | A JSON response; `T` is what the typed client returns                      |
-| `noContent()`, `attachment(filename, body)` | A `204`, a JSON download                                                   |
-| `readBody(event, Schema)`                   | The JSON body validated by a zod schema: `400 Invalid JSON`, `400 JSON object expected`, then the `ZodError` (`Invalid data: …` + `issues`) |
-| `readJson(event, check)`                    | A JSON body passed through your own check (`object`: any object; `passthrough`: as sent), for custom messages |
-| `idParam(event, 'Download')`                | A positive integer `:id`, otherwise `404 Download not found`; read it before the body |
-| `queryOf(event, 'key', …)`                  | The first value of each query key present (it refuses nothing)             |
-| `notFound('Profile')`                       | `404 Profile not found`                                                    |
-| `new HttpError(409, message, code)`         | Any refusal; add a `code` when the web app must react to it                |
-
-A file that reads a body or a query exports its type, `export type Body` or `export type Query` (`QueryOf<'key'>`):
-that is what the typed client checks a call against.
-
-```ts title="app/server/routes/api/downloads/index.post.ts"
-export type Body = z.input<typeof DownloadRequestSchema>;
-
-export default defineHandler(async (event) => {
-  const { hf, downloads, settings } = deps();
-  const body = await readBody(event, DownloadRequestSchema);
-  const items = await downloads.enqueue(await downloadInputs(hf, body, expandHome(settings.get().modelsDir)));
-  return reply({ items }, 202);
-});
-```
-
-When the handler must look something up (and answer `404` or `409`) before the body is checked, do not validate the
-body ahead of it: read it with `readJson(event, object)` after the lookup, or pass it as sent
-(`readJson(event, passthrough)`) to a repository that validates it.
+There is nothing to validate in the handler: `Api` decodes payloads strictly (an unknown key is an issue), and a
+payload, a query or a header that does not decode answers `400` `RequestInvalid`, a path parameter `404`
+`RouteNotFound` ([Validation errors](/developers/api/overview/#validation-errors)).
 
   </Step>
-  <Step title="Register the route">
+  <Step title="Write the handler">
 
-There is nothing to mount: Nitro scans the file, and `app/build/apiTypes.ts` writes the route into
-`app/server/api.gen.ts` (the client's types and the `405` table) at the start of `pnpm dev`, on every save under
-`app/server/routes/api/` and at every build. A new dependency goes into `AppDeps` and is built in `createDeps()`
-(`app/server/lib/deps.ts`). Add the route to `ROUTES` in `app/server/lib/contract/cases.ts` (the contract suite fails
-otherwise), then regenerate the golden (see [Testing](/developers/contributing/testing/#http-contract-suite)).
+The handlers of a group are one `HttpApiBuilder.group(Api, '<group>', …)` in `app/server/<domain>/http.ts`. They take
+the services they need from the context and call them; a service's typed error becomes the endpoint's reply when it
+is one of the endpoint's errors.
+
+```ts title="app/server/profiles/http.ts"
+      .handle('get', ({ params }) => repo.get(params.id))
+      .handle('update', ({ params, payload }) => repo.update({ id: params.id, input: payload }))
+      .handle('remove', ({ params }) => Effect.provideContext(removeProfile(params.id), services))
+      .handle('duplicate', ({ params }) => repo.duplicate(params.id))
+```
+
+A new group's handlers go into the `Layer.mergeAll(…)` of `ApiRoutes` in `app/server/http/HttpLive.ts`. The guard,
+the `404` of an unknown route and the error bodies apply to every endpoint of `Api`: there is nothing to wrap. A route
+added outside `Api` with `HttpRouter.add` is not guarded until its layer is provided `Guarded`
+(`app/server/http/Guard.ts`), as `WsHub.route` is.
+
+  </Step>
+  <Step title="Add its contract cases">
+
+The contract suite (`app/server/contract/`) builds its matrix from `Api` (`HttpApi.reflect`): every method a path
+lacks, a bad and an unknown id for each `:param`, and five broken bodies for each payload, with nothing to write. By
+hand, in `cases()` of `app/server/contract/cases.ts`, add a success for an endpoint the matrix does not reach (the
+coverage test fails otherwise), a `violation` for a body the schema refuses and a `refusal` for what the domain refuses
+beyond an unknown id. Then regenerate the golden record and read its diff
+([HTTP contract suite](/developers/contributing/testing/#http-contract-suite)).
 
   </Step>
   <Step title="Call it from the web app">
 
-The typed client sees the route as soon as `api.gen.ts` lists it:
-`api('POST /api/downloads', { body: { repo, revision, keys } })` (`app/src/lib/api.ts`, with `params: { id }` for an
-`:id` and `query` for the query) returns the type of the handler's `reply(…)` and throws an `ApiError` with `status`,
-`issues` (zod details on a `400`) and `code`. Branch on `code`, never on the message. The body and the query of the
-call are checked against the file's `Body` and `Query` (see [Typed client](/developers/api/overview/#typed-client)).
+The web calls the endpoint through the typed client of `app/src/lib/api.ts`, which derives everything from `Api`:
+
+```ts title="app/src/lib/profiles.ts"
+export const duplicateProfile = (id: number) => call((api) => api.profiles.duplicate({ params: { id } }));
+```
+
+The promise resolves with the decoded reply, or rejects with the endpoint's tagged error (`ApiUnreachable` when no
+answer came). Branch on `errorTag(error)`, never on the message. A type error in a call is fixed in the shared schema,
+not with a cast ([Typed client](/developers/api/overview/#typed-client)).
 
   </Step>
   <Step title="Test it">
 
-Test the logic behind the route without HTTP (a builder like `buildSetupReport` in `app/server/lib/setup.ts`, a
-repository on `openDb(':memory:')`). To test the route file itself, mount it with `routeApp()` and give it test doubles
-with `provideDeps()` ([Write a test](/developers/contributing/testing/#write-a-test)).
+`app/server/<domain>/http.test.ts` runs the handlers on the services of `ServicesTest` with `layer(…)` of
+`@effect/vitest`, through the typed client (`HttpApiTest.groups(Api, ['<group>'])`), and over raw HTTP for what the
+client would never send (a body the schema refuses):
+
+```ts title="app/server/profiles/http.test.ts"
+    it.effect('duplicate answers the copy', () =>
+      Effect.gen(function* () {
+        const client = yield* makeClient;
+        const source = yield* client.profiles.create({ payload: input('Dup', { port: 8085 }) });
+        const copy = yield* client.profiles.duplicate({ params: { id: source.id } });
+        assert.strictEqual(copy.name, 'Dup (copy)');
+        assert.strictEqual(copy.port, 8085);
+        assert.notStrictEqual(copy.id, source.id);
+        const missing = yield* Effect.flip(client.profiles.duplicate({ params: { id: 999 } }));
+        assert.strictEqual(missing._tag, 'ProfileNotFound');
+      }),
+    );
+```
+
+See [Write a test](/developers/contributing/testing/#write-a-test).
 
   </Step>
 </Steps>
 
 **Docs to update**: the API reference page of the domain (`site/content/developers/api/<domain>.mdx`, written by
-hand: every route, body, response and error code), and the user page of the feature. The common rules (guard, error
+hand: every endpoint, body, response and error), and the user page of the feature. The common rules (guard, error
 shape) live on the [API overview](/developers/api/overview/).
+
+## Add a service
+
+<Steps>
+  <Step title="Declare it">
+
+A service is a `Context.Service` class in `app/server/<domain>/<Name>.ts`, keyed by its path, with its interface as
+the class's type parameter:
+
+```ts title="app/server/ws/WsHub.ts"
+export class WsHub extends Context.Service<
+  WsHub,
+  {
+    /** Sends a message to every connected client. */
+    readonly publish: (message: WsMessage) => Effect.Effect<void>;
+    /** The number of connected clients. */
+    readonly size: Effect.Effect<number>;
+    /** The life of one client on its upgraded socket, until it closes: what the `/ws` route runs. */
+    readonly attach: (socket: Socket.Socket) => Effect.Effect<void>;
+  }
+>()('@llama-webui/app/server/ws/WsHub') {
+```
+
+  </Step>
+  <Step title="Build it as a layer">
+
+Its layers are statics of the class: `layer` for the app, and `layerWith(options)` when its durations or limits
+differ in tests. The layer builds the state, forks the fibers of the service in its own scope (they end with it), and
+registers its finalizers and its shutdown step.
+
+```ts title="app/server/bench/BenchRunner.ts"
+  static readonly layer = BenchRunner.layerWith({
+    killTimeout: '5 seconds',
+    pause: '1 second',
+    stoppingTimeout: '60 seconds',
+    liveThrottle: '250 millis',
+  });
+```
+
+Never `node:child_process`, `fetch`, `JSON` or a timer in a service: a program runs through `effect/process`
+(`followProgram()` when it lasts), a request to llama-server through `LlamaHttp`, one to Hugging Face through `HfHttp`,
+a file through `FileSystem`, and a wait through `Effect.sleep` or a `Schedule`.
+
+  </Step>
+  <Step title="Add it to the app">
+
+Add its layer to `Services` in `app/server/App.ts`, in the tier above everything it needs (the database is built
+first, `ExternalWatch` last): the services are built tier by tier, and undone in the reverse order when the app stops.
+Add it the same way to `ServicesTest` (`app/server/testing/services.ts`), with `layerWith` and shorter durations.
+
+  </Step>
+</Steps>
+
+**Docs to update**: the server page of its domain, and [Architecture](/developers/architecture/) when it adds a tier
+or a shutdown step.
+
+## Add a shutdown step
+
+A step saves what a service is doing before the app stops: a chat reply saved `stopped`, a benchmark `interrupted`,
+the last message of the hub. It is registered while the service is built:
+
+```ts title="app/server/downloads/Downloads.ts"
+        yield* shutdown.before(
+          Effect.gen(function* () {
+            const running = yield* SynchronizedRef.modifyEffect(state, (s) =>
+              Effect.as(Ref.set(closing, true), [s.loop, s] as const),
+            );
+            if (Option.isSome(running)) yield* Fiber.interrupt(running.value);
+          }).pipe(Effect.withSpan('Downloads.shutdown')),
+        );
+```
+
+The steps run on `SIGINT` or `SIGTERM`, last registered first, before the HTTP server stops serving; a step that fails
+is logged and the next ones still run. A wait inside a step is made `Effect.interruptible` before its
+`Effect.timeout`. A step that saves what `llama-server` is doing belongs to a service built above the supervisor, so it
+runs while the process still answers. It saves first, then stops the work, and the work writes nothing once its result
+is saved. **Docs to update**: the shutdown table of [Architecture](/developers/architecture/#shutdown) and of the
+domain's page.
 
 ## Add a WebSocket message
 
 <Steps>
   <Step title="Declare it">
 
-Add a variant to the `WsMessage` union in `packages/webui-shared/src/ws.ts`, with a payload type from `packages/webui-shared/`:
+Add a `Schema.Struct` with its `type` literal and its `payload` to `packages/webui-shared/src/ws.ts`, and add it to the
+`WsMessage` union:
 
 ```ts title="packages/webui-shared/src/ws.ts"
-| { type: 'download-progress'; payload: DownloadLive | null } // throttled; null when the queue is idle
-```
-
-  </Step>
-  <Step title="Broadcast it">
-
-Services do not import the hub: they take callbacks, and `createDeps()` connects them to `hub.broadcast()`
-(`app/server/lib/ws/hub.ts`), which sends the message to every client:
-
-```ts title="app/server/lib/deps.ts"
-const downloads = new DownloadQueue({
-  repo: downloadsRepo,
-  hf,
-  onItem: (i) => hub.broadcast({ type: 'download', payload: i }),
-  onLive: (l) => hub.broadcast({ type: 'download-progress', payload: l }),
-  onDeleted: (ids) => hub.broadcast({ type: 'download-deleted', payload: { ids } }),
+export const WsDownloadProgress = Schema.Struct({
+  type: Schema.Literal('download-progress'),
+  payload: Schema.NullOr(DownloadLive),
 });
 ```
 
-Events of the runtime (the supervisor, the log ring, the monitor) are forwarded in `boot()` (`app/server/lib/boot.ts`),
-as `monitor.onSnapshot((s) => hub.broadcast(…))` does: the subscription lasts as long as the runtime. Routes that
-change state themselves can broadcast through `deps().hub`, as the delete routes of `app/server/routes/api/bench/` do
-for `bench-deleted`.
+  </Step>
+  <Step title="Publish it">
+
+The service that changes the state publishes the message on the hub, `WsHub.publish`, which sends it to every client:
+
+```ts title="app/server/downloads/Downloads.ts"
+            yield* hub.publish({ type: 'download-progress', payload: live });
+```
+
+A message that does not encode is not sent, and logged as an error (`a <type> message does not encode: not sent`):
+make a reading finite before it reaches a schema.
 
   </Step>
   <Step title="Receive it">
 
 In the store's file in `app/src/lib/`, subscribe with `onWs()` inside a `start<Domain>Sync()` function that runs once.
-Messages are not replayed after a disconnection, so the same function reloads the state over REST on every
+Messages are not replayed after a disconnection, so the same function reloads the state over HTTP on every
 (re)connection:
 
 ```ts title="app/src/lib/downloads.ts"
-onWs('download-progress', (m) => useDownloads.setState({ live: m.payload }));
-// …
-useWs.subscribe((s, prev) => {
-  if (s.status === 'open' && prev.status !== 'open') void useDownloads.getState().load();
-});
+  onWs('download-progress', receive);
+  onWs('download', receive);
+  onWs('download-deleted', receive);
+  useWs.subscribe((s, prev) => {
+    if (s.status === 'open' && prev.status !== 'open') void useDownloads.getState().load();
+  });
 ```
 
 Call it from `app/src/main.tsx` when the whole app needs it (status bar, toasts), or when a page mounts when only that
-page does.
+page does, as `BenchPage` does with `startBenchSync()`.
 
   </Step>
 </Steps>
@@ -221,32 +326,35 @@ page of the screen that shows it.
 ## Add a database migration
 
 <Steps>
-  <Step title="Append the SQL">
+  <Step title="Append it">
 
-Add an entry at the end of `MIGRATIONS` in `app/server/lib/db/migrations.ts`, with a comment that gives its version and
-purpose. Never edit, reorder or remove an entry that has shipped:
+Add an entry at the end of `MIGRATIONS` in `app/server/db/migrations.ts`, keyed by its number and name
+(`0018_<name>`), with a comment that gives its purpose. Never edit, reorder or remove an entry that has shipped:
 
-```ts title="app/server/lib/db/migrations.ts"
-/** One entry per schema version; never change a migration that has shipped, add a new one. */
-export const MIGRATIONS: string[] = [
+```ts title="app/server/db/migrations.ts"
+export const MIGRATIONS: Record<string, Migration> = {
+  // key/value settings
+  '0001_settings': statements(`CREATE TABLE settings(key TEXT PRIMARY KEY, value_json TEXT NOT NULL);`),
 ```
 
-The database only stores a version number, the count of entries already applied (`schema_version`). `runMigrations()`,
-called by `openDb()` at startup, runs each missing entry in a transaction together with the version bump, so a database
-that already ran an entry never sees a later edit to it. Existing entries hold one statement each; a table rebuild
-takes several (versions 10 to 14 rebuild `bench_runs` and copy its rows).
+`statements(…)` runs its SQL one statement at a time; a table rebuild goes through `rebuild({ version, sqls })`, which
+also checks that no foreign key points to a missing row. `SqliteMigrator` (`app/server/db/Db.ts`) runs each missing
+entry in a transaction when the database opens ([Database](/developers/server/database/)).
 
   </Step>
   <Step title="Update the repository">
 
-Each table has a repository in `app/server/lib/db/` (`settings.ts`, `profiles.ts`, `benchRuns.ts`, `downloads.ts`…) that maps
-rows to the types of `packages/webui-shared/`. Change its queries and row mapping, and the shared type if the API exposes the column.
+Each table has a repository in its domain's folder (`settings/SettingsRepo.ts`, `profiles/ProfilesRepo.ts`,
+`bench/BenchRunsRepo.ts`, `downloads/DownloadsRepo.ts`…), a service on `SqlClient` that maps rows to the schemas of
+`packages/webui-shared/`. Change its queries and row mapping, and the shared schema if the API exposes the column. A
+number fed to a JSON function or an untyped column is written `CAST(? AS INTEGER)`: `node:sqlite` binds a JS number as
+REAL otherwise.
 
   </Step>
   <Step title="Test it">
 
-`openDb(':memory:')` applies every migration, so the repository tests exercise the new schema. When the migration
-rewrites existing data, also test it from the schema it starts from, filled with rows
+`Db.layerAt(':memory:')` (under `ServicesTest`) applies every migration, so the repository tests exercise the new
+schema. When the migration rewrites existing data, also test it from the schema it starts from, filled with rows
 ([Migrations on old data](/developers/contributing/testing/#migrations-on-old-data)).
 
   </Step>
@@ -257,32 +365,33 @@ rewrites existing data, also test it from the schema it starts from, filled with
 ## Add a collector
 
 <Steps>
-  <Step title="Write the sampler">
+  <Step title="Write the reader">
 
-Add the reader in `app/server/lib/collectors/<name>.ts`: a class or function that returns a typed sample, or `null` when the
-source is unavailable. Keep parsing in pure functions tested against captured output in `testdata/`, and take the
-`/proc` or `/sys` root, the `spawn` function or the binary path as parameters so tests can replace them.
+Add the reader in `app/server/collectors/<name>.ts`: an effect that gives a typed sample. Keep parsing in pure
+functions tested against captured output in `testdata/`, and read files through `FileSystem` and programs through
+`effect/process`, so a test can give its own files and programs.
 
   </Step>
   <Step title="Type the sample">
 
-Declare the sample type in `packages/webui-shared/src/monitor.ts`, as `SystemSample` and `DiskSample` are, and add a nullable field to
-`Snapshot`. Add its history keys to `SERIES` if it is charted.
+Declare the sample's schema in `packages/webui-shared/src/monitor.ts`, as `SystemSample` and `DiskSample` are, and add
+a nullable field to `Snapshot`. Add its history keys to `SERIES` if it is charted. Its numbers are `Schema.Finite` or
+`Schema.Int`: `app/server/monitor/finite.ts` makes a reading finite before it reaches the snapshot.
 
   </Step>
   <Step title="Register it">
 
-`Collectors` (`app/server/lib/collectors/registry.ts`) owns every source. Create the new one in `start()` or `configure()` and
-expose it through a getter that is `undefined` while its switch is off, as `system` and `disk` are; stop it in `stop()`.
-A GPU source honors the `GpuNeeds` of `app/server/lib/collectors/needs.ts`: `gpuSkipped(needs, busId)` is true for a hidden
-card, which is identified but never read.
+`Collectors` (`app/server/collectors/Collectors.ts`) owns every source. Expose the new one as an
+`Effect<Option<Source>>` that is none while its switch is off, as `system` and `disk` are, and start or stop it in
+`configure`, which applies the settings.
 
   </Step>
-  <Step title="Sample it on each tick">
+  <Step title="Read it on each tick">
 
-In `Monitor.doTick()` (`app/server/lib/monitor/monitor.ts`), start the read alongside the others and catch its errors as they
-do (`.catch(() => null)`): an exception would drop the whole snapshot of that tick. Put the result in the snapshot and
-feed its series with `push()`, or `known()` when the value can be missing (the series gets a gap).
+`Monitor` (`app/server/monitor/Monitor.ts`) reads every source of a tick in one `Effect.all`, each read with its own
+fallback (`orElse(null)`): a read that fails gives no value, never a lost snapshot. What the tick does with the
+readings is the pure `endTick` of `app/server/monitor/tick.ts`: put the sample in the `TickReading`, then in the
+snapshot, and feed its series. Test the rule in `tick.test.ts`, as a plain function.
 
   </Step>
   <Step title="Show it">
@@ -303,32 +412,35 @@ page for the new `Snapshot` field, and the user pages that show it ([Dashboard](
 <Steps>
   <Step title="Add it to the schema">
 
-Add a field with its limits and a `.default()` to `SettingsSchema` (`packages/webui-shared/src/settings.ts`). `DEFAULT_SETTINGS` and the
-`Settings` type follow from it.
+Add the default to `DEFAULTS` and a field with its limits and its decoding default to `Settings`
+(`packages/webui-shared/src/settings.ts`):
 
 ```ts title="packages/webui-shared/src/settings.ts"
-historySeconds: z.number().int().min(30, 'Between 30 and 1800 s').max(1800, 'Between 30 and 1800 s').default(300),
+  historySeconds: IntBetween(30, 1800, 'Between 30 and 1800 s').pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(DEFAULTS.historySeconds)),
+  ),
 ```
 
-No migration is needed: the `settings` table stores one JSON value per key, and `SettingsRepo.get()`
-(`app/server/lib/db/settings.ts`) starts from the defaults, so a new key gets its default and a stored value that no longer
-validates falls back to it. A switch inside `collectors` goes into both the inner object and the outer `.default({…})`.
+No migration is needed: the `settings` table stores one JSON value per key, and `SettingsRepo.get`
+(`app/server/settings/SettingsRepo.ts`) decodes each stored value on its own, so a new key gets its default and a
+stored value that no longer validates falls back to it, with a warning in the log.
 
   </Step>
   <Step title="Use it on the server">
 
-Read it with `settings.get()` when it is used (modules receive a getter such as `settings: () => settings.get()`), so a
-change applies without a restart. `PATCH /api/settings` (`app/server/routes/api/settings.patch.ts`) also calls `monitor.configure()`: a setting
-the monitor or the collectors depend on belongs in `MonitorSettings` and `CollectorSettings`.
+Read it with `SettingsRepo.get` when it is used, so a change applies without a restart. The `PATCH /api/settings`
+handler (`app/server/settings/http.ts`) hands a patch to `monitor.configure` when it changes what the monitor follows:
+a setting the monitor or the collectors depend on also goes into `MonitorSettings` and `monitorSettingsOf`
+(`app/server/monitor/Monitor.ts`).
 
   </Step>
   <Step title="Add it to the Settings page">
 
 `app/src/features/settings/SettingsPage.tsx` has three tabs (**General**, **Monitoring**, **Appearance**). Add a field
 from `fields.tsx` (`TextField`, `SwitchRow`) to the right section and save it with `save({ key: value })` from
-`useSettingsEditor()` (`app/src/lib/settings.ts`). When the server refuses the value, `errors.<key>` holds the zod
-message, which `TextField` shows under the field. The first-run checklist (`app/src/features/home/`) shares the editor
-and the fields.
+`useSettingsEditor()` (`app/src/lib/settings.ts`). When the server refuses the value (`SettingsInvalid`), `errors.<key>`
+holds the message of its issue, which `TextField` shows under the field. The first-run checklist
+(`app/src/features/home/`) shares the editor and the fields.
 
   </Step>
 </Steps>

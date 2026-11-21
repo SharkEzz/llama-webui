@@ -1,4 +1,5 @@
-import type { WsMessage } from '@llama-webui/shared';
+import { WsMessage } from '@llama-webui/shared';
+import { Option, Result, Schema } from 'effect';
 import { create } from 'zustand';
 
 export type WsStatus = 'connecting' | 'open' | 'closed';
@@ -11,6 +12,19 @@ interface WsState {
 
 const BACKOFF_START_MS = 500;
 const BACKOFF_MAX_MS = 10_000;
+
+const decode = Schema.decodeUnknownResult(Schema.fromJsonString(WsMessage));
+
+/**
+ * A frame as a message of the push channel. What does not decode (not JSON, a type or a field this page does not
+ * know: a page and a server of two versions) is none, and logged: a page that stops updating says nothing of why.
+ */
+export const decodeFrame = (frame: string): Option.Option<WsMessage> => {
+  const decoded = decode(frame);
+  if (Result.isSuccess(decoded)) return Option.some(decoded.success);
+  console.error('llama-webui: a message of the server does not decode', decoded.failure);
+  return Option.none();
+};
 
 type Listener = (msg: WsMessage) => void;
 const listeners = new Map<WsMessage['type'], Set<Listener>>();
@@ -53,13 +67,9 @@ export const useWs = create<WsState>()((set, get) => {
       set({ status: 'open' });
     };
     ws.onmessage = (event) => {
-      let msg: WsMessage;
-      try {
-        msg = JSON.parse(String(event.data));
-      } catch {
-        return;
-      }
-      if (typeof msg !== 'object' || msg === null) return;
+      const decoded = decodeFrame(String(event.data));
+      if (Option.isNone(decoded)) return;
+      const msg = decoded.value;
       if (msg.type === 'ping') ws.send(JSON.stringify({ type: 'pong' } satisfies WsMessage));
       set({ lastMessage: msg });
       for (const fn of listeners.get(msg.type) ?? []) fn(msg);

@@ -5,12 +5,12 @@ import { cn } from '@/lib/utils';
 import { GLASS } from './glass';
 
 interface GlassCardProps {
-  title?: string;
-  icon?: LucideIcon;
+  title?: string | undefined;
+  icon?: LucideIcon | undefined;
   actions?: ReactNode;
-  className?: string;
+  className?: string | undefined;
   /** Classes of the content area, e.g. `flex min-h-0 flex-1 flex-col` for a content that fills a stretched card. */
-  contentClassName?: string;
+  contentClassName?: string | undefined;
   children?: ReactNode;
 }
 

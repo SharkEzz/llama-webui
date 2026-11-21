@@ -1,7 +1,7 @@
-import type { CpuInfo } from '@llama-webui/shared';
+import type { SystemInfo } from '@llama-webui/shared';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/lib/api';
+import { call } from '@/lib/api';
 import { useMonitor } from '@/lib/monitor';
 import { ChecksCard } from './ChecksCard';
 import { CpuCard } from './CpuCard';
@@ -9,17 +9,11 @@ import { DiskCard } from './DiskCard';
 import { GpuCard } from './GpuCard';
 import { MemoryCard } from './MemoryCard';
 
-export interface SystemInfo {
-  cpu: CpuInfo;
-  gpus: { key: string; name: string; vendor: 'nvidia' | 'amd'; busId: string; vramTotalBytes: number }[];
-  nvidiaSource: 'nvml' | 'nvidia-smi';
-}
-
 export function SystemPage() {
   const snapshot = useMonitor((s) => s.snapshot);
   const [info, setInfo] = useState<SystemInfo | null>(null);
   useEffect(() => {
-    void api('GET /api/system/info').then(setInfo, () => {});
+    void call((api) => api.monitor.systemInfo()).then(setInfo, () => {});
   }, []);
 
   return (

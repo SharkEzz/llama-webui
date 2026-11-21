@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
-import type { SlotView, Snapshot } from './monitor';
-import type { ServerState } from './server';
-import { hostDevice, pcieBps, phaseOf, placementTotals } from './topology';
+import type { SlotView, Snapshot } from './monitor.ts';
+import type { ServerState } from './server.ts';
+import { hostDevice, pcieBps, phaseOf, placementTotals } from './topology.ts';
 
 const slot = (o: Partial<SlotView>): SlotView => ({
   id: 0,

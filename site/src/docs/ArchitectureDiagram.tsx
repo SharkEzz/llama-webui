@@ -25,7 +25,7 @@ const MACHINE: Node[] = [
     detail: 'child process (setpriv --pdeathsig); /health, /metrics, /slots, /props, /v1/chat/completions, /completion',
   },
   { name: 'llama-bench', detail: 'benchmark runs, sweep exploration, --list-devices' },
-  { name: 'GPUs and kernel', detail: 'NVML (worker) or nvidia-smi, amdgpu sysfs, /proc, perf' },
+  { name: 'GPUs and kernel', detail: 'NVML (sampler process) or nvidia-smi, amdgpu sysfs, /proc, perf' },
   { name: 'Models folder', detail: 'GGUF files, headers read for metadata and estimates' },
   { name: 'Hugging Face', detail: 'search and downloads, only when you use them' },
 ];
@@ -85,10 +85,10 @@ export function ArchitectureDiagram() {
 
       <Tier title="llama-webui: one Node.js process, port 7860" accent>
         <div className={cn(BOX, 'mb-2')}>
-          <p className="font-medium">Nitro server (srvx)</p>
+          <p className="font-medium">Effect HTTP server (node:http)</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            UI (Vite in dev, the built assets and index.html in production), API file routes behind the guard and 405
-            middlewares, WebSocket hub on crossws.
+            UI (Vite in dev, the built assets and index.html in production), the API's endpoints behind the guard, the
+            WebSocket hub.
           </p>
         </div>
         <Boxes nodes={MODULES} className="grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-4" />
@@ -107,9 +107,9 @@ export function ArchitectureDiagram() {
       </Tier>
 
       <figcaption className="mt-4 px-1 text-xs text-muted-foreground">
-        The supervisor, the monitor, the logs and the bench gate live as long as the runtime: under{' '}
-        <code className="font-mono whitespace-nowrap">pnpm dev</code>, saving a route keeps it, saving business code
-        rebuilds it, and llama-server with it.
+        The supervisor, the monitor, the logs and the bench gate are services of the runtime: under{' '}
+        <code className="font-mono whitespace-nowrap">pnpm dev</code>, saving a server file restarts it, and
+        llama-server with it.
       </figcaption>
     </figure>
   );

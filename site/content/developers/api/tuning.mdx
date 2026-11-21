@@ -1,23 +1,27 @@
 ---
 title: Tuning
-description: Routes that read the hardware, estimate the best llama-server flags for a model and a preset, plan a sweep, run the system checks and time the model's disk.
+description: Endpoints that read the hardware, estimate the best llama-server flags for a model and a preset, plan a sweep, run the system checks and time the model's disk.
 ---
 
-The tuning routes give the [Tuning](/docs/tuning/) page its recommendation: the hardware the estimator works with, the
-estimate itself, the dry run of a sweep plan, the system checks and the model disk's read speed. They live in
-`app/server/routes/api/tuning/`; the types and the presets are in `packages/webui-shared/src/tuning.ts`, the estimator and the checks in
-`app/server/lib/tuning/` (see [Tuning](/developers/server/tuning/)).
+The tuning endpoints give the [Tuning](/docs/tuning/) page its recommendation: the hardware the estimator works with, the
+estimate itself, the dry run of a sweep plan, the system checks and the model disk's read speed. They are declared in
+`TuningApi` (`packages/webui-shared/src/api/TuningApi.ts`) and handled in `app/server/tuning/http.ts`; the types, the
+request schemas and the presets are in `packages/webui-shared/src/tuning.ts`, the estimator and the checks in
+`app/server/tuning/` (see [Tuning](/developers/server/tuning/)).
 
-The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
+The guard, the error shape and the `400` `RequestInvalid` follow the common rules of the [API overview](/developers/api/overview/).
 
 ## Model errors
 
-The routes that read a model parse its GGUF with `loadModel()` (`app/server/lib/tuning/models.ts`), cached while the file's size
-and modification time do not change. It answers:
+The endpoints that read a model parse its GGUF with `loadModel()` (`app/server/tuning/models.ts`), through the
+`GgufReader` cache (kept while the file's size and modification time do not change). They answer
+(`ModelLoadErrors` of `TuningApi`):
 
-- `400` `Expected an absolute path to a .gguf file`;
-- `404` `Model not found` (or `Projector not found` for `mmprojPath`);
-- `422` with the parser's message when the file is not a readable GGUF.
+- `400` `ModelPathInvalid` `Expected an absolute path to a .gguf file`;
+- `403` `ModelPathRefused` `Outside the models folder and not used by a profile`: a model or projector must be under
+  the models folder, or a profile's (see [Security](/developers/server/security/#paths-the-api-reads-and-writes));
+- `404` `ModelNotFound` `Model not found` (or `ProjectorNotFound` `Projector not found` for `mmprojPath`);
+- `422` `ModelUnreadable` with the parser's message when the file is not a readable GGUF.
 
 ## Presets
 
@@ -37,7 +41,7 @@ A preset (`PRESETS` in `packages/webui-shared/src/tuning.ts`) sets what the esti
 
 <Endpoint method="GET" path="/api/tuning/hardware" />
 
-What the estimator plans for (`readTuningHardware()` in `app/server/lib/tuning/hardware.ts`).
+What the estimator plans for (the `TuningHardware` service, `app/server/tuning/TuningHardware.ts`).
 
 **Response**: `200` with a `TuningHardware`.
 
@@ -64,10 +68,10 @@ curl http://127.0.0.1:7860/api/tuning/hardware
 <Endpoint method="POST" path="/api/tuning/estimate" />
 
 Reads the model's GGUF and the hardware, then searches the placement that fits best for the preset
-(`estimate()` in `app/server/lib/tuning/estimate.ts`). The latest estimate of each model is kept in memory for the
+(`estimate()` in `app/server/tuning/estimate.ts`). The latest estimate of each model is kept in memory (`TuningMemo`) for the
 [checks](#run-the-system-checks).
 
-**Body**: `EstimateRequest`, a schema local to `app/server/routes/api/tuning/`, strict.
+**Body**: `EstimateRequest` (`packages/webui-shared/src/tuning.ts`), strict.
 
 | Field        | Type           | Required | Description                                                           |
 | ------------ | -------------- | -------- | --------------------------------------------------------------------- |
@@ -79,7 +83,7 @@ Reads the model's GGUF and the hardware, then searches the placement that fits b
 
 **Response**: `200` with an `Estimate`, also when nothing fits (`ok: false`).
 
-**Errors**: `400` invalid body; the [model errors](#model-errors).
+**Errors**: `400` `RequestInvalid` (invalid body); the [model errors](#model-errors).
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/tuning/estimate \
@@ -136,18 +140,18 @@ warning `dense model: -ncmoe has no effect`.
 | `params`                | `BenchParams`      | The recommended flags, pins included. When nothing fits: the simplest configuration (all layers on the widest set of cards, or `-ngl 0`), not validated. |
 | `ctx`                   | number             | Context size.                                                                       |
 | `kv`                    | cache type         | The final K cache type: `f16`, `q8_0`, `f8_e4m3` (with `fa: "off"`) or the pinned `ctk`. |
-| `serverArgs`            | string[]           | `serverArgs(params)`, then `-c <ctx>`, `--fit off`, and `--mlock` and `--numa distribute` when they apply: ready for a profile. |
+| `serverArgs`            | string[]           | `serverArgs(params)`, then `-c <ctx>`, `--fit off`, and `--load-mode mmap+mlock` and `--numa distribute` when they apply: ready for a profile. |
 | `rows`                  | `Recommendation[]` | One row per flag: `flag`, `value` and `why`, the reason shown in the UI. Empty when `ok` is false. |
 | `fit`                   | `Fit`              | Per-device memory and verdict (below).                                              |
 | `ramOverflowBytes`      | number             | What exceeds the available RAM (re-read from disk through mmap).                    |
 | `diskReadBytesPerToken` | number             | Bytes read from disk per generated token when RAM overflows, 0 otherwise.           |
 | `warnings`              | string[]           | Slow placements (layers or experts in RAM, RAM overflow), a `tight` fit's reason, and the placement's issues. |
 
-`--mlock` is added when `-ngl` is not `all`, some weights stay in RAM, `-ncmoe` is not used, nothing overflows, and at
+`--load-mode mmap+mlock` is added when `-ngl` is not `all`, some weights stay in RAM, `-ncmoe` is not used, nothing overflows, and at
 least 2 GiB of RAM are left. `--numa distribute` is added on a machine with several NUMA nodes. `--fit off` is always there: what gets
 measured is exactly what gets written.
 
-`Fit` (`fitOf()` in `app/server/lib/tuning/placement.ts`):
+`Fit` (`fitOf()` in `app/server/tuning/placement.ts`):
 
 | Field               | Type             | Description                                                     |
 | ------------------- | ---------------- | --------------------------------------------------------------- |
@@ -219,7 +223,7 @@ Expands a sweep spec and runs the estimator on each combination, without saving 
 | `droppedTs`        | number       | `-ts` values discarded because the `-dev` of the combination has another length.   |
 | `estimatedSeconds` | number       | Rough duration: per item, one load at 1.5 GiB/s plus 10 seconds per repetition.     |
 
-**Errors**: `400` `JSON object expected` or an invalid spec; the [model errors](#model-errors).
+**Errors**: `400` `RequestInvalid` (no body, or an invalid spec); the [model errors](#model-errors).
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/tuning/plan \
@@ -234,7 +238,7 @@ curl -X POST http://127.0.0.1:7860/api/tuning/plan \
 <Endpoint method="GET" path="/api/tuning/checks" />
 
 Checks the drivers, the CPU, the kernel and the `llama-server` build for settings that cost speed (`runChecks()` in
-`app/server/lib/tuning/checks.ts`). With a model, the checks also use its file, the latest
+`app/server/tuning/checks.ts`). With a model, the checks also use its file, the latest
 [estimate](#estimate-the-flags-for-a-model) of the same model path and its latest
 [disk measurement](#measure-the-model-disks-read-speed); both are kept in memory and lost when llama-webui restarts.
 
@@ -243,6 +247,8 @@ Checks the drivers, the CPU, the kernel and the `llama-server` build for setting
 | Parameter | Required | Description                                                                  |
 | --------- | -------- | ---------------------------------------------------------------------------- |
 | `model`   | no       | Absolute path of a model. A model that cannot be read is ignored.            |
+
+**Errors**: `403` `ModelPathRefused` for a `model` outside the models folder and no profile's.
 
 **Response**: `200` with a `ChecksReport`: `checks` (`Check[]`), `summary` (the count of each state: `warn`, `ok`,
 `unknown`, `na`) and `at` (epoch ms).
@@ -265,7 +271,7 @@ Check ids, by family (`<busId>` is a GPU's PCI address):
 | Family   | Ids                                                                                                       |
 | -------- | --------------------------------------------------------------------------------------------------------- |
 | `nvidia` | `nvidia.persistence.<busId>`, `nvidia.powerlimit.<busId>`, `nvidia.rebar.<busId>`, `nvidia.pcie.<busId>`, `nvidia.driver`, `nvidia.uvm` |
-| `amd`    | `amd.dpm.<busId>`, `amd.pcie.<busId>`, `amd.hip`, `amd.rocm-gfx`                                          |
+| `amd`    | `amd.dpm.<busId>`, `amd.pcie.<busId>`, `amd.hip`, `amd.rocm-gfx.<busId>`                                  |
 | `cpu`    | `cpu.governor`, `cpu.thp`, `cpu.memlock`, `cpu.swappiness`, `cpu.numa`                                    |
 | `build`  | `build.cuda`, `build.simd`, `build.age`                                                                   |
 | `kernel` | `kernel.iommu`, `kernel.disk`, `kernel.disk-speed`, `kernel.swap`                                         |
@@ -284,11 +290,11 @@ curl 'http://127.0.0.1:7860/api/tuning/checks?model=/home/demo/models/Qwen3-30B-
 
 <Endpoint method="POST" path="/api/tuning/disk-speed" />
 
-Times a sequential read of the model file (`measureDiskSpeed()` in `app/server/lib/tuning/disk.ts`): up to 1 GiB, from a random
+Times a sequential read of the model file (`measureDiskSpeed()` in `app/server/tuning/disk.ts`): up to 1 GiB, from a random
 offset to avoid the start of the file that is often already cached. The OS page cache can still inflate the result.
 The measurement is kept in memory for the `kernel.disk-speed` check.
 
-**Body**: strict.
+**Body**: `DiskSpeedRequest`, strict.
 
 | Field       | Type   | Required | Description                    |
 | ----------- | ------ | -------- | ------------------------------ |
@@ -303,8 +309,10 @@ The measurement is kept in memory for the `kernel.disk-speed` check.
 | `path`         | string | The file.                        |
 | `at`           | number | Time of the measurement (epoch ms). |
 
-**Errors**: `400` invalid body; `409` `A benchmark is running: the measurement would be skewed`; the
-[model errors](#model-errors); `400` `File too small to measure` below 64 MiB.
+**Errors**: `400` `RequestInvalid` (invalid body); `409` `BenchRunning`
+`A benchmark is running: the measurement would be skewed`; the [model errors](#model-errors) but the projector's (and
+`404` `ModelFileNotFound` `File not found: <path>` when the file goes away before the read); `400` `FileTooSmall`
+`File too small to measure (<n> MiB)` below 64 MiB.
 
 ```bash title="Terminal"
 curl -X POST http://127.0.0.1:7860/api/tuning/disk-speed \
