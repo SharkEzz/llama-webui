@@ -163,7 +163,7 @@ export const SHOTS: Shot[] = [
     prepare: async (page) => {
       await selectOption(page, '[aria-label="Starting profile"]', 'Qwen3.8 Flash-Next · 70 GB MoE');
       // Loading the profile resets the preset: wait for its recommendation before picking one.
-      await page.waitForSelector(byText('experts of the first'), { timeout: 30_000 });
+      await page.waitForSelector(byText('CUDA0,CUDA1,ROCm0'), { timeout: 30_000 });
       await page.waitForFunction(
         () => {
           const label = [...document.querySelectorAll('label')].find((l) => l.textContent?.includes('100 GB model'));
