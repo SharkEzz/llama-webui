@@ -3,9 +3,9 @@ title: Server, state and logs
 description: Read the state of llama-server, start, switch, restart and stop it, read its /props and its flags, and read the log ring.
 ---
 
-These routes drive the supervised `llama-server` and read what it reports (`server/routes/server.ts`). The process
-itself is managed by the `Supervisor` (`server/supervisor/supervisor.ts`, see
-[Supervisor](/developers/server/supervisor/)), its output by the `LogBuffer` ring (`server/logs/buffer.ts`). Types:
+These routes drive the supervised `llama-server` and read what it reports (`app/server/routes/api/server/`). The process
+itself is managed by the `Supervisor` (`app/server/lib/supervisor/supervisor.ts`, see
+[Supervisor](/developers/server/supervisor/)), its output by the `LogBuffer` ring (`app/server/lib/logs/buffer.ts`). Types:
 `ServerState` and `ServerView` (`packages/webui-shared/src/server.ts`), `LogLine` (`packages/webui-shared/src/logs.ts`), `Flag`
 (`llamacpp-js/flags`, re-exported by `@llama-webui/shared`). The common rules are on the [API overview](/developers/api/overview/); the Server page is
 described on [Server](/docs/server/).
@@ -29,7 +29,7 @@ The supervisor's state, a union on `kind` (`packages/webui-shared/src/server.ts`
 `since` and `at` are epoch milliseconds, `exitCode` and `signal` are `null` when unknown. llama-webui looks for an
 external server on the `port` setting and the last started profile's port at startup, then every 2 seconds while the
 state is `idle`, `crashed` or `external`, except during a benchmark (`externalWatcher()`,
-`server/supervisor/external.ts`). Only a service whose `/health` answers like `llama-server` counts.
+`app/server/lib/supervisor/external.ts`). Only a service whose `/health` answers like `llama-server` counts.
 
 ### ServerView
 
@@ -238,7 +238,7 @@ curl http://127.0.0.1:7860/api/flags
 The lines of the log ring: the stdout and stderr of `llama-server`, and llama-webui's own lines about it
 (`[llama-webui] launch: <command>`, `[llama-webui] GGML_CUDA_P2P is set: …`, `[llama-webui] llama-server exited (code …)`,
 `[bench] stopping llama-server for the benchmark`…). The ring is in memory only and keeps the last 10,000 lines (`LogBuffer(10_000)` in
-`server/runtime.ts`), so a restart of llama-webui empties it. New lines are pushed as
+`app/server/lib/runtime.ts`), so a restart of llama-webui empties it. New lines are pushed as
 [`log`](/developers/api/websocket/#log) messages.
 
 **Query**

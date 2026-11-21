@@ -1,12 +1,12 @@
 ---
 title: Health and settings
-description: The health check createApi defines itself and the settings read and patch, with every field of the settings schema, plus the fallbacks of the host.
+description: The health check and the settings read and patch, with every field of the settings schema, plus the fallbacks for the other paths.
 ---
 
-`createApi()` (`server/api.ts`) defines the health check itself, next to the domain apps it mounts (the settings come
-from `server/routes/settings.ts`), and the `/api/*` fallback; `mount()` (`server/host.ts`) adds the `/ws` upgrade and
-the web app. The settings schema is `SettingsSchema` (`packages/webui-shared/src/settings.ts`), stored
-by `SettingsRepo` (`server/db/settings.ts`). The common rules (guard, error shape, `400` on invalid data) are on the
+The health check is `app/server/routes/api/health.get.ts`, the settings routes `settings.get.ts` and
+`settings.patch.ts` next to it; the fallbacks for the other paths come from the middlewares and from Nitro (see
+[Fallbacks](#fallbacks)). The settings schema is `SettingsSchema` (`packages/webui-shared/src/settings.ts`), stored
+by `SettingsRepo` (`app/server/lib/db/settings.ts`). The common rules (guard, error shape, `400` on invalid data) are on the
 [API overview](/developers/api/overview/).
 
 ## Health
@@ -15,16 +15,16 @@ by `SettingsRepo` (`server/db/settings.ts`). The common rules (guard, error shap
 
 <Endpoint method="GET" path="/api/health" />
 
-Answers as long as the Node.js process serves requests, whatever the state of `llama-server`. It goes through the guard
-like every API route.
+Answers once llama-webui has started, whatever the state of `llama-server`; until then, like every API route, it gets
+`503` `llama-webui is starting`. It goes through the guard like every API route.
 
 **Response**: `200`
 
 | Field      | Type    | Description                                                                 |
 | ---------- | ------- | --------------------------------------------------------------------------- |
 | `ok`       | boolean | Always `true`.                                                              |
-| `version`  | string  | `APP_VERSION` (`server/version.ts`): `dev` in development (`pnpm dev`); in a build (`pnpm build`), `git describe --tags --always --dirty` at build time (tag, else short commit hash), the `package.json` version without git. Shown in the status bar. |
-| `uptimeMs` | number  | Milliseconds since `server/api.ts` was loaded (`startedAt`).                |
+| `version`  | string  | `APP_VERSION` (`app/server/lib/version.ts`): `dev` in development (`pnpm dev`); in a build (`pnpm build`), `git describe --tags --always --dirty` at build time (tag, else short commit hash), the `package.json` version without git. Shown in the status bar. |
+| `uptimeMs` | number  | Milliseconds since `app/server/routes/api/health.get.ts` was loaded (`startedAt`). |
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/health
@@ -137,11 +137,13 @@ curl -X PATCH http://127.0.0.1:7860/api/settings \
 
 ## Fallbacks
 
-After the domain routes, `createApi()` and `mount()` (`server/host.ts`) handle:
+Besides the route files, the middlewares of `app/server/middleware/` and Nitro handle:
 
 - `/api/*`: any other path under `/api/` gets `404` `{ "error": "Unknown route" }`; a method that a known path does
-  not define gets `405` with an `Allow` header (see
+  not define gets `405` with an `Allow` header (`01.guard.ts`, see
   [How routes are registered](/developers/api/overview/#how-routes-are-registered)).
-- `/ws`: the WebSocket upgrade (`426` without an upgrade). See [WebSocket](/developers/api/websocket/).
-- The web app for every other path: Vite's middlewares with HMR in development, the files of `pnpm build` (`dist/web`)
-  in production (`staticWeb()`, `server/routes/web.ts`).
+- `/ws`: the WebSocket upgrade (`app/server/routes/ws.ts`; `426` without an upgrade). See
+  [WebSocket](/developers/api/websocket/).
+- The web app for every other path: Vite with HMR in development; in production, the built files of
+  `app/.output/public/` and, for any other path, `index.html` from Nitro's renderer (see
+  [Serving the UI](/developers/architecture/#serving-the-ui)).

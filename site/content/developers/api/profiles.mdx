@@ -4,8 +4,8 @@ description: Create, read, update, delete and duplicate llama-server profiles, e
 ---
 
 A profile is a saved `llama-server` launch: a model, optional projector, working directory, host, port, arguments and
-environment. The routes are in `server/routes/profiles.ts`, the storage in `ProfilesRepo` (`server/db/profiles.ts`),
-the llama-tui reader in `server/llamatui.ts`, and the schema and import parser in `packages/webui-shared/src/profile.ts`. The common
+environment. The routes are in `app/server/routes/api/profiles/`, the storage in `ProfilesRepo` (`app/server/lib/db/profiles.ts`),
+the llama-tui reader in `app/server/lib/llamatui.ts`, and the schema and import parser in `packages/webui-shared/src/profile.ts`. The common
 rules are on the [API overview](/developers/api/overview/); the Profiles page is described on
 [Profiles](/docs/profiles/).
 
@@ -30,7 +30,7 @@ It is the profile format of llama-tui. The object is strict: an unknown key is r
 `args` cannot contain a flag llama-webui passes itself (`RESERVED_FLAGS`): `--host`, `--port`, `--metrics`, `--slots`,
 `--props`, `-m`, `--model`, `-mm`, `--mmproj`, also written as `--flag=value`. Each one is a zod issue at its index,
 `<flag> is managed by llama-webui (use the profile fields)` with the path `args.<index>`. The launch command itself is
-built by `buildCommand()` (`server/supervisor/args.ts`, see [Supervisor](/developers/server/supervisor/)).
+built by `buildCommand()` (`app/server/lib/supervisor/args.ts`, see [Supervisor](/developers/server/supervisor/)).
 
 ### Profile
 
@@ -226,7 +226,7 @@ curl -X POST http://127.0.0.1:7860/api/profiles/import \
 
 llama-webui reads the profiles of llama-tui from its configuration file,
 `$XDG_CONFIG_HOME/llama-tui/config.json`, or `~/.config/llama-tui/config.json` when `XDG_CONFIG_HOME` is not set
-(`llamaTuiConfigPath()`, `server/llamatui.ts`). The file is read on every call, and parsed with the same
+(`llamaTuiConfigPath()`, `app/server/lib/llamatui.ts`). The file is read on every call, and parsed with the same
 `parseProfileImport()` as a file import.
 
 ### Check for llama-tui profiles

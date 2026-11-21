@@ -3,10 +3,10 @@ title: Models
 description: Scan the models folder for GGUF files, read the header and weight breakdown of one GGUF, with every field of ModelSummary and ModelDetail, and delete a model.
 ---
 
-These routes list the GGUF files of the models folder, describe one of them, and delete one (`server/routes/models.ts`).
-The scan is `scanModels()` (`server/models/scan.ts`), the GGUF reader `readModel()` (`server/models/gguf.ts`), the
-weight breakdown `weightSizes()` (`server/models/sizes.ts`), and the types `ModelList`, `ModelEntry`, `ModelSummary`
-and `ModelDetail` (`packages/webui-shared/src/models.ts`); deletion is in `server/models/delete.ts`. The common rules are on the [API overview](/developers/api/overview/); the
+These routes list the GGUF files of the models folder, describe one of them, and delete one (`app/server/routes/api/models/`).
+The scan is `scanModels()` (`app/server/lib/models/scan.ts`), the GGUF reader `readModel()` (`app/server/lib/models/gguf.ts`), the
+weight breakdown `weightSizes()` (`app/server/lib/models/sizes.ts`), and the types `ModelList`, `ModelEntry`, `ModelSummary`
+and `ModelDetail` (`packages/webui-shared/src/models.ts`); deletion is in `app/server/lib/models/delete.ts`. The common rules are on the [API overview](/developers/api/overview/); the
 Models page is described on [Models](/docs/models/).
 
 ## Scan the models folder
@@ -57,7 +57,7 @@ file:
 
 ### ModelSummary
 
-What the header of a GGUF says (`toSummary()`, `server/models/scan.ts`). `<arch>` is the value of
+What the header of a GGUF says (`toSummary()`, `app/server/lib/models/scan.ts`). `<arch>` is the value of
 `general.architecture`.
 
 | Field             | Type                     | Description                                                                                               |

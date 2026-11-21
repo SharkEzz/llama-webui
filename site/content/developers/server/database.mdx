@@ -4,22 +4,22 @@ description: The SQLite database behind llama-webui, where it lives, its pragmas
 ---
 
 llama-webui stores everything that must outlive a restart in one SQLite database, opened with `node:sqlite` through a
-small wrapper. The code lives in `server/db/`: `sqlite.ts` wraps the driver, `open.ts` opens the file, `migrations.ts`
+small wrapper. The code lives in `app/server/lib/db/`: `sqlite.ts` wraps the driver, `open.ts` opens the file, `migrations.ts`
 creates and evolves the schema, and one repository class per table (or pair of tables) reads and writes it.
 
 | File                          | Role                                                                          |
 | ----------------------------- | ----------------------------------------------------------------------------- |
-| `server/db/sqlite.ts`         | `Database`: the wrapper around `node:sqlite` that every repository takes.     |
-| `server/db/open.ts`           | `openDb(path)`: opens the file, sets the pragmas, runs the migrations.        |
-| `server/db/migrations.ts`     | `MIGRATIONS` and `runMigrations()`.                                           |
-| `server/db/settings.ts`       | `SettingsRepo`: the `settings` table.                                         |
-| `server/db/profiles.ts`       | `ProfilesRepo`: the `profiles` table.                                         |
-| `server/db/conversations.ts`  | `ConversationsRepo`: the `conversations` and `messages` tables.               |
-| `server/db/benchRuns.ts`      | `BenchRunsRepo`: the `bench_runs` table (one-off runs and sweep items).       |
-| `server/db/sweeps.ts`         | `SweepsRepo`: the `sweeps` table.                                             |
-| `server/db/downloads.ts`      | `DownloadsRepo`: the `downloads` table (Hugging Face queue).                  |
-| `server/db/modelCache.ts`     | `ModelCacheRepo`: the `model_cache` table.                                    |
-| `server/paths.ts`             | `dataDir()` and `dbPath()`: where the file lives.                              |
+| `app/server/lib/db/sqlite.ts`         | `Database`: the wrapper around `node:sqlite` that every repository takes.     |
+| `app/server/lib/db/open.ts`           | `openDb(path)`: opens the file, sets the pragmas, runs the migrations.        |
+| `app/server/lib/db/migrations.ts`     | `MIGRATIONS` and `runMigrations()`.                                           |
+| `app/server/lib/db/settings.ts`       | `SettingsRepo`: the `settings` table.                                         |
+| `app/server/lib/db/profiles.ts`       | `ProfilesRepo`: the `profiles` table.                                         |
+| `app/server/lib/db/conversations.ts`  | `ConversationsRepo`: the `conversations` and `messages` tables.               |
+| `app/server/lib/db/benchRuns.ts`      | `BenchRunsRepo`: the `bench_runs` table (one-off runs and sweep items).       |
+| `app/server/lib/db/sweeps.ts`         | `SweepsRepo`: the `sweeps` table.                                             |
+| `app/server/lib/db/downloads.ts`      | `DownloadsRepo`: the `downloads` table (Hugging Face queue).                  |
+| `app/server/lib/db/modelCache.ts`     | `ModelCacheRepo`: the `model_cache` table.                                    |
+| `app/server/lib/paths.ts`             | `dataDir()` and `dbPath()`: where the file lives.                              |
 | `packages/webui-shared/src/settings.ts`      | `SettingsSchema` and `DEFAULT_SETTINGS`.                                       |
 
 Monitoring history and logs are not in the database: they live in memory (see
@@ -27,7 +27,8 @@ Monitoring history and logs are not in the database: they live in memory (see
 
 ## Where the file lives
 
-`server/index.ts` opens `dbPath(cli.dataDir)`. `dataDir()` picks the first of:
+`boot()` (`app/server/lib/boot.ts`) opens `dbPath(cli.dataDir)`, the options it parses from the environment (the
+launcher, `app/bin/llama-webui.ts`, turns `--data-dir` into `LLAMA_WEBUI_DATA_DIR`). `dataDir()` picks the first of:
 
 1. the `--data-dir` flag;
 2. `$LLAMA_WEBUI_DATA_DIR`;
@@ -39,7 +40,7 @@ in [Configuration](/docs/configuration/#data-directory).
 
 ## Opening and pragmas
 
-```ts title="server/db/open.ts"
+```ts title="app/server/lib/db/open.ts"
 export function openDb(path: string): Database {
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path);
@@ -55,13 +56,13 @@ export function openDb(path: string): Database {
 - `foreign_keys = ON`: SQLite does not enforce foreign keys without it, and the schema relies on `ON DELETE CASCADE`
   and `ON DELETE SET NULL` (see [Tables](#tables)).
 
-The database handle is not kept in the runtime. `start()` (`server/index.ts`) opens it first and registers it on its
+The database handle is not kept in the runtime. `boot()` (`app/server/lib/boot.ts`) opens it first and registers it on its
 shutdown stack (`stack.use(db)`, through `Symbol.dispose`), so it is closed last, after everything that writes to it
 has stopped ([Architecture](/developers/architecture/#shutdown)). Tests open a migrated database in memory with `openDb(':memory:')`.
 
 ## The `Database` wrapper
 
-`Database` (`server/db/sqlite.ts`) wraps `DatabaseSync` from `node:sqlite` with the surface the repositories use,
+`Database` (`app/server/lib/db/sqlite.ts`) wraps `DatabaseSync` from `node:sqlite` with the surface the repositories use,
 where it differs from `DatabaseSync`:
 
 | Call                             | Behaviour                                                                                                      |
@@ -82,14 +83,14 @@ where it differs from `DatabaseSync`:
   file read-only.
 - Rows are objects without a prototype: compare them with `toEqual`, not `instanceof Object`.
 
-`server/db/sqlite.test.ts` covers each of these points.
+`app/server/lib/db/sqlite.test.ts` covers each of these points.
 
 ## Migrations
 
 `MIGRATIONS` has one entry per schema version: an SQL string, or a `Rebuild` (`{ rebuild: string[] }`) for a table
 rebuild. The rule is written above it:
 
-```ts title="server/db/migrations.ts"
+```ts title="app/server/lib/db/migrations.ts"
 /** One entry per schema version; never change a migration that has shipped, add a new one. */
 export const MIGRATIONS: Migration[] = [
   // 1 — key/value settings
@@ -120,7 +121,8 @@ already broken. `runMigrations(db, upTo)` stops at version `upTo`: tests use it 
    other tables reference the one rebuilt (entries 10 to 14, for `bench_runs`, predate it).
 4. Update the repository that owns the table, and its tests.
 
-The migration runs at the next start. In development (`pnpm dev`), saving the file restarts the process, which runs it.
+The migration runs at the next start. In development (`pnpm dev`), saving the file rebuilds the runtime, which
+opens the database again and runs it.
 
 ## Tables
 
@@ -160,7 +162,7 @@ Indexes: `messages_by_conversation` on `messages(conversation_id, id)`, `bench_r
 ## Repositories
 
 Each repository takes the `Database` and, except `SettingsRepo`, an optional `now` function (default `Date.now`)
-for tests. `createDeps()` (`server/deps.ts`) creates them once, at startup; `ModelCacheRepo` is created by the models and setup
+for tests. `createDeps()` (`app/server/lib/deps.ts`) creates them once, at startup; `ModelCacheRepo` is created by the models and setup
 routes. They convert rows to the shared types (`Profile`, `Conversation`, `ChatMessage`, `BenchRun`, `Sweep`,
 `DownloadItem`) and back, and some validate their input:
 
@@ -177,7 +179,7 @@ routes. They convert rows to the shared types (`Profile`, `Conversation`, `ChatM
 
 ### Interrupted work at startup
 
-A row can be left in a running state if llama-webui was killed. On startup `server/index.ts` resets them:
+A row can be left in a running state if llama-webui was killed. On startup `boot()` (`app/server/lib/boot.ts`) resets them:
 
 - `ConversationsRepo.stopOrphans()`: messages left `streaming` become `stopped`.
 - `BenchRunsRepo.stopOrphans()`: runs left `running` become `interrupted`, with the error
@@ -221,7 +223,7 @@ so a new default in the schema applies to them on the next read. Users see these
 
 ## The model cache
 
-`scanModels()` (`server/models/scan.ts`) keeps the summary of each GGUF it reads in `model_cache`, so a scan of the
+`scanModels()` (`app/server/lib/models/scan.ts`) keeps the summary of each GGUF it reads in `model_cache`, so a scan of the
 models folder does not parse unchanged files again:
 
 - `path` is the absolute path of the model's main file (the first part of a split model).

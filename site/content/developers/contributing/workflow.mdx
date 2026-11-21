@@ -14,34 +14,37 @@ soon as a change forgets it.
 
 | Code you change                                                              | Pages to update                                                                                                                  |
 | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `server/routes/<domain>.ts`, `server/api.ts`, zod schemas in `packages/webui-shared/src/`   | `/developers/api/<domain>/` (`server/api.ts` and `server/routes/settings.ts` are [Health and settings](/developers/api/app/)) and the user page of the feature    |
-| `packages/webui-shared/src/ws.ts`, `server/ws/`                                             | [WebSocket](/developers/api/websocket/)                                                                                          |
-| `server/cli.ts`, `server/paths.ts`, environment variables                    | [Launch options](/docs/configuration/), [Architecture](/developers/architecture/)                                                |
-| `server/security.ts`, `server/http.ts`                                       | [Security](/docs/security/) (user), [Security](/developers/server/security/) (server), [API overview](/developers/api/overview/) |
-| `server/supervisor/**`                                                       | [Supervisor](/developers/server/supervisor/), [Server](/docs/server/)                                                            |
-| `server/logs/**`                                                             | [Supervisor](/developers/server/supervisor/), [Server, state and logs](/developers/api/server/), [Logs](/docs/logs/)             |
-| `server/monitor/**`, `server/collectors/**`                                  | [Monitor and collectors](/developers/server/monitor/), [Dashboard](/docs/dashboard/), [System](/docs/system/), [Topology](/docs/topology/) |
-| `server/hardware/**` (PCI, CPU)                                              | [Topology](/developers/api/topology/) and [Monitor and system](/developers/api/monitor/) (API), [Topology](/docs/topology/), [System](/docs/system/) |
-| `server/chat/**`                                                             | [Chat runs](/developers/server/chat/), [Chat](/docs/chat/)                                                                       |
-| `server/bench/**`                                                            | [Benchmarks and sweeps](/developers/server/bench/), [Benchmark](/docs/benchmark/), [Sweeps](/docs/sweeps/)                       |
-| `packages/webui-shared/src/tuning.ts`, `server/tuning/**`                                   | [Tuning](/developers/server/tuning/) (server), [Tuning](/docs/tuning/) (user), [Sweeps](/docs/sweeps/), the guides it affects    |
-| `server/hf/**`                                                               | [Hugging Face downloads](/developers/server/hugging-face/) (server), [Hugging Face downloads](/docs/hugging-face/) (user)        |
-| `server/models/**` (scan, GGUF)                                              | [Models](/developers/api/models/) (API), [Models](/docs/models/) (user)                                                          |
-| `server/setup.ts`                                                            | [Setup and launch pad](/developers/api/setup/), [First run](/docs/getting-started/first-run/)                                    |
-| `server/llamatui.ts`                                                         | [Profiles](/developers/api/profiles/) (API), [Profiles](/docs/profiles/) (user)                                                  |
-| `server/db/**` (migrations, tables)                                          | [Database](/developers/server/database/)                                                                                         |
-| `web/src/features/home/setup/**`                                             | [First run](/docs/getting-started/first-run/)                                                                                    |
-| `web/src/features/<page>/**`                                                 | `/docs/<page>/` and its screenshots (`bench` is [Benchmark](/docs/benchmark/), the Hugging Face part of `models` is [Hugging Face downloads](/docs/hugging-face/)) |
-| `web/src/app/**`, `web/src/lib/**`, `web/src/components/**`                  | [Web app](/developers/frontend/)                                                                                                 |
+| `app/server/routes/api/<domain>/`, `app/server/middleware/`, `app/server/error.ts`, zod schemas in `packages/webui-shared/src/`   | `/developers/api/<domain>/` (`health.get.ts` and `settings.*.ts` are [Health and settings](/developers/api/app/)) and the user page of the feature    |
+| `packages/webui-shared/src/ws.ts`, `app/server/lib/ws/`, `app/server/routes/ws.ts`                  | [WebSocket](/developers/api/websocket/)                                                                                          |
+| `app/server/lib/cli.ts`, `app/server/lib/paths.ts`, `app/server/lib/env.ts`, `app/bin/llama-webui.ts`, environment variables | [Launch options](/docs/configuration/), [Architecture](/developers/architecture/)                                                |
+| `app/server/lib/security.ts`, `app/server/lib/http.ts`                                       | [Security](/docs/security/) (user), [Security](/developers/server/security/) (server), [API overview](/developers/api/overview/) |
+| `app/server/lib/proc.ts`                                                             | [Conventions](/developers/contributing/conventions/), [Supervisor](/developers/server/supervisor/)                               |
+| `app/server/lib/supervisor/**`                                                       | [Supervisor](/developers/server/supervisor/), [Server](/docs/server/)                                                            |
+| `app/server/lib/logs/**`                                                             | [Supervisor](/developers/server/supervisor/), [Server, state and logs](/developers/api/server/), [Logs](/docs/logs/)             |
+| `app/server/lib/monitor/**`, `app/server/lib/collectors/**`                                  | [Monitor and collectors](/developers/server/monitor/), [Dashboard](/docs/dashboard/), [System](/docs/system/), [Topology](/docs/topology/) |
+| `app/server/lib/hardware/**` (PCI, CPU)                                              | [Topology](/developers/api/topology/) and [Monitor and system](/developers/api/monitor/) (API), [Topology](/docs/topology/), [System](/docs/system/) |
+| `app/server/lib/chat/**`                                                             | [Chat runs](/developers/server/chat/), [Chat](/docs/chat/)                                                                       |
+| `app/server/lib/bench/**`                                                            | [Benchmarks and sweeps](/developers/server/bench/), [Benchmark](/docs/benchmark/), [Sweeps](/docs/sweeps/)                       |
+| `packages/webui-shared/src/tuning.ts`, `app/server/lib/tuning/**`                                   | [Tuning](/developers/server/tuning/) (server), [Tuning](/docs/tuning/) (user), [Sweeps](/docs/sweeps/), the guides it affects    |
+| `app/server/lib/hf/**`                                                               | [Hugging Face downloads](/developers/server/hugging-face/) (server), [Hugging Face downloads](/docs/hugging-face/) (user)        |
+| `app/server/lib/models/**` (scan, GGUF)                                              | [Models](/developers/api/models/) (API), [Models](/docs/models/) (user)                                                          |
+| `app/server/lib/setup.ts`                                                            | [Setup and launch pad](/developers/api/setup/), [First run](/docs/getting-started/first-run/)                                    |
+| `app/server/lib/llamatui.ts`                                                         | [Profiles](/developers/api/profiles/) (API), [Profiles](/docs/profiles/) (user)                                                  |
+| `app/server/lib/db/**` (migrations, tables)                                          | [Database](/developers/server/database/)                                                                                         |
+| `app/src/features/home/setup/**`                                             | [First run](/docs/getting-started/first-run/)                                                                                    |
+| `app/src/features/<page>/**`                                                 | `/docs/<page>/` and its screenshots (`bench` is [Benchmark](/docs/benchmark/), the Hugging Face part of `models` is [Hugging Face downloads](/docs/hugging-face/)) |
+| `app/src/app/**`, `app/src/lib/**`, `app/src/components/**`                  | [Web app](/developers/frontend/)                                                                                                 |
+| `packages/llamacpp-js/**` (a module, an export, an error, a rule of the package) | [llamacpp-js](/developers/llamacpp-js/) and the server page that uses it ([Supervisor](/developers/server/supervisor/), [Monitor and collectors](/developers/server/monitor/), [Chat runs](/developers/server/chat/), [Benchmarks and sweeps](/developers/server/bench/)) |
 | `packages/webui-shared/src/**` (a new module, the role of a module)                         | [Shared package](/developers/shared/)                                                                                            |
 | `packages/webui-shared/src/settings.ts`, the Settings page                                  | [Settings](/docs/settings/), [Health and settings](/developers/api/app/)                                                         |
-| `server/index.ts`, `server/runtime.ts`, `server/dev.ts`, `server/routes/web.ts` | [Architecture](/developers/architecture/)                                                                                        |
+| `app/server/lib/boot.ts`, `app/server/lib/context.ts`, `app/server/lib/deps.ts`, `app/server/lib/runtime.ts`, `app/server/plugins/`, `app/vite.config.ts`, `app/build/**`, shutdown, dev reloads | [Architecture](/developers/architecture/)                                                                                        |
 | `package.json` scripts, repository layout                                    | [Development setup](/developers/getting-started/)                                                                                |
-| `server/testing/**`, `testdata/**` (fakes, fixtures)                         | [Testing](/developers/contributing/testing/)                                                                                     |
+| `app/server/lib/testing/**`, `app/server/lib/contract/**`, `testdata/**` (fakes, fixtures, the contract suite) | [Testing](/developers/contributing/testing/) (and `/developers/api/*` when the golden changes)                                   |
 | Requirements, installation (README)                                          | [Requirements](/docs/getting-started/requirements/), [Installation](/docs/getting-started/installation/)                         |
 | Project conventions (Biome, language, tests, docs)                           | These Contributing pages                                                                                                         |
 
-The rules on these pages come from `CLAUDE.md` at the root of the repository: when a convention changes, update both.
+This table is the only copy: `CLAUDE.md` points to it. The other rules on these pages come from `CLAUDE.md` at the root
+of the repository: when a convention changes, update both.
 
 ## Write a docs page
 
@@ -90,7 +93,7 @@ The components of `site/src/docs/mdx-components.tsx` need no import:
 
 Leave a blank line after an opening tag and before the closing tag when the content is Markdown. A code fence always
 takes a language, and a title after it for a snippet from a file or a terminal: `bash title="Terminal"`,
-`ts title="server/http.ts"`.
+`ts title="app/server/lib/http.ts"`.
 
 Internal links use the route with its trailing slash and without the `/llama-webui` base, which React Router adds:
 `[Server](/docs/server/)`, `[States](/docs/server/#server-states)`. An anchor is the heading text in lowercase, spaces
@@ -223,10 +226,10 @@ pnpm test
 ```
 
 - `pnpm lint`: Biome with zero errors and zero warnings (format, lint, sorted imports).
-- `pnpm check`: the type checks of every project (`tsc`: `packages/*`, `server/`, `scripts/`, `web/`), and
+- `pnpm check`: the type checks of every project (`tsc`: `packages/*`, `scripts/`, `app/` and `app/server/`), and
   `site/`.
-- `pnpm test`: every Vitest project, `web/src/` and `site/` included, then the `llamacpp-js` tests on `node --test`
-  ([Run the tests](/developers/contributing/testing/#run-the-tests)).
+- `pnpm test`: every Vitest project, `app/src/` and `site/` included (the `server` project builds the app first),
+  then the `llamacpp-js` tests on `node --test` ([Run the tests](/developers/contributing/testing/#run-the-tests)).
 
 When the change touches the server, the build or the package, also run `pnpm build`, then `node scripts/smoke.ts`
 and `node scripts/smoke.ts --tarball`, as CI does.
@@ -261,7 +264,7 @@ never deploys: the site changes it brings go live when it is merged.
 
 ## Releases
 
-Every `package.json` (root, `server`, `shared`, `llamacpp-js`, `web`, `site`) carries the version of the last release, and the tag
+Every `package.json` (root, `app`, `shared`, `llamacpp-js`, `site`) carries the version of the last release, and the tag
 must match it. A release takes two steps:
 
 ```bash title="Terminal"

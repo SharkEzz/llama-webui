@@ -1,4 +1,4 @@
-// Same tones as web/src/components/glass/tones.ts.
+// Same tones as app/src/components/glass/tones.ts.
 export type Tone = 'blue' | 'teal' | 'amber' | 'rose';
 
 export const TONE_VAR: Record<Tone, string> = {

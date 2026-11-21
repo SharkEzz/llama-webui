@@ -4,20 +4,20 @@ description: The Hub client, how repository files become variants, and the persi
 ---
 
 The Hugging Face module searches the Hub, lists a repository's GGUF files as downloadable variants, and downloads them
-into the models folder through a persistent queue that survives restarts. It lives in `server/hf/`, with
-its routes in `server/routes/hf.ts`, its table in `server/db/downloads.ts` and its types in `packages/webui-shared/src/hf.ts`. For
+into the models folder through a persistent queue that survives restarts. It lives in `app/server/lib/hf/`, with
+its routes in `app/server/routes/api/hf/`, its table in `app/server/lib/db/downloads.ts` and its types in `packages/webui-shared/src/hf.ts`. For
 what users see, read [Hugging Face downloads](/docs/hugging-face/).
 
 | File                        | Role                                                                                     |
 | --------------------------- | ---------------------------------------------------------------------------------------- |
-| `server/hf/client.ts`       | `HfClient`: search, repository files at a revision, token account; `hfHttpError()`       |
-| `server/hf/repo.ts`         | `describeRepo()` for the download sheet, `downloadInputs()` for the queue                |
-| `server/hf/variants.ts`     | `groupRepoFiles()`: files grouped into variants and projectors                           |
-| `server/hf/downloader.ts`   | `DownloadQueue`, `freeBytesOf()`                                                         |
-| `server/hf/paths.ts`        | `repoDir()`, `fileDest()`, `partPath()`, `sizeOf()`                                      |
-| `server/hf/token.ts`        | `resolveHfToken()`, `hfTokenPath()`, `hfEndpoint()`                                      |
-| `server/db/downloads.ts`    | `DownloadsRepo`: the `downloads` table                                                   |
-| `server/routes/hf.ts`       | The HTTP routes (see [Hugging Face API](/developers/api/hf/))                            |
+| `app/server/lib/hf/client.ts`       | `HfClient`: search, repository files at a revision, token account; `hfHttpError()`       |
+| `app/server/lib/hf/repo.ts`         | `describeRepo()` for the download sheet, `downloadInputs()` for the queue                |
+| `app/server/lib/hf/variants.ts`     | `groupRepoFiles()`: files grouped into variants and projectors                           |
+| `app/server/lib/hf/downloader.ts`   | `DownloadQueue`, `freeBytesOf()`                                                         |
+| `app/server/lib/hf/paths.ts`        | `repoDir()`, `fileDest()`, `partPath()`, `sizeOf()`                                      |
+| `app/server/lib/hf/token.ts`        | `resolveHfToken()`, `hfTokenPath()`, `hfEndpoint()`                                      |
+| `app/server/lib/db/downloads.ts`    | `DownloadsRepo`: the `downloads` table                                                   |
+| `app/server/routes/api/hf/`       | The HTTP routes (see [Hugging Face API](/developers/api/hf/))                            |
 | `packages/webui-shared/src/hf.ts`          | Types, `HF_REPO_RE`, `parseHfInput()`, `DownloadRequestSchema`, `vramFit()`              |
 
 ## From a search to a file
@@ -40,7 +40,7 @@ repository changes while they download.
 
 ## The Hub client
 
-`HfClient` (`server/hf/client.ts`) calls the Hub's JSON API at the [endpoint](#token-and-endpoint), with the header
+`HfClient` (`app/server/lib/hf/client.ts`) calls the Hub's JSON API at the [endpoint](#token-and-endpoint), with the header
 `user-agent: llama-webui` and, when there is a token, `authorization: Bearer <token>`. Every call times out after
 10 seconds (`timeoutMs`). Searches and repository listings are also dropped when the browser's request is (a closed
 sheet, a new keystroke).
@@ -72,7 +72,7 @@ Without a token, the gated and not-found messages end with ``(set HF_TOKEN or ru
 
 ## Variants
 
-`groupRepoFiles(files)` (`server/hf/variants.ts`) turns the repository's file list into what the download sheet
+`groupRepoFiles(files)` (`app/server/lib/hf/variants.ts`) turns the repository's file list into what the download sheet
 offers:
 
 - Only `.gguf` files are kept; README, safetensors and the rest are ignored, and so are the GGUF files whose name
@@ -111,7 +111,7 @@ it.
 
 ## The download queue
 
-`DownloadQueue` (`server/hf/downloader.ts`) downloads one item at a time, one file after another.
+`DownloadQueue` (`app/server/lib/hf/downloader.ts`) downloads one item at a time, one file after another.
 
 ### Enqueue
 
@@ -167,7 +167,7 @@ is marked done.
 When every file is done, the item becomes `done`. The `.part` is opened with `node:fs` in append mode, and the
 checksum is a `node:crypto` sha256 hash.
 
-The transfer goes through `downloadFetch()` (`server/llamaFetch.ts`), a `node:https` request with the signature and
+The transfer goes through `downloadFetch()` (`app/server/lib/llamaFetch.ts`), a `node:https` request with the signature and
 errors of `fetch`, not through Node's own `fetch`: that one speaks HTTP/2 with the Hub and its CDN, and its
 flow-control window caps one stream at about 22 MiB/s, where an HTTP/1.1 request goes at the speed of the link.
 
@@ -217,7 +217,7 @@ transfer, such as a failed rename (`500`, `code: "download-failed"`). The item k
 
 ## Persistence
 
-The queue is the `downloads` table (`DownloadsRepo`, `server/db/downloads.ts`). A row holds the repository, the pinned
+The queue is the `downloads` table (`DownloadsRepo`, `app/server/lib/db/downloads.ts`). A row holds the repository, the pinned
 revision, the variant's key, name, quant and kind, the absolute folder, the files (`files_json`: path, size, sha256,
 `done`), the status, `bytes_done`, `total_bytes`, `error`, `code`, `created_at` and `finished_at`. The full schema is
 on the [Database](/developers/server/database/) page.
@@ -232,15 +232,15 @@ the live state.
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
 | Shutdown (`SIGINT`, `SIGTERM`) | `downloads.dispose()`, an early step of the shutdown stack, aborts the transfer and keeps the `.part` and the row, still `downloading` |
 | llama-webui killed             | Same state on disk: the `.part` and a `downloading` row                                                       |
-| Next start                     | `downloads.resume()` in `server/index.ts` starts the loop, which takes the `downloading` item first and resumes it from its `.part` |
+| Next start                     | `downloads.resume()` in `boot()` (`app/server/lib/boot.ts`) starts the loop, which takes the `downloading` item first and resumes it from its `.part` |
 
 There is no orphan cleanup for downloads: an interrupted item carries on where it stopped. In development, a save under
-`server/` or `packages/` restarts the process: a shutdown, then a next start. One queue runs one attempt at a time, so a
+`app/server/lib/` or `packages/` rebuilds the runtime: a shutdown, then a next start. One queue runs one attempt at a time, so a
 `.part` has a single writer.
 
 ## Token and endpoint
 
-`resolveHfToken()` (`server/hf/token.ts`) follows the rules of the `hf` command-line tool:
+`resolveHfToken()` (`app/server/lib/hf/token.ts`) follows the rules of the `hf` command-line tool:
 
 1. `HF_TOKEN`, or the older `HUGGING_FACE_HUB_TOKEN`, from the environment;
 2. otherwise the file written by `hf auth login`, at `hfTokenPath()`: `HF_TOKEN_PATH` when set, else
@@ -256,14 +256,14 @@ and the start of the repository page link (`HfRepo.url`). See
 [Launch options](/docs/configuration/#hugging-face) for how users set these variables.
 
 The client calls Node's `fetch` and the downloader `downloadFetch()`, which both ignore `HTTP_PROXY`, `HTTPS_PROXY`
-and `NO_PROXY` unless Node is started with `--use-env-proxy`. The entry points call `useEnvProxy()` (`server/env.ts`)
-instead, after `.env` is loaded: when a proxy variable is set, `http.setGlobalProxyFromEnv()` routes `fetch` and
+and `NO_PROXY` unless Node is started with `--use-env-proxy`. `boot()` (`app/server/lib/boot.ts`) calls `useEnvProxy()` (`app/server/lib/env.ts`)
+instead, once the `.env` files are loaded, and undoes it at shutdown: when a proxy variable is set, `http.setGlobalProxyFromEnv()` routes `fetch` and
 `node:http`/`node:https`'s global agents (those of `downloadFetch()`) through it, with `localhost`, `127.0.0.1` and
 `::1` added to `NO_PROXY` so the requests to `llama-server` stay direct.
 
 ## WebSocket messages
 
-`server/index.ts` turns the queue's callbacks into broadcasts; see [WebSocket](/developers/api/websocket/).
+`createDeps()` (`app/server/lib/deps.ts`) turns the queue's callbacks into broadcasts; see [WebSocket](/developers/api/websocket/).
 
 | Message             | Payload                | When                                                                                                                   |
 | ------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -277,10 +277,10 @@ late reads `GET /api/downloads`, which returns the items and `live`.
 
 ## Tests
 
-- `server/hf/hf.test.ts`: token resolution and the token file location, the endpoint, destination paths and path
+- `app/server/lib/hf/hf.test.ts`: token resolution and the token file location, the endpoint, destination paths and path
   safety, `groupRepoFiles()`, and `HfClient` against a stubbed `fetch` (pinned commit, search parameters, error codes,
   `status()`).
-- `server/hf/downloader.test.ts`: the queue against a fake Hub, an injected `fetch` that redirects `/resolve` to a fake
+- `app/server/lib/hf/downloader.test.ts`: the queue against a fake Hub, an injected `fetch` that redirects `/resolve` to a fake
   CDN with range support and scripted failures: shards, resume with `Range`, a server that ignores it, connections cut
   mid-file, retries, gated repositories, checksum mismatches, cancel and retry, duplicates, disk space, and resuming
   after a restart from a database file.

@@ -4,9 +4,9 @@ description: Routes that create, list, cancel, resume, validate and delete sweep
 ---
 
 A sweep runs a series of benchmarks over a space of flag values, keeps the items that the estimator says fit, and ranks
-the results with a tuning preset. The routes live in `server/routes/sweeps.ts`; the spec schema, the space expansion
-and the ranking are in `packages/webui-shared/src/sweep.ts`, the planning in `server/tuning/space.ts`, the execution in
-`server/bench/runner.ts` (see [Benchmarks and sweeps](/developers/server/bench/)). The user side is described on the
+the results with a tuning preset. The routes live in `app/server/routes/api/sweeps/`; the spec schema, the space expansion
+and the ranking are in `packages/webui-shared/src/sweep.ts`, the planning in `app/server/lib/tuning/space.ts`, the execution in
+`app/server/lib/bench/runner.ts` (see [Benchmarks and sweeps](/developers/server/bench/)). The user side is described on the
 [Sweeps](/docs/sweeps/) page.
 
 The guard, the error shape and the zod `400` follow the common rules of the [API overview](/developers/api/overview/).
@@ -29,7 +29,7 @@ A sweep's items are benchmark runs (`bench_runs` rows with a `sweepId`), so they
 4. **Validate** (optional): `POST /api/sweeps/:id/validate` queues the best configurations again as `server` items,
    measured with a real `llama-server`, and runs the sweep again.
 
-When llama-webui stops (in development, on a save under `server/` or `packages/` too), the sweep and its running
+When llama-webui stops (in development, on a save of business code under `app/server/lib/` or `packages/` too), the sweep and its running
 item become `interrupted`, and `POST /api/sweeps/:id/resume` picks them up.
 
 Progress goes over the [WebSocket](/developers/api/websocket/), next to the `bench-run` and `bench-progress` messages
@@ -84,7 +84,7 @@ base value. For the list fields (`ot`, `dev`, `ts`), each value is itself a list
 - Each item is labeled with the space's dimensions only, as `llama-server` flags (`itemLabel()`):
   `-ncmoe 8 · -dev CUDA0,CUDA1 · -ub 2048`, `-<key> default` for an unset value, `base` for an empty space.
 
-The estimator (`planSweep()` in `server/tuning/space.ts`) checks each item at the sweep's context (`sweepCtx()`: the
+The estimator (`planSweep()` in `app/server/lib/tuning/space.ts`) checks each item at the sweep's context (`sweepCtx()`: the
 last `-c`, `--ctx-size`, `-c=` or `--ctx-size=` of `serverArgs`, read by `ctxFromArgs()`, otherwise the preset's
 minimum context), with the item's `ctk` and
 `ctv` (default `f16`; `ctv` defaults to `ctk`) and `ub` (default 512). Its verdict is saved in each item's `fit`.

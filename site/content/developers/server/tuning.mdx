@@ -6,28 +6,28 @@ description: How the estimator reads GGUF metadata and hardware, models the memo
 The tuning module recommends `llama-server` flags for a model on this machine without running anything. It reads the
 GGUF header, the devices `llama-bench` lists and the RAM, computes what each device would hold for a set of flags, and
 searches for the placement a preset prefers. It also reviews the system settings that affect llama.cpp. It lives in
-`server/tuning/`, with the presets and result types in `packages/webui-shared/src/tuning.ts`. For what users see, read
+`app/server/lib/tuning/`, with the presets and result types in `packages/webui-shared/src/tuning.ts`. For what users see, read
 [Tuning](/docs/tuning/).
 
 | File                         | Role                                                                                   |
 | ---------------------------- | -------------------------------------------------------------------------------------- |
-| `server/tuning/estimate.ts`  | `estimate()`: the search, the recommended flags, the "why" strings and the warnings   |
-| `server/tuning/placement.ts` | `measurePlacement()` and `fitOf()`: every tensor on a device or in RAM, then a verdict |
-| `server/tuning/memory.ts`    | KV cache per layer, recurrent state, compute buffers, margins                          |
-| `server/tuning/space.ts`     | `planSweep()`: a sweep's items with their verdict                                      |
-| `server/tuning/hardware.ts`  | `readTuningHardware()`: devices, CPU, RAM                                              |
-| `server/tuning/models.ts`    | `loadModel()` and `mmprojBytes()`: the parsed GGUF and the projector size              |
-| `server/tuning/checks.ts`    | `runChecks()` and `summarize()`: the system checks                                     |
-| `server/tuning/sysinfo.ts`   | `readSys()`: the `/proc`, `/sys` and log readings the checks need                      |
-| `server/tuning/disk.ts`      | `measureDiskSpeed()`: sequential read speed of the model's disk                        |
-| `server/tuning/fixtures.ts`  | `fakeModel()` and `hw3()`, for tests                                                   |
-| `server/models/gguf.ts`      | `readModel()`: GGUF header to `ModelInfo`                                              |
-| `server/models/sizes.ts`     | `tensorBytes()`, `EXPERTS`                                                             |
+| `app/server/lib/tuning/estimate.ts`  | `estimate()`: the search, the recommended flags, the "why" strings and the warnings   |
+| `app/server/lib/tuning/placement.ts` | `measurePlacement()` and `fitOf()`: every tensor on a device or in RAM, then a verdict |
+| `app/server/lib/tuning/memory.ts`    | KV cache per layer, recurrent state, compute buffers, margins                          |
+| `app/server/lib/tuning/space.ts`     | `planSweep()`: a sweep's items with their verdict                                      |
+| `app/server/lib/tuning/hardware.ts`  | `readTuningHardware()`: devices, CPU, RAM                                              |
+| `app/server/lib/tuning/models.ts`    | `loadModel()` and `mmprojBytes()`: the parsed GGUF and the projector size              |
+| `app/server/lib/tuning/checks.ts`    | `runChecks()` and `summarize()`: the system checks                                     |
+| `app/server/lib/tuning/sysinfo.ts`   | `readSys()`: the `/proc`, `/sys` and log readings the checks need                      |
+| `app/server/lib/tuning/disk.ts`      | `measureDiskSpeed()`: sequential read speed of the model's disk                        |
+| `app/server/lib/tuning/fixtures.ts`  | `fakeModel()` and `hw3()`, for tests                                                   |
+| `app/server/lib/models/gguf.ts`      | `readModel()`: GGUF header to `ModelInfo`                                              |
+| `app/server/lib/models/sizes.ts`     | `tensorBytes()`, `EXPERTS`                                                             |
 | `packages/webui-shared/src/tuning.ts`       | `PRESETS`, `NOISE`, `deviceRole()`, `gpuDevices()`, `Estimate`, `Fit`, `Check`…        |
 
 The estimator, the placement, the memory model, `planSweep()` and the checks are pure functions: data in, result out,
 which is what the tests rely on. Only `readTuningHardware()`, `loadModel()`, `readSys()` and `measureDiskSpeed()` touch
-the system. The routes are in `server/routes/tuning.ts` (see [Tuning API](/developers/api/tuning/)).
+the system. The routes are in `app/server/routes/api/tuning/` (see [Tuning API](/developers/api/tuning/)).
 
 ## Inputs
 
@@ -37,9 +37,9 @@ context (`ctx`).
 
 ### GGUF metadata
 
-`loadModel(path)` (`server/tuning/models.ts`) refuses a path that is not absolute or does not end in `.gguf` (`400`),
+`loadModel(path)` (`app/server/lib/tuning/models.ts`) refuses a path that is not absolute or does not end in `.gguf` (`400`),
 answers `404` for a missing file and `422` for an unreadable GGUF, and keeps the result while the file's size and
-modification time are unchanged. It calls `readModel()` (`server/models/gguf.ts`), which reads the header with
+modification time are unchanged. It calls `readModel()` (`app/server/lib/models/gguf.ts`), which reads the header with
 `@huggingface/gguf` (every shard when the name is `…-00001-of-0000N.gguf`) and keeps up to `CACHE_MAX = 8` models,
 stamped with the size and modification time of every part.
 
@@ -61,17 +61,17 @@ ends at the end of the file. The estimator uses these `ModelInfo` fields:
 | `contextLength`                        | `<arch>.context_length`                                                                | Largest context tried        |
 | `fileBytes`                            | Sum of the parts' sizes                                                                | Sweep duration, memlock check |
 
-`EXPERTS = /ffn_(gate|up|down)_(ch)?exps/` (`server/models/sizes.ts`) matches the tensors that `--n-cpu-moe` moves to
+`EXPERTS = /ffn_(gate|up|down)_(ch)?exps/` (`app/server/lib/models/sizes.ts`) matches the tensors that `--n-cpu-moe` moves to
 the CPU, as in llama.cpp; shared experts (`_shexp`) stay. For the estimator, a model is a MoE when `expertCount > 0`
 and at least one tensor matches.
 
 ### Hardware
 
-`readTuningHardware({ benchBinary, mem, gpus })` (`server/tuning/hardware.ts`) returns a `TuningHardware`:
+`readTuningHardware({ benchBinary, mem, gpus })` (`app/server/lib/tuning/hardware.ts`) returns a `TuningHardware`:
 
 - `devices`: the cached `llama-bench --list-devices` output (see
   [Hardware and the device list](/developers/server/bench/#hardware-and-the-device-list)), with its live memory:
-  `withLiveMemory(devices, gpus)` (`server/tuning/match.ts`) sets `freeMib` and `otherUsedMib` from the Monitor's
+  `withLiveMemory(devices, gpus)` (`app/server/lib/tuning/match.ts`) sets `freeMib` and `otherUsedMib` from the Monitor's
   `allGpus` (see below).
 - `devicesError`: why the list is not trusted (`llama-bench --list-devices` crashed, a GPU listed without memory),
   `null` otherwise; the devices are then the last good list.
@@ -127,7 +127,7 @@ measurement noise, below which two sweep results are a tie.
 
 ## The memory model
 
-`server/tuning/memory.ts` holds the formulas. Every size is in bytes.
+`app/server/lib/tuning/memory.ts` holds the formulas. Every size is in bytes.
 
 - **KV cache element.** `KV_BYTES` gives the bytes per element of each cache type: `f32` 4, `f16` and `bf16` 2,
   `q8_0` 1.0625, `f8_e4m3` 1, `q5_1` 0.75, `q5_0` 0.6875, `q4_1` 0.625, `q4_0` and `iq4_nl` 0.5625.
@@ -142,7 +142,7 @@ measurement noise, below which two sweep results are a tie.
   computes it as the recurrent layers × (`inner_size` × `state_size` + `conv_kernel` × `inner_size`) × 4.
 - **Compute buffers and margin.**
 
-```ts title="server/tuning/memory.ts"
+```ts title="app/server/lib/tuning/memory.ts"
 /** Compute buffers of the main GPU for a micro-batch of `ub` tokens. */
 export const computeBytes = (m: ModelInfo, ub: number): number =>
   ub * (m.embeddingLength * 4 + m.vocabSize * 4) + 256 * MiB;
@@ -156,7 +156,7 @@ held by a desktop session or another model is not available, the managed llama-s
 
 ## Placement
 
-`measurePlacement(input)` (`server/tuning/placement.ts`) applies a set of flags the way llama.cpp would and returns
+`measurePlacement(input)` (`app/server/lib/tuning/placement.ts`) applies a set of flags the way llama.cpp would and returns
 the bytes on each device (`vram`), the bytes in RAM (`ram`), the device of each layer (`layerDevice`), the weights
 split by kind (`cpuWeights`, `cpuExpertsBytes`, `cpuOtherBytes`, `gpuWeights`) and `issues`.
 
@@ -215,7 +215,7 @@ first device when at least one layer is on a GPU, otherwise to RAM.
 
 ## The estimator
 
-`estimate(input)` (`server/tuning/estimate.ts`) adapts llama-tui's rule-based estimator. It tries placement families
+`estimate(input)` (`app/server/lib/tuning/estimate.ts`) adapts llama-tui's rule-based estimator. It tries placement families
 in a fixed order and keeps the first configuration that passes `fitOf()`, then explains it.
 
 ### Candidates
@@ -321,21 +321,21 @@ some of them fitted in VRAM but needed more RAM than available (`tryParams()` ke
 ### Who calls it
 
 - `POST /api/tuning/estimate` computes an estimate and keeps the last one per model in memory, for the checks.
-- The launch pad (`GET /api/launchpad`, `server/setup.ts`) gives each profile a fit badge with the `fit` preset, the
+- The launch pad (`GET /api/launchpad`, `app/server/lib/setup.ts`) gives each profile a fit badge with the `fit` preset, the
   profile's own flags pinned (`paramsFromServerArgs()`) and its `-c` (`ctxFromArgs()`). It shows no badge when
   `llama-bench` lists no device while the Monitor sees GPUs: an estimate without them would be wrong.
 - Sweep planning calls `fitOf()` directly for each item (see [Sweeps](/developers/server/bench/#sweeps)).
 
 ## System checks
 
-`runChecks(ctx)` (`server/tuning/checks.ts`) turns a `CheckContext` into a list of `Check`s. A check has a stable `id`,
+`runChecks(ctx)` (`app/server/lib/tuning/checks.ts`) turns a `CheckContext` into a list of `Check`s. A check has a stable `id`,
 a `family` (`nvidia`, `amd`, `cpu`, `build`, `kernel`), a `label`, a `state` (`ok`, `warn`, `unknown`, `na`), a
 `detail`, the exact `command` to run when there is one, `persistence` (`session` until reboot, or `permanent`) and its
 `impact`. `summarize()` counts the states.
 
 ### Readings
 
-`readSys(deps)` (`server/tuning/sysinfo.ts`) gathers the readings; each one is tolerant and returns `null` or an empty
+`readSys(deps)` (`app/server/lib/tuning/sysinfo.ts`) gathers the readings; each one is tolerant and returns `null` or an empty
 value when it cannot read, it never rejects.
 
 | Reading                   | Source                                                                                  |
@@ -388,9 +388,10 @@ links train down to save power (ASPM), so only a link read under load says somet
 ### Context of a check run
 
 `GET /api/tuning/checks?model=<path>` builds the context from the Monitor's latest snapshot (`allGpus`), the cards the
-last estimate runs on as `retainedBusIds` (`retainedBusIds()` in `server/tuning/match.ts`: its `-dev`, or every
+last estimate runs on as `retainedBusIds` (`retainedBusIds()` in `app/server/lib/tuning/match.ts`: its `-dev`, or every
 dedicated card without one, matched to the monitored cards; every card when there is no device list), the hardware, the parsed model, the log ring, the last estimate computed for that model and
-its last disk measurement. Both are kept in memory in `server/routes/tuning.ts`, so a restart forgets them.
+its last disk measurement. Both are kept in memory in `app/server/lib/tuning/memo.ts`, which the route files that write and read them share: a
+restart forgets them.
 
 The first-run checklist on the Home page only shows the checks for which `isSetupCheck(id)` is true: it drops those that
 need a model or a running server (`cpu.memlock`, `cpu.swappiness`, `kernel.disk`, `kernel.disk-speed`,
@@ -398,7 +399,7 @@ need a model or a running server (`cpu.memlock`, `cpu.swappiness`, `kernel.disk`
 
 ## Disk speed
 
-`measureDiskSpeed(path)` (`server/tuning/disk.ts`) reads up to 1 GiB of the model file, never more than the file,
+`measureDiskSpeed(path)` (`app/server/lib/tuning/disk.ts`) reads up to 1 GiB of the model file, never more than the file,
 starting at a random offset to avoid the part already in the page cache, and divides by the time it took. It answers
 `404` for a missing file and `400` for a file under 64 MiB (`MIN_BYTES`). The page cache can still inflate the result.
 `POST /api/tuning/disk-speed` refuses to measure while a benchmark runs, and keeps the result for the
@@ -406,7 +407,7 @@ starting at a random offset to avoid the part already in the page cache, and div
 
 ## Fixtures and tests
 
-`server/tuning/fixtures.ts` builds the inputs of the pure functions:
+`app/server/lib/tuning/fixtures.ts` builds the inputs of the pure functions:
 
 - `fakeModel(o)` returns a complete `ModelInfo` with synthetic tensors: 48 layers by default, `token_embd.weight` of
   300 MiB, one `attn_q` tensor per layer (`otherBytesPerLayer`, 100 MiB), the experts of each layer split into
@@ -419,13 +420,13 @@ starting at a random offset to avoid the part already in the page cache, and div
 
 The tests:
 
-- `server/tuning/placement.test.ts`: device roles, `-ncmoe`, `-ot` against `-ngl`, `-ts` slices, the default devices,
+- `app/server/lib/tuning/placement.test.ts`: device roles, `-ncmoe`, `-ot` against `-ngl`, `-ts` slices, the default devices,
   the `fits` / `tight` / `no` thresholds, and RAM overflow as `tight`.
-- `server/tuning/estimate.test.ts`: the `big` preset on a MoE over 100 GB, a dense model on one card, a MoE split over
+- `app/server/lib/tuning/estimate.test.ts`: the `big` preset on a MoE over 100 GB, a dense model on one card, a MoE split over
   the CUDA pair before its experts go to RAM, pinned values, and `planSweep()`.
-- `server/tuning/checks.test.ts`: checks on fixed `SysReadings`.
-- `packages/webui-shared/src/setup.test.ts` covers `isSetupCheck()`; `server/models/gguf.test.ts` writes real GGUF files with
-  `writeGguf()` from `server/models/gguf.fixture.ts` to test the reader.
+- `app/server/lib/tuning/checks.test.ts`: checks on fixed `SysReadings`.
+- `packages/webui-shared/src/setup.test.ts` covers `isSetupCheck()`; `app/server/lib/models/gguf.test.ts` writes real GGUF files with
+  `writeGguf()` from `app/server/lib/models/gguf.fixture.ts` to test the reader.
 
 ### Add a hardware fixture
 
@@ -438,7 +439,7 @@ Run `llama-bench --list-devices` on the machine. Each line gives an id, a name, 
   </Step>
   <Step title="Write the fixture">
 
-Next to `hw3()` in `server/tuning/fixtures.ts`, add a function that returns a `TuningHardware`. Build each device with
+Next to `hw3()` in `app/server/lib/tuning/fixtures.ts`, add a function that returns a `TuningHardware`. Build each device with
 the file's `dev(id, name, totalMib, freeMib?)` helper, in the listed order: the backend comes from the letters of the
 id, and the role from `deviceRole()`, so keep the names exactly as llama.cpp prints them. Fill in the CPU (physical
 cores, threads, flags, NUMA nodes) and the RAM.

@@ -5,19 +5,20 @@ description: Base URL, the REST, WebSocket and SSE channels, the request guard, 
 
 <Callout type="note">
 
-Checked against commit `bbc6a5b`.
+Checked against commit `c5e88eb`.
 
 </Callout>
 
-llama-webui has one HTTP API. Its own web app uses it, and so can your scripts and integrations. The Hono app is
-built by `createApi()` in `server/api.ts`, the HTTP host in `server/host.ts`, the routes themselves in `server/routes/` (one file per domain), the handler wrapper and errors in
-`server/http.ts`, and the request guard in `server/security.ts`. Types and zod schemas come from `packages/webui-shared/src/`
-(`@llama-webui/shared`).
+llama-webui has one HTTP API. Its own web app uses it, and so can your scripts and integrations. It is served by
+[Nitro](https://nitro.build): each route is a file under `app/server/routes/api/`, the request guard is in
+`app/server/lib/security.ts` (run by the middleware `app/server/middleware/01.guard.ts`), the reply helpers,
+validators and errors in `app/server/lib/http.ts`, and the error handler in `app/server/error.ts`. Types and zod
+schemas come from `packages/webui-shared/src/` (`@llama-webui/shared`).
 
 ## Base URL
 
 One Node.js process serves the API, the WebSocket and the web app on one address, `http://127.0.0.1:7860` by default
-(`DEFAULT_HOST` and `DEFAULT_PORT` in `server/cli.ts`). `--host` and `--port`, or `LLAMA_WEBUI_HOST` and
+(`DEFAULT_HOST` and `DEFAULT_PORT` in `app/server/lib/cli.ts`). `--host` and `--port`, or `LLAMA_WEBUI_HOST` and
 `LLAMA_WEBUI_PORT`, change it: see [Launch options](/docs/configuration/).
 
 - REST routes are under `/api/`.
@@ -41,13 +42,13 @@ described on [Chat](/developers/api/chat/).
 
 ## The request guard
 
-Every `/api/*` route and the `/ws` upgrade go through `guard()` (`server/security.ts`) before their handler runs. The
+Every `/api/*` route and the `/ws` upgrade go through `guard()` (`app/server/lib/security.ts`) before their handler runs. The
 API is unauthenticated and local, so the guard protects it from other websites open in your browser. It does not
 protect it from people on your network. It applies three checks, in this order:
 
 | Check          | Rule                                                                                                                                      | Refusal                                                          |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `Host`         | The header (or the URL's host) parses, and its hostname is `localhost`, ends in `.localhost`, or is an IPv4 or IPv6 literal.             | `403` `Host not allowed`; `400` when it does not parse           |
+| `Host`         | The header (or the URL's host) parses, and its hostname is `localhost`, ends in `.localhost`, or is an IPv4 or IPv6 literal.             | `403` `Host not allowed`; `400` `Invalid host` when it does not parse |
 | `Origin`       | When the header is present, it equals `<scheme>//<Host header>` exactly.                                                                  | `403` `Origin not allowed`                                       |
 | `content-type` | For `POST`, `PUT`, `PATCH` and `DELETE`: a `content-type`, when sent, is `application/json` (parameters such as `; charset=utf-8` allowed), and a request with a body sends it. | `415` `JSON body expected (content-type: application/json)` |
 
@@ -59,8 +60,8 @@ protect it from people on your network. It applies three checks, in this order:
   body without asking, but `application/json` needs a CORS preflight, which llama-webui never grants. A write without
   a body and without a `content-type` passes (`curl -X POST http://127.0.0.1:7860/api/server/stop`).
 
-A `Host` header that is not a host at all (`Host: a b`) is a malformed request, not a refusal: the HTTP adapter
-answers `400` without a body before the guard runs.
+A `Host` header that is not a host at all (`Host: a b`) does not parse: the guard answers `400`
+`{"error":"Invalid host"}`.
 
 A refusal has the usual error shape, without a `code`:
 
@@ -87,18 +88,20 @@ Every `/api/*` error is a JSON object with an `error` message, and a `code` when
 { "error": "A profile named “Qwen3 32B” already exists", "code": "name-taken" }
 ```
 
-The API's `onError` (`server/api.ts`) turns whatever a handler or a validator throws into a response with
-`errorResponse()` (`server/http.ts`):
+The error handler (`app/server/error.ts`) turns whatever a handler or a validator throws into a response with
+`errorResponse()` (`app/server/lib/http.ts`). h3 wraps a thrown error, and the handler passes on the original, its
+`cause`:
 
 | Thrown                                           | Status         | Body                                                     |
 | ------------------------------------------------ | -------------- | -------------------------------------------------------- |
 | `HttpError(status, message, code?)`              | `status`       | `{ error: message }`, plus `code` when there is one       |
 | `ZodError` (a schema refused the input)          | `400`          | `{ error: "Invalid data: <first issue> (<path>)", issues }` |
-| `SyntaxError`, or Hono's `Malformed JSON in request body` (the body is not valid JSON) | `400` | `{ error: "Invalid JSON" }` |
+| `SyntaxError` (the body is not valid JSON)       | `400`          | `{ error: "Invalid JSON" }`                              |
+| An error of h3's own with a status below `500`   | its status     | `{ error: message }`                                     |
 | Anything else                                    | `500`          | `{ error: "Internal error" }`, and the error is logged on the server console |
 
 Match on the status and the `code`, never on the `error` text: messages are written for people and can change. The
-web app follows the same rule (`ApiError` in `web/src/lib/api.ts` keeps `status`, `issues` and `code`).
+web app follows the same rule (`ApiError` in `app/src/lib/api.ts` keeps `status`, `issues` and `code`).
 
 ### Validation errors
 
@@ -138,7 +141,7 @@ Every other error has no `code`.
 | `201`  | A resource was created (profile, duplicate, conversation, profile from a benchmark run); the body is the new resource.                                 |
 | `202`  | The operation started and goes on in the background (server start, switch and restart, benchmark run, sweep, download); follow it over the WebSocket. |
 | `204`  | Success without a body (deletions, cancellations, a chat stream with no reply in progress).                                                            |
-| `400`  | Invalid body, JSON or query parameter; a `Host` header that does not parse (no body).                                                                  |
+| `400`  | Invalid body, JSON or query parameter; a `Host` header that does not parse (`Invalid host`).                                                           |
 | `401`  | Hugging Face rejected the token (`hf-unauthorized`).                                                                                                    |
 | `403`  | Refused by the guard (`Host`, `Origin`), or a gated Hugging Face repository.                                                                           |
 | `404`  | Unknown route, unknown id, or missing file.                                                                                                             |
@@ -150,107 +153,117 @@ Every other error has no `code`.
 | `429`  | Hugging Face rate limit reached (`hf-rate-limited`).                                                                                                    |
 | `500`  | An unexpected exception (`Internal error`).                                                                                                             |
 | `502`  | An upstream service failed: `llama-server` (`/props`) or Hugging Face.                                                                                  |
-| `503`  | `llama-server --help` failed (`/api/flags`).                                                                                                            |
+| `503`  | `llama-server --help` failed (`/api/flags`); or llama-webui has not finished starting, or failed to (plain-text body `llama-webui is starting`).        |
 | `507`  | Not enough disk space for a download.                                                                                                                   |
 
 ## How routes are registered
 
-The API is one [Hono](https://hono.dev) app, built by `createApi()` in `server/api.ts`. Each domain module in
-`server/routes/` exports a function that takes its dependencies and returns a chained `Hono` app; `createApi()`
-mounts them in turn with `.route('/', …)` (the health route is defined there directly):
+Nitro builds the API from the files of `app/server/routes/api/`, one file per route: the file's path is the route's
+path, a `[id]` folder or file name is the `:id` parameter, `index` stands for the folder itself, and the name ends
+with the method (`.get.ts`, `.post.ts`, `.put.ts`, `.patch.ts`, `.delete.ts`):
 
-```ts title="server/routes/topology.ts"
-export const topologyRoutes = ({ placement }: TopologyRouteDeps) =>
-  new Hono<Env>().get('/api/topology', async (c) =>
-    c.json({ graph: await readPciTopology(), placement: placement.current }),
-  );
+| File (under `app/server/routes/api/`) | Route                           |
+| ------------------------------------- | ------------------------------- |
+| `health.get.ts`                       | `GET /api/health`               |
+| `profiles/index.post.ts`              | `POST /api/profiles`            |
+| `profiles/[id]/index.put.ts`          | `PUT /api/profiles/:id`         |
+| `profiles/[id]/duplicate.post.ts`     | `POST /api/profiles/:id/duplicate` |
+| `bench/from-profile/[id].get.ts`      | `GET /api/bench/from-profile/:id` |
+
+Each file default-exports a handler made with `defineHandler()` of `nitro`. It reaches the app's services through
+`deps()` (`app/server/lib/context.ts`) and answers with `reply()`:
+
+```ts title="app/server/routes/api/topology.get.ts"
+/** Hardware graph (re-read on every call: the current link state changes with power states) and model placement. */
+export default defineHandler(async () =>
+  reply({ graph: await readPciTopology(), placement: deps().placement.current }),
+);
 ```
 
-```ts title="server/api.ts"
-  const api = new Hono<Env>()
-    .use(guardMw, allow.mw)
-    .get('/api/health', (c) => c.json({ ok: true, version: APP_VERSION, uptimeMs: Date.now() - startedAt }))
-    .route('/', settingsRoutes({ settings, monitor }))
-    // … one .route() per domain file
-  allow.load(apiRoutes(api));
-  api.notFound((c) => c.json({ error: 'Unknown route' }, 404));
-  api.onError((err) => errorResponse(err));
-```
+`reply<T>(data, status = 200)` answers `T` as JSON, with the `application/json` type exactly; `noContent()` answers
+`204`, and `attachment(filename, body)` a JSON file to download. Every API request goes through the middlewares of
+`app/server/middleware/` first, in this order:
 
-`mount()` in `server/host.ts` sends it every `/api/*` request, from the host's own Hono app on the server of
-`@hono/node-server` (`createHostServer()`, `server/hostServer.ts`), which also answers `/ws` and the web app. A JSON reply has the `application/json` type that `c.json()` gives it. Every API request goes
-through two middlewares first, in this order:
+- `00.ready.ts` waits for llama-webui to finish starting; while it cannot answer, the request gets `503`
+  `llama-webui is starting` (plain text).
+- `01.guard.ts` applies the request guard of `app/server/lib/security.ts` (see [Security](/developers/server/security/)),
+  then `allowTable()` (`app/server/lib/http.ts`), built from `ROUTES`, the route list of the generated
+  `app/server/api.gen.ts`. It answers `405` `{ "error": "Method not allowed (POST)" }` with `Allow: POST` when the
+  path is known but the method is not one of its routes (`HEAD` counts as `GET`). It takes the most specific matching
+  pattern (a static segment beats a `:param`), so `GET /api/profiles/import` (a `POST` route) is a `405` rather than
+  `/api/profiles/:id` answering `Profile not found`. An unknown path under `/api/` gets `404`
+  `{ "error": "Unknown route" }`, so it never receives the app's HTML.
 
-- `guardMw` applies the request guard of `server/security.ts` (see [Security](/developers/server/security/)).
-- `allow.mw` (`allowTable()`, `server/http.ts`) answers `405` `{ "error": "Method not allowed (POST)" }` with
-  `Allow: POST` when the path is known but the method is not one of its routes (`HEAD` counts as `GET`). It takes
-  the most specific matching pattern (a static segment beats a `:param`), so `GET /api/profiles/import` (a `POST`
-  route) is a `405` rather than `/api/profiles/:id` answering `Profile not found`.
+Then, in the handler:
 
-Then:
-
-- An unknown path under `/api/` gets `404` `{ "error": "Unknown route" }`.
-- Hono matches routes in registration order: within a domain file, a static path is registered before the `:param`
-  pattern that would also match it (`/api/profiles/export` before `/api/profiles/:id`). The contract suite checks it
-  with `shadowed()`.
-- Path parameters go through the `id(what)` validator: anything but a positive integer gives `404` `<what> not
-  found`, the same answer as an id that does not exist, and before any body check.
-- A body validated by a zod schema goes through `body(Schema)` (`@hono/zod-validator`): no JSON body is `400`
-  `Invalid JSON`, then a JSON value that is not an object is `400` `JSON object expected`, then the schema's
-  `ZodError`. A body with an imperative check goes through `json(check)`, with the same first two
-  messages (`object(body)` throws the second).
-- A handler that answers `404` or `409` before reading its body reads it itself (`object(await c.req.json())`), so a
-  busy resource is `409` even with a malformed body. `accepts<T>()` declares that body's type for the typed client and
-  reads nothing.
-- `query(...keys)` declares the query keys a route reads (`query('path')`) and gives them to the handler as
-  `c.req.valid('query')`: the first value of each key present, decoded as `URLSearchParams` does. It never refuses a
-  request: the handler decides what a missing key means.
-- `notFound(what)` is the shared `404` `<what> not found`.
+- A static path wins over a `[id]` one: `profiles/export.get.ts` answers `GET /api/profiles/export`, not
+  `profiles/[id]/index.get.ts`.
+- `idParam(event, what)` reads the `:id`: anything but a positive integer gives `404` `<what> not found`, the same
+  answer as an id that does not exist. Handlers read it before any body check.
+- `readBody(event, Schema)` reads a body validated by a zod schema: a body whose `content-type` is not a JSON media
+  type, or that is not JSON, is `400` `Invalid JSON`, then a JSON value that is not an object is `400`
+  `JSON object expected`, then the schema's `ZodError`. `readJson(event, check)` passes the parsed body through an
+  imperative check, with the same first message: `object` accepts any JSON object (else `JSON object expected`),
+  `passthrough` returns the body as sent, for a handler or a repository that validates it after a lookup.
+- A handler that answers `404` or `409` before reading its body reads it after those checks
+  (`POST /api/sweeps/:id/resume` looks the sweep up, then reads `object(await event.req.json())`), so a busy resource
+  is `409` even with a malformed body.
+- `queryOf(event, ...keys)` reads the query keys a route uses (`queryOf(event, 'path')`): the first value of each key
+  present, decoded as `URLSearchParams` does. It never refuses a request: the handler decides what a missing key means.
+- `HttpError(status, message, code?)` refuses a request, and `notFound(what)` is the shared `404` `<what> not found`.
 
 ### Typed client
 
-The web app calls the API through Hono's client (`hc` from `hono/client`), typed by the routes themselves.
-`server/rpc.ts` is the package entry `@llama-webui/server/api`: it exports `AppType`, the inferred type of
-`createApi()`, and nothing at runtime. That type holds the whole route schema (paths, methods, `param`, `query`,
-`json` inputs, `c.json()` outputs and statuses). The web imports it with `import type`, so its type check reads the
-server's sources and no server code reaches the bundle. `Env` types the bindings as a plain `object`: the Node adapter
-passes its `incoming` and `outgoing` objects there, and no route reads them.
+The web app calls the API through `api()` (`app/src/lib/api.ts`), typed by the routes themselves:
 
-What the client checks follows what the route declares:
+```ts title="app/src/lib/models.ts"
+export const modelUsage = (path: string) => api('GET /api/models/usage', { query: { path } });
+```
 
-- **Replies** are typed by the handler's `c.json(…)`. A route that answers `Response.json(…)` (`GET
-  /api/server/props`, llama-server's own JSON) is untyped: the web narrows it with guards.
-- **Path and query** come from `id()` and `query()`.
-- **Bodies** are typed by `body(Schema)` (the schema's input), by `accepts<T>()`, or by the return type of a
-  `json(check)` check. A route with `json(object)` or `json(passthrough)` takes any object: a misspelled key compiles.
+`app/server/api.gen.ts` is generated from Nitro's own scan of the route files (`app/build/apiTypes.ts`, at the start
+of `vite dev`, on every build, and in development on every save under `app/server/routes/api/`): `ROUTES`, the method
+and path of each route, and `Api`, a type map from `'METHOD /api/path'` to the route's reply, body and query types.
+Do not edit it. The web imports it with `import type`, so its type check reads the server's sources and no server
+code reaches the bundle.
+
+What the client checks follows what the route file declares:
+
+- **Replies** are typed by the handler's return type: `T` of `reply<T>()`, `undefined` for `noContent()`. A handler
+  that returns a plain `Response` (`GET /api/server/props`, llama-server's own JSON) is typed `unknown`: the web
+  narrows it with guards.
+- **Path parameters** come from the route's path: `params: { id }` for a `:id`.
+- **Bodies and queries** are typed by the `Body` and `Query` types the route file exports
+  (`export type Body = z.input<typeof Schema>`, `export type Query = QueryOf<'path'>`). A route that exports none
+  takes neither. A route whose `Body` is `unknown` or a plain record (`PUT /api/profiles/:id`, `PATCH /api/settings`)
+  takes any body: a misspelled key compiles.
 
 To add a route, see [How-to guides](/developers/contributing/how-to/).
 
 ## API pages
 
-68 routes (a method on a path), in 12 files, plus the WebSocket:
+70 routes (a method on a path), one file each, plus the WebSocket. The sources are under `app/server/routes/api/`:
 
-| Page                                                   | Source                       | Routes | Paths                                                         |
-| ------------------------------------------------------ | ---------------------------- | ------ | ------------------------------------------------------------- |
-| [Health and settings](/developers/api/app/)            | `server/api.ts`, `server/routes/settings.ts` | 3 | `/api/health`, `/api/settings`                                |
-| [Setup and launch pad](/developers/api/setup/)         | `server/routes/setup.ts`     | 2      | `/api/setup`, `/api/launchpad`                                |
-| [Profiles](/developers/api/profiles/)                  | `server/routes/profiles.ts`  | 11     | `/api/profiles/*`                                             |
-| [Server, state and logs](/developers/api/server/)      | `server/routes/server.ts`    | 9      | `/api/state`, `/api/server/*`, `/api/flags`, `/api/logs`      |
-| [Models](/developers/api/models/)                      | `server/routes/models.ts`    | 2      | `/api/models`, `/api/models/info`                             |
-| [Hugging Face](/developers/api/hf/)                    | `server/routes/hf.ts`        | 8      | `/api/hf/*`, `/api/downloads/*`                               |
-| [Chat](/developers/api/chat/)                          | `server/routes/chat.ts`      | 9      | `/api/chat/*`                                                 |
-| [Monitor and system](/developers/api/monitor/)         | `server/routes/monitor.ts`   | 3      | `/api/monitor/*`, `/api/system/info`                          |
-| [Topology](/developers/api/topology/)                  | `server/routes/topology.ts`  | 1      | `/api/topology`                                               |
-| [Benchmarks](/developers/api/bench/)                   | `server/routes/bench.ts`     | 8      | `/api/bench/*`                                                |
-| [Sweeps](/developers/api/sweeps/)                      | `server/routes/sweeps.ts`    | 7      | `/api/sweeps/*`                                               |
-| [Tuning](/developers/api/tuning/)                      | `server/routes/tuning.ts`    | 5      | `/api/tuning/*`                                               |
-| [WebSocket](/developers/api/websocket/)                | `server/ws/hub.ts`           | 1      | `/ws`, 16 message types                                       |
+| Page                                              | Source                                            | Routes | Paths                                                    |
+| ------------------------------------------------- | ------------------------------------------------- | ------ | -------------------------------------------------------- |
+| [Health and settings](/developers/api/app/)       | `health.get.ts`, `settings.get.ts`, `settings.patch.ts` | 3 | `/api/health`, `/api/settings`                       |
+| [Setup and launch pad](/developers/api/setup/)    | `setup.get.ts`, `launchpad.get.ts`                | 2      | `/api/setup`, `/api/launchpad`                           |
+| [Profiles](/developers/api/profiles/)             | `profiles/`                                       | 11     | `/api/profiles/*`                                        |
+| [Server, state and logs](/developers/api/server/) | `server/`, `state.get.ts`, `flags.get.ts`, `logs.get.ts` | 9 | `/api/state`, `/api/server/*`, `/api/flags`, `/api/logs` |
+| [Models](/developers/api/models/)                 | `models/`                                         | 4      | `/api/models`, `/api/models/info`, `/api/models/usage`   |
+| [Hugging Face](/developers/api/hf/)               | `hf/`, `downloads/`                               | 8      | `/api/hf/*`, `/api/downloads/*`                          |
+| [Chat](/developers/api/chat/)                     | `chat/`                                           | 9      | `/api/chat/*`                                            |
+| [Monitor and system](/developers/api/monitor/)    | `monitor/`, `system/`                             | 3      | `/api/monitor/*`, `/api/system/info`                     |
+| [Topology](/developers/api/topology/)             | `topology.get.ts`                                 | 1      | `/api/topology`                                          |
+| [Benchmarks](/developers/api/bench/)              | `bench/`                                          | 8      | `/api/bench/*`                                           |
+| [Sweeps](/developers/api/sweeps/)                 | `sweeps/`                                         | 7      | `/api/sweeps/*`                                          |
+| [Tuning](/developers/api/tuning/)                 | `tuning/`                                         | 5      | `/api/tuning/*`                                          |
+| [WebSocket](/developers/api/websocket/)           | `app/server/routes/ws.ts`, `app/server/lib/ws/hub.ts` | 1  | `/ws`, 16 message types                                  |
 
 ## Conventions
 
 - **JSON everywhere.** Bodies are JSON, sent with `content-type: application/json`. Responses are JSON, except a `204`
-  (no body), the chat event streams (`text/event-stream`), the profile exports (a JSON file sent as an attachment) and
-  the `426` of `/ws` (plain text).
+  (no body), the chat event streams (`text/event-stream`), the profile exports (a JSON file sent as an attachment),
+  the `426` of `/ws` and the `503` of a startup in progress (plain text).
 - **Ids** are SQLite integer ids (`id INTEGER PRIMARY KEY`), positive integers in paths (`/api/profiles/3`).
 - **Times** are epoch milliseconds, from `Date.now()`: `createdAt`, `updatedAt`, `finishedAt`, `since`, `at`,
   `scannedAt`, `serverTime`.

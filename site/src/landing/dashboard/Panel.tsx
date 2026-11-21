@@ -35,7 +35,7 @@ export function Panel({
   );
 }
 
-/** Number tile (web/src/components/glass/StatTile.tsx): tone dot, label, value in tabular mono, unit, hint. */
+/** Number tile (app/src/components/glass/StatTile.tsx): tone dot, label, value in tabular mono, unit, hint. */
 export function StatTile({
   label,
   value,

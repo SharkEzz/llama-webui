@@ -3,7 +3,7 @@
  * answers with the build's version, the UI and every file it references are served (from a deep URL), React is its
  * production build, and the WebSocket says hello. Exits 1 on the first failure, the server stopped.
  *
- *   node scripts/smoke.ts [dist/server/main.js]   the build, run by this Node
+ *   node scripts/smoke.ts [app/.output/llama-webui.mjs]   the build (Nitro's launcher), run by this Node
  *   node scripts/smoke.ts --tarball [file.tgz]    the package as a user installs it: `pnpm pack` (or the given
  *                                                 tarball), `npm install` into an empty prefix, then the same checks
  *                                                 through its `node_modules/.bin/llama-webui`
@@ -55,7 +55,7 @@ function installTarball(given: string | undefined): string {
   const work = temp('lw-tarball-');
   let tgz = given ? resolve(given) : null;
   if (!tgz) {
-    if (!existsSync(join(ROOT, 'dist/server/main.js'))) fail('no build to pack: run pnpm build first');
+    if (!existsSync(join(ROOT, 'app/.output/llama-webui.mjs'))) fail('no build to pack: run pnpm build first');
     run('pnpm', ['pack', '--pack-destination', work]);
     const packed = readdirSync(work).find((f) => f.endsWith('.tgz')) ?? fail('pnpm pack wrote no tarball');
     tgz = join(work, packed);
@@ -63,8 +63,7 @@ function installTarball(given: string | undefined): string {
   const prefix = join(work, 'prefix');
   run('npm', ['install', '--prefix', prefix, '--no-audit', '--no-fund', tgz], work);
 
-  // Nothing but the package and its dependencies, at the exact versions it names: no transitive dependency that a
-  // future install could resolve differently (scripts/package.test.ts).
+  // Nothing but the package: Nitro's output bundles every dependency (scripts/package.test.ts).
   const modules = join(prefix, 'node_modules');
   const pkg = JSON.parse(readFileSync(join(modules, 'llama-webui/package.json'), 'utf8'));
   const wanted: Record<string, string> = { 'llama-webui': pkg.version, ...pkg.dependencies };
@@ -83,23 +82,35 @@ function installTarball(given: string | undefined): string {
 // The command that runs the app, and how it is named in the report.
 const [cmd, ...cmdArgs] = values.tarball
   ? [installTarball(positionals[0])]
-  : [process.execPath, resolve(positionals[0] ?? 'dist/server/main.js')];
+  : [process.execPath, resolve(positionals[0] ?? 'app/.output/llama-webui.mjs')];
 const main = cmdArgs[0] ?? cmd;
 
 const help = spawnSync(cmd, [...cmdArgs, '--help']);
-if (help.status !== 0) fail(`--help exited with ${help.status}: ${help.stderr.toString()}`);
+if (help.status !== 0) fail(`--help exited with ${help.status ?? help.signal}: ${help.error ?? help.stderr}`);
 if (!help.stdout.toString().includes('llama-webui [options]')) fail('--help does not show the usage');
 
-// A free port: the OS picks one, released right away.
-const probe = createServer();
-await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
-const { port } = probe.address() as AddressInfo;
-await new Promise((done) => probe.close(done));
+/** A free port: the OS picks one, released right away. */
+async function freePort(): Promise<number> {
+  const probe = createServer();
+  await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
+  const { port } = probe.address() as AddressInfo;
+  await new Promise((done) => probe.close(done));
+  return port;
+}
+const port = await freePort();
+// A `PORT` in the environment (common on servers) must not win over `--port`: Nitro reads `PORT` too.
+const decoy = await freePort();
 
 const dataDir = temp('lw-smoke-');
-// Run from the data directory: no .env or config of the repository around (dependencies resolve from main.js).
+// As a user runs it: without `CI` or `TEST` (GitHub Actions sets `CI`), under which srvx installs no signal handler and
+// the server never stops on SIGTERM (`app/server/plugins/runtime.ts`).
+const env: Record<string, string | undefined> = { ...process.env, PORT: String(decoy) };
+delete env.CI;
+delete env.TEST;
+// Run from the data directory: no .env or config of the repository around (Nitro's output carries its dependencies).
 const proc = spawn(cmd, [...cmdArgs, '--data-dir', dataDir, '--port', String(port)], {
   cwd: dataDir,
+  env,
   stdio: ['ignore', 'pipe', 'inherit'],
 });
 const exited = new Promise((done) => proc.once('exit', done));
@@ -131,6 +142,7 @@ try {
   if (!health?.ok) fail('/api/health did not answer');
   const { version } = (await health.json()) as { version: string };
   if (!version || version === 'dev') fail(`no build version (${version})`);
+  if (await fetch(`http://127.0.0.1:${decoy}/api/health`).catch(() => null)) fail(`listens on PORT=${decoy} too`);
 
   const page = await fetch(`${base}/chat/12`);
   if (!page.ok || !page.headers.get('content-type')?.includes('text/html')) fail(`deep URL: ${page.status}`);

@@ -4,8 +4,8 @@ description: The latest monitoring snapshot, the full history of the series, and
 ---
 
 These routes expose what the monitor samples on every tick: the latest `Snapshot`, the history of every series, and
-the identity of the CPU and GPUs. They live in `server/routes/monitor.ts`; the types are in `packages/webui-shared/src/monitor.ts`,
-the sampling in `server/monitor/` and `server/collectors/` (see [Monitor and collectors](/developers/server/monitor/)).
+the identity of the CPU and GPUs. They live in `app/server/routes/api/monitor/`; the types are in `packages/webui-shared/src/monitor.ts`,
+the sampling in `app/server/lib/monitor/` and `app/server/lib/collectors/` (see [Monitor and collectors](/developers/server/monitor/)).
 The [Dashboard](/docs/dashboard/) and [System](/docs/system/) pages are built on them.
 
 The guard and the error shape follow the common rules of the [API overview](/developers/api/overview/). None of these
@@ -13,11 +13,11 @@ routes takes a parameter or a body.
 
 ## Snapshots and history
 
-The monitor (`Monitor` in `server/monitor/monitor.ts`) ticks every `pollIntervalMs` (setting, 1000 ms by default),
+The monitor (`Monitor` in `app/server/lib/monitor/monitor.ts`) ticks every `pollIntervalMs` (setting, 1000 ms by default),
 whether a client is connected or not. Each tick builds a `Snapshot`, broadcasts it as the `snapshot` message of the
 [WebSocket](/developers/api/websocket/), and appends one point to every history series.
 
-A client keeps a live copy of the history this way (`web/src/lib/monitor.ts`):
+A client keeps a live copy of the history this way (`app/src/lib/monitor.ts`):
 
 1. On every WebSocket connection, `GET /api/monitor/history` loads the whole history.
 2. Each `snapshot` message carries the values added on that tick in `points`: append them to the copy.
@@ -48,7 +48,7 @@ Returns every series of the history in full. There is no query parameter: the si
 | `pollIntervalMs` | 1000    | at least 250 ms |
 
 The number of points kept is `capacity = ceil(historySeconds × 1000 / pollIntervalMs)` (`historyPoints()` in
-`server/monitor/history.ts`): 300 points by default, 7200 at most (1800 s every 250 ms). Changing either setting resizes
+`app/server/lib/monitor/history.ts`): 300 points by default, 7200 at most (1800 s every 250 ms). Changing either setting resizes
 the history and keeps its most recent points.
 
 **Response**: `200` with a `HistoryDump` plus the `bootId` of this llama-webui process.
@@ -95,7 +95,7 @@ The static identity of the machine, for the [System](/docs/system/) and [Setting
 
 | Field          | Type                         | Description                                                                                  |
 | -------------- | ---------------------------- | -------------------------------------------------------------------------------------------- |
-| `cpu`          | `CpuInfo`                    | Read once from `/proc/cpuinfo` and `/sys` (`readCpuInfo()` in `server/hardware/cpu.ts`), then cached. |
+| `cpu`          | `CpuInfo`                    | Read once from `/proc/cpuinfo` and `/sys` (`readCpuInfo()` in `app/server/lib/hardware/cpu.ts`), then cached. |
 | `gpus`         | object[]                     | `key`, `name`, `vendor`, `busId` and `vramTotalBytes` of every GPU of the latest snapshot's `allGpus` (empty before the first tick). |
 | `nvidiaSource` | `"nvml"` \| `"nvidia-smi"`    | How NVIDIA cards are read: NVML, or the `nvidia-smi` fallback. Chosen once at startup.       |
 

@@ -5,25 +5,25 @@ description: The always-on sampling loop, the Snapshot it builds on every tick, 
 
 The monitor samples `llama-server` and the machine on a fixed interval, whether a browser is connected or not. Each
 tick produces a `Snapshot`, appends one point to every history series, and is broadcast over the WebSocket. The loop
-lives in `server/monitor/`, the readers of each data source in `server/collectors/`.
+lives in `app/server/lib/monitor/`, the readers of each data source in `app/server/lib/collectors/`.
 
 | File                               | Role                                                                                         |
 | ---------------------------------- | -------------------------------------------------------------------------------------------- |
-| `server/monitor/monitor.ts`        | `Monitor`: the tick loop, the `Snapshot`, the series it feeds.                               |
-| `server/monitor/history.ts`        | `History` (named rings plus timestamps) and `historyPoints()`.                               |
-| `server/monitor/ring.ts`           | `Ring`, a fixed-capacity numeric ring buffer.                                                |
-| `server/monitor/placement.ts`      | `PlacementTracker` and `parsePlacement()`: how the model is split across devices, from the logs. |
-| `server/collectors/registry.ts`    | `Collectors`: creates the collectors and follows the settings.                               |
-| `server/collectors/needs.ts`       | `GpuNeeds`: what the GPU readers must read.                                                  |
+| `app/server/lib/monitor/monitor.ts`        | `Monitor`: the tick loop, the `Snapshot`, the series it feeds.                               |
+| `app/server/lib/monitor/history.ts`        | `History` (named rings plus timestamps) and `historyPoints()`.                               |
+| `app/server/lib/monitor/ring.ts`           | `Ring`, a fixed-capacity numeric ring buffer.                                                |
+| `app/server/lib/monitor/placement.ts`      | `PlacementTracker` and `parsePlacement()`: how the model is split across devices, from the logs. |
+| `app/server/lib/collectors/registry.ts`    | `Collectors`: creates the collectors and follows the settings.                               |
+| `app/server/lib/collectors/needs.ts`       | `GpuNeeds`: what the GPU readers must read.                                                  |
 | `llamacpp-js/client`, `llamacpp-js/metrics` | `fetchLlama()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)). |
-| `server/collectors/nvml/`          | NVIDIA through NVML (`node:ffi`) in a child process (`nvml/sampler.ts`).                     |
-| `server/collectors/nvidia.ts`      | `NvidiaMonitor`, the `nvidia-smi` fallback.                                                  |
-| `server/collectors/amdgpu.ts`      | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                          |
-| `server/collectors/gpu.ts`         | Shared GPU helpers: `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`.              |
-| `server/collectors/proc.ts`        | `ProcSampler`: CPU and RSS of the `llama-server` process.                                    |
-| `server/collectors/system.ts`      | `SystemSampler`: machine CPU, memory, load, frequency, temperature.                          |
-| `server/collectors/disk.ts`        | `DiskSampler` and `resolveModelDisk()`.                                                       |
-| `server/collectors/membw.ts`       | `MemBandwidthSampler`: DRAM bandwidth through `perf stat`.                                    |
+| `app/server/lib/collectors/nvml/`          | NVIDIA through NVML (`node:ffi`) in a child process (`nvml/sampler.ts`).                     |
+| `app/server/lib/collectors/nvidia.ts`      | `NvidiaMonitor`, the `nvidia-smi` fallback.                                                  |
+| `app/server/lib/collectors/amdgpu.ts`      | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                          |
+| `app/server/lib/collectors/gpu.ts`         | Shared GPU helpers: `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`.              |
+| `app/server/lib/collectors/proc.ts`        | `ProcSampler`: CPU and RSS of the `llama-server` process.                                    |
+| `app/server/lib/collectors/system.ts`      | `SystemSampler`: machine CPU, memory, load, frequency, temperature.                          |
+| `app/server/lib/collectors/disk.ts`        | `DiskSampler` and `resolveModelDisk()`.                                                       |
+| `app/server/lib/collectors/membw.ts`       | `MemBandwidthSampler`: DRAM bandwidth through `perf stat`.                                    |
 | `packages/webui-shared/src/monitor.ts`            | `Snapshot`, `HistoryDump`, `GpuSample`, `SERIES` and the other monitoring types.              |
 
 The user-facing pages are the [Dashboard](/docs/dashboard/), [System](/docs/system/) and
@@ -31,9 +31,9 @@ The user-facing pages are the [Dashboard](/docs/dashboard/), [System](/docs/syst
 
 ## The tick loop
 
-`startMonitor(runtime, settings)` (`server/runtime.ts`) creates the monitor once per process with
+`startMonitor(runtime, settings)` (`app/server/lib/runtime.ts`) creates the monitor once per process with
 `Monitor.start()`, which starts the collectors, runs a first tick at once, then one every `pollIntervalMs`
-(1,000 ms by default, at least 250 ms). The `Monitor` lives in the runtime; `start()` (`server/index.ts`) stops it at
+(1,000 ms by default, at least 250 ms). The `Monitor` lives in the runtime; `boot()` (`app/server/lib/boot.ts`) stops it at
 shutdown, after the WebSocket hub and before `llama-server` ([Architecture](/developers/architecture/#shutdown)).
 
 A tick that is still running when the next one is due makes that one skip (`inFlight`), so a slow source never
@@ -98,14 +98,15 @@ Details worth knowing:
 
 `History` keeps one `Ring` per series key, all with the same capacity, plus a ring of the tick timestamps:
 
-```ts title="server/monitor/history.ts"
+```ts title="app/server/lib/monitor/history.ts"
 export const historyPoints = (historySeconds: number, intervalMs: number) =>
   Math.ceil((historySeconds * 1000) / intervalMs);
 ```
 
 With the defaults (`historySeconds = 300`, `pollIntervalMs = 1000`) a series holds 300 points. The settings schema
 bounds `historySeconds` to 30 to 1,800 and `pollIntervalMs` to at least 250, so a series holds at most 7,200 points.
-The history is only in memory: it is lost when llama-webui stops, a development restart included.
+The history is only in memory: it is lost when llama-webui stops, and in development when a save of business code
+rebuilds the runtime.
 
 The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`):
 
@@ -131,8 +132,8 @@ left with `null` for a series that started after the oldest timestamp.
 
 ## How snapshots reach the browser
 
-`server/index.ts` subscribes with `monitor.onSnapshot()` and broadcasts each snapshot as a `snapshot` WebSocket
-message ([WebSocket](/developers/api/websocket/)). The web app (`web/src/lib/monitor.ts`):
+`boot()` (`app/server/lib/boot.ts`) subscribes with `monitor.onSnapshot()` and broadcasts each snapshot as a `snapshot` WebSocket
+message ([WebSocket](/developers/api/websocket/)). The web app (`app/src/lib/monitor.ts`):
 
 - reads `GET /api/monitor/history` when the WebSocket opens, and replays the snapshots that arrived during that
   request;
@@ -188,10 +189,10 @@ processes, and the driver and CUDA driver versions. Device handles are pointers,
 `node:ffi` is experimental in Node 26: the sampler starts with `--disable-warning=ExperimentalWarning`, so its warning
 does not print on every start. `workerUrl()` (`nvml/monitor.ts`) finds its module next to the one that starts it:
 
-| Run                        | Sampler                                                                                 |
-| -------------------------- | --------------------------------------------------------------------------------------- |
-| `pnpm dev`, tests          | `nvml/worker.ts`, run as is by Node (type stripping: its imports keep their `.ts` extension) |
-| `node dist/server/main.js` | `dist/server/nvml-worker.js`, built by the `nvml` environment of `vite.config.ts`        |
+| Run                                   | Sampler                                                                                 |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| `pnpm dev`, unit tests                | `nvml/worker.ts`, run as is by Node (type stripping: its imports keep their `.ts` extension) |
+| `node app/.output/llama-webui.mjs`    | `app/.output/server/nvml-worker.mjs`, built by Rolldown in the `compiled` hook of `app/vite.config.ts` |
 
 The child and its channel are `unref()`'d: they never keep the server alive. `stop()` kills the child, a sampler that
 cannot load or crashes exits (the same failure as an `error`: `null` at startup, cleared readings later), and a
@@ -241,7 +242,7 @@ The disk that holds the model is found by `resolveModelDisk(path)`: it maps the 
 `/sys/dev/block/<major>:<minor>`, and from a partition to its parent disk. It returns `null` when the disk is unknown
 (tmpfs, btrfs, NFS, missing file). The monitor runs that lookup in the background, once per profile, and retries a
 failed one every 30 seconds (`MODEL_DISK_RETRY_MS`): a `stat` on a dead network mount must never block a tick. The
-model path comes from a resolver that `server/index.ts` sets at startup (`setModelPathResolver()`).
+model path comes from a resolver that `boot()` (`app/server/lib/boot.ts`) sets at startup (`setModelPathResolver()`).
 
 ### DRAM bandwidth (perf)
 
@@ -261,7 +262,7 @@ rate older than three intervals counts as unknown. The sampler follows the CPU a
 
 `GpuNeeds` tells the GPU readers what to read:
 
-```ts title="server/collectors/needs.ts"
+```ts title="app/server/lib/collectors/needs.ts"
 export interface GpuNeeds {
   /** false: no card is read. */
   gpus: boolean;
@@ -302,15 +303,15 @@ context, after the lines of a draft model):
   give the address of `CUDA<N>` as hex digits (`3000` is `0000:03:00.0`). An address from a `using device` line wins;
   with `-sm tensor`, which only logs the `Meta()` device, this is the only one.
 
-`createDeps()` (`server/deps.ts`) creates the tracker: it replays the log ring at construction, and keeps the last
+`createDeps()` (`app/server/lib/deps.ts`) creates the tracker: it replays the log ring at construction, and keeps the last
 placement it read with the PID of its server, so once the launch lines have left the ring it still knows the placement
 of the same PID. It subscribes to new log lines (only those that
-can change the result) and to the supervisor, and `server/index.ts` broadcasts each change as a `placement` message.
+can change the result) and to the supervisor, and `boot()` broadcasts each change as a `placement` message.
 An external server has no placement: it writes nothing to the ring.
 
 ## Add a collector
 
-1. Write the reader in `server/collectors/<name>.ts`: pure parse functions for the raw text, and a sampler whose
+1. Write the reader in `app/server/lib/collectors/<name>.ts`: pure parse functions for the raw text, and a sampler whose
    roots (`procRoot`, `sysRoot`) and side effects (`spawn`, `now`) can be injected, so tests run on fixtures. It
    returns `null` on any failure.
 2. Add its type to `packages/webui-shared/src/monitor.ts` as an optional or nullable field of `Snapshot` (or of `SystemSample`), and
@@ -319,7 +320,7 @@ An external server has no placement: it writes nothing to the ring.
    `collectors` (`packages/webui-shared/src/settings.ts`) controls it.
 4. Call it from `Monitor.doTick()` or `sampleMachine()`, push its series with `push()` or `known()`, and put its value
    in the snapshot.
-5. Save: `pnpm dev` restarts the process, and the new collector runs from the first tick.
+5. Save: `pnpm dev` rebuilds the runtime, and the new collector runs from the first tick.
 
 The pages that show the new figure ([System](/docs/system/), [Dashboard](/docs/dashboard/)) change in the same pull
 request, with this page. See also [How-to guides](/developers/contributing/how-to/).

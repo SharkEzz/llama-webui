@@ -12,7 +12,7 @@ const SERIES: ThroughputSeries[] = ['gen', 'pp'];
 const WELL = 'rounded-md bg-well inset-shadow-well';
 
 /**
- * The Dashboard page of the app (web/src/features/dashboard/DashboardPage.tsx), drawn from a simulated frame.
+ * The Dashboard page of the app (app/src/features/dashboard/DashboardPage.tsx), drawn from a simulated frame.
  * Responsive to its container (the hero window), not the viewport: tiles and the two throughput charts on small
  * widths, the full page from @3xl, charts and system card side by side from @5xl.
  */
@@ -176,7 +176,7 @@ interface MeterProps {
 }
 
 /**
- * One resource of the app's System card (web/src/features/dashboard/SystemCard.tsx): gauge, name, detail lines, and
+ * One resource of the app's System card (app/src/features/dashboard/SystemCard.tsx): gauge, name, detail lines, and
  * the history of its percentage in the height the cell has to spare.
  */
 function Meter({ label, value, tone, lines, history }: MeterProps) {

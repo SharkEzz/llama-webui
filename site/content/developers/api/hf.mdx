@@ -4,8 +4,8 @@ description: Routes that search the Hugging Face Hub, describe a repository's GG
 ---
 
 These routes back the download sheet of the [Models](/docs/models/) page: the Hub token status, the search, a
-repository's GGUF variants with what is already on disk, and the download queue. They live in `server/routes/hf.ts`;
-the types and the request schema are in `packages/webui-shared/src/hf.ts`, the Hub client and the queue in `server/hf/` (see
+repository's GGUF variants with what is already on disk, and the download queue. They live in `app/server/routes/api/hf/`;
+the types and the request schema are in `packages/webui-shared/src/hf.ts`, the Hub client and the queue in `app/server/lib/hf/` (see
 [Hugging Face downloads](/developers/server/hugging-face/)). The user side is described on the
 [Hugging Face](/docs/hugging-face/) page.
 
@@ -13,7 +13,7 @@ The guard, the error shape and the zod `400` follow the common rules of the [API
 
 ## Hub errors
 
-The Hub client (`server/hf/client.ts`) turns every failed Hub call into an `HttpError` with a `code`
+The Hub client (`app/server/lib/hf/client.ts`) turns every failed Hub call into an `HttpError` with a `code`
 (`hfHttpError()`): it reads the `X-Error-Code` header first, then the status. These codes can come back from
 `GET /api/hf/search`, `GET /api/hf/repo` and `POST /api/downloads`, and they are stored in `DownloadItem.code` when a
 download fails.
@@ -36,7 +36,7 @@ to the Hub call: a client that goes away (a closed sheet, a new keystroke) cance
 <Endpoint method="GET" path="/api/hf/status" />
 
 Says which Hugging Face token llama-webui uses and whose account it is. The token is resolved on every call with the
-rules of the `hf` CLI (`server/hf/token.ts`): `HF_TOKEN` (or the legacy `HUGGING_FACE_HUB_TOKEN`), otherwise the file
+rules of the `hf` CLI (`app/server/lib/hf/token.ts`): `HF_TOKEN` (or the legacy `HUGGING_FACE_HUB_TOKEN`), otherwise the file
 `hf auth login` writes (`HF_TOKEN_PATH`, else `$HF_HOME/token`, else `$XDG_CACHE_HOME/huggingface/token`, default
 `~/.cache/huggingface/token`). A login made
 while llama-webui runs is picked up.
@@ -95,9 +95,9 @@ curl 'http://127.0.0.1:7860/api/hf/search?q=qwen3%208b'
 <Endpoint method="GET" path="/api/hf/repo" />
 
 Lists the GGUF files of a repository at a revision, grouped into downloadable variants (`describeRepo()` in
-`server/hf/repo.ts`), and checks which ones are already in the models folder.
+`app/server/lib/hf/repo.ts`), and checks which ones are already in the models folder.
 
-Grouping (`groupRepoFiles()` in `server/hf/variants.ts`): one variant per `.gguf` file, or one per shard set
+Grouping (`groupRepoFiles()` in `app/server/lib/hf/variants.ts`): one variant per `.gguf` file, or one per shard set
 (`…-00001-of-00003.gguf`, possibly in a subfolder). Files with `mmproj` in their name go to `projectors`; other files
 (README, safetensors, imatrix…) are ignored. Both lists are sorted smallest first.
 
@@ -168,7 +168,7 @@ curl 'http://127.0.0.1:7860/api/hf/repo?id=unsloth/Qwen3-8B-GGUF'
 
 ## Download queue
 
-The queue (`DownloadQueue` in `server/hf/downloader.ts`) downloads one item at a time. Each file goes to
+The queue (`DownloadQueue` in `app/server/lib/hf/downloader.ts`) downloads one item at a time. Each file goes to
 `<file>.part`, is resumed with a `Range` request after an error or a restart, is checked against its sha256, then is
 renamed into place. Items are rows of the `downloads` table, so the queue survives a restart of llama-webui.
 

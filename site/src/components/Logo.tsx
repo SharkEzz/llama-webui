@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-/** The three rising bars of the brand mark (same geometry and colors as web/src/favicon.svg). */
+/** The three rising bars of the brand mark (same geometry and colors as app/src/favicon.svg). */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" aria-hidden="true" className={cn('size-5', className)}>

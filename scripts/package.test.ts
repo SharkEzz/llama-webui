@@ -7,24 +7,16 @@ import { expect, test } from 'vitest';
 const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'));
 
 test('the root package is the one npm installs', () => {
-  expect(pkg.bin).toEqual({ 'llama-webui': 'dist/server/main.js' });
-  // Not all of dist/: whatever else lies there (an old `dist/llama-webui` executable) would ship too.
-  expect(pkg.files).toEqual(['dist/server', 'dist/web']);
+  expect(pkg.bin).toEqual({ 'llama-webui': 'app/.output/llama-webui.mjs' });
+  // Nitro's whole output: the launcher, the server and its chunks, the NVML sampler, the client assets.
+  expect(pkg.files).toEqual(['app/.output']);
   expect(pkg.os).toEqual(['linux']);
   expect(pkg.engines.node).toMatch(/^>=26\./);
-  // What main.js and nvml-worker.js import besides Node: everything else is bundled.
-  expect(pkg.dependencies).toEqual({ '@hono/node-server': 'catalog:', hono: 'catalog:', ws: 'catalog:' });
 });
 
-test('the runtime dependencies are pinned to exact versions', () => {
-  // `pnpm pack` writes the catalog's specifier into the published package.json, and npm resolves it at install time,
-  // with no lockfile: a range would let a newer release, never tested, into an install. The three have no
-  // dependencies of their own, so exact versions pin the whole runtime tree (the tarball smoke checks it).
-  const workspace = readFileSync(join(import.meta.dirname, '..', 'pnpm-workspace.yaml'), 'utf8');
-  for (const name of Object.keys(pkg.dependencies)) {
-    const line = workspace.split('\n').find((l) => l.replace(/"/g, '').startsWith(`  ${name}:`));
-    expect(line, name).toMatch(/:\s+\d+\.\d+\.\d+$/);
-  }
+test('the package has no runtime dependency: the build is self-contained', () => {
+  // Nitro bundles everything the server imports: an install from the tarball has nothing to resolve (no lockfile).
+  expect(pkg.dependencies ?? {}).toEqual({});
 });
 
 test('packing without a build fails instead of shipping a package with no command', () => {
@@ -36,7 +28,11 @@ test('packing without a build fails instead of shipping a package with no comman
     const refused = spawnSync(process.execPath, [script], { cwd: empty, encoding: 'utf8' });
     expect(refused.status).toBe(1);
     expect(refused.stderr).toContain('pnpm build');
-    for (const file of ['dist/server/main.js', 'dist/server/nvml-worker.js', 'dist/web/index.html']) {
+    for (const file of [
+      'app/.output/llama-webui.mjs',
+      'app/.output/server/index.mjs',
+      'app/.output/server/nvml-worker.mjs',
+    ]) {
       mkdirSync(dirname(join(empty, file)), { recursive: true });
       writeFileSync(join(empty, file), '');
     }

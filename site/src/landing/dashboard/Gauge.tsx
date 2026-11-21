@@ -1,4 +1,4 @@
-// Ported from web/src/components/glass/Gauge.tsx (keep both visually in sync).
+// Ported from app/src/components/glass/Gauge.tsx (keep both visually in sync).
 import type { Tone } from './tones';
 import { TONE_VAR } from './tones';
 

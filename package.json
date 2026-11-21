@@ -4,16 +4,15 @@
   "private": true,
   "type": "module",
   "bin": {
-    "llama-webui": "dist/server/main.js"
+    "llama-webui": "app/.output/llama-webui.mjs"
   },
   "files": [
-    "dist/server",
-    "dist/web"
+    "app/.output"
   ],
   "scripts": {
-    "build": "vite build",
+    "build": "pnpm --filter @llama-webui/app build",
     "check": "pnpm -r --parallel --include-workspace-root typecheck",
-    "dev": "node --watch-path=server --watch-path=packages --watch-preserve-output server/dev.ts",
+    "dev": "pnpm --filter @llama-webui/app dev",
     "format": "biome format --write",
     "lint": "biome check",
     "lint:fix": "biome check --write",
@@ -22,21 +21,14 @@
     "site:build": "pnpm --filter llama-webui-site build",
     "site:dev": "pnpm --filter llama-webui-site dev",
     "site:preview": "pnpm --filter llama-webui-site preview",
-    "start": "pnpm build && node dist/server/main.js",
+    "start": "pnpm build && node app/.output/llama-webui.mjs",
     "test": "pnpm test:unit && pnpm --filter llamacpp-js test",
     "test:unit": "vitest run",
     "typecheck": "tsc -p scripts"
   },
-  "dependencies": {
-    "@hono/node-server": "catalog:",
-    "hono": "catalog:",
-    "ws": "catalog:"
-  },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
-    "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",
-    "@vitejs/plugin-react": "^6.3.0",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "5.1.0"

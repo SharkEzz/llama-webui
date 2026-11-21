@@ -4,9 +4,9 @@ description: Routes that start, list, cancel and delete benchmark runs with llam
 ---
 
 The benchmark routes run one measurement at a time with `llama-bench` or with a `llama-server` started for the
-purpose, and keep every run in the `bench_runs` table. They live in `server/routes/bench.ts`; the spec schema, the
+purpose, and keep every run in the `bench_runs` table. They live in `app/server/routes/api/bench/`; the spec schema, the
 types and the flag translation are in `packages/webui-shared/src/bench.ts`, the runner, the executor and the server gate in
-`server/bench/` (see [Benchmarks and sweeps](/developers/server/bench/)). The user side is described on the
+`app/server/lib/bench/` (see [Benchmarks and sweeps](/developers/server/bench/)). The user side is described on the
 [Benchmark](/docs/benchmark/) page. Sweep items are runs too: their routes are on the [Sweeps](/developers/api/sweeps/)
 page.
 
@@ -14,8 +14,8 @@ The guard, the error shape and the zod `400` follow the common rules of the [API
 
 ## Runs and the server gate
 
-`BenchRunner` (`server/bench/runner.ts`) accepts one run or one sweep at a time. A run needs the GPUs to itself, so it
-takes the server gate (`BenchGate`, `server/bench/gate.ts`): the managed `llama-server` is stopped once when the gate is
+`BenchRunner` (`app/server/lib/bench/runner.ts`) accepts one run or one sweep at a time. A run needs the GPUs to itself, so it
+takes the server gate (`BenchGate`, `app/server/lib/bench/gate.ts`): the managed `llama-server` is stopped once when the gate is
 taken and restarted once when it is released. While the gate is held, the server control routes are refused with
 `409 A benchmark is running` (see [Server, state and logs](/developers/api/server/)).
 
@@ -88,7 +88,7 @@ offending index.
 
 ### What each tool runs
 
-`RunExecutor.commandOf()` (`server/bench/execute.ts`) builds the command, saved in the run as `command`:
+`RunExecutor.commandOf()` (`app/server/lib/bench/execute.ts`) builds the command, saved in the run as `command`:
 
 - **`bench`**: `llama-bench -m <model> -o json --progress -r <r> -p <p> -n <n>` followed by the `params` flags, in the
   source profile's environment. `mmprojPath` and `serverArgs` are not passed: `ignoredByBench()` lists the profile
