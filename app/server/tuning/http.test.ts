@@ -23,6 +23,7 @@ import { sweepSpec } from '../testing/bench.ts';
 import { type KvValue, writeGguf } from '../testing/gguf.ts';
 import { ServerTest } from '../testing/http.ts';
 import { ServicesWithoutBench } from '../testing/services.ts';
+import { locksMemory } from './estimate.ts';
 import { TuningMemo } from './TuningMemo.ts';
 
 /** The home of the test (`HOME`, and `~/bin` the whole `PATH`): nothing of the user's is found or run. */
@@ -214,11 +215,11 @@ layer(served, { excludeTestServices: true, buildPerTest: true })('/api/tuning ov
       const after = yield* checksOf(path);
       const disk = Option.getOrThrow(checkOf(after, 'kernel.disk-speed'));
       assert.isTrue(Str.startsWith('sequential read')(disk.detail ?? ''), disk.detail ?? '');
-      // The memlock check follows the estimate kept: it reads `--mlock` in its args.
+      // The memlock check follows the estimate kept: it reads `--load-mode mmap+mlock` in its args.
       const memlock = Option.getOrThrow(checkOf(after, 'cpu.memlock'));
       assert.strictEqual(
-        memlock.detail === '--mlock not recommended here',
-        !Arr.contains(estimate.serverArgs, '--mlock'),
+        memlock.detail === '--load-mode mmap+mlock not recommended here',
+        !locksMemory(estimate.serverArgs),
       );
     }),
   );

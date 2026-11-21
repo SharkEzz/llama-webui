@@ -12,6 +12,7 @@ import type {
 import { fmtBytes, GiB } from '@llama-webui/shared';
 import { Array as Arr, Option, Predicate, String as Str } from 'effect';
 import type { ModelInfo } from '../models/gguf.ts';
+import { locksMemory } from './estimate.ts';
 
 /** What the checks read from the machine (`readSys`); every reading is tolerant. */
 export interface SysReadings {
@@ -395,10 +396,11 @@ export const runChecks = (ctx: CheckContext): Array<Check> => {
   {
     const id = 'cpu.memlock';
     const label = 'memlock limit';
-    const impact = '--mlock fails, weights can be evicted';
-    const wantsMlock = estimate !== null && Arr.contains(estimate.serverArgs, '--mlock');
+    const impact = '--load-mode mmap+mlock fails, weights can be evicted';
+    const wantsMlock = estimate !== null && locksMemory(estimate.serverArgs);
     const need = ctx.model?.fileBytes ?? 0;
-    if (!wantsMlock) push({ id, family: 'cpu', label, state: 'ok', detail: '--mlock not recommended here', impact });
+    if (!wantsMlock)
+      push({ id, family: 'cpu', label, state: 'ok', detail: '--load-mode mmap+mlock not recommended here', impact });
     else if (r.memlockLimitBytes === null)
       push({ id, family: 'cpu', label, state: 'unknown', detail: 'unreadable', impact });
     else if (r.memlockLimitBytes < need)

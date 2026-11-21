@@ -65,6 +65,18 @@ const fp8Backend = (d: BenchDevice): boolean => d.backend === 'CUDA';
 export const cacheOf = (p: BenchParams): KvTypes => ({ k: p.ctk ?? 'f16', v: p.ctv ?? 'f16' });
 
 /** A count that the legacy estimator read as set only when it is not 0. */
+/** Locks the weights in RAM, still memory-mapped: what `--mlock` did before llama.cpp replaced it by `--load-mode`. */
+export const MLOCK_ARGS: ReadonlyArray<string> = ['--load-mode', 'mmap+mlock'];
+
+/** Whether `args` lock the model in memory (`--load-mode mlock` or `mmap+mlock`, `-lm` included). */
+export const locksMemory = (args: ReadonlyArray<string>): boolean =>
+  Arr.some(args, (a, i) => {
+    const [flag, inline] = Str.split(a, '=');
+    if (flag !== '--load-mode' && flag !== '-lm') return false;
+    const value = inline ?? args[i + 1] ?? '';
+    return value === 'mlock' || value === 'mmap+mlock';
+  });
+
 const positive = (n: number | undefined): n is number => n !== undefined && n !== 0;
 
 const idsOf = (cards: ReadonlyArray<BenchDevice>): string =>
@@ -436,7 +448,7 @@ export const estimate = (input: EstimateInput): Estimate => {
     params.ub === 512 && batch === DEFAULT_BATCH ? 'default' : 'faster prompt processing, enough VRAM headroom',
   );
   row('--fit', 'off', 'what gets measured is exactly what gets written');
-  if (mlock) row('--mlock', '', 'whole model locked in memory, enough RAM');
+  if (mlock) row('--load-mode', 'mmap+mlock', 'whole model locked in memory, enough RAM');
   if (numa) row('--numa', 'distribute', 'several NUMA nodes');
 
   if (Predicate.isNumber(params.ngl) && params.ngl > 0)
@@ -471,7 +483,7 @@ export const estimate = (input: EstimateInput): Estimate => {
       String(ctx),
       '--fit',
       'off',
-      ...(mlock ? ['--mlock'] : []),
+      ...(mlock ? MLOCK_ARGS : []),
       ...(numa ? ['--numa', 'distribute'] : []),
     ],
     rows,

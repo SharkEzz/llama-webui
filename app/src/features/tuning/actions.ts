@@ -15,7 +15,7 @@ import { createProfile, useProfiles } from '@/lib/profiles';
 import { stem } from '@/lib/stem';
 import { useTuning } from '@/lib/tuning';
 
-/** The profile's other flags minus those the estimate already sets (-c, --fit, --mlock, --numa…), values included. */
+/** The profile's other flags minus those the estimate already sets (-c, --fit, --load-mode, --numa…), values included. */
 export function mergeArgs(estimateArgs: ReadonlyArray<string>, rest: ReadonlyArray<string>): string[] {
   const fixed = new Set(estimateArgs.filter((a) => a.startsWith('-')));
   if (fixed.has('-c')) fixed.add('--ctx-size');

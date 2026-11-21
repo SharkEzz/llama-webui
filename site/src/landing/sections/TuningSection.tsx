@@ -17,7 +17,7 @@ const ROWS = [
   ['-ctk / -ctv', 'f16', 'the budget allows it, no loss'],
   ['-t', '6', '6 physical cores'],
   ['--fit', 'off', 'what gets measured is exactly what gets written'],
-  ['--mlock', '', 'whole model locked in memory, enough RAM'],
+  ['--load-mode', 'mmap+mlock', 'whole model locked in memory, enough RAM'],
 ] as const;
 
 /** Same estimate: GiB used, usable budget (headroom deducted) and total, per device then RAM. */
@@ -210,7 +210,7 @@ export function TuningSection() {
             crop={{ x: 0.16, y: 0.1, w: 0.83 }}
             width="min(42rem, 90vw)"
             fade
-            className={`${SHOT_FRAME} aspect-[3/2] flex-1 lg:aspect-auto lg:min-h-96`}
+            className={`${SHOT_FRAME} aspect-3/2 flex-1 lg:aspect-auto lg:min-h-96`}
           />
         }
       >

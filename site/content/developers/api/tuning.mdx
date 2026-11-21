@@ -140,14 +140,14 @@ warning `dense model: -ncmoe has no effect`.
 | `params`                | `BenchParams`      | The recommended flags, pins included. When nothing fits: the simplest configuration (all layers on the widest set of cards, or `-ngl 0`), not validated. |
 | `ctx`                   | number             | Context size.                                                                       |
 | `kv`                    | cache type         | The final K cache type: `f16`, `q8_0`, `f8_e4m3` (with `fa: "off"`) or the pinned `ctk`. |
-| `serverArgs`            | string[]           | `serverArgs(params)`, then `-c <ctx>`, `--fit off`, and `--mlock` and `--numa distribute` when they apply: ready for a profile. |
+| `serverArgs`            | string[]           | `serverArgs(params)`, then `-c <ctx>`, `--fit off`, and `--load-mode mmap+mlock` and `--numa distribute` when they apply: ready for a profile. |
 | `rows`                  | `Recommendation[]` | One row per flag: `flag`, `value` and `why`, the reason shown in the UI. Empty when `ok` is false. |
 | `fit`                   | `Fit`              | Per-device memory and verdict (below).                                              |
 | `ramOverflowBytes`      | number             | What exceeds the available RAM (re-read from disk through mmap).                    |
 | `diskReadBytesPerToken` | number             | Bytes read from disk per generated token when RAM overflows, 0 otherwise.           |
 | `warnings`              | string[]           | Slow placements (layers or experts in RAM, RAM overflow), a `tight` fit's reason, and the placement's issues. |
 
-`--mlock` is added when `-ngl` is not `all`, some weights stay in RAM, `-ncmoe` is not used, nothing overflows, and at
+`--load-mode mmap+mlock` is added when `-ngl` is not `all`, some weights stay in RAM, `-ncmoe` is not used, nothing overflows, and at
 least 2 GiB of RAM are left. `--numa distribute` is added on a machine with several NUMA nodes. `--fit off` is always there: what gets
 measured is exactly what gets written.
 

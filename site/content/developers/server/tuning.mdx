@@ -281,7 +281,7 @@ with a strictly larger context: `f8_e4m3` is chosen only when `f16` cannot reach
 ### Flags and why
 
 The result (`Estimate`) has the flags (`params`), `ctx`, `kv` (the final K cache type, a pinned `ctk` included),
-`serverArgs` (the flags, then `-c`, `--fit off`, and `--mlock` and `--numa distribute` when they apply), the verdict,
+`serverArgs` (the flags, then `-c`, `--fit off`, and `--load-mode mmap+mlock` and `--numa distribute` when they apply), the verdict,
 and one row per flag with a "why" string. The rows are built from the final flags, after the pinned values: a pinned
 `-fa` or cache type shows as such.
 
@@ -297,10 +297,10 @@ and one row per flag with a "why" string. The rows are built from the final flag
 | `-t`                 | `N physical cores`                                                                                                                                     |
 | `-b / -ub`           | `default` for 2048 / 512, otherwise `faster prompt processing, enough VRAM headroom`                                                                   |
 | `--fit`              | `what gets measured is exactly what gets written`                                                                                                      |
-| `--mlock`            | `whole model locked in memory, enough RAM`                                                                                                             |
+| `--load-mode`        | `whole model locked in memory, enough RAM`                                                                                                             |
 | `--numa distribute`  | `several NUMA nodes`                                                                                                                                   |
 
-`--mlock` is recommended when `-ngl` is not `all`, some weights are in RAM, `-ncmoe` is not used, RAM does not overflow
+`--load-mode mmap+mlock` is recommended when `-ngl` is not `all`, some weights are in RAM, `-ncmoe` is not used, RAM does not overflow
 and at least 2 GiB of RAM remain. `--numa distribute` is added when the CPU has several NUMA nodes.
 
 When RAM overflows, `ramOverflowBytes` is what exceeds the available RAM and `diskReadBytesPerToken` estimates what
@@ -379,7 +379,7 @@ empty value when it cannot read, it never fails.
 | `amd.rocm-gfx.<busId>`       | The card has no KFD node (ROCm does not see it), or its gfx target is not in `hipTargets`, exactly or through its generic target (`gfx12-generic`…, `genericOf()`); `unknown` without the HIP library or when its targets cannot be read | `-DAMDGPU_TARGETS=<gfx>` at the build, or `HSA_OVERRIDE_GFX_VERSION` | permanent |
 | `cpu.governor`               | A core is not on `performance`                                              | `echo performance \| sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor` | session |
 | `cpu.thp`                    | `never`                                                                     | `echo madvise \| sudo tee /sys/kernel/mm/transparent_hugepage/enabled`           | session     |
-| `cpu.memlock`                | `--mlock` is recommended and the limit is below the model's size            | `ulimit -l unlimited`                                                            | session     |
+| `cpu.memlock`                | `mmap+mlock` is recommended and the limit is below the model's size         | `ulimit -l unlimited`                                                            | session     |
 | `cpu.swappiness`             | Above 10 while the model spills into RAM                                    | `sudo sysctl vm.swappiness=10`                                                   | session     |
 | `cpu.numa`                   | Several NUMA nodes without `--numa` in the recommendation                   |                                                                                  | permanent   |
 | `build.cuda`                 | An NVIDIA card, no CUDA device listed and no `libggml-cuda*`               |                                                                                  | permanent   |

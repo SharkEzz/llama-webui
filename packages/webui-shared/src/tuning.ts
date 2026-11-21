@@ -131,7 +131,7 @@ export const Estimate = Schema.Struct({
   ctx: Schema.Int,
   /** K cache type of the configuration (pinned `ctk` included). */
   kv: Schema.Literals(CACHE_TYPES),
-  /** serverArgs(params) (-t, -b and -ub included), then -c, --fit off, and --mlock and --numa when relevant. */
+  /** serverArgs(params) (-t, -b and -ub included), then -c, --fit off, and --load-mode mmap+mlock and --numa when relevant. */
   serverArgs: Schema.Array(Schema.String),
   rows: Schema.Array(Recommendation),
   fit: Fit,

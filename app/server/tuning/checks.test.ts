@@ -3,7 +3,7 @@ import type { Check, Estimate, GpuSample } from '@llama-webui/shared';
 import { Array as Arr, Option, String as Str } from 'effect';
 import { fakeModel, hw3 } from '../testing/tuning.ts';
 import { type CheckContext, genericOf, runChecks, type SysReadings, summarize } from './checks.ts';
-import { estimate } from './estimate.ts';
+import { estimate, locksMemory } from './estimate.ts';
 import { retainedBusIds } from './match.ts';
 
 const MiB = 1024 ** 2;
@@ -78,7 +78,7 @@ const rx = gpu({
 const on = (g: GpuSample, o: Partial<CheckContext> = {}, r: Partial<SysReadings> = {}) =>
   ctx({ gpus: [g], retainedBusIds: [g.busId], ...o }, r);
 
-/** An estimate that spills into RAM (a partial offload, --mlock recommended). */
+/** An estimate that spills into RAM (a partial offload, --load-mode mmap+mlock recommended). */
 const spilling = (): Estimate =>
   estimate({
     model: fakeModel({ layers: 60, otherBytesPerLayer: 500 * MiB }),
@@ -236,10 +236,10 @@ describe('runChecks', () => {
     assert.strictEqual(stateOf(ctx({}, { thp: null }), 'cpu.thp'), 'unknown');
   });
 
-  it('the memlock limit matters only when the estimate recommends --mlock', () => {
-    assert.strictEqual(byId(ctx(), 'cpu.memlock').detail, '--mlock not recommended here');
+  it('the memlock limit matters only when the estimate locks the model in memory', () => {
+    assert.strictEqual(byId(ctx(), 'cpu.memlock').detail, '--load-mode mmap+mlock not recommended here');
     const e = spilling();
-    assert.include(e.serverArgs, '--mlock');
+    assert.isTrue(locksMemory(e.serverArgs));
     const model = fakeModel({ layers: 60, otherBytesPerLayer: 500 * MiB });
     assert.strictEqual(byId(ctx({ estimate: e, model }), 'cpu.memlock').detail, 'unlimited');
     assert.strictEqual(stateOf(ctx({ estimate: e, model }, { memlockLimitBytes: 8 * MiB }), 'cpu.memlock'), 'warn');

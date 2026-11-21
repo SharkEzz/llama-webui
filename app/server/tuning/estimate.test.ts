@@ -2,7 +2,7 @@ import { assert, describe, it } from '@effect/vitest';
 import type { BenchParams } from '@llama-webui/shared';
 import { Array as Arr, Option, String as Str } from 'effect';
 import { fakeModel, hw3 } from '../testing/tuning.ts';
-import { type EstimateInput, estimate } from './estimate.ts';
+import { type EstimateInput, estimate, locksMemory } from './estimate.ts';
 
 const MiB = 1024 ** 2;
 const GiB = 1024 ** 3;
@@ -142,12 +142,13 @@ describe('estimate', () => {
     assert.include(vulkan.warnings, 'only CUDA and the CPU support an f8_e4m3 KV cache: Vulkan3 may fail');
   });
 
-  it('a partial offload with RAM to spare recommends --mlock and warns of slow generation', () => {
+  it('a partial offload with RAM to spare recommends --load-mode mmap+mlock and warns of slow generation', () => {
     const e = run({ model: fakeModel({ layers: 60, otherBytesPerLayer: 500 * MiB }), pinned: { dev: ['CUDA0'] } });
     assert.isTrue(e.ok);
     assert.strictEqual(e.params.ngl, 25);
-    assert.include(e.serverArgs, '--mlock');
-    assert.isTrue(Option.isSome(rowOf(e, '--mlock')));
+    assert.strictEqual(e.serverArgs[e.serverArgs.indexOf('--load-mode') + 1], 'mmap+mlock');
+    assert.notInclude(e.serverArgs, '--mlock');
+    assert.strictEqual(Option.getOrThrow(rowOf(e, '--load-mode')).value, 'mmap+mlock');
     assert.include(e.warnings, 'slow generation: 35 of 60 layers in RAM');
   });
 
@@ -172,5 +173,16 @@ describe('estimate', () => {
   it('a pinned context of 0 counts as none', () => {
     const model = fakeModel({ layers: 36, otherBytesPerLayer: 120 * MiB });
     assert.strictEqual(run({ model, ctx: 0 }).ctx, run({ model }).ctx);
+  });
+});
+
+describe('locksMemory', () => {
+  it('reads --load-mode and -lm, separate or after =: llama.cpp dropped --mlock', () => {
+    assert.isTrue(locksMemory(['-c', '4096', '--load-mode', 'mmap+mlock']));
+    assert.isTrue(locksMemory(['-lm', 'mlock']));
+    assert.isTrue(locksMemory(['--load-mode=mmap+mlock']));
+    assert.isFalse(locksMemory(['--load-mode', 'mmap']));
+    assert.isFalse(locksMemory(['--mlock']));
+    assert.isFalse(locksMemory(['--load-mode']));
   });
 });

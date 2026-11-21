@@ -32,7 +32,7 @@ same proportion: the active share of the experts left in RAM.
 | `-dev`, `-ts`               | `--device`, `--tensor-split`       | The cards to use, and each card's share of the layers.                 | Every dedicated card, split by usable VRAM.                                                                 |
 | `-ctk`, `-ctv`, `-fa`       | `--cache-type-k`, `--cache-type-v`, `--flash-attn` | KV cache types; flash attention.                       | `q8_0` with `-fa on`: half the KV cache of `f16`.                                                           |
 | `--fit off`                 |                                    |                                                                        | Always added: what gets measured is exactly what gets written.                                              |
-| `--mlock`                   |                                    | Locks the model in RAM.                                                | Never added together with `-ncmoe`.                                                                         |
+| `--load-mode mmap+mlock`    |                                    | Locks the model in RAM.                                                | Never added together with `-ncmoe`.                                                                         |
 
 ## How llama-webui picks the split
 
@@ -69,7 +69,7 @@ weights and KV cache of any layer left on the CPU. It compares this with the **a
 - **Swap**: weights pushed out to swap slow generation down. When the recommendation leaves part of the model in RAM,
   the [System](/docs/system/) checks flag a `vm.swappiness` above 10 (fix: `sudo sysctl vm.swappiness=10`) and any swap
   in use (advice: lower `-c` or raise `--n-cpu-moe`).
-- **`--mlock`**: llama-webui does not recommend it with `-ncmoe`. It only adds it when `-ngl` leaves whole layers in
+- **`--load-mode mmap+mlock`**: llama-webui does not recommend it with `-ncmoe`. It only adds it when `-ngl` leaves whole layers in
   RAM, nothing overflows and at least 2 GiB of RAM is left.
 
 ## When the model is larger than your RAM
