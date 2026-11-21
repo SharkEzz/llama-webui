@@ -1,82 +1,19 @@
 import type { TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/shared';
 import { Array as Arr, Clock, Effect, FileSystem, HashSet, Option, Order, Path, String as Str } from 'effect';
-import { dual, pipe } from 'effect/Function';
 import { physicalDisks } from '../collectors/disk.ts';
 import { readTrimmed } from '../collectors/read.ts';
 import { readCpuInfo } from './cpu.ts';
 import { displayName, PciIds } from './PciIds.ts';
+import { isHostBridge, readLinkCurrent, readLinkMax, readNum, slotLink } from './pcieLink.ts';
+import { chipsetLabel, cpuLabel } from './pciLabels.ts';
 
 /*
- * The machine's PCIe topology, read from sysfs (never lspci: it wakes up suspended cards). Shared with the
- * AMD collector, which needs the same link readings.
+ * The machine's PCIe topology, read from sysfs (never lspci: it wakes up suspended cards).
  */
 
 export { findPciIdsEntry } from './PciIds.ts';
-
-/** The number a file holds, null when it cannot be read or is not one. */
-export const readNum = (file: string | null): Effect.Effect<number | null, never, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    if (file === null) return null;
-    const text = yield* readTrimmed(file);
-    const n = text === null ? Number.NaN : Number(text);
-    return Number.isFinite(n) ? n : null;
-  });
-
-/** A sysfs host bridge directory (pciDDDD:BB): what sits right under it is a root port or a root-bus device. */
-export const isHostBridge = (dir: string): boolean => /(?:^|\/)pci[0-9a-f]{4,}:[0-9a-f]{2}$/i.test(dir);
-
-const GEN_BY_RATE: Readonly<Record<string, number>> = { '2.5': 1, '5': 2, '8': 3, '16': 4, '32': 5, '64': 6 };
-
-/** sysfs `current_link_speed` ("32.0 GT/s PCIe") → PCIe generation. */
-export function parseLinkSpeed(text: string): number | null {
-  const m = /^([\d.]+)\s*GT\/s/.exec(Str.trim(text));
-  return m === null ? null : (GEN_BY_RATE[String(Number(m[1]))] ?? null);
-}
-
-/** The smaller of two link capabilities; either may be unknown (a width of 0 is unknown too). */
-export const minKnown: {
-  (b: number | null): (a: number | null) => number | null;
-  (a: number | null, b: number | null): number | null;
-} = dual(2, (a: number | null, b: number | null): number | null => {
-  const ka = a !== null && a > 0 ? a : null;
-  const kb = b !== null && b > 0 ? b : null;
-  if (ka === null) return kb;
-  return kb === null ? ka : Math.min(ka, kb);
-});
-
-const isBridge = Effect.fnUntraced(function* (dir: string) {
-  const path = yield* Path.Path;
-  const cls = yield* readTrimmed(path.join(dir, 'class'));
-  return Str.startsWith('0x0604')(cls ?? '');
-});
-
-/**
- * Recent Radeon cards sit behind a PCIe switch on the card itself: the GPU's own link goes to that switch
- * and always reads its full width (e.g. Gen5 x16). The slot link is the switch's upstream port: the walk
- * climbs the card vendor's bridges (class 0x0604: any PCI bridge) above the device, and stops at the first
- * other bridge (a chipset port) or at a root port, which is never on the card even when it is AMD's own
- * (old ATI chipsets: RD890, 990FX). The link's other end is the port it plugs into, whose capability
- * bounds the link's maximum (a Gen4 x4 chipset slot); a host bridge has no link, so it gives no port.
- */
-export const slotLink = Effect.fn('pci.slotLink')(function* (options: {
-  readonly devicePath: string;
-  /** The card vendor's sysfs id; Radeon (`0x1002`) by default. */
-  readonly vendor?: string;
-}) {
-  const path = yield* Path.Path;
-  const vendor = options.vendor ?? '0x1002';
-  let link = options.devicePath;
-  for (let i = 0; i < 8; i++) {
-    const parent = path.dirname(link);
-    if (parent === link || isHostBridge(path.dirname(parent))) break;
-    if ((yield* readTrimmed(path.join(parent, 'vendor'))) !== vendor || !(yield* isBridge(parent))) break;
-    link = parent;
-  }
-  const port = path.dirname(link);
-  return isHostBridge(port) || port === link
-    ? ({ linkPath: link } as { linkPath: string; portPath?: string })
-    : { linkPath: link, portPath: port };
-});
+export { isHostBridge, minKnown, parseLinkSpeed, readNum, saneLinkWidth, slotLink } from './pcieLink.ts';
+export { chipsetLabel, cpuLabel } from './pciLabels.ts';
 
 /** The `vendor` and `device` ids of a device directory (cached attributes, read without waking the card up). */
 const idsOf = Effect.fnUntraced(function* (dir: string) {
@@ -123,33 +60,6 @@ const isChipset = Effect.fnUntraced(function* (up: string, root: string, entry: 
   return removable !== 'removable' && !/thunderbolt|usb4/i.test(Option.getOrElse(entry, () => ''));
 });
 
-/** “600 Series Chipset PCIe Switch Upstream Port” → “600 Series Chipset”. */
-export function chipsetLabel(name: string | null): string {
-  if (name === null || name === '') return 'Chipset';
-  const cut = pipe(
-    name,
-    Str.replace(/\s*(PCIe|PCI Express|PCI-E)\b.*$/i, ''),
-    Str.replace(/\s*(Upstream|Downstream|Root)\s+Port.*$/i, ''),
-    Str.trim,
-  );
-  return cut === '' ? 'Chipset' : cut;
-}
-
-/** “AMD Ryzen 5 9600X 6-Core Processor” → “AMD Ryzen 5 9600X”; “Intel(R) Core(TM) i7-12700K CPU @ 3.60GHz” → “Intel Core i7-12700K”. */
-export function cpuLabel(model: string): string {
-  const label = pipe(
-    model,
-    Str.replace(/\((R|TM)\)/gi, ''),
-    Str.replace(/\s+\d+-Core Processor$/i, ''),
-    Str.replace(/\s+Processor$/i, ''),
-    Str.replace(/\s+CPU\s*@.*$/i, ''),
-    Str.replace(/\s+with Radeon Graphics$/i, ''),
-    Str.replace(/\s{2,}/g, ' '),
-    Str.trim,
-  );
-  return label === '' ? 'CPU' : label;
-}
-
 const VENDORS: Readonly<Record<string, TopologyNode['vendor']>> = {
   '0x10de': 'nvidia',
   '0x1002': 'amd',
@@ -164,32 +74,18 @@ const pcieLink = Effect.fnUntraced(function* (
   linkPath: string,
   portPath: string | null,
 ) {
-  const path = yield* Path.Path;
-  const speed = Effect.fnUntraced(function* (dir: string | null, file: string) {
-    const text = dir === null ? null : yield* readTrimmed(path.join(dir, file));
-    return text === null ? null : parseLinkSpeed(text);
+  const [max, cur] = yield* Effect.all([readLinkMax(linkPath, portPath), readLinkCurrent(linkPath)], {
+    concurrency: 'unbounded',
   });
-  const width = (dir: string | null, file: string) => readNum(dir === null ? null : path.join(dir, file));
-  const [genL, widthL, genP, widthP, genCur, widthCur] = yield* Effect.all([
-    speed(linkPath, 'max_link_speed'),
-    width(linkPath, 'max_link_width'),
-    speed(portPath, 'max_link_speed'),
-    width(portPath, 'max_link_width'),
-    speed(linkPath, 'current_link_speed'),
-    width(linkPath, 'current_link_width'),
-  ]);
-  // A suspended card (D3cold) may answer 0xFFFF to a config read: width “63”, to be ignored.
-  const sane = (w: number | null) => (w !== null && Number.isInteger(w) && w > 0 && w <= 32 ? w : null);
-  const genMax = minKnown(genL, genP);
   return {
     id,
     from,
     to,
-    kind: genMax === null && genCur === null ? 'internal' : 'pcie',
-    genMax,
-    widthMax: minKnown(sane(widthL), sane(widthP)),
-    genCur,
-    widthCur: sane(widthCur),
+    kind: max.gen === null && cur.gen === null ? 'internal' : 'pcie',
+    genMax: max.gen,
+    widthMax: max.width,
+    genCur: cur.gen,
+    widthCur: cur.width,
   } satisfies TopologyLink;
 });
 

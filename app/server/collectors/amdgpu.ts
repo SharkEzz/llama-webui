@@ -1,7 +1,8 @@
 import type { GpuReading } from '@llama-webui/shared';
-import { Array as Arr, Effect, FileSystem, Option, Path, String as Str } from 'effect';
+import { Array as Arr, Effect, FileSystem, Option, Order, Path, String as Str } from 'effect';
 import { PciIds } from '../hardware/PciIds.ts';
-import { minKnown, parseLinkSpeed, readNum, slotLink } from '../hardware/pci.ts';
+import { readLinkCurrent, readLinkMax, readNum, slotLink } from '../hardware/pcieLink.ts';
+import { finiteOrNull } from '../monitor/finite.ts';
 import { identityReading } from './gpu.ts';
 import { readTrimmed } from './read.ts';
 
@@ -94,7 +95,7 @@ export const discoverAmdCards = Effect.fn('amdgpu.discoverAmdCards')(function* (
   const ids = yield* PciIds;
   const drmRoot = options.drmRoot ?? '/sys/class/drm';
   const entries = yield* fs.readDirectory(drmRoot).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
-  const sorted = Arr.sort(entries, (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0));
+  const sorted = Arr.sort(entries, Order.String);
   const nodeNames = Arr.filter(sorted, (e) => /^(card|renderD)\d+$/.test(e));
   const found: Array<AmdCard> = [];
   for (const card of Arr.filter(sorted, (e) => /^card\d+$/.test(e))) {
@@ -107,7 +108,7 @@ export const discoverAmdCards = Effect.fn('amdgpu.discoverAmdCards')(function* (
     const hwmons = yield* fs
       .readDirectory(path.join(devicePath, 'hwmon'))
       .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
-    const hwmon = Arr.head(Arr.sort(hwmons, (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)));
+    const hwmon = Arr.head(Arr.sort(hwmons, Order.String));
     const hwmonPath = Option.match(hwmon, { onNone: () => null, onSome: (h) => path.join(devicePath, 'hwmon', h) });
     const nodes = yield* Effect.filter(nodeNames, (node) =>
       fs.realPath(path.join(drmRoot, node, 'device')).pipe(
@@ -143,23 +144,11 @@ const readWith = Effect.fnUntraced(function* <T>(file: string | null, parse: (te
  */
 const linkMax = Effect.fnUntraced(function* (card: AmdCard, link: string) {
   if (card.linkMax !== undefined) return card.linkMax;
-  const path = yield* Path.Path;
-  const port = card.portPath ?? null;
-  const [gen, width, portGen, portWidth] = yield* Effect.all(
-    [
-      readWith(path.join(link, 'max_link_speed'), parseLinkSpeed),
-      readNum(path.join(link, 'max_link_width')),
-      readWith(port === null ? null : path.join(port, 'max_link_speed'), parseLinkSpeed),
-      readNum(port === null ? null : path.join(port, 'max_link_width')),
-    ],
-    { concurrency: 'unbounded' },
-  );
-  const max = { gen: minKnown(gen, portGen), width: minKnown(width, portWidth) };
-  const ends = port === null ? [gen, width] : [gen, width, portGen, portWidth];
-  if (Arr.every(ends, (v) => v !== null && v > 0) && max.gen !== null && max.width !== null) {
+  const max = yield* readLinkMax(link, card.portPath ?? null);
+  if (max.complete && max.gen !== null && max.width !== null) {
     card.linkMax = { gen: max.gen, width: max.width };
   }
-  return max;
+  return { gen: max.gen, width: max.width };
 });
 
 /** `pp_dpm_sclk` / `pp_dpm_mclk`: the current level is marked with "*". */
@@ -203,15 +192,13 @@ export const suspendedAmdReading = (card: AmdCard): GpuReading => identityReadin
 /** A card no tab shows: listed, not read. */
 export const hiddenAmdReading = (card: AmdCard): GpuReading => identityReading(amdIdentity(card), 'hidden');
 
-const finiteOrNull = (n: number | null): number | null => (n !== null && Number.isFinite(n) ? n : null);
-
 export const readAmdCard = Effect.fn('amdgpu.readAmdCard')(function* (card: AmdCard) {
   const path = yield* Path.Path;
   const d = card.devicePath;
   const hw = card.hwmonPath;
   const h = (file: string): string | null => (hw === null ? null : path.join(hw, file));
   const link = card.linkPath ?? d;
-  const [util, used, total, temp, pAvg, memBusy, gen, max, width, sclk, mclk, pwm, pwmMax, cap] = yield* Effect.all(
+  const [util, used, total, temp, pAvg, memBusy, cur, max, sclk, mclk, pwm, pwmMax, cap] = yield* Effect.all(
     [
       readNum(path.join(d, 'gpu_busy_percent')),
       readNum(path.join(d, 'mem_info_vram_used')),
@@ -219,9 +206,8 @@ export const readAmdCard = Effect.fn('amdgpu.readAmdCard')(function* (card: AmdC
       readNum(h('temp1_input')),
       readNum(h('power1_average')),
       readNum(path.join(d, 'mem_busy_percent')),
-      readWith(path.join(link, 'current_link_speed'), parseLinkSpeed),
+      readLinkCurrent(link),
       linkMax(card, link),
-      readNum(path.join(link, 'current_link_width')),
       readWith(path.join(d, 'pp_dpm_sclk'), parseDpm),
       readWith(path.join(d, 'pp_dpm_mclk'), parseDpm),
       readNum(h('pwm1')),
@@ -252,9 +238,8 @@ export const readAmdCard = Effect.fn('amdgpu.readAmdCard')(function* (card: AmdC
     clockGrMhz: sclk?.curMhz ?? null,
     clockGrMaxMhz: sclk?.maxMhz ?? null,
     clockMemMhz: mclk?.curMhz ?? null,
-    pcieGen: finiteOrNull(gen),
-    // A link that is down or retraining reads a width of 0: unknown, like an unknown maximum.
-    pcieWidth: width !== null && Number.isInteger(width) && width > 0 ? width : null,
+    pcieGen: finiteOrNull(cur.gen),
+    pcieWidth: cur.width,
     pcieGenMax: max.gen,
     pcieWidthMax: max.width,
   } satisfies GpuReading;

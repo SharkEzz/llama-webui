@@ -11,13 +11,15 @@ import {
   Option,
   Path,
   Ref,
-  Stream,
+  Scope,
 } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 import { parseDeviceList } from 'llamacpp-js/bench';
 import { expandHome } from '../config/Home.ts';
 import { readCpuInfo } from '../hardware/cpu.ts';
+import { boundedText } from '../process/bounded.ts';
 import { causeMessage, endingOf } from '../process/ending.ts';
+import { closeWithin } from '../process/followed.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { which } from './which.ts';
 
@@ -86,28 +88,40 @@ export class BenchHardware extends Context.Service<
         const paths = yield* Path.Path;
         const platform = Context.make(FileSystem.FileSystem, fs).pipe(Context.add(Path.Path, paths));
 
+        const MAX_OUTPUT = 1024 * 1024;
+
         /** Stdout then stderr of `<binary> <arg>`, killed after `timeout`; fails when it cannot start, fails or crashes. */
         const output = (binary: string, arg: string, timeout: Duration.Input) =>
-          Effect.gen(function* () {
-            const handle = yield* spawner
-              .spawn(ChildProcess.make(binary, [arg], { stdin: 'ignore', killSignal: 'SIGKILL' }))
-              .pipe(Effect.mapError((e): OutputFailure => ({ _tag: 'Spawn', message: causeMessage(e) })));
-            const [out, err, ended] = yield* Effect.all(
-              [
-                Stream.mkString(Stream.decodeText(handle.stdout)).pipe(Effect.orElseSucceed(() => '')),
-                Stream.mkString(Stream.decodeText(handle.stderr)).pipe(Effect.orElseSucceed(() => '')),
-                Effect.result(handle.exitCode),
-              ],
-              { concurrency: 3 },
-            );
-            const { code, signal } = endingOf(ended);
-            if (signal !== null)
-              return yield* Effect.fail<OutputFailure>({ _tag: 'Ended', message: `killed by ${signal}` });
-            if (code !== 0)
-              return yield* Effect.fail<OutputFailure>({ _tag: 'Ended', message: `exited with code ${code ?? '-'}` });
-            return `${out}\n${err}`;
-          }).pipe(
-            Effect.scoped,
+          Effect.acquireUseRelease(
+            Scope.make(),
+            (own) =>
+              Effect.gen(function* () {
+                const handle = yield* spawner
+                  .spawn(ChildProcess.make(binary, [arg], { stdin: 'ignore', killSignal: 'SIGKILL' }))
+                  .pipe(
+                    Scope.provide(own),
+                    Effect.mapError((e): OutputFailure => ({ _tag: 'Spawn', message: causeMessage(e) })),
+                  );
+                const [out, err, ended] = yield* Effect.all(
+                  [
+                    boundedText(handle.stdout, MAX_OUTPUT).pipe(Effect.orElseSucceed(() => '')),
+                    boundedText(handle.stderr, MAX_OUTPUT).pipe(Effect.orElseSucceed(() => '')),
+                    Effect.result(handle.exitCode),
+                  ],
+                  { concurrency: 3 },
+                );
+                const { code, signal } = endingOf(ended);
+                if (signal !== null)
+                  return yield* Effect.fail<OutputFailure>({ _tag: 'Ended', message: `killed by ${signal}` });
+                if (code !== 0)
+                  return yield* Effect.fail<OutputFailure>({
+                    _tag: 'Ended',
+                    message: `exited with code ${code ?? '-'}`,
+                  });
+                return `${out}\n${err}`;
+              }),
+            (own) => closeWithin({ scope: own, name: `${binary} ${arg}` }),
+          ).pipe(
             Effect.timeoutOrElse({
               duration: timeout,
               orElse: () =>

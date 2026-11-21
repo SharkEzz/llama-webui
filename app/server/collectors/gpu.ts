@@ -7,16 +7,19 @@ import { dual, pipe } from 'effect/Function';
  * only identified.
  */
 export interface GpuNeeds {
-  /** PCIe bandwidth (NVML blocks about 50 ms per GPU to read it). */
-  readonly pcie: boolean;
   /** Hidden cards (PCI bus ids): not read. */
   readonly skipGpus: ReadonlyArray<string>;
 }
 
-export const MEASURE_ALL: GpuNeeds = { pcie: true, skipGpus: [] };
+/** Polling cadence and card filter shared by GPU readers and the NVML worker. */
+export interface GpuPollConfig {
+  readonly intervalMs: number;
+  readonly needs: GpuNeeds;
+}
+
+export const MEASURE_ALL: GpuNeeds = { skipGpus: [] };
 
 export const gpuNeeds = (hiddenGpus: ReadonlyArray<string>): GpuNeeds => ({
-  pcie: true,
   skipGpus: hiddenGpus,
 });
 
@@ -107,5 +110,5 @@ export interface NvidiaReader {
   readonly gpus: Effect.Effect<ReadonlyArray<GpuReading>>;
   readonly procVram: (pid: number) => Effect.Effect<ReadonlyMap<string, number>>;
   readonly refreshApps: Effect.Effect<void>;
-  readonly configure: (o: { readonly intervalMs: number; readonly needs: GpuNeeds }) => Effect.Effect<void>;
+  readonly configure: (o: GpuPollConfig) => Effect.Effect<void>;
 }

@@ -17,7 +17,7 @@ import { checkModelPaths } from '../models/allowedPath.ts';
 import type { GgufReader } from '../models/GgufReader.ts';
 import type { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
-import { checkPathForm, loadModel, mmprojBytes } from '../tuning/models.ts';
+import { loadTuningInputs } from '../tuning/inputs.ts';
 import { planSweep } from '../tuning/space.ts';
 import { TuningHardware } from '../tuning/TuningHardware.ts';
 import { WsHub } from '../ws/WsHub.ts';
@@ -122,12 +122,10 @@ export const SweepsHandlers = HttpApiBuilder.group(
      * that keeps no item is a 409, else the sweep and its items are written in one transaction.
      */
     const create = Effect.fn('SweepsHandlers.create')(function* (spec: SweepSpec, stopServer: boolean) {
-      yield* checkPathForm(spec.modelPath);
-      yield* checkModelPaths(spec).pipe(Effect.provideContext(files));
-      const { model, mmproj, hw } = yield* Effect.all(
-        { model: loadModel(spec.modelPath), mmproj: mmprojBytes(spec.mmprojPath), hw: hardware.read },
-        { concurrency: 'unbounded' },
-      ).pipe(Effect.provideContext(files));
+      const { model, mmproj, hw } = yield* loadTuningInputs(spec).pipe(
+        Effect.provideService(TuningHardware, hardware),
+        Effect.provideContext(files),
+      );
       const plan = planSweep({ model, hw, spec, mmprojBytes: mmproj });
       const { modelPath, mmprojPath, profileId, serverArgs, p, n, r } = spec;
       const sweep = yield* runner.startSweep({

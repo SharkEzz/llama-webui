@@ -1,6 +1,6 @@
 import { type Profile, type ProfileInput, ProfileNameTaken, ProfileNotFound, ProfileSource } from '@llama-webui/shared';
 import { Array as Arr, Clock, Context, Effect, Layer, Option, Schema } from 'effect';
-import { SqlClient, SqlSchema } from 'effect/sql';
+import { SqlClient, type SqlError, SqlSchema } from 'effect/sql';
 
 /** A row of `profiles`, its JSON columns decoded. */
 const Row = Schema.Struct({
@@ -145,79 +145,68 @@ export class ProfilesRepo extends Context.Service<
         Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
       );
 
+      const transact = <A, E, R>(effect: Effect.Effect<A, E | SqlError.SqlError | Schema.SchemaError, R>) =>
+        effect.pipe(sql.withTransaction, Effect.catchTag(['SqlError', 'SchemaError'], Effect.die));
+
       // The name is checked in the transaction that writes: two creates of one name do not both pass.
-      const create = Effect.fn('ProfilesRepo.create')(
-        function* (input: ProfileInput) {
+      const create = Effect.fn('ProfilesRepo.create')(function* (input: ProfileInput) {
+        const holder = yield* idOfName(input.name);
+        if (Option.isSome(holder)) return yield* nameTaken(input.name);
+        return yield* insert(input, 'ui');
+      }, transact);
+
+      const update = Effect.fn('ProfilesRepo.update')(function* ({
+        id,
+        input,
+      }: {
+        readonly id: number;
+        readonly input: ProfileInput;
+      }) {
+        yield* byId(id);
+        const holder = yield* idOfName(input.name);
+        if (Option.isSome(holder) && holder.value.id !== id) return yield* nameTaken(input.name);
+        const now = yield* Clock.currentTimeMillis;
+        const values = yield* columns(input);
+        yield* sql`UPDATE profiles SET ${sql.update({ ...values, updated_at: now })} WHERE id = ${id}`;
+        const row = yield* byId(id);
+        return fromRow(row);
+      }, transact);
+
+      const remove = Effect.fn('ProfilesRepo.remove')(function* (id: number) {
+        yield* byId(id);
+        yield* sql`DELETE FROM profiles WHERE id = ${id}`;
+      }, transact);
+
+      const duplicate = Effect.fn('ProfilesRepo.duplicate')(function* (id: number) {
+        const row = yield* byId(id);
+        const source = fromRow(row);
+        /** Whether the `n`th copy's name is taken. */
+        const taken = (n: number) => Effect.map(idOfName(copyName(source.name, n)), Option.isSome);
+        let n = 1;
+        while (yield* taken(n)) n++;
+        const { id: _id, source: from, createdAt: _c, updatedAt: _u, ...input } = source;
+        return yield* insert({ ...input, name: copyName(source.name, n) }, from === 'llama-tui' ? 'import' : from);
+      }, transact);
+
+      const importMany = Effect.fn('ProfilesRepo.importMany')(function* ({
+        inputs,
+        source,
+      }: {
+        readonly inputs: ReadonlyArray<ProfileInput>;
+        readonly source: ProfileSource;
+      }) {
+        const imported: Array<Profile> = [];
+        const skipped: Array<{ readonly name: string; readonly reason: string }> = [];
+        for (const input of inputs) {
           const holder = yield* idOfName(input.name);
-          if (Option.isSome(holder)) return yield* nameTaken(input.name);
-          return yield* insert(input, 'ui');
-        },
-        sql.withTransaction,
-        Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
-      );
-
-      const update = Effect.fn('ProfilesRepo.update')(
-        function* ({ id, input }: { readonly id: number; readonly input: ProfileInput }) {
-          yield* byId(id);
-          const holder = yield* idOfName(input.name);
-          if (Option.isSome(holder) && holder.value.id !== id) return yield* nameTaken(input.name);
-          const now = yield* Clock.currentTimeMillis;
-          const values = yield* columns(input);
-          yield* sql`UPDATE profiles SET ${sql.update({ ...values, updated_at: now })} WHERE id = ${id}`;
-          const row = yield* byId(id);
-          return fromRow(row);
-        },
-        sql.withTransaction,
-        Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
-      );
-
-      const remove = Effect.fn('ProfilesRepo.remove')(
-        function* (id: number) {
-          yield* byId(id);
-          yield* sql`DELETE FROM profiles WHERE id = ${id}`;
-        },
-        sql.withTransaction,
-        Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
-      );
-
-      const duplicate = Effect.fn('ProfilesRepo.duplicate')(
-        function* (id: number) {
-          const row = yield* byId(id);
-          const source = fromRow(row);
-          /** Whether the `n`th copy's name is taken. */
-          const taken = (n: number) => Effect.map(idOfName(copyName(source.name, n)), Option.isSome);
-          let n = 1;
-          while (yield* taken(n)) n++;
-          const { id: _id, source: from, createdAt: _c, updatedAt: _u, ...input } = source;
-          return yield* insert({ ...input, name: copyName(source.name, n) }, from === 'llama-tui' ? 'import' : from);
-        },
-        sql.withTransaction,
-        Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
-      );
-
-      const importMany = Effect.fn('ProfilesRepo.importMany')(
-        function* ({
-          inputs,
-          source,
-        }: {
-          readonly inputs: ReadonlyArray<ProfileInput>;
-          readonly source: ProfileSource;
-        }) {
-          const imported: Array<Profile> = [];
-          const skipped: Array<{ readonly name: string; readonly reason: string }> = [];
-          for (const input of inputs) {
-            const holder = yield* idOfName(input.name);
-            if (Option.isSome(holder)) skipped.push({ name: input.name, reason: 'already exists' });
-            else {
-              const profile = yield* insert(input, source);
-              imported.push(profile);
-            }
+          if (Option.isSome(holder)) skipped.push({ name: input.name, reason: 'already exists' });
+          else {
+            const profile = yield* insert(input, source);
+            imported.push(profile);
           }
-          return { imported, skipped };
-        },
-        sql.withTransaction,
-        Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
-      );
+        }
+        return { imported, skipped };
+      }, transact);
 
       return ProfilesRepo.of({ list, count, get, create, update, remove, duplicate, importMany });
     }),

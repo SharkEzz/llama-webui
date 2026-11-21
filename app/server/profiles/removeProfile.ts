@@ -15,7 +15,7 @@ export const refuseRunning = Effect.fn('refuseRunning')(function* (id: number) {
 
 /**
  * Clears the `defaultProfileId` setting when it names one of `ids`. Called once the profiles are deleted (after the
- * commit of a transaction that deletes them): the settings keep a cache, which a rollback would not undo.
+ * commit of a transaction that deletes them) so a rollback does not clear the setting.
  */
 export const clearDefaultProfile = Effect.fn('clearDefaultProfile')(function* (ids: ReadonlyArray<number>) {
   const settings = yield* SettingsRepo;

@@ -1,9 +1,10 @@
 import { FlagsUnavailable } from '@llama-webui/shared';
-import { Cache, Context, Duration, Effect, Exit, Layer, Path, Stream } from 'effect';
+import { Cache, Context, Duration, Effect, Exit, Layer, Path } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 import type { FlagCatalog } from 'llamacpp-js/flags';
 import { parseHelp } from 'llamacpp-js/flags';
 import { expandHome } from '../config/Home.ts';
+import { boundedText } from '../process/bounded.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 
 /** How long `--help` may run, and how much it may print. */
@@ -32,12 +33,7 @@ export class Flags extends Context.Service<
             const handle = yield* spawner.spawn(
               ChildProcess.make(binary, ['--help'], { stdin: 'ignore', stderr: 'ignore', forceKillAfter: '1 second' }),
             );
-            let size = 0;
-            const capped = Stream.mapEffect(handle.stdout, (chunk) => {
-              size += chunk.length;
-              return size > MAX_OUTPUT ? Effect.fail('more than 16 MiB of output') : Effect.succeed(chunk);
-            });
-            const [text, code] = yield* Effect.all([Stream.mkString(Stream.decodeText(capped)), handle.exitCode], {
+            const [text, code] = yield* Effect.all([boundedText(handle.stdout, MAX_OUTPUT), handle.exitCode], {
               concurrency: 2,
             });
             if (code !== 0) return yield* Effect.fail(`exit code ${code}`);

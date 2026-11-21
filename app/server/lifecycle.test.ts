@@ -13,6 +13,7 @@ import { writeGguf } from './testing/gguf.ts';
 import { startHub } from './testing/hub.ts';
 import { freePort, LAUNCHER, launch, userEnv } from './testing/launch.ts';
 import { FAKE, FAKE_BENCH, startFakeThrough } from './testing/llama.ts';
+import { seedWatchPort } from './testing/seed.ts';
 import { tempDir } from './testing/tempDir.ts';
 import { ofType, openWs } from './testing/ws.ts';
 
@@ -114,6 +115,7 @@ const bare = (home: string, extra: Record<string, string> = {}) => {
 
 test('a variable of .env sets the port, the environment wins over it', async () => {
   const data = dataDir();
+  await seedWatchPort(data, await freePort());
   const fromFile = await freePort();
   writeFileSync(join(data, '.env'), `LLAMA_WEBUI_PORT=${fromFile}\nLLAMA_WEBUI_HOST=127.0.0.1\n`);
   const app = run(['--data-dir', data], data, bare(data));
@@ -133,6 +135,7 @@ test('a variable of .env sets the port, the environment wins over it', async () 
 
 test('--env-override lets .env win over the environment', async () => {
   const data = dataDir();
+  await seedWatchPort(data, await freePort());
   const fromFile = await freePort();
   writeFileSync(join(data, '.env'), `LLAMA_WEBUI_PORT=${fromFile}\nLLAMA_WEBUI_HOST=127.0.0.1\n`);
   const fromEnv = await freePort();

@@ -1,10 +1,9 @@
 import { Api, activeProfileId, ChatSseEvent, type ConversationDetail } from '@llama-webui/shared';
 import { Effect, Option, Path, Schema, Stream } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
-import { homeDir } from '../config/Home.ts';
 import { sseResponse } from '../http/Sse.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
-import { profilePaths } from '../supervisor/command.ts';
+import { resolveProfilePaths } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
 import { type ChatReply, ChatRuns } from './ChatRuns.ts';
 import { ConversationsRepo } from './ConversationsRepo.ts';
@@ -47,8 +46,7 @@ export const ChatHandlers = HttpApiBuilder.group(
     /** A conversation on the profile `id` and its model, as llama-server opens it. */
     const onProfile = Effect.fn('ChatHandlers.onProfile')(function* (id: number) {
       const profile = yield* profiles.get(id);
-      const home = yield* homeDir;
-      const { model } = profilePaths({ profile, home, cwd: path.resolve('.'), path });
+      const { model } = yield* resolveProfilePaths(profile).pipe(Effect.provideService(Path.Path, path));
       return yield* repo.create({ profileId: profile.id, modelPath: model });
     });
 

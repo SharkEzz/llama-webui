@@ -85,7 +85,7 @@ interface ModelDisk {
 }
 
 /** A read that dies gives `fallback`: one broken reader leaves its part of the tick empty, not the whole tick. */
-const orElse =
+const fallbackOnDefect =
   <B>(fallback: B) =>
   <A>(self: Effect.Effect<A>): Effect.Effect<A | B> =>
     Effect.catchDefect(self, () => Effect.succeed(fallback));
@@ -186,7 +186,7 @@ export class Monitor extends Context.Service<
             return Option.getOrNull(found);
           }).pipe(
             Effect.orElseSucceed(() => null),
-            orElse(null),
+            fallbackOnDefect(null),
             Effect.flatMap((found) =>
               Effect.flatMap(Clock.currentTimeMillis, (at) => setModelDisk(id, { disk: found, at, pending: false })),
             ),
@@ -243,14 +243,19 @@ export class Monitor extends Context.Service<
             [
               Option.match(active, {
                 onNone: () => none,
-                onSome: (a) => readLlama(a.target).pipe(Effect.provideContext(context), orElse(null)),
+                onSome: (a) => readLlama(a.target).pipe(Effect.provideContext(context), fallbackOnDefect(null)),
               }),
-              gpusOf(collectors, pid, begun.ticksForPid, settings.hiddenGpus).pipe(orElse([])),
-              pid === null ? none : collectors.proc(pid).pipe(Effect.map(Option.getOrNull), orElse(null)),
-              Option.isSome(active) && Option.isSome(system) ? system.value.memBw.procSample.pipe(orElse(null)) : none,
-              Option.match(system, { onNone: () => none, onSome: (s) => s.sample.pipe(orElse(null)) }),
-              Option.match(system, { onNone: () => none, onSome: (s) => s.memBw.sample.pipe(orElse(null)) }),
-              Option.match(disk, { onNone: () => none, onSome: (d) => d.sample(modelDisk).pipe(orElse(null)) }),
+              gpusOf(collectors, pid, begun.ticksForPid, settings.hiddenGpus).pipe(fallbackOnDefect([])),
+              pid === null ? none : collectors.proc(pid).pipe(Effect.map(Option.getOrNull), fallbackOnDefect(null)),
+              Option.isSome(active) && Option.isSome(system)
+                ? system.value.memBw.procSample.pipe(fallbackOnDefect(null))
+                : none,
+              Option.match(system, { onNone: () => none, onSome: (s) => s.sample.pipe(fallbackOnDefect(null)) }),
+              Option.match(system, { onNone: () => none, onSome: (s) => s.memBw.sample.pipe(fallbackOnDefect(null)) }),
+              Option.match(disk, {
+                onNone: () => none,
+                onSome: (d) => d.sample(modelDisk).pipe(fallbackOnDefect(null)),
+              }),
             ],
             { concurrency: 'unbounded' },
           );

@@ -5,7 +5,7 @@ import type { ChildProcessSpawner } from 'effect/process';
 import { BenchRunner } from '../bench/BenchRunner.ts';
 import { expandHome, type homeDir } from '../config/Home.ts';
 import { LogRing } from '../logs/LogRing.ts';
-import { checkModelPath, checkModelPaths } from '../models/allowedPath.ts';
+import { checkModelPath } from '../models/allowedPath.ts';
 import type { GgufReader } from '../models/GgufReader.ts';
 import { Monitor } from '../monitor/Monitor.ts';
 import type { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
@@ -13,8 +13,9 @@ import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { runChecks, summarize } from './checks.ts';
 import { measureDiskSpeed } from './disk.ts';
 import { estimate } from './estimate.ts';
+import { loadTuningInputs } from './inputs.ts';
 import { retainedBusIds } from './match.ts';
-import { checkPathForm, loadModel, mmprojBytes } from './models.ts';
+import { checkPathForm, loadModel } from './models.ts';
 import { planSweep } from './space.ts';
 import { readSys } from './sysinfo.ts';
 import { TuningHardware } from './TuningHardware.ts';
@@ -107,17 +108,8 @@ export const TuningHandlers = HttpApiBuilder.group(
     });
 
     /** The model, its projector's size and the hardware, read together, once the paths are allowed. */
-    const inputs = Effect.fn('TuningHandlers.inputs')(function* (files: {
-      readonly modelPath: string;
-      readonly mmprojPath?: string | null | undefined;
-    }) {
-      yield* checkPathForm(files.modelPath);
-      yield* checkModelPaths(files);
-      return yield* Effect.all(
-        { model: loadModel(files.modelPath), mmproj: mmprojBytes(files.mmprojPath), hw: hardware.read },
-        { concurrency: 'unbounded' },
-      );
-    });
+    const inputs = (files: { readonly modelPath: string; readonly mmprojPath?: string | null | undefined }) =>
+      loadTuningInputs(files).pipe(Effect.provideService(TuningHardware, hardware));
 
     return handlers
       .handle('checks', ({ query }) => checks(query.model).pipe(Effect.provideContext(services)))

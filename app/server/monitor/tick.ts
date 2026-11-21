@@ -6,7 +6,7 @@ import {
   type Snapshot,
   type SystemSample,
 } from '@llama-webui/shared';
-import { Array as Arr, Option, Record } from 'effect';
+import { Array as Arr, Option } from 'effect';
 import { dual } from 'effect/Function';
 import {
   foldRecent,
@@ -34,7 +34,7 @@ import {
   finiteSystem,
   int,
 } from './finite.ts';
-import type { History } from './History.ts';
+import type { History, HistoryRecorder } from './History.ts';
 
 /** What one tick leaves to the next: the counts and what the rates and the request stats are computed from. */
 export interface TickMemory {
@@ -92,28 +92,7 @@ export interface TickReading {
   readonly memBw: MemBandwidth | null;
 }
 
-/** The points of one tick, pushed into `history` as they are recorded. */
-const recorder = (history: History) => {
-  const points: Record<string, number | null> = {};
-  /** The tick's value of a series (NaN: a gap). */
-  const push = (key: string, v: number) => {
-    history.series(key).push(v);
-    points[key] = Number.isFinite(v) ? v : null;
-  };
-  /** A series starts at its first known value; an existing one gets a gap when the value is unknown. */
-  const known = (key: string, v: number | null | undefined) => {
-    if (v !== null && v !== undefined && Number.isFinite(v)) push(key, v);
-    else if (history.has(key)) push(key, Number.NaN);
-  };
-  /** Every existing series not fed on this tick gets a gap: they all move together, aligned on the times. */
-  const finish = () => {
-    for (const key of history.keys()) if (!Record.has(points, key)) push(key, Number.NaN);
-    return points;
-  };
-  return { push, known, finish };
-};
-
-type Recorder = ReturnType<typeof recorder>;
+type Recorder = HistoryRecorder;
 
 /** The series of every card in the machine, whether the server uses it or not. */
 const pushGpus = (r: Recorder, gpus: ReadonlyArray<GpuSample>) => {
@@ -163,7 +142,7 @@ export const endTick: {
   (memory: TickMemory, history: History, reading: TickReading): { memory: TickMemory; snapshot: Snapshot };
 } = dual(3, (memory: TickMemory, history: History, reading: TickReading) => {
   history.tick(reading.at);
-  const r = recorder(history);
+  const r = history.beginTick();
   pushGpus(r, reading.allGpus);
   const machine = pushMachine(r, reading);
 

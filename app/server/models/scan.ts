@@ -1,11 +1,10 @@
+import { parseGgufShardFilename } from '@huggingface/gguf';
 import type { ModelEntry, ModelSummary } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Number as Num, Option, Order, Path, String as Str } from 'effect';
 import { dual } from 'effect/Function';
 import { GgufReader, stampOf } from './GgufReader.ts';
-import type { ModelInfo } from './gguf.ts';
+import { type ModelInfo, shardName } from './gguf.ts';
 import { ModelCacheRepo } from './ModelCacheRepo.ts';
-
-const SHARD = /^(.*)-(\d{5})-of-(\d{5})\.gguf$/;
 
 /** One model of the folder: its first file, the parts found, the parts missing (relative paths). */
 export interface GgufGroup {
@@ -21,19 +20,19 @@ export const groupGgufFiles = (relPaths: ReadonlyArray<string>): Array<GgufGroup
   const shards = new Map<string, { prefix: string; total: string; parts: Set<number> }>();
   const out: Array<GgufGroup> = [];
   for (const p of relPaths) {
-    const m = Option.fromNullishOr(SHARD.exec(p));
+    const m = Option.fromNullishOr(parseGgufShardFilename(p));
     if (Option.isNone(m)) {
       out.push({ main: p, files: [p], missing: [] });
       continue;
     }
-    const [, prefix = '', part = '', total = ''] = m.value;
+    const { prefix, shard: part, total } = m.value;
     const key = `${prefix}|${total}`;
     const group = shards.get(key) ?? { prefix, total, parts: new Set<number>() };
     shards.set(key, group);
     group.parts.add(Number(part));
   }
   for (const { prefix, total, parts } of shards.values()) {
-    const name = (i: number) => `${prefix}-${Str.padStart(5, '0')(String(i))}-of-${total}.gguf`;
+    const name = (i: number) => shardName({ prefix, part: i, total });
     // `Arr.range` is never empty: a `-of-00000` name has no part, as in the Nitro server.
     const all = Number(total) >= 1 ? Arr.range(1, Number(total)) : [];
     out.push({

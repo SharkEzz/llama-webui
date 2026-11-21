@@ -1,5 +1,6 @@
 import { Array as Arr, Effect, pipe, String as Str } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/http';
+import { withoutTrailingSlash } from '../config/paths.ts';
 
 /** The path of a request target, without its query or fragment. */
 const pathOf = (url: string): string => Arr.headNonEmpty(Str.split(url, /[?#]/));
@@ -21,6 +22,6 @@ export const noTrailingSlash = <E, R>(
     const path = pathOf(request.url);
     if (!Str.startsWith('/')(path) || !Str.endsWith('/')(path)) return yield* route;
     const query = Str.slice(path.length)(request.url);
-    const target = pipe(path, Str.replace(/^\/+/, '/'), Str.replace(/\/+$/, ''));
+    const target = pipe(path, Str.replace(/^\/+/, '/'), withoutTrailingSlash);
     return HttpServerResponse.redirect(`${target}${query}`, { status: 308 });
   });

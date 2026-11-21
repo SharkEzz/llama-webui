@@ -13,7 +13,7 @@
 import { NodeRuntime, NodeServices } from '@effect/platform-node';
 import { type Cause, Clock, Effect, Fiber, Predicate, Queue, Ref, Schema, Stdio, Stream } from 'effect';
 import { Ndjson } from 'effect/encoding';
-import { type GpuNeeds, MEASURE_ALL } from '../gpu.ts';
+import { type GpuPollConfig, MEASURE_ALL } from '../gpu.ts';
 import { FromSampler, ToSampler } from './protocol.ts';
 import { deviceHandles, readNvml } from './read.ts';
 import { openNvml } from './symbols.ts';
@@ -46,11 +46,11 @@ const program = Effect.gen(function* () {
     Effect.forkScoped,
   );
   const send = (message: FromSampler) => Queue.offer(outbox, message);
-  const config = yield* Ref.make<{ readonly intervalMs: number; readonly needs: GpuNeeds }>({
+  const config = yield* Ref.make<GpuPollConfig>({
     intervalMs: 1000,
     needs: MEASURE_ALL,
   });
-  const apply = (command: { readonly intervalMs: number; readonly needs: GpuNeeds }) =>
+  const apply = (command: GpuPollConfig) =>
     Ref.set(config, { intervalMs: Math.max(MIN_INTERVAL_MS, command.intervalMs), needs: command.needs });
   const started = yield* Ref.make(false);
 

@@ -50,3 +50,6 @@ data/
 .claude/*.local.*
 .claude/skills
 .vscode/
+
+# agent tooling
+.serena/
