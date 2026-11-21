@@ -242,24 +242,22 @@ When the change touches `site/`, including its pages, also run `pnpm site:build`
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `master` (or by hand, `workflow_dispatch`, when
-a push did not start it), on Ubuntu with Node.js 26.13 and pnpm:
+a push did not start it), on Ubuntu with Node.js 26.13 and pnpm. Its jobs run in parallel, each on its own runner: the
+run lasts as long as the longest one (a half of the tests), and a lint or type error shows within a minute.
 
-| Step                                         | Command                                              |
-| -------------------------------------------- | ---------------------------------------------------- |
-| Check out the repository, `repos/effect` included | `actions/checkout` with `submodules: recursive` |
-| Install the dependencies (site included)     | `pnpm install --frozen-lockfile`                     |
-| Lint                                         | `pnpm lint`                                          |
-| Type check                                   | `pnpm check`                                         |
-| Tests                                        | `pnpm test`                                          |
-| Build the app                                | `pnpm build`                                         |
-| Smoke-test the build (help, version, UI, WebSocket) | `node scripts/smoke.ts`                       |
-| The same, on the package installed from its tarball | `node scripts/smoke.ts --tarball`             |
-| Build the site                               | `pnpm site:build`                                    |
-| Check the site's links                       | `pnpm --dir site check-links`                        |
+| Job                       | Commands                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------- |
+| Lint, types, llamacpp-js  | `pnpm lint`, `pnpm check`, `pnpm --filter llamacpp-js test`                            |
+| Tests (1/2) and (2/2)     | `pnpm test:unit --shard=1/2` and `--shard=2/2`: each half of the Vitest files, with its own production build |
+| Build and package         | `pnpm build`, `node scripts/smoke.ts` (help, version, UI, WebSocket), `node scripts/smoke.ts --tarball` (the same, on the package installed from its tarball) |
+| Website                   | `pnpm site:build`, `pnpm --dir site check-links`                                      |
+| llamacpp-js on Node 24    | The tests of `packages/llamacpp-js/` on Node.js 24, the lowest version it supports, without any install |
 
-A second job runs the tests of `packages/llamacpp-js/` on Node.js 24, the lowest version it supports, without any
-install. `--frozen-lockfile` fails when the lockfile is out of date: commit `pnpm-lock.yaml` with any dependency
-change.
+Every job but the last installs through `.github/actions/setup` (pnpm, Node.js with the pnpm store cached,
+`pnpm install --frozen-lockfile`, site included). `--frozen-lockfile` fails when the lockfile is out of date: commit
+`pnpm-lock.yaml` with any dependency change. No job checks out `repos/` (submodules): nothing the gate runs reads it.
+Only the build job fetches the whole history, for the version `git describe` gives the build. A new push to a pull
+request cancels its run still going; the runs on `master` all go to their end.
 
 `.github/workflows/site-deploy.yml` publishes `site/dist/` to GitHub Pages: on every push to `master` that changes
 `site/` (or the workflow itself), and when started by hand from the Actions tab (`workflow_dispatch`). A pull request
