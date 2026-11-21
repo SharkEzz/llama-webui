@@ -1,4 +1,6 @@
-# Quality gate for the whole repo (app + website): Biome, type check, tests, website build.
+# Quality gate for the whole repo (app + website): Biome, type check, tests, builds. Parallel jobs: the run lasts as long
+# as its longest one (a test shard), and a lint or type error shows within a minute. Nothing here needs the vendored
+# repositories (repos/, submodules): no job checks them out.
 name: CI
 
 on:
@@ -8,41 +10,66 @@ on:
   # Started by hand (`gh workflow run ci.yml --ref master`) when a push did not trigger it.
   workflow_dispatch:
 
+# A new push to a pull request cancels its run still going; every run on master goes to its end.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  check:
+  lint:
+    name: Lint, types, llamacpp-js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pnpm lint
+      - run: pnpm check
+      - run: pnpm --filter llamacpp-js test
+
+  # `pnpm test:unit` (Vitest) in two halves: the suites wait on processes and sockets, the runner's cores are the limit,
+  # not the longest file. Each half makes its own production build (the server project's globalSetup).
+  test:
+    name: Tests (${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: pnpm test:unit --shard=${{ matrix.shard }}/2
+
+  build:
+    name: Build and package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # tags and history: the build's version comes from `git describe`
-          submodules: recursive
-      # pnpm installs (version from `packageManager`) and runs the gate, on Node.
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 26.13
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm check
-      # Vitest, then llamacpp-js (node --test).
-      - run: pnpm test
+      - uses: ./.github/actions/setup
       # Production build: starts from an empty data directory, serves the production UI and the WebSocket.
       - run: pnpm build
       - run: node scripts/smoke.ts
       # The package as a user installs it: pnpm pack, npm install into an empty prefix, the same checks through its bin.
       - run: node scripts/smoke.ts --tarball
+
+  site:
+    name: Website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
       - run: pnpm site:build
       - run: pnpm --dir site check-links
 
   # llamacpp-js still supports Node >= 24, while the workspace needs Node 26: its tests (no dependencies) run on the
   # lowest supported version too.
   llamacpp-js-node24:
+    name: llamacpp-js on Node 24
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          submodules: recursive
       - uses: actions/setup-node@v7
         with:
           node-version: 24

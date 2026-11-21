@@ -288,8 +288,9 @@ pnpm check
 pnpm test
 ```
 
-CI (`.github/workflows/ci.yml`) runs the same commands, then `pnpm build`, the two smoke tests, the website build and
-its link check, and runs the `llamacpp-js` tests again on Node 24, the package's minimum. Do not disable a Biome rule
+CI (`.github/workflows/ci.yml`) runs the same commands, the tests in two halves, plus `pnpm build`, the two smoke
+tests, the website build and its link check, in parallel jobs, and runs the `llamacpp-js` tests again on Node 24, the
+package's minimum. Do not disable a Biome rule
 or lower it to a warning to get a green run: for a genuine false positive, add a targeted
 `// biome-ignore lint/<group>/<rule>: <reason>` comment. `app/src/components/ui/` (generated shadcn components) is
 ignored by Biome. [Conventions](/developers/contributing/conventions/) has the full rules.

@@ -42,7 +42,14 @@ quickly after a change that does not touch the build.
 | `LLAMA_WEBUI_TEST_BUILD=0 pnpm exec vitest run app/server/lifecycle.test.ts` | One file, on the existing build |
 | `pnpm exec vitest run --project web`               | The tests of one project                             |
 | `pnpm exec vitest run -t 'sweep'`                  | Tests whose name matches the regular expression      |
+| `pnpm exec vitest run --changed`                   | Test files that import a file changed since the last commit |
 | `pnpm exec vitest`                                 | Watch mode: reruns the tests a change affects        |
+
+<Callout type="warning">
+  `--changed` and watch mode follow imports only. The suites that start the production build (contract, lifecycle,
+  build output) and `vite dev` (`app/server/dev.test.ts`) do not import the server: a change to a route or a service
+  does not select them. Use them as a quick loop while working, and run the full `pnpm test` before every commit.
+</Callout>
 
 A test has 5 seconds by default. The tests that start `vite dev` pass a longer timeout as the last argument of
 `test()` (`}, 90_000);` in `app/server/dev.test.ts`); an effect that waits bounds its own wait with `Effect.timeout`.
