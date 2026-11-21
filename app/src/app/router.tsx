@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { AppLayout } from './AppLayout';
 import { MILESTONE_BY_PATH, ROUTES } from './routes';
 
@@ -31,7 +31,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, ...page(() => import('@/features/home/HomePage'), 'HomePage') },
       { path: 'setup', ...page(() => import('@/features/home/HomePage'), 'SetupPage') },
-      { path: 'dashboard', ...page(() => import('@/features/dashboard/DashboardPage'), 'DashboardPage') },
+      { path: 'dashboard', element: <Navigate to="/" replace /> },
       { path: 'server', ...page(() => import('@/features/server/ServerPage'), 'ServerPage') },
       { path: 'profiles', ...page(() => import('@/features/profiles/ProfilesPage'), 'ProfilesPage') },
       { path: 'logs', ...page(() => import('@/features/logs/LogsPage'), 'LogsPage') },

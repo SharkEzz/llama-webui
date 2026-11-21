@@ -47,7 +47,7 @@ const STEPS = [
     'Every combination of the values you list (devices, splits, cache types, -ot patterns) that the estimator says fits, run one after the other with llama-bench. A restart resumes where it stopped.',
   ],
   ['Validate', 'The best candidates run again on a real llama-server.'],
-  ['Keep', 'The winner becomes a profile, ready to start from the launch pad.'],
+  ['Keep', 'The winner becomes a profile, ready to start from the Server page.'],
 ] as const;
 
 const gib = (n: number) => `${n.toFixed(1)} GiB`;

@@ -1,4 +1,4 @@
-import { Boxes, Home, MessageSquare, SlidersHorizontal } from 'lucide-react';
+import { Boxes, MessageSquare, Server, SlidersHorizontal } from 'lucide-react';
 import { Shot } from '@/components/Shot';
 import { BentoCard, FeatureSection, SHOT_FRAME } from '../Bento';
 import { ArgsEditorDemo } from './ArgsEditorDemo';
@@ -11,11 +11,11 @@ export function ProfilesSection() {
       pages={[
         { label: 'Models', icon: Boxes, doc: '/docs/models/' },
         { label: 'Profiles', icon: SlidersHorizontal, doc: '/docs/profiles/' },
-        { label: 'Home', icon: Home, doc: '/docs/home/' },
+        { label: 'Server', icon: Server, doc: '/docs/server/' },
         { label: 'Chat', icon: MessageSquare, doc: '/docs/chat/' },
       ]}
       title="From a GGUF file to a conversation."
-      lede="Download a model from Hugging Face, save how to run it in a profile, start it from Home and chat with it, without leaving the tab."
+      lede="Download a model from Hugging Face, save how to run it in a profile, start llama-server and chat with it, without leaving the tab."
     >
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <BentoCard
@@ -43,19 +43,19 @@ export function ProfilesSection() {
 
         <BentoCard
           tone="rose"
-          title="Start in one click"
+          title="Start and switch llama-server"
           visual={
             <Shot
-              name="launchpad"
-              alt="Launch pad: three profiles with their model, quantization, last benchmark and memory fit, each with a Start or Switch button"
-              crop={{ x: 0.155, y: 0.07, w: 0.445, h: 0.3 }}
+              name="server"
+              alt="Server page: profile selector, Start, Restart and Stop controls, effective llama-server command and live status"
+              crop={{ x: 0.155, y: 0.07, w: 0.835, h: 0.48 }}
               width="min(36rem, 90vw)"
               className={SHOT_FRAME}
             />
           }
         >
-          The launch pad on Home lists every profile with its last benchmark and whether it fits, then starts or
-          switches llama-server.
+          Pick a profile, start, stop or switch llama-server cleanly, and inspect the exact effective command and
+          capabilities reported by /props.
         </BentoCard>
 
         <BentoCard

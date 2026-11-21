@@ -13,7 +13,7 @@ import { BenchStep, BinaryStep, GpuStep, MachineStep, ModelsStep, NetworkStep, P
 
 /**
  * First-run checklist, on one page: two required steps (llama-server, models folder), the rest optional.
- * “Finish” records `onboardingDone`; Home then shows the launch pad.
+ * “Finish” records `onboardingDone`; `/` then shows the Dashboard.
  */
 export function SetupChecklist({
   settings,

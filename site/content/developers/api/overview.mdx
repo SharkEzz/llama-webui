@@ -236,7 +236,7 @@ To add an endpoint, see [How-to guides](/developers/contributing/how-to/).
 | Page                                              | Groups                                            | Endpoints | Paths                                                    |
 | ------------------------------------------------- | ------------------------------------------------- | --------- | -------------------------------------------------------- |
 | [Health and settings](/developers/api/app/)       | `HealthApi`, `SettingsApi`                        | 3         | `/api/health`, `/api/settings`                           |
-| [Setup and launch pad](/developers/api/setup/)    | `SetupApi`                                        | 2         | `/api/setup`, `/api/launchpad`                           |
+| [Setup](/developers/api/setup/)                   | `SetupApi`                                        | 1         | `/api/setup`                                             |
 | [Profiles](/developers/api/profiles/)             | `ProfilesApi`                                     | 9         | `/api/profiles/*`                                        |
 | [Server, state and logs](/developers/api/server/) | `ServerApi`, `FlagsApi`, `LogsApi`                | 9         | `/api/state`, `/api/server/*`, `/api/flags`, `/api/logs` |
 | [Models](/developers/api/models/)                 | `ModelsApi`                                       | 4         | `/api/models`, `/api/models/info`, `/api/models/usage`   |
@@ -263,7 +263,7 @@ To add an endpoint, see [How-to guides](/developers/contributing/how-to/).
   `…Bps` (`readBps`, `diskReadPeakBps`). The exceptions are in MiB and say so: `BenchDevice.totalMib` and
   `BenchDevice.freeMib` (as `llama-bench --list-devices` reports them) and `BenchRun.vramPeak[].mib`.
 - **`null` and absent fields.** A field typed `T | null` is always present, and `null` means unknown, not applicable
-  or not set (`SetupReport.binary.path`, `ServerView.command`, `LaunchpadEntry.fit`). An optional field is left out
+  or not set (`SetupReport.binary.path`, `ServerView.command`, `GpuSample.tempC`). An optional field is left out
   when it has no value, never sent as `null`: the optional fields of a profile (`mmproj`, `cwd`, `host`, `port`),
   `Flag.value` for a switch. A few monitor fields accept both (`GpuSample.fanPct`): missing or `null` both mean
   unknown.

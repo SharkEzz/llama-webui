@@ -7,7 +7,6 @@ import { SqlClient } from 'effect/sql';
 import { TestClock } from 'effect/testing';
 import * as Db from '../db/Db.ts';
 import { MIGRATIONS } from '../db/migrations.ts';
-import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { benchSpec, fresh, NO_HARDWARE, sweepSpec } from '../testing/bench.ts';
 import { BenchRunsRepo, MAX_RUNS, runFilters } from './BenchRunsRepo.ts';
 import { SweepsRepo } from './SweepsRepo.ts';
@@ -38,47 +37,6 @@ describe('BenchRunsRepo', () => {
         assert.strictEqual(run.spec.profileId, null);
       }),
     ),
-  );
-
-  it.effect(
-    'lastOkByProfile: the latest successful one-off run per profile; failures, sweep items and orphans ignored',
-    () =>
-      fresh(
-        Effect.gen(function* () {
-          const runs = yield* BenchRunsRepo;
-          const profiles = yield* ProfilesRepo;
-          const sweeps = yield* SweepsRepo;
-          const a = yield* profiles.create({ name: 'a', model: '/m/a.gguf', args: [], env: {} });
-          const b = yield* profiles.create({ name: 'b', model: '/m/b.gguf', args: [], env: {} });
-          const c = yield* profiles.create({ name: 'c', model: '/m/c.gguf', args: [], env: {} });
-          const run = Effect.fn('run')(function* (profileId: number | null, status: 'ok' | 'failed', tg: number) {
-            yield* TestClock.adjust('1 millis');
-            const r = yield* runs.create({
-              spec: benchSpec({ modelPath: '/m/x.gguf', profileId }),
-              command: 'cmd',
-              hardware: NO_HARDWARE,
-              status: 'running',
-            });
-            return yield* runs.finish(r.id, { status, tg: { tps: tg, stddev: 0, tokens: 128 } });
-          });
-          yield* run(a.id, 'ok', 10);
-          const latestA = yield* run(a.id, 'ok', 20);
-          yield* run(a.id, 'failed', 30);
-          yield* run(b.id, 'failed', 40);
-          yield* run(null, 'ok', 50);
-          const s = yield* sweeps.create(sweepSpec({ modelPath: '/m/c.gguf', profileId: c.id, space: { ncmoe: [0] } }));
-          const [item] = yield* runs.enqueue(s.id, [
-            { spec: benchSpec({ modelPath: '/m/c.gguf', profileId: c.id }), label: '-ncmoe 0', fit: 'fits' },
-          ]);
-          assert(item !== undefined);
-          yield* runs.finish(item.id, { status: 'ok', tg: { tps: 60, stddev: 0, tokens: 128 } });
-
-          const last = yield* runs.lastOkByProfile;
-          assert.deepStrictEqual([...last.keys()], [a.id]);
-          assert.strictEqual(last.get(a.id)?.id, latestA.id);
-          assert.strictEqual(last.get(a.id)?.tg?.tps, 20);
-        }),
-      ),
   );
 
   it.effect("a deleted run's id is never handed out again", () =>

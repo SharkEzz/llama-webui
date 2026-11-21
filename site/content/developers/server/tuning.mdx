@@ -22,7 +22,7 @@ searches for the placement a preset prefers. It also reviews the system settings
 | `app/server/tuning/sysinfo.ts` | `readSys()`: the `/proc`, `/sys` and log readings the checks need |
 | `app/server/tuning/disk.ts` | `measureDiskSpeed()`: sequential read speed of the model's disk |
 | `app/server/tuning/TuningMemo.ts` | `TuningMemo`: the last estimate and disk measurement of each model, for the checks |
-| `app/server/tuning/http.ts`, `setup.ts` | `TuningHandlers`; `SetupHandlers` and `buildLaunchpad` |
+| `app/server/tuning/http.ts`, `setup.ts` | `TuningHandlers` and `SetupHandlers` |
 | `app/server/hardware/CpuInfo.ts`, `cpu.ts` | `CpuInfo` on `readCpuInfo()`: model, cores, threads, flags, NUMA nodes |
 | `app/server/models/GgufReader.ts`, `gguf.ts` | `GgufReader`: GGUF header to `ModelInfo`, cached |
 | `app/server/models/sizes.ts` | `tensorBytes()`, `EXPERTS` |
@@ -331,9 +331,6 @@ some of them fitted in VRAM but needed more RAM than available (`tryParams()` ke
 ### Who calls it
 
 - `POST /api/tuning/estimate` computes an estimate and keeps the last one per model in memory, for the checks.
-- The launch pad (`GET /api/launchpad`, `buildLaunchpad` in `app/server/tuning/setup.ts`) gives each profile a fit badge with the `fit` preset, the
-  profile's own flags pinned (`paramsFromServerArgs()`) and its `-c` (`ctxFromArgs()`). It shows no badge when
-  `llama-bench` lists no device while the Monitor sees GPUs: an estimate without them would be wrong.
 - Sweep planning calls `fitOf()` directly for each item (see [Sweeps](/developers/server/bench/#sweeps)).
 
 ## System checks
@@ -440,8 +437,8 @@ The tests:
 - `memory.test.ts`, `match.test.ts`: the memory formulas, the pairing of devices with monitored cards.
 - `checks.test.ts` and `sysinfo.test.ts`: checks on fixed `SysReadings`, and the readings from fake `/proc` and `/sys`
   folders.
-- `TuningHardware.test.ts`, `reads.test.ts`, `setup.test.ts`: the hardware, `loadModel()` and `mmprojBytes()`, the
-  setup report and the launch pad, as layers on `ServicesTest`.
+- `TuningHardware.test.ts`, `reads.test.ts`, `setup.test.ts`: the hardware, `loadModel()` and `mmprojBytes()`, and the
+  setup report, as layers on `ServicesTest`.
 - `packages/webui-shared/src/setup.test.ts` covers `isSetupCheck()`; `app/server/models/gguf.test.ts` writes real GGUF
   files with `writeGguf()` from `app/server/testing/gguf.ts` to test the reader.
 

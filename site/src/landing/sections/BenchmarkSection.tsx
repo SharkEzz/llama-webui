@@ -89,7 +89,7 @@ export function BenchmarkSection() {
               </div>
             }
           >
-            The flags you measured become a profile in one click, ready for the launch pad.
+            The flags you measured become a profile in one click, ready to start on the Server page.
           </BentoCard>
         </div>
       </div>

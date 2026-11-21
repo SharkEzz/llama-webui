@@ -3,7 +3,6 @@ import {
   Boxes,
   Cpu,
   Gauge,
-  Home,
   type LucideIcon,
   MessageSquare,
   Network,
@@ -22,10 +21,7 @@ import { StateBadge } from './DashboardReplica';
 
 /** Same entries, icons and groups as the app's sidebar (app/src/app/routes.ts); a line separates two groups. */
 const NAV: [string, LucideIcon][][] = [
-  [
-    ['Home', Home],
-    ['Dashboard', Activity],
-  ],
+  [['Dashboard', Activity]],
   [
     ['Models', Boxes],
     ['Profiles', SlidersHorizontal],
@@ -75,7 +71,7 @@ export function AppWindow({ children }: { children: React.ReactNode }) {
     <div className="@container overflow-hidden rounded-xl bg-[radial-gradient(ellipse_at_top,var(--page-from),var(--page-to))] ring-1 ring-surface-border">
       <div className="flex h-10 items-center border-b border-border px-4">
         <span className="mx-auto rounded-md bg-muted px-16 py-1 text-xs text-muted-foreground @max-xl:px-6">
-          127.0.0.1:7860/dashboard
+          127.0.0.1:7860/
         </span>
       </div>
       <div className="flex">

@@ -1,6 +1,5 @@
 import { Schema } from 'effect';
 import { BenchDevice } from './bench.ts';
-import { FitVerdict } from './tuning.ts';
 
 const Listen = Schema.Struct({
   host: Schema.String,
@@ -47,32 +46,6 @@ export const SetupReport = Schema.Struct({
   ready: Schema.Boolean,
 });
 export type SetupReport = typeof SetupReport.Type;
-
-/** One card of the launch pad. */
-export const LaunchpadEntry = Schema.Struct({
-  profileId: Schema.Int,
-  name: Schema.String,
-  /** Absolute model path, null when the profile cannot be resolved. */
-  modelPath: Schema.NullOr(Schema.String),
-  model: Schema.NullOr(Schema.Struct({ name: Schema.String, quant: Schema.String, fileBytes: Schema.Finite })),
-  modelError: Schema.NullOr(Schema.String),
-  /** Latest successful benchmark run of this profile. */
-  lastBench: Schema.NullOr(
-    Schema.Struct({ ppTps: Schema.NullOr(Schema.Finite), tgTps: Schema.NullOr(Schema.Finite), at: Schema.Int }),
-  ),
-  /** Memory estimate with the profile's own args. */
-  fit: Schema.NullOr(
-    Schema.Struct({
-      verdict: FitVerdict,
-      reason: Schema.NullOr(Schema.String),
-      /** Planned on the GPUs, all cards together. */
-      vramBytes: Schema.Finite,
-      /** Left in system RAM (CPU layers, offloaded experts). */
-      ramBytes: Schema.Finite,
-    }),
-  ),
-});
-export type LaunchpadEntry = typeof LaunchpadEntry.Type;
 
 const LOOPBACK = /^(127\.|::1$|localhost$|\[::1\]$)/;
 

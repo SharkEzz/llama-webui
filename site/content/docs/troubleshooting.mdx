@@ -32,7 +32,7 @@ If the crash message is instead `spawn setpriv ENOENT`, install `util-linux`, wh
 
 **What you see:** the **llama-bench** step of the setup checklist says the binary `is missing or lists no device`. The
 **Hardware** card on the Tuning page says `No devices: check the binary in Settings.`, and the Benchmark form says
-`No devices read (llama-bench not found?): the choice stays automatic.` Launch pad cards have no memory fit badge.
+`No devices read (llama-bench not found?): the choice stays automatic.`
 
 **Cause:** llama-webui looks for `llama-bench` in the same folder as `llama-server` and reads the device list from
 `llama-bench --list-devices`. Without it, benchmarks and sweeps cannot run and Tuning does not know your GPUs.
@@ -130,7 +130,7 @@ No restart is needed: after a failure, llama-webui tries `perf` again every minu
 ### Another server is on the port
 
 **What you see:** the server status reads **External**, with a PID when llama-webui could find one. The Server page says
-`A llama-server started outside llama-webui is using port 8080`, **Start** is disabled on the launch pad, and starting
+`A llama-server started outside llama-webui is using port 8080`, and starting
 a profile fails with `port in use by an external server (PID …)`. A benchmark refuses to start with
 `An external llama-server is running on port 8080: stop it first`.
 
@@ -150,7 +150,7 @@ the profile.
 ### The server crashes right after Start
 
 **What you see:** the status goes from **Starting…** to **Crashed**. The **Exit** row of the [Server](/docs/server/)
-page, and the profile's card on the launch pad, give the reason, the exit code or the signal.
+page gives the reason, the exit code or the signal.
 
 **Cause and fix**, by message:
 
@@ -164,8 +164,7 @@ page, and the profile's card on the launch pad, give the reason, the exit code o
 A flag that your build does not know is a common cause after a llama.cpp update: flag names change between versions.
 The argument editor of a profile only suggests the flags your binary lists in its `--help`.
 
-A profile whose model file cannot be read shows the error in red on its launch pad card, in place of the model name,
-and its **Start** button is disabled.
+A profile whose model file cannot be read fails to start with the error on the [Server](/docs/server/) page.
 
 ### Out of memory while loading
 
@@ -217,8 +216,7 @@ usually end this way. **Delete failed** clears the failed runs from the history.
 
 ### A model does not fit
 
-**What you see:** the Tuning recommendation shows a **Does not fit** alert with a reason, or a launch pad card shows a
-**Does not fit** badge. Hover the badge for the estimate.
+**What you see:** the Tuning recommendation shows a **Does not fit** alert with a reason.
 
 **Cause:** the estimate places the model, its KV cache and its buffers on the devices, and finds a device over its
 usable memory: its total minus a margin of 512 MiB plus 4 %. The reason names the problem:
@@ -230,10 +228,9 @@ usable memory: its total minus a margin of 512 MiB plus 4 %. The reason names th
 | `not enough RAM: … needed with weights in RAM, … available` | The model is too large for the GPUs, and moving experts or layers to RAM needs more RAM than is available: free RAM, or pick **100 GB model**, which accepts reading the rest from disk. |
 | `model too large: … of RAM needed, … available` | Nothing fits on the GPUs and the RAM is too small as well.                                   |
 
-The launch pad estimates each profile with its own flags and context. **Tight in VRAM** means less than 5 % headroom
-on a card: it should start, but the margin is thin. A placement that runs over the RAM is also only tight, not a
-failure: what does not fit is read back from the disk, slowly. In the Hugging Face sheet, **Partial offload** only
-means the file is larger than your VRAM: part of the model will stay in RAM.
+**Tight in VRAM** means less than 5 % headroom on a card: it should start, but the margin is thin. A placement that runs
+over the RAM is also only tight, not a failure: what does not fit is read back from the disk, slowly. In the Hugging
+Face sheet, **Partial offload** only means the file is larger than your VRAM: part of the model will stay in RAM.
 
 **Fix:** on the [Tuning](/docs/tuning/) page, pick **Make the model fit**, or **100 GB model** for a large MoE model,
 and create a profile from the result. Otherwise use a smaller quantization. For `unknown device`, check the device

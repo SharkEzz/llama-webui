@@ -1,23 +1,14 @@
 import { NodeServices } from '@effect/platform-node';
-import { assert, describe, layer } from '@effect/vitest';
-import { type GpuSample, LaunchpadEntry, SetupReport, type Snapshot } from '@llama-webui/shared';
+import { assert, layer } from '@effect/vitest';
+import { SetupReport } from '@llama-webui/shared';
 import { Array as Arr, ConfigProvider, Context, Effect, FileSystem, Layer, Path, Schema } from 'effect';
 import { HttpClient } from 'effect/http';
-import { BenchHardware } from '../bench/BenchHardware.ts';
-import { BenchRunsRepo } from '../bench/BenchRunsRepo.ts';
-import * as Db from '../db/Db.ts';
-import { CpuInfo } from '../hardware/CpuInfo.ts';
 import { ApiRoutes, serve } from '../http/HttpLive.ts';
-import { GgufReader } from '../models/GgufReader.ts';
 import { Monitor } from '../monitor/Monitor.ts';
-import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
-import { benchSpec, NO_HARDWARE } from '../testing/bench.ts';
 import { type KvValue, writeGguf } from '../testing/gguf.ts';
 import { ServerTest } from '../testing/http.ts';
 import { ServicesTest } from '../testing/services.ts';
-import { buildLaunchpad } from './setup.ts';
-import { TuningHardware } from './TuningHardware.ts';
 
 /** The home of the test (`HOME`, and `~/bin` the whole `PATH`): nothing of the user's is found or run. */
 class Home extends Context.Service<Home, string>()('@llama-webui/app/server/tuning/setup.test/Home') {}
@@ -194,128 +185,4 @@ layer(served, { excludeTestServices: true, buildPerTest: true })('GET /api/setup
       assert.isTrue(telemetry.perfParanoid === null || Number.isInteger(telemetry.perfParanoid));
     }),
   );
-
-  it.effect(
-    'the launchpad gives each profile its model, fit and last bench; an unreadable model only sets modelError',
-    () =>
-      Effect.gen(function* () {
-        const home = yield* Home;
-        yield* patch({ binary: `${home}/bin/llama-server` });
-        const bytes = yield* writeModel(`${home}/models/a.gguf`, 'A');
-        const profiles = yield* ProfilesRepo;
-        const one = yield* profiles.create({
-          name: 'one',
-          model: '~/models/a.gguf',
-          args: ['-ngl', '99', '-c', '2048'],
-          env: {},
-        });
-        const two = yield* profiles.create({ name: 'two', model: '~/models/gone.gguf', args: [], env: {} });
-        const runs = yield* BenchRunsRepo;
-        const run = yield* runs.create({
-          spec: benchSpec({ profileId: one.id }),
-          command: 'llama-bench',
-          hardware: NO_HARDWARE,
-          status: 'running',
-        });
-        const done = yield* runs.finish(run.id, { status: 'ok', pp: { tps: 900, stddev: 9, tokens: 512 } });
-
-        const client = yield* HttpClient.HttpClient;
-        const res = yield* client.get('/api/launchpad');
-        assert.strictEqual(res.status, 200);
-        const json = yield* res.json;
-        const entries = yield* Schema.decodeUnknownEffect(Schema.Array(LaunchpadEntry))(json);
-        const [first, second] = entries;
-        assert.deepInclude(first, {
-          profileId: one.id,
-          name: 'one',
-          modelPath: `${home}/models/a.gguf`,
-          model: { name: 'A', quant: first?.model?.quant ?? '', fileBytes: bytes },
-          modelError: null,
-          lastBench: { ppTps: 900, tgTps: null, at: done.createdAt },
-        });
-        // No GPU anywhere: the estimate plans on the CPU, and gives its verdict.
-        assert.isNotNull(first?.fit);
-        assert.deepStrictEqual(second, {
-          profileId: two.id,
-          name: 'two',
-          modelPath: `${home}/models/gone.gguf`,
-          model: null,
-          modelError: 'Model not found',
-          lastBench: null,
-          fit: null,
-        });
-      }),
-  );
-});
-
-const MiB = 1024 ** 2;
-const GiB = 1024 ** 3;
-
-const GPU: GpuSample = {
-  key: 'nvidia:a',
-  vendor: 'nvidia',
-  name: 'NVIDIA GeForce RTX 5070 Ti',
-  busId: '0000:01:00.0',
-  utilPct: 0,
-  vramUsedBytes: GiB,
-  vramTotalBytes: 15933 * MiB,
-  tempC: null,
-  powerW: null,
-  procVramBytes: 0,
-};
-
-/** The stub monitor, with a last tick that sees `GPU`. */
-const monitorWithGpu = Layer.effect(
-  Monitor,
-  Effect.map(Monitor, (stub) =>
-    Monitor.of({
-      ...stub,
-      latest: Effect.succeed<Snapshot>({
-        at: 0,
-        tick: 1,
-        health: null,
-        rates: { genTps: 0, ppTps: 0 },
-        slots: null,
-        kv: null,
-        queue: null,
-        lastRequest: null,
-        spec: null,
-        recentRequests: [],
-        gpus: [],
-        allGpus: [GPU],
-        proc: null,
-        system: null,
-        disk: null,
-        points: {},
-        history: { intervalMs: 1000, capacity: 0 },
-      }),
-    }),
-  ),
-).pipe(Layer.provide(Monitor.layerStub));
-
-/** The launchpad's services on a new database, the monitor seeing a GPU, HOME the test's. */
-const launchpadLayer = TuningHardware.layer.pipe(
-  Layer.provideMerge(Layer.mergeAll(BenchHardware.layer, monitorWithGpu, GgufReader.layer)),
-  Layer.provideMerge(Layer.mergeAll(SettingsRepo.layer, ProfilesRepo.layer, BenchRunsRepo.layer, CpuInfo.layer)),
-  Layer.provideMerge(Db.layerAt(':memory:')),
-  Layer.provideMerge(homeConfig),
-  Layer.provideMerge(NodeServices.layer),
-);
-
-describe('buildLaunchpad', () => {
-  layer(launchpadLayer, { excludeTestServices: true })('on a machine with a GPU', (it) => {
-    it.effect('the fit is dropped when llama-bench sees no device but the monitor sees GPUs', () =>
-      Effect.gen(function* () {
-        const home = yield* Home;
-        yield* patch({ binary: `${home}/bin/llama-server` });
-        yield* writeModel(`${home}/models/a.gguf`, 'A');
-        const profiles = yield* ProfilesRepo;
-        yield* profiles.create({ name: 'one', model: `${home}/models/a.gguf`, args: [], env: {} });
-        const [entry] = yield* buildLaunchpad;
-        assert.strictEqual(entry?.modelError, null);
-        assert.strictEqual(entry?.model?.name, 'A');
-        assert.isNull(entry?.fit);
-      }),
-    );
-  });
 });

@@ -452,7 +452,6 @@ export function cases(ctx: { base: string; asset: string } & Fixtures): Case[] {
   );
   add('refusal', 'POST /api/sweeps (outside the models folder)', json('POST', '/api/sweeps', sweep(ctx.outside)));
   add('read', 'GET /api/setup', bare('GET', '/api/setup'), { machine: true });
-  add('read', 'GET /api/launchpad', bare('GET', '/api/launchpad'), { machine: true });
 
   // The Hub: no token, offline (every call to the Hub fails before it leaves: `fetch failed`).
   add('read', 'GET /api/hf/status', bare('GET', '/api/hf/status'));
