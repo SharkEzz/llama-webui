@@ -18,6 +18,7 @@ import {
   Fiber,
   type FileSystem,
   Layer,
+  Metric,
   Option,
   Path,
   Predicate,
@@ -35,6 +36,7 @@ import type { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { readLlama, type Target } from '../llama/probes.ts';
 import { closeWithin } from '../process/followed.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
+import { MonitorMetrics } from '../runtime/Metrics.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { profilePaths } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
@@ -84,11 +86,14 @@ interface ModelDisk {
   readonly pending: boolean;
 }
 
-/** A read that dies gives `fallback`: one broken reader leaves its part of the tick empty, not the whole tick. */
+/**
+ * A read that dies gives `fallback`: one broken reader leaves its part of the tick empty, not the whole tick. The
+ * death is counted by `reader`.
+ */
 const fallbackOnDefect =
-  <B>(fallback: B) =>
+  <B>(reader: string, fallback: B) =>
   <A>(self: Effect.Effect<A>): Effect.Effect<A | B> =>
-    Effect.catchDefect(self, () => Effect.succeed(fallback));
+    Effect.catchDefect(self, () => Effect.as(Metric.update(MonitorMetrics.readerDefects, reader), fallback));
 
 /**
  * The monitoring: one tick every `pollIntervalMs`, whether clients are connected or not. A tick reads llama-server,
@@ -186,7 +191,7 @@ export class Monitor extends Context.Service<
             return Option.getOrNull(found);
           }).pipe(
             Effect.orElseSucceed(() => null),
-            fallbackOnDefect(null),
+            fallbackOnDefect('modelDisk', null),
             Effect.flatMap((found) =>
               Effect.flatMap(Clock.currentTimeMillis, (at) => setModelDisk(id, { disk: found, at, pending: false })),
             ),
@@ -243,18 +248,27 @@ export class Monitor extends Context.Service<
             [
               Option.match(active, {
                 onNone: () => none,
-                onSome: (a) => readLlama(a.target).pipe(Effect.provideContext(context), fallbackOnDefect(null)),
+                onSome: (a) =>
+                  readLlama(a.target).pipe(Effect.provideContext(context), fallbackOnDefect('llama', null)),
               }),
-              gpusOf(collectors, pid, begun.ticksForPid, settings.hiddenGpus).pipe(fallbackOnDefect([])),
-              pid === null ? none : collectors.proc(pid).pipe(Effect.map(Option.getOrNull), fallbackOnDefect(null)),
+              gpusOf(collectors, pid, begun.ticksForPid, settings.hiddenGpus).pipe(fallbackOnDefect('gpus', [])),
+              pid === null
+                ? none
+                : collectors.proc(pid).pipe(Effect.map(Option.getOrNull), fallbackOnDefect('proc', null)),
               Option.isSome(active) && Option.isSome(system)
-                ? system.value.memBw.procSample.pipe(fallbackOnDefect(null))
+                ? system.value.memBw.procSample.pipe(fallbackOnDefect('procMemBw', null))
                 : none,
-              Option.match(system, { onNone: () => none, onSome: (s) => s.sample.pipe(fallbackOnDefect(null)) }),
-              Option.match(system, { onNone: () => none, onSome: (s) => s.memBw.sample.pipe(fallbackOnDefect(null)) }),
+              Option.match(system, {
+                onNone: () => none,
+                onSome: (s) => s.sample.pipe(fallbackOnDefect('system', null)),
+              }),
+              Option.match(system, {
+                onNone: () => none,
+                onSome: (s) => s.memBw.sample.pipe(fallbackOnDefect('memBw', null)),
+              }),
               Option.match(disk, {
                 onNone: () => none,
-                onSome: (d) => d.sample(modelDisk).pipe(fallbackOnDefect(null)),
+                onSome: (d) => d.sample(modelDisk).pipe(fallbackOnDefect('disk', null)),
               }),
             ],
             { concurrency: 'unbounded' },
@@ -295,10 +309,16 @@ export class Monitor extends Context.Service<
         const round = Effect.fnUntraced(function* (collectors: Collectors['Service']) {
           const startedAt = yield* Clock.currentTimeMillis;
           yield* tick(collectors).pipe(
+            Effect.trackDuration(MonitorMetrics.tick),
             Effect.catchCauseIf(Predicate.not(Cause.hasInterruptsOnly), (cause) =>
-              Effect.logError('monitoring tick', cause),
+              Effect.logError('monitoring tick', cause).pipe(
+                Effect.andThen(Metric.update(MonitorMetrics.tickFailed, 1)),
+              ),
             ),
           );
+          const endedAt = yield* Clock.currentTimeMillis;
+          const { settings } = yield* Ref.get(held);
+          if (endedAt - startedAt > settings.pollIntervalMs) yield* Metric.update(MonitorMetrics.overrun, 1);
           yield* waitAfter(startedAt);
         });
 

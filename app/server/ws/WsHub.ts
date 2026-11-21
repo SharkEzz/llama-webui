@@ -6,6 +6,7 @@ import {
   type Duration,
   Effect,
   Layer,
+  Metric,
   PubSub,
   Ref,
   Schedule,
@@ -16,6 +17,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { Socket } from 'effect/socket';
 import { AppInfo } from '../config/AppInfo.ts';
 import { Guarded } from '../http/Guard.ts';
+import { WsMetrics } from '../runtime/Metrics.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 
 /** Pings a client may leave unanswered: at the next tick it is closed with 4000 `heartbeat`. */
@@ -84,20 +86,29 @@ export class WsHub extends Context.Service<
               encode(message).pipe(
                 Effect.matchEffect({
                   onFailure: (error) => Effect.logError(`a ${message.type} message does not encode: not sent`, error),
-                  onSuccess: (text) => Effect.ignore(write(text)),
+                  onSuccess: (text) =>
+                    Effect.ignore(write(text)).pipe(
+                      Effect.andThen(Metric.update(WsMetrics.sent, 1)),
+                      Effect.andThen(Metric.update(WsMetrics.sentBytes, text.length)),
+                    ),
                 }),
               );
             // Subscribed before it is counted: a flush that waits for this client finds `Flush` in its queue.
             const messages = yield* PubSub.subscribe(pubsub);
             const flushed = yield* Deferred.make<void>();
             yield* Effect.acquireRelease(
-              Ref.update(clients, (set) => new Set(set).add(flushed)),
+              Ref.updateAndGet(clients, (set) => new Set(set).add(flushed)).pipe(
+                Effect.flatMap((set) => Metric.update(WsMetrics.clients, set.size)),
+              ),
               () =>
-                Ref.update(clients, (set) => {
+                Ref.updateAndGet(clients, (set) => {
                   const rest = new Set(set);
                   rest.delete(flushed);
                   return rest;
-                }).pipe(Effect.andThen(Deferred.succeed(flushed, undefined))),
+                }).pipe(
+                  Effect.flatMap((set) => Metric.update(WsMetrics.clients, set.size)),
+                  Effect.andThen(Deferred.succeed(flushed, undefined)),
+                ),
             );
 
             const serverTime = yield* Clock.currentTimeMillis;
@@ -113,6 +124,7 @@ export class WsHub extends Context.Service<
             const tick = Effect.gen(function* () {
               const unanswered = yield* Ref.getAndUpdate(missed, (n) => n + 1);
               if (unanswered < MAX_MISSED) return yield* send({ type: 'ping' });
+              yield* Metric.update(WsMetrics.heartbeatClosed, 1);
               yield* write(new Socket.CloseEvent(4000, 'heartbeat')).pipe(Effect.ignore);
             });
             yield* tick.pipe(
@@ -137,7 +149,12 @@ export class WsHub extends Context.Service<
         );
 
         return {
-          publish: Effect.fn((message) => PubSub.publish(pubsub, message).pipe(Effect.asVoid)),
+          publish: Effect.fn((message) =>
+            Metric.update(WsMetrics.published, message.type).pipe(
+              Effect.andThen(PubSub.publish(pubsub, message)),
+              Effect.asVoid,
+            ),
+          ),
           size: Ref.get(clients).pipe(Effect.map((set) => set.size)),
           attach,
         };

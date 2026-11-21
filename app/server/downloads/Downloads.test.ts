@@ -11,6 +11,7 @@ import {
   FileSystem,
   Layer,
   Logger,
+  Metric,
   Option,
   Path,
   Queue,
@@ -21,6 +22,7 @@ import {
 } from 'effect';
 import { SqlClient } from 'effect/sql';
 import type { NewDownload } from '../hf/repo.ts';
+import { DownloadMetrics } from '../runtime/Metrics.ts';
 import { ServicesWithoutQueue } from '../testing/services.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { Downloads } from './Downloads.ts';
@@ -394,6 +396,30 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Downloads', (it)
         yield* reaches(item.id, 'canceled');
       }),
     ),
+  );
+
+  it.effect('an item that ends is counted by its status, and timed', () =>
+    withQueue(
+      Effect.gen(function* () {
+        const downloads = yield* Downloads;
+        const transfers = yield* Transfers;
+        const [m, n] = yield* downloads.enqueue([yield* input('m.gguf'), yield* input('n.gguf')]);
+        if (m === undefined || n === undefined) return assert.fail('no items');
+        yield* transfers.release(m.id);
+        yield* reaches(m.id, 'done');
+        // Canceled while it runs.
+        yield* transfers.release(n.id, hang(1000));
+        yield* eventually(exists('n.gguf.part'));
+        yield* downloads.remove(n.id);
+        yield* reaches(n.id, 'canceled');
+        const done = Metric.withAttributes(DownloadMetrics.items, { status: 'done' });
+        const canceled = Metric.withAttributes(DownloadMetrics.items, { status: 'canceled' });
+        assert.strictEqual((yield* Metric.value(done)).count, 1);
+        assert.strictEqual((yield* Metric.value(canceled)).count, 1);
+        assert.strictEqual((yield* Metric.value(DownloadMetrics.duration)).count, 2);
+        assert.strictEqual((yield* Metric.value(DownloadMetrics.bps)).value, 0);
+      }),
+    ).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
   );
 
   it.effect('remove and clear finished items', () =>

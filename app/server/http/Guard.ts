@@ -1,6 +1,7 @@
 import { RequestRefused } from '@llama-webui/shared';
-import { Array as Arr, Effect, String as Str } from 'effect';
+import { Array as Arr, Effect, Metric, String as Str } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
+import { HttpMetrics } from '../runtime/Metrics.ts';
 import { noTrailingSlash } from './TrailingSlash.ts';
 
 /** A request as the guard reads it: its method, and its headers with lower-case names (Node's). */
@@ -69,13 +70,16 @@ const guard = <E, R>(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const verdict = refusal(request);
     if (verdict === undefined) return yield* route;
+    const upgrade = request.headers.upgrade !== undefined;
+    yield* Metric.update(
+      Metric.withAttributes(HttpMetrics.refused, { status: `${verdict.status}`, upgrade: `${upgrade}` }),
+      1,
+    );
     const response = yield* encodeRefusal(RequestRefused.make({ message: verdict.message }), {
       status: verdict.status,
     }).pipe(Effect.orDie);
     // An upgrade refused: the socket is not left open for another request.
-    return request.headers.upgrade === undefined
-      ? response
-      : HttpServerResponse.setHeader(response, 'connection', 'close');
+    return !upgrade ? response : HttpServerResponse.setHeader(response, 'connection', 'close');
   });
 
 /**

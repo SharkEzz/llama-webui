@@ -11,6 +11,7 @@ import {
   Fiber,
   FileSystem,
   Layer,
+  Metric,
   Option,
   type Path,
   Ref,
@@ -23,6 +24,7 @@ import type { ChildProcessSpawner } from 'effect/process';
 import { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { isAlive } from '../llama/procScan.ts';
 import { LogRing } from '../logs/LogRing.ts';
+import { LlamaMetrics } from '../runtime/Metrics.ts';
 import { FAKE, fakeOutside, freePort, httpStub, killFromOutside, ownVariable } from '../testing/llama.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { type BuiltCommand, buildCommand } from './command.ts';
@@ -272,6 +274,27 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
           ]);
         }),
       ),
+  );
+
+  it.effect('a start and a stop are measured: the states entered, the time to ready, the time to stop', () =>
+    fresh()(
+      Effect.gen(function* () {
+        const supervisor = yield* Supervisor;
+        yield* startFake();
+        yield* stateWhen(kindIs('ready'));
+        assert.strictEqual((yield* Metric.value(LlamaMetrics.ready)).value, 1);
+        yield* supervisor.stop;
+        const entered = yield* Metric.value(LlamaMetrics.transitions);
+        assert.deepStrictEqual(
+          Arr.map(['starting', 'ready', 'stopping', 'idle'], (kind) => entered.occurrences.get(kind)),
+          [1, 1, 1, 1],
+        );
+        assert.strictEqual((yield* Metric.value(LlamaMetrics.ready)).value, 0);
+        assert.strictEqual((yield* Metric.value(LlamaMetrics.startup)).count, 1);
+        assert.strictEqual((yield* Metric.value(LlamaMetrics.stop)).count, 1);
+        assert.strictEqual((yield* Metric.value(LlamaMetrics.sigkill)).count, 0);
+      }),
+    ).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
   );
 
   it.effect('stop: stopping, then idle; the ring ends with "llama-server exited (code 0)"; the process is gone', () =>

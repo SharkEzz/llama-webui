@@ -6,6 +6,7 @@ import {
   Duration,
   Effect,
   FileSystem,
+  Metric,
   Option,
   Path,
   type PlatformError,
@@ -22,6 +23,7 @@ import { type HubError, hubError, reasonOf } from '../hf/HfClient.ts';
 import { HfHttp } from '../hf/HfHttp.ts';
 import { fileDest, partPath, sizeOf } from '../hf/paths.ts';
 import { hfEndpoint, hfToken, hubHeaders } from '../hf/token.ts';
+import { DownloadMetrics } from '../runtime/Metrics.ts';
 import { DownloadsRepo, doneBytes } from './DownloadsRepo.ts';
 import { type Sha256, sha256 } from './hash.ts';
 
@@ -248,6 +250,7 @@ export const transferWith = (options: {
               yield* remove(part);
               return yield* Retryable.make({ message: `${file.path}: unexpected range in the response` });
             }
+            yield* Metric.update(DownloadMetrics.resumed, 1);
           } else if (offset > 0) {
             // The server ignored the Range header: from zero.
             start = 0;
@@ -271,6 +274,7 @@ export const transferWith = (options: {
                   hash.value.bytes += chunk.byteLength;
                 }
                 written += chunk.byteLength;
+                yield* Metric.update(DownloadMetrics.bytes, chunk.byteLength);
                 yield* Ref.set(progressed, true);
                 yield* downloading(file, base + written, true);
               }),
@@ -342,6 +346,7 @@ export const transferWith = (options: {
             return yield* TransferFailed.make({ message, code: 'hf-unreachable', status: 502 });
           }
           yield* Effect.logWarning(`[llama-webui] download ${item.repo}/${file.path}: ${message}, retrying`);
+          yield* Metric.update(DownloadMetrics.retries, 1);
           const now = yield* Clock.currentTimeMillis;
           const dest = yield* Effect.orDie(fileDest(item.dir, file.path));
           const part = yield* sizeAt(partPath(dest));

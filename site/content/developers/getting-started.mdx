@@ -99,8 +99,10 @@ expansion. Two habits keep development away from your everyday instance:
 A save of server code stops the `llama-server` that `pnpm dev` manages, and a running sweep ends as `interrupted`
 (Resume button). Edit the server between benchmarks rather than during one; the web app can be edited at any time.
 
-In development, the server also sends its spans to the [Effect DevTools](https://effect.website/docs/getting-started/devtools/)
-when they listen (`LLAMA_WEBUI_DEVTOOLS_URL`, `ws://localhost:34437` by default).
+In development, the server also sends its spans and its metrics to the
+[Effect DevTools](https://effect.website/docs/getting-started/devtools/) when they listen (`LLAMA_WEBUI_DEVTOOLS_URL`,
+`ws://localhost:34437` by default): start them, then save a server file to connect. The metrics are listed in
+[Architecture](/developers/architecture/#metrics).
 
 ### The package
 

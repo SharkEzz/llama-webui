@@ -166,9 +166,10 @@ one). A server that still accepts nothing after 10 seconds is logged
 `app/vite.config.ts` applies `.env` the way `main.ts` does, before it reads the address, and the server inherits the
 result. No other environment file is read.
 
-In development, the server sends its spans to the [Effect DevTools](https://effect.website/docs/getting-started/devtools/)
-when they listen, at `LLAMA_WEBUI_DEVTOOLS_URL` (`ws://localhost:34437` by default); it says in the terminal whether it
-connected. A build never connects to them.
+In development, the server sends its spans and its metrics to the
+[Effect DevTools](https://effect.website/docs/getting-started/devtools/) when they listen, at `LLAMA_WEBUI_DEVTOOLS_URL`
+(`ws://localhost:34437` by default); it says in the terminal whether it connected. A build never connects to them
+([Metrics](#metrics)).
 
 ### Production
 
@@ -280,3 +281,22 @@ A save under `app/src/` is a hot module replacement of the UI and leaves the ser
 
 Stopping Vite (Ctrl+C, `SIGTERM`, or the terminal closed) sends the server `SIGTERM` and waits for it, so an open
 page gets its `1001` and `llama-server` stops; a second Ctrl+C kills the server and exits at once.
+
+## Metrics
+
+The metrics of the server are declared in `app/server/runtime/Metrics.ts`, each named `llama_webui_<domain>_<what>`
+with its description; the DevTools show them in their Metrics panel, refreshed while they are connected. They are
+recorded in production too (an update is a write to a map in memory), where nothing reads them. With the DevTools, the
+server also adds the fibers' own metrics (`child_fibers_*`).
+
+| Group | What it measures |
+| --- | --- |
+| `HttpMetrics` | every response by method and class of status (`2xx`…, `aborted`), its duration, the defects (500), the requests the guard refused, the ones that did not decode (by part) |
+| `WsMetrics` | the `/ws` clients connected, the messages published by type, the messages and bytes written, the clients closed by the heartbeat |
+| `ChatMetrics` | the replies being written, the replies saved by status, the failures by cause, the refusals by tag, the time to the first token, the speeds (tg and pp) and the tokens of each reply |
+| `LlamaMetrics` | the states the supervised `llama-server` entered, whether it is ready, the time to ready, the time a stop took, the stops that needed SIGKILL |
+| `DownloadMetrics` | the bytes received, the current speed, the files resumed, the retries, the items ended by status, the errors by code, the time an item ran |
+| `MonitorMetrics` | the time a tick took, the ticks longer than the interval, the ticks that failed, the readers that died, the source of the NVIDIA cards, the NVML sampler's stops and restarts |
+
+An attribute is always a value from a closed set (a status, a kind, a tag): never an id, a path or a model, which would
+make one series per value.

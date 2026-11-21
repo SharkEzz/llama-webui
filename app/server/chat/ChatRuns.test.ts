@@ -7,6 +7,7 @@ import {
   Effect,
   Fiber,
   Layer,
+  Metric,
   Option,
   Path,
   Ref,
@@ -16,6 +17,7 @@ import {
 } from 'effect';
 import { TestClock } from 'effect/testing';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
+import { ChatMetrics } from '../runtime/Metrics.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { buildCommand } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
@@ -133,6 +135,32 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('ChatRuns', (it) 
       assert.strictEqual((yield* repo.get(conv.id)).title, 'Hi there');
       yield* noRunLeft(runs, conv.id);
     }),
+  );
+
+  it.effect('a reply is measured: its status, its first token, its speed and its tokens', () =>
+    Effect.gen(function* () {
+      const { llama, conv, runs } = yield* setup();
+      const reply = yield* runs.send(conv.id, 'Hi there');
+      const end = yield* toEnd(reply);
+      yield* llama.requested(1);
+      assert.strictEqual((yield* Metric.value(ChatMetrics.active)).value, 1);
+      yield* llama.chunk({ content: 'Hello' });
+      yield* llama.chunk({}, { timings: TIMINGS });
+      yield* llama.done;
+      yield* Fiber.join(end);
+      const done = Metric.withAttributes(ChatMetrics.replies, { status: 'done' });
+      assert.strictEqual((yield* Metric.value(done)).count, 1);
+      assert.strictEqual((yield* Metric.value(ChatMetrics.active)).value, 0);
+      assert.strictEqual((yield* Metric.value(ChatMetrics.ttft)).count, 1);
+      const tg = yield* Metric.value(ChatMetrics.tgTps);
+      assert.deepStrictEqual([tg.count, tg.sum], [1, 51.23]);
+      assert.strictEqual((yield* Metric.value(ChatMetrics.promptTokens)).count, 10);
+      assert.strictEqual((yield* Metric.value(ChatMetrics.genTokens)).count, 3);
+      // A blank message is refused: counted by its tag.
+      const error = yield* Effect.flip(runs.send(conv.id, ' '));
+      const refused = yield* Metric.value(ChatMetrics.refused);
+      assert.strictEqual(refused.occurrences.get(error._tag), 1);
+    }).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
   );
 
   it.effect('stop saves the partial answer as stopped', () =>

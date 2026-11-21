@@ -2,8 +2,8 @@
 import { createServer } from 'node:http';
 import { NodeHttpServer } from '@effect/platform-node';
 import { Api, RouteNotFound } from '@llama-webui/shared';
-import { Array as Arr, Cause, Effect, ErrorReporter, Layer } from 'effect';
-import { HttpRouter, HttpServer, HttpServerResponse } from 'effect/http';
+import { Array as Arr, Cause, Clock, Duration, Effect, ErrorReporter, Exit, Layer, Metric } from 'effect';
+import { HttpRouter, HttpServer, HttpServerError, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { HttpApiBuilder } from 'effect/http-api';
 import { BenchHandlers, SweepsHandlers } from '../bench/http.ts';
 import { ChatHandlers } from '../chat/http.ts';
@@ -17,6 +17,7 @@ import { LogsHandlers } from '../logs/http.ts';
 import { ModelsHandlers } from '../models/http.ts';
 import { MonitorHandlers } from '../monitor/http.ts';
 import { ProfilesHandlers } from '../profiles/http.ts';
+import { HttpMetrics, statusClass } from '../runtime/Metrics.ts';
 import { SettingsHandlers } from '../settings/http.ts';
 import { ServerHandlers } from '../supervisor/http.ts';
 import { TuningHandlers } from '../tuning/http.ts';
@@ -73,21 +74,42 @@ const isDefect = (reason: Cause.Reason<unknown>): boolean =>
   !HttpServerResponse.isHttpServerResponse(reason.defect) &&
   !ErrorReporter.isIgnored(reason.defect);
 
-/** A defect is logged: the client only gets a 500 without its message. */
+/** A defect is logged and counted: the client only gets a 500 without its message. */
 const logDefects = <E, R>(app: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>) =>
   Effect.tapCause(app, (cause) =>
-    Arr.some(cause.reasons, isDefect) ? Effect.logError('a request failed', cause) : Effect.void,
+    Arr.some(cause.reasons, isDefect)
+      ? Effect.logError('a request failed', cause).pipe(Effect.andThen(Metric.update(HttpMetrics.defects, 1)))
+      : Effect.void,
   );
 
 /**
- * `routes` on the HTTP server as the app serves them: defects logged, no access log. The guard is not here: it is on
- * the routes it protects (`Guarded`: `ApiRoutes`, `WsHub.route`).
+ * Every response counted and timed by its method and the class of its status: the status of a failure is the one the
+ * server answers it with, a request whose client went away (interrupted) is `aborted`.
+ */
+const measure = Effect.fnUntraced(function* <E, R>(app: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>) {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const started = yield* Clock.currentTimeMillis;
+  const exit = yield* Effect.exit(app);
+  const ended = yield* Clock.currentTimeMillis;
+  const kind = Exit.isSuccess(exit)
+    ? statusClass(exit.value.status)
+    : Cause.hasInterruptsOnly(exit.cause)
+      ? 'aborted'
+      : statusClass(HttpServerError.causeResponseStripped(exit.cause)[0].status);
+  yield* Metric.update(Metric.withAttributes(HttpMetrics.requests, { method: request.method, class: kind }), 1);
+  yield* Metric.update(Metric.withAttributes(HttpMetrics.duration, { class: kind }), Duration.millis(ended - started));
+  return yield* exit;
+});
+
+/**
+ * `routes` on the HTTP server as the app serves them: defects logged, every response measured (`HttpMetrics`), no
+ * access log. The guard is not here: it is on the routes it protects (`Guarded`: `ApiRoutes`, `WsHub.route`).
  */
 export const serve = <A, E, R>(routes: Layer.Layer<A, E, R>) =>
   HttpRouter.serve(routes, {
     disableLogger: true,
     disableListenLog: true,
-    middleware: logDefects,
+    middleware: (app) => app.pipe(logDefects, measure),
   });
 
 /**
