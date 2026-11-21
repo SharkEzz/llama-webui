@@ -1,7 +1,6 @@
-import { Effect, Option, Path } from 'effect';
-import { homeDir } from '../config/Home.ts';
+import { Effect, Option, type Path } from 'effect';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
-import { profilePaths } from '../supervisor/command.ts';
+import { resolveProfilePaths } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
 
 /** The llama-server a reply is asked of. */
@@ -32,10 +31,8 @@ export const chatTarget: Effect.Effect<
   }
   if (state.kind !== 'ready') return Option.none();
   const profiles = yield* ProfilesRepo;
-  const path = yield* Path.Path;
-  const home = yield* homeDir;
   const modelPath = yield* profiles.get(state.profileId).pipe(
-    Effect.map((profile) => profilePaths({ profile, home, cwd: path.resolve('.'), path }).model),
+    Effect.flatMap((profile) => Effect.map(resolveProfilePaths(profile), (p) => p.model)),
     Effect.catchTag('ProfileNotFound', () => Effect.succeed(null)),
   );
   return Option.some({ host: state.host, port: state.port, profileId: state.profileId, modelPath });

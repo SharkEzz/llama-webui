@@ -1,9 +1,8 @@
 import { ModelPathRefused } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Path, String as Str } from 'effect';
-import { homeDir } from '../config/Home.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import type { SettingsRepo } from '../settings/SettingsRepo.ts';
-import { profilePaths } from '../supervisor/command.ts';
+import { resolveProfilePaths } from '../supervisor/command.ts';
 import { modelsRoot } from './access.ts';
 
 const refused = () => ModelPathRefused.make({ message: 'Outside the models folder and not used by a profile' });
@@ -31,13 +30,9 @@ export const checkModelPath = Effect.fn('models.checkModelPath')(function* (
   if (Arr.some(roots, (root) => under(root)(written) || under(root)(followed))) return;
 
   const profiles = yield* ProfilesRepo;
-  const home = yield* homeDir;
-  const cwd = paths.resolve('.');
   const all = yield* profiles.list;
-  const opened = Arr.flatMap(all, (profile) => {
-    const { model, mmproj } = profilePaths({ profile, home, cwd, path: paths });
-    return mmproj === null ? [model] : [model, mmproj];
-  });
+  const resolved = yield* Effect.forEach(all, resolveProfilePaths);
+  const opened = Arr.flatMap(resolved, ({ model, mmproj }) => (mmproj === null ? [model] : [model, mmproj]));
   if (Arr.contains(opened, written)) return;
   const openedReal = yield* Effect.forEach(opened, real);
   if (Arr.contains(openedReal, followed)) return;

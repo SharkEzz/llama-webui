@@ -13,6 +13,7 @@ import {
 } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 import { linesOf } from '../logs/lines.ts';
+import { boundedText } from '../process/bounded.ts';
 import { closeWithin, FORCE_KILL_AFTER, type Followed, followProgram } from '../process/followed.ts';
 import { type NvidiaReader, normalizeBusId, procVramOf } from './gpu.ts';
 
@@ -227,7 +228,7 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
             return;
           }
           const handle = spawned.success;
-          const text = yield* Effect.all([Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode], {
+          const text = yield* Effect.all([boundedText(handle.stdout, 1024 * 1024), handle.exitCode], {
             concurrency: 2,
           }).pipe(
             Effect.timeoutOption(appsTimeout),

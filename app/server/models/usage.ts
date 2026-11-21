@@ -12,11 +12,11 @@ import {
 import { Array as Arr, Effect, FileSystem, Option, Order, Path, String as Str } from 'effect';
 import { SqlClient } from 'effect/sql';
 import { BenchRunner } from '../bench/BenchRunner.ts';
-import { homeDir } from '../config/Home.ts';
+import { fileDest } from '../hf/paths.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
 import { clearDefaultProfile, refuseRunning } from '../profiles/removeProfile.ts';
 import type { SettingsRepo } from '../settings/SettingsRepo.ts';
-import { profilePaths } from '../supervisor/command.ts';
+import { resolveProfilePaths } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
 import { ActiveWrites } from './ActiveWrites.ts';
 
@@ -41,11 +41,7 @@ const matcher = Effect.fnUntraced(function* (files: ReadonlyArray<string>) {
 });
 
 /** Where a download writes `file` in `dir`; none for a path that leaves `dir` (refused when it was queued). */
-const destOf = (paths: Path.Path, dir: string, file: string): Option.Option<string> => {
-  const root = paths.resolve(dir);
-  const dest = paths.resolve(root, file);
-  return !paths.isAbsolute(file) && Str.startsWith(`${root}${paths.sep}`)(dest) ? Option.some(dest) : Option.none();
-};
+const destOf = (paths: Path.Path, dir: string, file: string) => fileDest(paths.resolve(dir), file).pipe(Effect.option);
 
 /**
  * What deleting the model would remove (its files, the profiles that open it, as their model checked first, then as
@@ -64,14 +60,14 @@ export const modelUsage = Effect.fn('models.modelUsage')(function* (
   const runner = yield* BenchRunner;
   const writes = yield* ActiveWrites;
   const paths = yield* Path.Path;
-  const home = yield* homeDir;
-  const cwd = paths.resolve('.');
   const uses = yield* matcher(entry.files);
   /** Whether one of `files` is one of the model's. */
   const usesAny = (files: ReadonlyArray<string | null>) =>
     Effect.findFirst(files, (file) => uses(file)).pipe(Effect.map(Option.isSome));
   const all = yield* profiles.list;
-  const opened = Arr.map(all, (profile) => ({ profile, ...profilePaths({ profile, home, cwd, path: paths }) }));
+  const opened = yield* Effect.forEach(all, (profile) =>
+    Effect.map(resolveProfilePaths(profile), (resolved) => ({ profile, ...resolved })),
+  );
 
   const roles = yield* Effect.forEach(opened, ({ profile, model, mmproj }) =>
     Effect.gen(function* () {
@@ -94,9 +90,11 @@ export const modelUsage = Effect.fn('models.modelUsage')(function* (
     const benchFiles = yield* runner.files;
     if (yield* usesAny(benchFiles)) return 'A benchmark in progress uses it';
     const items = yield* writes.active;
-    const dests = Arr.flatMap(items, (item) =>
-      Arr.getSomes(Arr.map(item.files, (file) => destOf(paths, item.dir, file.path))),
+    const resolvedDests = yield* Effect.forEach(
+      Arr.flatMap(items, (item) => Arr.map(item.files, (file) => ({ dir: item.dir, file: file.path }))),
+      ({ dir, file }) => destOf(paths, dir, file),
     );
+    const dests = Arr.getSomes(resolvedDests);
     const written = yield* usesAny(dests);
     return written ? 'A download in progress writes it' : null;
   });

@@ -81,8 +81,7 @@ const readProcs = (lib: NvmlSymbols, h: bigint, key: string): ReadonlyArray<Nvml
 };
 
 /**
- * One reading per device, and the processes on it. Cards `needs` skips are only identified (UUID, name, bus id);
- * PCIe throughput, which blocks about 50 ms per card, is read only when `needs.pcie`.
+ * One reading per device, and the processes on it. Cards `needs` skips are only identified (UUID, name, bus id).
  */
 export const readNvml: {
   (handles: ReadonlyArray<bigint>, needs: GpuNeeds): (lib: NvmlSymbols) => NvmlSnapshot;
@@ -91,7 +90,7 @@ export const readNvml: {
   const gpus: Array<GpuReading> = [];
   const procs: Array<NvmlProc> = [];
   const u32 = Buffer.alloc(4);
-  const one = (rc: number, mul = 1, div = 1): number | null =>
+  const readU32 = (rc: number, mul = 1, div = 1): number | null =>
     rc === SUCCESS ? (u32.readUInt32LE(0) * mul) / div : null;
 
   for (const h of handles) {
@@ -114,7 +113,7 @@ export const readNvml: {
     const memOk = lib.nvmlDeviceGetMemoryInfo_v2(h, mem) === SUCCESS; // unknown VRAM reads as 0, the GPU stays listed
     const util = Buffer.alloc(8);
     const utilOk = lib.nvmlDeviceGetUtilizationRates(h, util) === SUCCESS;
-    const persistence = one(lib.nvmlDeviceGetPersistenceMode(h, u32));
+    const persistence = readU32(lib.nvmlDeviceGetPersistenceMode(h, u32));
 
     gpus.push({
       key,
@@ -125,21 +124,21 @@ export const readNvml: {
       memUtilPct: utilOk ? util.readUInt32LE(4) : null,
       vramUsedBytes: memOk ? Number(mem.readBigUInt64LE(32)) : 0,
       vramTotalBytes: memOk ? Number(mem.readBigUInt64LE(8)) : 0,
-      tempC: one(lib.nvmlDeviceGetTemperature(h, 0, u32)),
-      powerW: one(lib.nvmlDeviceGetPowerUsage(h, u32), 1, 1000),
-      powerLimitW: one(lib.nvmlDeviceGetPowerManagementLimit(h, u32), 1, 1000),
-      powerDefaultLimitW: one(lib.nvmlDeviceGetPowerManagementDefaultLimit(h, u32), 1, 1000),
+      tempC: readU32(lib.nvmlDeviceGetTemperature(h, 0, u32)),
+      powerW: readU32(lib.nvmlDeviceGetPowerUsage(h, u32), 1, 1000),
+      powerLimitW: readU32(lib.nvmlDeviceGetPowerManagementLimit(h, u32), 1, 1000),
+      powerDefaultLimitW: readU32(lib.nvmlDeviceGetPowerManagementDefaultLimit(h, u32), 1, 1000),
       persistence: persistence === null ? null : persistence === 1,
-      clockGrMhz: one(lib.nvmlDeviceGetClockInfo(h, CLOCK_GRAPHICS, u32)),
-      clockGrMaxMhz: one(lib.nvmlDeviceGetMaxClockInfo(h, CLOCK_GRAPHICS, u32)),
-      clockMemMhz: one(lib.nvmlDeviceGetClockInfo(h, CLOCK_MEM, u32)),
-      fanPct: one(lib.nvmlDeviceGetFanSpeed(h, u32)),
-      pcieGen: one(lib.nvmlDeviceGetCurrPcieLinkGeneration(h, u32)),
-      pcieWidth: one(lib.nvmlDeviceGetCurrPcieLinkWidth(h, u32)),
-      pcieGenMax: one(lib.nvmlDeviceGetMaxPcieLinkGeneration(h, u32)),
-      pcieWidthMax: one(lib.nvmlDeviceGetMaxPcieLinkWidth(h, u32)),
-      pcieRxBps: needs.pcie ? one(lib.nvmlDeviceGetPcieThroughput(h, PCIE_RX, u32), 1024) : null,
-      pcieTxBps: needs.pcie ? one(lib.nvmlDeviceGetPcieThroughput(h, PCIE_TX, u32), 1024) : null,
+      clockGrMhz: readU32(lib.nvmlDeviceGetClockInfo(h, CLOCK_GRAPHICS, u32)),
+      clockGrMaxMhz: readU32(lib.nvmlDeviceGetMaxClockInfo(h, CLOCK_GRAPHICS, u32)),
+      clockMemMhz: readU32(lib.nvmlDeviceGetClockInfo(h, CLOCK_MEM, u32)),
+      fanPct: readU32(lib.nvmlDeviceGetFanSpeed(h, u32)),
+      pcieGen: readU32(lib.nvmlDeviceGetCurrPcieLinkGeneration(h, u32)),
+      pcieWidth: readU32(lib.nvmlDeviceGetCurrPcieLinkWidth(h, u32)),
+      pcieGenMax: readU32(lib.nvmlDeviceGetMaxPcieLinkGeneration(h, u32)),
+      pcieWidthMax: readU32(lib.nvmlDeviceGetMaxPcieLinkWidth(h, u32)),
+      pcieRxBps: readU32(lib.nvmlDeviceGetPcieThroughput(h, PCIE_RX, u32), 1024),
+      pcieTxBps: readU32(lib.nvmlDeviceGetPcieThroughput(h, PCIE_TX, u32), 1024),
     });
     procs.push(...readProcs(lib, h, key));
   }

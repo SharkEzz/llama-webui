@@ -194,12 +194,16 @@ export const parseModel = ({
   };
 };
 
+/** Formats the 1-based `part` filename of a split GGUF (`<prefix>-0000k-of-<total>.gguf`). */
+export const shardName = (options: {
+  readonly prefix: string;
+  readonly part: number;
+  readonly total: string;
+}): string => `${options.prefix}-${Str.padStart(5, '0')(String(options.part))}-of-${options.total}.gguf`;
+
 /** Every part of a model: the `-0000k-of-0000N.gguf` names of a split one, in order, else the path alone. */
 export const shardFiles = (path: string): ReadonlyArray<string> => {
   const shard = parseGgufShardFilename(path);
   if (shard === null) return [path];
-  return times(
-    Number(shard.total),
-    (i) => `${shard.prefix}-${Str.padStart(5, '0')(String(i + 1))}-of-${shard.total}.gguf`,
-  );
+  return times(Number(shard.total), (i) => shardName({ prefix: shard.prefix, part: i + 1, total: shard.total }));
 };

@@ -277,14 +277,12 @@ rate older than three intervals counts as unknown. The sampler follows the CPU a
 
 ```ts title="app/server/collectors/gpu.ts"
 export interface GpuNeeds {
-  /** PCIe bandwidth (NVML blocks about 50 ms per GPU to read it). */
-  readonly pcie: boolean;
   /** Hidden cards (PCI bus ids): not read. */
   readonly skipGpus: ReadonlyArray<string>;
 }
 ```
 
-`gpuNeeds(hiddenGpus)` currently always measures the PCIe throughput, and skips the hidden cards.
+`gpuNeeds(hiddenGpus)` measures everything, the PCIe throughput included, and only skips the hidden cards.
 `gpuSkipped(needs, busId)` is the single test the NVML sampler and the monitor apply: a skipped card is only identified
 (key, vendor, name, bus ID).
 

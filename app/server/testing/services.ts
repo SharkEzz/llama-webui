@@ -11,6 +11,7 @@ import * as Db from '../db/Db.ts';
 import { Downloads } from '../downloads/Downloads.ts';
 import { DownloadsRepo } from '../downloads/DownloadsRepo.ts';
 import { Flags } from '../flags/Flags.ts';
+import { CpuInfo } from '../hardware/CpuInfo.ts';
 import { PciIds } from '../hardware/PciIds.ts';
 import { HfClient } from '../hf/HfClient.ts';
 import { HfHttp } from '../hf/HfHttp.ts';
@@ -49,7 +50,13 @@ export const ServicesWithoutBench = Layer.mergeAll(TuningHardware.layer, TuningM
   Layer.provideMerge(Supervisor.layerWith({ killTimeout: '1 second', healthPoll: '50 millis' })),
   Layer.provideMerge(Layer.mergeAll(Flags.layer, BenchHardware.layer)),
   Layer.provideMerge(
-    Layer.mergeAll(LogRing.layer, LlamaHttp.layer, PciIds.layer, HfClient.layer.pipe(Layer.provideMerge(HfHttp.layer))),
+    Layer.mergeAll(
+      LogRing.layer,
+      LlamaHttp.layer,
+      CpuInfo.layer,
+      PciIds.layer,
+      HfClient.layer.pipe(Layer.provideMerge(HfHttp.layer)),
+    ),
   ),
   Layer.provideMerge(
     Layer.mergeAll(

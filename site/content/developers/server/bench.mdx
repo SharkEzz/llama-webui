@@ -338,7 +338,7 @@ saved as `diskReadPeakBps`.
 `BenchHardware` (`app/server/bench/BenchHardware.ts`) reads what a run records about the machine, and the devices
 llama.cpp sees.
 
-- `hardware(gpus)` gives the hardware of a run: the CPU model (read once), each GPU's name, bus id and total VRAM, and
+- `hardware(gpus)` gives the hardware of a run: the CPU model (from `CpuInfo`, read once), each GPU's name, bus id and total VRAM, and
   the build. It is frozen in `hardware_json` when a one-off run is created or a sweep item starts.
 - `build(binary)` runs `<binary> --version` (5-second timeout) and turns `build 12119, commit 6f1e65437` into
   `b12119 (6f1e65437)`. The result is cached per binary path and modification time, so a rebuild is read again;
@@ -352,6 +352,7 @@ not cached, when:
 
 - the tool is missing, exits with a non-zero code or is killed by a signal (recent builds crash in `--list-devices`
   while llama-server holds the GPUs, after printing part of the list);
+- it prints more than 1 MiB: it is killed at once (`printed more than 1 MiB`); `--version` gives `null` the same way;
 - a GPU backend's device (CUDA, ROCm, Vulkan…) is listed with 0 MiB.
 
 `error` then says why, and `devices` is the last good list of that binary (`[]` if there was none). The free memory in

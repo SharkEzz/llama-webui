@@ -456,15 +456,18 @@ export class BenchRunner extends Context.Service<
           }).pipe(Effect.ensuring(unclaim));
         });
 
-        /** The best run of a sweep: among its validations if one succeeded, otherwise among its exploration. */
-        const bestOf = Effect.fnUntraced(function* (sweep: Sweep) {
-          const all = yield* runs.list({
+        const itemsOf = (id: number) =>
+          runs.list({
             kind: Option.none(),
             status: Option.none(),
             modelPath: Option.none(),
-            sweep: sweep.id,
+            sweep: id,
             limit: Number.MAX_SAFE_INTEGER,
           });
+
+        /** The best run of a sweep: among its validations if one succeeded, otherwise among its exploration. */
+        const bestOf = Effect.fnUntraced(function* (sweep: Sweep) {
+          const all = yield* itemsOf(sweep.id);
           const validated = Arr.some(all, (r) => r.kind === 'server' && r.status === 'ok');
           const ranked = rankRuns(
             Arr.filter(all, (r) => r.kind === (validated ? 'server' : 'bench')),
@@ -571,15 +574,6 @@ export class BenchRunner extends Context.Service<
             return yield* SweepStillRunning.make({ message: 'This sweep is still running: cancel it first' });
           return found.value;
         });
-
-        const itemsOf = (id: number) =>
-          runs.list({
-            kind: Option.none(),
-            status: Option.none(),
-            modelPath: Option.none(),
-            sweep: id,
-            limit: Number.MAX_SAFE_INTEGER,
-          });
 
         const resume = Effect.fn('BenchRunner.resume')(function* (
           id: number,

@@ -4,7 +4,7 @@ import { Ndjson } from 'effect/encoding';
 import { dual } from 'effect/Function';
 import { ChildProcess, type ChildProcessSpawner } from 'effect/process';
 import { followProgram } from '../../process/followed.ts';
-import { type GpuNeeds, type NvidiaReader, procVramOf } from '../gpu.ts';
+import { type GpuNeeds, type GpuPollConfig, type NvidiaReader, procVramOf } from '../gpu.ts';
 import { FromSampler, type NvmlProc, type NvmlSnapshot, type NvmlSystem, ToSampler } from './protocol.ts';
 
 /*
@@ -216,10 +216,7 @@ export const startNvml = Effect.fn('startNvml')(function* (options: {
     return isFresh(s, now) ? Option.some(s) : Option.none();
   });
 
-  const configure = Effect.fn('Nvml.configure')(function* (o: {
-    readonly intervalMs: number;
-    readonly needs: GpuNeeds;
-  }) {
+  const configure = Effect.fn('Nvml.configure')(function* (o: GpuPollConfig) {
     yield* Ref.update(state, onConfigure(o.intervalMs));
     yield* Queue.offer(outbox, { type: 'configure', intervalMs: o.intervalMs, needs: o.needs });
   });

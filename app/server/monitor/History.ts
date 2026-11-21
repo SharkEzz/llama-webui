@@ -1,6 +1,13 @@
 import type { HistoryDump } from '@llama-webui/shared';
-import { Array as Arr, Clock, Effect, Option } from 'effect';
+import { Array as Arr, Clock, Effect, Option, Record } from 'effect';
 import { dual } from 'effect/Function';
+
+/** One tick's writer on a `History`: pushes values and pads untouched series with NaN gaps on `finish`. */
+export interface HistoryRecorder {
+  readonly push: (key: string, v: number) => void;
+  readonly known: (key: string, v: number | null | undefined) => void;
+  readonly finish: () => Record<string, number | null>;
+}
 
 /** Points of a `historySeconds` history sampled every `intervalMs`. */
 export const historyPoints: {
@@ -96,6 +103,24 @@ export class History {
 
   keys(): ReadonlyArray<string> {
     return Array.from(this.rings.keys());
+  }
+
+  /** A recorder for one tick of this history; call `finish()` once every series for the tick has been fed. */
+  recorder(): HistoryRecorder {
+    const points: Record<string, number | null> = {};
+    const push = (key: string, v: number) => {
+      this.series(key).push(v);
+      points[key] = Number.isFinite(v) ? v : null;
+    };
+    const known = (key: string, v: number | null | undefined) => {
+      if (v !== null && v !== undefined && Number.isFinite(v)) push(key, v);
+      else if (this.has(key)) push(key, Number.NaN);
+    };
+    const finish = () => {
+      for (const key of this.rings.keys()) if (!Record.has(points, key)) push(key, Number.NaN);
+      return points;
+    };
+    return { push, known, finish };
   }
 
   /** Every series over the times, oldest first, `null` for a gap; `at` is the last tick, else the clock's time. */

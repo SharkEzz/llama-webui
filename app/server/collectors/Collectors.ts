@@ -23,7 +23,7 @@ import type { PciIds } from '../hardware/PciIds.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { type AmdCard, discoverAmdCards, isRuntimeSuspended, readAmdCard, readProcAmdVram } from './amdgpu.ts';
 import { makeDiskSampler, physicalDisks, resolveModelDisk } from './disk.ts';
-import { type GpuNeeds, gpuNeeds, type NvidiaReader } from './gpu.ts';
+import { type GpuPollConfig, gpuNeeds, type NvidiaReader } from './gpu.ts';
 import { type MemBandwidthSampler, makeMemBandwidth } from './membw.ts';
 import { makeNvidiaSmi, type NvidiaSmi } from './nvidia.ts';
 import { type NvmlReader, startNvml } from './nvml/Nvml.ts';
@@ -155,7 +155,7 @@ export class Collectors extends Context.Service<
         >();
         const initial = options.initial;
 
-        const lastConfig = yield* Ref.make<{ readonly intervalMs: number; readonly needs: GpuNeeds }>({
+        const lastConfig = yield* Ref.make<GpuPollConfig>({
           intervalMs: initial.pollIntervalMs,
           needs: gpuNeeds(initial.hiddenGpus),
         });

@@ -3,12 +3,14 @@ import { assert, describe, it } from '@effect/vitest';
 import { Array as Arr, Effect, FileSystem, Layer, Path, type Scope, String as Str } from 'effect';
 import type { ChildProcessSpawner } from 'effect/process';
 import * as Db from '../db/Db.ts';
+import { CpuInfo } from '../hardware/CpuInfo.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
+import { pidAlive } from '../testing/llama.ts';
 import { BenchHardware } from './BenchHardware.ts';
 
 /** The hardware on a new database and new caches, with the Node platform for the scripts the test writes. */
 const Fresh = BenchHardware.layer.pipe(
-  Layer.provideMerge(SettingsRepo.layer),
+  Layer.provideMerge(Layer.mergeAll(SettingsRepo.layer, CpuInfo.layer)),
   Layer.provideMerge(Db.layerAt(':memory:')),
   Layer.provideMerge(NodeServices.layer),
 );
@@ -133,6 +135,25 @@ describe('BenchHardware', () => {
         yield* script('llama-bench', `printf '${LIST}'`, 1);
         const good = yield* hw.devices(bin);
         assert.strictEqual(good.devices[0]?.totalMib, 15933);
+      }),
+    ),
+  );
+
+  it.effect('a listing that prints more than 1 MiB fails at once and its program is killed', () =>
+    fresh(
+      Effect.gen(function* () {
+        const hw = yield* BenchHardware;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const { dir, script } = yield* workspace;
+        const pidFile = path.join(dir, 'pid');
+        const bin = yield* script('llama-bench', `echo $$ > '${pidFile}'\nexec yes`, 1);
+        const listed = yield* hw.devices(bin);
+        assert.deepStrictEqual(listed.devices, []);
+        assert.include(listed.error, 'printed more than 1 MiB');
+        const written = yield* fs.readFileString(pidFile);
+        const pid = Number(Str.trim(written));
+        assert.isFalse(pidAlive(pid));
       }),
     ),
   );

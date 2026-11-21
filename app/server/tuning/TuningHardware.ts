@@ -5,7 +5,7 @@ import { BenchHardware } from '../bench/BenchHardware.ts';
 import { readText } from '../collectors/read.ts';
 import { parseMeminfo } from '../collectors/system.ts';
 import { expandHome } from '../config/Home.ts';
-import { readCpuInfo } from '../hardware/cpu.ts';
+import { CpuInfo } from '../hardware/CpuInfo.ts';
 import { Monitor } from '../monitor/Monitor.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { withLiveMemory } from './match.ts';
@@ -16,25 +16,30 @@ export class TuningHardware extends Context.Service<
   {
     /**
      * The devices `llama-bench --list-devices` gives for the `binary` setting (`~` expanded), with the live memory of
-     * the monitor's GPUs; why the list is not trusted; the CPU (read once); the RAM of the last snapshot, else of
+     * the monitor's GPUs; why the list is not trusted; the CPU (`CpuInfo`, read once); the RAM of the last snapshot, else of
      * `/proc/meminfo`, else 0.
      */
     readonly read: Effect.Effect<Hardware>;
   }
 >()('@llama-webui/app/server/tuning/TuningHardware') {
+  /** Reads `meminfo` under `procRoot` (`/proc`) when there is no snapshot. */
   static readonly layerWith = (
-    options: { readonly procRoot?: string; readonly sysRoot?: string } = {},
-  ): Layer.Layer<TuningHardware, never, SettingsRepo | BenchHardware | Monitor | FileSystem.FileSystem | Path.Path> =>
+    options: { readonly procRoot?: string } = {},
+  ): Layer.Layer<
+    TuningHardware,
+    never,
+    SettingsRepo | BenchHardware | CpuInfo | Monitor | FileSystem.FileSystem | Path.Path
+  > =>
     Layer.effect(
       TuningHardware,
       Effect.gen(function* () {
         const settings = yield* SettingsRepo;
         const bench = yield* BenchHardware;
         const monitor = yield* Monitor;
+        const cpuInfo = yield* CpuInfo;
         const fs = yield* FileSystem.FileSystem;
         const paths = yield* Path.Path;
         const platform = Context.make(FileSystem.FileSystem, fs).pipe(Context.add(Path.Path, paths));
-        const cpu = yield* Effect.cached(Effect.provideContext(readCpuInfo(options), platform));
         const meminfo = paths.join(options.procRoot ?? '/proc', 'meminfo');
 
         const read = Effect.gen(function* () {
@@ -48,7 +53,7 @@ export class TuningHardware extends Context.Service<
           const hardware: Hardware = {
             devices: withLiveMemory(list.devices, snapshot?.allGpus ?? []),
             devicesError: list.error,
-            cpu: yield* cpu,
+            cpu: yield* cpuInfo.read,
             ramTotalBytes: mem?.totalBytes ?? 0,
             ramAvailableBytes: mem?.availableBytes ?? 0,
           };

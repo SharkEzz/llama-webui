@@ -1,5 +1,6 @@
 import { Config, Context, Effect, Layer, Option, Path } from 'effect';
 import type { CliFlags } from './Cli.ts';
+import { homeDir } from './Home.ts';
 
 /** A flag that was given, else `config`. */
 const flagOr = <A>(flag: Option.Option<A>, config: Config.Config<A>): Config.Config<A> =>
@@ -32,9 +33,8 @@ export class AppConfig extends Context.Service<
       AppConfig,
       Effect.gen(function* () {
         const path = yield* Path.Path;
-        const dataHome = Config.String('XDG_DATA_HOME').pipe(
-          Config.orElse(() => Config.String('HOME').pipe(Config.map((home) => path.join(home, '.local', 'share')))),
-        );
+        const home = yield* homeDir;
+        const dataHome = Config.String('XDG_DATA_HOME').pipe(Config.withDefault(path.join(home, '.local', 'share')));
         return yield* Config.all({
           host: flagOr(flags.host, Config.String('LLAMA_WEBUI_HOST').pipe(Config.withDefault('127.0.0.1'))),
           port: flagOr(flags.port, Config.Port('LLAMA_WEBUI_PORT').pipe(Config.withDefault(7860))),

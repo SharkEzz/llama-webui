@@ -11,13 +11,17 @@ import {
   Option,
   Path,
   Ref,
-  Stream,
+  Schema,
+  Scope,
+  type Stream,
 } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/process';
 import { parseDeviceList } from 'llamacpp-js/bench';
 import { expandHome } from '../config/Home.ts';
-import { readCpuInfo } from '../hardware/cpu.ts';
+import { CpuInfo } from '../hardware/CpuInfo.ts';
+import { boundedText, OutputTooLarge } from '../process/bounded.ts';
 import { causeMessage, endingOf } from '../process/ending.ts';
+import { closeWithin } from '../process/followed.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { which } from './which.ts';
 
@@ -75,39 +79,63 @@ export class BenchHardware extends Context.Service<
   }): Layer.Layer<
     BenchHardware,
     never,
-    SettingsRepo | ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
+    SettingsRepo | CpuInfo | ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
   > =>
     Layer.effect(
       BenchHardware,
       Effect.gen(function* () {
         const settings = yield* SettingsRepo;
+        const cpuInfo = yield* CpuInfo;
         const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
         const fs = yield* FileSystem.FileSystem;
         const paths = yield* Path.Path;
         const platform = Context.make(FileSystem.FileSystem, fs).pipe(Context.add(Path.Path, paths));
 
-        /** Stdout then stderr of `<binary> <arg>`, killed after `timeout`; fails when it cannot start, fails or crashes. */
+        const MAX_OUTPUT = 1024 * 1024;
+
+        const isTooLarge = Schema.is(OutputTooLarge);
+
+        /** All of `stream` as text; more than `MAX_OUTPUT` bytes fails the command, an unreadable stream reads as ''. */
+        const text = <E, R>(stream: Stream.Stream<Uint8Array, E, R>) =>
+          boundedText(stream, MAX_OUTPUT).pipe(
+            Effect.catch((error) =>
+              isTooLarge(error)
+                ? Effect.fail<OutputFailure>({ _tag: 'Ended', message: 'printed more than 1 MiB' })
+                : Effect.succeed(''),
+            ),
+          );
+
+        /**
+         * Stdout then stderr of `<binary> <arg>`, killed after `timeout` or as soon as it prints more than 1 MiB; fails
+         * when it cannot start, fails, crashes or prints too much.
+         */
         const output = (binary: string, arg: string, timeout: Duration.Input) =>
-          Effect.gen(function* () {
-            const handle = yield* spawner
-              .spawn(ChildProcess.make(binary, [arg], { stdin: 'ignore', killSignal: 'SIGKILL' }))
-              .pipe(Effect.mapError((e): OutputFailure => ({ _tag: 'Spawn', message: causeMessage(e) })));
-            const [out, err, ended] = yield* Effect.all(
-              [
-                Stream.mkString(Stream.decodeText(handle.stdout)).pipe(Effect.orElseSucceed(() => '')),
-                Stream.mkString(Stream.decodeText(handle.stderr)).pipe(Effect.orElseSucceed(() => '')),
-                Effect.result(handle.exitCode),
-              ],
-              { concurrency: 3 },
-            );
-            const { code, signal } = endingOf(ended);
-            if (signal !== null)
-              return yield* Effect.fail<OutputFailure>({ _tag: 'Ended', message: `killed by ${signal}` });
-            if (code !== 0)
-              return yield* Effect.fail<OutputFailure>({ _tag: 'Ended', message: `exited with code ${code ?? '-'}` });
-            return `${out}\n${err}`;
-          }).pipe(
-            Effect.scoped,
+          Effect.acquireUseRelease(
+            Scope.make(),
+            (own) =>
+              Effect.gen(function* () {
+                const handle = yield* spawner
+                  .spawn(ChildProcess.make(binary, [arg], { stdin: 'ignore', killSignal: 'SIGKILL' }))
+                  .pipe(
+                    Scope.provide(own),
+                    Effect.mapError((e): OutputFailure => ({ _tag: 'Spawn', message: causeMessage(e) })),
+                  );
+                const [out, err, ended] = yield* Effect.all(
+                  [text(handle.stdout), text(handle.stderr), Effect.result(handle.exitCode)],
+                  { concurrency: 3 },
+                );
+                const { code, signal } = endingOf(ended);
+                if (signal !== null)
+                  return yield* Effect.fail<OutputFailure>({ _tag: 'Ended', message: `killed by ${signal}` });
+                if (code !== 0)
+                  return yield* Effect.fail<OutputFailure>({
+                    _tag: 'Ended',
+                    message: `exited with code ${code ?? '-'}`,
+                  });
+                return `${out}\n${err}`;
+              }),
+            (own) => closeWithin({ scope: own, name: `${binary} ${arg}` }),
+          ).pipe(
             Effect.timeoutOrElse({
               duration: timeout,
               orElse: () =>
@@ -186,12 +214,7 @@ export class BenchHardware extends Context.Service<
               : Duration.zero,
         });
 
-        const cpu = yield* Effect.cached(
-          Effect.provideContext(readCpuInfo(), platform).pipe(
-            Effect.map((info) => info.model),
-            Effect.orElseSucceed(() => ''),
-          ),
-        );
+        const cpu = Effect.map(cpuInfo.read, (info) => info.model);
 
         const build = Effect.fn('BenchHardware.build')(function* (binary: string) {
           const key = yield* keyOf(binary);

@@ -4,6 +4,7 @@ import type { GpuSample, Snapshot } from '@llama-webui/shared';
 import { Array as Arr, ConfigProvider, Effect, FileSystem, Layer, Path, type Scope } from 'effect';
 import { BenchHardware } from '../bench/BenchHardware.ts';
 import * as Db from '../db/Db.ts';
+import { CpuInfo } from '../hardware/CpuInfo.ts';
 import { Monitor } from '../monitor/Monitor.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { TuningHardware } from './TuningHardware.ts';
@@ -61,8 +62,9 @@ const monitorAt = (snapshot: Snapshot | null) =>
 
 /** The tuning hardware on `/proc` at `procRoot`, a new database and new caches, the monitor at `snapshot`. */
 const layerAt = (options: { readonly procRoot: string; readonly snapshot: Snapshot | null }) =>
-  TuningHardware.layerWith({ procRoot: options.procRoot, sysRoot: options.procRoot }).pipe(
+  TuningHardware.layerWith({ procRoot: options.procRoot }).pipe(
     Layer.provideMerge(Layer.mergeAll(BenchHardware.layer, monitorAt(options.snapshot))),
+    Layer.provideMerge(CpuInfo.layerWith({ procRoot: options.procRoot, sysRoot: options.procRoot })),
     Layer.provideMerge(SettingsRepo.layer),
     Layer.provideMerge(Db.layerAt(':memory:')),
     Layer.provideMerge(NodeServices.layer),

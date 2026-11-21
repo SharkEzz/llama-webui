@@ -59,6 +59,13 @@ export const profilePaths = (options: {
   };
 };
 
+/** Effectful `profilePaths`: resolves `homeDir` and `Path.Path` once for `profile`. */
+export const resolveProfilePaths = Effect.fnUntraced(function* (profile: Pick<Profile, 'model' | 'mmproj' | 'cwd'>) {
+  const path = yield* Path.Path;
+  const home = yield* homeDir;
+  return profilePaths({ profile, home, cwd: path.resolve('.'), path });
+});
+
 /**
  * The command of a profile under these settings. llama-server runs without a shell: `~` is expanded here (in the
  * binary, the model and the projector), relative paths stay relative to its folder.
