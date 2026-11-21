@@ -13,6 +13,7 @@ import {
   FileSystem,
   Layer,
   Logger,
+  Metric,
   Option,
   Path,
   Queue,
@@ -32,6 +33,7 @@ import { isAlive } from '../llama/procScan.ts';
 import { LogRing } from '../logs/LogRing.ts';
 import { CLOSE_BOUND } from '../process/followed.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
+import { MonitorMetrics } from '../runtime/Metrics.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { buildCommand } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
@@ -352,7 +354,10 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
       assert.lengthOf(errors, 1);
       assert.deepStrictEqual(errors[0]?.message, ['monitoring tick']);
       assert.include(errors[0]?.cause ?? '', 'boom');
-    }),
+      // Counted as failed, and timed like the others (the third may still be measured once it published).
+      assert.strictEqual((yield* Metric.value(MonitorMetrics.tickFailed)).count, 1);
+      assert.isAtLeast((yield* Metric.value(MonitorMetrics.tick)).count, 2);
+    }).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
   );
 
   it.effect("the monitor's layer is built before its collectors answer", () =>

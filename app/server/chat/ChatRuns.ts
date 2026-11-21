@@ -25,6 +25,7 @@ import {
   Effect,
   Exit,
   Layer,
+  Metric,
   Option,
   type Path,
   PubSub,
@@ -38,6 +39,7 @@ import { probeUrl } from 'llamacpp-js/client';
 import { type ChatChunk, streamChat } from '../llama/chatStream.ts';
 import { LlamaHttp } from '../llama/LlamaHttp.ts';
 import type { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
+import { ChatMetrics } from '../runtime/Metrics.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import type { Supervisor } from '../supervisor/Supervisor.ts';
 import { ConversationsRepo } from './ConversationsRepo.ts';
@@ -202,12 +204,24 @@ export class ChatRuns extends Context.Service<
         const closing = yield* Ref.make(false);
 
         const withoutRun = (run: Run) =>
-          SynchronizedRef.update(runs, (now) => {
-            if (now.get(run.conversationId) !== run) return now;
+          SynchronizedRef.updateEffect(runs, (now) => {
+            if (now.get(run.conversationId) !== run) return Effect.succeed(now);
             const next = new Map(now);
             next.delete(run.conversationId);
-            return next;
+            return Effect.as(Metric.update(ChatMetrics.active, next.size), next);
           });
+
+        /** The metrics of a reply as it is saved: its status, and what its timings say when it has them. */
+        const recorded = Effect.fnUntraced(function* (outcome: Outcome, stats: MessageStats | null | undefined) {
+          yield* Metric.update(Metric.withAttributes(ChatMetrics.replies, { status: outcome.status }), 1);
+          if (stats === null || stats === undefined) return;
+          yield* Metric.update(ChatMetrics.tgTps, stats.tgTps);
+          yield* Metric.update(ChatMetrics.ppTps, stats.ppTps);
+          yield* Metric.update(ChatMetrics.promptTokens, stats.promptTokens);
+          yield* Metric.update(ChatMetrics.cachedTokens, stats.cachedTokens);
+          yield* Metric.update(ChatMetrics.genTokens, stats.genTokens);
+          yield* Metric.update(ChatMetrics.duration, Duration.millis(stats.durationMs));
+        });
 
         /**
          * Saves the reply as it ends (`stats` undefined keeps the stored ones) and publishes its `done`, unless it was
@@ -231,6 +245,7 @@ export class ChatRuns extends Context.Service<
                     error: outcome.error,
                   };
                   const measured = yield* stats;
+                  yield* recorded(outcome, measured);
                   const saved = yield* repo
                     .updateMessage(run.assistant.id, measured === undefined ? fields : { ...fields, stats: measured })
                     .pipe(
@@ -285,15 +300,20 @@ export class ChatRuns extends Context.Service<
                   const { content, reasoning } = textOf(chunk);
                   if (Str.isEmpty(content) && Str.isEmpty(reasoning)) return;
                   const now = yield* Clock.currentTimeMillis;
-                  yield* Ref.update(
-                    ttft,
-                    Option.orElse(() => Option.some(now - started)),
-                  );
+                  const first = yield* Ref.get(ttft);
+                  if (Option.isNone(first)) {
+                    yield* Ref.set(ttft, Option.some(now - started));
+                    yield* Metric.update(ChatMetrics.ttft, Duration.millis(now - started));
+                  }
                   yield* append(run, content, reasoning, now);
                 }),
               ),
               Effect.as<Outcome>({ status: 'done', error: null }),
-              Effect.catch((failure) => Effect.succeed<Outcome>({ status: 'error', error: failureMessage(failure) })),
+              Effect.catch((failure) =>
+                Metric.update(ChatMetrics.failures, failure._tag).pipe(
+                  Effect.as<Outcome>({ status: 'error', error: failureMessage(failure) }),
+                ),
+              ),
               Effect.provideService(LlamaHttp, http),
               Effect.raceFirst(
                 Deferred.await(run.stopped).pipe(Effect.as<Outcome>({ status: 'stopped', error: null })),
@@ -314,6 +334,7 @@ export class ChatRuns extends Context.Service<
                 yield* withoutRun(run);
                 if (Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause)) {
                   yield* Effect.logError(`the reply of conversation ${run.conversationId} failed`, exit.cause);
+                  yield* Metric.update(ChatMetrics.failures, 'Defect');
                   // Dead before it was saved: saved `error` with its text so far, its `done` ends the clients'
                   // streams. Best-effort: a save that fails too leaves the row to the next start's `stopOrphans`.
                   yield* save({
@@ -377,7 +398,9 @@ export class ChatRuns extends Context.Service<
             ),
             scope,
           );
-          return [replyOf(run), new Map(now).set(id, run)] as const;
+          const next = new Map(now).set(id, run);
+          yield* Metric.update(ChatMetrics.active, next.size);
+          return [replyOf(run), next] as const;
         });
 
         /**
@@ -402,6 +425,10 @@ export class ChatRuns extends Context.Service<
             }),
           ).pipe(Effect.uninterruptible);
 
+        /** A send or a regeneration refused, counted by its tag. */
+        const countRefusal = <A, E extends { readonly _tag: string }, R>(self: Effect.Effect<A, E, R>) =>
+          Effect.tapError(self, (error) => Metric.update(ChatMetrics.refused, error._tag));
+
         const send = Effect.fn('ChatRuns.send')(function* (id: number, content: string) {
           const text = Str.trim(content);
           if (Str.isEmpty(text)) return yield* EmptyMessage.make({ message: 'Empty message' });
@@ -414,7 +441,7 @@ export class ChatRuns extends Context.Service<
               return user;
             }),
           );
-        });
+        }, countRefusal);
 
         const regenerate = Effect.fn('ChatRuns.regenerate')(function* (id: number) {
           return yield* starting(id, () =>
@@ -429,7 +456,7 @@ export class ChatRuns extends Context.Service<
               return null;
             }),
           );
-        });
+        }, countRefusal);
 
         const runOf = (id: number) => Effect.map(SynchronizedRef.get(runs), (now) => Option.fromNullishOr(now.get(id)));
 

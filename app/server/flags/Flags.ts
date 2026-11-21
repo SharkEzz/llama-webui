@@ -5,6 +5,7 @@ import type { FlagCatalog } from 'llamacpp-js/flags';
 import { parseHelp } from 'llamacpp-js/flags';
 import { expandHome } from '../config/Home.ts';
 import { boundedText } from '../process/bounded.ts';
+import { CacheMetrics, cacheLoad, cacheLookup } from '../runtime/Metrics.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 
 /** How long `--help` may run, and how much it may print. */
@@ -30,6 +31,7 @@ export class Flags extends Context.Service<
         /** `<binary> --help` parsed; the reason it gave no catalogue is not kept, only that it gave none. */
         const readHelp = Effect.fn('Flags.readHelp')(
           function* (binary: string) {
+            yield* cacheLoad('flags');
             const handle = yield* spawner.spawn(
               ChildProcess.make(binary, ['--help'], { stdin: 'ignore', stderr: 'ignore', forceKillAfter: '1 second' }),
             );
@@ -42,6 +44,7 @@ export class Flags extends Context.Service<
           },
           Effect.scoped,
           Effect.timeout(HELP_TIMEOUT),
+          Effect.trackDuration(CacheMetrics.flagsHelp),
           (effect, binary) =>
             Effect.mapError(effect, () => FlagsUnavailable.make({ message: `llama-server --help failed (${binary})` })),
         );
@@ -55,6 +58,7 @@ export class Flags extends Context.Service<
         const catalog = Effect.gen(function* () {
           const { binary } = yield* settings.get;
           const path = yield* Effect.provideService(expandHome(binary), Path.Path, paths);
+          yield* cacheLookup('flags');
           return yield* Cache.get(cache, path);
         }).pipe(Effect.withSpan('Flags.catalog'));
 

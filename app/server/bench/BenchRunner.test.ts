@@ -20,6 +20,7 @@ import {
   Fiber,
   FileSystem,
   Layer,
+  Metric,
   Option,
   Path,
   Ref,
@@ -31,6 +32,7 @@ import {
 import { TestClock } from 'effect/testing';
 import { LogRing } from '../logs/LogRing.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
+import { BenchMetrics } from '../runtime/Metrics.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { buildCommand } from '../supervisor/command.ts';
@@ -373,7 +375,11 @@ describe('BenchRunner', () => {
       assert.isTrue(Arr.some(lives, (l) => l.phase === 'prompt' && l.step !== null));
       assert.isTrue(Arr.every(lives, (l) => l.lines.length <= 20));
       yield* gateWas(STOP_AND_RESTART);
-    }).pipe(withRunner(), fresh),
+      const ok = yield* Metric.value(Metric.withAttributes(BenchMetrics.runs, { kind: 'bench', status: 'ok' }));
+      const timed = yield* Metric.value(Metric.withAttributes(BenchMetrics.runDuration, { kind: 'bench' }));
+      const gate = yield* Metric.value(BenchMetrics.gateRefused);
+      assert.deepStrictEqual([ok.count, timed.count, gate.occurrences.get('ServerRunning')], [1, 1, 1]);
+    }).pipe(withRunner(), fresh, Effect.provideService(Metric.MetricRegistry, new Map())),
   );
 
   it.live('a missing model is refused before anything stops', () =>

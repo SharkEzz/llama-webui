@@ -1,6 +1,5 @@
 import { NodeSocket } from '@effect/platform-node';
-import { Effect, Layer, Schema, String as Str } from 'effect';
-import { DevTools } from 'effect/devtools';
+import { Effect, Layer, Metric, Schema, String as Str } from 'effect';
 import { BenchHardware } from './bench/BenchHardware.ts';
 import { BenchRunner } from './bench/BenchRunner.ts';
 import { BenchRunsRepo } from './bench/BenchRunsRepo.ts';
@@ -26,6 +25,7 @@ import { ModelCacheRepo } from './models/ModelCacheRepo.ts';
 import { Monitor } from './monitor/Monitor.ts';
 import { Placement } from './monitor/Placement.ts';
 import { ProfilesRepo } from './profiles/ProfilesRepo.ts';
+import * as DevToolsWire from './runtime/DevToolsWire.ts';
 import { Shutdown } from './runtime/Shutdown.ts';
 import { SettingsRepo } from './settings/SettingsRepo.ts';
 import { ExternalWatch } from './supervisor/ExternalWatch.ts';
@@ -105,8 +105,9 @@ const accepts = (url: string) =>
   );
 
 /**
- * In dev (`LLAMA_WEBUI_DEV=1`, set by `vite dev`), the spans go to the Effect DevTools when they run: the DevTools
- * client waits a second for a first connection, which nothing listening would add to each restart. A production
+ * In dev (`LLAMA_WEBUI_DEV=1`, set by `vite dev`), the spans and the metrics (`runtime/Metrics.ts`, and the fibers'
+ * own) go to the Effect DevTools when they run, in the shape the VS Code extension decodes (`runtime/DevToolsWire.ts`):
+ * the DevTools client waits a second for a first connection, which nothing listening would add to each restart. A production
  * start never adds them, nor looks for them.
  */
 const DevToolsInDev = Layer.unwrap(
@@ -115,7 +116,8 @@ const DevToolsInDev = Layer.unwrap(
     if (!dev) return Layer.empty;
     if (yield* accepts(devToolsUrl)) {
       yield* Effect.logInfo(`Effect DevTools connected (${devToolsUrl})`);
-      return DevTools.layer(devToolsUrl);
+      // The fibers' metrics too (`child_fibers_*`): they cost a little on every fork, so only while the DevTools listen.
+      return Layer.merge(DevToolsWire.layer(devToolsUrl), Metric.enableRuntimeMetricsLayer);
     }
     yield* Effect.logInfo(`no Effect DevTools at ${devToolsUrl}: start them, then save a server file`);
     return Layer.empty;

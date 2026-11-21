@@ -17,6 +17,7 @@ import {
   Effect,
   type FileSystem,
   Layer,
+  Metric,
   Option,
   Predicate,
   Schema,
@@ -26,6 +27,7 @@ import {
 } from 'effect';
 import { dual } from 'effect/Function';
 import { type HttpClientError, HttpClientRequest, type HttpClientResponse, type UrlParams } from 'effect/http';
+import { cacheLoad, cacheLookup, HfMetrics } from '../runtime/Metrics.ts';
 import { HfHttp } from './HfHttp.ts';
 import { hfEndpoint, hfToken, hubHeaders } from './token.ts';
 
@@ -237,6 +239,9 @@ export class HfClient extends Context.Service<
             duration: API_TIMEOUT,
             orElse: () => Effect.fail(HfUnreachable.make({ message: 'Hugging Face unreachable: no answer in 10 s' })),
           }),
+          Effect.trackDuration(HfMetrics.duration),
+          Effect.tap(() => Metric.update(HfMetrics.requests, 'ok')),
+          Effect.tapError((error) => Metric.update(HfMetrics.requests, error._tag)),
         );
 
       /** The account of `token` as the Hub tells it, and whether to keep it (not after a failure of the network). */
@@ -265,8 +270,10 @@ export class HfClient extends Context.Service<
         Effect.flatMap(
           SynchronizedRef.modifyEffect(accounts, (known) => {
             const pending = known.get(token);
-            if (pending !== undefined) return Effect.succeed([pending, known] as const);
+            if (pending !== undefined) return Effect.as(cacheLookup('whoami'), [pending, known] as const);
             return Effect.gen(function* () {
+              yield* cacheLookup('whoami');
+              yield* cacheLoad('whoami');
               const asked = yield* Deferred.make<Account>();
               yield* askAccount(token).pipe(
                 Effect.flatMap(({ account, keep }) =>

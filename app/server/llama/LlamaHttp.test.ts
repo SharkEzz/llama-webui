@@ -1,6 +1,7 @@
 import { assert, layer } from '@effect/vitest';
-import { Effect, Exit, Option, Stream } from 'effect';
+import { Effect, Exit, Metric, Option, Stream } from 'effect';
 import { HttpClientRequest } from 'effect/http';
+import { LlamaHttpMetrics } from '../runtime/Metrics.ts';
 import { freePort, httpStub, later, nodeFetchText, proxiedEnvironment, until } from '../testing/llama.ts';
 import { LlamaHttp } from './LlamaHttp.ts';
 
@@ -51,7 +52,14 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('LlamaHttp', (it) => {
         Effect.scoped,
       );
       assert.deepStrictEqual(reply, [503, 'GET loading']);
-    }),
+      // Counted by the class of its status, with nothing to answer as a failure.
+      const failed = yield* Metric.value(Metric.withAttributes(LlamaHttpMetrics.requests, { class: '5xx' }));
+      const closed = yield* freePort;
+      const unanswered = yield* client.get(`http://127.0.0.1:${closed}/`).pipe(Effect.scoped, Effect.exit);
+      const lost = yield* Metric.value(Metric.withAttributes(LlamaHttpMetrics.requests, { class: 'failed' }));
+      assert.isTrue(Exit.isFailure(unanswered));
+      assert.deepStrictEqual([failed.count, lost.count], [1, 1]);
+    }).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
   );
 
   it.effect('the body is streamed as it arrives, and leaving it closes the connection', () =>

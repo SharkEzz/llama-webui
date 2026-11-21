@@ -8,6 +8,7 @@ import {
   Exit,
   FileSystem,
   Layer,
+  Metric,
   Option,
   Path,
   Ref,
@@ -22,6 +23,7 @@ import { CpuInfo } from '../hardware/CpuInfo.ts';
 import { boundedText, OutputTooLarge } from '../process/bounded.ts';
 import { causeMessage, endingOf } from '../process/ending.ts';
 import { closeWithin } from '../process/followed.ts';
+import { CacheMetrics, cacheLoad, cacheLookup } from '../runtime/Metrics.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { which } from './which.ts';
 
@@ -161,7 +163,7 @@ export class BenchHardware extends Context.Service<
         });
 
         const readBuild = (key: Key) =>
-          output(key.binary, '--version', options.versionTimeout).pipe(
+          Effect.andThen(cacheLoad('bench_build'), output(key.binary, '--version', options.versionTimeout)).pipe(
             Effect.map((text) =>
               Option.fromNullishOr(VERSION.exec(text)).pipe(
                 Option.map((m) => `b${m[1]} (${m[2]})`),
@@ -182,13 +184,16 @@ export class BenchHardware extends Context.Service<
           Ref.get(lastGood).pipe(Effect.map((m) => Option.fromNullishOr(m.get(binary))));
 
         const readDevices = Effect.fn('BenchHardware.readDevices')(function* (key: Key) {
+          yield* cacheLoad('bench_devices');
           const listed = yield* Effect.result(output(key.binary, '--list-devices', options.listTimeout));
           const previous = yield* lastGoodOf(key.binary);
+          const fallback = Option.isSome(previous) ? Metric.update(CacheMetrics.devicesFallback, 1) : Effect.void;
           if (listed._tag === 'Failure') {
             // A crash while llama-server runs prints a truncated list (#15): never trust it.
             const failure = listed.failure;
             const error = failure._tag === 'Spawn' ? failure.message : `llama-bench --list-devices ${failure.message}`;
             const list: DeviceList = { devices: Option.getOrElse(previous, () => []), error };
+            yield* fallback;
             return list;
           }
           const devices = parseDeviceList(listed.success);
@@ -198,6 +203,7 @@ export class BenchHardware extends Context.Service<
               devices: Option.getOrElse(previous, () => devices),
               error: `${empty.value.id} listed without memory`,
             };
+            yield* fallback;
             return list;
           }
           if (Arr.isReadonlyArrayNonEmpty(devices))
@@ -218,11 +224,13 @@ export class BenchHardware extends Context.Service<
 
         const build = Effect.fn('BenchHardware.build')(function* (binary: string) {
           const key = yield* keyOf(binary);
+          yield* cacheLookup('bench_build');
           return yield* Cache.get(builds, key);
         });
 
         const devices = Effect.fn('BenchHardware.devices')(function* (benchBinary: string) {
           const key = yield* keyOf(benchBinary);
+          yield* cacheLookup('bench_devices');
           return yield* Cache.get(deviceLists, key);
         });
 

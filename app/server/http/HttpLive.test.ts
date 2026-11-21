@@ -1,6 +1,7 @@
 import { assert, layer } from '@effect/vitest';
-import { Array as Arr, Effect, Layer, Logger } from 'effect';
+import { Array as Arr, Effect, Layer, Logger, Metric, Schedule } from 'effect';
 import { HttpClient, HttpClientRequest, HttpRouter } from 'effect/http';
+import { HttpMetrics } from '../runtime/Metrics.ts';
 import { ServerTest } from '../testing/http.ts';
 import { PublicTest } from '../testing/public.ts';
 import { ServicesTest } from '../testing/services.ts';
@@ -17,6 +18,14 @@ const Errors = Logger.layer([
   }),
 ]);
 
+/** The count of `metric`, once it reaches `n`: a response is measured after it is written. */
+const countReaches = (metric: Metric.Counter<number>, n: number) =>
+  Metric.value(metric).pipe(
+    Effect.repeat({ until: (state) => state.count >= n, schedule: Schedule.spaced('10 millis') }),
+    Effect.timeout('2 seconds'),
+    Effect.map((state) => state.count),
+  );
+
 /** The API, /ws, a route that dies, and a UI of one page, served as the app serves them. */
 const TestApp = serve(Layer.mergeAll(ApiRoutes, WsHub.route, Boom, PublicTest)).pipe(
   Layer.provide(ServicesTest),
@@ -24,7 +33,8 @@ const TestApp = serve(Layer.mergeAll(ApiRoutes, WsHub.route, Boom, PublicTest)).
   Layer.provide(Errors),
 );
 
-layer(TestApp)('HttpLive', (it) => {
+// On the real clock: a measure is waited for.
+layer(TestApp, { excludeTestServices: true })('HttpLive', (it) => {
   it.effect('an unknown /api path is a 404 RouteNotFound, not the page', () =>
     Effect.gen(function* () {
       const client = yield* HttpClient.HttpClient;
@@ -124,6 +134,42 @@ layer(TestApp)('HttpLive', (it) => {
       const text = yield* res.text;
       assert.notInclude(text, 'secret');
       assert.isTrue(Arr.some(errors, (message) => Arr.contains(Arr.ensure(message), 'a request failed')));
+    }),
+  );
+
+  it.effect('every response is counted by method and class of status, a defect too', () =>
+    Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const ok = Metric.withAttributes(HttpMetrics.requests, { method: 'GET', class: '2xx' });
+      const missing = Metric.withAttributes(HttpMetrics.requests, { method: 'POST', class: '4xx' });
+      const failed = Metric.withAttributes(HttpMetrics.requests, { method: 'GET', class: '5xx' });
+      const before = {
+        ok: (yield* Metric.value(ok)).count,
+        missing: (yield* Metric.value(missing)).count,
+        failed: (yield* Metric.value(failed)).count,
+        defects: (yield* Metric.value(HttpMetrics.defects)).count,
+        invalid: (yield* Metric.value(HttpMetrics.invalid)).occurrences.get('Payload') ?? 0,
+      };
+      yield* client.get('/api/health');
+      yield* client.execute(HttpClientRequest.post('/api/nope'));
+      yield* client.get('/api/boom');
+      yield* client.execute(
+        HttpClientRequest.patch('/api/settings').pipe(HttpClientRequest.bodyText('[1]', 'application/json')),
+      );
+      const after = {
+        ok: yield* countReaches(ok, before.ok + 1),
+        missing: yield* countReaches(missing, before.missing + 1),
+        failed: yield* countReaches(failed, before.failed + 1),
+        defects: yield* countReaches(HttpMetrics.defects, before.defects + 1),
+      };
+      assert.deepStrictEqual(after, {
+        ok: before.ok + 1,
+        missing: before.missing + 1,
+        failed: before.failed + 1,
+        defects: before.defects + 1,
+      });
+      const invalid = yield* Metric.value(HttpMetrics.invalid);
+      assert.strictEqual(invalid.occurrences.get('Payload'), before.invalid + 1);
     }),
   );
 });

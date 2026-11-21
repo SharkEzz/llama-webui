@@ -22,6 +22,7 @@ import {
   Fiber,
   FileSystem,
   Layer,
+  Metric,
   Option,
   Path,
   Ref,
@@ -32,6 +33,7 @@ import type { HfHttp } from '../hf/HfHttp.ts';
 import { fileDest, partPath, sizeOf } from '../hf/paths.ts';
 import type { NewDownload } from '../hf/repo.ts';
 import { removeEmptyFolders } from '../models/usage.ts';
+import { DownloadMetrics } from '../runtime/Metrics.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { DownloadsRepo, doneBytes } from './DownloadsRepo.ts';
@@ -324,6 +326,7 @@ export class Downloads extends Context.Service<
                   bps,
                 };
                 yield* hub.publish({ type: 'download-progress', payload: live });
+                yield* Metric.update(DownloadMetrics.bps, bps);
                 const next: Running = { ...run, live, lastEmit: now, lastBytes: progress.bytesDone };
                 return { ...s, running: Option.some(next) };
               }),
@@ -364,6 +367,9 @@ export class Downloads extends Context.Service<
               const item = found.value;
               // Canceled, even when the transfer ended first: the cancel came before this look.
               const wasCanceled = yield* Deferred.isDone(canceled);
+              const status = wasCanceled ? 'canceled' : outcome._tag;
+              yield* Metric.update(Metric.withAttributes(DownloadMetrics.items, { status }), 1);
+              if (!wasCanceled && outcome._tag === 'error') yield* Metric.update(DownloadMetrics.errors, outcome.code);
               const saved = yield* wasCanceled
                 ? discard(item).pipe(
                     // Canceled all the same; what is left on disk is named in the log.
@@ -381,6 +387,7 @@ export class Downloads extends Context.Service<
                   : repo.setStatus(id, 'done');
               yield* published(saved);
               yield* hub.publish({ type: 'download-progress', payload: null });
+              yield* Metric.update(DownloadMetrics.bps, 0);
               return { ...s, running: Option.none() };
             }),
           );
@@ -406,7 +413,7 @@ export class Downloads extends Context.Service<
             const picked = yield* pick;
             if (Option.isNone(picked)) return;
             const { item, canceled } = picked.value;
-            const outcome = yield* process(item, canceled);
+            const outcome = yield* process(item, canceled).pipe(Effect.trackDuration(DownloadMetrics.duration));
             yield* finish(item.id, canceled, outcome);
           }
         }).pipe(

@@ -10,6 +10,7 @@ import {
   Fiber,
   type FileSystem,
   Layer,
+  Metric,
   Option,
   type Path,
   Predicate,
@@ -20,6 +21,7 @@ import {
 } from 'effect';
 import type { ChildProcessSpawner } from 'effect/process';
 import type { PciIds } from '../hardware/PciIds.ts';
+import { MonitorMetrics } from '../runtime/Metrics.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { type AmdCard, discoverAmdCards, isRuntimeSuspended, readAmdCard, readProcAmdVram } from './amdgpu.ts';
 import { makeDiskSampler, physicalDisks, resolveModelDisk } from './disk.ts';
@@ -181,9 +183,9 @@ export class Collectors extends Context.Service<
         const first = initial.collectors.nvml ? yield* tryNvml : Option.none<Source>();
         // nvidia-smi only when NVML did not come up.
         const smi = Option.isSome(first) ? Option.none<NvidiaSmi>() : yield* Effect.asSome(smiReader);
-        const current = yield* Ref.make<Source>(
-          Option.getOrElse(first, (): Source => ({ kind: 'nvidia-smi', reader: Option.getOrThrow(smi) })),
-        );
+        const source = Option.getOrElse(first, (): Source => ({ kind: 'nvidia-smi', reader: Option.getOrThrow(smi) }));
+        const current = yield* Ref.make<Source>(source);
+        yield* Metric.update(MonitorMetrics.gpuSource, source.kind);
         /** The reader of the moment: a switch of source is seen by the next call. */
         const nvidia: NvidiaReader = {
           gpus: Effect.flatMap(Ref.get(current), (s) => s.reader.gpus),
@@ -196,6 +198,7 @@ export class Collectors extends Context.Service<
         /** `next` the source, the last settings applied to it. */
         const switchTo = Effect.fnUntraced(function* (next: Source) {
           yield* Ref.set(current, next);
+          yield* Metric.update(MonitorMetrics.gpuSource, next.kind);
           const config = yield* Ref.get(lastConfig);
           yield* next.reader.configure(config);
         });
@@ -212,6 +215,7 @@ export class Collectors extends Context.Service<
           while (true) {
             const startedAt = yield* Clock.currentTimeMillis;
             yield* live.reader.died;
+            yield* Metric.update(MonitorMetrics.nvmlDeaths, 1);
             yield* Scope.close(live.scope, Exit.void);
             if ((yield* Clock.currentTimeMillis) - startedAt >= healthyMs) used = 0;
             let next = Option.none<Source>();
@@ -225,6 +229,7 @@ export class Collectors extends Context.Service<
               next = yield* tryNvml;
             }
             if (Option.isNone(next) || next.value.kind !== 'nvml') break;
+            yield* Metric.update(MonitorMetrics.nvmlRestarts, 1);
             live = next.value;
             yield* switchTo(live);
           }

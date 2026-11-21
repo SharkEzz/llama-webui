@@ -14,6 +14,7 @@ import {
   Fiber,
   FileSystem,
   Layer,
+  Metric,
   Option,
   type Path,
   PubSub,
@@ -30,6 +31,7 @@ import { LogRing } from '../logs/LogRing.ts';
 import { isIdleNoise, linesOf } from '../logs/lines.ts';
 import { causeMessage, type Ending, endingOf } from '../process/ending.ts';
 import { FORCE_KILL_AFTER, type Followed, followProgram } from '../process/followed.ts';
+import { LlamaMetrics } from '../runtime/Metrics.ts';
 import { WsHub } from '../ws/WsHub.ts';
 import { type BuiltCommand, launchLines } from './command.ts';
 
@@ -150,10 +152,22 @@ export class Supervisor extends Context.Service<
                   ? Effect.void
                   : hub
                       .publish({ type: 'server-state', payload: viewOf(next) })
-                      .pipe(Effect.andThen(PubSub.publish(states, next.state)))
+                      .pipe(
+                        Effect.andThen(PubSub.publish(states, next.state)),
+                        Effect.andThen(measured(now.state, next.state)),
+                      )
                 ).pipe(Effect.as([true, next] as const)),
             }),
           );
+
+        /** The metrics of a change of state: the state entered, whether it is ready, and how long a start took. */
+        const measured = Effect.fnUntraced(function* (before: ServerState, after: ServerState) {
+          yield* Metric.update(LlamaMetrics.transitions, after.kind);
+          yield* Metric.update(LlamaMetrics.ready, after.kind === 'ready' ? 1 : 0);
+          if (before.kind === 'starting' && after.kind === 'ready') {
+            yield* Metric.update(LlamaMetrics.startup, Duration.millis(after.since - before.since));
+          }
+        });
 
         const viewOf = (h: Held): ServerView => serverView({ state: h.state, last: Option.getOrNull(h.last) });
 
@@ -352,15 +366,19 @@ export class Supervisor extends Context.Service<
           );
           // The wait is made interruptible for the timeout to end it, in a finalizer too.
           const { handle } = running.program;
+          const stopAt = yield* Clock.currentTimeMillis;
           const stopped = yield* handle
             .kill({ killSignal: 'SIGTERM' })
             .pipe(Effect.ignore, Effect.interruptible, Effect.timeoutOption(killTimeout));
           if (Option.isNone(stopped)) {
+            yield* Metric.update(LlamaMetrics.sigkill, 1);
             yield* ring.push(`[llama-webui] not stopped after ${Duration.toMillis(killTimeout)} ms, SIGKILL`);
             yield* handle.kill({ killSignal: 'SIGKILL' }).pipe(Effect.ignore);
           }
           // Its exit handled by the fiber that watches it: the state says so, its scope is closed.
           yield* running.program.ended;
+          const endAt = yield* Clock.currentTimeMillis;
+          yield* Metric.update(LlamaMetrics.stop, Duration.millis(endAt - stopAt));
         });
 
         /** Runs `operation` in a fiber of `ops` and waits for it: the caller may go away, the operation runs to its end. */

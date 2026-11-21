@@ -1,7 +1,8 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, describe, it } from '@effect/vitest';
-import { Array as Arr, Context, Effect, FileSystem, Layer, Option, Path, Ref, type Scope } from 'effect';
+import { Array as Arr, Context, Effect, FileSystem, Layer, Metric, Option, Path, Ref, type Scope } from 'effect';
 import * as Db from '../db/Db.ts';
+import { CacheMetrics, ModelMetrics } from '../runtime/Metrics.ts';
 import { type FakeTensor, type KvValue, writeGguf } from '../testing/gguf.ts';
 import { GgufReader } from './GgufReader.ts';
 import { ModelCacheRepo } from './ModelCacheRepo.ts';
@@ -109,8 +110,16 @@ describe('scan', () => {
         const secondReads = yield* takeReads;
         assert.strictEqual(secondReads, 1);
         assert.deepStrictEqual(second, first);
+        // Three lookups a scan; the first loads them all, the second only the one that failed.
+        const lookups = yield* Metric.value(Metric.withAttributes(CacheMetrics.lookups, { cache: 'model_cache' }));
+        const loads = yield* Metric.value(Metric.withAttributes(CacheMetrics.loads, { cache: 'model_cache' }));
+        assert.deepStrictEqual([lookups.count, loads.count], [6, 4]);
+        const models = yield* Metric.value(ModelMetrics.models);
+        const failed = yield* Metric.value(ModelMetrics.failed);
+        assert.deepStrictEqual([models.value, failed.value], [3, 1]);
+        assert.strictEqual((yield* Metric.value(ModelMetrics.scanDuration)).count, 2);
       }),
-    ),
+    ).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
   );
 
   it.effect('scanModels follows a .gguf symlink to a regular file but not a directory symlink', () =>
@@ -186,8 +195,9 @@ describe('scan', () => {
         );
         const after = yield* cached([a, b, old]);
         assert.deepStrictEqual(after, [true, false, false]);
+        assert.strictEqual((yield* Metric.value(ModelMetrics.pruned)).count, 2);
       }),
-    ),
+    ).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
   );
 
   it.effect('scanModels never caches a failed read', () =>

@@ -12,6 +12,7 @@ import {
   type PlatformError,
   Predicate,
 } from 'effect';
+import { CacheMetrics, cacheLoad, cacheLookup } from '../runtime/Metrics.ts';
 import { type ModelInfo, ModelReadError, type ParsedShard, parseModel, shardFiles } from './gguf.ts';
 
 /** The parsed models kept (each holds its tensor table). */
@@ -97,9 +98,10 @@ export class GgufReader extends Context.Service<
       });
 
       const load = Effect.fn('GgufReader.load')(function* (path: string) {
+        yield* cacheLoad('gguf');
         const files = shardFiles(path);
         const parts = yield* statParts(files);
-        const { shards, parameterCount } = yield* parse(path);
+        const { shards, parameterCount } = yield* parse(path).pipe(Effect.trackDuration(CacheMetrics.ggufParse));
         const sizes = Arr.map(parts, (info) => Number(info.size));
         const model: ModelInfo = { ...parseModel({ path, shards, fileSizes: sizes, parameterCount }), files };
         return { stamp: stampOf(parts), model };
@@ -112,6 +114,7 @@ export class GgufReader extends Context.Service<
       });
 
       const read = Effect.fn('GgufReader.read')(function* (path: string) {
+        yield* cacheLookup('gguf');
         const current = yield* stamp(path);
         yield* Cache.invalidateWhen(cache, path, (entry) => entry.stamp !== current);
         const entry = yield* Cache.get(cache, path);

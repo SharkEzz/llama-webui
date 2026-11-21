@@ -6,6 +6,7 @@ import {
   Effect,
   Exit,
   Fiber,
+  Metric,
   Option,
   Predicate,
   Ref,
@@ -14,6 +15,7 @@ import {
   Scope,
 } from 'effect';
 import { LogRing } from '../logs/LogRing.ts';
+import { BenchMetrics } from '../runtime/Metrics.ts';
 import type { BuiltCommand } from '../supervisor/command.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
 
@@ -89,37 +91,40 @@ export const makeGate = Effect.fn('makeGate')(function* (options: {
     Option.exists(s.stopping, (fiber) => fiber.pollUnsafe() === undefined),
   );
 
-  const acquire = Effect.fn('Gate.acquire')(function* (request: { readonly stopServer: boolean }) {
-    const now = yield* supervisor.state.pipe(
-      Effect.repeat({
-        schedule: Schedule.spaced(options.poll ?? '100 millis'),
-        until: (s) => s.kind !== 'stopping',
-      }),
-      Effect.timeoutOrElse({
-        duration: options.stoppingTimeout,
-        orElse: () =>
-          Effect.fail(ServerStopTooSlow.make({ message: 'llama-server is taking too long to stop: try again' })),
-      }),
-    );
-    if (now.kind === 'external')
-      return yield* ExternalServerRunning.make({
-        message: `An external llama-server is running on port ${now.port}: stop it first`,
-      });
-    if (now.kind !== 'starting' && now.kind !== 'ready') return yield* Ref.set(state, { ...FREE, held: true });
-    if (!request.stopServer)
-      return yield* ServerRunning.make({
-        message: `llama-server is running (profile ${now.profile}): it will be stopped during the benchmark, then restarted`,
-      });
-    const last = yield* supervisor.lastCommand;
-    yield* ring.push('[bench] stopping llama-server for the benchmark');
-    // Forked and recorded at once: an interruption in between would lose the stop to wait for.
-    yield* Effect.uninterruptible(
-      Effect.gen(function* () {
-        const stopping = yield* Effect.forkIn(supervisor.stop, scope);
-        yield* Ref.set(state, { ...FREE, held: true, stopped: last, stopping: Option.some(stopping) });
-      }),
-    );
-  });
+  const acquire = Effect.fn('Gate.acquire')(
+    function* (request: { readonly stopServer: boolean }) {
+      const now = yield* supervisor.state.pipe(
+        Effect.repeat({
+          schedule: Schedule.spaced(options.poll ?? '100 millis'),
+          until: (s) => s.kind !== 'stopping',
+        }),
+        Effect.timeoutOrElse({
+          duration: options.stoppingTimeout,
+          orElse: () =>
+            Effect.fail(ServerStopTooSlow.make({ message: 'llama-server is taking too long to stop: try again' })),
+        }),
+      );
+      if (now.kind === 'external')
+        return yield* ExternalServerRunning.make({
+          message: `An external llama-server is running on port ${now.port}: stop it first`,
+        });
+      if (now.kind !== 'starting' && now.kind !== 'ready') return yield* Ref.set(state, { ...FREE, held: true });
+      if (!request.stopServer)
+        return yield* ServerRunning.make({
+          message: `llama-server is running (profile ${now.profile}): it will be stopped during the benchmark, then restarted`,
+        });
+      const last = yield* supervisor.lastCommand;
+      yield* ring.push('[bench] stopping llama-server for the benchmark');
+      // Forked and recorded at once: an interruption in between would lose the stop to wait for.
+      yield* Effect.uninterruptible(
+        Effect.gen(function* () {
+          const stopping = yield* Effect.forkIn(supervisor.stop, scope);
+          yield* Ref.set(state, { ...FREE, held: true, stopped: last, stopping: Option.some(stopping) });
+        }),
+      );
+    },
+    (effect) => Effect.tapError(effect, (error) => Metric.update(BenchMetrics.gateRefused, error._tag)),
+  );
 
   const ready = Effect.gen(function* () {
     const { stopping } = yield* Ref.get(state);

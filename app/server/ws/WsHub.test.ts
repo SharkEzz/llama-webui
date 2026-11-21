@@ -11,6 +11,7 @@ import {
   Fiber,
   Layer,
   Logger,
+  Metric,
   Schedule,
   Schema,
   Scope,
@@ -21,6 +22,7 @@ import { Socket } from 'effect/socket';
 import { TestClock } from 'effect/testing';
 import { AppInfo } from '../config/AppInfo.ts';
 import { serve } from '../http/HttpLive.ts';
+import { WsMetrics } from '../runtime/Metrics.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { ServerTest } from '../testing/http.ts';
 import { ofType, openWs, type WsClient } from '../testing/ws.ts';
@@ -105,6 +107,30 @@ it.live('a published message reaches every client', () =>
     const size = yield* hub.size;
     assert.strictEqual(size, 2);
   }),
+);
+
+it.live('the clients are counted while they are connected, and the messages they are sent', () =>
+  Effect.gen(function* () {
+    const { open, hub } = yield* start();
+    const a = yield* open();
+    const b = yield* open();
+    yield* sizeIs(hub, 2);
+    assert.strictEqual((yield* Metric.value(WsMetrics.clients)).value, 2);
+    yield* hub.publish({ type: 'ping' });
+    yield* next(a, 'ping');
+    yield* next(b, 'ping');
+    // A hello and a ping to each: counted once written, so maybe just after the client read it.
+    const sent = yield* Metric.value(WsMetrics.sent).pipe(
+      Effect.repeat({ until: (state) => state.count >= 4, schedule: Schedule.spaced('10 millis') }),
+      Effect.timeout('2 seconds'),
+    );
+    assert.strictEqual(sent.count, 4);
+    assert.isAbove((yield* Metric.value(WsMetrics.sentBytes)).count, 0);
+    assert.strictEqual((yield* Metric.value(WsMetrics.published)).occurrences.get('ping'), 1);
+    a.socket.close();
+    yield* sizeIs(hub, 1);
+    assert.strictEqual((yield* Metric.value(WsMetrics.clients)).value, 1);
+  }).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
 );
 
 it.live('a message that does not encode is logged with its type, not sent, and the next one arrives', () => {
