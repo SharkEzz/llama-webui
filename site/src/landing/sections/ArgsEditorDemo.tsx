@@ -88,7 +88,7 @@ export function ArgsEditorDemo() {
     <div ref={ref} className="mx-6 mb-6" aria-hidden="true">
       <p className="mb-2 text-sm font-medium">llama-server arguments</p>
       <div className="relative">
-        <div className="min-h-72 rounded-lg border border-ring bg-input/30 px-3 py-2.5 font-mono text-sm leading-6 ring-3 ring-ring/30">
+        <div className="min-h-72 rounded-xl border border-ring bg-well px-3.5 py-3 font-mono text-sm leading-6 ring-3 ring-ring/25">
           {BASE.map((l) => (
             <div key={l}>
               <Line text={l} />
@@ -101,8 +101,8 @@ export function ArgsEditorDemo() {
         </div>
         {step.suggestions && (
           <ul
-            className="absolute inset-x-2 z-10 rounded-lg border border-border bg-popover p-1 shadow-surface"
-            style={{ top: `calc(0.625rem + ${BASE.length + 1} * 1.5rem + 0.25rem)` }}
+            className="absolute inset-x-2 z-10 rounded-xl border border-surface-border-bright bg-surface-strong p-1 shadow-surface inset-shadow-highlight backdrop-blur-2xl"
+            style={{ top: `calc(0.75rem + ${BASE.length + 1} * 1.5rem + 0.25rem)` }}
           >
             {step.suggestions.map((name, i) => (
               <li

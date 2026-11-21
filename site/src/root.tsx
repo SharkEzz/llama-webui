@@ -2,6 +2,7 @@ import './styles/app.css';
 import interLatin from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url';
 import monoLatin from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url';
 import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
+import { AuroraBackground } from '@/components/AuroraBackground';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { THEME_INIT_SCRIPT, useResolvedTheme } from '@/lib/theme';
 import type { Route } from './+types/root';
@@ -28,6 +29,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
+        <AuroraBackground />
         {children}
         <ScrollRestoration />
         <Scripts />

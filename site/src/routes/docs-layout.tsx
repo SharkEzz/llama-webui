@@ -25,7 +25,7 @@ export default function DocsLayout() {
   return (
     <MDXProvider components={mdxComponents}>
       <SiteHeader />
-      <div className="sticky top-14 z-30 border-b border-border/60 bg-background/80 px-4 py-2 backdrop-blur-xl sm:px-6 lg:hidden">
+      <div className="sticky top-[4.5rem] z-30 border-y border-border/60 bg-background/75 px-4 py-2 backdrop-blur-xl sm:px-6 lg:hidden">
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger render={<Button variant="ghost" size="sm" className="-ml-2 gap-2" />}>
             <Menu />
@@ -44,7 +44,7 @@ export default function DocsLayout() {
 
       <div className="mx-auto flex max-w-7xl gap-10 px-4 sm:px-6">
         <div className="hidden w-60 shrink-0 lg:block">
-          <div className="sticky top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto py-10 pr-2">
+          <div className="sticky top-20 max-h-[calc(100dvh-5rem)] overflow-y-auto py-10 pr-2">
             <DocsNav pathname={pathname} />
           </div>
         </div>
@@ -96,7 +96,7 @@ export default function DocsLayout() {
         </main>
 
         <div className="hidden w-56 shrink-0 xl:block">
-          <div className="sticky top-14 max-h-[calc(100dvh-3.5rem)] overflow-y-auto py-12">
+          <div className="sticky top-20 max-h-[calc(100dvh-5rem)] overflow-y-auto py-12">
             {doc && <Toc key={doc.path} items={doc.toc} />}
           </div>
         </div>
