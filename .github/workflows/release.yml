@@ -16,13 +16,13 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # tags and history, for `git describe`
           submodules: recursive
       - uses: pnpm/action-setup@v6
       # No `cache: pnpm` here: the published package is built from a fresh install, not from a restored store.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 26.13
       - run: pnpm install --frozen-lockfile
