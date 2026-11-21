@@ -241,8 +241,8 @@ When the change touches `site/`, including its pages, also run `pnpm site:build`
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `master`, on Ubuntu with Node.js 26.13 and
-pnpm:
+`.github/workflows/ci.yml` runs on every pull request and every push to `master` (or by hand, `workflow_dispatch`, when
+a push did not start it), on Ubuntu with Node.js 26.13 and pnpm:
 
 | Step                                         | Command                                              |
 | -------------------------------------------- | ---------------------------------------------------- |

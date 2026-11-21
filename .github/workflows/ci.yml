@@ -5,6 +5,8 @@ on:
   pull_request:
   push:
     branches: [master]
+  # Started by hand (`gh workflow run ci.yml --ref master`) when a push did not trigger it.
+  workflow_dispatch:
 
 jobs:
   check:
