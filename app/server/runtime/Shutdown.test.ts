@@ -1,5 +1,6 @@
 import { assert, it } from '@effect/vitest';
-import { Context, Effect, Exit, Layer, Ref } from 'effect';
+import { Context, Effect, Exit, Layer, Metric, Ref } from 'effect';
+import { ShutdownMetrics } from './Metrics.ts';
 import { Shutdown } from './Shutdown.ts';
 
 /** The shape of `App`: the runner outermost, a layer under it (the HTTP server), `Shutdown.layer` under both. */
@@ -50,5 +51,7 @@ it.effect('a step that fails does not stop the next ones', () =>
     assert.isTrue(Exit.isSuccess(exit));
     const after = yield* Ref.get(log);
     assert.deepStrictEqual(after, ['c', 'a', 'server undone']);
-  }),
+    assert.strictEqual((yield* Metric.value(ShutdownMetrics.stepFailed)).count, 1);
+    assert.strictEqual((yield* Metric.value(ShutdownMetrics.duration)).count, 1);
+  }).pipe(Effect.provideService(Metric.MetricRegistry, new Map())),
 );

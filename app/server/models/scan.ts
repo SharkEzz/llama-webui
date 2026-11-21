@@ -1,7 +1,8 @@
 import { parseGgufShardFilename } from '@huggingface/gguf';
 import type { ModelEntry, ModelSummary } from '@llama-webui/shared';
-import { Array as Arr, Effect, FileSystem, Number as Num, Option, Order, Path, String as Str } from 'effect';
+import { Array as Arr, Effect, FileSystem, Metric, Number as Num, Option, Order, Path, String as Str } from 'effect';
 import { dual } from 'effect/Function';
+import { cacheLoad, cacheLookup, ModelMetrics } from '../runtime/Metrics.ts';
 import { GgufReader, stampOf } from './GgufReader.ts';
 import { type ModelInfo, shardName } from './gguf.ts';
 import { ModelCacheRepo } from './ModelCacheRepo.ts';
@@ -150,10 +151,12 @@ export const scanModels = Effect.fn('scanModels')(function* (
     // A part that cannot be stat'ed has no stamp: the read tells why.
     const stamp = Arr.every(stats, Option.isSome) ? Option.some(stampOf(Arr.getSomes(stats))) : Option.none();
     if (Option.isSome(stamp)) {
+      yield* cacheLookup('model_cache');
       const hit = yield* cache.get(main);
       if (Option.isSome(hit) && hit.value.stamp === stamp.value) {
         return { ok: true, ...hit.value.summary, relPath: group.main } satisfies ModelEntry;
       }
+      yield* cacheLoad('model_cache');
     }
     return yield* reader.read(main).pipe(
       Effect.matchEffect({
@@ -173,6 +176,9 @@ export const scanModels = Effect.fn('scanModels')(function* (
   const found = yield* ggufFiles(root);
   const groups = groupGgufFiles(found);
   const entries = yield* Effect.forEach(groups, entryOf, { concurrency: 'unbounded' });
-  yield* cache.prune(Arr.map(groups, (group) => path.join(root, group.main)));
+  const pruned = yield* cache.prune(Arr.map(groups, (group) => path.join(root, group.main)));
+  yield* Metric.update(ModelMetrics.pruned, pruned);
+  yield* Metric.update(ModelMetrics.models, entries.length);
+  yield* Metric.update(ModelMetrics.failed, Arr.filter(entries, (entry) => !entry.ok).length);
   return entries;
-});
+}, Effect.trackDuration(ModelMetrics.scanDuration));

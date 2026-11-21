@@ -32,6 +32,7 @@ import {
   Fiber,
   FileSystem,
   Layer,
+  Metric,
   Option,
   type Path,
   Ref,
@@ -43,6 +44,7 @@ import type { LlamaHttp } from '../llama/LlamaHttp.ts';
 import type { LogRing } from '../logs/LogRing.ts';
 import { Monitor } from '../monitor/Monitor.ts';
 import { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
+import { BenchMetrics } from '../runtime/Metrics.ts';
 import { Shutdown } from '../runtime/Shutdown.ts';
 import { SettingsRepo } from '../settings/SettingsRepo.ts';
 import { type BuiltCommand, buildCommand } from '../supervisor/command.ts';
@@ -318,6 +320,19 @@ export class BenchRunner extends Context.Service<
             current: Option.map(s.current, (c) => (c.runId === runId ? f(c) : c)),
           }));
 
+        /** The metrics of a run that ended: its status, and its duration when it has one. */
+        const measuredRun = Effect.fnUntraced(function* (saved: BenchRun) {
+          yield* Metric.update(Metric.withAttributes(BenchMetrics.runs, { kind: saved.kind, status: saved.status }), 1);
+          if (saved.durationMs !== null) {
+            const duration = Metric.withAttributes(BenchMetrics.runDuration, { kind: saved.kind });
+            yield* Metric.update(duration, Duration.millis(saved.durationMs));
+          }
+        });
+
+        /** The metric of a sweep that ended. */
+        const measuredSweep = (sweep: Sweep) =>
+          Metric.update(Metric.withAttributes(BenchMetrics.sweeps, { status: sweep.status }), 1);
+
         /** Executes the current run after the gate's stop, saves its result and publishes it. */
         const executed = Effect.fnUntraced(function* (current: Current, spec: BenchSpec, run: BenchRun) {
           const ready = yield* gate.ready.pipe(Effect.result);
@@ -338,6 +353,7 @@ export class BenchRunner extends Context.Service<
                   disk,
                 }).pipe(Effect.scoped, Effect.provideContext(context));
           const saved = yield* runs.finish(run.id, { error: null, ...result });
+          yield* measuredRun(saved);
           yield* updateCurrent(run.id, (c) => ({ ...c, finished: true }));
           yield* publish({ type: 'bench-run', payload: saved });
           return saved;
@@ -356,6 +372,7 @@ export class BenchRunner extends Context.Service<
             yield* publishLive(live);
           }
           const restarted = yield* gate.release(rebuild).pipe(Effect.result);
+          if (restarted._tag === 'Failure') yield* Metric.update(BenchMetrics.restartFailed, 1);
           if (restarted._tag === 'Failure' && Option.isSome(lastRun)) {
             const run = yield* runs.get(lastRun.value);
             if (Option.isSome(run)) {
@@ -383,6 +400,7 @@ export class BenchRunner extends Context.Service<
          */
         const crashed = Effect.fnUntraced(function* (cause: Cause.Cause<never>) {
           yield* Effect.logError('a benchmark stopped on a defect', cause);
+          yield* Metric.update(BenchMetrics.crashed, 1);
           const step = <A>(effect: Effect.Effect<A>) =>
             effect.pipe(Effect.catchCause((failed) => Effect.logError('the end of a benchmark failed', failed)));
           const s = yield* SynchronizedRef.get(state);
@@ -397,14 +415,18 @@ export class BenchRunner extends Context.Service<
                   error: `internal error: ${defect instanceof Error ? defect.message : String(defect)}`,
                   durationMs: now - current.value.live.startedAt,
                 })
-                .pipe(Effect.flatMap((saved) => publish({ type: 'bench-run', payload: saved }))),
+                .pipe(
+                  Effect.tap(measuredRun),
+                  Effect.flatMap((saved) => publish({ type: 'bench-run', payload: saved })),
+                ),
             );
           }
           if (Option.isSome(s.sweep)) {
             yield* step(
-              sweeps
-                .setStatus(s.sweep.value.id, 'interrupted')
-                .pipe(Effect.flatMap((sweep) => publish({ type: 'sweep', payload: sweep }))),
+              sweeps.setStatus(s.sweep.value.id, 'interrupted').pipe(
+                Effect.tap(measuredSweep),
+                Effect.flatMap((sweep) => publish({ type: 'sweep', payload: sweep })),
+              ),
             );
           }
           yield* step(abandon);
@@ -528,6 +550,7 @@ export class BenchRunner extends Context.Service<
           const bestRunId = Option.isSome(sweep) ? yield* bestOf(sweep.value) : null;
           const finishedAt = yield* Clock.currentTimeMillis;
           const ended = yield* sweeps.setStatus(id, cancelled ? 'cancelled' : 'done', { bestRunId, finishedAt });
+          yield* measuredSweep(ended);
           yield* publish({ type: 'sweep', payload: ended });
           yield* release(last);
           yield* SynchronizedRef.update(state, (s) => ({ ...s, sweep: Option.none(), work: Option.none() }));
@@ -697,10 +720,12 @@ export class BenchRunner extends Context.Service<
                 error: Option.getOrNull(Option.flatMap(run, (r) => Option.fromNullishOr(r.error))) ?? INTERRUPTED,
                 durationMs: now - current.value.live.startedAt,
               });
+              yield* measuredRun(saved);
               yield* hub.publish({ type: 'bench-run', payload: saved });
             }
             if (Option.isSome(s.sweep)) {
               const sweep = yield* sweeps.setStatus(s.sweep.value.id, 'interrupted');
+              yield* measuredSweep(sweep);
               yield* hub.publish({ type: 'sweep', payload: sweep });
             }
             if (Option.isSome(s.current)) yield* hub.publish({ type: 'bench-progress', payload: null });

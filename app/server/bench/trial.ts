@@ -1,5 +1,18 @@
 import type { BenchPhase, Measure } from '@llama-webui/shared';
-import { Array as Arr, Clock, Deferred, Duration, Effect, Exit, Option, Ref, Schema, Scope, Stream } from 'effect';
+import {
+  Array as Arr,
+  Clock,
+  Deferred,
+  Duration,
+  Effect,
+  Exit,
+  Metric,
+  Option,
+  Ref,
+  Schema,
+  Scope,
+  Stream,
+} from 'effect';
 import { HttpClientRequest, HttpClientResponse } from 'effect/http';
 import { ChildProcess, type ChildProcessSpawner } from 'effect/process';
 import { ERROR_LINE } from 'llamacpp-js/bench';
@@ -8,6 +21,7 @@ import { health } from '../llama/probes.ts';
 import { linesOf } from '../logs/lines.ts';
 import { type Ending, endingOf } from '../process/ending.ts';
 import { FORCE_KILL_AFTER, type Followed, followProgram } from '../process/followed.ts';
+import { BenchMetrics } from '../runtime/Metrics.ts';
 import type { BuiltCommand } from '../supervisor/command.ts';
 import { draftAcceptPct, measure } from './measure.ts';
 import { benchFailure } from './parse.ts';
@@ -167,7 +181,8 @@ export const runTrial = Effect.fn('trial.runTrial')(function* (options: {
   );
 
   const measured = Effect.gen(function* () {
-    const deadline = (yield* Clock.currentTimeMillis) + loadTimeout;
+    const loadStart = yield* Clock.currentTimeMillis;
+    const deadline = loadStart + loadTimeout;
     for (;;) {
       if (yield* Deferred.isDone(exit)) return yield* yield* exitError;
       if ((yield* Clock.currentTimeMillis) > deadline)
@@ -176,6 +191,8 @@ export const runTrial = Effect.fn('trial.runTrial')(function* (options: {
       if (Option.contains(status, 200)) break;
       yield* Effect.sleep(healthPoll);
     }
+    const loaded = yield* Clock.currentTimeMillis;
+    yield* Metric.update(BenchMetrics.trialLoad, Duration.millis(loaded - loadStart));
     yield* options.onPhase('warmup', null);
     yield* post('/completion', { prompt: WARMUP_PROMPT, n_predict: 16 });
     // Measured through chat, like real use: a repeated raw prompt would make the model copy it, and speculative

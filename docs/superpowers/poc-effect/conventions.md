@@ -334,7 +334,8 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
 
 - **Declared in the catalog**: every `Metric` of the server is a constant of `app/server/runtime/Metrics.ts`, in the
   group of its domain (`HttpMetrics`, `WsMetrics`, `ChatMetrics`, `LlamaMetrics`, `DownloadMetrics`,
-  `MonitorMetrics`), named `llama_webui_<domain>_<what>` with a `description`; a call site only updates it
+  `MonitorMetrics`, `BenchMetrics`, `HfMetrics`, `LlamaHttpMetrics`, `CacheMetrics`, `ModelMetrics`,
+  `ShutdownMetrics`), named `llama_webui_<domain>_<what>` with a `description`; a call site only updates it
   (`Metric.update`, `Effect.trackDuration`), never builds one. A counter is `incremental`.
 - **Closed attributes**: `Metric.withAttributes(metric, { status })` takes a value from a closed set (a status, a kind,
   a tag, a class of HTTP status from `statusClass`); never an id, a path, a model or a URL (one series per value). A
@@ -346,6 +347,8 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
 - **A duration**: `Effect.trackDuration(timer)` when one effect is the measure; `Metric.update(timer,
   Duration.millis(end - start))` when the start and the end are separate events (the first token, a start of
   llama-server). An HTTP response is measured once written: a test waits for its count.
+- **A cache**: `cacheLookup(<cache>)` at each lookup, `cacheLoad(<cache>)` in what loads it (a hit is a lookup that
+  loaded nothing); the name is a constant of the service, listed in `CacheMetrics`' comment.
 - **Tests**: `Effect.provideService(Metric.MetricRegistry, new Map())` around a test that builds its layers gives it
   its own registry; a suite on a shared layer compares the counts before and after.
 

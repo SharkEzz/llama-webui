@@ -297,6 +297,12 @@ server also adds the fibers' own metrics (`child_fibers_*`).
 | `LlamaMetrics` | the states the supervised `llama-server` entered, whether it is ready, the time to ready, the time a stop took, the stops that needed SIGKILL |
 | `DownloadMetrics` | the bytes received, the current speed, the files resumed, the retries, the items ended by status, the errors by code, the time an item ran |
 | `MonitorMetrics` | the time a tick took, the ticks longer than the interval, the ticks that failed, the readers that died, the source of the NVIDIA cards, the NVML sampler's stops and restarts |
+| `BenchMetrics` | the runs ended by kind and status and their duration, the sweeps ended by status, the works that died, the refusals of the gate, the failed restarts of `llama-server`, the time a trial server took to load |
+| `HfMetrics` | the requests to the Hub API by result (`ok` or the error's tag), their duration |
+| `LlamaHttpMetrics` | the requests to a `llama-server` (the monitor's polls, the chat, the trials) by class of status, `failed` or `aborted`, and the time to their headers |
+| `CacheMetrics` | the lookups and the loads of each cache (`gguf`, `flags`, `bench_build`, `bench_devices`, `model_cache`, `whoami`: a hit is a lookup that loaded nothing), the time a GGUF header and a `--help` took to read, the device listings that fell back to the last good one |
+| `ModelMetrics` | the time a scan of the models folder took, the models it found and could not read, the `model_cache` rows pruned |
+| `ShutdownMetrics` | the time the shutdown steps took, the steps that failed |
 
 An attribute is always a value from a closed set (a status, a kind, a tag): never an id, a path or a model, which would
 make one series per value.

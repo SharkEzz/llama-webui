@@ -1,4 +1,5 @@
-import { Context, Effect, Exit, Layer, Scope } from 'effect';
+import { Context, Effect, Exit, Layer, Metric, Scope } from 'effect';
+import { ShutdownMetrics } from './Metrics.ts';
 
 /**
  * Steps that must run while clients are still connected: a reply saved "stopped", a run saved "interrupted", a last
@@ -23,10 +24,20 @@ export class Shutdown extends Context.Service<
         // A step that fails is logged and does not keep the next ones from running.
         yield* Scope.addFinalizer(
           steps,
-          step.pipe(Effect.catchCause((cause) => Effect.logError('a shutdown step failed', cause))),
+          step.pipe(
+            Effect.catchCause((cause) =>
+              Effect.logError('a shutdown step failed', cause).pipe(
+                Effect.andThen(Metric.update(ShutdownMetrics.stepFailed, 1)),
+              ),
+            ),
+          ),
         );
       });
-      return Shutdown.of({ before, run: Scope.close(steps, Exit.void).pipe(Effect.withSpan('Shutdown.run')) });
+      const run = Scope.close(steps, Exit.void).pipe(
+        Effect.trackDuration(ShutdownMetrics.duration),
+        Effect.withSpan('Shutdown.run'),
+      );
+      return Shutdown.of({ before, run });
     }),
   );
 
