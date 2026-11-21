@@ -343,7 +343,8 @@ The model is the NVML sampler, `app/server/collectors/nvml/`.
   error tag, a state).
 - **Always recorded**: an update is a write to the in-memory registry, in production too; no `dev` check at a call
   site. Only the fibers' own metrics (`Metric.enableRuntimeMetricsLayer`, a cost on every fork) are added with the
-  DevTools (`DevToolsInDev` of `App.ts`).
+  DevTools (`DevToolsInDev` of `App.ts`). Their client is `runtime/DevToolsWire.ts`: the VS Code extension (0.10.0)
+  decodes the metrics of Effect 3, so the snapshots are rewritten into that shape; to remove once it reads Effect 4's.
 - **A duration**: `Effect.trackDuration(timer)` when one effect is the measure; `Metric.update(timer,
   Duration.millis(end - start))` when the start and the end are separate events (the first token, a start of
   llama-server). An HTTP response is measured once written: a test waits for its count.
