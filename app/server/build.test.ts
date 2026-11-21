@@ -105,8 +105,8 @@ test('a deep URL gets the shell', async () => {
 test('the licenses of the bundled code ship with the server', () => {
   const text = readFileSync(join(OUTPUT, 'server/THIRD-PARTY-LICENSES.md'), 'utf8');
   // Each heading followed by the text of its license.
-  expect(text).toMatch(/^## effect - 4\.1\.4 .*\n\n\S/m);
-  expect(text).toMatch(/^## @effect\/platform-node - 4\.1\.4 .*\n\n\S/m);
+  expect(text).toMatch(/^## effect - 4\.1\.5 .*\n\n\S/m);
+  expect(text).toMatch(/^## @effect\/platform-node - 4\.1\.5 .*\n\n\S/m);
 });
 
 test('the server finds the NVML sampler: the module that names it sits next to it', () => {
