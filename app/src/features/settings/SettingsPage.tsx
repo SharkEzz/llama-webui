@@ -14,6 +14,7 @@ import { call } from '@/lib/api';
 import { formatDuration } from '@/lib/format';
 import { type SettingsErrors, useSettingsEditor } from '@/lib/settings';
 import { useTheme } from '@/lib/theme';
+import { useDraft } from '@/lib/useDraft';
 import { cn } from '@/lib/utils';
 import { EnvField, GpuSwitches, SwitchRow, TextField } from './fields';
 
@@ -134,8 +135,7 @@ function Server({ settings, errors, save }: SectionProps & { errors: SettingsErr
 
 function Monitoring({ settings, save }: SectionProps) {
   const [info, setInfo] = useState<SystemInfo | null>(null);
-  const [history, setHistory] = useState(settings.historySeconds);
-  useEffect(() => setHistory(settings.historySeconds), [settings.historySeconds]);
+  const [history, setHistory] = useDraft(settings.historySeconds);
   useEffect(() => {
     void call((api) => api.monitor.systemInfo()).then(setInfo, () => {});
   }, []);

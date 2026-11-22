@@ -58,15 +58,13 @@ export function ChecksCard() {
     if (!models) void useModels.getState().refresh();
   }, [models]);
 
-  // Default model: the active profile's, otherwise the first one in the folder.
+  // Default model: the active profile's (read from the server), otherwise the first one in the folder (set by the
+  // render that finds it).
+  const first = models?.models.filter(readable).find((m) => m.kind === 'model')?.path ?? null;
+  if (model === null && profileId === null && first) setModel(first);
   useEffect(() => {
-    if (model !== null) return;
+    if (model !== null || profileId === null) return;
     let gone = false;
-    const first = models?.models.filter(readable).find((m) => m.kind === 'model')?.path ?? null;
-    if (profileId === null) {
-      if (first) setModel(first);
-      return;
-    }
     void call((api) => api.bench.fromProfile({ params: { id: profileId } })).then(
       (d) => !gone && setModel(d.modelPath),
       () => !gone && first && setModel(first),
@@ -74,7 +72,7 @@ export function ChecksCard() {
     return () => {
       gone = true;
     };
-  }, [model, models, profileId]);
+  }, [model, first, profileId]);
 
   // Loaded when opened, when the model changes, then every 10 s while the card is expanded.
   useEffect(() => {

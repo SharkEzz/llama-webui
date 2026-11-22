@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
 import { CodeTextarea } from '@/components/CodeTextarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { formatEnv, parseEnv } from '@/features/profiles/argsText';
 import { highlightEnv } from '@/features/profiles/highlight';
 import { formatBytes } from '@/lib/format';
+import { useDraft } from '@/lib/useDraft';
 
 /** Environment variables, `KEY=value` per line, committed on blur when they parse and changed. */
 export function EnvField(props: {
@@ -17,8 +17,7 @@ export function EnvField(props: {
   onCommit: (env: Record<string, string>) => void;
 }) {
   const saved = formatEnv(props.value);
-  const [draft, setDraft] = useState(saved);
-  useEffect(() => setDraft(saved), [saved]);
+  const [draft, setDraft] = useDraft(saved);
   const parsed = parseEnv(draft);
   const error = 'error' in parsed ? parsed.error : props.error;
   return (
@@ -55,8 +54,7 @@ export function TextField(props: {
   placeholder?: string | undefined;
   onCommit: (v: string) => void;
 }) {
-  const [draft, setDraft] = useState(props.value);
-  useEffect(() => setDraft(props.value), [props.value]);
+  const [draft, setDraft] = useDraft(props.value);
   const commit = () => {
     if (draft.trim() !== props.value) props.onCommit(draft.trim());
   };

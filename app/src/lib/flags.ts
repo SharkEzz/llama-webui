@@ -12,9 +12,13 @@ interface FlagsStore {
 
 const useFlagsStore = create<FlagsStore>()(() => ({ catalog: null, loading: false }));
 
-/** Flag catalog of the configured llama-server (read once, via `llama-server --help` on the server). */
-export function useFlags(): FlagsStore {
-  const s = useFlagsStore();
+/**
+ * Flag catalog of the configured llama-server (read once, via `llama-server --help` on the server), or why there is
+ * none.
+ */
+export function useFlags(): { catalog: FlagCatalog | null; error: string | undefined } {
+  const catalog = useFlagsStore((s) => s.catalog);
+  const error = useFlagsStore((s) => s.error);
   useEffect(() => {
     const st = useFlagsStore.getState();
     if (st.catalog || st.loading || st.error) return;
@@ -27,5 +31,5 @@ export function useFlags(): FlagsStore {
       (e: unknown) => useFlagsStore.setState({ error: errorMessage(e), loading: false }),
     );
   }, []);
-  return s;
+  return { catalog, error };
 }

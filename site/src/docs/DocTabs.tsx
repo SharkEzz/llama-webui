@@ -3,7 +3,7 @@ import { TabsContent, TabsList, Tabs as TabsRoot, TabsTrigger } from '@/componen
 
 /** Content of one tab: <Tab title="…">Markdown</Tab>, inside <Tabs>. */
 export function Tab({ children }: { title: string; children: React.ReactNode }) {
-  return <>{children}</>;
+  return children;
 }
 
 /** <Tabs><Tab title="A">…</Tab><Tab title="B">…</Tab></Tabs>; the first tab is open. */

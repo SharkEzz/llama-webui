@@ -12,6 +12,7 @@ import { call, errorMessage } from '@/lib/api';
 import { formatBytes, formatInt, formatParams } from '@/lib/format';
 import { useProfiles } from '@/lib/profiles';
 import { replacedProfileParams, useTuning } from '@/lib/tuning';
+import { useDraft } from '@/lib/useDraft';
 
 const NO_PROFILE = '__none';
 
@@ -32,14 +33,19 @@ export function ModelCard() {
   const profiles = useProfiles((s) => s.profiles);
   const [info, setInfo] = useState<ModelDetail | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
+  // Another model: the previous one's header goes, in the render that sees it
+  const [infoPath, setInfoPath] = useState(modelPath);
+  if (modelPath !== infoPath) {
+    setInfoPath(modelPath);
+    setInfo(null);
+    setInfoError(null);
+  }
 
   useEffect(() => {
     void useProfiles.getState().reload();
   }, []);
 
   useEffect(() => {
-    setInfo(null);
-    setInfoError(null);
     if (!modelPath) return;
     let gone = false;
     void call((api) => api.models.info({ query: { path: modelPath } })).then(
@@ -123,8 +129,8 @@ export function ModelCard() {
             </code>
             {addedCtx && (
               <span className="text-xs text-muted-foreground">
-                -c from the recommendation: the profile sets no context, and llama-server would allocate the model's
-                full one.
+                -c from the recommendation: the profile sets no context, and llama-server would allocate the
+                model&apos;s full one.
               </span>
             )}
             {ignored.length > 0 && (
@@ -166,8 +172,7 @@ function PathInput({
   value: string;
   onCommit: (p: string) => void;
 }) {
-  const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
+  const [text, setText] = useDraft(value);
   const id = `tuning-${kind}`;
   return (
     <div className="flex flex-col gap-1.5">

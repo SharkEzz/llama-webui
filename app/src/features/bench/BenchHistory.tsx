@@ -51,7 +51,8 @@ export function BenchHistory() {
   const loaded = useBench((s) => s.loaded);
   const filters = useBench((s) => s.filters);
   const selected = useBench((s) => s.selected);
-  const { setFilters, toggle } = useBench.getState();
+  const setFilters = useBench((s) => s.setFilters);
+  const toggle = useBench((s) => s.toggle);
   const [comparing, setComparing] = useState(false);
   const [deleting, setDeleting] = useState<BenchRun | null>(null);
   const navigate = useNavigate();

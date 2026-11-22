@@ -127,7 +127,7 @@ test('a download, download-progress or download-deleted message updates the stor
   expect(store.getState().live).toBeNull();
   // A finished download is told once: the models folder changed.
   expect(downloaded).toHaveBeenCalledExactlyOnceWith(done);
-  expect(success).toHaveBeenCalledOnce();
+  expect(success).toHaveBeenCalledTimes(1);
   // Its Details opens the model on the Models page, through the navigation the store was given.
   const action = success.mock.calls[0]?.[1]?.action;
   expect(action).toMatchObject({ label: 'Details' });
@@ -136,7 +136,7 @@ test('a download, download-progress or download-deleted message updates the stor
     `/models?open=${encodeURIComponent('/models/org/repo-GGUF/repo-Q4_K_M.gguf')}`,
   );
   store.getState().receive({ type: 'download', payload: done });
-  expect(downloaded).toHaveBeenCalledOnce();
+  expect(downloaded).toHaveBeenCalledTimes(1);
 
   store.getState().receive({ type: 'download', payload: item({ id: 2, status: 'error', error: 'Checksum mismatch' }) });
   expect(error).toHaveBeenCalledExactlyOnceWith('Download of repo-Q4_K_M.gguf (Q4_K_M) failed', {

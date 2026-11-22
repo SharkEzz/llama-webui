@@ -29,16 +29,22 @@ export function SetupChecklist({
   onFinish: () => void;
 }) {
   const [report, setReport] = useState<SetupReport | null>(null);
-  const [loading, setLoading] = useState(false);
+  // The first load starts with the mount
+  const [loading, setLoading] = useState(true);
 
+  const load = useCallback(
+    () =>
+      getSetup()
+        .then(setReport, (e: unknown) => toast.error(errorMessage(e)))
+        .finally(() => setLoading(false)),
+    [],
+  );
   const refresh = useCallback(() => {
     setLoading(true);
-    return getSetup()
-      .then(setReport, (e: unknown) => toast.error(errorMessage(e)))
-      .finally(() => setLoading(false));
-  }, []);
+    return load();
+  }, [load]);
 
-  useEffect(() => void refresh(), [refresh]);
+  useEffect(() => void load(), [load]);
 
   // Every step: the setup report, the machine checks (Tuning store) and the profiles.
   const checkAgain = () => {

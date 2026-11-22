@@ -31,7 +31,10 @@ export function SpaceEditor() {
   const modelPath = useTuning((s) => s.modelPath);
   const run = useTuning((s) => s.run);
   const includeUnfit = useTuning((s) => s.includeUnfit);
-  const { setSpace, setBase, setRun, setIncludeUnfit } = useTuning.getState();
+  const setSpace = useTuning((s) => s.setSpace);
+  const setBase = useTuning((s) => s.setBase);
+  const setRun = useTuning((s) => s.setRun);
+  const setIncludeUnfit = useTuning((s) => s.setIncludeUnfit);
   const gpus = gpuDevices(hw?.devices ?? []);
   const baseArgs = serverArgs(base);
   const ncmoe = estimate?.params.ncmoe ?? 0;
@@ -251,7 +254,8 @@ function ValuesRow<T>(props: {
           setError(null);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') {
+          // An Enter that ends an IME composition picks the text, it does not add the value
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
             e.preventDefault();
             submit();
           }

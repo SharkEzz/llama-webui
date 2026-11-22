@@ -50,6 +50,7 @@ export function LogsPage() {
   const visible = hiddenBefore < 0 ? all.length : all.filter((l) => l.seq >= hiddenBefore).length;
   const empty: keyof typeof EMPTY = all.length === 0 ? 'none' : visible === 0 ? 'cleared' : 'filtered';
 
+  // oxlint-disable-next-line react/incompatible-library -- TanStack Virtual is the virtualizer of choice; nothing memoizes what it returns
   const virtualizer = useVirtualizer({
     count: lines.length,
     getScrollElement: () => scroller.current,

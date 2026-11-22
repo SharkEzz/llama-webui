@@ -22,6 +22,7 @@ export function BenchLiveCard() {
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- lines is a trigger: scroll to the bottom on every batch
   }, [lines]);
 
   if (!live) {

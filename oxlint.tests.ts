@@ -18,12 +18,12 @@ export const tests: OxlintConfig = {
         // `expect(value, message)`: the message is the second argument
         'vitest/valid-expect': ['error', { maxArgs: 2 }],
 
-        // --- Debt: off until its milestone ---
-        // Here and not in the base: this override enables the plugin, and its category turns these back on.
-        'vitest/no-conditional-expect': 'off', // L5: 2
-        'vitest/require-mock-type-parameters': 'off', // L5: 2
-        'vitest/require-to-throw-message': 'off', // L5: 1
-        // --- end of debt ---
+        // The Vitest selection (spec, "The selection" › L5)
+        'vitest/no-conditional-expect': 'error',
+        'vitest/require-mock-type-parameters': 'error',
+        'vitest/require-to-throw-message': 'error',
+        'vitest/prefer-to-have-length': 'error',
+        'vitest/prefer-called-times': 'error',
       },
     },
   ],
