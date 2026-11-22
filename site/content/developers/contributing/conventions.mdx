@@ -145,7 +145,8 @@ project config repeats those under its directory. Besides what `.gitignore` list
 outputs. `.eslintignore` holds `/repos/`: oxlint reads it before it looks for nested configs, and only it keeps
 oxlint from loading `repos/effect/.oxlintrc.json`, whose plugin is not installed here. Given a path under `repos/`
 explicitly, oxlint still loads that config and fails with a configuration error; `pnpm lint`, which walks the
-repository, does not.
+repository, does not. The VS Code extension does not read `.eslintignore`: `pnpm install` leaves `repos/effect/.oxlintrc.json` out of
+the submodule's checkout (`scripts/vendored.ts`).
 
 The rules that report on today's code and are not fixed yet are off in two marked blocks, each rule with its count
 and the milestone of the oxc migration (L5, the only one left) that turns it on and fixes its reports: `--- Debt: off until its
