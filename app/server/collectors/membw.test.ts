@@ -1,6 +1,6 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, layer } from '@effect/vitest';
-import { Array as Arr, Duration, Effect, Exit, FileSystem, Path, Schedule, Scope, String as Str } from 'effect';
+import { Array as Arr, Duration, Effect, Exit, FileSystem, Option, Path, Schedule, Scope, String as Str } from 'effect';
 import { ChildProcessSpawner } from 'effect/process';
 import { isAlive } from '../llama/procScan.ts';
 import { CLOSE_BOUND } from '../process/followed.ts';
@@ -214,27 +214,32 @@ layer(NodeServices.layer, { excludeTestServices: true })('perf', (it) => {
         const s = yield* makeMemBandwidth({ bin, intervalMs: 1000 });
         yield* s.setPid(42);
         const proc = yield* eventually(s.procSample, (p) => p !== null);
-        const args = yield* ws.argsOf;
-        assert.deepStrictEqual(args[1], [
-          bin,
-          'stat',
-          '-p',
-          '42',
-          '-e',
-          'ls_any_fills_from_sys.dram_io_all',
-          '-I',
-          '1000',
-          '-x',
-          ',',
-          '--log-fd',
-          '1',
-        ]);
+        // The system stream and this one start together: either may record its start first.
+        const started = yield* ws.recorded;
+        const ofPid42 = Arr.findFirst(started, (c) => Arr.contains(c.args, '-p'));
+        assert.deepStrictEqual(
+          Option.map(ofPid42, (c) => c.args),
+          Option.some([
+            bin,
+            'stat',
+            '-p',
+            '42',
+            '-e',
+            'ls_any_fills_from_sys.dram_io_all',
+            '-I',
+            '1000',
+            '-x',
+            ',',
+            '--log-fd',
+            '1',
+          ]),
+        );
         assert.strictEqual(proc, 3028 * 64);
         yield* s.setPid(42);
         yield* Effect.sleep('100 millis');
         const same = yield* ws.recorded;
         assert.lengthOf(same, 2); // same PID: nothing relaunched
-        const pid42 = same[1]?.pid ?? 0;
+        const pid42 = Option.match(ofPid42, { onNone: () => 0, onSome: (c) => c.pid });
 
         yield* s.setPid(7);
         yield* eventually(ws.recorded, (c) => c.length === 3);
@@ -261,12 +266,13 @@ layer(NodeServices.layer, { excludeTestServices: true })('perf', (it) => {
         yield* s.setPid(42);
         yield* s.configure(500);
         const calls = yield* eventually(ws.recorded, (c) => c.length === 4);
-        assert.lengthOf(calls, 4);
-        assert.isTrue(Arr.contains(calls[2]?.args ?? [], '500'));
-        assert.isTrue(Arr.contains(calls[3]?.args ?? [], '500'));
+        // The two streams of an interval start together: told apart by their interval, not by their order.
+        const first = Arr.filter(calls, (c) => Arr.contains(c.args, '1000'));
+        const second = Arr.filter(calls, (c) => Arr.contains(c.args, '500'));
+        assert.lengthOf(first, 2);
+        assert.lengthOf(second, 2);
         // The streams of the first interval are stopped.
-        yield* eventually(isAlive(calls[0]?.pid ?? 0), (alive) => !alive);
-        yield* eventually(isAlive(calls[1]?.pid ?? 0), (alive) => !alive);
+        for (const c of first) yield* eventually(isAlive(c.pid), (alive) => !alive);
         const bw = yield* eventually(s.sample, (b) => b !== null);
         assert.isNotNull(bw);
         const proc = yield* eventually(s.procSample, (p) => p !== null);

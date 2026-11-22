@@ -9,12 +9,39 @@ import { seedWatchPort } from './seed.ts';
 /** The launcher of the production build (`pnpm build`; the server tests' globalSetup builds it, `build.ts`). */
 export const LAUNCHER = resolve(import.meta.dirname, '../../.output/llama-webui.mjs');
 
+/**
+ * The ports `freePort` draws from: below Linux's ephemeral range (32768–60999), where a `listen(0)` and the outgoing
+ * connections of the other tests take theirs. A port from that range, free when `freePort` looked, could be taken by
+ * one of them before the program it was meant for listens on it.
+ */
+const FIRST_PORT = 10_000;
+const PORTS_PER_BLOCK = 256;
+const BLOCKS = Math.floor((32_768 - FIRST_PORT) / PORTS_PER_BLOCK);
+/** This process's block: one per Vitest worker (`VITEST_POOL_ID`, unique among the running workers), else by pid. */
+const block = (Number(process.env.VITEST_POOL_ID) || process.pid) % BLOCKS;
+/** The next port of the block to try; a random start, a child of a test shares its worker's block. */
+let next = Math.floor(Math.random() * PORTS_PER_BLOCK);
+
+/** Whether something already listens on this port of 127.0.0.1. */
+const taken = (port: number): Promise<boolean> =>
+  new Promise((done) => {
+    const s = createServer();
+    s.once('error', () => done(true));
+    s.listen(port, '127.0.0.1', () => s.close(() => done(false)));
+  });
+
+/**
+ * A port nothing listens on, on 127.0.0.1, for a program to listen on soon after. Drawn in turn from this process's
+ * block of ports (`FIRST_PORT`), so that neither another worker's `freePort` nor a connection gives it out meanwhile;
+ * one taken (a service of the machine, a program left by an earlier test) is skipped.
+ */
 export async function freePort(): Promise<number> {
-  const s = createServer();
-  await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
-  const port = (s.address() as { port: number }).port;
-  await new Promise((r) => s.close(r));
-  return port;
+  for (let tried = 0; tried < PORTS_PER_BLOCK; tried++) {
+    const port = FIRST_PORT + block * PORTS_PER_BLOCK + (next % PORTS_PER_BLOCK);
+    next += 1;
+    if (!(await taken(port))) return port;
+  }
+  throw new Error(`no free port in the block ${block} of the test ports`);
 }
 
 export interface Launched extends AsyncDisposable {
