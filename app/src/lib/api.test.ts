@@ -43,6 +43,19 @@ interface Seen {
   init: RequestInit | undefined;
 }
 
+/**
+ * A reply that never comes: it rejects, as fetch does, with the reason of the request's signal once it is aborted.
+ * That reason is an `AbortError` (a `DOMException`, an `Error`); anything else is wrapped, as its `cause`.
+ */
+const untilAborted = ({ init }: Seen) =>
+  new Promise<Response>((_, reject) => {
+    const signal = init?.signal;
+    signal?.addEventListener('abort', () => {
+      const reason: unknown = signal.reason;
+      reject(reason instanceof Error ? reason : new Error('the request was aborted', { cause: reason }));
+    });
+  });
+
 /** A `fetch` that answers `reply` (or rejects with it) and records what it was given. */
 function stub(reply: (seen: Seen) => Promise<Response>) {
   const seen: Seen[] = [];
@@ -118,11 +131,7 @@ test('a payload the client refuses to send rejects as the RequestInvalid the ser
 });
 
 test('call() passes its signal: an abort reaches fetch and rejects the call', async () => {
-  const { call, seen } = stub(
-    ({ init }) =>
-      // fetch rejects with the signal's reason, an `AbortError` (a `DOMException`, an `Error`)
-      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error))),
-  );
+  const { call, seen } = stub(untilAborted);
   const controller = new AbortController();
   const pending = call((api) => api.t.get({ params: { id: 7 }, query: {} }), { signal: controller.signal });
   await vi.waitFor(() => expect(seen).toHaveLength(1));
@@ -222,11 +231,7 @@ test('an event that does not decode rejects callStream() as an invalid reply, no
 });
 
 test('an abort before the response headers ends callStream() without an error and aborts its request', async () => {
-  const { callStream, seen } = stub(
-    ({ init }) =>
-      // fetch rejects with the signal's reason, an `AbortError` (a `DOMException`, an `Error`)
-      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error))),
-  );
+  const { callStream, seen } = stub(untilAborted);
   const controller = new AbortController();
   const onEvent = vi.fn();
   const pending = callStream((api) => api.t.events({ params: { id: 7 } }), onEvent, { signal: controller.signal });
