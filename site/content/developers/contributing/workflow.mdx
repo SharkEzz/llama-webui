@@ -94,9 +94,9 @@ The components of `site/src/docs/mdx-components.tsx` need no import:
 | `ArchitectureDiagram` | The overview diagram of the [Architecture](/developers/architecture/) page               |
 
 Leave a blank line after an opening tag and before the closing tag when the content is Markdown: oxfmt, which formats
-the pages, joins Markdown glued to a tag into one paragraph. For the same reason, do not start a line of a paragraph
-with an inline component such as `<Kbd>`: oxfmt splits the paragraph there. A code fence always
-takes a language, and a title after it for a snippet from a file or a terminal: `bash title="Terminal"`,
+the pages, joins Markdown glued to a tag into one paragraph. Do not start a line of a paragraph with an inline
+component such as `<Kbd>`: oxfmt splits the paragraph there, and the component begins a paragraph of its own. A code
+fence always takes a language, and a title after it for a snippet from a file or a terminal: `bash title="Terminal"`,
 `ts title="app/server/http/Guard.ts"`.
 
 Internal links use the route with its trailing slash and without the `/llama-webui` base, which React Router adds:

@@ -46,9 +46,11 @@ quickly after a change that does not touch the build.
 | `pnpm exec vitest`                                                           | Watch mode: reruns the tests a change affects               |
 
 <Callout type="warning">
-  `--changed` and watch mode follow imports only. The suites that start the production build (contract, lifecycle,
-  build output) and `vite dev` (`app/server/dev.test.ts`) do not import the server: a change to a route or a service
-  does not select them. Use them as a quick loop while working, and run the full `pnpm test` before every commit.
+
+`--changed` and watch mode follow imports only. The suites that start the production build (contract, lifecycle, build
+output) and `vite dev` (`app/server/dev.test.ts`) do not import the server: a change to a route or a service does not
+select them. Use them as a quick loop while working, and run the full `pnpm test` before every commit.
+
 </Callout>
 
 A test has 5 seconds by default. The tests that start `vite dev` pass a longer timeout as the last argument of
@@ -405,8 +407,10 @@ recorded on the Nitro server and replayed on the Effect server; the replies that
 `docs/superpowers/poc-effect/behaviours.md` of the repository.
 
 <Callout type="note">
+
 The golden pins no Hugging Face success (the suite has no network) and no value of the machine-dependent endpoints:
 check those screens in the running app after a change of framework or runtime.
+
 </Callout>
 
 ## Migrations on old data
