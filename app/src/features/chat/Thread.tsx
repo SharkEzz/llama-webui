@@ -15,9 +15,9 @@ export function Thread({ canSend }: { canSend: boolean }) {
     const el = box.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   });
-  // current.id is a trigger: re-pin to the bottom on every conversation change
   useLayoutEffect(() => {
     stick.current = true;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- current.id is a trigger: re-pin to the bottom on every conversation change
   }, [current?.id]);
 
   const messages = current?.messages ?? [];

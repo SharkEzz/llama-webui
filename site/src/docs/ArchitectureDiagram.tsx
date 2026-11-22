@@ -87,8 +87,8 @@ export function ArchitectureDiagram() {
         <div className={cn(BOX, 'mb-2')}>
           <p className="font-medium">Effect HTTP server (node:http)</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            UI (Vite in dev, the built assets and index.html in production), the API's endpoints behind the guard, the
-            WebSocket hub.
+            UI (Vite in dev, the built assets and index.html in production), the API&apos;s endpoints behind the guard,
+            the WebSocket hub.
           </p>
         </div>
         <Boxes nodes={MODULES} className="grid-cols-1 @md:grid-cols-2 @3xl:grid-cols-4" />

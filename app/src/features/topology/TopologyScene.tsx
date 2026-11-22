@@ -63,11 +63,14 @@ const REF_BPS = 16 * 3.938e9;
 
 export function TopologyScene(p: TopologySceneProps) {
   const smoother = useMemo(() => new Smoother(0.4), []);
-  const pacer = useMemo(() => new FramePacer(), []);
+  // Mutated from frame and event callbacks, never rendered: a ref (as state, the canvas would re-render every frame).
+  // The pacer is cheap to build: the one made by a later render is discarded.
+  const pacerRef = useRef(new FramePacer());
   // An input changed: a frame as soon as possible, then running smoothings keep the pace (see FramePacer).
   useEffect(() => {
-    pacer.requested = true;
-  }, [pacer, p.flows, p.peers, p.live, p.tones, p.colors, p.hovered, p.layout, p.reducedMotion]);
+    pacerRef.current.requested = true;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- the inputs are triggers: a frame as soon as one of them changes
+  }, [pacerRef, p.flows, p.peers, p.live, p.tones, p.colors, p.hovered, p.layout, p.reducedMotion]);
   const byId = useMemo(() => new Map(p.graph.nodes.map((n) => [n.id, n])), [p.graph]);
   const peerPaths = useMemo(() => {
     const out = new Map<string, LinkPath>();
@@ -93,13 +96,13 @@ export function TopologyScene(p: TopologySceneProps) {
       className="cursor-grab active:cursor-grabbing"
       onPointerMissed={() => p.onHover(null)}
     >
-      <FrameDriver pacer={pacer} smoother={smoother} />
+      <FrameDriver pacerRef={pacerRef} smoother={smoother} />
       <Rig
         bounds={p.layout.bounds}
         drift={!p.reducedMotion}
-        view={p.view}
+        viewRef={p.view}
         onMovedChange={p.onViewMoved}
-        pacer={pacer}
+        pacerRef={pacerRef}
       />
       <Projector layout={p.layout} peerPaths={peerPaths} layer={p.labelLayer} />
       <ambientLight intensity={p.colors.dark ? 0.55 : 0.85} />
@@ -139,7 +142,7 @@ export function TopologyScene(p: TopologySceneProps) {
             reducedMotion={p.reducedMotion}
             busy={p.busy}
             smoother={smoother}
-            pacer={pacer}
+            pacerRef={pacerRef}
           />
         );
       })}
@@ -158,23 +161,24 @@ const DAMPING_MS = 1000;
  * Render loop (frameloop “never”): on every rAF, a frame only if the pacer asks for one. A hidden tab no longer gets
  * rAFs: nothing is drawn.
  */
-function FrameDriver({ pacer, smoother }: { pacer: FramePacer; smoother: Smoother }) {
+function FrameDriver({ pacerRef, smoother }: { pacerRef: RefObject<FramePacer>; smoother: Smoother }) {
   const get = useThree((s) => s.get);
   const size = useThree((s) => s.size);
   // Resizing clears the canvas: draw a frame right away.
   useEffect(() => {
-    pacer.requested = true;
-  }, [pacer, size]);
+    pacerRef.current.requested = true;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- size is a trigger: a resize clears the canvas, a frame right away
+  }, [pacerRef, size]);
   useEffect(() => {
     let raf = requestAnimationFrame(function tick(now) {
       raf = requestAnimationFrame(tick);
-      if (!pacer.shouldRender(now)) return;
+      if (!pacerRef.current.shouldRender(now)) return;
       // With frameloop “never”, the scene clock follows the time passed in here, in seconds.
       advance(now / 1000, true, get());
-      pacer.rendered(now, smoother.takeMoving());
+      pacerRef.current.rendered(now, smoother.takeMoving());
     });
     return () => cancelAnimationFrame(raf);
-  }, [pacer, smoother, get]);
+  }, [pacerRef, smoother, get]);
   return null;
 }
 
@@ -190,9 +194,9 @@ const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 
 interface RigProps {
   bounds: Bounds;
   drift: boolean;
-  view: RefObject<SceneView | null>;
+  viewRef: RefObject<SceneView | null>;
   onMovedChange: (moved: boolean) => void;
-  pacer: FramePacer;
+  pacerRef: RefObject<FramePacer>;
 }
 
 /**
@@ -200,7 +204,7 @@ interface RigProps {
  * right-click (or two fingers) pans, the wheel zooms: once the user takes over, the camera stays where they left it
  * (no drift, no refit on resize) until “Recenter view”, which eases it back.
  */
-function Rig({ bounds, drift, view, onMovedChange, pacer }: RigProps) {
+function Rig({ bounds, drift, viewRef, onMovedChange, pacerRef }: RigProps) {
   const { camera, size } = useThree();
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const cam = useMemo(() => fitCamera(bounds, size.width / Math.max(1, size.height)), [bounds, size]);
@@ -210,26 +214,26 @@ function Rig({ bounds, drift, view, onMovedChange, pacer }: RigProps) {
   const back = useRef<{ pos: Vector3; target: Vector3; t: number } | null>(null);
 
   useEffect(() => {
-    view.current = {
+    viewRef.current = {
       reset: () => {
         const c = controls.current;
         if (!c) return;
         moved.current = false;
         back.current = drift ? { pos: camera.position.clone(), target: c.target.clone(), t: 0 } : null;
-        pacer.requested = true;
+        pacerRef.current.requested = true;
         onMovedChange(false);
       },
     };
     return () => {
-      view.current = null;
+      viewRef.current = null;
     };
-  }, [view, camera, drift, onMovedChange, pacer]);
+  }, [viewRef, camera, drift, onMovedChange, pacerRef]);
 
   // After the controls (priority -1, which apply the damping): the resting pose wins as long as the user has not
   // taken over.
   useFrame(({ clock }, dt) => {
     const c = controls.current;
-    pacer.drift = drift && !moved.current;
+    pacerRef.current.drift = drift && !moved.current;
     if (!c || moved.current) return;
     const t = drift ? clock.elapsedTime : 0;
     goalPos.set(
@@ -245,7 +249,7 @@ function Rig({ bounds, drift, view, onMovedChange, pacer }: RigProps) {
       goalPos.lerpVectors(b.pos, goalPos, k);
       goalTarget.lerpVectors(b.target, goalTarget, k);
       if (b.t >= 1) back.current = null;
-      else pacer.active = true;
+      else pacerRef.current.active = true;
     }
     camera.position.copy(goalPos);
     c.target.copy(goalTarget);
@@ -263,16 +267,16 @@ function Rig({ bounds, drift, view, onMovedChange, pacer }: RigProps) {
       // Stay above the floor: never go under the slabs.
       maxPolarAngle={Math.PI / 2 - 0.05}
       onStart={() => {
-        pacer.interacting = true;
+        pacerRef.current.interacting = true;
         back.current = null;
         if (moved.current) return;
         moved.current = true;
         onMovedChange(true);
       }}
       onEnd={() => {
-        pacer.interacting = false;
-        if (drift) pacer.hold(performance.now(), DAMPING_MS);
-        else pacer.requested = true;
+        pacerRef.current.interacting = false;
+        if (drift) pacerRef.current.hold(performance.now(), DAMPING_MS);
+        else pacerRef.current.requested = true;
       }}
     />
   );
@@ -569,13 +573,13 @@ interface LinkProps {
   reducedMotion: boolean;
   busy: boolean;
   smoother: Smoother;
-  pacer: FramePacer;
+  pacerRef: RefObject<FramePacer>;
 }
 
 const LEVEL_STEP = { ok: 0, warn: 1, crit: 2 } as const;
 const tint = new Color();
 
-function Link({ link, path, flow, color, colors, reducedMotion, busy, smoother, pacer }: LinkProps) {
+function Link({ link, path, flow, color, colors, reducedMotion, busy, smoother, pacerRef }: LinkProps) {
   // Under the floor (background traffic at rest), the link stays still: no streaks, no glow.
   const shown = linkShown(flow, busy);
   const neutral = color === colors.neutral;
@@ -609,7 +613,7 @@ function Link({ link, path, flow, color, colors, reducedMotion, busy, smoother, 
     if (link.kind === 'memory' && f.fwdBps === null && f.backBps === null) {
       // Without a DRAM measurement: a pulse whose rate follows CPU activity (0–100); without animation, a fixed intensity.
       const a = Math.min(1, (f.activity ?? 0) / 100);
-      if (!reducedMotion && a > 0) pacer.active = true;
+      if (!reducedMotion && a > 0) pacerRef.current.active = true;
       target = reducedMotion
         ? 0.08 + 0.6 * a
         : 0.08 + a * (0.35 + 0.35 * Math.abs(Math.sin(clock.elapsedTime * (1 + 4 * a))));
@@ -649,7 +653,7 @@ function Link({ link, path, flow, color, colors, reducedMotion, busy, smoother, 
             side={lane}
             thickness={thickness}
             smoother={smoother}
-            pacer={pacer}
+            pacerRef={pacerRef}
           />
           <Streaks
             id={`${link.id}:back`}
@@ -660,7 +664,7 @@ function Link({ link, path, flow, color, colors, reducedMotion, busy, smoother, 
             side={-lane}
             thickness={thickness}
             smoother={smoother}
-            pacer={pacer}
+            pacerRef={pacerRef}
           />
         </>
       )}
@@ -680,7 +684,7 @@ interface StreaksProps {
   /** Radius of a streak (units). */
   thickness: number;
   smoother: Smoother;
-  pacer: FramePacer;
+  pacerRef: RefObject<FramePacer>;
 }
 
 const UP = new Vector3(0, 1, 0);
@@ -691,7 +695,7 @@ const tmpTangent = new Vector3();
  * Streaks along one lane of a link: elongated along the curve, their count, length and speed on a log scale of the
  * throughput (see flowVisual), smoothed.
  */
-function Streaks({ id, curve, bps, color, reverse, side, thickness, smoother, pacer }: StreaksProps) {
+function Streaks({ id, curve, bps, color, reverse, side, thickness, smoother, pacerRef }: StreaksProps) {
   const mesh = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
   // Initial offset of each streak, deterministic (Weyl sequence): adding one does not move the others.
@@ -712,7 +716,7 @@ function Streaks({ id, curve, bps, color, reverse, side, thickness, smoother, pa
     const room = length > 0 ? Math.max(1, Math.floor((span * 0.5) / length)) : 0;
     const n = Math.min(room, Math.round(smoother.step(`${id}:n`, vis.count, dt)));
     phase.current = (phase.current + speed * dt) % 1;
-    if (n > 0) pacer.active = true;
+    if (n > 0) pacerRef.current.active = true;
     m.count = n;
     for (let i = 0; i < n; i++) {
       let u = (offsets[i]! + phase.current) % 1;

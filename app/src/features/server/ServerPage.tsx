@@ -215,10 +215,15 @@ function PropsCard() {
   const key = live ? `${state.kind}-${state.pid}` : null;
   const [props, setProps] = useState<Props | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
+  // Another server (or none): the previous one's /props go, in the render that sees it
+  const [shownKey, setShownKey] = useState(key);
+  if (key !== shownKey) {
+    setShownKey(key);
     setProps(null);
     setError(null);
+  }
+
+  useEffect(() => {
     if (!key) return;
     getServerProps().then(setProps, (e: unknown) => setError(errorMessage(e)));
   }, [key]);

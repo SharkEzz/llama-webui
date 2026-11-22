@@ -27,10 +27,15 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
   const [detail, setDetail] = useState<ModelDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
+  // Another path: the previous one's details go, in the render that sees it
+  const [shownPath, setShownPath] = useState(path);
+  if (path !== shownPath) {
+    setShownPath(path);
     setDetail(null);
     setError(null);
+  }
+
+  useEffect(() => {
     if (!path) return;
     const ac = new AbortController();
     call((api) => api.models.info({ query: { path } }), { signal: ac.signal }).then(

@@ -74,13 +74,12 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const [hits, setHits] = useState<Hit[]>([]);
   const [error, setError] = useState<string | null>(null);
   const latest = useRef('');
+  // An empty query has no hits: cleared by the render that sees it
+  if (!query.trim() && hits.length > 0) setHits([]);
 
   useEffect(() => {
     latest.current = query;
-    if (!query.trim()) {
-      setHits([]);
-      return;
-    }
+    if (!query.trim()) return;
     loadPagefind()
       .then(async (pf) => {
         const search = await pf.debouncedSearch(query, {}, 150);

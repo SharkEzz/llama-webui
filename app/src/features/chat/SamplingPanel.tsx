@@ -1,10 +1,11 @@
 import type { ConversationDetail, Sampling } from '@llama-webui/shared';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useChat } from '@/lib/chat';
+import { useDraft } from '@/lib/useDraft';
 import { type FieldErrors, fieldErrors } from './errors';
 import { SAMPLING_FIELDS } from './fields';
 import type { ServerProps } from './useServerProps';
@@ -107,8 +108,7 @@ function NumberField(props: {
   onCommit: (v: number | undefined) => void;
   onInvalid: (msg: string) => void;
 }) {
-  const [draft, setDraft] = useState(props.value === undefined ? '' : String(props.value));
-  useEffect(() => setDraft(props.value === undefined ? '' : String(props.value)), [props.value]);
+  const [draft, setDraft] = useDraft(props.value === undefined ? '' : String(props.value));
   const commit = () => {
     const t = draft.trim().replace(',', '.');
     if (t === '') {

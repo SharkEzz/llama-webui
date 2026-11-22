@@ -6,15 +6,15 @@ import { createSimulation, type Frame } from './telemetry';
  * so the prerendered HTML and the hydrated page match.
  */
 export function useSimulation(running: boolean): Frame {
-  const sim = useRef<ReturnType<typeof createSimulation> | null>(null);
-  sim.current ??= createSimulation();
-  const [frame, setFrame] = useState(() => sim.current!.frame());
+  // One simulation per mount, never replaced: its state lives in its closure, not in React's
+  const [sim] = useState(() => createSimulation());
+  const [frame, setFrame] = useState(() => sim.frame());
 
   useEffect(() => {
     if (!running) return;
-    const id = setInterval(() => setFrame(sim.current!.tick()), 1000);
+    const id = setInterval(() => setFrame(sim.tick()), 1000);
     return () => clearInterval(id);
-  }, [running]);
+  }, [running, sim]);
 
   return frame;
 }

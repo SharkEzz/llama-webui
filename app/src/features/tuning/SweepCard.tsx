@@ -29,14 +29,19 @@ export function SweepCard() {
   const current = useTuning((s) => s.current);
   const sweepLive = useTuning((s) => s.sweepLive);
   const live = useTuning((s) => s.live);
+  const cancelSweep = useTuning((s) => s.cancelSweep);
+  const resume = useTuning((s) => s.resume);
+  const validate = useTuning((s) => s.validate);
+  const removeSweep = useTuning((s) => s.removeSweep);
+  const open = useTuning((s) => s.open);
   const [n, setN] = useState('3');
   const [confirm, setConfirm] = useState<'resume' | 'validate' | null>(null);
   const now = useNow(1000);
   const logRef = useRef<HTMLPreElement>(null);
-  // live.lines is a trigger: scroll to the bottom on every batch
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- live.lines is a trigger: scroll to the bottom on every batch
   }, [live?.lines]);
 
   if (!current) return null;
@@ -51,7 +56,6 @@ export function SweepCard() {
   const avgMs = finished.length ? finished.reduce((a, r) => a + r.durationMs!, 0) / finished.length : null;
   const left = avgMs !== null ? avgMs * (c.queued + c.running) : null;
   const explored = runs.some((r) => r.kind === 'bench' && r.status === 'ok');
-  const { cancelSweep, resume, validate, removeSweep, open } = useTuning.getState();
 
   const act = async (what: 'resume' | 'validate', stopServer = false) => {
     const r = what === 'resume' ? await resume(sweep.id, stopServer) : await validate(sweep.id, Number(n), stopServer);

@@ -207,17 +207,17 @@ export function Hud({ phase, snapshot, graph, placement, tones, reducedMotion, e
               <Swatch color="var(--muted-foreground)" label="other" />
             </li>
             <li>
-              A tank's surface turns amber from {FILL_WARN_PCT}% full, red from {FILL_CRIT_PCT}%.
+              A tank&apos;s surface turns amber from {FILL_WARN_PCT}% full, red from {FILL_CRIT_PCT}%.
             </li>
             <li>Bar under a name: load. CPU tiles: one per thread, lit with its load.</li>
             <li>Link thickness: PCIe capacity.</li>
             <li>
-              Streaks: measured throughput (log scale), one direction per lane. The badge above a block gives its link's
-              exact figures. At rest, a link shows its traffic only from 8 MiB/s.
+              Streaks: measured throughput (log scale), one direction per lane. The badge above a block gives its
+              link&apos;s exact figures. At rest, a link shows its traffic only from 8 MiB/s.
             </li>
             <li>
-              Percentage on a badge: share of the link's current capacity, amber from {fmt(LINK_WARN * 100, 0)}%, red
-              from {fmt(LINK_CRIT * 100, 0)}%.
+              Percentage on a badge: share of the link&apos;s current capacity, amber from {fmt(LINK_WARN * 100, 0)}%,
+              red from {fmt(LINK_CRIT * 100, 0)}%.
             </li>
             <li>
               {snapshot?.system?.memBw
@@ -226,7 +226,7 @@ export function Hud({ phase, snapshot, graph, placement, tones, reducedMotion, e
             </li>
             <li>
               Dotted link between GPUs: peer-to-peer (direct transfers), fainter when only requested. Not measured
-              apart: its traffic is part of each card's figures.
+              apart: its traffic is part of each card&apos;s figures.
             </li>
             <li>Hover a block for its details.</li>
           </ul>

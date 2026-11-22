@@ -13,7 +13,7 @@ export default function NotFound() {
       <main className="mx-auto flex max-w-xl flex-col items-center px-6 py-32 text-center">
         <p className="num text-sm text-primary-ink">404</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Page not found</h1>
-        <p className="mt-4 text-muted-foreground">This page doesn't exist, or it moved.</p>
+        <p className="mt-4 text-muted-foreground">This page doesn&apos;t exist, or it moved.</p>
         <div className="mt-8 flex gap-3">
           <Button nativeButton={false} render={<Link to="/" />}>
             Home

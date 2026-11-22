@@ -17,8 +17,13 @@ export const react: OxlintConfig = {
     'react/no-namespace': 'error',
     'react/rules-of-hooks': 'error',
     'jsx-a11y/anchor-ambiguous-text': 'error',
-    // The two parity rules that report today (react/jsx-no-useless-fragment, react/no-object-type-as-default-prop)
-    // are in the debt block of the base.
+    'react/jsx-no-useless-fragment': 'error',
+    'react/no-object-type-as-default-prop': 'error',
+
+    // The React selection (spec, "The selection" › L5)
+    'react/no-unescaped-entities': 'error',
+    'react/hooks': 'error',
+    'react/exhaustive-effect-dependencies': 'error',
 
     // Accessibility is out of scope for now: the jsx-a11y rules that report on today's code are off
     // 7 reports: an element carries its role on purpose (`meter` on an <svg>, `combobox`, `status`)
