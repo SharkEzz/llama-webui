@@ -3,6 +3,8 @@ import type { OxlintConfig } from 'oxlint';
 
 export const react: OxlintConfig = {
   plugins: ['react', 'jsx-a11y'],
+  // react-doctor: the plugin alone, ten of its rules and no other (spec, "react-doctor")
+  jsPlugins: [{ name: 'react-doctor', specifier: 'oxlint-plugin-react-doctor' }],
   rules: {
     // The JSX transform of React 17+ needs no `React` in scope
     'react/react-in-jsx-scope': 'off',
@@ -17,8 +19,24 @@ export const react: OxlintConfig = {
     'react/no-namespace': 'error',
     'react/rules-of-hooks': 'error',
     'jsx-a11y/anchor-ambiguous-text': 'error',
-    // The two parity rules that report today (react/jsx-no-useless-fragment, react/no-object-type-as-default-prop)
-    // are in the debt block of the base.
+    'react/jsx-no-useless-fragment': 'error',
+    'react/no-object-type-as-default-prop': 'error',
+
+    // The React selection (spec, "The selection" › L5)
+    'react/no-unescaped-entities': 'error',
+    'react/hooks': 'error',
+    'react/exhaustive-effect-dependencies': 'error',
+
+    // react-doctor (the tenth, for the site only, is in site/oxlint.config.ts)
+    'react-doctor/no-mirror-prop-effect': 'error',
+    'react-doctor/no-reset-all-state-on-prop-change': 'error',
+    'react-doctor/no-set-state-after-await-in-effect': 'error',
+    'react-doctor/no-loading-flag-reset-outside-finally': 'error',
+    'react-doctor/no-impure-state-updater': 'error',
+    'react-doctor/zustand-no-whole-store-destructure': 'error',
+    'react-doctor/no-enter-submit-without-ime-composition-guard': 'error',
+    'react-doctor/react-router-require-root-error-boundary': 'error',
+    'react-doctor/rerender-state-only-in-handlers': 'error',
 
     // Accessibility is out of scope for now: the jsx-a11y rules that report on today's code are off
     // 7 reports: an element carries its role on purpose (`meter` on an <svg>, `combobox`, `status`)

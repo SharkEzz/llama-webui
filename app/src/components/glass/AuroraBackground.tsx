@@ -7,7 +7,7 @@ export function AuroraBackground() {
         <div className="glow glow-2" />
         <div className="glow glow-3" />
       </div>
-      <div className="bg-grid pointer-events-none fixed inset-0 -z-1" aria-hidden="true" />
+      <div className="pointer-events-none fixed inset-0 -z-1 bg-grid" aria-hidden="true" />
     </>
   );
 }

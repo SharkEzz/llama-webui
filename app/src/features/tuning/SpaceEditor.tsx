@@ -31,7 +31,10 @@ export function SpaceEditor() {
   const modelPath = useTuning((s) => s.modelPath);
   const run = useTuning((s) => s.run);
   const includeUnfit = useTuning((s) => s.includeUnfit);
-  const { setSpace, setBase, setRun, setIncludeUnfit } = useTuning.getState();
+  const setSpace = useTuning((s) => s.setSpace);
+  const setBase = useTuning((s) => s.setBase);
+  const setRun = useTuning((s) => s.setRun);
+  const setIncludeUnfit = useTuning((s) => s.setIncludeUnfit);
   const gpus = gpuDevices(hw?.devices ?? []);
   const baseArgs = serverArgs(base);
   const ncmoe = estimate?.params.ncmoe ?? 0;
@@ -62,7 +65,7 @@ export function SpaceEditor() {
               <span className="text-muted-foreground">no flags (llama-bench defaults)</span>
             ) : (
               <>
-                <code className="rounded-md bg-well inset-shadow-well px-2 py-1 font-mono text-xs">
+                <code className="rounded-md bg-well px-2 py-1 font-mono text-xs inset-shadow-well">
                   {baseArgs.join(' ')}
                 </code>
                 <Button variant="ghost" size="xs" onClick={() => setBase({})}>
@@ -251,7 +254,8 @@ function ValuesRow<T>(props: {
           setError(null);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') {
+          // An Enter that ends an IME composition picks the text, it does not add the value
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
             e.preventDefault();
             submit();
           }

@@ -79,7 +79,7 @@ export function FeatureSection({
       >
         {title}
       </h2>
-      <p className="mt-4 max-w-[60ch] text-lg text-muted-foreground text-pretty">{lede}</p>
+      <p className="mt-4 max-w-[60ch] text-lg text-pretty text-muted-foreground">{lede}</p>
       <div className="mt-12">{children}</div>
     </section>
   );
@@ -113,7 +113,7 @@ export function BentoCard({
     >
       <div className={cn('px-6 pt-6 pb-5', side && 'lg:pb-6')}>
         <h3 className="text-[1.0625rem] font-semibold tracking-tight">{title}</h3>
-        <p className="mt-1.5 max-w-[56ch] text-sm leading-relaxed text-muted-foreground text-pretty">{children}</p>
+        <p className="mt-1.5 max-w-[56ch] text-sm leading-relaxed text-pretty text-muted-foreground">{children}</p>
         {details}
       </div>
       <div className={cn('relative flex min-h-0 flex-1 flex-col', side && 'lg:pt-6')}>{visual}</div>

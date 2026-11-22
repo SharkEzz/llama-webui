@@ -215,10 +215,15 @@ function PropsCard() {
   const key = live ? `${state.kind}-${state.pid}` : null;
   const [props, setProps] = useState<Props | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
+  // Another server (or none): the previous one's /props go, in the render that sees it
+  const [shownKey, setShownKey] = useState(key);
+  if (key !== shownKey) {
+    setShownKey(key);
     setProps(null);
     setError(null);
+  }
+
+  useEffect(() => {
     if (!key) return;
     getServerProps().then(setProps, (e: unknown) => setError(errorMessage(e)));
   }, [key]);
@@ -292,7 +297,7 @@ function CommandCard({ command, host }: { command: string | null; host: string |
     >
       {command ? (
         <div className="flex flex-col gap-2">
-          <pre className="overflow-x-auto rounded-md bg-well inset-shadow-well p-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-foreground/90">
+          <pre className="overflow-x-auto rounded-md bg-well p-3 font-mono text-xs leading-5 break-all whitespace-pre-wrap text-foreground/90 inset-shadow-well">
             {command}
           </pre>
           {host !== null && !isLoopback(host) && (
@@ -325,7 +330,7 @@ function RecentLogs() {
       {last.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing yet.</p>
       ) : (
-        <div className="flex flex-col rounded-md bg-well inset-shadow-well p-3">
+        <div className="flex flex-col rounded-md bg-well p-3 inset-shadow-well">
           {last.map((l) => (
             <LogRow key={l.seq} line={l} />
           ))}

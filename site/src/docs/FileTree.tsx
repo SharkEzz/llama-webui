@@ -70,7 +70,7 @@ function Items({ list }: { list: El }) {
 export function FileTree({ children }: { children: ReactNode }) {
   const list = Children.toArray(children).find((c) => isTag(c, 'ul'));
   return (
-    <HScroll className="not-prose my-6 rounded-xl bg-well px-4 py-3 font-mono text-[0.8125rem] leading-6 inset-shadow-well ring-1 ring-border">
+    <HScroll className="not-prose my-6 rounded-xl bg-well px-4 py-3 font-mono text-[0.8125rem] leading-6 ring-1 inset-shadow-well ring-border">
       {list ? <Items list={list} /> : children}
     </HScroll>
   );

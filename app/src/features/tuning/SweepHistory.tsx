@@ -58,14 +58,14 @@ export function SweepHistory() {
                   {modelName(s.spec.modelPath)}
                 </TableCell>
                 <TableCell className="text-xs">{presetOf(s.spec.preset).label}</TableCell>
-                <TableCell className="num text-right text-xs">
+                <TableCell className="text-right num text-xs">
                   {s.counts.ok} / {s.counts.failed} / {s.counts.total}
                 </TableCell>
                 <TableCell className="max-w-64 text-xs whitespace-normal">
                   {s.best ? (
                     <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                       <span className="font-mono">{s.best.label?.replace(/^validation · /, '') ?? '—'}</span>
-                      <span className="num shrink-0">{formatRate(s.best.tgTps)}</span>
+                      <span className="shrink-0 num">{formatRate(s.best.tgTps)}</span>
                       {s.best.kind === 'server' && <Badge variant="secondary">server</Badge>}
                     </span>
                   ) : (
@@ -75,7 +75,7 @@ export function SweepHistory() {
                 <TableCell>
                   <Badge variant={SWEEP_STATUS[s.status].variant}>{SWEEP_STATUS[s.status].label}</Badge>
                 </TableCell>
-                <TableCell className="num text-right text-xs whitespace-nowrap">
+                <TableCell className="text-right num text-xs whitespace-nowrap">
                   {formatShortDate(s.createdAt)}
                 </TableCell>
               </TableRow>

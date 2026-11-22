@@ -223,8 +223,8 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
 - `pnpm-workspace.yaml` the workspace, its `catalog:` and pnpm's settings
 - `vitest.config.ts` one Vitest project per code base
 - `tsconfig.base.json` the options every project's `tsconfig.json` extends; `tsconfig.effect.json` adds Effect's language service
-- `oxfmt.config.ts` format rules (style, import and `package.json` order)
-- `oxlint.config.ts` lint rules: the `base` every project's `oxlint.config.ts` extends, with the fragments `oxlint.react.ts` and `oxlint.tests.ts`
+- `oxfmt.config.ts` format rules (style, import, `package.json` and Tailwind class order)
+- `oxlint.config.ts` lint rules: the `base` every project's `oxlint.config.ts` extends, with the fragments `oxlint.react.ts`, `oxlint.tests.ts` and `oxlint.tailwind.ts`
 - `.eslintignore` keeps oxlint out of `repos/`
 - `.git-blame-ignore-revs` the formatting commits `git blame` skips
 

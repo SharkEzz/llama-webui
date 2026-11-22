@@ -58,15 +58,13 @@ export function ChecksCard() {
     if (!models) void useModels.getState().refresh();
   }, [models]);
 
-  // Default model: the active profile's, otherwise the first one in the folder.
+  // Default model: the active profile's (read from the server), otherwise the first one in the folder (set by the
+  // render that finds it).
+  const first = models?.models.filter(readable).find((m) => m.kind === 'model')?.path ?? null;
+  if (model === null && profileId === null && first) setModel(first);
   useEffect(() => {
-    if (model !== null) return;
+    if (model !== null || profileId === null) return;
     let gone = false;
-    const first = models?.models.filter(readable).find((m) => m.kind === 'model')?.path ?? null;
-    if (profileId === null) {
-      if (first) setModel(first);
-      return;
-    }
     void call((api) => api.bench.fromProfile({ params: { id: profileId } })).then(
       (d) => !gone && setModel(d.modelPath),
       () => !gone && first && setModel(first),
@@ -74,7 +72,7 @@ export function ChecksCard() {
     return () => {
       gone = true;
     };
-  }, [model, models, profileId]);
+  }, [model, first, profileId]);
 
   // Loaded when opened, when the model changes, then every 10 s while the card is expanded.
   useEffect(() => {
@@ -199,7 +197,7 @@ export function CheckList({ checks }: { checks: ReadonlyArray<Check> }) {
             {ok.length > 0 && (
               <Collapsible>
                 <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                  <ChevronDown className="size-3.5 transition-transform group-data-[panel-open]:rotate-180" />
+                  <ChevronDown className="size-3.5 transition-transform group-data-panel-open:rotate-180" />
                   {ok.length} {plural(ok.length, 'check')} ok
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -236,7 +234,7 @@ function CheckRow({ check: c }: { check: Check }) {
         <p className="text-muted-foreground">{c.detail}</p>
         {c.state === 'warn' && <p className="text-xs text-muted-foreground">Impact: {c.impact}</p>}
         {c.command && (
-          <div className="flex items-start gap-1.5 rounded-md bg-well inset-shadow-well py-1 pr-1 pl-2.5">
+          <div className="flex items-start gap-1.5 rounded-md bg-well py-1 pr-1 pl-2.5 inset-shadow-well">
             <code className="min-w-0 flex-1 py-0.5 font-mono text-xs break-all">{c.command}</code>
             <Button variant="ghost" size="icon-xs" onClick={() => void copyText(c.command!)} aria-label="Copy command">
               <Copy />

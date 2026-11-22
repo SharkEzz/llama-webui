@@ -37,7 +37,7 @@ export function AppLayout({ loading = false }: { loading?: boolean }) {
       <div
         className={cn(
           'grid h-dvh transition-[grid-template-columns] duration-200 ease-out motion-reduce:transition-none',
-          collapsed ? 'grid-cols-[calc(5rem_+_2px)_minmax(0,1fr)]' : 'grid-cols-[15rem_minmax(0,1fr)]',
+          collapsed ? 'grid-cols-[calc(5rem+2px)_minmax(0,1fr)]' : 'grid-cols-[15rem_minmax(0,1fr)]',
         )}
       >
         <Sidebar />

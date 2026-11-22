@@ -22,6 +22,7 @@ export function BenchLiveCard() {
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- lines is a trigger: scroll to the bottom on every batch
   }, [lines]);
 
   if (!live) {
@@ -75,7 +76,7 @@ export function BenchLiveCard() {
         </div>
         <pre
           ref={logRef}
-          className="h-48 overflow-auto rounded-md bg-well inset-shadow-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground"
+          className="h-48 overflow-auto rounded-md bg-well p-3 font-mono text-[0.7rem] leading-relaxed text-muted-foreground inset-shadow-well"
         >
           {live.lines.join('\n') || '…'}
         </pre>

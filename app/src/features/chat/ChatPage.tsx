@@ -31,7 +31,7 @@ function ContextGauge({ props }: { props: ServerProps | null }) {
       className="flex min-w-48 flex-col gap-1"
       title="Conversation so far (cached prompt, new message and the last reply), out of the server context"
     >
-      <div className={cn('num flex justify-between gap-3 text-xs', high ? 'text-warning' : 'text-muted-foreground')}>
+      <div className={cn('flex justify-between gap-3 num text-xs', high ? 'text-warning' : 'text-muted-foreground')}>
         <span>Context</span>
         <span>
           {formatInt(used)} / {formatInt(nCtx)} tokens

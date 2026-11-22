@@ -491,7 +491,7 @@ test('SIGTERM during a download keeps its .part and the next start resumes it', 
     expect(cdn.map((r) => r.headers.range)).toEqual([undefined, `bytes=${first}-`]);
     // The token goes to the Hub on each start, the resumed request's included, and never to the CDN (another origin).
     const resolve = hub.requests().filter((r) => r.route === 'resolve');
-    expect(resolve.length).toBe(2);
+    expect(resolve).toHaveLength(2);
     expect(resolve.map((r) => r.headers.authorization)).toEqual([`Bearer ${token}`, `Bearer ${token}`]);
     expect(cdn.map((r) => r.headers.authorization)).toEqual([undefined, undefined]);
     expect(readFileSync(dest).equals(body)).toBe(true);

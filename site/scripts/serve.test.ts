@@ -118,6 +118,6 @@ describe('serve.ts', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toBe('text/html;charset=utf-8');
     expect(res.headers['content-length']).toBe(String('<h1>home</h1>'.length));
-    expect(res.body.length).toBe(0);
+    expect(res.body).toHaveLength(0);
   });
 });

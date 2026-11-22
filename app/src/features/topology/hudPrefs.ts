@@ -28,14 +28,16 @@ function stored(): Collapsed {
 /** Folded state of the cards, kept by the browser from one visit to the next. */
 export function useCollapsed(): [Collapsed, (card: HudCard) => void] {
   const [collapsed, setCollapsed] = useState(stored);
-  const toggle = useCallback((card: HudCard) => {
-    setCollapsed((c) => {
-      const next = { ...c, [card]: !c[card] };
+  // The write happens once per toggle, outside the updater (which React may run twice)
+  const toggle = useCallback(
+    (card: HudCard) => {
+      const next = { ...collapsed, [card]: !collapsed[card] };
+      setCollapsed(next);
       try {
         localStorage.setItem(KEY, JSON.stringify(next));
       } catch {}
-      return next;
-    });
-  }, []);
+    },
+    [collapsed],
+  );
   return [collapsed, toggle];
 }

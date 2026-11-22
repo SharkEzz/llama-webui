@@ -132,7 +132,7 @@ export function PlanTable() {
                     </span>
                   ))}
                 </TableCell>
-                <TableCell className="num text-right text-xs">{formatBytes(it.fit.ramBytes)}</TableCell>
+                <TableCell className="text-right num text-xs">{formatBytes(it.fit.ramBytes)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

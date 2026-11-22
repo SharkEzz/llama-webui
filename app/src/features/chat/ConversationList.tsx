@@ -48,7 +48,8 @@ export function ConversationList({ onNew, onDeleted }: { onNew: () => void; onDe
               onBlur={() => setRenaming(null)}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') setRenaming(null);
-                if (e.key === 'Enter' && renaming.title.trim())
+                // An Enter that ends an IME composition (Japanese, Chinese…) picks the text, it does not rename
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing && renaming.title.trim())
                   void rename(c.id, renaming.title.trim()).finally(() => setRenaming(null));
               }}
               aria-label="New title"

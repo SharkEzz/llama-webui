@@ -26,7 +26,7 @@
 
 /* Frosted glass surface used by landing cards, pills, and floating chrome. */
 @utility glass {
-  @apply rounded-2xl bg-card shadow-surface inset-shadow-highlight ring-1 ring-surface-border backdrop-blur-(--surface-blur) backdrop-saturate-150;
+  @apply rounded-2xl bg-card shadow-surface ring-1 inset-shadow-highlight ring-surface-border backdrop-blur-(--surface-blur) backdrop-saturate-150;
 }
 
 /* Interactive cursor-tracking spotlight & border glow on landing cards (hover-capable pointers only). */

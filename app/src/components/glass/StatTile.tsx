@@ -32,7 +32,7 @@ export function StatTile({ label, value, unit, hint, tone = 'blue', mono = true,
       size="sm"
       onPointerMove={onPointerMove}
       style={style}
-      className={cn(GLASS, 'app-spotlight min-w-0 gap-2 rounded-xl px-4 py-4', className)}
+      className={cn(GLASS, 'app-spotlight min-w-0 gap-2 rounded-xl p-4', className)}
     >
       <div className="spotlight-layer" aria-hidden="true" />
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -44,7 +44,7 @@ export function StatTile({ label, value, unit, hint, tone = 'blue', mono = true,
         <span className="truncate">{label}</span>
       </div>
       <div className="flex items-baseline gap-1.5">
-        <span className={cn('truncate text-2xl font-medium leading-none tracking-tight', mono && 'num')}>{value}</span>
+        <span className={cn('truncate text-2xl leading-none font-medium tracking-tight', mono && 'num')}>{value}</span>
         {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
       </div>
       {hint && <p className="truncate text-xs text-muted-foreground">{hint}</p>}

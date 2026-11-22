@@ -28,6 +28,7 @@ The web app is a React 19 single-page app in `app/src/`, served by the same serv
       - `routes.ts` sidebar entries (path, label, icon, group)
       - `AppLayout.tsx` layout: sidebar, status bar, page outlet, toasts
       - `Sidebar.tsx`, `StatusBar.tsx`, `ThemeToggle.tsx`, `PageSkeleton.tsx`
+      - `RouteError.tsx` the root route's error element
       - `sidebarPrefs.ts` collapsed sidebar, kept by the browser
     - `features/` one folder per page
       - `home/` `/` entry: the first-run `setup/` checklist until finished, then the Dashboard
@@ -90,7 +91,9 @@ const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, n
 `load` must stay a literal `import()` so that `vite build` can split the page into its own chunk: the initial bundle
 only holds the shell, and the Topology page's three.js scene only loads with that page. On the first load of a deep
 URL, `hydrateFallbackElement` renders `<AppLayout loading />`, the shell with a `PageSkeleton`, until the page's code
-arrives. Unknown paths render the placeholder page with "Page not found".
+arrives. Unknown paths render the placeholder page with "Page not found". A page that fails to load (its chunk gone
+after a new build) or to render shows the root route's `errorElement`, `RouteError`: the app's destructive alert, "This
+page could not be shown", with the error and a **Reload** button.
 
 `/` is `HomePage` (`features/home/`): the setup checklist until `onboardingDone` is recorded (by **Finish** or **Skip
 for now**), then `DashboardPage`, which it imports directly, so the Dashboard has no chunk of its own. `/dashboard`,
@@ -134,6 +137,11 @@ export function startServerSync() {
 ```
 
 The WebSocket only pushes changes; the REST read on (re)connection fills whatever was missed while disconnected.
+
+A component reads a store through one selector per field or action (`useBench((s) => s.runs)`,
+`useBench((s) => s.toggle)`). It never takes the whole store, and never calls `getState()` in its body or in a
+`useMemo`; the lint reports both ([React](/developers/contributing/conventions/#react)). `getState()` is for handlers,
+effects and the sync functions.
 
 | Module         | Store                                    | Fed by                                                                                                                         |
 | -------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -287,6 +295,13 @@ The colors are CSS variables defined in the shared `@llama-webui/theme` package 
 imported by both `app/src/index.css` and `site/src/styles/app.css`: `:root` for light, `.dark` for dark, exposed to
 Tailwind through `@theme inline`. Components only use these semantic classes, never raw colors. The four tones of the
 glass components and the charts are `blue`, `teal`, `amber` and `rose` (`components/glass/tones.ts`).
+
+oxfmt sorts the classes of `className`, `cn(…)` and `cva(…)` against `app/src/index.css`, and `oxlint-tailwindcss`
+lints them against the same stylesheet (`oxlint.tailwind.ts`, entry point in `app/src/oxlint.config.ts`): an
+unknown class, a conflicting pair, a non-canonical spelling or a raw color fails `pnpm lint`. The theme's plain
+classes (`aurora`, `glow`…) are allowed by name ([Tailwind classes](/developers/contributing/conventions/#tailwind-classes)).
+The plugin caches the theme by the package's version, not its content: after editing `packages/webui-theme/theme.css`, delete
+`$TMPDIR/oxlint-tailwindcss-<uid>` (or set a fresh `OXLINT_TAILWINDCSS_CACHE_DIR`) before trusting `pnpm lint`.
 
 ## Charts
 

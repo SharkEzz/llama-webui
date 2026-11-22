@@ -27,7 +27,7 @@ export const useMonitor = create<MonitorState>(() => ({ snapshot: null, history:
 /** History series (aligned with `history.times`); updates with `version`. */
 export function useSeries(key: string): (number | null)[] | undefined {
   useMonitor((s) => s.version);
-  return useMonitor.getState().history.series.get(key);
+  return useMonitor((s) => s.history.series.get(key));
 }
 
 /** A history of the client's own: each series is copied into a mutable array, which `append` grows. */

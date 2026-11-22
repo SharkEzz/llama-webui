@@ -141,13 +141,13 @@ export function ModelsPage() {
                           <TableCell>
                             <Badge variant="secondary">{m.quant}</Badge>
                           </TableCell>
-                          <TableCell className="num text-right">{formatBytes(m.fileBytes)}</TableCell>
-                          <TableCell className="num text-right">{formatParams(m.params)}</TableCell>
-                          <TableCell className="num text-right">{formatInt(m.blockCount)}</TableCell>
-                          <TableCell className="num text-right">
+                          <TableCell className="text-right num">{formatBytes(m.fileBytes)}</TableCell>
+                          <TableCell className="text-right num">{formatParams(m.params)}</TableCell>
+                          <TableCell className="text-right num">{formatInt(m.blockCount)}</TableCell>
+                          <TableCell className="text-right num">
                             {m.contextLength > 0 ? formatInt(m.contextLength) : '—'}
                           </TableCell>
-                          <TableCell className="num text-right">
+                          <TableCell className="text-right num">
                             {m.expertCount > 0 ? `${m.expertCount} / ${m.expertUsedCount}` : '—'}
                           </TableCell>
                         </>

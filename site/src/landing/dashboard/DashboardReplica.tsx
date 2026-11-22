@@ -95,7 +95,7 @@ export function DashboardReplica({ frame }: { frame: Frame }) {
               <span className="num text-xs text-muted-foreground">nvme0n1</span>
             </div>
             <div className="flex h-10 flex-1 items-end pb-0.5">
-              <span className="h-0.5 w-full rounded-full bg-(--tone-amber)" />
+              <span className="h-0.5 w-full rounded-full bg-tone-amber" />
             </div>
             <div className="flex shrink-0 flex-col items-end gap-0.5">
               <span className="num text-sm font-medium">0 B/s</span>
@@ -117,7 +117,7 @@ export function DashboardReplica({ frame }: { frame: Frame }) {
             >
               {busy ? 'busy' : 'free'}
             </span>
-            <span className="num ml-auto text-xs text-muted-foreground">
+            <span className="ml-auto num text-xs text-muted-foreground">
               {formatInt(frame.ctxUsed)} / {formatInt(frame.ctxTotal)} ({formatPct(ctxPct)})
             </span>
           </div>
@@ -187,14 +187,14 @@ function Meter({ label, value, tone, lines, history }: MeterProps) {
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="truncate text-sm font-medium">{label}</span>
           {lines.map((line) => (
-            <span key={line} className="num truncate text-[0.6875rem] leading-4 text-muted-foreground">
+            <span key={line} className="truncate num text-[0.6875rem] leading-4 text-muted-foreground">
               {line}
             </span>
           ))}
         </div>
       </div>
       {/* A size container, as in the app: it takes the spare height and hides a history too flat to read. */}
-      <div className="min-h-0 flex-1 [container-type:size]">
+      <div className="@container-size min-h-0 flex-1">
         <div className="invisible h-full pt-2 [@container(min-height:2.5rem)]:visible">
           <Sparkline values={history} tone={tone} />
         </div>

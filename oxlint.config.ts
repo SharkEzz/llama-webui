@@ -209,19 +209,6 @@ export const base = defineConfig({
     'typescript/no-implied-eval': 'error',
     'typescript/require-array-sort-compare': 'error',
     'unicorn/no-useless-spread': 'error',
-
-    // --- Debt: off until its milestone ---
-    // Rules on by category or parity rules that report on today's code; the milestone turns each on and fixes
-    // its reports. L5: React (the Vitest rules have theirs in oxlint.tests.ts).
-    'react/immutability': 'off', // L5: 14
-    'react/set-state-in-effect': 'off', // L5: 13
-    'react/exhaustive-effect-dependencies': 'off', // L5: 6
-    'react/hooks': 'off', // L5: 4
-    'react/refs': 'off', // L5: 1
-    'react/incompatible-library': 'off', // L5: 1
-    'react/jsx-no-useless-fragment': 'off', // L5: 1
-    'react/no-object-type-as-default-prop': 'off', // L5: 1
-    // --- end of debt ---
   },
   overrides: [
     {

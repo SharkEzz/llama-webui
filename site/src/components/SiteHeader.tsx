@@ -1,5 +1,5 @@
 import { Menu, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -71,13 +71,18 @@ export function SiteHeader() {
   );
 }
 
+// The user agent never changes: nothing to subscribe to
+const noSubscription = () => () => {};
+const isMac = () => /Mac|iPhone|iPad/.test(navigator.userAgent);
+// The prerendered page, and the hydration that must match it, know no user agent
+const notMac = () => false;
+
 /** Opens the documentation search; ⌘K / Ctrl+K and "/" open it from anywhere. */
 function SearchButton() {
   const [open, setOpen] = useState(false);
-  const [mac, setMac] = useState(false);
+  const mac = useSyncExternalStore(noSubscription, isMac, notMac);
 
   useEffect(() => {
-    setMac(/Mac|iPhone|iPad/.test(navigator.userAgent));
     const onKey = (e: KeyboardEvent) => {
       const target = e.target instanceof HTMLElement ? e.target : null;
       const typing = target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? '');

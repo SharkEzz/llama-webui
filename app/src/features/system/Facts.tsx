@@ -7,7 +7,7 @@ export function Facts({ rows }: { rows: [string, ReactNode][] }) {
       {rows.map(([label, value]) => (
         <div key={label} className="flex items-baseline justify-between gap-4 py-1.5">
           <dt className="text-muted-foreground">{label}</dt>
-          <dd className="num text-right">{value}</dd>
+          <dd className="text-right num">{value}</dd>
         </div>
       ))}
     </dl>

@@ -12,6 +12,7 @@ import { call, errorMessage } from '@/lib/api';
 import { formatBytes, formatInt, formatParams } from '@/lib/format';
 import { useProfiles } from '@/lib/profiles';
 import { replacedProfileParams, useTuning } from '@/lib/tuning';
+import { useDraft } from '@/lib/useDraft';
 
 const NO_PROFILE = '__none';
 
@@ -32,14 +33,19 @@ export function ModelCard() {
   const profiles = useProfiles((s) => s.profiles);
   const [info, setInfo] = useState<ModelDetail | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
+  // Another model: the previous one's header goes, in the render that sees it
+  const [infoPath, setInfoPath] = useState(modelPath);
+  if (modelPath !== infoPath) {
+    setInfoPath(modelPath);
+    setInfo(null);
+    setInfoError(null);
+  }
 
   useEffect(() => {
     void useProfiles.getState().reload();
   }, []);
 
   useEffect(() => {
-    setInfo(null);
-    setInfoError(null);
     if (!modelPath) return;
     let gone = false;
     void call((api) => api.models.info({ query: { path: modelPath } })).then(
@@ -101,15 +107,15 @@ export function ModelCard() {
               {info.arch} · {info.quant} · {formatParams(info.params)}
             </dd>
             <dt className="text-muted-foreground">Size</dt>
-            <dd className="num text-right">{formatBytes(info.fileBytes)}</dd>
+            <dd className="text-right num">{formatBytes(info.fileBytes)}</dd>
             <dt className="text-muted-foreground">Layers</dt>
-            <dd className="num text-right">{info.blockCount}</dd>
+            <dd className="text-right num">{info.blockCount}</dd>
             <dt className="text-muted-foreground">Experts</dt>
-            <dd className="num text-right">
+            <dd className="text-right num">
               {info.expertCount > 0 ? `${info.expertUsedCount} active of ${info.expertCount}` : 'dense'}
             </dd>
             <dt className="text-muted-foreground">Max context</dt>
-            <dd className="num text-right">{formatInt(info.contextLength)}</dd>
+            <dd className="text-right num">{formatInt(info.contextLength)}</dd>
           </dl>
         )}
 
@@ -118,13 +124,13 @@ export function ModelCard() {
             <span className="text-xs text-muted-foreground">
               Other profile flags (carried over to the created profile and the server validation)
             </span>
-            <code className="rounded-md bg-well inset-shadow-well px-2.5 py-1.5 font-mono text-xs break-all">
+            <code className="rounded-md bg-well px-2.5 py-1.5 font-mono text-xs break-all inset-shadow-well">
               {shellQuote(serverArgs)}
             </code>
             {addedCtx && (
               <span className="text-xs text-muted-foreground">
-                -c from the recommendation: the profile sets no context, and llama-server would allocate the model's
-                full one.
+                -c from the recommendation: the profile sets no context, and llama-server would allocate the
+                model&apos;s full one.
               </span>
             )}
             {ignored.length > 0 && (
@@ -145,7 +151,7 @@ export function ModelCard() {
                 <Lock /> Pin
               </Button>
             </div>
-            <code className="rounded-md bg-well inset-shadow-well px-2.5 py-1.5 font-mono text-xs break-all">
+            <code className="rounded-md bg-well px-2.5 py-1.5 font-mono text-xs break-all inset-shadow-well">
               {shellQuote(replacedArgs)}
             </code>
           </div>
@@ -166,8 +172,7 @@ function PathInput({
   value: string;
   onCommit: (p: string) => void;
 }) {
-  const [text, setText] = useState(value);
-  useEffect(() => setText(value), [value]);
+  const [text, setText] = useDraft(value);
   const id = `tuning-${kind}`;
   return (
     <div className="flex flex-col gap-1.5">

@@ -51,7 +51,8 @@ export function BenchHistory() {
   const loaded = useBench((s) => s.loaded);
   const filters = useBench((s) => s.filters);
   const selected = useBench((s) => s.selected);
-  const { setFilters, toggle } = useBench.getState();
+  const setFilters = useBench((s) => s.setFilters);
+  const toggle = useBench((s) => s.toggle);
   const [comparing, setComparing] = useState(false);
   const [deleting, setDeleting] = useState<BenchRun | null>(null);
   const navigate = useNavigate();
@@ -203,7 +204,7 @@ export function BenchHistory() {
                         aria-label={`Select run #${r.id} for comparison`}
                       />
                     </TableCell>
-                    <TableCell className="num whitespace-nowrap text-xs">
+                    <TableCell className="num text-xs whitespace-nowrap">
                       #{r.id}
                       <div className="text-[0.7rem] text-muted-foreground">{formatShortDate(r.createdAt)}</div>
                     </TableCell>
@@ -244,8 +245,8 @@ export function BenchHistory() {
                     )}
                     <MeasureCell m={r.pp} />
                     <MeasureCell m={r.tg} />
-                    <TableCell className="num text-right text-xs">{formatAccept(r.draftAcceptPct)}</TableCell>
-                    <TableCell className="num whitespace-nowrap text-right text-xs">
+                    <TableCell className="text-right num text-xs">{formatAccept(r.draftAcceptPct)}</TableCell>
+                    <TableCell className="text-right num text-xs whitespace-nowrap">
                       {r.vramPeak.length === 0 ? (
                         '—'
                       ) : (
@@ -261,7 +262,7 @@ export function BenchHistory() {
                         </Tooltip>
                       )}
                     </TableCell>
-                    <TableCell className="num whitespace-nowrap text-right text-xs">
+                    <TableCell className="text-right num text-xs whitespace-nowrap">
                       {r.durationMs === null ? '—' : formatDuration(r.durationMs)}
                     </TableCell>
                     <TableCell>
@@ -375,7 +376,7 @@ function FilterSelect<V extends string>(props: {
 /** Throughput on one line, standard deviation below (keeps the table free of horizontal scrolling). */
 function MeasureCell({ m }: { m: Measure | null }) {
   return (
-    <TableCell className="num whitespace-nowrap text-right text-xs">
+    <TableCell className="text-right num text-xs whitespace-nowrap">
       {formatRate(m?.tps)}
       {m && m.stddev > 0 && <div className="text-[0.7rem] text-muted-foreground">{formatStddev(m.stddev).trim()}</div>}
     </TableCell>

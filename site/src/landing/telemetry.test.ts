@@ -21,9 +21,7 @@ describe('createSimulation', () => {
     for (let i = 0; i < 10; i++) sim.tick();
     const { history, at } = sim.frame();
     expect(history.at(-1)!.at).toBe(at);
-    history.forEach((p, i) => {
-      if (i > 0) expect(p.at - history[i - 1]!.at).toBe(1);
-    });
+    for (let i = 1; i < history.length; i++) expect(history[i]!.at - history[i - 1]!.at).toBe(1);
   });
 
   test('stays within measured bounds over a long run', () => {
@@ -65,10 +63,8 @@ describe('createSimulation', () => {
     const sim = createSimulation();
     for (let i = 0; i < 90; i++) sim.tick();
     const { requests } = sim.frame();
-    requests.forEach((r, i) => {
-      if (i > 0) expect(r.at).toBeLessThan(requests[i - 1]!.at);
-      expect(r.durationSec).toBeCloseTo(r.prompt / r.ppTps + r.generated / r.genTps, 6);
-    });
+    for (let i = 1; i < requests.length; i++) expect(requests[i]!.at).toBeLessThan(requests[i - 1]!.at);
+    for (const r of requests) expect(r.durationSec).toBeCloseTo(r.prompt / r.ppTps + r.generated / r.genTps, 6);
   });
 });
 

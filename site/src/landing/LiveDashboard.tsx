@@ -32,7 +32,7 @@ export function LiveDashboard() {
           </AppWindow>
         </div>
       </div>
-      <figcaption className="mx-auto mt-6 max-w-[64ch] text-center text-sm text-muted-foreground text-pretty">
+      <figcaption className="mx-auto mt-6 max-w-[64ch] text-center text-sm text-pretty text-muted-foreground">
         The Dashboard page, replaying a real session: Qwen3.8 27B with MTP drafting, split across an RTX 5070 Ti and an
         RTX 5060 Ti.
       </figcaption>

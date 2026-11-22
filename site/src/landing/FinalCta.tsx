@@ -17,13 +17,13 @@ export function FinalCta() {
         >
           Run it on your machine.
         </h2>
-        <p className="mx-auto mt-4 max-w-[54ch] text-lg text-muted-foreground text-pretty">
+        <p className="mx-auto mt-4 max-w-[54ch] text-lg text-pretty text-muted-foreground">
           Install a release with npm, start it and open port 7860. A setup checklist takes it from there.
         </p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <Button
             size="lg"
-            className="h-11 rounded-xl px-5 shadow-[0_10px_28px_-6px] shadow-primary/55 inset-shadow-highlight"
+            className="h-11 rounded-xl px-5 shadow-[0_10px_28px_-6px] inset-shadow-highlight shadow-primary/55"
             nativeButton={false}
             render={<Link to="/docs/getting-started/installation/" />}
           >

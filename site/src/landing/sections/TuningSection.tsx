@@ -61,7 +61,7 @@ function Recommendation() {
     <div>
       <div className="mb-6">
         <h3 className="text-[1.0625rem] font-semibold tracking-tight">Every flag comes with a reason</h3>
-        <p className="mt-1.5 max-w-[66ch] text-sm leading-relaxed text-muted-foreground text-pretty">
+        <p className="mt-1.5 max-w-[66ch] text-sm leading-relaxed text-pretty text-muted-foreground">
           Responsive chat for a 70.6 GiB model on an RTX 5070 Ti, an RTX 5060 Ti and a Radeon RX 9070 XT. The estimator
           keeps 5 of 48 layers in RAM and flags the cards with a thin margin.
         </p>
@@ -96,7 +96,7 @@ function Recommendation() {
               <div key={b.device} className="flex flex-col gap-1.5">
                 <div className="flex items-baseline gap-2 text-sm">
                   <span className="font-mono font-medium">{b.device}</span>
-                  <span className="num ml-auto text-xs whitespace-nowrap">
+                  <span className="ml-auto num text-xs whitespace-nowrap">
                     {gib(b.used)}{' '}
                     <span className="text-muted-foreground">
                       / {gib(b.budget)} {ram ? 'available' : 'usable'}
@@ -138,7 +138,7 @@ function Presets() {
     <div>
       <div className="mb-6">
         <h3 className="text-[1.0625rem] font-semibold tracking-tight">Pick a goal</h3>
-        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-muted-foreground text-pretty">
+        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-pretty text-muted-foreground">
           Each preset sets the target context, the KV cache type and what the ranking favors.
         </p>
       </div>
@@ -165,7 +165,7 @@ function Checks() {
     <div>
       <div className="mb-6">
         <h3 className="text-[1.0625rem] font-semibold tracking-tight">Check the system</h3>
-        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-muted-foreground text-pretty">
+        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-pretty text-muted-foreground">
           A read-only list of what slows llama.cpp down on this machine, each with the command that fixes it.
         </p>
       </div>
@@ -223,7 +223,7 @@ export function TuningSection() {
             >
               Get flags that fit your hardware.
             </h2>
-            <p className="mt-4 max-w-[58ch] text-lg text-muted-foreground text-pretty">
+            <p className="mt-4 max-w-[58ch] text-lg text-pretty text-muted-foreground">
               Choose a goal. llama-webui reads your GPUs, RAM and CPU, recommends every flag with the reason behind it,
               then backs it up with benchmarks.
             </p>
@@ -264,12 +264,12 @@ export function TuningSection() {
           <ol className="mt-6 flex flex-col gap-5">
             {STEPS.map(([name, text], i) => (
               <li key={name} className="grid grid-cols-[1.75rem_1fr] gap-x-3">
-                <span className="num flex size-7 items-center justify-center rounded-full bg-tone-amber/15 text-xs font-medium text-tone-amber">
+                <span className="flex size-7 items-center justify-center rounded-full bg-tone-amber/15 num text-xs font-medium text-tone-amber">
                   {i + 1}
                 </span>
                 <div>
                   <p className="text-sm font-medium">{name}</p>
-                  <p className="mt-0.5 text-sm text-muted-foreground text-pretty">{text}</p>
+                  <p className="mt-0.5 text-sm text-pretty text-muted-foreground">{text}</p>
                 </div>
               </li>
             ))}

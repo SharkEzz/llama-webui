@@ -172,12 +172,12 @@ function Ranking({
                   <Measure m={r.run.pp} />
                   <Measure m={r.run.tg} />
                   {server && (
-                    <TableCell className="num text-right text-xs">{formatAccept(r.run.draftAcceptPct)}</TableCell>
+                    <TableCell className="text-right num text-xs">{formatAccept(r.run.draftAcceptPct)}</TableCell>
                   )}
-                  <TableCell className="num text-right text-xs whitespace-nowrap">
+                  <TableCell className="text-right num text-xs whitespace-nowrap">
                     {r.run.vramPeak.length ? vramTotal(r.run) : '—'}
                   </TableCell>
-                  <TableCell className="num text-right text-xs whitespace-nowrap">
+                  <TableCell className="text-right num text-xs whitespace-nowrap">
                     {r.run.durationMs === null ? '—' : formatDuration(r.run.durationMs)}
                   </TableCell>
                   <TableCell>
@@ -253,7 +253,7 @@ function StatusBadge({ run }: { run: BenchRun }) {
 
 function Measure({ m }: { m: BenchRun['pp'] }) {
   return (
-    <TableCell className="num text-right text-xs whitespace-nowrap">
+    <TableCell className="text-right num text-xs whitespace-nowrap">
       {m ? fmt(m.tps, 1) : '—'}
       {m && m.stddev > 0 && <div className="text-[0.7rem] text-muted-foreground">{formatStddev(m.stddev).trim()}</div>}
     </TableCell>

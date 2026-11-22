@@ -61,7 +61,7 @@ export default function DocsLayout() {
               <header className="mb-10">
                 {place && <p className="mb-3 text-sm font-medium text-primary-ink">{place.current.group.title}</p>}
                 <h1 className="text-4xl font-semibold tracking-[-0.025em] text-balance">{doc.title}</h1>
-                <p className="mt-4 text-lg text-muted-foreground text-pretty">{doc.description}</p>
+                <p className="mt-4 text-lg text-pretty text-muted-foreground">{doc.description}</p>
               </header>
             )}
             <div className="docs-prose">

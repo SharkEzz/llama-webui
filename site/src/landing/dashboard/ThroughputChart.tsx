@@ -89,7 +89,7 @@ export function ThroughputChart({ history, series }: { history: HistoryPoint[]; 
       {ticks.map((t) => (
         <span
           key={t}
-          className="num absolute -left-9 w-7 -translate-y-1/2 text-right text-[11px] text-muted-foreground"
+          className="absolute -left-9 w-7 -translate-y-1/2 text-right num text-[11px] text-muted-foreground"
           style={{ top: `${100 - (t / max) * 100}%` }}
         >
           {t}
@@ -98,7 +98,7 @@ export function ThroughputChart({ history, series }: { history: HistoryPoint[]; 
       {timeTicks.map((t) => (
         <span
           key={t.at}
-          className="num absolute top-full mt-1.5 -translate-x-1/2 text-[11px] text-muted-foreground"
+          className="absolute top-full mt-1.5 -translate-x-1/2 num text-[11px] text-muted-foreground"
           style={{ left: `${t.x}%` }}
         >
           {clock(t.at)}

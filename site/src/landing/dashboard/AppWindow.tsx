@@ -52,12 +52,12 @@ function NavItem({ label, icon: Icon, active, className }: NavItemProps) {
       className={cn(
         'relative flex h-9 items-center gap-3 rounded-lg px-3 text-sm text-sidebar-foreground/70',
         active &&
-          'bg-sidebar-primary/14 text-sidebar-accent-foreground inset-shadow-highlight shadow-[0_0_20px_-8px] shadow-sidebar-primary/50',
+          'bg-sidebar-primary/14 text-sidebar-accent-foreground shadow-[0_0_20px_-8px] inset-shadow-highlight shadow-sidebar-primary/50',
         className,
       )}
     >
       {active && (
-        <span className="absolute top-2.5 bottom-2.5 left-1 w-0.5 rounded-full bg-sidebar-primary shadow-[0_0_8px] shadow-sidebar-primary/80" />
+        <span className="absolute inset-y-2.5 left-1 w-0.5 rounded-full bg-sidebar-primary shadow-[0_0_8px] shadow-sidebar-primary/80" />
       )}
       <Icon className={cn('size-4 shrink-0', active && 'text-sidebar-primary')} />
       <span className="hidden truncate @5xl:inline">{label}</span>

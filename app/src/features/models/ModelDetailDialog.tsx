@@ -27,10 +27,15 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
   const [detail, setDetail] = useState<ModelDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-
-  useEffect(() => {
+  // Another path: the previous one's details go, in the render that sees it
+  const [shownPath, setShownPath] = useState(path);
+  if (path !== shownPath) {
+    setShownPath(path);
     setDetail(null);
     setError(null);
+  }
+
+  useEffect(() => {
     if (!path) return;
     const ac = new AbortController();
     call((api) => api.models.info({ query: { path } }), { signal: ac.signal }).then(
@@ -45,7 +50,7 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
     <Dialog open={path !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="break-all font-mono text-sm">{detail?.relPath ?? path}</DialogTitle>
+          <DialogTitle className="font-mono text-sm break-all">{detail?.relPath ?? path}</DialogTitle>
           <DialogDescription>{detail?.name || 'GGUF header'}</DialogDescription>
         </DialogHeader>
         {error ? (
@@ -92,7 +97,7 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
                   {detail.files.length > 1 ? `${detail.files.length} files` : 'File'}
                 </p>
                 {detail.files.map((f) => (
-                  <p key={f} className="break-all font-mono text-xs">
+                  <p key={f} className="font-mono text-xs break-all">
                     {f}
                   </p>
                 ))}

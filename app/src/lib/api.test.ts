@@ -10,6 +10,11 @@ class TestNotFound extends Schema.TaggedError<TestNotFound>()(
 ) {}
 
 const Item = Schema.Struct({ id: Schema.Int, name: Schema.String });
+/** An event of `t.events`, as `callStream` gives it. */
+interface ItemEvent {
+  event: string;
+  data: typeof Item.Type;
+}
 
 class TestApi extends HttpApi.make('test').add(
   HttpApiGroup.make('t').add(
@@ -175,7 +180,7 @@ test('callStream() gives each event of the stream in order and resolves at its e
 
 test('callStream() rejects with the tagged error of the endpoint', async () => {
   const { callStream } = stub(json(404, { _tag: 'TestNotFound', message: 'No item 7' }));
-  const onEvent = vi.fn();
+  const onEvent = vi.fn<(event: ItemEvent) => void>();
   const error = await callStream((api) => api.t.events({ params: { id: 7 } }), onEvent).catch((e: unknown) => e);
   expect(errorTag(error)).toBe('TestNotFound');
   expect((error as Error).message).toBe('No item 7');
@@ -233,7 +238,7 @@ test('an event that does not decode rejects callStream() as an invalid reply, no
 test('an abort before the response headers ends callStream() without an error and aborts its request', async () => {
   const { callStream, seen } = stub(untilAborted);
   const controller = new AbortController();
-  const onEvent = vi.fn();
+  const onEvent = vi.fn<(event: ItemEvent) => void>();
   const pending = callStream((api) => api.t.events({ params: { id: 7 } }), onEvent, { signal: controller.signal });
   await vi.waitFor(() => expect(seen).toHaveLength(1));
   controller.abort();

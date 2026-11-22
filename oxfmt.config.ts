@@ -9,6 +9,15 @@ export default defineConfig({
     { files: ['**/*.css', '**/*.yaml', '**/*.yml'], options: { singleQuote: false } },
     // Fenced code blocks of the site's pages and of the Markdown stay as written
     { files: ['**/*.md', '**/*.mdx'], options: { embeddedLanguageFormatting: 'off' } },
+    // Tailwind class order, against each project's stylesheet (its theme and its own utilities)
+    {
+      files: ['app/**'],
+      options: { sortTailwindcss: { stylesheet: './app/src/index.css', functions: ['cn', 'cva'] } },
+    },
+    {
+      files: ['site/**'],
+      options: { sortTailwindcss: { stylesheet: './site/src/styles/app.css', functions: ['cn', 'cva'] } },
+    },
   ],
   // What `.gitignore` lists is skipped by oxfmt itself
   ignorePatterns: [

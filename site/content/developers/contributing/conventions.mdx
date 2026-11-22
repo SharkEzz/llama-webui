@@ -73,12 +73,14 @@ wording of earlier versions (the app used to be in French, and old rows keep the
 ## Formatting and lint
 
 [oxfmt](https://oxc.rs) formats and [oxlint](https://oxc.rs) lints. Both are pinned devDependencies (`oxfmt` 0.79.0,
-`oxlint` 1.94.0, with `oxlint-tsgolint` 7.0.2008 for the rules that read types), configured in TypeScript files.
+`oxlint` 1.94.0, with `oxlint-tsgolint` 7.0.2008 for the rules that read types, and the JS plugins
+`oxlint-plugin-react-doctor` 0.9.23 for ten React rules and `oxlint-tailwindcss` 1.17.2 for the Tailwind classes),
+configured in TypeScript files.
 
 ### Format
 
-oxfmt formats, sorts imports and sorts the keys of every `package.json`. Its config, `oxfmt.config.ts`, holds the
-style:
+oxfmt formats, sorts imports, sorts the keys of every `package.json` and sorts Tailwind classes. Its config,
+`oxfmt.config.ts`, holds the style:
 
 | Setting        | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
@@ -88,11 +90,19 @@ style:
 | Semicolons     | Always                                                                     |
 | Imports        | Sorted by oxfmt, no blank line between groups                              |
 | `package.json` | Keys sorted by oxfmt                                                       |
+| Tailwind       | Classes sorted by oxfmt, in Tailwind's order                               |
 
 oxfmt formats TypeScript, JavaScript, JSON, CSS, YAML, HTML, every `.md` file (the root `docs/` included) and the
 site's `.mdx` pages. In Markdown and MDX, the code of fenced blocks stays as written (`embeddedLanguageFormatting`
 off). It skips what `.gitignore` lists, `repos/`, `testdata`, `pnpm-lock.yaml`, the generated
 `app/server/contract/golden.json` and the generated shadcn components.
+
+oxfmt sorts the Tailwind classes of `className`, `cn(…)` and `cva(…)` (`sortTailwindcss`), with one override per
+project for the stylesheet that defines its utilities: `app/**` reads `app/src/index.css`, `site/**` reads
+`site/src/styles/app.css`. A class string elsewhere, such as a constant or a map of variants, is not sorted and
+stays as written. The order of a `class` attribute never changes the cascade; it matters only to `cn`, which keeps
+the last of two conflicting classes, and two classes of the same property and variant in one list are what
+`tailwindcss/no-conflicting-classes` reports, so the sort cannot change which one wins.
 
 ### Lint
 
@@ -102,34 +112,39 @@ name) and a selection of other rules picked by name, all in `error`. The type-aw
 (`options.typeAware`) read the types through the `tsconfig.json` of each file. Every rule that is off or has options
 carries a one-line comment with its reason in the config: that is where to read why.
 
-Three families of the rules picked by name shape how the code is written:
+Five families of the rules picked by name shape how the code is written:
 
-| Family                            | Rules                                                                                                                                                | The code                                                                                                                                                                                     |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unsafe `any`                      | `typescript/no-unsafe-assignment`, `no-unsafe-member-access`, `no-unsafe-argument`, `no-unsafe-return`, `no-unsafe-call`, `no-unsafe-type-assertion` | What `JSON.parse`, a `catch` or an untyped import gives is decoded or typed before use; a cast is a decode, a guard, a `satisfies` or a narrower declaration (tests may cast their fixtures) |
-| Discarded promises                | `typescript/no-floating-promises`, `no-misused-promises`, `no-confusing-void-expression`, `require-await`                                            | A promise is awaited, returned, handled, or discarded on purpose with `void`; a function that returns one is not passed where a `void` callback is expected (an event handler)               |
-| Interface functions as properties | `typescript/method-signature-style`                                                                                                                  | `fn: (x: T) => U`, not `fn(x: T): U`: the parameters are checked strictly, and the function can be read off its object                                                                       |
+| Family                            | Rules                                                                                                                                                                   | The code                                                                                                                                                                                     |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unsafe `any`                      | `typescript/no-unsafe-assignment`, `no-unsafe-member-access`, `no-unsafe-argument`, `no-unsafe-return`, `no-unsafe-call`, `no-unsafe-type-assertion`                    | What `JSON.parse`, a `catch` or an untyped import gives is decoded or typed before use; a cast is a decode, a guard, a `satisfies` or a narrower declaration (tests may cast their fixtures) |
+| Discarded promises                | `typescript/no-floating-promises`, `no-misused-promises`, `no-confusing-void-expression`, `require-await`                                                               | A promise is awaited, returned, handled, or discarded on purpose with `void`; a function that returns one is not passed where a `void` callback is expected (an event handler)               |
+| Interface functions as properties | `typescript/method-signature-style`                                                                                                                                     | `fn: (x: T) => U`, not `fn(x: T): U`: the parameters are checked strictly, and the function can be read off its object                                                                       |
+| React state and effects           | `react/hooks`, `react/exhaustive-deps`, `react/exhaustive-effect-dependencies`, `react/set-state-in-effect`, `react/immutability`, `react/refs`, the react-doctor rules | See [React](#react): a value derived or reset during render rather than copied in an effect, a ref for what is never rendered, Zustand read through selectors                                |
+| Test assertions                   | `vitest/no-conditional-expect`, `require-mock-type-parameters`, `require-to-throw-message`, `prefer-to-have-length`, `prefer-called-times`                              | An `expect` never sits under an `if` (a loop over the cases instead); `vi.fn<T>()` is typed; `toThrow` names the error it expects; `toHaveLength(n)`, `toHaveBeenCalledTimes(1)`             |
 
 The root and four projects (`app/server`, `app/src`, `site`, `packages/llamacpp-js`) each have an `oxlint.config.ts`,
 and a file takes the nearest one above it. That config replaces the root one instead of adding to it, so a project
 config extends `base` and the fragments it needs:
 
-| File                                    | Lints, or holds                                                                                                                                                                                                                                                                                                                          |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `oxlint.config.ts`                      | Its named export `base`: the plugins (`eslint`, `typescript`, `unicorn`, `oxc`, `import`, `promise`), the `correctness`, `suspicious` and `perf` categories, the rules by name, the debt block. Its default export, `base` and the Vitest rules, lints `scripts/`, `app/build/`, `app/bin/`, `packages/webui-shared/` and the root files |
-| `app/server/oxlint.config.ts`           | The server: `base` and the Vitest rules, with `require-yield` off (a generator of `Effect.gen` or `Effect.fn` does not always yield) and `no-console` on (a log goes through `Effect.log*`)                                                                                                                                              |
-| `app/src/oxlint.config.ts`              | The web app: `base`, the React rules and the Vitest rules, with `no-console` on                                                                                                                                                                                                                                                          |
-| `site/oxlint.config.ts`                 | The website: `base`, the React rules and the Vitest rules                                                                                                                                                                                                                                                                                |
-| `packages/llamacpp-js/oxlint.config.ts` | `llamacpp-js`: `base` alone, since its tests run on `node:test`                                                                                                                                                                                                                                                                          |
-| `oxlint.react.ts`                       | The React fragment: the `react` and `jsx-a11y` plugins. Accessibility is limited to the rules that pass today; the others of `jsx-a11y` are off by name                                                                                                                                                                                  |
-| `oxlint.tests.ts`                       | The Vitest fragment: an override for `**/*.test.ts` and `**/*.test.tsx` with the `vitest` plugin                                                                                                                                                                                                                                         |
-| `scripts/oxlint/directives.ts`          | The local plugin of `directives/require-reason` (see [Never disable a rule](#never-disable-a-rule)), tested by `scripts/oxlint/directives.test.ts`                                                                                                                                                                                       |
+| File                                    | Lints, or holds                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `oxlint.config.ts`                      | Its named export `base`: the plugins (`eslint`, `typescript`, `unicorn`, `oxc`, `import`, `promise`), the `correctness`, `suspicious` and `perf` categories, the rules by name. Its default export, `base` and the Vitest rules, lints `scripts/`, `app/build/`, `app/bin/`, `packages/webui-shared/` and the root files |
+| `app/server/oxlint.config.ts`           | The server: `base` and the Vitest rules, with `require-yield` off (a generator of `Effect.gen` or `Effect.fn` does not always yield) and `no-console` on (a log goes through `Effect.log*`)                                                                                                                              |
+| `app/src/oxlint.config.ts`              | The web app: `base`, the React, Vitest and Tailwind rules (its stylesheet: `index.css`), with `no-console` on                                                                                                                                                                                                            |
+| `site/oxlint.config.ts`                 | The website: `base`, the React, Vitest and Tailwind rules (its stylesheet: `src/styles/app.css`)                                                                                                                                                                                                                         |
+| `packages/llamacpp-js/oxlint.config.ts` | `llamacpp-js`: `base` alone, since its tests run on `node:test`                                                                                                                                                                                                                                                          |
+| `oxlint.react.ts`                       | The React fragment: the `react` and `jsx-a11y` plugins, and the `react-doctor` JS plugin with nine of its rules (the site config adds the tenth). Accessibility is limited to the rules that pass today; the others of `jsx-a11y` are off by name                                                                        |
+| `oxlint.tests.ts`                       | The Vitest fragment: an override for `**/*.test.ts` and `**/*.test.tsx` with the `vitest` plugin                                                                                                                                                                                                                         |
+| `oxlint.tailwind.ts`                    | The Tailwind fragment: the `oxlint-tailwindcss` JS plugin with its recommended rules (see [Tailwind classes](#tailwind-classes)); each project that extends it sets its stylesheet in `settings.tailwindcss.entryPoint`, relative to its config                                                                          |
+| `scripts/oxlint/directives.ts`          | The local plugin of `directives/require-reason` (see [Never disable a rule](#never-disable-a-rule)), tested by `scripts/oxlint/directives.test.ts`                                                                                                                                                                       |
 
 A project config is short:
 
 ```ts title="app/src/oxlint.config.ts"
 export default defineConfig({
-  extends: [base, react, tests],
+  extends: [base, react, tests, tailwind],
+  // The stylesheet the Tailwind rules read (it imports Tailwind and the theme), relative to this file
+  settings: { tailwindcss: { entryPoint: 'index.css' } },
   rules: {
     // The page logs nothing to the console but what it cannot show (a suppression says which)
     'no-console': 'error',
@@ -147,12 +162,6 @@ oxlint from loading `repos/effect/.oxlintrc.json`, whose plugin is not installed
 explicitly, oxlint still loads that config and fails with a configuration error; `pnpm lint`, which walks the
 repository, does not. The VS Code extension does not read `.eslintignore`: `pnpm install` leaves `repos/effect/.oxlintrc.json` out of
 the submodule's checkout (`scripts/vendored.ts`).
-
-The rules that report on today's code and are not fixed yet are off in two marked blocks, each rule with its count
-and the milestone of the oxc migration (L5, the only one left) that turns it on and fixes its reports: `--- Debt: off until its
-milestone ---` in `oxlint.config.ts`, and the Vitest rules in the override of `oxlint.tests.ts` (the override's
-category would turn them back on from the base). A block only shrinks: a rule never goes into it to get the lint
-through.
 
 The Effect diagnostics are not oxlint's: `tsc` reports them in `pnpm check`
 ([Effect diagnostics](/developers/contributing/testing/#effect-diagnostics)).
@@ -189,6 +198,35 @@ the formatter and let it apply oxlint's fixes when you save:
 Before a commit, a pull request or the end of a milestone, `pnpm lint` must report zero errors and zero warnings
 (see [the quality gate](/developers/contributing/workflow/#the-quality-gate)).
 
+### Tailwind classes
+
+`oxlint.tailwind.ts` lints the classes of the web app and of the site with `oxlint-tailwindcss`, which reads the
+design system of the project's stylesheet (`settings.tailwindcss.entryPoint`), so it knows the theme's tokens and the
+project's own utilities. Sixteen of its seventeen recommended rules are on, in `error`: an unknown class, two
+conflicting classes, a variant made useless by the base class, a duplicate, a class built at runtime, a deprecated or
+non-canonical spelling (`[container-type:size]` is `@container-size`), an arbitrary value a named class already
+gives, axes a shorthand covers (`px-4 py-4` is `p-4`), variants out of order, and a hard-coded color. The
+seventeenth, `enforce-sort-order`, stays off, and so does `enforce-consistent-line-wrapping` (not recommended, off as
+a guard): oxfmt is the single owner of the class order and of the wrapping.
+
+The plugin caches each stylesheet's design system in `oxlint-tailwindcss-<uid>` under the system temp directory
+(`$TMPDIR`, `/tmp` by default), keyed by the stylesheet and the versions of the packages it imports, not by the
+content of `@llama-webui/theme`: after editing `packages/webui-theme/theme.css`, delete that directory (or run with a
+fresh `OXLINT_TAILWINDCSS_CACHE_DIR`) before trusting `pnpm lint` or the editor, since CI always starts cold.
+
+| Case                                      | What to do                                                                                                                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A plain class of the theme, not a utility | Add it by name to the `allowlist` of `tailwindcss/no-unknown-classes` in `oxlint.tailwind.ts` (today `aurora` and `glow`, `glow-1` to `glow-3`, from `packages/webui-theme/theme.css`); never delete it |
+| A shorthand, a canonical spelling         | Take the form the rule proposes once it is the same CSS; a shorthand under a variant is not always one (`sm:top-2 bottom-2` is not `inset-y-2`)                                                         |
+| A hard-coded color                        | Use the theme token of exactly that value; without one, keep the value under a suppression that says what it reproduces, and add no token                                                               |
+
+The landing page reproduces screens and a terminal with their own colors, so a few colors stay:
+
+```tsx title="site/src/components/Logo.tsx"
+{/* oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- the blue of the logo mark's first bar (fill above, as in the favicon) */}
+<span className="text-[#3698ff]">webui</span>
+```
+
 ### Never disable a rule
 
 Do not turn a rule off or lower it to `warn` to get the lint through. When a rule reports a false positive, suppress
@@ -215,30 +253,39 @@ no rule (`unicorn/no-abusive-eslint-disable`), and on one that suppresses nothin
 
 ## React
 
-The web app uses React 19. Three rules cover most effect-related lint reports:
+The web app and the site use React 19. The lint enforces the idioms below: the React Compiler-based rules of oxlint's
+`react` plugin (`react/hooks`, `react/exhaustive-effect-dependencies`, `react/set-state-in-effect`,
+`react/immutability`, `react/refs`, all on in `error`, next to `react/exhaustive-deps`) and ten rules of
+[react-doctor](#react-doctor).
 
-- **Trigger dependencies.** `react-hooks/exhaustive-deps` reports a value a hook reads but does not list, and a
-  dependency that a `useMemo` or a `useCallback` lists but does not read. An effect may list a value it does not read:
-  when it is a deliberate trigger (the effect must run again when it changes), keep it and say so in a comment:
+- **Trigger dependencies.** Two rules read an effect's dependency array:
+  - `react/exhaustive-deps` (named `react-hooks/exhaustive-deps` in its reports and directives) reports, in any hook,
+    a value the hook reads but does not list, and an effect with no array that sets state. In a `useMemo` or a
+    `useCallback` it also reports a dependency that is listed but not read. In an effect it does not.
+  - `react/exhaustive-effect-dependencies` reports an effect's array: "Found missing effect dependencies" for a value
+    read but not listed, and "Found extra effect dependencies" for a value listed but not read. A deliberate trigger
+    is the second case, and every suppression in the code is that case.
+
+  When the dependency is a deliberate trigger (the effect must run again when it changes), keep it. Suppress the
+  report with the rule it names, above the dependency array, with a reason that says what it triggers:
 
   ```tsx title="app/src/features/chat/Thread.tsx"
-  // current.id is a trigger: re-pin to the bottom on every conversation change
   useLayoutEffect(() => {
     stick.current = true;
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- current.id is a trigger: re-pin to the bottom on every conversation change
   }, [current?.id]);
   ```
 
-  When the rule reports a list that is deliberate, the directive goes above the dependency array: it silences every
-  report of that hook, a missing dependency included, although the report prints the line where the value is used. A
-  hook with no array (an effect that runs after every render) takes the directive above the hook:
+  The directive above a dependency array silences every report of that rule for the hook, a missing dependency
+  included, although the report prints the line where the value is used. Suppress a deliberate list, never a missing
+  dependency that is a real bug. A hook with no array (an effect that runs after every render) takes the directive
+  above the hook.
 
-  ```tsx title="app/src/components/charts/TimeSeriesChart.tsx"
-  const data = useMemo((): uPlot.AlignedData => {
-    const { times, series: all } = useMonitor.getState().history;
-    return [times, ...series.map((s) => all.get(s.key) ?? new Array<number | null>(times.length).fill(null))];
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- version triggers the history reread (read outside the closure); signature sums up `series`
-  }, [version, signature]);
-  ```
+  A value an effect reads but must not re-run it for is not left out with a suppression: read it through
+  `useEffectEvent` (next point). Do not suppress `react-hooks/exhaustive-deps` either: a `react-hooks/…` directive
+  makes the React Compiler-based rules (`react/hooks`, `react/exhaustive-effect-dependencies`,
+  `react/memo-dependencies`, `react/set-state-in-effect`, `react/immutability`…) skip the whole component, as the
+  React Compiler itself does. The code has none.
 
 - **Read the latest value without re-running the effect.** Use `useEffectEvent` rather than leaving the value out of
   the dependencies with a suppression:
@@ -253,12 +300,57 @@ The web app uses React 19. Three rules cover most effect-related lint reports:
   }, [wanted]);
   ```
 
-- **Reset state when the identity changes.** Put a `key` on the component instead of clearing its state in an effect:
+- **State is not copied or reset in an effect.** `react/set-state-in-effect` reports a `setState` in an effect's body,
+  and react-doctor's `no-mirror-prop-effect` and `no-reset-all-state-on-prop-change` report an effect that copies a prop
+  into state or clears state when a prop changes. Derive the value during render; reset a whole component with a `key`;
+  adjust a piece of state in the render that sees the new input; move the update to the event that causes it. An
+  effect keeps only what synchronizes with something outside React (a fetch, a subscription):
 
   ```tsx title="app/src/features/chat/SamplingPanel.tsx"
   // key: switching conversations remounts the form (fields and errors start from scratch).
   return <SamplingForm key={current.id} current={current} props={props} />;
   ```
+
+  A field whose draft follows a saved value takes `useDraft(value)` (`app/src/lib/useDraft.ts`): the draft resets in
+  the render that sees a new `value`, without a remount, so the field keeps its focus. `value` is a primitive or a
+  stable reference (it is compared with `Object.is`).
+
+- **What is never rendered is a ref.** `react/immutability` reports a value made during render and mutated afterwards,
+  and react-doctor's `rerender-state-only-in-handlers` a state that only handlers read: hold either in a `useRef`. A ref
+  passed down as a prop is named `…Ref` (the rule recognises it by its name: `pacerRef` in
+  `features/topology/TopologyScene.tsx`).
+
+- **Zustand is read through selectors.** Two rules apply:
+  - `react/hooks` reports `useStore.getState()` called where the component renders: its body, or a `useMemo` callback.
+    It does not report a call in a handler or an effect.
+  - react-doctor's `zustand-no-whole-store-destructure` reports a component that takes the whole store.
+
+  Select each field and each action (`useBench((s) => s.remove)`). `getState()` stays for handlers and effects.
+
+### react-doctor
+
+[react-doctor](https://github.com/millionco/react-doctor)'s oxlint plugin, `oxlint-plugin-react-doctor`, is a pinned
+devDependency (0.9.23), loaded by `jsPlugins: [{ name: 'react-doctor', specifier: 'oxlint-plugin-react-doctor' }]` in
+`oxlint.react.ts`. Only these ten of its rules are on, all in `error`:
+
+| Rule                                                 | Reports                                                                                        | Where                                         |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `no-mirror-prop-effect`                              | An effect that copies a prop into state                                                        | `oxlint.react.ts`                             |
+| `no-reset-all-state-on-prop-change`                  | An effect that resets state when a prop changes (a `key` does it)                              | `oxlint.react.ts`                             |
+| `no-set-state-after-await-in-effect`                 | A `setState` after an `await` in an effect without an `ignore` flag set by its cleanup         | `oxlint.react.ts`                             |
+| `no-loading-flag-reset-outside-finally`              | A loading flag set back outside a `finally`: a rejection would leave it on                     | `oxlint.react.ts`                             |
+| `no-impure-state-updater`                            | A side effect (`localStorage`, a request) inside a state updater, which React may run twice    | `oxlint.react.ts`                             |
+| `zustand-no-whole-store-destructure`                 | A Zustand store read whole instead of through selectors                                        | `oxlint.react.ts`                             |
+| `no-enter-submit-without-ime-composition-guard`      | An Enter handler without `!e.nativeEvent.isComposing`: an IME composition's Enter would submit | `oxlint.react.ts`                             |
+| `react-router-require-root-error-boundary`           | A router without an error element on its root route (`app/src/app/RouteError.tsx`)             | `oxlint.react.ts`                             |
+| `rerender-state-only-in-handlers`                    | A state that is never rendered (a ref instead)                                                 | `oxlint.react.ts`                             |
+| `no-unguarded-browser-global-in-render-or-hook-init` | `window`, `document` or `navigator` read during render or in a hook's initial state            | `site/oxlint.config.ts` (the site prerenders) |
+
+Its licence is a **Modified MIT**: MIT, except that two uses need the copyright holder's prior written permission —
+using the code as training, fine-tuning or evaluation data for a machine-learning model or AI system, and selling it
+or offering it as a paid, hosted or managed service whose value derives from it. Running it as a lint rule of this
+repository is neither; the maintainer accepted these terms. The plugin is a devDependency only: nothing of it reaches
+the build or the published package.
 
 ## The platform and Effect
 
