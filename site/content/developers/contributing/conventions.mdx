@@ -115,7 +115,8 @@ and which config holds them, is in [What the linter enforces](#what-the-linter-e
 
 The root and five projects (`app/server`, `app/src`, `site`, `packages/llamacpp-js`, `packages/webui-shared`) each
 have an `oxlint.config.ts`, and a file takes the nearest one above it. That config replaces the root one instead of
-adding to it, so a project config extends `base` and the fragments it needs. A project config is short:
+adding to it, so a project config extends `base` and the fragments it needs. A project config is short (here its
+default export, without the imports and the ban patterns above it):
 
 ```ts title="app/src/oxlint.config.ts"
 export default defineConfig({
@@ -125,11 +126,14 @@ export default defineConfig({
   rules: {
     // The page logs nothing to the console but what it cannot show (a suppression says which)
     'no-console': 'error',
-    'no-restricted-imports': ['error', { patterns: [vendored, server, { ...nodeBuiltins, message: web }] }],
+    'no-restricted-imports': [
+      'error',
+      { patterns: [vendored, server, llamacppNode, { ...nodeBuiltins, message: web }] },
+    ],
   },
   overrides: [
     {
-      // A test may use Node's modules
+      // A test may use Node (its modules, `llamacpp-js/node`)
       files: ['**/*.test.ts', '**/*.test.tsx'],
       rules: { 'no-restricted-imports': ['error', { patterns: [vendored, server] }] },
     },
@@ -221,15 +225,15 @@ not see an `import()` of a template literal or of a computed string, a `require`
 type written `import('…').T` or `typeof import('…')`, which `typescript/consistent-type-imports` refuses whatever the
 path.
 
-| Config                                              | Refused                                                                                                                           | Message                                                                    |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `oxlint.config.ts` (`vendored`, everyone)           | `repos/…` and any relative path into `repos/`                                                                                     | the vendored repositories are reference material, import the package       |
-| `app/src/oxlint.config.ts`                          | `app/server/` (`@llama-webui/app/server/…`, `../server/…`, `../../app/server/…`); `node:*`                                        | the web talks to the server through `@llama-webui/shared` and `lib/api.ts` |
-| `site/oxlint.config.ts`                             | Anything of `app/` (`@llama-webui/app`, `../../app/…`); `@llama-webui/shared`, which the site does not use                        | the site copies what it reuses; tokens come from `@llama-webui/theme`      |
-| `packages/llamacpp-js/oxlint.config.ts`             | `@llama-webui/*` and the relative paths into the other packages and `app/`; `effect`, `@effect/*`; `node:*` outside `src/node.ts` | the package has no dependency; Node APIs live behind `llamacpp-js/node`    |
-| `packages/webui-shared/oxlint.config.ts`            | `app/` (`@llama-webui/app`, `../../../app/…`); `node:*`                                                                           | shared code runs in the browser                                            |
-| `llamacppNode` (`app/src`, `packages/webui-shared`) | `llamacpp-js/node` and the relative paths to `packages/llamacpp-js/src/node.ts`                                                   | browser code: llamacpp-js/node needs Node                                  |
-| `app/server/oxlint.config.ts`                       | `better-sqlite3`, `bun:*`; `node:sqlite` outside `db/`                                                                            | SQLite goes through `SqlClient` (`app/server/db/Db.ts`)                    |
+| Config                                              | Refused                                                                                                                                      | Message                                                                    |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `oxlint.config.ts` (`vendored`, everyone)           | `repos/…` and any relative path into `repos/`                                                                                                | the vendored repositories are reference material, import the package       |
+| `app/src/oxlint.config.ts`                          | `app/server/` (`@llama-webui/app/server/…`, `../server/…`, `../../app/server/…`); `node:*`                                                   | the web talks to the server through `@llama-webui/shared` and `lib/api.ts` |
+| `site/oxlint.config.ts`                             | Anything of `app/` (`@llama-webui/app`, `../../app/…`); `@llama-webui/shared` (`../../packages/webui-shared/…`), which the site does not use | the site copies what it reuses; tokens come from `@llama-webui/theme`      |
+| `packages/llamacpp-js/oxlint.config.ts`             | `@llama-webui/*` and the relative paths into the other packages and `app/`; `effect`, `@effect/*`; `node:*` outside `src/node.ts`            | the package has no dependency; Node APIs live behind `llamacpp-js/node`    |
+| `packages/webui-shared/oxlint.config.ts`            | `app/` (`@llama-webui/app`, `../../../app/…`); `node:*`                                                                                      | shared code runs in the browser                                            |
+| `llamacppNode` (`app/src`, `packages/webui-shared`) | `llamacpp-js/node` and the relative paths to `packages/llamacpp-js/src/node.ts`                                                              | browser code: llamacpp-js/node needs Node                                  |
+| `app/server/oxlint.config.ts`                       | `better-sqlite3`, `bun:*`; `node:sqlite` outside `db/`                                                                                       | SQLite goes through `SqlClient` (`app/server/db/Db.ts`)                    |
 
 A config that sets the rule replaces the options of `base`, so each project lists `vendored` again. `llamacppNode` is
 in `oxlint.config.ts`, for the two projects whose code runs in the browser. A ban of `node:*` or of `llamacpp-js/node`

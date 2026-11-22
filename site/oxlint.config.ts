@@ -7,9 +7,9 @@ import { tests } from '../oxlint.tests.ts';
 
 const copies = 'the site copies what it reuses; tokens come from `@llama-webui/theme`';
 // Anything of `app/`, by its package name or a relative path out of `site/` (`../app/…`, `../../../app/src/…`); and
-// `@llama-webui/shared`, which the site does not use
+// `@llama-webui/shared`, which the site does not use, by its name or a relative path (`../../packages/webui-shared/…`)
 const app = { regex: '^((@/)?(\\.\\./)+app|@llama-webui/app)(/|$)', message: copies };
-const shared = { regex: '^@llama-webui/shared(/|$)', message: copies };
+const shared = { regex: '^(@llama-webui/shared|(@/)?(\\.\\./)+packages/webui-shared)(/|$)', message: copies };
 
 export default defineConfig({
   extends: [base, react, tests, tailwind],
