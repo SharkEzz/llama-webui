@@ -38,7 +38,6 @@
     "oxlint-plugin-react-doctor": "0.9.23",
     "oxlint-tsgolint": "7.0.2008",
     "typescript": "catalog:",
-    "typescript-language-server": "^6.1.0",
     "vite": "catalog:",
     "vitest": "5.1.1"
   },
