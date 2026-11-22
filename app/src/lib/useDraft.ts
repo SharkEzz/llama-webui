@@ -3,6 +3,8 @@ import { type Dispatch, type SetStateAction, useState } from 'react';
 /**
  * A draft of `value` that the user edits, reset to `value` each time it changes (a save, a reload). The reset happens
  * in the render that sees the new value (React's "adjusting state when a prop changes"), not in an effect afterwards.
+ * `value` is a primitive or a stable reference: it is compared with `Object.is`, and a fresh object on each render
+ * would reset the draft on each render, in a loop.
  */
 export function useDraft<T>(value: T): [T, Dispatch<SetStateAction<T>>] {
   const [draft, setDraft] = useState(value);
