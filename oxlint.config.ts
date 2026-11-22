@@ -209,11 +209,6 @@ export const base = defineConfig({
     'typescript/no-implied-eval': 'error',
     'typescript/require-array-sort-compare': 'error',
     'unicorn/no-useless-spread': 'error',
-
-    // --- Debt: off until its milestone ---
-    // Rules on by category or parity rules that report on today's code; the milestone turns each on and fixes
-    // its reports. L5: React (the Vitest rules have theirs in oxlint.tests.ts).
-    // --- end of debt ---
   },
   overrides: [
     {

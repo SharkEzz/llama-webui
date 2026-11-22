@@ -302,7 +302,7 @@ test('dev reads .env, the environment wins over it', async () => {
   const fromEnv = await freePort();
   const dev = await startDev({ LLAMA_WEBUI_PORT: String(fromEnv) });
   expect(dev.base).toBe(`http://127.0.0.1:${fromEnv}`);
-  await expect(fetch(`http://127.0.0.1:${fromFile}/api/health`)).rejects.toThrow();
+  await expect(fetch(`http://127.0.0.1:${fromFile}/api/health`)).rejects.toThrow('fetch failed');
 }, 90_000);
 
 test('in dev the server connects to the Effect DevTools address', async () => {
