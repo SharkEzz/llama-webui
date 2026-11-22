@@ -14,7 +14,7 @@ export const FAKE = resolve(import.meta.dirname, '../../../testdata/fake/fake-ll
 /** `testdata/fake/fake-llama-bench`, the llama-bench beside `FAKE` (see its source for the `FAKE_*` variables). */
 export const FAKE_BENCH = resolve(import.meta.dirname, '../../../testdata/fake/fake-llama-bench');
 
-/** A port nothing listens on, on 127.0.0.1, at the time of the call. */
+/** `freePort` of `launch.ts` as an effect: a port nothing listens on, on 127.0.0.1, that no other test gives out. */
 export const freePort: Effect.Effect<number> = Effect.promise(freePortAsync);
 
 /** Whether a process with this pid exists (signal 0). */

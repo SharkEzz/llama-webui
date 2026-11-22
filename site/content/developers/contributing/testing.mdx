@@ -139,7 +139,9 @@ describe('SettingsRepo', () => {
   `chatStub` (a fake `llama-server` stream the test feeds chunk by chunk) and `fakeOutside` (a `llama-server` started
   by someone else). `app/server/testing/hub.ts` is a fake Hugging Face Hub and CDN, with `Range` support and scripted
   faults. A test that starts a process checks that it is dead at the end.
-- **Ports**: a test takes a free port, never 7860, 7861 or 8080 (where the user's own app and `llama-server` run).
+- **Ports**: a test takes a free port, never 7860, 7861 or 8080 (where the user's own app and `llama-server` run):
+  `freePort` draws it from a block of ports of its Vitest worker, below Linux's ephemeral range, so that neither
+  another worker nor an outgoing connection takes it before the program listens on it.
 - **Environment variables** a test sets are owned by its scope (`ownVariable(name, value)`), so they are restored
   when it ends.
 - **Promises**, in a plain Vitest test, are awaited: `await expect(p).rejects.toThrow()`. The lint enforces it:
