@@ -27,25 +27,25 @@ It runs commands and reads the disk, so it is not free:
 
 **Response**: `200` with a `SetupReport`.
 
-| Field                     | Type                       | Description                                                                                                                         |
-| ------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `binary.setting`          | string                     | The `binary` setting as typed.                                                                                                      |
-| `binary.path`             | string \| null             | The resolved absolute path (looked up in the `PATH` for a bare name, links resolved), `null` when it is not an executable regular file. |
-| `binary.version`          | string \| null             | The build, `b12119 (6f1e65437)` from `--version`; `null` when the binary is not found or its output has no build number.            |
-| `bench.path`              | string                     | The `llama-bench` derived from the server binary: same folder, or a bare name for a bare `binary`.                                 |
-| `bench.devices`           | `BenchDevice[]`            | The devices `llama-bench --list-devices` reports; empty when `llama-bench` is missing or fails.                                    |
-| `models.setting`          | string                     | The `modelsDir` setting as typed.                                                                                                   |
-| `models.dir`              | string                     | The folder with `~` expanded.                                                                                                       |
-| `models.exists`           | boolean                    | The folder exists and is a directory.                                                                                               |
-| `models.count`            | number                     | Readable models in it, projectors and unreadable files left out.                                                                    |
-| `models.bytes`            | number                     | Total size of those models, in bytes.                                                                                               |
-| `telemetry.nvidiaSource`  | `'nvml' \| 'nvidia-smi'`   | How the monitor reads NVIDIA cards.                                                                                                 |
-| `telemetry.perfParanoid`  | number \| null             | `kernel.perf_event_paranoid` (`/proc/sys/kernel/perf_event_paranoid`), `null` when unreadable.                                      |
-| `listen.host`             | string                     | The address llama-webui itself listens on (`--host`).                                                                               |
-| `listen.exposed`          | boolean                    | That address is not a loopback one (`isLoopback()`: `127.*`, `::1`, `localhost`, `[::1]`), so the network can reach the API.       |
-| `llamaListen.host`        | string                     | The `host` setting: the default `--host` of `llama-server`.                                                                           |
-| `llamaListen.exposed`     | boolean                    | That address is not a loopback one, so the network can reach `llama-server`'s API.                                                    |
-| `ready`                   | boolean                    | The required steps pass: `binary.path` is not `null` and `models.exists` is `true`.                                                 |
+| Field                    | Type                     | Description                                                                                                                             |
+| ------------------------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `binary.setting`         | string                   | The `binary` setting as typed.                                                                                                          |
+| `binary.path`            | string \| null           | The resolved absolute path (looked up in the `PATH` for a bare name, links resolved), `null` when it is not an executable regular file. |
+| `binary.version`         | string \| null           | The build, `b12119 (6f1e65437)` from `--version`; `null` when the binary is not found or its output has no build number.                |
+| `bench.path`             | string                   | The `llama-bench` derived from the server binary: same folder, or a bare name for a bare `binary`.                                      |
+| `bench.devices`          | `BenchDevice[]`          | The devices `llama-bench --list-devices` reports; empty when `llama-bench` is missing or fails.                                         |
+| `models.setting`         | string                   | The `modelsDir` setting as typed.                                                                                                       |
+| `models.dir`             | string                   | The folder with `~` expanded.                                                                                                           |
+| `models.exists`          | boolean                  | The folder exists and is a directory.                                                                                                   |
+| `models.count`           | number                   | Readable models in it, projectors and unreadable files left out.                                                                        |
+| `models.bytes`           | number                   | Total size of those models, in bytes.                                                                                                   |
+| `telemetry.nvidiaSource` | `'nvml' \| 'nvidia-smi'` | How the monitor reads NVIDIA cards.                                                                                                     |
+| `telemetry.perfParanoid` | number \| null           | `kernel.perf_event_paranoid` (`/proc/sys/kernel/perf_event_paranoid`), `null` when unreadable.                                          |
+| `listen.host`            | string                   | The address llama-webui itself listens on (`--host`).                                                                                   |
+| `listen.exposed`         | boolean                  | That address is not a loopback one (`isLoopback()`: `127.*`, `::1`, `localhost`, `[::1]`), so the network can reach the API.            |
+| `llamaListen.host`       | string                   | The `host` setting: the default `--host` of `llama-server`.                                                                             |
+| `llamaListen.exposed`    | boolean                  | That address is not a loopback one, so the network can reach `llama-server`'s API.                                                      |
+| `ready`                  | boolean                  | The required steps pass: `binary.path` is not `null` and `models.exists` is `true`.                                                     |
 
 A `BenchDevice` (`packages/webui-shared/src/bench.ts`) is `{ id, name, totalMib, freeMib, backend }`: the device id (`CUDA0`,
 `Vulkan1`), its name, its total and free memory in MiB as `llama-bench` reports them, and the backend (the letters of

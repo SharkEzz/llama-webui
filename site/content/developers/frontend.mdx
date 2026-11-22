@@ -135,23 +135,23 @@ export function startServerSync() {
 
 The WebSocket only pushes changes; the REST read on (re)connection fills whatever was missed while disconnected.
 
-| Module | Store | Fed by |
-| --- | --- | --- |
-| `ws.ts` | `useWs` | The socket: connection status and last message. |
-| `server.ts` | `useServer` | `server-state`; `GET /api/state` on connection. Also the start, switch, restart and stop actions. |
-| `monitor.ts` | `useMonitor` | `snapshot`, appended to a client-side history; `GET /api/monitor/history` on connection and when the history shape changes. |
-| `logs.ts` | `useLogs` | `hello` and `log`; `GET /api/logs?since=<seq>` on connection. |
-| `topology.ts` | `useTopology` | `placement`; `GET /api/topology` on connection. |
-| `downloads.ts` | `useDownloads` | `download`, `download-progress`, `download-deleted`; the queue reloaded on connection. A finished download rescans the models. |
-| `bench.ts` | `useBench` | `bench-progress`, `bench-run`, `bench-deleted`; the history reloaded on connection. |
-| `tuning.ts` | `useTuning` | `sweep`, `sweep-progress`, `sweep-deleted`, and the `bench-*` messages of the open sweep; the sweeps reloaded on connection. |
-| `chat.ts` | `useChat` | REST and the SSE stream of the open conversation. |
-| `health.ts` | `useHealth` | `GET /api/health`, refreshed by `AppLayout` on every connection. |
-| `theme.ts` | `useTheme` | `localStorage` and the `theme` setting. |
-| `models.ts` | `useModels` | `GET /api/models`, on demand. |
-| `profiles.ts` | `useProfiles` | `GET /api/profiles`, on demand. |
-| `flags.ts` | `useFlags()` (hook over a private store) | `GET /api/flags`, read once: the flag catalogue of the configured `llama-server`. |
-| `settings.ts` | `useSettingsEditor()` (hook, no store) | `GET` and `PATCH /api/settings`, with per-field validation errors. |
+| Module         | Store                                    | Fed by                                                                                                                         |
+| -------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `ws.ts`        | `useWs`                                  | The socket: connection status and last message.                                                                                |
+| `server.ts`    | `useServer`                              | `server-state`; `GET /api/state` on connection. Also the start, switch, restart and stop actions.                              |
+| `monitor.ts`   | `useMonitor`                             | `snapshot`, appended to a client-side history; `GET /api/monitor/history` on connection and when the history shape changes.    |
+| `logs.ts`      | `useLogs`                                | `hello` and `log`; `GET /api/logs?since=<seq>` on connection.                                                                  |
+| `topology.ts`  | `useTopology`                            | `placement`; `GET /api/topology` on connection.                                                                                |
+| `downloads.ts` | `useDownloads`                           | `download`, `download-progress`, `download-deleted`; the queue reloaded on connection. A finished download rescans the models. |
+| `bench.ts`     | `useBench`                               | `bench-progress`, `bench-run`, `bench-deleted`; the history reloaded on connection.                                            |
+| `tuning.ts`    | `useTuning`                              | `sweep`, `sweep-progress`, `sweep-deleted`, and the `bench-*` messages of the open sweep; the sweeps reloaded on connection.   |
+| `chat.ts`      | `useChat`                                | REST and the SSE stream of the open conversation.                                                                              |
+| `health.ts`    | `useHealth`                              | `GET /api/health`, refreshed by `AppLayout` on every connection.                                                               |
+| `theme.ts`     | `useTheme`                               | `localStorage` and the `theme` setting.                                                                                        |
+| `models.ts`    | `useModels`                              | `GET /api/models`, on demand.                                                                                                  |
+| `profiles.ts`  | `useProfiles`                            | `GET /api/profiles`, on demand.                                                                                                |
+| `flags.ts`     | `useFlags()` (hook over a private store) | `GET /api/flags`, read once: the flag catalogue of the configured `llama-server`.                                              |
+| `settings.ts`  | `useSettingsEditor()` (hook, no store)   | `GET` and `PATCH /api/settings`, with per-field validation errors.                                                             |
 
 ### Monitoring history
 
@@ -183,8 +183,8 @@ another conversation aborts the stream, which only unsubscribes: the generation 
   connection that missed two (see [WebSocket](/developers/api/websocket/)).
 - **Dispatch.** `onWs(type, fn)` registers a typed listener for one message type and returns its unsubscribe
   function. Each frame is decoded with the shared `WsMessage` schema and dispatched by `type`; a frame that does not decode
-(not JSON, a type or a field the page does not know) is skipped and logged to the console (`decodeFrame()`:
-`llama-webui: a message of the server does not decode`, with the schema error).
+  (not JSON, a type or a field the page does not know) is skipped and logged to the console (`decodeFrame()`:
+  `llama-webui: a message of the server does not decode`, with the schema error).
 - **HMR.** In development, `import.meta.hot.dispose` closes the socket and clears the retry timer, so a hot update
   of the client does not leave ghost sockets behind.
 
@@ -220,12 +220,12 @@ code of the web app calls `fetch('/api…')` by hand. A reply that streams, the 
 
 A call rejects with:
 
-| Error | When |
-| --- | --- |
+| Error                       | When                                                                                                                                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The endpoint's tagged error | The server answered one of the errors the endpoint declares (`ProfileNameTaken`, `HfGated`, `ServerRunning`…), or a shared one (`RequestInvalid` with its `issues`, `RequestRefused`, `RouteNotFound`). |
-| `RequestInvalid` | Also when the client refuses to send a payload its schema does not encode: the same error the server would answer. |
-| `ApiUnreachable` | The request got no answer (message `llama-webui server unreachable`), or a stream broke off. |
-| `ApiReplyInvalid` | An event of a stream does not decode; the cause is logged to the console. |
+| `RequestInvalid`            | Also when the client refuses to send a payload its schema does not encode: the same error the server would answer.                                                                                      |
+| `ApiUnreachable`            | The request got no answer (message `llama-webui server unreachable`), or a stream broke off.                                                                                                            |
+| `ApiReplyInvalid`           | An event of a stream does not decode; the cause is logged to the console.                                                                                                                               |
 
 The rule is that the web app never compares the text of a server message: it branches on the error's `_tag`
 (`errorTag(e)`, `app/src/lib/api.ts`) or a shared helper; the text it shows is `errorMessage(e)` of the same file. For example, when a benchmark would stop the running
@@ -253,22 +253,22 @@ Validation errors come back field by field: the profile form and the settings ed
 Every number, date and unit shown in the UI goes through `app/src/lib/format.ts`: no component formats with a locale of
 its own.
 
-| Export | Output |
-| --- | --- |
-| `LOCALE` | `'en-US'`, the locale of every number and date. |
-| `num(max, min = max)` | A cached `Intl.NumberFormat` with at most `max` and at least `min` fraction digits. |
-| `fmt(v, max = 1)` | A number with up to `max` decimals: `fmt(3.14159, 1)` → "3.1". |
-| `plural(n, one, other?)` | The English singular or plural, `other` defaulting to `one` + "s": `plural(0, 'line')` → "lines". |
-| `formatBytes(n, digits = 1)` | Base 1024 with B, KiB, MiB, GiB, TiB: "12.3 GiB". |
-| `formatBps(n)` | A byte rate: "1.2 GiB/s". |
-| `formatRate(tps)` | Tokens per second: "42.7 tok/s". |
-| `formatPct(n)` | A percentage, one decimal below 10: "37%". |
-| `formatInt(n)` | A grouped integer: "32,768". |
-| `formatParams(n)` | A parameter count: "27.3 B", "600 M". |
-| `formatTemp(c)` | "54 °C". |
-| `formatDuration(ms)` | "45 s", "12 min 05 s", "3 h 07 min", "2 d 4 h". |
-| `formatTime(t)`, `formatShortDate(t)` | "14:03:27", "Nov 7, 14:03". |
-| `formatStddev(sd)` | " ± 0.4", empty when zero. |
+| Export                                | Output                                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `LOCALE`                              | `'en-US'`, the locale of every number and date.                                                   |
+| `num(max, min = max)`                 | A cached `Intl.NumberFormat` with at most `max` and at least `min` fraction digits.               |
+| `fmt(v, max = 1)`                     | A number with up to `max` decimals: `fmt(3.14159, 1)` → "3.1".                                    |
+| `plural(n, one, other?)`              | The English singular or plural, `other` defaulting to `one` + "s": `plural(0, 'line')` → "lines". |
+| `formatBytes(n, digits = 1)`          | Base 1024 with B, KiB, MiB, GiB, TiB: "12.3 GiB".                                                 |
+| `formatBps(n)`                        | A byte rate: "1.2 GiB/s".                                                                         |
+| `formatRate(tps)`                     | Tokens per second: "42.7 tok/s".                                                                  |
+| `formatPct(n)`                        | A percentage, one decimal below 10: "37%".                                                        |
+| `formatInt(n)`                        | A grouped integer: "32,768".                                                                      |
+| `formatParams(n)`                     | A parameter count: "27.3 B", "600 M".                                                             |
+| `formatTemp(c)`                       | "54 °C".                                                                                          |
+| `formatDuration(ms)`                  | "45 s", "12 min 05 s", "3 h 07 min", "2 d 4 h".                                                   |
+| `formatTime(t)`, `formatShortDate(t)` | "14:03:27", "Nov 7, 14:03".                                                                       |
+| `formatStddev(sd)`                    | " ± 0.4", empty when zero.                                                                        |
 
 The formatters return "—" for `null`, `undefined` or a non-finite number. The UI text itself is in English.
 
@@ -304,15 +304,15 @@ draws its scene with react-three-fiber (`features/topology/`).
 
 `features/topology/` keeps what is drawn apart from how it is computed:
 
-| File                | Role                                                                                                             |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| File                | Role                                                                                                                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `flows.ts`          | Pure: projects the snapshot and the placement onto the graph. `linkFlows()` (throughput, share of the capacity, alert level), `linkBadge()`, `nodeLive()` (tank layers, labels, tooltip), `peerLinks()`. |
-| `layout.ts`         | Pure: where each block sits, the curve of each link (`linkPath()`, `peerPath()`) and the camera fit.             |
-| `smooth.ts`         | `Smoother` (per-key easing between two ticks) and `flowVisual()`, the log scale of the streaks.                  |
-| `pacing.ts`         | `FramePacer`: a frame only when something moves.                                                                 |
-| `TopologyScene.tsx` | The three.js scene: tanks, CPU thread grid, tubes, streaks, peer-to-peer dots, and the `Projector` that anchors the DOM labels. |
-| `Labels.tsx`        | DOM labels, link badges and the tooltip, positioned by the scene.                                                |
-| `Hud.tsx`           | The Phase and Model cards and the legend popover; `hudPrefs.ts` keeps the folded cards in `localStorage` (`llama-webui:topology-hud`). |
+| `layout.ts`         | Pure: where each block sits, the curve of each link (`linkPath()`, `peerPath()`) and the camera fit.                                                                                                     |
+| `smooth.ts`         | `Smoother` (per-key easing between two ticks) and `flowVisual()`, the log scale of the streaks.                                                                                                          |
+| `pacing.ts`         | `FramePacer`: a frame only when something moves.                                                                                                                                                         |
+| `TopologyScene.tsx` | The three.js scene: tanks, CPU thread grid, tubes, streaks, peer-to-peer dots, and the `Projector` that anchors the DOM labels.                                                                          |
+| `Labels.tsx`        | DOM labels, link badges and the tooltip, positioned by the scene.                                                                                                                                        |
+| `Hud.tsx`           | The Phase and Model cards and the legend popover; `hudPrefs.ts` keeps the folded cards in `localStorage` (`llama-webui:topology-hud`).                                                                   |
 
 Thresholds are named constants in `flows.ts` (`LINK_WARN`, `LINK_CRIT`, `FILL_WARN_PCT`, `FILL_CRIT_PCT`,
 `REST_BADGE_FLOOR_BPS`), which the legend reads too. Two rules hold the scene together: a tank's level is always the

@@ -10,12 +10,12 @@ interface.
 
 ## What you need
 
-| Requirement                                       | Why                                                                                                    |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Linux**                                         | Hardware discovery and telemetry read `/proc` and `/sys`. `setpriv` (util-linux) ties `llama-server` to llama-webui. |
-| **[Node.js](https://nodejs.org) 26.13 or later**  | Runs llama-webui. npm comes with it; [pnpm](https://pnpm.io) 12 is needed only to run from source.     |
-| **A [llama.cpp](https://github.com/ggml-org/llama.cpp) build** | `llama-server` is required. `llama-bench`, next to it, enables benchmarks and sweeps.       |
-| **GGUF models**                                   | In a folder of your choice, set during the first run.                                                  |
+| Requirement                                                    | Why                                                                                                                  |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Linux**                                                      | Hardware discovery and telemetry read `/proc` and `/sys`. `setpriv` (util-linux) ties `llama-server` to llama-webui. |
+| **[Node.js](https://nodejs.org) 26.13 or later**               | Runs llama-webui. npm comes with it; [pnpm](https://pnpm.io) 12 is needed only to run from source.                   |
+| **A [llama.cpp](https://github.com/ggml-org/llama.cpp) build** | `llama-server` is required. `llama-bench`, next to it, enables benchmarks and sweeps.                                |
+| **GGUF models**                                                | In a folder of your choice, set during the first run.                                                                |
 
 GPU telemetry is optional: NVIDIA cards are read through NVML (falling back to `nvidia-smi`), AMD cards through the
 `amdgpu` driver's sysfs files. Without them, llama-webui still runs models and shows CPU and memory.

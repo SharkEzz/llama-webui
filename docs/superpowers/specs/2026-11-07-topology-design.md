@@ -51,6 +51,7 @@ serveur (chargement, prompt, génération) et répartition du modèle entre les 
   Nul pour un serveur externe, `idle` ou `crashed`. Le dernier placement lu est gardé avec le PID du serveur (sur
   `globalThis`) : il reste valable une fois la ligne de lancement évincée du ring, ou après un rechargement de Bun, tant
   que le serveur suivi a le même PID ; oublié à l'arrêt.
+
 - **Phase** : `phaseOf(state, snapshot)` (`shared/`) : arrêté → chargement → inactif → prompt → génération. Un slot
   occupé est en phase prompt tant qu'il n'a généré aucun token (`n_decoded = 0`) : `n_prompt_tokens` est tout le
   contexte du slot (il grossit des tokens générés) et `n_prompt_tokens_processed` exclut le cache.

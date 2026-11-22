@@ -22,22 +22,22 @@ website, which imports no code of the app.
 
 ## Tech stack
 
-| Layer | Technology | Where |
-| --- | --- | --- |
-| Runtime | [Node.js](https://nodejs.org) 26.13 or later, one process for the API, the WebSocket and the UI | `app/server/` |
-| Build | [Vite](https://vite.dev): `vite dev` with HMR and the web client's `vite build`; [Rolldown](https://rolldown.rs) bundles the server into one file | `app/vite.config.ts`, `app/build/server.ts` |
-| Server | [Effect](https://effect.website) 4: services and layers, `HttpApi` (`node:http` through `@effect/platform-node`) for the API, the `/ws` WebSocket and the UI, `effect/process` for the programs it runs | `app/server/` |
-| API | One `HttpApi` definition shared by the server and the web app: endpoints, payloads, replies and tagged errors; the web calls it through a typed client | `packages/webui-shared/src/api/`, `app/src/lib/api.ts` |
-| Database | `node:sqlite` through `@effect/sql-sqlite-node` (`SqlClient`), one file in the data directory, WAL journal | `app/server/db/` |
-| Validation | Effect `Schema`: request bodies, queries and settings are decoded on the server, the same schemas type both sides | `packages/webui-shared/src/` |
-| GGUF headers | `@huggingface/gguf` | `app/server/models/`, `app/server/hf/` |
-| UI | [React](https://react.dev) 19, [React Router](https://reactrouter.com) 8 (data router, lazy routes) | `app/src/` |
-| Styling | [Tailwind CSS](https://tailwindcss.com) 4 through `@tailwindcss/vite` | `app/src/index.css` |
-| Components | [shadcn/ui](https://ui.shadcn.com) (`base-nova` style) on [Base UI](https://base-ui.com), lucide icons, sonner toasts, cmdk | `app/src/components/ui/` |
-| State | [zustand](https://zustand.docs.pmnd.rs) 5, one store per domain | `app/src/lib/` |
-| Charts and 3D | [uPlot](https://github.com/leeoniya/uPlot) time series, [react-three-fiber](https://r3f.docs.pmnd.rs) and three.js for the Topology page | `app/src/components/charts/`, `app/src/features/topology/` |
-| Text | react-markdown and remark-gfm for chat replies, [Shiki](https://shiki.style) for code blocks | `app/src/features/chat/`, `app/src/lib/highlight.ts` |
-| Quality | TypeScript 7 (`tsc`) with the Effect language service, [oxfmt](https://oxc.rs) (format, imports, `package.json` keys), [Biome](https://biomejs.dev) 2 (lint), [Vitest](https://vitest.dev) and `node:test` | `oxfmt.config.ts`, `biome.jsonc`, `tsconfig.base.json`, `vitest.config.ts` |
+| Layer         | Technology                                                                                                                                                                                                 | Where                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Runtime       | [Node.js](https://nodejs.org) 26.13 or later, one process for the API, the WebSocket and the UI                                                                                                            | `app/server/`                                                              |
+| Build         | [Vite](https://vite.dev): `vite dev` with HMR and the web client's `vite build`; [Rolldown](https://rolldown.rs) bundles the server into one file                                                          | `app/vite.config.ts`, `app/build/server.ts`                                |
+| Server        | [Effect](https://effect.website) 4: services and layers, `HttpApi` (`node:http` through `@effect/platform-node`) for the API, the `/ws` WebSocket and the UI, `effect/process` for the programs it runs    | `app/server/`                                                              |
+| API           | One `HttpApi` definition shared by the server and the web app: endpoints, payloads, replies and tagged errors; the web calls it through a typed client                                                     | `packages/webui-shared/src/api/`, `app/src/lib/api.ts`                     |
+| Database      | `node:sqlite` through `@effect/sql-sqlite-node` (`SqlClient`), one file in the data directory, WAL journal                                                                                                 | `app/server/db/`                                                           |
+| Validation    | Effect `Schema`: request bodies, queries and settings are decoded on the server, the same schemas type both sides                                                                                          | `packages/webui-shared/src/`                                               |
+| GGUF headers  | `@huggingface/gguf`                                                                                                                                                                                        | `app/server/models/`, `app/server/hf/`                                     |
+| UI            | [React](https://react.dev) 19, [React Router](https://reactrouter.com) 8 (data router, lazy routes)                                                                                                        | `app/src/`                                                                 |
+| Styling       | [Tailwind CSS](https://tailwindcss.com) 4 through `@tailwindcss/vite`                                                                                                                                      | `app/src/index.css`                                                        |
+| Components    | [shadcn/ui](https://ui.shadcn.com) (`base-nova` style) on [Base UI](https://base-ui.com), lucide icons, sonner toasts, cmdk                                                                                | `app/src/components/ui/`                                                   |
+| State         | [zustand](https://zustand.docs.pmnd.rs) 5, one store per domain                                                                                                                                            | `app/src/lib/`                                                             |
+| Charts and 3D | [uPlot](https://github.com/leeoniya/uPlot) time series, [react-three-fiber](https://r3f.docs.pmnd.rs) and three.js for the Topology page                                                                   | `app/src/components/charts/`, `app/src/features/topology/`                 |
+| Text          | react-markdown and remark-gfm for chat replies, [Shiki](https://shiki.style) for code blocks                                                                                                               | `app/src/features/chat/`, `app/src/lib/highlight.ts`                       |
+| Quality       | TypeScript 7 (`tsc`) with the Effect language service, [oxfmt](https://oxc.rs) (format, imports, `package.json` keys), [Biome](https://biomejs.dev) 2 (lint), [Vitest](https://vitest.dev) and `node:test` | `oxfmt.config.ts`, `biome.jsonc`, `tsconfig.base.json`, `vitest.config.ts` |
 
 The website uses its own stack (Vite, React Router in framework mode with prerendering, MDX), and its scripts run
 on Node.js like the app's.

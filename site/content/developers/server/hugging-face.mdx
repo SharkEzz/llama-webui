@@ -9,21 +9,21 @@ the queue in `app/server/downloads/`, their schemas in `packages/webui-shared/sr
 `packages/webui-shared/src/api/HfApi.ts` and `DownloadsApi.ts`. For what users see, read
 [Hugging Face downloads](/docs/hugging-face/).
 
-| File | Role |
-| --- | --- |
-| `app/server/hf/HfHttp.ts` | `HfHttp`: the HTTP client of every request to Hugging Face, HTTP/1.1 on its own agents, through the environment's proxy. |
-| `app/server/hf/HfClient.ts` | `HfClient`: search, repository files at a revision, token account; `hubError()`. |
-| `app/server/hf/repo.ts` | `describeRepo()` for the download sheet, `downloadInputs()` for the queue. |
-| `app/server/hf/variants.ts` | `groupRepoFiles()`: files grouped into variants and projectors. |
-| `app/server/hf/paths.ts` | `repoDir()`, `fileDest()`, `partPath()`, `sizeOf()`. |
-| `app/server/hf/token.ts` | `hfToken`, `hfTokenPath`, `hfEndpoint`, `hubHeaders()`. |
-| `app/server/hf/http.ts` | `HfHandlers`: the `hf` group (see [Hugging Face API](/developers/api/hf/)). |
-| `app/server/downloads/Downloads.ts` | `Downloads`: the queue. |
-| `app/server/downloads/transfer.ts` | `transferWith()`: the files of an item, with range resume, retries and checks. |
-| `app/server/downloads/freeSpace.ts`, `hash.ts` | `freeBytesOf()`; the streamed sha256. |
-| `app/server/downloads/DownloadsRepo.ts` | `DownloadsRepo`: the `downloads` table. |
-| `app/server/downloads/http.ts` | `DownloadsHandlers`: the `downloads` group. |
-| `packages/webui-shared/src/hf.ts` | Schemas, `HF_REPO_RE`, `parseHfInput()`, `DownloadRequest`, `vramFit()`. |
+| File                                           | Role                                                                                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `app/server/hf/HfHttp.ts`                      | `HfHttp`: the HTTP client of every request to Hugging Face, HTTP/1.1 on its own agents, through the environment's proxy. |
+| `app/server/hf/HfClient.ts`                    | `HfClient`: search, repository files at a revision, token account; `hubError()`.                                         |
+| `app/server/hf/repo.ts`                        | `describeRepo()` for the download sheet, `downloadInputs()` for the queue.                                               |
+| `app/server/hf/variants.ts`                    | `groupRepoFiles()`: files grouped into variants and projectors.                                                          |
+| `app/server/hf/paths.ts`                       | `repoDir()`, `fileDest()`, `partPath()`, `sizeOf()`.                                                                     |
+| `app/server/hf/token.ts`                       | `hfToken`, `hfTokenPath`, `hfEndpoint`, `hubHeaders()`.                                                                  |
+| `app/server/hf/http.ts`                        | `HfHandlers`: the `hf` group (see [Hugging Face API](/developers/api/hf/)).                                              |
+| `app/server/downloads/Downloads.ts`            | `Downloads`: the queue.                                                                                                  |
+| `app/server/downloads/transfer.ts`             | `transferWith()`: the files of an item, with range resume, retries and checks.                                           |
+| `app/server/downloads/freeSpace.ts`, `hash.ts` | `freeBytesOf()`; the streamed sha256.                                                                                    |
+| `app/server/downloads/DownloadsRepo.ts`        | `DownloadsRepo`: the `downloads` table.                                                                                  |
+| `app/server/downloads/http.ts`                 | `DownloadsHandlers`: the `downloads` group.                                                                              |
+| `packages/webui-shared/src/hf.ts`              | Schemas, `HF_REPO_RE`, `parseHfInput()`, `DownloadRequest`, `vramFit()`.                                                 |
 
 ## From a search to a file
 
@@ -52,11 +52,11 @@ endpoint's origin, so the token never leaves it) and its body read; a `200` is d
 dropped when the browser's request is (a closed sheet, a new keystroke): the handler is interrupted, which aborts the
 request.
 
-| Method                  | Hub request                                                            | Returns                                                                                  |
-| ----------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `search(q)`             | `/api/models?search=<q>&filter=gguf&sort=downloads&direction=-1&limit=30`, with `downloads`, `likes`, `gated` and `lastModified` expanded | `HfSearchHit[]`, most downloaded first |
-| `repoFiles(id, revision)` | `/api/models/<id>/revision/<revision>?blobs=true`                    | The resolved commit (`sha`), `gated`, and each file's path, size and sha256              |
-| `status`                | `/api/whoami-v2`, only with a token                                    | `HfStatus`: token source, account name, whether the token was rejected, endpoint        |
+| Method                    | Hub request                                                                                                                               | Returns                                                                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `search(q)`               | `/api/models?search=<q>&filter=gguf&sort=downloads&direction=-1&limit=30`, with `downloads`, `likes`, `gated` and `lastModified` expanded | `HfSearchHit[]`, most downloaded first                                           |
+| `repoFiles(id, revision)` | `/api/models/<id>/revision/<revision>?blobs=true`                                                                                         | The resolved commit (`sha`), `gated`, and each file's path, size and sha256      |
+| `status`                  | `/api/whoami-v2`, only with a token                                                                                                       | `HfStatus`: token source, account name, whether the token was rejected, endpoint |
 
 For a file stored with Git LFS, the size and the sha256 come from its `lfs` entry. Other files have no sha256: they
 are not verified. `status` asks for the account once per token; a network failure is not cached (it is tried again next
@@ -68,13 +68,13 @@ time), a rejected token is.
 answers as they are. It reads the `X-Error-Code` header first, because a missing or private repository answers
 `401 RepoNotFound` to an anonymous request.
 
-| `_tag` | Status | When |
-| --- | --- | --- |
-| `HfGated` | 403 | `X-Error-Code: GatedRepo`, or a `403` |
-| `HfNotFound` | 404 | `RepoNotFound`, `RevisionNotFound`, `EntryNotFound`, or a `404` |
-| `HfUnauthorized` | 401 | Any other `401`: the token was rejected |
-| `HfRateLimited` | 429 | `429` |
-| `HfUnreachable` | 502 | Any other status, a request without an answer (`Hugging Face unreachable: <reason>`), no answer in 10 s, or a `200` that does not decode (a proxy or captive portal) |
+| `_tag`           | Status | When                                                                                                                                                                 |
+| ---------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HfGated`        | 403    | `X-Error-Code: GatedRepo`, or a `403`                                                                                                                                |
+| `HfNotFound`     | 404    | `RepoNotFound`, `RevisionNotFound`, `EntryNotFound`, or a `404`                                                                                                      |
+| `HfUnauthorized` | 401    | Any other `401`: the token was rejected                                                                                                                              |
+| `HfRateLimited`  | 429    | `429`                                                                                                                                                                |
+| `HfUnreachable`  | 502    | Any other status, a request without an answer (`Hugging Face unreachable: <reason>`), no answer in 10 s, or a `200` that does not decode (a proxy or captive portal) |
 
 Without a token, the gated and not-found messages end with ``(set HF_TOKEN or run `hf auth login`)``.
 
@@ -191,14 +191,14 @@ above 0. `HfHttp` follows no redirect: the transfer follows them itself, so that
 origin, never to the CDN that serves the file; the signed CDN URL is requested again on every attempt, since it
 expires. After six redirects, the item fails with `Too many redirects from Hugging Face` (`code: "hf-unreachable"`).
 
-| Response                                     | What the queue does                                                   |
-| -------------------------------------------- | --------------------------------------------------------------------- |
-| `206` with `content-range: bytes <offset>-…` | Appends to the `.part`                                                |
-| `206` starting elsewhere                     | Deletes the `.part`, retries                                          |
+| Response                                     | What the queue does                                                                |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `206` with `content-range: bytes <offset>-…` | Appends to the `.part`                                                             |
+| `206` starting elsewhere                     | Deletes the `.part`, retries                                                       |
 | `200` while the offset is above 0            | The server ignored the range: rewrites the `.part` from zero and restarts the hash |
-| `416`                                        | The `.part` no longer matches the file: deletes it, retries from zero |
-| `408`, `429`, `5xx`                          | Retries                                                               |
-| Any other error                              | Fails the item with the [Hub error](#errors) and its code (`hf-gated`…) |
+| `416`                                        | The `.part` no longer matches the file: deletes it, retries from zero              |
+| `408`, `429`, `5xx`                          | Retries                                                                            |
+| Any other error                              | Fails the item with the [Hub error](#errors) and its code (`hf-gated`…)            |
 
 ### Retries
 
@@ -225,7 +225,7 @@ also saves the item `error` with `download-failed`, its cause logged. The item k
   projector, and the copy one of them placed, or the `.part` the next one will resume, is not the canceled item's to
   delete.
 - `retry(id)` puts a failed or canceled item back in the queue (`409` `NotFinished` `Only a failed or canceled
-  download can be retried` otherwise), with the same duplicate and disk space checks as a new download. No file is
+download can be retried` otherwise), with the same duplicate and disk space checks as a new download. No file is
   trusted as done any more: each one is checked on disk again, and those still in place are kept.
 - `clear` takes the `done`, `error` and `canceled` items out of the list, their files kept.
 
@@ -242,11 +242,11 @@ the live state.
 
 ## Shutdown and restarts
 
-| Event | What happens |
-| --- | --- |
+| Event                          | What happens                                                                                                                                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Shutdown (`SIGINT`, `SIGTERM`) | The shutdown step of `Downloads` (`shutdown.before`) interrupts the transfer under the queue's lock: nothing is written or started after it, the `.part` and the row, still `downloading`, are kept |
-| llama-webui killed | Same state on disk: the `.part` and a `downloading` row |
-| Next start | Building `Downloads` starts the loop, which takes the `downloading` item first and resumes it from its `.part` |
+| llama-webui killed             | Same state on disk: the `.part` and a `downloading` row                                                                                                                                             |
+| Next start                     | Building `Downloads` starts the loop, which takes the `downloading` item first and resumes it from its `.part`                                                                                      |
 
 There is no orphan cleanup for downloads: an interrupted item carries on where it stopped. In development, a save of a
 file the server imports restarts it: a shutdown, then a next start. One queue runs one attempt at a time, so a
@@ -280,11 +280,11 @@ no proxy. With `LLAMA_WEBUI_TEST_OFFLINE=1` (the exact value), nothing leaves th
 
 `Downloads` publishes these on the hub; see [WebSocket](/developers/api/websocket/).
 
-| Message             | Payload                | When                                                                                                                   |
-| ------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `download`          | `DownloadItem`         | An item is queued, starts downloading, is done, fails, is canceled, or is retried                                      |
+| Message             | Payload                | When                                                                                                                           |
+| ------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `download`          | `DownloadItem`         | An item is queued, starts downloading, is done, fails, is canceled, or is retried                                              |
 | `download-progress` | `DownloadLive \| null` | A phase change (`downloading`, `verifying`, `retrying`), progress at most every `liveEvery` (250 ms); `null` when an item ends |
-| `download-deleted`  | `{ ids }`              | Finished items are removed or cleared                                                                                  |
+| `download-deleted`  | `{ ids }`              | Finished items are removed or cleared                                                                                          |
 
 `DownloadLive` gives the item, the phase, the file in progress, the bytes done over the total, and `bps`, an
 exponential average of the throughput (70% of the previous value, 30% of the latest measure). A client that connects

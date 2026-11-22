@@ -17,16 +17,16 @@ rules are on the [API overview](/developers/api/overview/); the Profiles page is
 `ProfileInput` (`packages/webui-shared/src/profile.ts`) is the body of a create or an update, and the import and
 export format. The object is strict: an unknown key is refused (`unknown key`), and every issue is reported.
 
-| Field    | Type                     | Required | Description                                                                                                              |
-| -------- | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `name`   | string                   | yes      | Not empty. Unique among profiles (exact, case-sensitive match).                                                          |
-| `model`  | string                   | yes      | Not empty. The GGUF to load (`-m`): absolute, `~/…`, or relative to `cwd`.                                               |
-| `mmproj` | string                   | no       | A multimodal projector (`-mm`), with the same path rules.                                                                |
-| `cwd`    | string                   | no       | The working directory of `llama-server` (`~` expanded). Without it, llama-webui's own working directory.                 |
-| `host`   | string                   | no       | `--host`. Without it, the `host` setting.                                                                                |
-| `port`   | integer                  | no       | `--port`, 1 to 65535. Without it, the `port` setting.                                                                    |
-| `args`   | string[]                 | no       | The other `llama-server` arguments, one item per word (`["-c", "16384"]`). Default `[]`.                                 |
-| `env`    | `Record<string, string>` | no       | Environment variables added to llama-webui's own when `llama-server` starts. Default `{}`.                               |
+| Field    | Type                     | Required | Description                                                                                              |
+| -------- | ------------------------ | -------- | -------------------------------------------------------------------------------------------------------- |
+| `name`   | string                   | yes      | Not empty. Unique among profiles (exact, case-sensitive match).                                          |
+| `model`  | string                   | yes      | Not empty. The GGUF to load (`-m`): absolute, `~/…`, or relative to `cwd`.                               |
+| `mmproj` | string                   | no       | A multimodal projector (`-mm`), with the same path rules.                                                |
+| `cwd`    | string                   | no       | The working directory of `llama-server` (`~` expanded). Without it, llama-webui's own working directory. |
+| `host`   | string                   | no       | `--host`. Without it, the `host` setting.                                                                |
+| `port`   | integer                  | no       | `--port`, 1 to 65535. Without it, the `port` setting.                                                    |
+| `args`   | string[]                 | no       | The other `llama-server` arguments, one item per word (`["-c", "16384"]`). Default `[]`.                 |
+| `env`    | `Record<string, string>` | no       | Environment variables added to llama-webui's own when `llama-server` starts. Default `{}`.               |
 
 `args` cannot contain a flag llama-webui passes itself (`RESERVED_FLAGS`): `--host`, `--port`, `--metrics`, `--slots`,
 `--props`, `-m`, `--model`, `-mm`, `--mmproj`, also written as `--flag=value`. Each one is an issue at its index,
@@ -37,12 +37,12 @@ built by `buildCommand()` (`app/server/supervisor/command.ts`, see [Supervisor](
 
 What the endpoints return: a `ProfileInput` plus four fields.
 
-| Field       | Type                              | Description                                                                                   |
-| ----------- | --------------------------------- | --------------------------------------------------------------------------------------------- |
-| `id`        | number                            | The profile's id.                                                                             |
+| Field       | Type                              | Description                                                                                                                                                                                             |
+| ----------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`        | number                            | The profile's id.                                                                                                                                                                                       |
 | `source`    | `'ui' \| 'import' \| 'llama-tui'` | How it was created: `ui` by `POST /api/profiles` (the editor) or from a benchmark run, `import` by a file import, `llama-tui` by the llama-tui import of an older version (nothing writes it any more). |
-| `createdAt` | number                            | Creation time (epoch ms).                                                                     |
-| `updatedAt` | number                            | Last update time (epoch ms).                                                                  |
+| `createdAt` | number                            | Creation time (epoch ms).                                                                                                                                                                               |
+| `updatedAt` | number                            | Last update time (epoch ms).                                                                                                                                                                            |
 
 The optional fields (`mmproj`, `cwd`, `host`, `port`) are left out when they are not set, never `null`.
 
@@ -198,10 +198,10 @@ the source `import`. An import never overwrites: a name that already exists is s
 
 **Response**: `200`
 
-| Field      | Type                         | Description                                                    |
-| ---------- | ---------------------------- | -------------------------------------------------------------- |
-| `imported` | `Profile[]`                  | The profiles created.                                          |
-| `skipped`  | `{ name, reason }[]`         | The profiles left out: those refused by the parser first, then those whose name exists. |
+| Field      | Type                 | Description                                                                             |
+| ---------- | -------------------- | --------------------------------------------------------------------------------------- |
+| `imported` | `Profile[]`          | The profiles created.                                                                   |
+| `skipped`  | `{ name, reason }[]` | The profiles left out: those refused by the parser first, then those whose name exists. |
 
 The reasons are the first issue (`<message> (<path>)`), `duplicate name in the file`, `already exists`, or
 `no profile found in this JSON` with the name `(file)` when the document has none of the three forms. A profile without

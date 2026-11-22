@@ -87,16 +87,16 @@ Each sampling field is empty by default: the value then comes from `llama-server
 server's `/props`. Type a number to override it for this conversation; clear the field to go back to the server's
 value.
 
-| Setting              | Range                     | What it changes                                                                                      |
-| -------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Temperature**      | 0 to 5                    | Randomness of the choice of the next token. Lower is more deterministic.                             |
-| **Top-p**            | 0 to 1                    | Keeps the most likely tokens until their probabilities add up to this value.                         |
-| **Top-k**            | 0 to 1,000 (integer)      | Keeps only this many most likely tokens.                                                             |
-| **Min-p**            | 0 to 1                    | Drops tokens less likely than this fraction of the most likely one.                                  |
-| **Presence penalty** | −2 to 2                   | Penalizes tokens that already appeared, to push toward new topics.                                   |
-| **Repeat penalty**   | 0 to 5                    | Penalizes repeating recent tokens.                                                                   |
-| **Max tokens**       | 1 to 1,000,000 (integer)  | Maximum length of a reply. The placeholder reads **unlimited** when the server sets no limit.         |
-| **Seed**             | Any integer               | Fixed seed for reproducible replies. The placeholder reads **random** when the server picks one.     |
+| Setting              | Range                    | What it changes                                                                                  |
+| -------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| **Temperature**      | 0 to 5                   | Randomness of the choice of the next token. Lower is more deterministic.                         |
+| **Top-p**            | 0 to 1                   | Keeps the most likely tokens until their probabilities add up to this value.                     |
+| **Top-k**            | 0 to 1,000 (integer)     | Keeps only this many most likely tokens.                                                         |
+| **Min-p**            | 0 to 1                   | Drops tokens less likely than this fraction of the most likely one.                              |
+| **Presence penalty** | −2 to 2                  | Penalizes tokens that already appeared, to push toward new topics.                               |
+| **Repeat penalty**   | 0 to 5                   | Penalizes repeating recent tokens.                                                               |
+| **Max tokens**       | 1 to 1,000,000 (integer) | Maximum length of a reply. The placeholder reads **unlimited** when the server sets no limit.    |
+| **Seed**             | Any integer              | Fixed seed for reproducible replies. The placeholder reads **random** when the server picks one. |
 
 ## Stats under every reply
 
@@ -104,13 +104,13 @@ When a reply is complete, a line under it gives the numbers `llama-server` repor
 
 <Screenshot name="chat-stats" alt="The end of a reply, with highlighted code blocks and the stats line 0.3 s to first token · 438 t/s prompt · 59.0 t/s · 13,579 tokens · draft 52%, followed by copy and regenerate buttons." />
 
-| Stat                       | Meaning                                                                                                                                        |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **0.3 s to first token**   | Time from sending the request to the first token of reasoning or text. It includes processing the prompt.                                      |
-| **533 t/s prompt**         | Prompt processing speed. Only the tokens processed for this reply count: the part of the conversation already in the server's cache is skipped. |
-| **71.9 t/s**               | Generation speed of the reply.                                                                                                                 |
-| **10,608 tokens**          | Tokens generated, reasoning included.                                                                                                          |
-| **draft 51%**              | Share of drafted tokens the model accepted. Only shown when the profile uses speculative decoding: MTP, a draft model or n-gram drafts.       |
+| Stat                     | Meaning                                                                                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0.3 s to first token** | Time from sending the request to the first token of reasoning or text. It includes processing the prompt.                                       |
+| **533 t/s prompt**       | Prompt processing speed. Only the tokens processed for this reply count: the part of the conversation already in the server's cache is skipped. |
+| **71.9 t/s**             | Generation speed of the reply.                                                                                                                  |
+| **10,608 tokens**        | Tokens generated, reasoning included.                                                                                                           |
+| **draft 51%**            | Share of drafted tokens the model accepted. Only shown when the profile uses speculative decoding: MTP, a draft model or n-gram drafts.         |
 
 These are the same measures the [Dashboard](/docs/dashboard/) shows live, for one reply. To compare profiles on a
 fixed workload, use the [Benchmark](/docs/benchmark/) page. See

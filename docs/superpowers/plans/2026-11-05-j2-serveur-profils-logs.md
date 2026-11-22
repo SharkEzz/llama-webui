@@ -82,6 +82,7 @@
     expect(parseProfileImport([{ name: "a", model: "m" }, { name: "b", model: "m" }]).profiles).toHaveLength(2);
   });
   ```
+
 - [ ] **Step 3 : Vérifier l'échec** — `bun test shared` : FAIL (modules absents).
 - [ ] **Step 4 : Implémenter** les fichiers selon Interfaces ; `index.ts` ré-exporte tout ; script racine `test` devient `bun test server shared` (inchangé) — vérifier que `shared/src/*.test.ts` est trouvé.
 - [ ] **Step 5 : Vérifier** — `bun test` : PASS ; `bun run check` : vert (adapter `server/db/settings.test.ts` si `DEFAULT_SETTINGS` change — il compare à `DEFAULT_SETTINGS`, donc reste vert).

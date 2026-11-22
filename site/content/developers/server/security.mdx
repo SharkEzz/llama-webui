@@ -8,26 +8,26 @@ program of their choice (the **Binary** setting). Its protection is where it lis
 other websites in the browser away from the API. The guard is `refusal()` in `app/server/http/Guard.ts`, run around every
 route of the API and of `/ws` (`Guarded`), before the route's handler.
 
-| File | Role |
-| --- | --- |
-| `app/server/http/Guard.ts` | `refusal(request)`: the `Host`, `Origin` and content-type checks; `Guarded`: the route middleware that answers a refusal, then the trailing slash. |
-| `app/server/http/HttpLive.ts` | `ApiRoutes`: the API's routes, provided `Guarded`; `serve()`: the defect log around every route; `SERVER_OPTIONS`. |
-| `app/server/http/TrailingSlash.ts` | `noTrailingSlash`: the `308` of a trailing slash on a route of the API or of `/ws`. |
-| `app/server/http/RequestErrors.ts` | `RequestErrorsLive`: a request that does not decode becomes `RequestInvalid` (or `RouteNotFound` for a path parameter). |
-| `packages/webui-shared/src/api/errors.ts` | `RequestRefused`, `RouteNotFound`, `RequestInvalid`. |
-| `app/server/http/Guard.test.ts` | Tests of each rule of the guard. |
-| `app/server/config/Cli.ts`, `AppConfig.ts` | `--host` (default `127.0.0.1`) and `--port` (default `7860`). |
-| `app/server/hf/paths.ts` | `repoDir()` and `fileDest()`: download paths kept inside the models folder. |
+| File                                       | Role                                                                                                                                               |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/server/http/Guard.ts`                 | `refusal(request)`: the `Host`, `Origin` and content-type checks; `Guarded`: the route middleware that answers a refusal, then the trailing slash. |
+| `app/server/http/HttpLive.ts`              | `ApiRoutes`: the API's routes, provided `Guarded`; `serve()`: the defect log around every route; `SERVER_OPTIONS`.                                 |
+| `app/server/http/TrailingSlash.ts`         | `noTrailingSlash`: the `308` of a trailing slash on a route of the API or of `/ws`.                                                                |
+| `app/server/http/RequestErrors.ts`         | `RequestErrorsLive`: a request that does not decode becomes `RequestInvalid` (or `RouteNotFound` for a path parameter).                            |
+| `packages/webui-shared/src/api/errors.ts`  | `RequestRefused`, `RouteNotFound`, `RequestInvalid`.                                                                                               |
+| `app/server/http/Guard.test.ts`            | Tests of each rule of the guard.                                                                                                                   |
+| `app/server/config/Cli.ts`, `AppConfig.ts` | `--host` (default `127.0.0.1`) and `--port` (default `7860`).                                                                                      |
+| `app/server/hf/paths.ts`                   | `repoDir()` and `fileDest()`: download paths kept inside the models folder.                                                                        |
 
 The user-facing version of this page is [Security](/docs/security/).
 
 ## Threat model
 
-| Who                                               | What they can do                                       | What stops them                                     |
-| ------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------- |
-| Programs and users on the same machine            | Everything                                             | Nothing: same trust as the user running llama-webui |
-| Devices on the network, once `--host` opens it    | Everything                                             | Nothing in llama-webui: the network and a firewall  |
-| Another website open in the browser               | Make the browser send requests to `127.0.0.1:7860`      | The guard                                           |
+| Who                                            | What they can do                                   | What stops them                                     |
+| ---------------------------------------------- | -------------------------------------------------- | --------------------------------------------------- |
+| Programs and users on the same machine         | Everything                                         | Nothing: same trust as the user running llama-webui |
+| Devices on the network, once `--host` opens it | Everything                                         | Nothing in llama-webui: the network and a firewall  |
+| Another website open in the browser            | Make the browser send requests to `127.0.0.1:7860` | The guard                                           |
 
 The guard handles three ways a web page can reach a local API:
 
@@ -58,11 +58,11 @@ const trustedHostname = (hostname: string): boolean =>
 run in this order, and the first that fails answers with a `RequestRefused` body, `{ "_tag": "RequestRefused",
 "message": … }`:
 
-| Rule                                                                                                                | Response                                                                     |
-| ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| A `Host` header is present and parses as `http://<host>` (`Host: a b` does not) | `400` `Invalid host` |
-| Its hostname (as `URL` gives it: lower case, IPv4 dotted) is `localhost`, ends with `.localhost`, or is an IPv4 or IPv6 literal | `403` `Host not allowed` |
-| When an `Origin` header is present, it equals `` `http://${host}` `` exactly | `403` `Origin not allowed` |
+| Rule                                                                                                                                          | Response                                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| A `Host` header is present and parses as `http://<host>` (`Host: a b` does not)                                                               | `400` `Invalid host`                                        |
+| Its hostname (as `URL` gives it: lower case, IPv4 dotted) is `localhost`, ends with `.localhost`, or is an IPv4 or IPv6 literal               | `403` `Host not allowed`                                    |
+| When an `Origin` header is present, it equals `` `http://${host}` `` exactly                                                                  | `403` `Origin not allowed`                                  |
 | For `POST`, `PUT`, `PATCH` and `DELETE`: a `Content-Type`, when present, matches `/^application\/json\b/i`, and a request with a body has one | `415` `JSON body expected (content-type: application/json)` |
 
 What follows from these rules:
@@ -183,7 +183,7 @@ take a `modelPath` or an `mmprojPath` (`estimate`, `plan`, `inputs`, `disk-speed
   model itself, for example for benchmarks.
 - **Hugging Face downloads** are the only writes into a user-chosen folder, and they are confined. `repoDir()` accepts
   only an `org/name` repository ID matching `HF_REPO_RE` (checked by the request's schema: `400` `RequestInvalid`
-`Invalid data: Invalid repository id: …`) and maps it to
+  `Invalid data: Invalid repository id: …`) and maps it to
   `<modelsDir>/<org>/<name>`. `fileDest()` refuses a file path that is absolute or resolves outside that folder
   (`400` `HfInvalidPath` `Invalid file path in the repository: …`).
 

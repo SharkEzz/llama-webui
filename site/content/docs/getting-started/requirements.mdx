@@ -9,18 +9,18 @@ your machine. The install steps themselves are on the [Installation](/docs/getti
 
 ## At a glance
 
-| Piece                                 | Required | What it gives you                                                              | Without it                                                       |
-| ------------------------------------- | -------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| Linux, with `/proc` and `/sys`        | Yes      | Hardware discovery and telemetry                                               | llama-webui does not run                                         |
-| `setpriv` (util-linux)                | Yes      | Ties every `llama-server` and `llama-bench` to llama-webui                     | Nothing can be started                                           |
-| Node.js 26.13 or later                | Yes      | Runs llama-webui (npm, which comes with it, installs a release)                | llama-webui does not run                                         |
-| `llama-server`                        | Yes      | Runs your models                                                               | The setup checklist cannot be finished                           |
-| GGUF models                           | Yes      | Something to run                                                               | Nothing to start: download some from the Models page             |
-| `llama-bench`                         | No       | llama-bench benchmarks, sweeps, Tuning's view of your GPUs                     | Only real-server benchmarks; no sweeps                           |
-| NVIDIA driver                         | No       | NVIDIA telemetry through NVML (or `nvidia-smi`)                                | No readings for NVIDIA cards                                     |
-| `amdgpu` driver                       | No       | AMD telemetry through sysfs                                                    | No readings for AMD cards                                        |
-| `perf`, on an AMD Zen 4 or Zen 5 CPU  | No       | DRAM bandwidth, for the machine and for `llama-server`                         | CPU activity is shown instead                                    |
-| Hugging Face token                    | No       | Gated and private repositories, higher rate limits                             | Public models only                                               |
+| Piece                                | Required | What it gives you                                               | Without it                                           |
+| ------------------------------------ | -------- | --------------------------------------------------------------- | ---------------------------------------------------- |
+| Linux, with `/proc` and `/sys`       | Yes      | Hardware discovery and telemetry                                | llama-webui does not run                             |
+| `setpriv` (util-linux)               | Yes      | Ties every `llama-server` and `llama-bench` to llama-webui      | Nothing can be started                               |
+| Node.js 26.13 or later               | Yes      | Runs llama-webui (npm, which comes with it, installs a release) | llama-webui does not run                             |
+| `llama-server`                       | Yes      | Runs your models                                                | The setup checklist cannot be finished               |
+| GGUF models                          | Yes      | Something to run                                                | Nothing to start: download some from the Models page |
+| `llama-bench`                        | No       | llama-bench benchmarks, sweeps, Tuning's view of your GPUs      | Only real-server benchmarks; no sweeps               |
+| NVIDIA driver                        | No       | NVIDIA telemetry through NVML (or `nvidia-smi`)                 | No readings for NVIDIA cards                         |
+| `amdgpu` driver                      | No       | AMD telemetry through sysfs                                     | No readings for AMD cards                            |
+| `perf`, on an AMD Zen 4 or Zen 5 CPU | No       | DRAM bandwidth, for the machine and for `llama-server`          | CPU activity is shown instead                        |
+| Hugging Face token                   | No       | Gated and private repositories, higher rate limits              | Public models only                                   |
 
 ## Linux
 

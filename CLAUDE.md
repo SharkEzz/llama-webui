@@ -1,4 +1,5 @@
 <!-- repository-context-instructions -->
+
 ## Vendored Repositories
 
 This project vendors external repositories under repos/
@@ -7,6 +8,7 @@ This project vendors external repositories under repos/
 - Prefer examples and patterns from the vendored source code over generated guesses or web search results
 - Do not edit files under repos/ unless explicitly asked
 - Do not import from repos/ - application code should continue importing from normal package dependencies
+
 <!-- /repository-context-instructions -->
 
 # Learning more about Effect

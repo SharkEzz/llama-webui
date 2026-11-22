@@ -14,14 +14,14 @@ latest logs.
 llama-webui runs one `llama-server` at a time. Its state appears next to the page title and in the status bar at the top
 of every page (click it to open the Server page).
 
-| State          | Meaning                                                                                                                         |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Stopped**    | No server is running.                                                                                                           |
-| **Starting…**  | The process is running and loading the model. llama-webui checks its `/health` endpoint every half second.                     |
-| **Ready**      | `/health` answered: the model is loaded and the server accepts requests.                                                        |
-| **Stopping…**  | llama-webui asked the server to exit and waits for it.                                                                          |
-| **Crashed**    | The process exited without being asked to, or could not be launched. The exit code, the signal or the error appears with it.  |
-| **External**   | A `llama-server` that llama-webui did not start is using the port (see [An external server](#an-external-server)).             |
+| State         | Meaning                                                                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Stopped**   | No server is running.                                                                                                        |
+| **Starting…** | The process is running and loading the model. llama-webui checks its `/health` endpoint every half second.                   |
+| **Ready**     | `/health` answered: the model is loaded and the server accepts requests.                                                     |
+| **Stopping…** | llama-webui asked the server to exit and waits for it.                                                                       |
+| **Crashed**   | The process exited without being asked to, or could not be launched. The exit code, the signal or the error appears with it. |
+| **External**  | A `llama-server` that llama-webui did not start is using the port (see [An external server](#an-external-server)).           |
 
 A normal run goes **Stopped** → **Starting…** → **Ready** → **Stopping…** → **Stopped**. There is no time limit on
 **Starting…**: a large model can take minutes to load, and the [Logs](/docs/logs/) page shows its progress. If
@@ -65,12 +65,12 @@ If you have no profile yet, the card links to the [Profiles](/docs/profiles/) pa
 The profile's arguments are completed with `--metrics`, `--slots` and `--props` (see
 [Flags llama-webui sets itself](/docs/profiles/#flags-llama-webui-sets-itself)) so that llama-webui can read:
 
-| Endpoint   | When                                                     | Used for                                                                                  |
-| ---------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `/health`  | Every half second while starting, then at every sample   | The **Starting…** → **Ready** transition, and detecting an external server.               |
-| `/slots`   | At every sample, once ready                              | Live speed and context use per slot on the [Dashboard](/docs/dashboard/).                 |
-| `/metrics` | At every sample, once ready                              | Per-request stats, the request queue and speculative decoding acceptance on the Dashboard. |
-| `/props`   | When the server becomes ready                            | The **Server info** card, and the context size and default sampling shown in [Chat](/docs/chat/). |
+| Endpoint   | When                                                   | Used for                                                                                          |
+| ---------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `/health`  | Every half second while starting, then at every sample | The **Starting…** → **Ready** transition, and detecting an external server.                       |
+| `/slots`   | At every sample, once ready                            | Live speed and context use per slot on the [Dashboard](/docs/dashboard/).                         |
+| `/metrics` | At every sample, once ready                            | Per-request stats, the request queue and speculative decoding acceptance on the Dashboard.        |
+| `/props`   | When the server becomes ready                          | The **Server info** card, and the context size and default sampling shown in [Chat](/docs/chat/). |
 
 A sample is taken every polling interval, 1 second by default ([Settings](/docs/settings/)).
 

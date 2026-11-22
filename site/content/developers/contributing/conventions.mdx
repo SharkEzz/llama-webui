@@ -28,16 +28,16 @@ The web app formats every number, date and unit through `app/src/lib/format.ts`,
 message that shows a number (an error, a log line) uses `fmtInt()` from `packages/webui-shared/src/format.ts` the same way,
 and `fmtBytes()` of the same file for a size (`12.3 GiB`, `512 MiB`; `MiB` and `GiB` are there too).
 
-| Helper                                       | Output                                                          |
-| -------------------------------------------- | --------------------------------------------------------------- |
-| `num(max, min = max)`                        | Cached `Intl.NumberFormat` with that many fraction digits       |
-| `fmt(v, max = 1)`                            | Up to `max` decimals: `fmt(3.14159, 1)` gives “3.1”             |
-| `plural(n, one, other)`                      | `plural(1, 'line')` gives “line”, `plural(0, 'line')` “lines”   |
-| `formatBytes(n, digits = 1)`                 | Base 1024 with `B`, `KiB`, `MiB`, `GiB`, `TiB`: “12.3 GiB”      |
-| `formatBps`, `formatRate`                    | “1.2 GiB/s”, “42.7 tok/s”                                       |
-| `formatPct`, `formatInt`, `formatParams`     | “37%” (one decimal below 10), “32,768”, “27.3 B”                |
-| `formatTemp`, `formatStddev`                 | “54 °C”, “ ± 0.4”                                               |
-| `formatDuration`, `formatTime`, `formatShortDate` | “12 min 05 s”, “14:03:27”, “Nov 7, 14:03”                  |
+| Helper                                            | Output                                                        |
+| ------------------------------------------------- | ------------------------------------------------------------- |
+| `num(max, min = max)`                             | Cached `Intl.NumberFormat` with that many fraction digits     |
+| `fmt(v, max = 1)`                                 | Up to `max` decimals: `fmt(3.14159, 1)` gives “3.1”           |
+| `plural(n, one, other)`                           | `plural(1, 'line')` gives “line”, `plural(0, 'line')` “lines” |
+| `formatBytes(n, digits = 1)`                      | Base 1024 with `B`, `KiB`, `MiB`, `GiB`, `TiB`: “12.3 GiB”    |
+| `formatBps`, `formatRate`                         | “1.2 GiB/s”, “42.7 tok/s”                                     |
+| `formatPct`, `formatInt`, `formatParams`          | “37%” (one decimal below 10), “32,768”, “27.3 B”              |
+| `formatTemp`, `formatStddev`                      | “54 °C”, “ ± 0.4”                                             |
+| `formatDuration`, `formatTime`, `formatShortDate` | “12 min 05 s”, “14:03:27”, “Nov 7, 14:03”                     |
 
 Missing values (`null`, `undefined`, not finite) render as “—” in the helpers that accept them. The website has its own
 `site/src/lib/format.ts` with the same `LOCALE`.
@@ -75,19 +75,19 @@ wording of earlier versions (the app used to be in French, and old rows keep the
 devDependency (`oxfmt` 0.79.0) configured in `oxfmt.config.ts`, which holds the style.
 [Biome](https://biomejs.dev) lints. It is a pinned devDependency (`@biomejs/biome` 2.6.8) configured in `biome.jsonc`.
 
-| Setting       | Value                                                                                     |
-| ------------- | ----------------------------------------------------------------------------------------- |
-| Indentation   | 2 spaces                                                                                  |
-| Line width    | 120 columns                                                                               |
-| Quotes        | Single quotes in TypeScript, double quotes in JSX attributes, CSS and YAML                |
-| Semicolons    | Always                                                                                    |
-| Imports       | Sorted by oxfmt, no blank line between groups                                             |
-| `package.json` | Keys sorted by oxfmt                                                                     |
-| Lint rules    | The `recommended` preset, with `style/noNonNullAssertion` turned off (`x!` is allowed)     |
-| Domains       | `tailwind`, `test`, `project` (module graph) and `types` (type inference), `recommended`  |
-| React         | The `react` domain, turned on for `app/src/**` and `site/**` (not detected from `catalog:`) |
-| Server        | `correctness/useYield` off for `app/server/**`: a generator of `Effect.gen` or `Effect.fn` does not always yield |
-| CSS           | Parsed with Tailwind directives                                                           |
+| Setting        | Value                                                                                                            |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Indentation    | 2 spaces                                                                                                         |
+| Line width     | 120 columns                                                                                                      |
+| Quotes         | Single quotes in TypeScript, double quotes in JSX attributes, CSS and YAML                                       |
+| Semicolons     | Always                                                                                                           |
+| Imports        | Sorted by oxfmt, no blank line between groups                                                                    |
+| `package.json` | Keys sorted by oxfmt                                                                                             |
+| Lint rules     | The `recommended` preset, with `style/noNonNullAssertion` turned off (`x!` is allowed)                           |
+| Domains        | `tailwind`, `test`, `project` (module graph) and `types` (type inference), `recommended`                         |
+| React          | The `react` domain, turned on for `app/src/**` and `site/**` (not detected from `catalog:`)                      |
+| Server         | `correctness/useYield` off for `app/server/**`: a generator of `Effect.gen` or `Effect.fn` does not always yield |
+| CSS            | Parsed with Tailwind directives                                                                                  |
 
 oxfmt formats TypeScript, JavaScript, JSON, CSS, YAML and HTML. It skips what `.gitignore` lists, `repos/`, the root
 `docs/`, `testdata`, `pnpm-lock.yaml`, the generated `app/server/contract/golden.json`, the generated shadcn
@@ -99,11 +99,11 @@ the generated `app/server/contract/golden.json`, the `.mdx` pages (not supported
 (see [Generated shadcn components](#generated-shadcn-components)) and `repos/`, the reference copies of other
 repositories (`!!`: not even indexed).
 
-| Command            | Runs                                | Effect                                         |
-| ------------------ | ----------------------------------- | ---------------------------------------------- |
-| `pnpm lint`        | `oxfmt --check && biome lint`       | Format, imports and lint, read-only            |
-| `pnpm lint:fix`    | `biome lint --write && oxfmt`       | Applies Biome's safe fixes, then formats       |
-| `pnpm format`      | `oxfmt`                             | Formats only                                   |
+| Command         | Runs                          | Effect                                   |
+| --------------- | ----------------------------- | ---------------------------------------- |
+| `pnpm lint`     | `oxfmt --check && biome lint` | Format, imports and lint, read-only      |
+| `pnpm lint:fix` | `biome lint --write && oxfmt` | Applies Biome's safe fixes, then formats |
+| `pnpm format`   | `oxfmt`                       | Formats only                             |
 
 In VS Code, install the oxc extension (`oxc.oxc-vscode`) and set `"editor.defaultFormatter": "oxc.oxc-vscode"` in
 your settings: `.vscode/` is ignored by Git, so each contributor sets it.
@@ -166,20 +166,20 @@ The app runs on Node.js (26.13 or later). The server is written with [Effect](ht
 and its `@effect/*` packages, pinned to one exact version), and reaches the platform through Effect's services rather
 than through `node:*` or other npm packages:
 
-| Need                          | Used                                  | Where                                                      |
-| ----------------------------- | ------------------------------------- | ---------------------------------------------------------- |
-| HTTP server and routes        | `HttpApi` of `effect/http-api` on `NodeHttpServer` (`node:http`) | `packages/webui-shared/src/api/`, `app/server/<domain>/http.ts`, `app/server/http/` |
-| WebSocket                     | The upgrade of `effect/http` (`Socket`) | `app/server/ws/WsHub.ts`                                  |
-| Requests to llama-server      | `LlamaHttp` (`node:http` through `@effect/platform-node`, no time limit on headers or body) | `app/server/llama/LlamaHttp.ts`: chat stream, benchmark trials, `/props` |
-| Requests to Hugging Face      | `HfHttp` (HTTP/1.1 on its own agents, the environment's proxy) | `app/server/hf/HfHttp.ts`: the Hub's API and the downloads |
-| SQLite                        | `SqlClient` of `@effect/sql-sqlite-node` (`node:sqlite`) | `app/server/db/Db.ts`, the `*Repo.ts` of each domain |
-| Files and paths               | `FileSystem` and `Path`               | Collectors, hardware readers, models, downloads            |
-| Programs                      | `ChildProcess` of `effect/process`, `followProgram()` for one that lasts | `app/server/process/`: supervisor, bench, `nvidia-smi`, the NVML sampler |
-| NVML                          | `node:ffi` in an Effect program run as a child process | `app/server/collectors/nvml/`  |
-| Configuration                 | `Config` (`AppConfig`), `.env` parsed by `parseEnv()` of `node:util` | `app/server/config/`  |
-| Pauses and repeats            | `Effect.sleep`, `Schedule`, `Effect.timeout` | Everywhere: never a timer                           |
-| Front end, server bundle      | Vite (`vite dev`, `vite build`), Rolldown for the server and the NVML sampler | `app/vite.config.ts`, `app/build/server.ts` |
-| Tests                         | Vitest, `@effect/vitest` for effects  | Every `*.test.ts` but those of `packages/llamacpp-js/`     |
+| Need                     | Used                                                                                        | Where                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| HTTP server and routes   | `HttpApi` of `effect/http-api` on `NodeHttpServer` (`node:http`)                            | `packages/webui-shared/src/api/`, `app/server/<domain>/http.ts`, `app/server/http/` |
+| WebSocket                | The upgrade of `effect/http` (`Socket`)                                                     | `app/server/ws/WsHub.ts`                                                            |
+| Requests to llama-server | `LlamaHttp` (`node:http` through `@effect/platform-node`, no time limit on headers or body) | `app/server/llama/LlamaHttp.ts`: chat stream, benchmark trials, `/props`            |
+| Requests to Hugging Face | `HfHttp` (HTTP/1.1 on its own agents, the environment's proxy)                              | `app/server/hf/HfHttp.ts`: the Hub's API and the downloads                          |
+| SQLite                   | `SqlClient` of `@effect/sql-sqlite-node` (`node:sqlite`)                                    | `app/server/db/Db.ts`, the `*Repo.ts` of each domain                                |
+| Files and paths          | `FileSystem` and `Path`                                                                     | Collectors, hardware readers, models, downloads                                     |
+| Programs                 | `ChildProcess` of `effect/process`, `followProgram()` for one that lasts                    | `app/server/process/`: supervisor, bench, `nvidia-smi`, the NVML sampler            |
+| NVML                     | `node:ffi` in an Effect program run as a child process                                      | `app/server/collectors/nvml/`                                                       |
+| Configuration            | `Config` (`AppConfig`), `.env` parsed by `parseEnv()` of `node:util`                        | `app/server/config/`                                                                |
+| Pauses and repeats       | `Effect.sleep`, `Schedule`, `Effect.timeout`                                                | Everywhere: never a timer                                                           |
+| Front end, server bundle | Vite (`vite dev`, `vite build`), Rolldown for the server and the NVML sampler               | `app/vite.config.ts`, `app/build/server.ts`                                         |
+| Tests                    | Vitest, `@effect/vitest` for effects                                                        | Every `*.test.ts` but those of `packages/llamacpp-js/`                              |
 
 The language service of Effect enforces it: `pnpm check` refuses a `node:*` import, `fetch`, a timer, `JSON` or
 `process.env` in the server ([Effect diagnostics](/developers/contributing/testing/#effect-diagnostics)). Four `node:*`

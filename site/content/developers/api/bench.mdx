@@ -23,23 +23,23 @@ taken and restarted once when it is released. While the gate is held, the server
 A run is created with status `running` and executes in the background. Its progress goes over the
 [WebSocket](/developers/api/websocket/):
 
-| Message          | Payload                | When                                                                    |
-| ---------------- | ---------------------- | ----------------------------------------------------------------------- |
-| `bench-run`      | `BenchRun`             | A run is created or starts (sweep item), and when it ends.              |
-| `bench-progress` | `BenchLive` \| null     | Phase and last lines of the running run, at most every 250 ms for new lines; null when no run is running. |
-| `bench-deleted`  | `{ ids: number[] }`    | Runs were deleted.                                                      |
+| Message          | Payload             | When                                                                                                      |
+| ---------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `bench-run`      | `BenchRun`          | A run is created or starts (sweep item), and when it ends.                                                |
+| `bench-progress` | `BenchLive` \| null | Phase and last lines of the running run, at most every 250 ms for new lines; null when no run is running. |
+| `bench-deleted`  | `{ ids: number[] }` | Runs were deleted.                                                                                        |
 
 ### Gate errors
 
 `BenchRunner` and the gate refuse to start, with a `409`, in these cases (`BenchStartErrors` of `BenchApi`, with
 `BenchFileMissing`). They apply to `POST /api/bench/run` and to the endpoints that start a sweep.
 
-| `_tag`                  | Message                                                                                         | When                                                                   |
-| ----------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `BenchRunning`          | `A benchmark is running`                                                                        | A run or a sweep is already running, or the gate is still held.        |
+| `_tag`                  | Message                                                                                             | When                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `BenchRunning`          | `A benchmark is running`                                                                            | A run or a sweep is already running, or the gate is still held.                              |
 | `ServerRunning`         | `llama-server is running (profile <name>): it will be stopped during the benchmark, then restarted` | The managed server is `starting` or `ready` and the request did not send `stopServer: true`. |
-| `ExternalServerRunning` | `An external llama-server is running on port <port>: stop it first`                             | A `llama-server` that llama-webui did not start holds the port.        |
-| `ServerStopTooSlow`     | `llama-server is taking too long to stop: try again`                                            | A stop of `llama-server` already in progress does not end in time.     |
+| `ExternalServerRunning` | `An external llama-server is running on port <port>: stop it first`                                 | A `llama-server` that llama-webui did not start holds the port.                              |
+| `ServerStopTooSlow`     | `llama-server is taking too long to stop: try again`                                                | A stop of `llama-server` already in progress does not end in time.                           |
 
 The web app tells them apart by `_tag`: `ServerRunning` asks to confirm, then sends the request again with
 `stopServer: true`.
@@ -52,17 +52,17 @@ The web app tells them apart by `_tag`: `ServerRunning` asks to confirm, then se
 
 `BenchSpec` (`BenchSpecSchema`, `packages/webui-shared/src/bench.ts`), strict:
 
-| Field        | Type            | Required | Description                                                                                    |
-| ------------ | --------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `kind`       | string          | yes      | `bench` (`llama-bench`) or `server` (a `llama-server` started for the measurement).            |
-| `modelPath`  | string          | yes      | Absolute path ending in `.gguf`.                                                               |
-| `mmprojPath` | string \| null   | no       | Projector, default null. Only a `server` run loads it.                                         |
-| `profileId`  | integer \| null  | no       | Source profile, default null: its environment (and, for `server`, its working directory) is used. |
-| `p`          | integer         | no       | Prompt tokens, 1 to 32,768, default 512.                                                       |
-| `n`          | integer         | no       | Generated tokens, 1 to 4096, default 128.                                                      |
-| `r`          | integer         | no       | Repetitions, 1 to 20, default 3.                                                               |
-| `params`     | `BenchParams`   | no       | The flags both tools understand (below), default `{}`.                                         |
-| `serverArgs` | string[]        | no       | Other `llama-server` flags, default `[]`. Only a `server` run passes them.                     |
+| Field        | Type            | Required | Description                                                                                       |
+| ------------ | --------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `kind`       | string          | yes      | `bench` (`llama-bench`) or `server` (a `llama-server` started for the measurement).               |
+| `modelPath`  | string          | yes      | Absolute path ending in `.gguf`.                                                                  |
+| `mmprojPath` | string \| null  | no       | Projector, default null. Only a `server` run loads it.                                            |
+| `profileId`  | integer \| null | no       | Source profile, default null: its environment (and, for `server`, its working directory) is used. |
+| `p`          | integer         | no       | Prompt tokens, 1 to 32,768, default 512.                                                          |
+| `n`          | integer         | no       | Generated tokens, 1 to 4096, default 128.                                                         |
+| `r`          | integer         | no       | Repetitions, 1 to 20, default 3.                                                                  |
+| `params`     | `BenchParams`   | no       | The flags both tools understand (below), default `{}`.                                            |
+| `serverArgs` | string[]        | no       | Other `llama-server` flags, default `[]`. Only a `server` run passes them.                        |
 
 `serverArgs` refuses the flags llama-webui manages (`--host`, `--port`, `--metrics`, `--slots`, `--props`, `-m`,
 `--model`, `-mm`, `--mmproj`) and any flag a `params` field covers (`-ngl: use the -ngl field`), with the issue at the
@@ -72,20 +72,20 @@ offending index.
 
 `BenchParams` (`BenchParamsSchema`), strict. A missing key keeps the tool's default.
 
-| Key     | Type                              | Flag     | Description                                                       |
-| ------- | --------------------------------- | -------- | ----------------------------------------------------------------- |
-| `ngl`   | integer 0 to 9999, `"all"`, `"auto"` | `-ngl`  | Layers on the GPU. `all` is `-ngl all` for `llama-server`, `-ngl 999` for `llama-bench`; `auto` writes no flag. |
-| `ot`    | string[]                          | `-ot`    | Tensor overrides, `pattern=buffer` (`exps=CPU`).                  |
-| `ncmoe` | integer 0 to 9999                 | `-ncmoe` | MoE layers whose experts stay on the CPU.                         |
-| `dev`   | string[]                          | `-dev`   | Devices (`CUDA0`, `Vulkan1`).                                     |
-| `ts`    | number[], each at least 0         | `-ts`    | Tensor split proportions.                                         |
-| `sm`    | `none`, `layer`, `row`, `tensor`  | `-sm`    | Split mode.                                                       |
-| `fa`    | `on`, `off`, `auto`               | `-fa`    | Flash attention.                                                  |
-| `ctk`   | cache type                        | `-ctk`   | K cache type: `f32`, `f16`, `bf16`, `f8_e4m3`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`. |
-| `ctv`   | cache type                        | `-ctv`   | V cache type, same values.                                        |
-| `t`     | integer 1 to 1024                 | `-t`     | Threads.                                                          |
-| `b`     | integer 1 to 1,000,000            | `-b`     | Batch size.                                                       |
-| `ub`    | integer 1 to 1,000,000            | `-ub`    | Micro-batch size.                                                 |
+| Key     | Type                                 | Flag     | Description                                                                                                     |
+| ------- | ------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `ngl`   | integer 0 to 9999, `"all"`, `"auto"` | `-ngl`   | Layers on the GPU. `all` is `-ngl all` for `llama-server`, `-ngl 999` for `llama-bench`; `auto` writes no flag. |
+| `ot`    | string[]                             | `-ot`    | Tensor overrides, `pattern=buffer` (`exps=CPU`).                                                                |
+| `ncmoe` | integer 0 to 9999                    | `-ncmoe` | MoE layers whose experts stay on the CPU.                                                                       |
+| `dev`   | string[]                             | `-dev`   | Devices (`CUDA0`, `Vulkan1`).                                                                                   |
+| `ts`    | number[], each at least 0            | `-ts`    | Tensor split proportions.                                                                                       |
+| `sm`    | `none`, `layer`, `row`, `tensor`     | `-sm`    | Split mode.                                                                                                     |
+| `fa`    | `on`, `off`, `auto`                  | `-fa`    | Flash attention.                                                                                                |
+| `ctk`   | cache type                           | `-ctk`   | K cache type: `f32`, `f16`, `bf16`, `f8_e4m3`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`.                |
+| `ctv`   | cache type                           | `-ctv`   | V cache type, same values.                                                                                      |
+| `t`     | integer 1 to 1024                    | `-t`     | Threads.                                                                                                        |
+| `b`     | integer 1 to 1,000,000               | `-b`     | Batch size.                                                                                                     |
+| `ub`    | integer 1 to 1,000,000               | `-ub`    | Micro-batch size.                                                                                               |
 
 `serverArgs()` and `benchArgs()` write these fields in this order. The list separators differ: `,` for `llama-server`;
 `/` for `-dev` and `-ts`, `;` for `-ot` with `llama-bench`.
@@ -109,40 +109,40 @@ file name, in the same folder (`benchBinary()`).
 
 `BenchRun` (`packages/webui-shared/src/bench.ts`):
 
-| Field            | Type                  | Description                                                                         |
-| ---------------- | --------------------- | ----------------------------------------------------------------------------------- |
-| `id`             | number                | Run id.                                                                             |
-| `kind`           | `"bench"` \| `"server"` | Tool.                                                                             |
-| `status`         | string                | `queued` (a sweep item waiting its turn), `running`, `ok`, `failed`, `cancelled` or `interrupted`. |
-| `spec`           | `BenchSpec`           | The spec as requested; `profileId` becomes null if the profile was deleted since.   |
-| `command`        | string                | The command line, shell-quoted (empty for a queued sweep item).                     |
-| `hardware`       | `BenchHardware`       | Frozen when the run starts: `cpu` (model name), `gpus` (`name`, `busId`, `vramTotalBytes`), `build` (`b6000 (6f1e654)`, or null). |
-| `pp`             | `Measure` \| null      | Prompt processing: `tps` (tokens/s), `stddev`, `tokens`.                            |
-| `tg`             | `Measure` \| null      | Generation, same fields.                                                            |
-| `draftAcceptPct` | number \| null         | `server` runs with speculative decoding: accepted draft tokens, %, one decimal.     |
-| `vramPeak`       | object[]              | Per card (`key`, `name`, `mib`): peak VRAM above what the card held at launch. Cards with 0 MiB are left out. |
-| `error`          | string \| null         | Why it failed. An out-of-memory failure starts with `Out of memory` (`OOM_ERROR`; test it with `isOomError()`). |
-| `logExcerpt`     | string                | The tool's last 50 lines.                                                           |
-| `durationMs`     | number \| null         | Duration of the execution.                                                          |
-| `diskReadPeakBps`| number \| null         | Peak read throughput of the model's disk during the run, if measured.               |
-| `sweepId`        | number \| null         | Its sweep, null for a one-off run.                                                  |
-| `sweepLabel`     | string \| null         | Label of the item in its sweep (`-ncmoe 8 · -dev CUDA0,CUDA1`).                     |
-| `fit`            | string \| null         | Sweep items: the estimator's verdict at planning time (`fits`, `tight`, `no`).      |
-| `createdAt`      | number                | Creation time; for a sweep item, the time it started.                               |
+| Field             | Type                    | Description                                                                                                                       |
+| ----------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | number                  | Run id.                                                                                                                           |
+| `kind`            | `"bench"` \| `"server"` | Tool.                                                                                                                             |
+| `status`          | string                  | `queued` (a sweep item waiting its turn), `running`, `ok`, `failed`, `cancelled` or `interrupted`.                                |
+| `spec`            | `BenchSpec`             | The spec as requested; `profileId` becomes null if the profile was deleted since.                                                 |
+| `command`         | string                  | The command line, shell-quoted (empty for a queued sweep item).                                                                   |
+| `hardware`        | `BenchHardware`         | Frozen when the run starts: `cpu` (model name), `gpus` (`name`, `busId`, `vramTotalBytes`), `build` (`b6000 (6f1e654)`, or null). |
+| `pp`              | `Measure` \| null       | Prompt processing: `tps` (tokens/s), `stddev`, `tokens`.                                                                          |
+| `tg`              | `Measure` \| null       | Generation, same fields.                                                                                                          |
+| `draftAcceptPct`  | number \| null          | `server` runs with speculative decoding: accepted draft tokens, %, one decimal.                                                   |
+| `vramPeak`        | object[]                | Per card (`key`, `name`, `mib`): peak VRAM above what the card held at launch. Cards with 0 MiB are left out.                     |
+| `error`           | string \| null          | Why it failed. An out-of-memory failure starts with `Out of memory` (`OOM_ERROR`; test it with `isOomError()`).                   |
+| `logExcerpt`      | string                  | The tool's last 50 lines.                                                                                                         |
+| `durationMs`      | number \| null          | Duration of the execution.                                                                                                        |
+| `diskReadPeakBps` | number \| null          | Peak read throughput of the model's disk during the run, if measured.                                                             |
+| `sweepId`         | number \| null          | Its sweep, null for a one-off run.                                                                                                |
+| `sweepLabel`      | string \| null          | Label of the item in its sweep (`-ncmoe 8 · -dev CUDA0,CUDA1`).                                                                   |
+| `fit`             | string \| null          | Sweep items: the estimator's verdict at planning time (`fits`, `tight`, `no`).                                                    |
+| `createdAt`       | number                  | Creation time; for a sweep item, the time it started.                                                                             |
 
 For a `bench` run, `Measure` is `llama-bench`'s `avg_ts` and `stddev_ts`. For a `server` run, it is the mean and the
 standard deviation of the `r` requests' `timings`.
 
 `BenchLive`, the payload of `bench-progress`:
 
-| Field       | Type                         | Description                                                                 |
-| ----------- | ---------------------------- | --------------------------------------------------------------------------- |
-| `runId`     | number                       | Running run.                                                                |
-| `kind`      | `"bench"` \| `"server"`       | Tool.                                                                       |
-| `phase`     | `BenchPhase`                 | `stopping-server`, `loading`, `warmup`, `prompt`, `generation` (`llama-bench` progress), `measure` (`server` requests), `restarting-server`. |
-| `step`      | `{ index, total }` \| null    | Position in the measurements: tests × repetitions for `llama-bench`, requests for `server`. |
-| `startedAt` | number                       | Epoch ms.                                                                   |
-| `lines`     | string[]                     | The tool's last 20 lines.                                                   |
+| Field       | Type                       | Description                                                                                                                                  |
+| ----------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runId`     | number                     | Running run.                                                                                                                                 |
+| `kind`      | `"bench"` \| `"server"`    | Tool.                                                                                                                                        |
+| `phase`     | `BenchPhase`               | `stopping-server`, `loading`, `warmup`, `prompt`, `generation` (`llama-bench` progress), `measure` (`server` requests), `restarting-server`. |
+| `step`      | `{ index, total }` \| null | Position in the measurements: tests × repetitions for `llama-bench`, requests for `server`.                                                  |
+| `startedAt` | number                     | Epoch ms.                                                                                                                                    |
+| `lines`     | string[]                   | The tool's last 20 lines.                                                                                                                    |
 
 ## Runs
 
@@ -155,10 +155,10 @@ status `running` and starts it in the background.
 
 **Body**:
 
-| Field        | Type        | Required | Description                                                                      |
-| ------------ | ----------- | -------- | -------------------------------------------------------------------------------- |
-| `spec`       | `BenchSpec` | yes      | [The run spec](#the-run-spec). Its issues have paths that start with `spec`.     |
-| `stopServer` | boolean     | no       | `true` allows stopping the managed server for the run (restarted at the end).    |
+| Field        | Type        | Required | Description                                                                   |
+| ------------ | ----------- | -------- | ----------------------------------------------------------------------------- |
+| `spec`       | `BenchSpec` | yes      | [The run spec](#the-run-spec). Its issues have paths that start with `spec`.  |
+| `stopServer` | boolean     | no       | `true` allows stopping the managed server for the run (restarted at the end). |
 
 **Response**: `202` with the created `BenchRun`. The result arrives with the `bench-run` message at the end, or with
 `GET /api/bench/runs`.
@@ -216,13 +216,13 @@ curl -X POST http://127.0.0.1:7860/api/bench/run \
 
 **Query parameters**, all optional. An unknown `kind` or `status` value is ignored.
 
-| Parameter | Description                                                                                         |
-| --------- | --------------------------------------------------------------------------------------------------- |
-| `kind`    | `bench` or `server`.                                                                                |
-| `status`  | `queued`, `running`, `ok`, `failed`, `cancelled` or `interrupted`.                                  |
-| `model`   | Exact `modelPath`.                                                                                  |
-| `sweep`   | Omitted: one-off runs only. `all`: one-off runs and sweep items. A sweep id: that sweep's items.    |
-| `limit`   | Positive integer, capped at 10,000 (`MAX_RUNS`). Default 200, or 10,000 with a sweep id.            |
+| Parameter | Description                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------ |
+| `kind`    | `bench` or `server`.                                                                             |
+| `status`  | `queued`, `running`, `ok`, `failed`, `cancelled` or `interrupted`.                               |
+| `model`   | Exact `modelPath`.                                                                               |
+| `sweep`   | Omitted: one-off runs only. `all`: one-off runs and sweep items. A sweep id: that sweep's items. |
+| `limit`   | Positive integer, capped at 10,000 (`MAX_RUNS`). Default 200, or 10,000 with a sweep id.         |
 
 Runs come newest first (`created_at`, then `id`), except with a sweep id: in item order (`id`).
 
@@ -347,13 +347,13 @@ response is then the last good list, or `[]`.
 
 **Response**: `200` with an array of `BenchDevice`.
 
-| Field      | Type   | Description                                              |
-| ---------- | ------ | -------------------------------------------------------- |
-| `id`       | string | ggml device name: `CUDA0`, `Vulkan1`…: the `-dev` value. |
-| `name`     | string | Device name.                                             |
-| `totalMib` | number | Memory of the device, MiB.                               |
-| `freeMib`  | number | Free memory when the list was read, MiB.                 |
-| `backend`  | string | Letters of the id: `CUDA`, `Vulkan`, `BLAS`…             |
+| Field          | Type             | Description                                                                                                                                      |
+| -------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`           | string           | ggml device name: `CUDA0`, `Vulkan1`…: the `-dev` value.                                                                                         |
+| `name`         | string           | Device name.                                                                                                                                     |
+| `totalMib`     | number           | Memory of the device, MiB.                                                                                                                       |
+| `freeMib`      | number           | Free memory when the list was read, MiB.                                                                                                         |
+| `backend`      | string           | Letters of the id: `CUDA`, `Vulkan`, `BLAS`…                                                                                                     |
 | `otherUsedMib` | number, optional | Only in [`GET /api/tuning/hardware`](/developers/api/tuning/#get-the-hardware): VRAM held by other processes than the managed llama-server, MiB. |
 
 ```bash title="Terminal"

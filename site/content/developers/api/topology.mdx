@@ -72,50 +72,50 @@ read degrades to unknown: at worst the graph holds the CPU and memory only.
 
 `TopologyGraph`:
 
-| Field   | Type             | Description                 |
-| ------- | ---------------- | --------------------------- |
-| `nodes` | `TopologyNode[]` | Devices.                    |
-| `links` | `TopologyLink[]` | Connections between them.   |
+| Field   | Type             | Description                  |
+| ------- | ---------------- | ---------------------------- |
+| `nodes` | `TopologyNode[]` | Devices.                     |
+| `links` | `TopologyLink[]` | Connections between them.    |
 | `at`    | number           | When it was read (epoch ms). |
 
 ### Nodes
 
 `TopologyNode`:
 
-| Field    | Type                                               | Description                                                                 |
-| -------- | -------------------------------------------------- | --------------------------------------------------------------------------- |
-| `id`     | string                                             | `cpu`, `ram`, `pci:<busId>` (GPU, NVMe) or `chipset:<busId of the switch>`. |
-| `kind`   | `"cpu"` \| `"ram"` \| `"nvme"` \| `"gpu"` \| `"chipset"` |                                                                       |
-| `label`  | string                                             | Display name: the CPU model shortened, `Memory`, the name from `pci.ids` (the bracketed name when there is one), the NVMe model, or the chipset name. |
-| `busId`  | string                                             | PCI address (`0000:01:00.0`), the same format as `GpuSample.busId` and the `hiddenGpus` setting. Missing for `cpu` and `ram`. |
-| `vendor` | `"nvidia"` \| `"amd"` \| `"intel"` \| `"other"`       | GPUs and NVMe drives only.                                                  |
-| `block`  | string                                             | NVMe only: its block device (`nvme0n1`), the key of `DiskSample.perDisk` and `model.disk` in the [Snapshot](/developers/api/monitor/#disk). |
-| `detail` | `Record<string, string \| number \| null>`           | Static facts for the tooltip; null is unknown.                              |
+| Field    | Type                                                     | Description                                                                                                                                           |
+| -------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`     | string                                                   | `cpu`, `ram`, `pci:<busId>` (GPU, NVMe) or `chipset:<busId of the switch>`.                                                                           |
+| `kind`   | `"cpu"` \| `"ram"` \| `"nvme"` \| `"gpu"` \| `"chipset"` |                                                                                                                                                       |
+| `label`  | string                                                   | Display name: the CPU model shortened, `Memory`, the name from `pci.ids` (the bracketed name when there is one), the NVMe model, or the chipset name. |
+| `busId`  | string                                                   | PCI address (`0000:01:00.0`), the same format as `GpuSample.busId` and the `hiddenGpus` setting. Missing for `cpu` and `ram`.                         |
+| `vendor` | `"nvidia"` \| `"amd"` \| `"intel"` \| `"other"`          | GPUs and NVMe drives only.                                                                                                                            |
+| `block`  | string                                                   | NVMe only: its block device (`nvme0n1`), the key of `DiskSample.perDisk` and `model.disk` in the [Snapshot](/developers/api/monitor/#disk).           |
+| `detail` | `Record<string, string \| number \| null>`               | Static facts for the tooltip; null is unknown.                                                                                                        |
 
 What `detail` holds per kind:
 
-| Kind      | Keys                                                                                           |
-| --------- | ---------------------------------------------------------------------------------------------- |
-| `cpu`     | `model`, `physicalCores`, `logicalThreads`, `numaNodes`                                        |
+| Kind      | Keys                                                                                                      |
+| --------- | --------------------------------------------------------------------------------------------------------- |
+| `cpu`     | `model`, `physicalCores`, `logicalThreads`, `numaNodes`                                                   |
 | `ram`     | `totalBytes`; `dimms` and `tempC`: the number of `spd5118` sensors (DDR5 modules) and the hottest reading |
-| `nvme`    | `sizeBytes`                                                                                    |
-| `gpu`     | none                                                                                           |
-| `chipset` | none                                                                                           |
+| `nvme`    | `sizeBytes`                                                                                               |
+| `gpu`     | none                                                                                                      |
+| `chipset` | none                                                                                                      |
 
 ### Links
 
 `TopologyLink`:
 
-| Field      | Type                                     | Description                                                                 |
-| ---------- | ---------------------------------------- | --------------------------------------------------------------------------- |
-| `id`       | string                                   | `cpu-ram`, `cpu-chipset:<busId>`, or `<from>-pci:<busId>`.                  |
-| `from`     | string                                   | Node id on the CPU side (upstream).                                         |
-| `to`       | string                                   | Node id downstream.                                                         |
-| `kind`     | `"pcie"` \| `"memory"` \| `"internal"`     | `memory` for `cpu-ram`; `internal` when the link reports no PCIe speed at all. |
-| `genMax`   | number \| null                            | Link capability: the lower of both ends' maximum generation.                |
-| `widthMax` | number \| null                            | Link capability: the lower of both ends' maximum width.                     |
-| `genCur`   | number \| null                            | Current generation.                                                         |
-| `widthCur` | number \| null                            | Current width.                                                              |
+| Field      | Type                                   | Description                                                                    |
+| ---------- | -------------------------------------- | ------------------------------------------------------------------------------ |
+| `id`       | string                                 | `cpu-ram`, `cpu-chipset:<busId>`, or `<from>-pci:<busId>`.                     |
+| `from`     | string                                 | Node id on the CPU side (upstream).                                            |
+| `to`       | string                                 | Node id downstream.                                                            |
+| `kind`     | `"pcie"` \| `"memory"` \| `"internal"` | `memory` for `cpu-ram`; `internal` when the link reports no PCIe speed at all. |
+| `genMax`   | number \| null                         | Link capability: the lower of both ends' maximum generation.                   |
+| `widthMax` | number \| null                         | Link capability: the lower of both ends' maximum width.                        |
+| `genCur`   | number \| null                         | Current generation.                                                            |
+| `widthCur` | number \| null                         | Current width.                                                                 |
 
 For recent Radeon cards, which sit behind a PCIe switch on the card itself, the link is read at the card's upstream
 port (`slotLink()`): the GPU's own link to that switch always reads its full width. A width outside 1 to 32 (a
@@ -136,31 +136,31 @@ llama-webui adds to a profile that sets no verbosity.
 logs, and for an external server (it writes nothing to the ring). Once the launch line is evicted from the ring, the
 last placement read stays valid as long as the server has the same PID.
 
-| Field       | Type                                         | Description                                                             |
-| ----------- | -------------------------------------------- | ----------------------------------------------------------------------- |
-| `launchSeq` | number                                       | Sequence number of the `[llama-webui] launch:` log line it comes from.  |
-| `layers`    | `{ offloaded, total }` \| null                | From `offloaded N/M layers to GPU`; null until that line has gone by.  |
-| `buffers`   | `PlacementBuffer[]`                          | One per device that has buffers.                                        |
+| Field       | Type                                                     | Description                                                                                        |
+| ----------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `launchSeq` | number                                                   | Sequence number of the `[llama-webui] launch:` log line it comes from.                             |
+| `layers`    | `{ offloaded, total }` \| null                           | From `offloaded N/M layers to GPU`; null until that line has gone by.                              |
+| `buffers`   | `PlacementBuffer[]`                                      | One per device that has buffers.                                                                   |
 | `p2p`       | `'active'` \| `'unavailable'` \| `'requested'`, optional | Peer-to-peer between the GPUs of a backend, see below. Absent when neither requested nor reported. |
 
 `PlacementBuffer`:
 
-| Field          | Type           | Description                                                                              |
-| -------------- | -------------- | ---------------------------------------------------------------------------------------- |
-| `device`       | string         | ggml device name: `CUDA0`, `ROCm0`, `Vulkan1`, `CPU`, `CPU_Mapped`, `CUDA_Host`…         |
-| `busId`        | string \| null  | PCI address from the `using device` line, or from NCCL's `cudaDev N … busId X` for a CUDA device it does not cover (`-sm tensor`); null for the host or when not logged. |
-| `modelBytes`   | number         | Weights on the device.                                                                   |
-| `kvBytes`      | number         | KV cache, plus the recurrent state (`RS`) of hybrid models.                              |
-| `computeBytes` | number         | Compute buffers, summed over the contexts (an MTP's adds to the model's); a context reserved again keeps only its last size. |
-| `estimated`    | `true`, optional | Spread from the `Meta()` buffers of `-sm tensor`, which only give the largest part: by `-ts`, equal parts without it. Absent otherwise. |
+| Field          | Type             | Description                                                                                                                                                              |
+| -------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `device`       | string           | ggml device name: `CUDA0`, `ROCm0`, `Vulkan1`, `CPU`, `CPU_Mapped`, `CUDA_Host`…                                                                                         |
+| `busId`        | string \| null   | PCI address from the `using device` line, or from NCCL's `cudaDev N … busId X` for a CUDA device it does not cover (`-sm tensor`); null for the host or when not logged. |
+| `modelBytes`   | number           | Weights on the device.                                                                                                                                                   |
+| `kvBytes`      | number           | KV cache, plus the recurrent state (`RS`) of hybrid models.                                                                                                              |
+| `computeBytes` | number           | Compute buffers, summed over the contexts (an MTP's adds to the model's); a context reserved again keeps only its last size.                                             |
+| `estimated`    | `true`, optional | Spread from the `Meta()` buffers of `-sm tensor`, which only give the largest part: by `-ts`, equal parts without it. Absent otherwise.                                  |
 
 `p2p` says what the logs tell about direct transfers between GPUs:
 
-| Value         | Read from                                                                                                                   |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `active`      | An NCCL line `Channel … via P2P/…`: a channel goes from GPU to GPU. Does not need `GGML_CUDA_P2P` (NCCL enables peer access itself). |
+| Value         | Read from                                                                                                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `active`      | An NCCL line `Channel … via P2P/…`: a channel goes from GPU to GPU. Does not need `GGML_CUDA_P2P` (NCCL enables peer access itself).                                                          |
 | `unavailable` | The launch set `GGML_CUDA_P2P` (llama-webui's own line, right after the launch line), and NCCL logs `P2P is disabled between connected GPUs` or a channel `via SHM/…`: the driver refuses it. |
-| `requested`   | The launch set `GGML_CUDA_P2P` and NCCL says nothing (not built in, or without `NCCL_DEBUG=INFO`): llama.cpp enables peer-to-peer where the driver allows, silently. |
+| `requested`   | The launch set `GGML_CUDA_P2P` and NCCL says nothing (not built in, or without `NCCL_DEBUG=INFO`): llama.cpp enables peer-to-peer where the driver allows, silently.                          |
 
 Every change is pushed as the `placement` message of the [WebSocket](/developers/api/websocket/), with the same
 `ModelPlacement | null` payload.
@@ -169,9 +169,9 @@ Every change is pushed as the `placement` message of the [WebSocket](/developers
 
 `packages/webui-shared/src/topology.ts` holds the pure logic the UI uses with this payload:
 
-| Export              | What it does                                                                                         |
-| ------------------- | ---------------------------------------------------------------------------------------------------- |
-| `hostDevice()`      | True for host-side (RAM) buffers: `CPU`, `CPU_*` (`CPU_Mapped`, `CPU_REPACK`…) and `*_Host`.         |
-| `placementTotals()` | `modelBytes`, `gpuModelBytes` and `hostModelBytes` of a placement.                                   |
+| Export              | What it does                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `hostDevice()`      | True for host-side (RAM) buffers: `CPU`, `CPU_*` (`CPU_Mapped`, `CPU_REPACK`…) and `*_Host`.                       |
+| `placementTotals()` | `modelBytes`, `gpuModelBytes` and `hostModelBytes` of a placement.                                                 |
 | `phaseOf()`         | `stopped`, `loading`, `idle`, `prompt` or `generating`, from the supervisor state and the latest snapshot's slots. |
-| `pcieBps()`         | Payload capacity of a link per direction (bytes/s) from its generation and width; null if either is unknown. |
+| `pcieBps()`         | Payload capacity of a link per direction (bytes/s) from its generation and width; null if either is unknown.       |

@@ -671,6 +671,7 @@ temporary folder).
       `git diff app/server/contract/golden.json`: only new cases, each reply the one this task describes (201, 204
       without body or content type, the two `content-disposition` headers, 409, both 404 shapes), times recorded as
       `<time>`. An export reply is recorded as parsed JSON: its indentation is proven by the handler test.
+
 - [ ] **Step 5: Run the whole suite, `pnpm check`, `pnpm build && node scripts/smoke.ts`.**
 - [ ] **Step 6: Commit** `feat(server): Serve the profiles`
 

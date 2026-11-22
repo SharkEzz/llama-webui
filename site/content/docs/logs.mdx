@@ -53,12 +53,12 @@ filters, followed by the total when they hide some (`120 lines of 915`).
 
 **Minimum level** keeps the lines at or above a level:
 
-| Option                  | Shows                                  |
-| ----------------------- | -------------------------------------- |
-| **Debug and above**     | Every line (the default).              |
-| **Info and above**      | Everything except debug lines.         |
-| **Warnings and errors** | Warnings and errors.                   |
-| **Errors only**         | Errors.                                |
+| Option                  | Shows                          |
+| ----------------------- | ------------------------------ |
+| **Debug and above**     | Every line (the default).      |
+| **Info and above**      | Everything except debug lines. |
+| **Warnings and errors** | Warnings and errors.           |
+| **Errors only**         | Errors.                        |
 
 `llama-server` marks each line with a level letter after its timestamp (`I`, `W`, `E`, `D`), and llama-webui uses
 it; trace lines count as debug. A line without a letter is classified by its words: `error`, `failed` or `abort` make

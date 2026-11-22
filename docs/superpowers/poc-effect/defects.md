@@ -367,8 +367,7 @@ Found while porting E5, accepted with its result:
 - `MessageStats` is all finite: a stored stats that no longer decodes (a `null` the Nitro server wrote for a NaN rate)
   reads as no stats, with a warning, the message kept; a run saves its stats only when every number is finite, else
   none; the `done` message built in memory (the conversation deleted) carries the stats a save would have written.
-- The run leaves the runs before its `done` is published: a client that sends again as soon as it reads `done` gets no
-  409.
+- The run leaves the runs before its `done` is published: a client that sends again as soon as it reads `done` gets no 409.
 - The shutdown step and `stopAndWait` read the runs under their lock (`SynchronizedRef.modify`), so a start in flight is
   stopped and saved too; the step saves every reply `stopped` first, then stops its run, so the run writes nothing after
   it.

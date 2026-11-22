@@ -7,18 +7,18 @@ The supervisor owns the one `llama-server` process llama-webui manages: it start
 to readiness, stops it, and publishes its state to the rest of the server. It is the `Supervisor` service
 (`app/server/supervisor/Supervisor.ts`), built once with the app's services and stopped when they are undone.
 
-| File | Role |
-| --- | --- |
-| `app/server/supervisor/Supervisor.ts` | `Supervisor`: the state machine, the launch, the output, the health poll, the stop. |
-| `app/server/supervisor/command.ts` | `buildCommand()`, `commandOf()`, `profilePaths()`, `launchLines()`: from a profile to a `BuiltCommand`. |
-| `app/server/supervisor/ExternalWatch.ts` | `ExternalWatch`: detects a `llama-server` llama-webui did not start. |
-| `app/server/supervisor/http.ts` | `ServerHandlers`: the `server` group (start, switch, restart, stop, state, props). |
-| `app/server/process/followed.ts` | `followProgram()`: a long-running program in a scope of its own, followed until it exits. |
-| `app/server/llama/probes.ts` | `health()`, `isLlamaServer()`, `props()`: requests to `llama-server` through `LlamaHttp`. |
-| `app/server/llama/procScan.ts` | `findLlamaServerPid()`: the PID of a `llama-server` read from `/proc`. |
-| `app/server/flags/Flags.ts` | `Flags`: the flag catalog of the binary, cached per path. |
-| `app/server/logs/LogRing.ts` | `LogRing`: the numbered lines of the server's output, published as `log` messages. |
-| `packages/webui-shared/src/server.ts` | `ServerState`, `ServerView`, `serverView()`, `activeProfileId()`, shared with the web app. |
+| File                                     | Role                                                                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `app/server/supervisor/Supervisor.ts`    | `Supervisor`: the state machine, the launch, the output, the health poll, the stop.                     |
+| `app/server/supervisor/command.ts`       | `buildCommand()`, `commandOf()`, `profilePaths()`, `launchLines()`: from a profile to a `BuiltCommand`. |
+| `app/server/supervisor/ExternalWatch.ts` | `ExternalWatch`: detects a `llama-server` llama-webui did not start.                                    |
+| `app/server/supervisor/http.ts`          | `ServerHandlers`: the `server` group (start, switch, restart, stop, state, props).                      |
+| `app/server/process/followed.ts`         | `followProgram()`: a long-running program in a scope of its own, followed until it exits.               |
+| `app/server/llama/probes.ts`             | `health()`, `isLlamaServer()`, `props()`: requests to `llama-server` through `LlamaHttp`.               |
+| `app/server/llama/procScan.ts`           | `findLlamaServerPid()`: the PID of a `llama-server` read from `/proc`.                                  |
+| `app/server/flags/Flags.ts`              | `Flags`: the flag catalog of the binary, cached per path.                                               |
+| `app/server/logs/LogRing.ts`             | `LogRing`: the numbered lines of the server's output, published as `log` messages.                      |
+| `packages/webui-shared/src/server.ts`    | `ServerState`, `ServerView`, `serverView()`, `activeProfileId()`, shared with the web app.              |
 
 `probeUrl()` (`llamacpp-js/client`) and `parseHelp()` (`llamacpp-js/flags`) come from
 [llamacpp-js](/developers/llamacpp-js/); the requests and the programs themselves are made by the app, through
@@ -56,19 +56,19 @@ process never ran).
 
 ### Transitions
 
-| From | Event | To |
-| --- | --- | --- |
-| `idle`, `crashed` | `start`: the process is spawned | `starting` |
-| `idle`, `crashed` | `start`: the profile's `cwd` does not exist, or the spawn fails | `crashed` (with `message`) |
-| `idle`, `crashed` | `start`: a `llama-server` already answers on the profile's port | `external` (and `start` fails) |
-| `idle`, `crashed` | the external watch finds a `llama-server` on the settings port or the last command's port | `external` |
-| `starting` | `/health` answers `200` | `ready` |
-| `starting`, `ready` | `stop` or `switchTo` | `stopping` |
-| `stopping` | the process exits | `idle` |
-| `starting`, `ready` | the process exits without being asked to | `crashed` |
-| `crashed` | `stop` | `idle` |
-| `external` | the recorded PID is dead or unknown, and the port no longer answers | `idle` |
-| `external` | `start`, and the port no longer answers | `idle`, then the normal start |
+| From                | Event                                                                                     | To                             |
+| ------------------- | ----------------------------------------------------------------------------------------- | ------------------------------ |
+| `idle`, `crashed`   | `start`: the process is spawned                                                           | `starting`                     |
+| `idle`, `crashed`   | `start`: the profile's `cwd` does not exist, or the spawn fails                           | `crashed` (with `message`)     |
+| `idle`, `crashed`   | `start`: a `llama-server` already answers on the profile's port                           | `external` (and `start` fails) |
+| `idle`, `crashed`   | the external watch finds a `llama-server` on the settings port or the last command's port | `external`                     |
+| `starting`          | `/health` answers `200`                                                                   | `ready`                        |
+| `starting`, `ready` | `stop` or `switchTo`                                                                      | `stopping`                     |
+| `stopping`          | the process exits                                                                         | `idle`                         |
+| `starting`, `ready` | the process exits without being asked to                                                  | `crashed`                      |
+| `crashed`           | `stop`                                                                                    | `idle`                         |
+| `external`          | the recorded PID is dead or unknown, and the port no longer answers                       | `idle`                         |
+| `external`          | `start`, and the port no longer answers                                                   | `idle`, then the normal start  |
 
 Every transition goes through one `change()` under the lock of the state (a `SynchronizedRef`): it stores the state,
 publishes it as a `server-state` WebSocket message (the `ServerView`) and to the `changes` stream, in the order of the

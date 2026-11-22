@@ -59,6 +59,7 @@ conventions").
 
   Before writing a row, `git grep` the imports it would ban: a row that would report on today's code is narrowed to
   what the code does (and the difference noted in the PR), never fixed by changing code.
+
 - [ ] **Step 2:** `import/no-cycle: 'error'` in the base. Expected: 0 report (measured in the spike). A cycle found
       now that the run is complete: report it in the PR and leave the rule off with a `// TODO(cycle): <files>` comment
       rather than restructure code in this milestone.

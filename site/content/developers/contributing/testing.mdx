@@ -21,10 +21,10 @@ pnpm test
 
 It runs two suites one after the other, and is the command CI runs:
 
-| Script                           | Command                                                    | Runs                                                        |
-| -------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
-| `test:unit`                      | `vitest run`                                               | Every `*.test.ts` of `app/server/`, `app/build/`, `scripts/`, `packages/webui-shared/`, `app/src/` and `site/`, on Node |
-| `test` of `llamacpp-js`          | `node --test 'tests/*.test.ts'`                            | The tests of `packages/llamacpp-js/`, on Node               |
+| Script                  | Command                         | Runs                                                                                                                    |
+| ----------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `test:unit`             | `vitest run`                    | Every `*.test.ts` of `app/server/`, `app/build/`, `scripts/`, `packages/webui-shared/`, `app/src/` and `site/`, on Node |
+| `test` of `llamacpp-js` | `node --test 'tests/*.test.ts'` | The tests of `packages/llamacpp-js/`, on Node                                                                           |
 
 `vitest.config.ts` at the root defines one Vitest project per code base: `server` (`app/server/`, `app/build/` and
 `scripts/`), `shared`, `web` (`app/src/`, with the `@/` alias to it) and `site` (with its own `@/` alias). Imports are
@@ -36,14 +36,14 @@ production build (`pnpm run build`, into `app/.output`), which the suites that s
 lifecycle, build output). `LLAMA_WEBUI_TEST_BUILD=0` skips it and reuses the build already there, to rerun a test
 quickly after a change that does not touch the build.
 
-| Command                                            | Runs                                                 |
-| -------------------------------------------------- | ---------------------------------------------------- |
-| `pnpm exec vitest run app/server/bench`            | Test files whose path contains `app/server/bench`    |
-| `LLAMA_WEBUI_TEST_BUILD=0 pnpm exec vitest run app/server/lifecycle.test.ts` | One file, on the existing build |
-| `pnpm exec vitest run --project web`               | The tests of one project                             |
-| `pnpm exec vitest run -t 'sweep'`                  | Tests whose name matches the regular expression      |
-| `pnpm exec vitest run --changed`                   | Test files that import a file changed since the last commit |
-| `pnpm exec vitest`                                 | Watch mode: reruns the tests a change affects        |
+| Command                                                                      | Runs                                                        |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `pnpm exec vitest run app/server/bench`                                      | Test files whose path contains `app/server/bench`           |
+| `LLAMA_WEBUI_TEST_BUILD=0 pnpm exec vitest run app/server/lifecycle.test.ts` | One file, on the existing build                             |
+| `pnpm exec vitest run --project web`                                         | The tests of one project                                    |
+| `pnpm exec vitest run -t 'sweep'`                                            | Tests whose name matches the regular expression             |
+| `pnpm exec vitest run --changed`                                             | Test files that import a file changed since the last commit |
+| `pnpm exec vitest`                                                           | Watch mode: reruns the tests a change affects               |
 
 <Callout type="warning">
   `--changed` and watch mode follow imports only. The suites that start the production build (contract, lifecycle,
@@ -61,14 +61,14 @@ A test file sits next to its module: `app/server/bench/parse.test.ts` tests `app
 `packages/llamacpp-js/tests/` (`tests/metrics.test.ts` tests `src/metrics.ts`), so that `src/` holds only what a
 published package ships.
 
-| Folder     | What the tests cover                                                                                                                                                                      |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/server/`  | Parsers (`nvidia-smi`, AMD sysfs and fdinfo, `perf`, startup logs, PCI topology), GGUF reading and the model scan, `llama-server` command lines, the supervisor and external-server detection, tuning, repositories and migrations, the bench runner and gate, chat runs, Hugging Face downloads, the guard and request errors, the configuration and command line, the setup report, the endpoints of each domain, the HTTP contract, the production build, shutdown and the development loop |
-| `app/build/`   | The build plugin that writes `THIRD-PARTY-LICENSES.md` (`licenses.test.ts`) |
-| `packages/webui-shared/`  | Pure logic used on both sides: benchmark parameters, profile import, sweeps, chat stats and titles, logs, topology, models, setup checks, Hugging Face inputs, `defer`; and the schemas (settings, profiles, the messages of `/ws`) |
-| `packages/llamacpp-js/`  | The llama.cpp client: flags from `--help`, the SSE parser, `/metrics` and `/slots`, `llama-bench` output, the health probes, `/props` and the streamed chat completion, `/proc` discovery, and the package's own contract (`tests/package.test.ts`: no app import, `.ts` import paths, one export per module, tree-shaking) |
-| `app/src/` | Pure UI logic: the typed client (`app/src/lib/api.ts`), the Topology page's flows, layout, pacing and smoothing (`app/src/features/topology/`), the benchmark form mapping (`app/src/lib/bench.ts`), the profile draft and the error texts of a page |
-| `site/`    | The link checker helpers, the sidebar and content routes, the landing page's telemetry simulation                                                                                         |
+| Folder                   | What the tests cover                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/server/`            | Parsers (`nvidia-smi`, AMD sysfs and fdinfo, `perf`, startup logs, PCI topology), GGUF reading and the model scan, `llama-server` command lines, the supervisor and external-server detection, tuning, repositories and migrations, the bench runner and gate, chat runs, Hugging Face downloads, the guard and request errors, the configuration and command line, the setup report, the endpoints of each domain, the HTTP contract, the production build, shutdown and the development loop |
+| `app/build/`             | The build plugin that writes `THIRD-PARTY-LICENSES.md` (`licenses.test.ts`)                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `packages/webui-shared/` | Pure logic used on both sides: benchmark parameters, profile import, sweeps, chat stats and titles, logs, topology, models, setup checks, Hugging Face inputs, `defer`; and the schemas (settings, profiles, the messages of `/ws`)                                                                                                                                                                                                                                                            |
+| `packages/llamacpp-js/`  | The llama.cpp client: flags from `--help`, the SSE parser, `/metrics` and `/slots`, `llama-bench` output, the health probes, `/props` and the streamed chat completion, `/proc` discovery, and the package's own contract (`tests/package.test.ts`: no app import, `.ts` import paths, one export per module, tree-shaking)                                                                                                                                                                    |
+| `app/src/`               | Pure UI logic: the typed client (`app/src/lib/api.ts`), the Topology page's flows, layout, pacing and smoothing (`app/src/features/topology/`), the benchmark form mapping (`app/src/lib/bench.ts`), the profile draft and the error texts of a page                                                                                                                                                                                                                                           |
+| `site/`                  | The link checker helpers, the sidebar and content routes, the landing page's telemetry simulation                                                                                                                                                                                                                                                                                                                                                                                              |
 
 `scripts/` holds the tests of the repository itself: the published package's fields (`package.test.ts`) and the
 versions of every `package.json` (`release.test.ts`).
@@ -111,7 +111,7 @@ describe('SettingsRepo', () => {
 ```
 
 - **Names** are English sentences that state the behavior: `a deleted profile's id is never given to a new profile
-  (#38)`, `isOomError recognizes the current and the legacy out-of-memory errors`. A `describe` block, or the name a
+(#38)`, `isOomError recognizes the current and the legacy out-of-memory errors`. A `describe` block, or the name a
   `layer(…)` gives its tests, groups the tests of one module.
 - **The services** come from layers, never from a mocked module. `layer(L)('Name', (it) => { … })` builds `L` once
   for the tests of its block and runs its finalizers after them; a test that needs its own state builds its layer
@@ -210,24 +210,23 @@ describe('parseSlots', () => {
   `llamacpp-js`) for the browser: tree-shaking keeps only what one function needs, and the browser-safe modules pull no
   Node built-in. Without an install, as in the Node 24 job, they pass `{ skip }` and Node reports them as skipped.
 
-
 ## Captured outputs
 
 `testdata/` holds real outputs captured from `llama-server`, `llama-bench`, `nvidia-smi` and the kernel. Parsers are
 tested against them rather than against hand-written strings. Biome does not check this folder.
 
-| File                                                   | What it is                                               | Read by                                 |
-| ------------------------------------------------------ | -------------------------------------------------------- | --------------------------------------- |
-| `llama-server-help.txt`                                | `llama-server --help`                                    | `packages/llamacpp-js/tests/flags.test.ts`, `node.test.ts` |
-| `llama-server-load.txt`, `llama-server-load-mtp.txt`, `llama-server-load-mtp-lv5.txt`, `llama-server-load-tensor.txt` | Startup logs (with MTP, at `-lv 5`, and the `Meta()` buffers of `-sm tensor`) | `app/server/monitor/placementLog.test.ts`, `Placement.test.ts` |
-| `metrics-idle.txt`, `metrics-after.txt`                | Prometheus `/metrics`, idle and after generating tokens  | `packages/llamacpp-js/tests/metrics.test.ts` |
-| `slots-idle.json`, `slots-busy.json`                   | `/slots`, idle and busy                                  | `packages/llamacpp-js/tests/metrics.test.ts` |
-| `nvidia-gpu.csv`, `nvidia-apps.csv`                    | `nvidia-smi` CSV queries (GPUs, compute apps)            | `app/server/collectors/nvidia.test.ts`      |
-| `fdinfo-amd-vram.txt`, `fdinfo-amd-igpu.txt`, `fdinfo-other.txt` | `/proc/<pid>/fdinfo` entries (AMD card, AMD iGPU, another driver) | `app/server/collectors/amdgpu.test.ts` |
-| `llama-tui-config.json`                                | A file of profiles with other top-level keys, to import  | `packages/webui-shared/src/profile.test.ts`            |
-| `llama-bench/ok.json`, `oom-stdout.json`, `oom-stderr.txt` | `llama-bench -o json` output, and an out-of-memory failure | `packages/llamacpp-js/tests/bench.test.ts`, `app/server/bench/parse.test.ts`, the fake `llama-bench` |
-| `llama-bench/list-devices.txt`                         | `llama-bench --list-devices`                             | `packages/llamacpp-js/tests/bench.test.ts`, the fake `llama-bench` |
-| `fake/`                                                | The fake binaries and the files they serve               | See below                               |
+| File                                                                                                                  | What it is                                                                    | Read by                                                                                              |
+| --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `llama-server-help.txt`                                                                                               | `llama-server --help`                                                         | `packages/llamacpp-js/tests/flags.test.ts`, `node.test.ts`                                           |
+| `llama-server-load.txt`, `llama-server-load-mtp.txt`, `llama-server-load-mtp-lv5.txt`, `llama-server-load-tensor.txt` | Startup logs (with MTP, at `-lv 5`, and the `Meta()` buffers of `-sm tensor`) | `app/server/monitor/placementLog.test.ts`, `Placement.test.ts`                                       |
+| `metrics-idle.txt`, `metrics-after.txt`                                                                               | Prometheus `/metrics`, idle and after generating tokens                       | `packages/llamacpp-js/tests/metrics.test.ts`                                                         |
+| `slots-idle.json`, `slots-busy.json`                                                                                  | `/slots`, idle and busy                                                       | `packages/llamacpp-js/tests/metrics.test.ts`                                                         |
+| `nvidia-gpu.csv`, `nvidia-apps.csv`                                                                                   | `nvidia-smi` CSV queries (GPUs, compute apps)                                 | `app/server/collectors/nvidia.test.ts`                                                               |
+| `fdinfo-amd-vram.txt`, `fdinfo-amd-igpu.txt`, `fdinfo-other.txt`                                                      | `/proc/<pid>/fdinfo` entries (AMD card, AMD iGPU, another driver)             | `app/server/collectors/amdgpu.test.ts`                                                               |
+| `llama-tui-config.json`                                                                                               | A file of profiles with other top-level keys, to import                       | `packages/webui-shared/src/profile.test.ts`                                                          |
+| `llama-bench/ok.json`, `oom-stdout.json`, `oom-stderr.txt`                                                            | `llama-bench -o json` output, and an out-of-memory failure                    | `packages/llamacpp-js/tests/bench.test.ts`, `app/server/bench/parse.test.ts`, the fake `llama-bench` |
+| `llama-bench/list-devices.txt`                                                                                        | `llama-bench --list-devices`                                                  | `packages/llamacpp-js/tests/bench.test.ts`, the fake `llama-bench`                                   |
+| `fake/`                                                                                                               | The fake binaries and the files they serve                                    | See below                                                                                            |
 
 Tests read these files relative to their own location:
 
@@ -266,20 +265,20 @@ The supervisor, the bench runner, the profiles' endpoints, the contract suite an
 
 Environment variables shape its behavior:
 
-| Variable                                  | Effect                                                                |
-| ----------------------------------------- | --------------------------------------------------------------------- |
-| `FAKE_LOAD_MS`                            | Loading time before `/health` is ready (default 300 ms)               |
-| `FAKE_SLOW_ARG`, `FAKE_SLOW_MS`           | A longer load (default 5000 ms) when that argument is present          |
-| `FAKE_FAIL_ARG`                           | Logs a CUDA out-of-memory and exits with 1 when that argument is present |
-| `FAKE_EXIT_LINES`                         | Logs these `\|`-separated lines, then exits with 1                     |
-| `FAKE_TAIL`                               | Writes this last line without its newline                             |
-| `FAKE_ECHO_ENV`                           | `A,B`: logs one line per variable, with its value as the fake sees it |
-| `FAKE_CRASH_ON_PREDICT`                   | Dies mid-request on a `/completion` with that `n_predict`             |
-| `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`        | Reported prompt and generation speeds, draft statistics when `1`      |
-| `FAKE_N_CTX`                              | Simulated context size (default 40192 tokens)                         |
-| `FAKE_CHAT_DELAY_MS`, `FAKE_CHAT_LINES`   | Delay between streamed chunks (default 60 ms), extra reply lines      |
-| `FAKE_IGNORE_TERM`                        | Ignores `SIGTERM` when `1`                                            |
-| `FAKE_EXIT_AFTER_MS`, `FAKE_EXIT_CODE`    | Exits on its own after a delay, with that code (default 1)            |
+| Variable                                | Effect                                                                   |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| `FAKE_LOAD_MS`                          | Loading time before `/health` is ready (default 300 ms)                  |
+| `FAKE_SLOW_ARG`, `FAKE_SLOW_MS`         | A longer load (default 5000 ms) when that argument is present            |
+| `FAKE_FAIL_ARG`                         | Logs a CUDA out-of-memory and exits with 1 when that argument is present |
+| `FAKE_EXIT_LINES`                       | Logs these `\|`-separated lines, then exits with 1                       |
+| `FAKE_TAIL`                             | Writes this last line without its newline                                |
+| `FAKE_ECHO_ENV`                         | `A,B`: logs one line per variable, with its value as the fake sees it    |
+| `FAKE_CRASH_ON_PREDICT`                 | Dies mid-request on a `/completion` with that `n_predict`                |
+| `FAKE_PP`, `FAKE_TG`, `FAKE_DRAFT`      | Reported prompt and generation speeds, draft statistics when `1`         |
+| `FAKE_N_CTX`                            | Simulated context size (default 40192 tokens)                            |
+| `FAKE_CHAT_DELAY_MS`, `FAKE_CHAT_LINES` | Delay between streamed chunks (default 60 ms), extra reply lines         |
+| `FAKE_IGNORE_TERM`                      | Ignores `SIGTERM` when `1`                                               |
+| `FAKE_EXIT_AFTER_MS`, `FAKE_EXIT_CODE`  | Exits on its own after a delay, with that code (default 1)               |
 
 ### Fake llama-bench
 
@@ -288,13 +287,13 @@ Environment variables shape its behavior:
 `llama-bench`'s progress lines on stderr and the JSON of `testdata/llama-bench/ok.json` on stdout, and answers
 `--list-devices` with `list-devices.txt`.
 
-| Variable                          | Effect                                                                            |
-| --------------------------------- | --------------------------------------------------------------------------------- |
-| `FAKE_BENCH_STEP_MS`              | Pause between progress steps (default 100 ms)                                     |
-| `FAKE_BENCH_OOM`                  | `1`: fails like an out-of-memory load (`oom-stderr.txt`, exit code 1)             |
-| `FAKE_BENCH_OOM_ARG`              | Same failure when the arguments contain that fragment                             |
-| `FAKE_PP`, `FAKE_TG`              | Overrides the prompt and generation speeds                                         |
-| `FAKE_TG_BY_ARG`                  | `-ncmoe 8=30;-dev CUDA0,CUDA1=55`: the generation speed of the first fragment found (the fake receives `-dev` with commas) |
+| Variable             | Effect                                                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `FAKE_BENCH_STEP_MS` | Pause between progress steps (default 100 ms)                                                                              |
+| `FAKE_BENCH_OOM`     | `1`: fails like an out-of-memory load (`oom-stderr.txt`, exit code 1)                                                      |
+| `FAKE_BENCH_OOM_ARG` | Same failure when the arguments contain that fragment                                                                      |
+| `FAKE_PP`, `FAKE_TG` | Overrides the prompt and generation speeds                                                                                 |
+| `FAKE_TG_BY_ARG`     | `-ncmoe 8=30;-dev CUDA0,CUDA1=55`: the generation speed of the first fragment found (the fake receives `-dev` with commas) |
 
 ### Use them in a test
 
@@ -382,6 +381,7 @@ with a `:param` or a body; write a success for the others). Another checks that 
 case succeeds.
 
 A reply is recorded with:
+
 - its status;
 - its `content-type`, `allow`, `cache-control`, `content-disposition` and `location` headers;
 - its body (JSON parsed, otherwise text).
@@ -451,14 +451,14 @@ There is no root `tsconfig.json` and no TypeScript project reference: each code 
 which extends `tsconfig.base.json` (the shared options, `noEmit` among them), directly or through
 `tsconfig.effect.json`, and adds its types and its files.
 
-| Project                               | Covers                                     | Types                                       |
-| ------------------------------------- | ------------------------------------------ | ------------------------------------------- |
-| `packages/llamacpp-js/tsconfig.json`  | The library's sources and its tests (`tests/`), as a Node user compiles them: NodeNext resolution | Node only (no DOM): a browser-only API fails here |
-| `packages/webui-shared/tsconfig.json` | `@llama-webui/shared` and its tests, with the Effect diagnostics | Node, no DOM: a browser-only API fails here |
-| `app/server/tsconfig.json`            | `app/server/` and its tests, with the Effect diagnostics | Node              |
-| `scripts/tsconfig.json`               | `scripts/`                                 | Node                                        |
-| `app/tsconfig.json`                   | `app/src/` (tests included), `app/build/` and `app/vite.config.ts` | DOM and Node        |
-| `site/tsconfig.json`                  | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types | DOM and Node |
+| Project                               | Covers                                                                                                                        | Types                                             |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `packages/llamacpp-js/tsconfig.json`  | The library's sources and its tests (`tests/`), as a Node user compiles them: NodeNext resolution                             | Node only (no DOM): a browser-only API fails here |
+| `packages/webui-shared/tsconfig.json` | `@llama-webui/shared` and its tests, with the Effect diagnostics                                                              | Node, no DOM: a browser-only API fails here       |
+| `app/server/tsconfig.json`            | `app/server/` and its tests, with the Effect diagnostics                                                                      | Node                                              |
+| `scripts/tsconfig.json`               | `scripts/`                                                                                                                    | Node                                              |
+| `app/tsconfig.json`                   | `app/src/` (tests included), `app/build/` and `app/vite.config.ts`                                                            | DOM and Node                                      |
+| `site/tsconfig.json`                  | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types | DOM and Node                                      |
 
 A project that imports another package checks the sources it reaches with its own options: the server those of
 `llamacpp-js` and `webui-shared`, and `app/tsconfig.json` those of `webui-shared`, whose API definition the typed
@@ -466,13 +466,13 @@ client is derived from (the client never imports server code), and those `app/vi
 the client project has Node's types next to the DOM's. The production build test (`app/server/build.test.ts`) checks
 that no chunk of the client bundle imports a `node:` module. The projects do not enable the same options:
 
-| Option                                                          | `tsconfig.base.json` (packages, `app/server/`, `scripts/`) | `app/` | `site/` |
-| --------------------------------------------------------------- | --------------------------- | ------ | ------- |
-| `strict`, `verbatimModuleSyntax`, `noFallthroughCasesInSwitch`  | yes                         | yes    | yes     |
-| `noUncheckedIndexedAccess`                                      | yes                         | yes    | yes     |
-| `noImplicitOverride`                                            | yes                         | yes    | no      |
-| `exactOptionalPropertyTypes`, `erasableSyntaxOnly`              | yes                         | yes    | no      |
-| `noUnusedLocals`, `noUnusedParameters`                          | no                          | yes    | yes     |
+| Option                                                         | `tsconfig.base.json` (packages, `app/server/`, `scripts/`) | `app/` | `site/` |
+| -------------------------------------------------------------- | ---------------------------------------------------------- | ------ | ------- |
+| `strict`, `verbatimModuleSyntax`, `noFallthroughCasesInSwitch` | yes                                                        | yes    | yes     |
+| `noUncheckedIndexedAccess`                                     | yes                                                        | yes    | yes     |
+| `noImplicitOverride`                                           | yes                                                        | yes    | no      |
+| `exactOptionalPropertyTypes`, `erasableSyntaxOnly`             | yes                                                        | yes    | no      |
+| `noUnusedLocals`, `noUnusedParameters`                         | no                                                         | yes    | yes     |
 
 With `verbatimModuleSyntax`, type-only imports must use `import type`. With `exactOptionalPropertyTypes`, an optional
 property (`x?: T`) takes no `undefined`: write `x?: T | undefined` (or `Schema.optional`) where a caller passes one on,

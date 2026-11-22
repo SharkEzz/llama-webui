@@ -30,10 +30,10 @@ these pages use `http://127.0.0.1:7860`.
 
 ## Channels
 
-| Channel            | Where                                                                                        | Carries                                                                                                                        |
-| ------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| REST               | `/api/*`                                                                                     | Reads and commands, JSON in and out.                                                                                           |
-| WebSocket          | `/ws`                                                                                        | Events pushed by the server: monitor snapshots, log lines, server state, benchmark, sweep and download progress.              |
+| Channel            | Where                                                                                      | Carries                                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| REST               | `/api/*`                                                                                   | Reads and commands, JSON in and out.                                                                                                    |
+| WebSocket          | `/ws`                                                                                      | Events pushed by the server: monitor snapshots, log lines, server state, benchmark, sweep and download progress.                        |
 | Server-sent events | `POST /api/chat/:id/messages`, `POST /api/chat/:id/regenerate`, `GET /api/chat/:id/stream` | The events of a chat reply while it is generated (`event: <type>` then `data: <json>`, a `: ping` comment after 15 seconds of silence). |
 
 The WebSocket only sends `hello` when a client connects, then events as they happen. A client reads the current state
@@ -47,11 +47,11 @@ else, an unknown path included, and whatever the spelling of the path the server
 `//api/health`). The API is unauthenticated and local, so the guard protects it from other websites
 open in your browser. It does not protect it from people on your network. It applies three checks, in this order:
 
-| Check          | Rule                                                                                                                                      | Refusal                                                          |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `Host`         | The header parses as a host, and its hostname is `localhost`, ends in `.localhost`, or is an IPv4 or IPv6 literal.                       | `403` `Host not allowed`; `400` `Invalid host` when it does not parse |
-| `Origin`       | When the header is present, it equals `http://<Host header>` exactly.                                                                     | `403` `Origin not allowed`                                       |
-| `content-type` | For `POST`, `PUT`, `PATCH` and `DELETE`: a `content-type`, when sent, is `application/json` (parameters such as `; charset=utf-8` allowed), and a request with a body sends it. | `415` `JSON body expected (content-type: application/json)` |
+| Check          | Rule                                                                                                                                                                            | Refusal                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `Host`         | The header parses as a host, and its hostname is `localhost`, ends in `.localhost`, or is an IPv4 or IPv6 literal.                                                              | `403` `Host not allowed`; `400` `Invalid host` when it does not parse |
+| `Origin`       | When the header is present, it equals `http://<Host header>` exactly.                                                                                                           | `403` `Origin not allowed`                                            |
+| `content-type` | For `POST`, `PUT`, `PATCH` and `DELETE`: a `content-type`, when sent, is `application/json` (parameters such as `; charset=utf-8` allowed), and a request with a body sends it. | `415` `JSON body expected (content-type: application/json)`           |
 
 - The `Host` rule stops DNS rebinding: a domain name can be made to resolve to `127.0.0.1`, an IP address cannot. The
   API therefore refuses requests addressed by host name, such as `http://myserver.lan:7860`.
@@ -96,11 +96,11 @@ web app follows the same rule (`errorTag()` in `app/src/lib/api.ts`).
 
 These errors are the same on every endpoint:
 
-| `_tag`           | Status       | When                                                                                                   |
-| ---------------- | ------------ | ------------------------------------------------------------------------------------------------------ |
-| `RequestRefused` | `400`, `403`, `415` | The [request guard](#the-request-guard) refused the request.                                     |
-| `RouteNotFound`  | `404`        | `Unknown route`: no endpoint has this path and method, or a path parameter does not decode.            |
-| `RequestInvalid` | `400`        | The body, the query or a header does not decode ([Validation errors](#validation-errors)).             |
+| `_tag`           | Status              | When                                                                                        |
+| ---------------- | ------------------- | ------------------------------------------------------------------------------------------- |
+| `RequestRefused` | `400`, `403`, `415` | The [request guard](#the-request-guard) refused the request.                                |
+| `RouteNotFound`  | `404`               | `Unknown route`: no endpoint has this path and method, or a path parameter does not decode. |
+| `RequestInvalid` | `400`               | The body, the query or a header does not decode ([Validation errors](#validation-errors)).  |
 
 An exception in a handler (a bug, not an error the endpoint declares) is logged on the server's console with its
 cause, and the client gets a `500` without its message.
@@ -134,36 +134,36 @@ Expected object`. The web app shows each issue under the field its first `path` 
 
 Before the move to Effect, a few errors carried a machine-readable `code`. Each is now a `_tag`:
 
-| Former `code`      | `_tag`                                                                 | Status |
-| ------------------ | ---------------------------------------------------------------------- | ------ |
-| `name-taken`       | `ProfileNameTaken` ([Profiles](/developers/api/profiles/))             | `409`  |
-| `server-running`   | `ServerRunning` ([Benchmarks](/developers/api/bench/))                 | `409`  |
+| Former `code`                                                                      | `_tag`                                                                                                            | Status                            |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `name-taken`                                                                       | `ProfileNameTaken` ([Profiles](/developers/api/profiles/))                                                        | `409`                             |
+| `server-running`                                                                   | `ServerRunning` ([Benchmarks](/developers/api/bench/))                                                            | `409`                             |
 | `hf-gated`, `hf-not-found`, `hf-unauthorized`, `hf-rate-limited`, `hf-unreachable` | `HfGated`, `HfNotFound`, `HfUnauthorized`, `HfRateLimited`, `HfUnreachable` ([Hugging Face](/developers/api/hf/)) | `403`, `404`, `401`, `429`, `502` |
-| `already-queued`, `not-finished` | `AlreadyQueued`, `NotFinished` ([Hugging Face](/developers/api/hf/)) | `409` |
-| `disk-full`        | `DiskFull` ([Hugging Face](/developers/api/hf/))                       | `507`  |
+| `already-queued`, `not-finished`                                                   | `AlreadyQueued`, `NotFinished` ([Hugging Face](/developers/api/hf/))                                              | `409`                             |
+| `disk-full`                                                                        | `DiskFull` ([Hugging Face](/developers/api/hf/))                                                                  | `507`                             |
 
 ## Status codes
 
-| Status | Meaning in this API                                                                                                                                     |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `200`  | Success, with a JSON body.                                                                                                                              |
-| `201`  | A resource was created (profile, duplicate, conversation, profile from a benchmark run); the body is the new resource.                                 |
+| Status | Meaning in this API                                                                                                                                   |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200`  | Success, with a JSON body.                                                                                                                            |
+| `201`  | A resource was created (profile, duplicate, conversation, profile from a benchmark run); the body is the new resource.                                |
 | `202`  | The operation started and goes on in the background (server start, switch and restart, benchmark run, sweep, download); follow it over the WebSocket. |
-| `204`  | Success without a body (deletions, cancellations, a chat stream with no reply in progress).                                                            |
-| `308`  | A path under `/api/` or `/ws/` that ends with a slash: `Location` is the same path without it, the query kept.                                         |
-| `400`  | A body, a query or a header that does not decode (`RequestInvalid`); invalid settings; a `Host` header that does not parse (`Invalid host`).           |
-| `401`  | Hugging Face rejected the token (`HfUnauthorized`).                                                                                                     |
-| `403`  | Refused by the guard (`Host`, `Origin`), or a gated Hugging Face repository.                                                                           |
-| `404`  | Unknown route (a path, a method a path does not have, `HEAD` included, or a path parameter that is not an id), unknown id, or missing file.            |
-| `409`  | The request conflicts with the current state: a name is taken, an operation is in progress, a benchmark holds the GPUs, a server is running…           |
-| `415`  | Refused by the guard: a write that is not `application/json`.                                                                                           |
-| `422`  | The file exists but cannot be read as a GGUF.                                                                                                           |
-| `426`  | `/ws` requested without a WebSocket upgrade (plain-text body `WebSocket upgrade expected`).                                                            |
-| `429`  | Hugging Face rate limit reached (`HfRateLimited`).                                                                                                      |
-| `500`  | An exception in a handler: logged on the server, answered without its message.                                                                          |
-| `502`  | An upstream service failed: `llama-server` (`/props`) or Hugging Face.                                                                                  |
-| `503`  | `llama-server --help` failed (`/api/flags`, `FlagsUnavailable`).                                                                                        |
-| `507`  | Not enough disk space for a download (`DiskFull`).                                                                                                      |
+| `204`  | Success without a body (deletions, cancellations, a chat stream with no reply in progress).                                                           |
+| `308`  | A path under `/api/` or `/ws/` that ends with a slash: `Location` is the same path without it, the query kept.                                        |
+| `400`  | A body, a query or a header that does not decode (`RequestInvalid`); invalid settings; a `Host` header that does not parse (`Invalid host`).          |
+| `401`  | Hugging Face rejected the token (`HfUnauthorized`).                                                                                                   |
+| `403`  | Refused by the guard (`Host`, `Origin`), or a gated Hugging Face repository.                                                                          |
+| `404`  | Unknown route (a path, a method a path does not have, `HEAD` included, or a path parameter that is not an id), unknown id, or missing file.           |
+| `409`  | The request conflicts with the current state: a name is taken, an operation is in progress, a benchmark holds the GPUs, a server is running…          |
+| `415`  | Refused by the guard: a write that is not `application/json`.                                                                                         |
+| `422`  | The file exists but cannot be read as a GGUF.                                                                                                         |
+| `426`  | `/ws` requested without a WebSocket upgrade (plain-text body `WebSocket upgrade expected`).                                                           |
+| `429`  | Hugging Face rate limit reached (`HfRateLimited`).                                                                                                    |
+| `500`  | An exception in a handler: logged on the server, answered without its message.                                                                        |
+| `502`  | An upstream service failed: `llama-server` (`/props`) or Hugging Face.                                                                                |
+| `503`  | `llama-server --help` failed (`/api/flags`, `FlagsUnavailable`).                                                                                      |
+| `507`  | Not enough disk space for a download (`DiskFull`).                                                                                                    |
 
 There is no `405`: a method a path does not define is the `404` `RouteNotFound` of an unknown path. There is no `503`
 "starting" either: the port opens once every service is built, so a request always finds the server ready.
@@ -233,21 +233,21 @@ To add an endpoint, see [How-to guides](/developers/contributing/how-to/).
 
 67 endpoints (a method on a path), plus the WebSocket. Their declarations are under `packages/webui-shared/src/api/`:
 
-| Page                                              | Groups                                            | Endpoints | Paths                                                    |
-| ------------------------------------------------- | ------------------------------------------------- | --------- | -------------------------------------------------------- |
-| [Health and settings](/developers/api/app/)       | `HealthApi`, `SettingsApi`                        | 3         | `/api/health`, `/api/settings`                           |
-| [Setup](/developers/api/setup/)                   | `SetupApi`                                        | 1         | `/api/setup`                                             |
-| [Profiles](/developers/api/profiles/)             | `ProfilesApi`                                     | 9         | `/api/profiles/*`                                        |
-| [Server, state and logs](/developers/api/server/) | `ServerApi`, `FlagsApi`, `LogsApi`                | 9         | `/api/state`, `/api/server/*`, `/api/flags`, `/api/logs` |
-| [Models](/developers/api/models/)                 | `ModelsApi`                                       | 4         | `/api/models`, `/api/models/info`, `/api/models/usage`   |
-| [Hugging Face](/developers/api/hf/)               | `HfApi`, `DownloadsApi`                           | 8         | `/api/hf/*`, `/api/downloads/*`                          |
-| [Chat](/developers/api/chat/)                     | `ChatApi`                                         | 9         | `/api/chat/*`                                            |
-| [Monitor and system](/developers/api/monitor/)    | `MonitorApi`                                      | 3         | `/api/monitor/*`, `/api/system/info`                     |
-| [Topology](/developers/api/topology/)             | `MonitorApi`                                      | 1         | `/api/topology`                                          |
-| [Benchmarks](/developers/api/bench/)              | `BenchApi`                                        | 8         | `/api/bench/*`                                           |
-| [Sweeps](/developers/api/sweeps/)                 | `SweepsApi`                                       | 7         | `/api/sweeps/*`                                          |
-| [Tuning](/developers/api/tuning/)                 | `TuningApi`                                       | 5         | `/api/tuning/*`                                          |
-| [WebSocket](/developers/api/websocket/)           | `app/server/ws/WsHub.ts`                          | 1         | `/ws`, 16 message types                                  |
+| Page                                              | Groups                             | Endpoints | Paths                                                    |
+| ------------------------------------------------- | ---------------------------------- | --------- | -------------------------------------------------------- |
+| [Health and settings](/developers/api/app/)       | `HealthApi`, `SettingsApi`         | 3         | `/api/health`, `/api/settings`                           |
+| [Setup](/developers/api/setup/)                   | `SetupApi`                         | 1         | `/api/setup`                                             |
+| [Profiles](/developers/api/profiles/)             | `ProfilesApi`                      | 9         | `/api/profiles/*`                                        |
+| [Server, state and logs](/developers/api/server/) | `ServerApi`, `FlagsApi`, `LogsApi` | 9         | `/api/state`, `/api/server/*`, `/api/flags`, `/api/logs` |
+| [Models](/developers/api/models/)                 | `ModelsApi`                        | 4         | `/api/models`, `/api/models/info`, `/api/models/usage`   |
+| [Hugging Face](/developers/api/hf/)               | `HfApi`, `DownloadsApi`            | 8         | `/api/hf/*`, `/api/downloads/*`                          |
+| [Chat](/developers/api/chat/)                     | `ChatApi`                          | 9         | `/api/chat/*`                                            |
+| [Monitor and system](/developers/api/monitor/)    | `MonitorApi`                       | 3         | `/api/monitor/*`, `/api/system/info`                     |
+| [Topology](/developers/api/topology/)             | `MonitorApi`                       | 1         | `/api/topology`                                          |
+| [Benchmarks](/developers/api/bench/)              | `BenchApi`                         | 8         | `/api/bench/*`                                           |
+| [Sweeps](/developers/api/sweeps/)                 | `SweepsApi`                        | 7         | `/api/sweeps/*`                                          |
+| [Tuning](/developers/api/tuning/)                 | `TuningApi`                        | 5         | `/api/tuning/*`                                          |
+| [WebSocket](/developers/api/websocket/)           | `app/server/ws/WsHub.ts`           | 1         | `/ws`, 16 message types                                  |
 
 ## Conventions
 

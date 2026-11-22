@@ -24,16 +24,16 @@ them.
 
 Each module has its own subpath export, and the root re-exports every module that runs anywhere:
 
-| Import | Module | What it exports |
-| --- | --- | --- |
-| `llamacpp-js/client` | `client.ts` | `probeUrl()`, `probeHealth()`, `probeLlamaServer()`, `fetchLlama()`, `fetchProps()`, `streamChatCompletion()`, the `LlamaTimings` and `ChatCompletionChunk` types. |
+| Import                | Module       | What it exports                                                                                                                                                                                                                                                                    |
+| --------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `llamacpp-js/client`  | `client.ts`  | `probeUrl()`, `probeHealth()`, `probeLlamaServer()`, `fetchLlama()`, `fetchProps()`, `streamChatCompletion()`, the `LlamaTimings` and `ChatCompletionChunk` types.                                                                                                                 |
 | `llamacpp-js/metrics` | `metrics.ts` | `parsePrometheus()`, `parseSlots()`, `liveRates()`, `lastRequestStats()`, `kvUsage()`, `requestDelta()`, `foldRecent()`, `mergeRequestStats()`, `specStats()`, `slotContextTokens()`, the `SlotView`, `Health`, `LlamaRaw`, `RequestStats`, `SpecStats` and `RequestRecord` types. |
-| `llamacpp-js/flags` | `flags.ts` | The flag catalogue of a `--help`: `parseHelp()`, `catalogFrom()`, `flagOf()`, `complete()`, `flagSuggestions()`, `unknownFlags()`, `describeFlag()`. |
-| `llamacpp-js/bench` | `bench.ts` | `parseBenchJson()`, `parseBenchProgress()`, `parseDeviceList()`, `ERROR_LINE` and `OOM_LINE`, the `BenchMeasure` and `BenchDevice` types. |
-| `llamacpp-js/sse` | `sse.ts` | `SseParser`, an incremental `text/event-stream` reader. |
-| `llamacpp-js/errors` | `errors.ts` | `LlamaError`, `contextOverflow()`, `parseLlamaError()` and the error classes below. |
-| `llamacpp-js/node` | `node.ts` | `loadFlags()` (runs `<binary> --help`), `findLlamaServerPid()`, `parseCmdline()`, `portFromArgv()`, `benchBinary()`. |
-| `llamacpp-js` | `index.ts` | Everything above except `llamacpp-js/node`. |
+| `llamacpp-js/flags`   | `flags.ts`   | The flag catalogue of a `--help`: `parseHelp()`, `catalogFrom()`, `flagOf()`, `complete()`, `flagSuggestions()`, `unknownFlags()`, `describeFlag()`.                                                                                                                               |
+| `llamacpp-js/bench`   | `bench.ts`   | `parseBenchJson()`, `parseBenchProgress()`, `parseDeviceList()`, `ERROR_LINE` and `OOM_LINE`, the `BenchMeasure` and `BenchDevice` types.                                                                                                                                          |
+| `llamacpp-js/sse`     | `sse.ts`     | `SseParser`, an incremental `text/event-stream` reader.                                                                                                                                                                                                                            |
+| `llamacpp-js/errors`  | `errors.ts`  | `LlamaError`, `contextOverflow()`, `parseLlamaError()` and the error classes below.                                                                                                                                                                                                |
+| `llamacpp-js/node`    | `node.ts`    | `loadFlags()` (runs `<binary> --help`), `findLlamaServerPid()`, `parseCmdline()`, `portFromArgv()`, `benchBinary()`.                                                                                                                                                               |
+| `llamacpp-js`         | `index.ts`   | Everything above except `llamacpp-js/node`.                                                                                                                                                                                                                                        |
 
 Only `llamacpp-js/node` uses Node APIs (`node:child_process`, `node:fs/promises`, `node:path`); every other module
 needs nothing but `fetch`, streams and `TextDecoder`, and runs in a browser too. The web app reaches the browser-safe
@@ -76,12 +76,12 @@ console.log(catalog?.byName.get('-c')?.help);
 
 The errors are classes with a fixed `name`, so a caller can test them with `instanceof` or by name:
 
-| Class | When | Carries |
-| --- | --- | --- |
-| `LlamaHttpError` | The server answered an HTTP error (or a stream response without a body). | `status`, `body`, and `error`: the `LlamaError` of a JSON body, else `null`. |
-| `LlamaReplyError` | A 2xx reply that is not what the endpoint returns (`/props` that is not JSON). | The message. |
-| `LlamaStreamError` | A streamed completion sent an `error` event. | `error`, the `LlamaError`. |
-| `LlamaStreamCutError` | The stream ended or broke before `[DONE]`. | The read error as `cause`, when there is one. |
+| Class                 | When                                                                           | Carries                                                                      |
+| --------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `LlamaHttpError`      | The server answered an HTTP error (or a stream response without a body).       | `status`, `body`, and `error`: the `LlamaError` of a JSON body, else `null`. |
+| `LlamaReplyError`     | A 2xx reply that is not what the endpoint returns (`/props` that is not JSON). | The message.                                                                 |
+| `LlamaStreamError`    | A streamed completion sent an `error` event.                                   | `error`, the `LlamaError`.                                                   |
+| `LlamaStreamCutError` | The stream ended or broke before `[DONE]`.                                     | The read error as `cause`, when there is one.                                |
 
 A `fetch` that fails before any response (nothing listens, a timeout) throws its own error unchanged. Node's `fetch`
 has timeouts of its own (300 s without response headers, 300 s between two chunks): for a request that can stay

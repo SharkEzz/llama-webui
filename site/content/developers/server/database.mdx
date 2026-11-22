@@ -7,20 +7,20 @@ llama-webui stores everything that must outlive a restart in one SQLite database
 of `@effect/sql-sqlite-node` (on `node:sqlite`). `app/server/db/` opens it and brings its schema up to date; each
 domain owns the repository of its tables, a `Context.Service` that takes the `SqlClient`.
 
-| File | Role |
-| --- | --- |
-| `app/server/db/Db.ts` | `layer` (the file of the data directory) and `layerAt(filename)`: opens the database and runs the migrations. |
-| `app/server/db/migrations.ts` | `MIGRATIONS` (keyed `0001_<name>` … `0017_<name>`) and `rebuild()`, a table rebuild checked for broken links. |
-| `app/server/db/LegacyBridge.ts` | `recognise` and `keepSchemaVersion`: a database of an earlier version opens as it is, and still opens with it. |
-| `app/server/settings/SettingsRepo.ts` | `SettingsRepo`: the `settings` table. |
-| `app/server/profiles/ProfilesRepo.ts` | `ProfilesRepo`: the `profiles` table. |
-| `app/server/chat/ConversationsRepo.ts` | `ConversationsRepo`: the `conversations` and `messages` tables. |
-| `app/server/bench/BenchRunsRepo.ts` | `BenchRunsRepo`: the `bench_runs` table (one-off runs and sweep items). |
-| `app/server/bench/SweepsRepo.ts` | `SweepsRepo`: the `sweeps` table. |
-| `app/server/downloads/DownloadsRepo.ts` | `DownloadsRepo`: the `downloads` table (Hugging Face queue). |
-| `app/server/models/ModelCacheRepo.ts` | `ModelCacheRepo`: the `model_cache` table. |
-| `app/server/config/AppConfig.ts` | `AppConfig.dataDir`: where the file lives. |
-| `packages/webui-shared/src/settings.ts` | `Settings` and `DEFAULT_SETTINGS`. |
+| File                                    | Role                                                                                                           |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `app/server/db/Db.ts`                   | `layer` (the file of the data directory) and `layerAt(filename)`: opens the database and runs the migrations.  |
+| `app/server/db/migrations.ts`           | `MIGRATIONS` (keyed `0001_<name>` … `0017_<name>`) and `rebuild()`, a table rebuild checked for broken links.  |
+| `app/server/db/LegacyBridge.ts`         | `recognise` and `keepSchemaVersion`: a database of an earlier version opens as it is, and still opens with it. |
+| `app/server/settings/SettingsRepo.ts`   | `SettingsRepo`: the `settings` table.                                                                          |
+| `app/server/profiles/ProfilesRepo.ts`   | `ProfilesRepo`: the `profiles` table.                                                                          |
+| `app/server/chat/ConversationsRepo.ts`  | `ConversationsRepo`: the `conversations` and `messages` tables.                                                |
+| `app/server/bench/BenchRunsRepo.ts`     | `BenchRunsRepo`: the `bench_runs` table (one-off runs and sweep items).                                        |
+| `app/server/bench/SweepsRepo.ts`        | `SweepsRepo`: the `sweeps` table.                                                                              |
+| `app/server/downloads/DownloadsRepo.ts` | `DownloadsRepo`: the `downloads` table (Hugging Face queue).                                                   |
+| `app/server/models/ModelCacheRepo.ts`   | `ModelCacheRepo`: the `model_cache` table.                                                                     |
+| `app/server/config/AppConfig.ts`        | `AppConfig.dataDir`: where the file lives.                                                                     |
+| `packages/webui-shared/src/settings.ts` | `Settings` and `DEFAULT_SETTINGS`.                                                                             |
 
 Monitoring history and logs are not in the database: they live in memory (see
 [Monitor and collectors](/developers/server/monitor/)).
@@ -126,27 +126,27 @@ the database again and runs it.
 Columns are `snake_case`. Columns ending in `_json` hold JSON text that the repository parses; timestamps are
 milliseconds since the epoch in `INTEGER` columns.
 
-| Table           | Repository          | Main columns                                                                                                                 |
-| --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `settings`      | `SettingsRepo`      | `key` (primary key), `value_json`                                                                                           |
-| `profiles`      | `ProfilesRepo`      | `id` (`AUTOINCREMENT`), `name` (unique), `model_path`, `mmproj_path`, `cwd`, `host`, `port`, `args_json`, `env_json`, `source`, `created_at`, `updated_at` |
-| `model_cache`   | `ModelCacheRepo`    | `path` (primary key), `stamp`, `summary_json`, `read_at`                                                                    |
-| `conversations` | `ConversationsRepo` | `id`, `title`, `profile_id`, `model_path`, `sampling_json`, `system_prompt`, `thinking`, `created_at`, `updated_at`          |
-| `messages`      | `ConversationsRepo` | `id`, `conversation_id`, `role`, `content`, `reasoning`, `status`, `error`, `stats_json`, `model_path`, `created_at`         |
+| Table           | Repository          | Main columns                                                                                                                                                                                                                                            |
+| --------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `settings`      | `SettingsRepo`      | `key` (primary key), `value_json`                                                                                                                                                                                                                       |
+| `profiles`      | `ProfilesRepo`      | `id` (`AUTOINCREMENT`), `name` (unique), `model_path`, `mmproj_path`, `cwd`, `host`, `port`, `args_json`, `env_json`, `source`, `created_at`, `updated_at`                                                                                              |
+| `model_cache`   | `ModelCacheRepo`    | `path` (primary key), `stamp`, `summary_json`, `read_at`                                                                                                                                                                                                |
+| `conversations` | `ConversationsRepo` | `id`, `title`, `profile_id`, `model_path`, `sampling_json`, `system_prompt`, `thinking`, `created_at`, `updated_at`                                                                                                                                     |
+| `messages`      | `ConversationsRepo` | `id`, `conversation_id`, `role`, `content`, `reasoning`, `status`, `error`, `stats_json`, `model_path`, `created_at`                                                                                                                                    |
 | `bench_runs`    | `BenchRunsRepo`     | `id` (`AUTOINCREMENT`), `kind`, `status`, `model_path`, `profile_id`, `args_json`, `command`, `hardware_json`, `pp_tps`, `tg_tps`, `stats_json`, `vram_mib_json`, `error`, `log_excerpt`, `duration_ms`, `sweep_id`, `sweep_label`, `fit`, `created_at` |
-| `sweeps`        | `SweepsRepo`        | `id` (`AUTOINCREMENT`), `name`, `status`, `model_path`, `profile_id`, `spec_json`, `best_run_id`, `created_at`, `finished_at` |
-| `downloads`     | `DownloadsRepo`     | `id` (`AUTOINCREMENT`), `repo`, `revision`, `variant_key`, `name`, `quant`, `kind`, `dir`, `files_json`, `status`, `bytes_done`, `total_bytes`, `error`, `code`, `created_at`, `finished_at` |
+| `sweeps`        | `SweepsRepo`        | `id` (`AUTOINCREMENT`), `name`, `status`, `model_path`, `profile_id`, `spec_json`, `best_run_id`, `created_at`, `finished_at`                                                                                                                           |
+| `downloads`     | `DownloadsRepo`     | `id` (`AUTOINCREMENT`), `repo`, `revision`, `variant_key`, `name`, `quant`, `kind`, `dir`, `files_json`, `status`, `bytes_done`, `total_bytes`, `error`, `code`, `created_at`, `finished_at`                                                            |
 
 Foreign keys:
 
-| Column                        | References          | On delete  |
-| ----------------------------- | ------------------- | ---------- |
-| `conversations.profile_id`    | `profiles(id)`      | `SET NULL` |
-| `messages.conversation_id`    | `conversations(id)` | `CASCADE`  |
-| `bench_runs.profile_id`       | `profiles(id)`      | `SET NULL` |
-| `bench_runs.sweep_id`         | `sweeps(id)`        | `CASCADE`  |
-| `sweeps.profile_id`           | `profiles(id)`      | `SET NULL` |
-| `sweeps.best_run_id`          | `bench_runs(id)`    | `SET NULL` |
+| Column                     | References          | On delete  |
+| -------------------------- | ------------------- | ---------- |
+| `conversations.profile_id` | `profiles(id)`      | `SET NULL` |
+| `messages.conversation_id` | `conversations(id)` | `CASCADE`  |
+| `bench_runs.profile_id`    | `profiles(id)`      | `SET NULL` |
+| `bench_runs.sweep_id`      | `sweeps(id)`        | `CASCADE`  |
+| `sweeps.profile_id`        | `profiles(id)`      | `SET NULL` |
+| `sweeps.best_run_id`       | `bench_runs(id)`    | `SET NULL` |
 
 Deleting a profile keeps its conversations, runs and sweeps, which still record the model path. Deleting a sweep
 deletes its runs. `bench_runs` and `profiles` use `AUTOINCREMENT` so that a deleted ID is never handed out again:
@@ -196,20 +196,20 @@ Settings are one row per key in `settings`, the value stored as JSON. The keys a
 `Settings` schema (`packages/webui-shared/src/settings.ts`): each field has its default as a decoding default
 (`withDecodingDefaultKey`), so a missing key decodes to it, and `DEFAULT_SETTINGS` holds them all:
 
-| Key | Default | Constraint |
-| --- | --- | --- |
-| `binary` | `'llama-server'` | non-empty |
-| `host` | `'127.0.0.1'` | non-empty |
-| `port` | `8080` | integer, 1 to 65535 |
-| `modelsDir` | `'~/models'` | non-empty |
-| `pollIntervalMs` | `1000` | integer, 250 to 60000 |
-| `historySeconds` | `300` | integer, 30 to 1800 |
-| `hiddenGpus` | `[]` | PCI bus IDs |
-| `defaultProfileId` | `null` | integer or `null` |
-| `onboardingDone` | `false` | boolean |
-| `collectors` | `{ nvml: true, system: true, disk: true }` | three booleans, each defaulted on its own |
-| `theme` | `'system'` | `system`, `light` or `dark` |
-| `env` | `{}` | variables added to the environment of what llama-webui starts; each name a shell name (`ENV_NAME`) |
+| Key                | Default                                    | Constraint                                                                                         |
+| ------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `binary`           | `'llama-server'`                           | non-empty                                                                                          |
+| `host`             | `'127.0.0.1'`                              | non-empty                                                                                          |
+| `port`             | `8080`                                     | integer, 1 to 65535                                                                                |
+| `modelsDir`        | `'~/models'`                               | non-empty                                                                                          |
+| `pollIntervalMs`   | `1000`                                     | integer, 250 to 60000                                                                              |
+| `historySeconds`   | `300`                                      | integer, 30 to 1800                                                                                |
+| `hiddenGpus`       | `[]`                                       | PCI bus IDs                                                                                        |
+| `defaultProfileId` | `null`                                     | integer or `null`                                                                                  |
+| `onboardingDone`   | `false`                                    | boolean                                                                                            |
+| `collectors`       | `{ nvml: true, system: true, disk: true }` | three booleans, each defaulted on its own                                                          |
+| `theme`            | `'system'`                                 | `system`, `light` or `dark`                                                                        |
+| `env`              | `{}`                                       | variables added to the environment of what llama-webui starts; each name a shell name (`ENV_NAME`) |
 
 `host` and `port` are the defaults for `llama-server`, not llama-webui's own address (that comes from the command
 line, see [Configuration](/docs/configuration/)).

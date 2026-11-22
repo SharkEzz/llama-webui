@@ -102,7 +102,7 @@ change sits in one marked block, off, for L4 and L5 to empty.
       outside every `tsconfig.json` is settled here (add it to the closest project's `include`, or exclude it from the
       type-aware rules with an override), and the choice written as a comment.
 - [ ] **Step 5:** Group the remaining diagnostics by rule. Each rule that reports goes into **one block of the base,
-  delimited by `// --- Debt: off until its milestone ---` and `// --- end of debt ---`**, as
+      delimited by `// --- Debt: off until its milestone ---` and `// --- end of debt ---`**, as
       `'<rule>': 'off', // L4: <count>` or `// L5: <count>` (L5 for `react/*`, `react-hooks/*`, `vitest/*`; L4 for the
       rest). The rules of `jsx-a11y` that report are not debt: they go off in `oxlint.react.ts` with the reason
       "accessibility is out of scope for now", along with every `jsx-a11y` rule that is not a Biome equivalent.
@@ -150,6 +150,7 @@ change sits in one marked block, off, for L4 and L5 to empty.
   | `complexity/noImportantStyles` (CSS)    | none: remove the comment                                                   |     3 |
 
   These four React rules are on in `oxlint.react.ts` (they are Biome's today), not in the debt block.
+
 - [ ] **Step 2:** `pnpm exec oxlint --deny-warnings --report-unused-disable-directives .`. Expected: exit 0. An unused
       directive: the rule reports on another line (move the comment) or not at all (remove it). A new report: the
       directive names the wrong rule.

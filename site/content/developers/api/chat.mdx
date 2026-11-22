@@ -36,33 +36,33 @@ role merged, since strict chat templates require alternating roles), the samplin
 
 `Conversation` (`packages/webui-shared/src/chat.ts`):
 
-| Field          | Type             | Description                                                                                  |
-| -------------- | ---------------- | -------------------------------------------------------------------------------------------- |
-| `id`           | number           | Conversation id.                                                                             |
-| `title`        | string           | `New conversation` until the first message gives it one (`autoTitle()`: 6 words, 48 characters at most). |
-| `profileId`    | number \| null    | Profile the conversation started with.                                                       |
-| `modelPath`    | string \| null    | Absolute path of its model. Set at creation, or by the first reply if it was null.           |
-| `systemPrompt` | string           | System prompt, empty by default.                                                             |
-| `sampling`     | `Sampling`       | Sampling overrides; a missing key keeps the server's value (the profile's).                  |
-| `thinking`     | boolean          | Reasoning enabled (`enable_thinking`), true by default.                                      |
-| `createdAt`    | number           | Epoch ms.                                                                                    |
-| `updatedAt`    | number           | Epoch ms, moved by every new or updated message and every `PATCH`.                           |
+| Field          | Type           | Description                                                                                              |
+| -------------- | -------------- | -------------------------------------------------------------------------------------------------------- |
+| `id`           | number         | Conversation id.                                                                                         |
+| `title`        | string         | `New conversation` until the first message gives it one (`autoTitle()`: 6 words, 48 characters at most). |
+| `profileId`    | number \| null | Profile the conversation started with.                                                                   |
+| `modelPath`    | string \| null | Absolute path of its model. Set at creation, or by the first reply if it was null.                       |
+| `systemPrompt` | string         | System prompt, empty by default.                                                                         |
+| `sampling`     | `Sampling`     | Sampling overrides; a missing key keeps the server's value (the profile's).                              |
+| `thinking`     | boolean        | Reasoning enabled (`enable_thinking`), true by default.                                                  |
+| `createdAt`    | number         | Epoch ms.                                                                                                |
+| `updatedAt`    | number         | Epoch ms, moved by every new or updated message and every `PATCH`.                                       |
 
 `ConversationDetail` adds `messages: ChatMessage[]` (oldest first) and `live: boolean` (a reply is being written).
 `ChatMessage`:
 
-| Field            | Type                         | Description                                                            |
-| ---------------- | ---------------------------- | ---------------------------------------------------------------------- |
-| `id`             | number                       | Message id.                                                            |
-| `conversationId` | number                       | Its conversation.                                                      |
-| `role`           | `"user"` \| `"assistant"`     |                                                                        |
-| `content`        | string                       | Text of the message.                                                   |
-| `reasoning`      | string                       | Reasoning of the reply (`reasoning_content`), empty otherwise.         |
-| `status`         | string                       | `streaming`, `done`, `stopped` (stopped or interrupted) or `error`.    |
-| `error`          | string \| null                | Why the reply failed.                                                  |
-| `stats`          | `MessageStats` \| null        | Read from `llama-server`'s `timings`: `ttftMs`, `promptTokens`, `cachedTokens`, `genTokens`, `ppTps`, `tgTps`, `draftN`, `draftAccepted`, `durationMs`. |
-| `model`          | string \| null                | Model that wrote the reply (null for user messages and external servers). |
-| `createdAt`      | number                       | Epoch ms.                                                              |
+| Field            | Type                      | Description                                                                                                                                             |
+| ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`             | number                    | Message id.                                                                                                                                             |
+| `conversationId` | number                    | Its conversation.                                                                                                                                       |
+| `role`           | `"user"` \| `"assistant"` |                                                                                                                                                         |
+| `content`        | string                    | Text of the message.                                                                                                                                    |
+| `reasoning`      | string                    | Reasoning of the reply (`reasoning_content`), empty otherwise.                                                                                          |
+| `status`         | string                    | `streaming`, `done`, `stopped` (stopped or interrupted) or `error`.                                                                                     |
+| `error`          | string \| null            | Why the reply failed.                                                                                                                                   |
+| `stats`          | `MessageStats` \| null    | Read from `llama-server`'s `timings`: `ttftMs`, `promptTokens`, `cachedTokens`, `genTokens`, `ppTps`, `tgTps`, `draftN`, `draftAccepted`, `durationMs`. |
+| `model`          | string \| null            | Model that wrote the reply (null for user messages and external servers).                                                                               |
+| `createdAt`      | number                    | Epoch ms.                                                                                                                                               |
 
 ### List conversations
 
@@ -83,9 +83,9 @@ Creates an empty conversation with the default title, an empty system prompt, no
 
 **Body**: a JSON object (send `{}` for the defaults).
 
-| Field       | Type    | Required | Description                                                                                         |
-| ----------- | ------- | -------- | --------------------------------------------------------------------------------------------------- |
-| `profileId` | integer \| null | no | Profile whose model the conversation records. Omitted: the profile of the running server, if any; `null`: none. |
+| Field       | Type            | Required | Description                                                                                                     |
+| ----------- | --------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `profileId` | integer \| null | no       | Profile whose model the conversation records. Omitted: the profile of the running server, if any; `null`: none. |
 
 **Response**: `201` with the `ConversationDetail` (no messages).
 
@@ -119,25 +119,25 @@ Changes the title, the system prompt, the sampling or the thinking switch. Missi
 
 **Body**: `ConversationPatch` (`ConversationPatchSchema`, `packages/webui-shared/src/chat.ts`), strict.
 
-| Field          | Type       | Required | Description                                  |
-| -------------- | ---------- | -------- | -------------------------------------------- |
-| `title`        | string     | no       | Trimmed, 1 to 200 characters.                |
-| `systemPrompt` | string     | no       | 100,000 characters at most.                  |
-| `sampling`     | `Sampling` | no       | Replaces the sampling overrides (below).     |
-| `thinking`     | boolean    | no       | Reasoning on or off.                         |
+| Field          | Type       | Required | Description                              |
+| -------------- | ---------- | -------- | ---------------------------------------- |
+| `title`        | string     | no       | Trimmed, 1 to 200 characters.            |
+| `systemPrompt` | string     | no       | 100,000 characters at most.              |
+| `sampling`     | `Sampling` | no       | Replaces the sampling overrides (below). |
+| `thinking`     | boolean    | no       | Reasoning on or off.                     |
 
 `Sampling` (`SamplingSchema`), strict, every key optional:
 
-| Key                | Type    | Range                  |
-| ------------------ | ------- | ---------------------- |
-| `temperature`      | number  | 0 to 5                 |
-| `top_p`            | number  | 0 to 1                 |
-| `top_k`            | integer | 0 to 1000              |
-| `min_p`            | number  | 0 to 1                 |
-| `presence_penalty` | number  | -2 to 2                |
-| `repeat_penalty`   | number  | 0 to 5                 |
-| `max_tokens`       | integer | 1 to 1,000,000         |
-| `seed`             | integer | any                    |
+| Key                | Type    | Range          |
+| ------------------ | ------- | -------------- |
+| `temperature`      | number  | 0 to 5         |
+| `top_p`            | number  | 0 to 1         |
+| `top_k`            | integer | 0 to 1000      |
+| `min_p`            | number  | 0 to 1         |
+| `presence_penalty` | number  | -2 to 2        |
+| `repeat_penalty`   | number  | 0 to 5         |
+| `max_tokens`       | integer | 1 to 1,000,000 |
+| `seed`             | integer | any            |
 
 **Response**: `200` with the `ConversationDetail`.
 
@@ -251,10 +251,10 @@ curl -N http://127.0.0.1:7860/api/chat/7/stream
 `HttpApiSchema.StreamSse`, so the typed client reads it with `callStream`). Each event is an `event:` line with
 the event type, then one `data:` line with the whole `ChatEvent` as single-line JSON, its `type` included.
 
-| Event   | Payload (`ChatEvent`)                                         | Description                                                                 |
-| ------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `start` | `{ type, user: ChatMessage \| null, assistant: ChatMessage }` | First event. `user` is the saved user message (null for a regeneration), `assistant` the reply being written. |
-| `delta` | `{ type, content?: string, reasoning?: string }`              | New text since the previous event; each key is present only when non-empty. |
+| Event   | Payload (`ChatEvent`)                                         | Description                                                                                                                |
+| ------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `start` | `{ type, user: ChatMessage \| null, assistant: ChatMessage }` | First event. `user` is the saved user message (null for a regeneration), `assistant` the reply being written.              |
+| `delta` | `{ type, content?: string, reasoning?: string }`              | New text since the previous event; each key is present only when non-empty.                                                |
 | `done`  | `{ type, message: ChatMessage }`                              | Last event: the reply as saved (`done`, `stopped` or `error`, with its `stats`). The server closes the stream right after. |
 
 Between events, the server writes a `: ping` comment every 15 seconds (`pingInterval` of `sseResponse`): a long prompt can be
