@@ -112,6 +112,7 @@
     after, and a client that reconnects reads the rows.
   - At its build, the layer marks the orphans: runs `running` → `interrupted` (COALESCE of the error), sweeps
     `running` → `interrupted`. This happens before any request is served.
+
 - **The runner sits in a tier of its own** in `App.ts`, between `ExternalWatch` (which reads `busy`) and the tier of
   `Monitor`, `Placement`, `ChatRuns` and `Downloads`. It reads `Monitor.latest` for `allGpus` and the model disk's
   `readBps`.
@@ -188,6 +189,7 @@
   - `ModelInUse` takes the message `A benchmark in progress uses it` (the `From E6:` line), and `blocked` in the usage
     reads `BenchRunner.files` too.
   - The web tells the refusals by `_tag`: `BenchForm`'s `server-running` becomes `ServerRunning`.
+
 - **The messages** are new members of `WsMessage`, published through `WsHub.publish`, with the timing rules of
   `behaviours.md` E7 "WebSocket messages":
   - `bench-progress` (`NullOr(BenchLive)`), at most every 250 ms, its phases and the 20 last lines;
@@ -351,6 +353,7 @@
 
   Tests: Task 6, `dispose (shutdown) saves the running sweep item and its sweep as interrupted`; Task 8,
   `SIGTERM during a benchmark ends it interrupted and kills llama-bench` in `app/server/lifecycle.test.ts`.
+
 - **llama-server comes back after a benchmark**:
   - with the profile as it is now (#39), or the recorded command when the profile is gone;
   - even when `llama-bench` fails;
@@ -360,6 +363,7 @@
   Tests: Task 4 (the two #39 tests), Task 6 (`restarts the server it stopped even when llama-bench fails`, `a failed
   restart is recorded on the run`, `a sweep stops the server once, continues after an OOM item and restarts it once`,
   `the end of a sweep shows restarting-server while llama-server comes back`).
+
 - **Cancel**: SIGTERM, then SIGKILL after the timeout with its ring line; a sweep moves on to its next item; a
   cancelled sweep ends `cancelled` with its best run. Tests: Task 5, `a cancel sends SIGTERM, then SIGKILL after the
   timeout`; Task 6, `cancelSweep cancels the queue and releases the gate`.
@@ -421,6 +425,7 @@
   | `toProfile`    | `POST /api/bench/:id/to-profile`  |                                                                    | `Profile`, `status(201)`  | `RunNotFound`, `RunStillRunning`, `ProfileNameTaken`                                              |
 
   `BenchDraft` is `{ modelPath, mmprojPath, profileId, params, serverArgs }`.
+
 - `SweepsApi` (`sweeps`):
 
   | Name       | Route                           | Input                               | Reply                  | Errors                                                                                                        |
@@ -717,6 +722,7 @@
 
     Record them with `UPDATE_GOLDEN=1 pnpm exec vitest run app/server/contract/contract.test.ts`, then read the diff of
     `golden.json`: new cases only, plus those that move from the 404 of a missing route to the bench's answers.
+
   - `lifecycle.test.ts`: `SIGTERM during a benchmark ends it interrupted and kills llama-bench` (Review Focus).
     - The build, with `binary` the fake through the settings and `FAKE_BENCH_STEP_MS` long.
     - A run posted, then SIGTERM: exit 0 in under 2 s, the fake bench's pid dead.
@@ -785,6 +791,7 @@
   First build the delete list from `grep -rn` of what the E8 files (`lib/tuning/*`, `lib/setup.ts`,
   `routes/api/setup.get.ts`, `routes/api/tuning/**`, `routes/api/sweeps/index.post.ts`) import. Keep what they import,
   and record it.
+
 - Create: `docs/superpowers/poc-effect/e7.json`.
 
 - [ ] **Step 1: Behaviours.** Section E7:
@@ -802,6 +809,7 @@
   - `dropped` with a reason, only where no rewrite exists (expected: none).
 
   The script checks that every E7 entry has a status and prints the count by status.
+
 - [ ] **Step 3: Defects and deviations.** `defects.md` section E7 gets the verdicts of the Calls. Under "Changed by
       the Effect server" goes one line per call of this plan and per deviation found while porting:
   - the unknown run's 404;
@@ -819,6 +827,7 @@
 
   `CLAUDE.md`: the `poc/effect` note says the bench goes through `BenchRunner` (`app/server/bench/`), its trial
   through `LlamaHttp`, and that `llamaFetch`/`downloadFetch` are gone.
+
 - [ ] **Step 5: Legacy files.** `git rm -r` the files listed above. Check with `grep -rn` that nothing kept for E8
       imports a deleted file other than `lib/deps.ts`, `lib/boot.ts` and the legacy `contract/` (as after E6).
 - [ ] **Step 6:** Run every final check:
@@ -828,6 +837,7 @@
   - `pgrep -f fake-llama` prints nothing.
 
   Commit `chore(poc): Close E7, the bench`.
+
 - [ ] **Step 7:** Run `node scripts/poc/measure.ts --out docs/superpowers/poc-effect/e7.json --skip-durations` (the
       times are taken by hand in the report, as E6), format the file, and commit `chore(poc): Measure E7`.
 - [ ] **Step 8: Report.** It covers:

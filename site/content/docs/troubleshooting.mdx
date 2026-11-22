@@ -154,12 +154,12 @@ page gives the reason, the exit code or the signal.
 
 **Cause and fix**, by message:
 
-| Message                                     | Cause                                                       | Fix                                                                         |
-| ------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `directory not found: …`                    | The profile's **Working directory** does not exist.         | Fix or empty the field on the [Profiles](/docs/profiles/) page.             |
-| `spawn setpriv ENOENT`                      | `setpriv` is missing.                                       | Install `util-linux`.                                                       |
-| `code 127`                                  | The binary cannot be run.                                   | See [`llama-server` cannot be found](#llama-server-cannot-be-found).        |
-| Another exit code                           | `llama-server` stopped on its own: bad argument, unreadable model, out of memory. | Read the last lines on the Logs page, or under **Latest logs** on the Server page. |
+| Message                  | Cause                                                                             | Fix                                                                                |
+| ------------------------ | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `directory not found: …` | The profile's **Working directory** does not exist.                               | Fix or empty the field on the [Profiles](/docs/profiles/) page.                    |
+| `spawn setpriv ENOENT`   | `setpriv` is missing.                                                             | Install `util-linux`.                                                              |
+| `code 127`               | The binary cannot be run.                                                         | See [`llama-server` cannot be found](#llama-server-cannot-be-found).               |
+| Another exit code        | `llama-server` stopped on its own: bad argument, unreadable model, out of memory. | Read the last lines on the Logs page, or under **Latest logs** on the Server page. |
 
 A flag that your build does not know is a common cause after a llama.cpp update: flag names change between versions.
 The argument editor of a profile only suggests the flags your binary lists in its `--help`.
@@ -221,12 +221,12 @@ usually end this way. **Delete failed** clears the failed runs from the history.
 **Cause:** the estimate places the model, its KV cache and its buffers on the devices, and finds a device over its
 usable memory: its total minus a margin of 512 MiB plus 4 %. The reason names the problem:
 
-| Reason                                           | Meaning                                                                                      |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `CUDA0: 18.2 GiB for 14.4 GiB usable`            | That device would hold more than it can.                                                     |
-| `unknown device: CUDA2`                          | The profile's `-dev` (or an `-ot` rule) names a device that `llama-bench --list-devices` does not list. |
+| Reason                                                      | Meaning                                                                                                                                                                                  |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CUDA0: 18.2 GiB for 14.4 GiB usable`                       | That device would hold more than it can.                                                                                                                                                 |
+| `unknown device: CUDA2`                                     | The profile's `-dev` (or an `-ot` rule) names a device that `llama-bench --list-devices` does not list.                                                                                  |
 | `not enough RAM: … needed with weights in RAM, … available` | The model is too large for the GPUs, and moving experts or layers to RAM needs more RAM than is available: free RAM, or pick **100 GB model**, which accepts reading the rest from disk. |
-| `model too large: … of RAM needed, … available` | Nothing fits on the GPUs and the RAM is too small as well.                                   |
+| `model too large: … of RAM needed, … available`             | Nothing fits on the GPUs and the RAM is too small as well.                                                                                                                               |
 
 In the recommendation's memory bars, **tight: less than 5% headroom** marks a card between 95 % and 100 % of its usable
 memory: it should start, but the margin is thin. A placement that runs over the RAM is also only tight, not a failure:
@@ -244,15 +244,15 @@ names in the **Hardware** card: they change when the build changes backends (see
 
 **What you see:** a row of the download queue on the Models page turns red with a message. Each message has its fix:
 
-| Message                                                    | Fix                                                                                                                                       |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `… is gated: accept its license on Hugging Face`           | Click **Accept the license on Hugging Face** in the row, accept it with the account of your token, then click **Retry**.                 |
-| `… not found on Hugging Face (or private …)`               | Check the repository id. A private repository needs a token from an account that can read it.                                            |
-| `Hugging Face rejected the token`                          | Create a new token, then set it again (below). The sheet's header says `The token from … was rejected.`                                  |
-| `Hugging Face rate limit reached, try again later`         | Wait, then click **Retry**.                                                                                                              |
-| `Hugging Face unreachable: …`                              | Check the network, `HF_ENDPOINT` if you use a mirror, or `HTTPS_PROXY` [behind a proxy](/docs/configuration/#behind-a-proxy).            |
-| `Checksum mismatch for …: the file was deleted`            | The downloaded file did not match its sha256. Click **Retry** to download it again.                                                      |
-| `Not enough disk space: …` or `Disk full`                  | Free space on the disk of the models folder. llama-webui keeps 1.0 GiB free on top of the download.                                      |
+| Message                                            | Fix                                                                                                                           |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `… is gated: accept its license on Hugging Face`   | Click **Accept the license on Hugging Face** in the row, accept it with the account of your token, then click **Retry**.      |
+| `… not found on Hugging Face (or private …)`       | Check the repository id. A private repository needs a token from an account that can read it.                                 |
+| `Hugging Face rejected the token`                  | Create a new token, then set it again (below). The sheet's header says `The token from … was rejected.`                       |
+| `Hugging Face rate limit reached, try again later` | Wait, then click **Retry**.                                                                                                   |
+| `Hugging Face unreachable: …`                      | Check the network, `HF_ENDPOINT` if you use a mirror, or `HTTPS_PROXY` [behind a proxy](/docs/configuration/#behind-a-proxy). |
+| `Checksum mismatch for …: the file was deleted`    | The downloaded file did not match its sha256. Click **Retry** to download it again.                                           |
+| `Not enough disk space: …` or `Disk full`          | Free space on the disk of the models folder. llama-webui keeps 1.0 GiB free on top of the download.                           |
 
 The token is the one of the `hf` command-line tool: `HF_TOKEN` if set when llama-webui starts, otherwise the file saved
 by `hf auth login`, which is read again on every request. After changing `HF_TOKEN`, restart llama-webui.

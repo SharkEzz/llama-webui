@@ -33,11 +33,11 @@ The **Run setup again** button, at the top of the page, reopens the [setup check
 The **llama-server** card tells llama-webui where to find `llama-server` and your models, and where `llama-server`
 listens by default.
 
-| Field             | Default        | Effect                                                                                                                                                                                                          |
-| ----------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Binary**        | `llama-server` | The `llama-server` to run: an absolute path (`~` for your home works), or a name found in the `PATH`. Also used to read its build number and its `--help`, and to find `llama-bench` in the same folder.            |
-| **Models folder** | `~/models`     | The folder scanned for GGUF files, with its subfolders. [Hugging Face downloads](/docs/hugging-face/) are saved there, and it becomes the working directory of a new profile when you pick its model.          |
-| **Default host**  | `127.0.0.1`    | The `--host` given to `llama-server` for profiles that leave **Host** empty. Below the field, a warning says when it opens `llama-server` to your network.                                                     |
+| Field             | Default        | Effect                                                                                                                                                                                                             |
+| ----------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Binary**        | `llama-server` | The `llama-server` to run: an absolute path (`~` for your home works), or a name found in the `PATH`. Also used to read its build number and its `--help`, and to find `llama-bench` in the same folder.           |
+| **Models folder** | `~/models`     | The folder scanned for GGUF files, with its subfolders. [Hugging Face downloads](/docs/hugging-face/) are saved there, and it becomes the working directory of a new profile when you pick its model.              |
+| **Default host**  | `127.0.0.1`    | The `--host` given to `llama-server` for profiles that leave **Host** empty. Below the field, a warning says when it opens `llama-server` to your network.                                                         |
 | **Default port**  | `8080`         | The `--port` given to `llama-server` for profiles that leave **Port** empty. Also the port of the temporary servers of benchmark runs, and the port where llama-webui looks for a `llama-server` it did not start. |
 
 Changes apply to the next start: a running `llama-server` keeps its binary, host and port until you restart it.
@@ -73,13 +73,13 @@ The Monitoring tab controls what llama-webui reads from the machine, how often, 
 
 ### Collection
 
-| Option                    | Default | Effect                                                                                                                                                                                                  |
-| ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **NVML for NVIDIA GPUs**  | On      | Reads NVIDIA cards through NVML. Off: through `nvidia-smi`, which gives no PCIe bandwidth, clocks or fans. **Applied on the next llama-webui start.**                                                      |
-| **CPU and memory**        | On      | CPU usage, memory, and the DRAM bandwidth measured with `perf`. Off: none of them is read, and `perf` is stopped.                                                                                         |
-| **Disks**                 | On      | Read and write rates of the disks, including the reads from the disk that holds the running model.                                                                                                      |
-| **Polling interval**      | 1000 ms | How often every collector is read and the figures are sent to your browser: 250 ms, 500 ms, 1000 ms or 2000 ms. A new sample arrives once per interval.                                                    |
-| **History kept**          | 5 min   | How far back the live charts of the Dashboard and the System page go, from 30 s to 30 min in steps of 30 s.                                                                                             |
+| Option                   | Default | Effect                                                                                                                                                  |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **NVML for NVIDIA GPUs** | On      | Reads NVIDIA cards through NVML. Off: through `nvidia-smi`, which gives no PCIe bandwidth, clocks or fans. **Applied on the next llama-webui start.**   |
+| **CPU and memory**       | On      | CPU usage, memory, and the DRAM bandwidth measured with `perf`. Off: none of them is read, and `perf` is stopped.                                       |
+| **Disks**                | On      | Read and write rates of the disks, including the reads from the disk that holds the running model.                                                      |
+| **Polling interval**     | 1000 ms | How often every collector is read and the figures are sent to your browser: 250 ms, 500 ms, 1000 ms or 2000 ms. A new sample arrives once per interval. |
+| **History kept**         | 5 min   | How far back the live charts of the Dashboard and the System page go, from 30 s to 30 min in steps of 30 s.                                             |
 
 Apart from the NVML switch, these options take effect at once. The history is kept in llama-webui's memory, not in the
 browser: a page you open later still shows the last minutes, but restarting llama-webui empties it. Monitoring never
@@ -102,11 +102,11 @@ the profile's flags or environment variables (see [Profiles](/docs/profiles/)).
 
 The **Theme** card has one option, **Interface theme**:
 
-| Value      | Effect                                                         |
-| ---------- | -------------------------------------------------------------- |
-| **System** | Default. Follows the light or dark setting of your system.     |
-| **Light**  | Always light.                                                  |
-| **Dark**   | Always dark.                                                   |
+| Value      | Effect                                                     |
+| ---------- | ---------------------------------------------------------- |
+| **System** | Default. Follows the light or dark setting of your system. |
+| **Light**  | Always light.                                              |
+| **Dark**   | Always dark.                                               |
 
 The theme button at the top right of every page sets the same option. The choice is saved in your browser and in
 llama-webui's database; when a page loads, the database value wins, so a theme chosen in one browser follows you to

@@ -33,12 +33,12 @@ The page title shows the state of the server: **Stopped**, **Starting…**, **Re
 
 The row of tiles at the top sums up the current activity.
 
-| Tile                       | What it shows                                                                                                                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Generation**             | Tokens generated per second, all busy slots together, measured between the last two samples. It drops to 0 as soon as nothing is generating.                                            |
-| **Prompt**                 | Prompt tokens processed per second, measured the same way. Tokens reused from the cache are not processed again, so they do not count.                                                |
+| Tile                       | What it shows                                                                                                                                                                          |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Generation**             | Tokens generated per second, all busy slots together, measured between the last two samples. It drops to 0 as soon as nothing is generating.                                           |
+| **Prompt**                 | Prompt tokens processed per second, measured the same way. Tokens reused from the cache are not processed again, so they do not count.                                                 |
 | **Speculative acceptance** | Share of drafted tokens the model accepted since the server started. The line below gives the average number of **tokens accepted per draft**. Shown only once the server has drafted. |
-| **Context used**           | Tokens held in the context of every slot, as a share of the total context. The line below gives the token counts.                                                                    |
+| **Context used**           | Tokens held in the context of every slot, as a share of the total context. The line below gives the token counts.                                                                      |
 
 The **Speculative acceptance** tile appears for servers that use a draft model or multi-token prediction (MTP). A
 higher acceptance means more tokens per forward pass; see [Speculative decoding and MTP](/docs/guides/speculative-decoding/)
@@ -70,11 +70,11 @@ in use, and the details next to it. When the window is tall enough, each meter a
 history, under its readings. The card is measured even when no server runs. **All readings** opens the
 [System](/docs/system/) page.
 
-| Meter                | What it shows                                                                                                                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **CPU**              | CPU load of the whole machine, with its temperature and the 1-minute load average when the machine reports them.                                                                           |
-| **RAM**              | Memory in use, total minus available, with the amounts (`7 GiB / 61 GiB`) and the page cache (`27 GiB cached`). Page cache that the kernel can free does not count as used.             |
-| **VRAM** _card name_ | VRAM in use on each GPU the server runs on, all processes included, with the amounts, the card's compute load and its temperature. Without a running server, every GPU is shown, except hidden and sleeping ones. |
+| Meter                | What it shows                                                                                                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **CPU**              | CPU load of the whole machine, with its temperature and the 1-minute load average when the machine reports them.                                                                                                   |
+| **RAM**              | Memory in use, total minus available, with the amounts (`7 GiB / 61 GiB`) and the page cache (`27 GiB cached`). Page cache that the kernel can free does not count as used.                                        |
+| **VRAM** _card name_ | VRAM in use on each GPU the server runs on, all processes included, with the amounts, the card's compute load and its temperature. Without a running server, every GPU is shown, except hidden and sleeping ones.  |
 | **Model disk**       | Read throughput of the disk that holds the running profile's model, with the disk's name (`nvme0n1`) and a curve of the reads over the history. When that disk is unknown, **Disks** shows the reads of all disks. |
 
 A GPU counts as used by the server once `llama-server` holds more than 64 MiB on it. The model disk is unknown for an
@@ -98,10 +98,10 @@ many there are. The **Slots and context** card lists them.
 
 The three figures at the bottom come from `llama-server`'s metrics:
 
-| Figure         | Meaning                                                    |
-| -------------- | ---------------------------------------------------------- |
-| **Processing** | Requests being processed.                                  |
-| **Queued**     | Requests waiting for a free slot.                          |
+| Figure         | Meaning                                                      |
+| -------------- | ------------------------------------------------------------ |
+| **Processing** | Requests being processed.                                    |
+| **Queued**     | Requests waiting for a free slot.                            |
 | **Busy slots** | Slots busy per decoding step, as reported by `llama-server`. |
 
 ## Recent requests
@@ -109,16 +109,16 @@ The three figures at the bottom come from `llama-server`'s metrics:
 The **Recent requests** table lists the last 20 requests, newest first, since the server started. Restarting the
 server, or switching to another profile, empties it.
 
-| Column               | Meaning                                                                       |
-| -------------------- | ----------------------------------------------------------------------------- |
-| **Time**             | When the request was seen.                                                    |
-| **Prompt**           | Prompt tokens processed.                                                      |
-| **Cache**            | Prompt tokens reused from the cache instead of being processed again.         |
-| **Generated**        | Tokens generated.                                                             |
-| **Duration (s)**     | Prompt processing time plus generation time.                                  |
-| **Prompt tok/s**     | Prompt speed of this request.                                                 |
-| **Generation tok/s** | Generation speed of this request.                                             |
-| **Acceptance**       | Share of drafted tokens accepted, for speculative decoding; `—` without it.   |
+| Column               | Meaning                                                                     |
+| -------------------- | --------------------------------------------------------------------------- |
+| **Time**             | When the request was seen.                                                  |
+| **Prompt**           | Prompt tokens processed.                                                    |
+| **Cache**            | Prompt tokens reused from the cache instead of being processed again.       |
+| **Generated**        | Tokens generated.                                                           |
+| **Duration (s)**     | Prompt processing time plus generation time.                                |
+| **Prompt tok/s**     | Prompt speed of this request.                                               |
+| **Generation tok/s** | Generation speed of this request.                                           |
+| **Acceptance**       | Share of drafted tokens accepted, for speculative decoding; `—` without it. |
 
 `llama-server` does not publish a per-request log. llama-webui rebuilds each row from the difference between two
 samples of its counters, so the table is exact for one request at a time and approximate when several slots work at
@@ -139,10 +139,10 @@ the rest comes back on the next sample.
 
 Both settings are on the **Monitoring** tab of [Settings](/docs/settings/), in the **Collection** card:
 
-| Setting              | Default                    | Range                                  |
-| -------------------- | -------------------------- | -------------------------------------- |
-| **Polling interval** | 1000 ms                    | 250 ms, 500 ms, 1000 ms or 2000 ms     |
-| **History kept**     | 300 s (shown as `5 min 00 s`) | 30 to 1,800 s, in steps of 30 s     |
+| Setting              | Default                       | Range                              |
+| -------------------- | ----------------------------- | ---------------------------------- |
+| **Polling interval** | 1000 ms                       | 250 ms, 500 ms, 1000 ms or 2000 ms |
+| **History kept**     | 300 s (shown as `5 min 00 s`) | 30 to 1,800 s, in steps of 30 s    |
 
 A shorter interval makes the tok/s figures and the charts react faster. Changing either setting reshapes the history:
 the most recent points are kept, and every open page reloads it.

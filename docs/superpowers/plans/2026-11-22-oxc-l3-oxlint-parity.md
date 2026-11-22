@@ -17,7 +17,7 @@ change sits in one marked block, off, for L4 and L5 to empty.
 
 ## Global Constraints
 
-- Starts once the L2 PR is merged. Branch `chore/oxlint` from `master`; one PR; green on `pnpm lint`, `pnpm check`
+- Branch `chore/oxlint` from `chore/oxfmt-mdx` (stacked; the PR is based on it); one PR; green on `pnpm lint`, `pnpm check`
   (0 `effect(` line), `pnpm test`.
 - **No code change**: `git diff master --stat -- '*.ts' '*.tsx' '*.css'` outside the new config files shows only
   comment lines (directives converted or removed).
@@ -102,7 +102,7 @@ change sits in one marked block, off, for L4 and L5 to empty.
       outside every `tsconfig.json` is settled here (add it to the closest project's `include`, or exclude it from the
       type-aware rules with an override), and the choice written as a comment.
 - [ ] **Step 5:** Group the remaining diagnostics by rule. Each rule that reports goes into **one block of the base,
-  delimited by `// --- Debt: off until its milestone ---` and `// --- end of debt ---`**, as
+      delimited by `// --- Debt: off until its milestone ---` and `// --- end of debt ---`**, as
       `'<rule>': 'off', // L4: <count>` or `// L5: <count>` (L5 for `react/*`, `react-hooks/*`, `vitest/*`; L4 for the
       rest). The rules of `jsx-a11y` that report are not debt: they go off in `oxlint.react.ts` with the reason
       "accessibility is out of scope for now", along with every `jsx-a11y` rule that is not a Biome equivalent.
@@ -150,6 +150,7 @@ change sits in one marked block, off, for L4 and L5 to empty.
   | `complexity/noImportantStyles` (CSS)    | none: remove the comment                                                   |     3 |
 
   These four React rules are on in `oxlint.react.ts` (they are Biome's today), not in the debt block.
+
 - [ ] **Step 2:** `pnpm exec oxlint --deny-warnings --report-unused-disable-directives .`. Expected: exit 0. An unused
       directive: the rule reports on another line (move the comment) or not at all (remove it). A new report: the
       directive names the wrong rule.
@@ -191,7 +192,7 @@ change sits in one marked block, off, for L4 and L5 to empty.
       ones taken from the code after Task 4. The editor note gains `"source.fixAll.oxc": "explicit"`.
 - [ ] **Step 2:** `pnpm format`; `pnpm site:build && pnpm --dir site check-links`; `pnpm lint && pnpm check && pnpm test`;
       `pnpm build && node scripts/smoke.ts`.
-- [ ] **Step 3:** Add the L2 squash commit to `.git-blame-ignore-revs`. Commit: `docs: oxlint and oxfmt replace Biome`.
+- [ ] **Step 3:** Commit: `docs: oxlint and oxfmt replace Biome`.
 - [ ] **Step 4:** Push, PR `chore: Replace Biome with oxlint`. Body: the parity table's totals (185 kept, the losses of
       the spec), the debt block as a checklist for L4 and L5, the timing. End with
       `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.

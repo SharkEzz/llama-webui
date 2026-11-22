@@ -9,11 +9,11 @@ from a few checks that keep other websites in your browser away from it.
 
 ## Defaults at a glance
 
-| Process                          | Listens on by default         | Change it with                                                                                  |
-| -------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
-| llama-webui                      | `127.0.0.1:7860`              | `--host` and `--port` ([Launch options](/docs/configuration/))                                   |
-| `llama-server`, from a profile   | `127.0.0.1:8080`              | **Default host** and **Default port** in [Settings](/docs/settings/#general), or the profile's **Host** and **Port** |
-| `llama-server`, for a benchmark  | `127.0.0.1`, on the default port | **Default port** in Settings                                                                |
+| Process                         | Listens on by default            | Change it with                                                                                                       |
+| ------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| llama-webui                     | `127.0.0.1:7860`                 | `--host` and `--port` ([Launch options](/docs/configuration/))                                                       |
+| `llama-server`, from a profile  | `127.0.0.1:8080`                 | **Default host** and **Default port** in [Settings](/docs/settings/#general), or the profile's **Host** and **Port** |
+| `llama-server`, for a benchmark | `127.0.0.1`, on the default port | **Default port** in Settings                                                                                         |
 
 On the default address, only programs running on the same machine can reach llama-webui. `llama-server` is a
 different story: see [How llama-server is exposed](#how-llama-server-is-exposed).
@@ -44,11 +44,11 @@ These checks protect llama-webui from **other websites open in your browser**: t
 driving the API behind your back. They do not protect it from people on your network, who can send any request they
 like. They apply to every API request and to the WebSocket.
 
-| Check            | Rule                                                                                                   | Otherwise                      | Protects against                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `Host` header    | `localhost`, a name ending in `.localhost`, or an IP address (IPv4 or IPv6)                            | `403`, "Host not allowed" (`400` when it is not a host name at all) | DNS rebinding: a site whose domain name is made to point to your machine                            |
-| `Origin` header  | When present, exactly the page's own origin: same scheme, host and port                                | `403`, "Origin not allowed"    | Cross-site requests, including a WebSocket opened by another site                                    |
-| Request body     | A `POST`, `PUT`, `PATCH` or `DELETE` with a body must be sent as `application/json`                    | `415`                          | Cross-site form submissions, which browsers send without asking                                      |
+| Check           | Rule                                                                                | Otherwise                                                           | Protects against                                                         |
+| --------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `Host` header   | `localhost`, a name ending in `.localhost`, or an IP address (IPv4 or IPv6)         | `403`, "Host not allowed" (`400` when it is not a host name at all) | DNS rebinding: a site whose domain name is made to point to your machine |
+| `Origin` header | When present, exactly the page's own origin: same scheme, host and port             | `403`, "Origin not allowed"                                         | Cross-site requests, including a WebSocket opened by another site        |
+| Request body    | A `POST`, `PUT`, `PATCH` or `DELETE` with a body must be sent as `application/json` | `415`                                                               | Cross-site form submissions, which browsers send without asking          |
 
 llama-webui also sends no CORS headers, so your browser does not let other sites read its responses.
 

@@ -35,12 +35,12 @@ with half its VRAM taken. The figure is the measured one, the same as on the [Sy
 
 In a GPU, the contents are stacked in layers, from the bottom:
 
-| Layer               | What it is                                                              | Color                    |
-| ------------------- | ----------------------------------------------------------------------- | ------------------------ |
-| **Model**           | The weights of the loaded model on this card                            | The card's color         |
-| **KV cache**        | The context kept on this card                                           | A lighter shade          |
-| **Compute buffers** | Working memory of `llama-server` on this card                           | A lighter shade still    |
-| **Other VRAM**      | Everything else in use: the desktop, other programs, a draft model or a projector | Gray           |
+| Layer               | What it is                                                                        | Color                 |
+| ------------------- | --------------------------------------------------------------------------------- | --------------------- |
+| **Model**           | The weights of the loaded model on this card                                      | The card's color      |
+| **KV cache**        | The context kept on this card                                                     | A lighter shade       |
+| **Compute buffers** | Working memory of `llama-server` on this card                                     | A lighter shade still |
+| **Other VRAM**      | Everything else in use: the desktop, other programs, a draft model or a projector | Gray                  |
 
 The three first sizes come from `llama-server`'s logs (see [How the model split is found](#how-the-model-split-is-found)).
 When they add up to more than the VRAM in use, while the model is still loading or with the estimate of `-sm tensor`,
@@ -76,13 +76,13 @@ Above each block, a label gives its name and what matters most:
 
 Hover a block for its details:
 
-| Block      | Details                                                                                                                                                       |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Block      | Details                                                                                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GPU        | **Utilization**, **VRAM**, the **Model**, **KV cache** and **Compute buffers** sizes it holds, **Other VRAM**, **Temperature**, **Power**, **PCIe link**, **Host → GPU** and **GPU → host** traffic, **Peer-to-peer** |
-| CPU        | **Load**, **llama-server** CPU use (one full core is 100%: it can exceed 100%), **Frequency**, **Temperature**, **Cores**, **NUMA**                            |
-| Memory     | **Used**, DRAM **Read** and **Write** (or **Bandwidth** not measured), **llama-server (DRAM)**, **llama-server (RSS)**, **Model in RAM**, **Swap**, **DIMMs** with their temperature |
-| NVMe drive | **Read**, **Write**, **Capacity**, **PCIe link**, and **Role** when it holds the running model                                                                 |
-| Chipset    | **CPU link** (current and maximum), number of **Devices** behind it                                                                                          |
+| CPU        | **Load**, **llama-server** CPU use (one full core is 100%: it can exceed 100%), **Frequency**, **Temperature**, **Cores**, **NUMA**                                                                                   |
+| Memory     | **Used**, DRAM **Read** and **Write** (or **Bandwidth** not measured), **llama-server (DRAM)**, **llama-server (RSS)**, **Model in RAM**, **Swap**, **DIMMs** with their temperature                                  |
+| NVMe drive | **Read**, **Write**, **Capacity**, **PCIe link**, and **Role** when it holds the running model                                                                                                                        |
+| Chipset    | **CPU link** (current and maximum), number of **Devices** behind it                                                                                                                                                   |
 
 A detail appears only when it is known. **DIMMs** needs memory modules with a temperature sensor the kernel reads
 (the `spd5118` driver, for DDR5 modules).
@@ -109,11 +109,11 @@ of an idle GPU leaves its link still.
 A link that carries traffic gets a badge, stacked on the label of the block it reaches, with the exact throughput in
 each direction:
 
-| Link             | Lines of the badge       |
-| ---------------- | ------------------------ |
-| CPU ↔ GPU        | **→ GPU**, **→ host**    |
-| CPU ↔ NVMe drive | **read**, **write**      |
-| CPU ↔ memory     | **read**, **write**      |
+| Link             | Lines of the badge        |
+| ---------------- | ------------------------- |
+| CPU ↔ GPU        | **→ GPU**, **→ host**     |
+| CPU ↔ NVMe drive | **read**, **write**       |
+| CPU ↔ memory     | **read**, **write**       |
 | CPU ↔ chipset    | **→ devices**, **→ host** |
 
 While `llama-server` loads a model, processes a prompt or generates, every link with measured traffic shows its
@@ -132,13 +132,13 @@ link to the CPU, with the sum of the devices behind it: two busy devices on one 
 
 ### What is measured
 
-| Link                 | Measured from                                                       | Without a measurement                             |
-| -------------------- | ------------------------------------------------------------------- | ------------------------------------------------- |
-| CPU ↔ NVIDIA GPU     | The card's PCIe counters, through NVML                              | No streaks, no badge (NVIDIA through `nvidia-smi`) |
-| CPU ↔ AMD GPU        | Not measured: the `amdgpu` driver does not report PCIe traffic      | No streaks, no badge                              |
-| CPU ↔ NVMe drive     | The drive's read and write counters (**Disks** collector)           | No streaks, no badge                              |
-| CPU ↔ chipset        | The sum of the devices behind it                                    | No streaks, no badge                              |
-| CPU ↔ memory         | DRAM traffic through `perf` (AMD Zen 4 and Zen 5), writes on one lane, reads on the other | A pulse whose rate follows CPU activity |
+| Link             | Measured from                                                                             | Without a measurement                              |
+| ---------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| CPU ↔ NVIDIA GPU | The card's PCIe counters, through NVML                                                    | No streaks, no badge (NVIDIA through `nvidia-smi`) |
+| CPU ↔ AMD GPU    | Not measured: the `amdgpu` driver does not report PCIe traffic                            | No streaks, no badge                               |
+| CPU ↔ NVMe drive | The drive's read and write counters (**Disks** collector)                                 | No streaks, no badge                               |
+| CPU ↔ chipset    | The sum of the devices behind it                                                          | No streaks, no badge                               |
+| CPU ↔ memory     | DRAM traffic through `perf` (AMD Zen 4 and Zen 5), writes on one lane, reads on the other | A pulse whose rate follows CPU activity            |
 
 Without a DRAM measurement, the memory link pulses with `llama-server`'s CPU use when a server runs, and with the
 machine's CPU load otherwise. [Monitor DRAM bandwidth](/docs/guides/dram-bandwidth/) explains how to get the real
@@ -152,11 +152,11 @@ only works when the driver allows it, which is usually limited to workstation an
 
 The page shows what is known of it for the cards that hold the model:
 
-| State                    | How it is known                                                                                      | On the page                                                                 |
-| ------------------------ | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| **Active**               | NCCL reports its channels going from GPU to GPU (`via P2P/…`)                                         | A dotted link between the cards, tagged **P2P**                              |
-| **Requested**            | `GGML_CUDA_P2P` is set and nothing says whether the driver allows it                                 | A fainter dotted link, tagged **P2P requested**                              |
-| **Refused by the driver** | `GGML_CUDA_P2P` is set and NCCL reports peer-to-peer disabled, its channels going through host memory | No link: the cards do not exchange directly                                 |
+| State                     | How it is known                                                                                       | On the page                                     |
+| ------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| **Active**                | NCCL reports its channels going from GPU to GPU (`via P2P/…`)                                         | A dotted link between the cards, tagged **P2P** |
+| **Requested**             | `GGML_CUDA_P2P` is set and nothing says whether the driver allows it                                  | A fainter dotted link, tagged **P2P requested** |
+| **Refused by the driver** | `GGML_CUDA_P2P` is set and NCCL reports peer-to-peer disabled, its channels going through host memory | No link: the cards do not exchange directly     |
 
 The state is also written under the model split and in each card's details. Only NCCL tells the first and the last
 apart, and it only writes these lines with `NCCL_DEBUG=INFO` in the profile's environment, on a `llama-server` built
@@ -175,13 +175,13 @@ remembers which ones are folded.
 The card at the top left shows what `llama-server` is doing, with the current **Generation** and **Prompt** speeds in
 tok/s (the same as on the [Dashboard](/docs/dashboard/)). Folded, it keeps the phase.
 
-| Phase          | Meaning                                                                       |
-| -------------- | ----------------------------------------------------------------------------- |
-| **Stopped**    | No server runs, or it is stopping or has crashed.                             |
-| **Loading**    | The server is starting and loading its model.                                 |
-| **Idle**       | The server is ready and no slot is busy.                                      |
-| **Prompt**     | A busy slot has not generated its first token yet: the prompt is processed.   |
-| **Generating** | Tokens are being generated.                                                   |
+| Phase          | Meaning                                                                     |
+| -------------- | --------------------------------------------------------------------------- |
+| **Stopped**    | No server runs, or it is stopping or has crashed.                           |
+| **Loading**    | The server is starting and loading its model.                               |
+| **Idle**       | The server is ready and no slot is busy.                                    |
+| **Prompt**     | A busy slot has not generated its first token yet: the prompt is processed. |
+| **Generating** | Tokens are being generated.                                                 |
 
 ### Model
 

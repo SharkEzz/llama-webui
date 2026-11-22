@@ -9,26 +9,26 @@ runs sweeps: lists of `llama-bench` runs planned by the estimator, optionally va
 and its API groups in `packages/webui-shared/src/api/BenchApi.ts` and `SweepsApi.ts`. For what users see, read [Benchmark](/docs/benchmark/) and
 [Sweeps](/docs/sweeps/).
 
-| File | Role |
-| --- | --- |
-| `app/server/bench/BenchRunner.ts` | `BenchRunner`: one-off runs and sweeps, the rows, the live state, the shutdown step |
-| `app/server/bench/gate.ts` | The gate: stops the managed server once and restarts it once |
-| `app/server/bench/execute.ts` | `commandOf()` and `execute()`: the command, the tool, the VRAM and disk peaks, the result |
-| `app/server/bench/trial.ts` | `runTrial()`: a temporary `llama-server` measured through chat requests |
-| `app/server/bench/measure.ts` | `measure()` and `draftAcceptPct()` |
-| `app/server/bench/parse.ts` | `benchFailure()`: why a run failed, from the tool's last lines |
-| `app/server/bench/prompt.ts` | `promptOf()`, `WARMUP_PROMPT`: the fixed texts of a server run |
-| `app/server/bench/vram.ts` | `startVramProbe()`: VRAM sampled every 100 ms |
-| `app/server/bench/BenchHardware.ts` | `BenchHardware`: the build, the hardware frozen with each run, the `--list-devices` cache |
-| `app/server/bench/which.ts` | `which()`: a binary looked up in the `PATH` |
-| `app/server/bench/toProfile.ts` | `toProfile()` and `fromProfile()`: a run to a profile, a profile to a run's draft |
-| `app/server/bench/BenchRunsRepo.ts`, `SweepsRepo.ts` | The `bench_runs` table (one-off runs and sweep items) and the `sweeps` table |
-| `app/server/bench/http.ts` | `BenchHandlers` and `SweepsHandlers` |
-| `app/server/tuning/space.ts` | `planSweep()`: a sweep's items, each with the estimator's verdict |
-| `llamacpp-js/bench` | `llama-bench` JSON, `--progress` lines, `--list-devices`, failure lines ([llamacpp-js](/developers/llamacpp-js/)) |
-| `llamacpp-js/node` | `benchBinary()`: `llama-bench` next to `llama-server` |
-| `packages/webui-shared/src/bench.ts` | `BenchSpec`, `BenchParams`, `BenchRun`, `BenchLive`, flag translation for both tools |
-| `packages/webui-shared/src/sweep.ts` | `SweepSpec`, `Sweep`, `SweepLive`, `expandSpace()`, `rankRuns()`, `sweepCtx()` |
+| File                                                 | Role                                                                                                              |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `app/server/bench/BenchRunner.ts`                    | `BenchRunner`: one-off runs and sweeps, the rows, the live state, the shutdown step                               |
+| `app/server/bench/gate.ts`                           | The gate: stops the managed server once and restarts it once                                                      |
+| `app/server/bench/execute.ts`                        | `commandOf()` and `execute()`: the command, the tool, the VRAM and disk peaks, the result                         |
+| `app/server/bench/trial.ts`                          | `runTrial()`: a temporary `llama-server` measured through chat requests                                           |
+| `app/server/bench/measure.ts`                        | `measure()` and `draftAcceptPct()`                                                                                |
+| `app/server/bench/parse.ts`                          | `benchFailure()`: why a run failed, from the tool's last lines                                                    |
+| `app/server/bench/prompt.ts`                         | `promptOf()`, `WARMUP_PROMPT`: the fixed texts of a server run                                                    |
+| `app/server/bench/vram.ts`                           | `startVramProbe()`: VRAM sampled every 100 ms                                                                     |
+| `app/server/bench/BenchHardware.ts`                  | `BenchHardware`: the build, the hardware frozen with each run, the `--list-devices` cache                         |
+| `app/server/bench/which.ts`                          | `which()`: a binary looked up in the `PATH`                                                                       |
+| `app/server/bench/toProfile.ts`                      | `toProfile()` and `fromProfile()`: a run to a profile, a profile to a run's draft                                 |
+| `app/server/bench/BenchRunsRepo.ts`, `SweepsRepo.ts` | The `bench_runs` table (one-off runs and sweep items) and the `sweeps` table                                      |
+| `app/server/bench/http.ts`                           | `BenchHandlers` and `SweepsHandlers`                                                                              |
+| `app/server/tuning/space.ts`                         | `planSweep()`: a sweep's items, each with the estimator's verdict                                                 |
+| `llamacpp-js/bench`                                  | `llama-bench` JSON, `--progress` lines, `--list-devices`, failure lines ([llamacpp-js](/developers/llamacpp-js/)) |
+| `llamacpp-js/node`                                   | `benchBinary()`: `llama-bench` next to `llama-server`                                                             |
+| `packages/webui-shared/src/bench.ts`                 | `BenchSpec`, `BenchParams`, `BenchRun`, `BenchLive`, flag translation for both tools                              |
+| `packages/webui-shared/src/sweep.ts`                 | `SweepSpec`, `Sweep`, `SweepLive`, `expandSpace()`, `rankRuns()`, `sweepCtx()`                                    |
 
 The endpoints are documented in [Benchmarks](/developers/api/bench/) and [Sweeps](/developers/api/sweeps/).
 
@@ -51,17 +51,17 @@ its work in fibers of its own scope, and registers a shutdown step (see
 
 A run is described by a `BenchSpec` (`packages/webui-shared/src/bench.ts`):
 
-| Field        | Type                      | Default | Notes                                                                       |
-| ------------ | ------------------------- | ------- | --------------------------------------------------------------------------- |
-| `kind`       | `"bench"` or `"server"`   |         | The tool: `llama-bench` or a temporary `llama-server`                       |
-| `modelPath`  | string                    |         | Absolute path ending in `.gguf`                                             |
-| `mmprojPath` | string or null            | `null`  | Projector, loaded by server runs only                                       |
-| `profileId`  | integer or null           | `null`  | Source profile: its directory and environment variables are reused          |
-| `p`          | integer, 1 to 32,768      | `512`   | Prompt tokens                                                               |
-| `n`          | integer, 1 to 4,096       | `128`   | Generated tokens                                                            |
-| `r`          | integer, 1 to 20          | `3`     | Repetitions                                                                 |
-| `params`     | `BenchParams`             | `{}`    | The flags both tools understand                                             |
-| `serverArgs` | string[]                  | `[]`    | Other `llama-server` flags; reserved flags and flags covered by a field are rejected |
+| Field        | Type                    | Default | Notes                                                                                |
+| ------------ | ----------------------- | ------- | ------------------------------------------------------------------------------------ |
+| `kind`       | `"bench"` or `"server"` |         | The tool: `llama-bench` or a temporary `llama-server`                                |
+| `modelPath`  | string                  |         | Absolute path ending in `.gguf`                                                      |
+| `mmprojPath` | string or null          | `null`  | Projector, loaded by server runs only                                                |
+| `profileId`  | integer or null         | `null`  | Source profile: its directory and environment variables are reused                   |
+| `p`          | integer, 1 to 32,768    | `512`   | Prompt tokens                                                                        |
+| `n`          | integer, 1 to 4,096     | `128`   | Generated tokens                                                                     |
+| `r`          | integer, 1 to 20        | `3`     | Repetitions                                                                          |
+| `params`     | `BenchParams`           | `{}`    | The flags both tools understand                                                      |
+| `serverArgs` | string[]                | `[]`    | Other `llama-server` flags; reserved flags and flags covered by a field are rejected |
 
 `BenchParams` holds the flags that both tools accept, in a fixed order (`FIELD_ORDER`): `ngl`, `ot`, `ncmoe`, `dev`,
 `ts`, `sm`, `fa`, `ctk`, `ctv`, `t`, `b`, `ub`. A missing key means the tool's default. Two functions write them out,
@@ -90,7 +90,7 @@ with `BenchRunning` `A benchmark is running`):
    (`stoppingTimeout`), then fails with `ServerStopTooSlow` `llama-server is taking too long to stop: try again`. A
    stop that someone else started leaves nothing to restart.
 2. If an external server runs: `ExternalServerRunning` `An external llama-server is running on port N: stop it
-   first`.
+first`.
 3. If the managed server is starting or ready and `stopServer` is false: `ServerRunning`. The web app tells it by its
    `_tag`, shows its confirmation dialog, then sends the same request again with `stopServer: true`.
 4. Otherwise it records the supervisor's `lastCommand`, logs `[bench] stopping llama-server for the benchmark`, and
@@ -373,13 +373,13 @@ for the whole sweep.
 A `SweepSpec` (`packages/webui-shared/src/sweep.ts`) has the run fields of a `BenchSpec` (`modelPath`,
 `mmprojPath`, `profileId`, `p`, `n`, `r`, `serverArgs`) plus:
 
-| Field          | Type                 | Default | Notes                                                    |
-| -------------- | -------------------- | ------- | -------------------------------------------------------- |
-| `name`         | string, 1 to 80      |         | Trimmed                                                  |
-| `preset`       | a `PresetId`         |         | Gives the score and the default context                  |
-| `base`         | `BenchParams`        | `{}`    | The values every item shares                             |
-| `space`        | `SweepSpace`         | `{}`    | For each field, a non-empty list of values to try        |
-| `includeUnfit` | boolean              | `false` | Keep the items the estimator says do not fit             |
+| Field          | Type            | Default | Notes                                             |
+| -------------- | --------------- | ------- | ------------------------------------------------- |
+| `name`         | string, 1 to 80 |         | Trimmed                                           |
+| `preset`       | a `PresetId`    |         | Gives the score and the default context           |
+| `base`         | `BenchParams`   | `{}`    | The values every item shares                      |
+| `space`        | `SweepSpace`    | `{}`    | For each field, a non-empty list of values to try |
+| `includeUnfit` | boolean         | `false` | Keep the items the estimator says do not fit      |
 
 `planSweep()` (`app/server/tuning/space.ts`) turns the spec into items:
 
@@ -458,14 +458,14 @@ A sweep's status (`SweepStatus`) is `running`, `done`, `cancelled` or `interrupt
   item (`409` `NothingToResume` `Nothing to resume: no interrupted or queued item`: a cancelled sweep has none), then
   takes the gate, puts the interrupted items back in the queue (`requeueInterrupted`) and starts the sweep.
 - Resume, validate and delete refuse a running sweep with `409` `SweepStillRunning` `This sweep is still running:
-  cancel it first`.
+cancel it first`.
 
 ## Shutdown and restarts
 
-| Event                               | One-off run in progress | Sweep item in progress                   | Sweep                       | Server stopped by the gate             |
-| ----------------------------------- | ----------------------- | ---------------------------------------- | --------------------------- | -------------------------------------- |
-| Shutdown (`SIGINT`, `SIGTERM`)      | `interrupted`           | `interrupted`                            | `interrupted`               | Not restarted: llama-webui exits        |
-| Start after llama-webui was killed  | `interrupted`           | `interrupted`                            | `interrupted`               | Not restarted                           |
+| Event                              | One-off run in progress | Sweep item in progress | Sweep         | Server stopped by the gate       |
+| ---------------------------------- | ----------------------- | ---------------------- | ------------- | -------------------------------- |
+| Shutdown (`SIGINT`, `SIGTERM`)     | `interrupted`           | `interrupted`          | `interrupted` | Not restarted: llama-webui exits |
+| Start after llama-webui was killed | `interrupted`           | `interrupted`          | `interrupted` | Not restarted                    |
 
 In development, a save of a file the server imports (`app/server/`, `packages/`) restarts it (`node --watch`): it is
 a shutdown like any other, and an interrupted sweep is resumed from the UI. A save under `app/src/` is HMR, and a

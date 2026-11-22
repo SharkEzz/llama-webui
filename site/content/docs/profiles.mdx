@@ -27,14 +27,14 @@ Other pages create profiles for you, already filled in: **Create profile** in a 
 
 ## Profile fields
 
-| Field                    | What it holds                                                                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Name**                 | Required, and unique among your profiles. It is what the Server page and the status bar show.                                                  |
-| **Working directory**    | The folder `llama-server` runs in. Relative paths in the model and projector fields start from here.                                           |
-| **Model (GGUF)**         | Required. The model file; for a split model, its first part.                                                                                   |
-| **Multimodal projector** | Optional. The `mmproj` file that lets the model read images (and audio or video for some models).                                               |
-| **Host**                 | The address `llama-server` listens on. Empty: the value from [Settings](/docs/settings/) (`127.0.0.1` by default).                              |
-| **Port**                 | The port `llama-server` listens on, from 1 to 65535. Empty: the value from Settings (`8080` by default).                                        |
+| Field                    | What it holds                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| **Name**                 | Required, and unique among your profiles. It is what the Server page and the status bar show.                      |
+| **Working directory**    | The folder `llama-server` runs in. Relative paths in the model and projector fields start from here.               |
+| **Model (GGUF)**         | Required. The model file; for a split model, its first part.                                                       |
+| **Multimodal projector** | Optional. The `mmproj` file that lets the model read images (and audio or video for some models).                  |
+| **Host**                 | The address `llama-server` listens on. Empty: the value from [Settings](/docs/settings/) (`127.0.0.1` by default). |
+| **Port**                 | The port `llama-server` listens on, from 1 to 65535. Empty: the value from Settings (`8080` by default).           |
 
 In the working directory, model and projector fields, a leading `~` stands for your home folder. Without a working
 directory, `llama-server` runs in llama-webui's own working directory and relative paths start from there: set one, or
@@ -75,7 +75,7 @@ output, so the list matches your build of llama.cpp.
 
 - Type `-` to see every flag that starts with what you typed, with its value and description, in a list that scrolls.
 - <Kbd>Tab</Kbd> completes the highlighted suggestion. <Kbd>↑</Kbd> and <Kbd>↓</Kbd> move through the list, then
-  <Kbd>Enter</Kbd> picks one. Otherwise <Kbd>Enter</Kbd> starts a new line. <Kbd>Esc</Kbd> closes the list.
+<Kbd>Enter</Kbd> picks one. Otherwise <Kbd>Enter</Kbd> starts a new line. <Kbd>Esc</Kbd> closes the list.
 - Below the box, a help line describes the flag under the cursor, or the flag whose value you are typing: its names,
   its value and its help text from `llama-server --help`.
 
@@ -84,12 +84,12 @@ and shows **Flag help unavailable:** with the error.
 
 ### Highlighting and warnings
 
-| Shown as                         | Meaning                                                                                                                                              |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Blue flag                        | A flag your `llama-server` knows.                                                                                                                    |
-| Amber flag, dotted underline     | A flag your `llama-server` does not list. A warning, **Unknown to this llama-server:**, names it. You can still save: it may come from another build. |
-| Rose flag, wavy underline        | A flag llama-webui sets itself (see below). An error explains which field to use instead, and the profile cannot be saved.                           |
-| Green text                       | A quoted value.                                                                                                                                      |
+| Shown as                     | Meaning                                                                                                                                               |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Blue flag                    | A flag your `llama-server` knows.                                                                                                                     |
+| Amber flag, dotted underline | A flag your `llama-server` does not list. A warning, **Unknown to this llama-server:**, names it. You can still save: it may come from another build. |
+| Rose flag, wavy underline    | A flag llama-webui sets itself (see below). An error explains which field to use instead, and the profile cannot be saved.                            |
+| Green text                   | A quoted value.                                                                                                                                       |
 
 ## Environment variables
 
@@ -109,13 +109,13 @@ llama-webui builds the command line from the profile fields, then adds the flags
 llama-server -m <model> [-mm <projector>] <your arguments> [-lv 4] --host <host> --port <port> --metrics --slots --props
 ```
 
-| Flag                             | Why                                                                                                  |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `-m`, `--model`                  | From **Model (GGUF)**.                                                                               |
-| `-mm`, `--mmproj`                | From **Multimodal projector**, when set.                                                             |
-| `--host`, `--port`               | From **Host** and **Port**, or Settings.                                                             |
-| `--metrics`, `--slots`, `--props` | Turn on the endpoints the [Dashboard](/docs/dashboard/), the [Server](/docs/server/) page and [Chat](/docs/chat/) read. |
-| `-lv 4`                          | Logs the buffer sizes the [Topology](/docs/topology/) page reads. Only added when your arguments set no verbosity (`-lv`, `-v`) and the environment has no `LLAMA_ARG_LOG_VERBOSITY`: yours wins. |
+| Flag                              | Why                                                                                                                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-m`, `--model`                   | From **Model (GGUF)**.                                                                                                                                                                            |
+| `-mm`, `--mmproj`                 | From **Multimodal projector**, when set.                                                                                                                                                          |
+| `--host`, `--port`                | From **Host** and **Port**, or Settings.                                                                                                                                                          |
+| `--metrics`, `--slots`, `--props` | Turn on the endpoints the [Dashboard](/docs/dashboard/), the [Server](/docs/server/) page and [Chat](/docs/chat/) read.                                                                           |
+| `-lv 4`                           | Logs the buffer sizes the [Topology](/docs/topology/) page reads. Only added when your arguments set no verbosity (`-lv`, `-v`) and the environment has no `LLAMA_ARG_LOG_VERBOSITY`: yours wins. |
 
 Because these come from the profile fields, you cannot write them in the arguments: the editor flags them, and saving
 is refused (`-lv 4` is the exception: you can set another verbosity). The binary itself is the one set in Settings,

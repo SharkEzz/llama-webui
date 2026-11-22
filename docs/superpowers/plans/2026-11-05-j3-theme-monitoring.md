@@ -108,6 +108,7 @@
   }
   export interface HistoryDump { intervalMs: number; capacity: number; at: number; series: Record<string, (number | null)[]> }
   ```
+
 - `ws.ts` : `snapshot` → `{ type: "snapshot"; payload: Snapshot }`.
 - `settings.ts` : `collectors: z.object({ nvml: z.boolean().default(true), system: z.boolean().default(true), disk: z.boolean().default(true) }).default({ nvml: true, system: true, disk: true })`.
 - Collecteurs : copies de llama-tui, imports de types vers `@llama-webui/shared` ; `LlamaRaw.metrics` reste une `Map` côté serveur (jamais envoyée telle quelle).

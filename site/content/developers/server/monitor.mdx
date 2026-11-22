@@ -7,25 +7,25 @@ The monitor samples `llama-server` and the machine on a fixed interval, whether 
 tick produces a `Snapshot`, appends one point to every history series, and is broadcast over the WebSocket. The loop
 lives in `app/server/monitor/`, the readers of each data source in `app/server/collectors/`.
 
-| File | Role |
-| --- | --- |
-| `app/server/monitor/Monitor.ts` | `Monitor`: the service of the ticks, its latest `Snapshot` and the history. |
-| `app/server/monitor/tick.ts` | `beginTick()` and `endTick()`: what a tick derives from its readings, the series it feeds, the snapshot. |
-| `app/server/monitor/gpus.ts` | `collectGpus()`: every card, with `llama-server`'s VRAM on it. |
-| `app/server/monitor/History.ts` | `History` (named rings plus timestamps), `Ring` and `historyPoints()`. |
-| `app/server/monitor/Placement.ts`, `placementLog.ts` | `Placement` and `parsePlacement()`: how the model is split across devices, from the logs. |
-| `app/server/llama/probes.ts` | `readLlama()`: `/health`, `/slots` and `/metrics` of a `llama-server`, through `LlamaHttp`. |
-| `llamacpp-js/metrics` | `parseSlots()`, `parsePrometheus()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)). |
-| `app/server/collectors/Collectors.ts` | `Collectors`: builds the readers and follows the settings. |
-| `app/server/collectors/gpu.ts` | `GpuNeeds`, `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`. |
-| `app/server/collectors/nvml/` | NVIDIA through NVML (`node:ffi`), in a program of its own (`worker.ts`, `Nvml.ts`, `protocol.ts`). |
-| `app/server/collectors/nvidia.ts` | The `nvidia-smi` fallback. |
-| `app/server/collectors/amdgpu.ts` | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`. |
-| `app/server/collectors/proc.ts` | `makeProcSampler()`: CPU and RSS of the `llama-server` process. |
-| `app/server/collectors/system.ts` | `makeSystemSampler()`: machine CPU, memory, load, frequency, temperature. |
-| `app/server/collectors/disk.ts` | `makeDiskSampler()`, `physicalDisks()` and `resolveModelDisk()`. |
-| `app/server/collectors/membw.ts` | DRAM bandwidth through `perf stat`. |
-| `packages/webui-shared/src/monitor.ts` | `Snapshot`, `HistoryDump`, `GpuSample`, `SERIES` and the other monitoring schemas. |
+| File                                                 | Role                                                                                                                   |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `app/server/monitor/Monitor.ts`                      | `Monitor`: the service of the ticks, its latest `Snapshot` and the history.                                            |
+| `app/server/monitor/tick.ts`                         | `beginTick()` and `endTick()`: what a tick derives from its readings, the series it feeds, the snapshot.               |
+| `app/server/monitor/gpus.ts`                         | `collectGpus()`: every card, with `llama-server`'s VRAM on it.                                                         |
+| `app/server/monitor/History.ts`                      | `History` (named rings plus timestamps), `Ring` and `historyPoints()`.                                                 |
+| `app/server/monitor/Placement.ts`, `placementLog.ts` | `Placement` and `parsePlacement()`: how the model is split across devices, from the logs.                              |
+| `app/server/llama/probes.ts`                         | `readLlama()`: `/health`, `/slots` and `/metrics` of a `llama-server`, through `LlamaHttp`.                            |
+| `llamacpp-js/metrics`                                | `parseSlots()`, `parsePrometheus()` and the math on `/slots` and `/metrics` ([llamacpp-js](/developers/llamacpp-js/)). |
+| `app/server/collectors/Collectors.ts`                | `Collectors`: builds the readers and follows the settings.                                                             |
+| `app/server/collectors/gpu.ts`                       | `GpuNeeds`, `selectUsedGpus()`, `identityReading()`, `normalizeBusId()`.                                               |
+| `app/server/collectors/nvml/`                        | NVIDIA through NVML (`node:ffi`), in a program of its own (`worker.ts`, `Nvml.ts`, `protocol.ts`).                     |
+| `app/server/collectors/nvidia.ts`                    | The `nvidia-smi` fallback.                                                                                             |
+| `app/server/collectors/amdgpu.ts`                    | AMD cards through the `amdgpu` sysfs files and `/proc/<pid>/fdinfo`.                                                   |
+| `app/server/collectors/proc.ts`                      | `makeProcSampler()`: CPU and RSS of the `llama-server` process.                                                        |
+| `app/server/collectors/system.ts`                    | `makeSystemSampler()`: machine CPU, memory, load, frequency, temperature.                                              |
+| `app/server/collectors/disk.ts`                      | `makeDiskSampler()`, `physicalDisks()` and `resolveModelDisk()`.                                                       |
+| `app/server/collectors/membw.ts`                     | DRAM bandwidth through `perf stat`.                                                                                    |
+| `packages/webui-shared/src/monitor.ts`               | `Snapshot`, `HistoryDump`, `GpuSample`, `SERIES` and the other monitoring schemas.                                     |
 
 The user-facing pages are the [Dashboard](/docs/dashboard/), [System](/docs/system/) and
 [Topology](/docs/topology/); the routes are in [Monitor and system](/developers/api/monitor/).
@@ -67,14 +67,14 @@ wait for the next tick follows the new interval. A change refused by the collect
 
 `Snapshot` (`packages/webui-shared/src/monitor.ts`) is the whole state of one tick, serializable as is.
 
-| Group                | Fields                                                                                | Source                                                    |
-| -------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Tick                 | `at` (ms), `tick` (counter since start)                                               | Monitor                                                   |
-| `llama-server`       | `health`, `rates`, `slots`, `kv`, `queue`, `lastRequest`, `spec`, `recentRequests`    | `/health`, `/slots`, `/metrics`                           |
-| GPUs                 | `gpus` (used by the server), `allGpus` (every card, sorted by `busId`)                | NVML or `nvidia-smi`, `amdgpu` sysfs                      |
-| `llama-server` process | `proc`: `cpuPct`, `rssBytes`, `dramBps`                                             | `/proc/<pid>/stat` and `status`, `perf`                   |
-| Machine              | `system` (`SystemSample`, with `memBw`), `disk` (`DiskSample`)                        | `/proc`, `/sys`, `perf`                                   |
-| History              | `points`, `history` (`intervalMs`, `capacity`)                                        | `History`                                                 |
+| Group                  | Fields                                                                             | Source                                  |
+| ---------------------- | ---------------------------------------------------------------------------------- | --------------------------------------- |
+| Tick                   | `at` (ms), `tick` (counter since start)                                            | Monitor                                 |
+| `llama-server`         | `health`, `rates`, `slots`, `kv`, `queue`, `lastRequest`, `spec`, `recentRequests` | `/health`, `/slots`, `/metrics`         |
+| GPUs                   | `gpus` (used by the server), `allGpus` (every card, sorted by `busId`)             | NVML or `nvidia-smi`, `amdgpu` sysfs    |
+| `llama-server` process | `proc`: `cpuPct`, `rssBytes`, `dramBps`                                            | `/proc/<pid>/stat` and `status`, `perf` |
+| Machine                | `system` (`SystemSample`, with `memBw`), `disk` (`DiskSample`)                     | `/proc`, `/sys`, `perf`                 |
+| History                | `points`, `history` (`intervalMs`, `capacity`)                                     | `History`                               |
 
 Details worth knowing:
 
@@ -116,14 +116,14 @@ server imports restarts it.
 
 The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`):
 
-| Keys                                                                                     | Measure                                     |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `llama.genTps`, `llama.ppTps`, `llama.specAccept`                                        | Generation and prompt speed, draft acceptance |
-| `llama.kvPct`, `llama.reqProcessing`, `llama.reqDeferred`, `llama.busySlots`             | Context use and request queue               |
-| `proc.cpuPct`, `proc.dram`                                                               | The `llama-server` process                  |
-| `gpu.<key>.util`, `.vramPct`, `.pcieRx`, `.pcieTx`, `.power`, `.temp`                     | Per GPU, `<key>` being `GpuSample.key`      |
-| `sys.cpu`, `sys.memPct`, `sys.tempC`, `mem.read`, `mem.write`                            | Machine CPU, memory, DRAM bandwidth         |
-| `disk.read`, `disk.write`, `disk.modelRead`                                              | Disks, and the disk holding the model       |
+| Keys                                                                         | Measure                                       |
+| ---------------------------------------------------------------------------- | --------------------------------------------- |
+| `llama.genTps`, `llama.ppTps`, `llama.specAccept`                            | Generation and prompt speed, draft acceptance |
+| `llama.kvPct`, `llama.reqProcessing`, `llama.reqDeferred`, `llama.busySlots` | Context use and request queue                 |
+| `proc.cpuPct`, `proc.dram`                                                   | The `llama-server` process                    |
+| `gpu.<key>.util`, `.vramPct`, `.pcieRx`, `.pcieTx`, `.power`, `.temp`        | Per GPU, `<key>` being `GpuSample.key`        |
+| `sys.cpu`, `sys.memPct`, `sys.tempC`, `mem.read`, `mem.write`                | Machine CPU, memory, DRAM bandwidth           |
+| `disk.read`, `disk.write`, `disk.modelRead`                                  | Disks, and the disk holding the model         |
 
 Two rules keep the series aligned on the timestamps:
 
@@ -186,10 +186,10 @@ set, to test the library missing) with `dlopen()` from `node:ffi` (`nvml/symbols
 writes one `sample` per interval (100 ms at least). The server speaks to it in NDJSON, one JSON value per line, on
 its stdin and stdout, and both sides decode the lines with the schemas of `nvml/protocol.ts`:
 
-| Direction | Message |
-| --- | --- |
-| server to sampler (`ToSampler`) | `{ type: 'start', intervalMs, needs, lib? }`, then `{ type: 'configure', intervalMs, needs }` |
-| sampler to server (`FromSampler`) | `{ type: 'ready' }`, `{ type: 'error', message }`, `{ type: 'sample', snapshot }` |
+| Direction                         | Message                                                                                       |
+| --------------------------------- | --------------------------------------------------------------------------------------------- |
+| server to sampler (`ToSampler`)   | `{ type: 'start', intervalMs, needs, lib? }`, then `{ type: 'configure', intervalMs, needs }` |
+| sampler to server (`FromSampler`) | `{ type: 'ready' }`, `{ type: 'error', message }`, `{ type: 'sample', snapshot }`             |
 
 `nvml/read.ts` reads, per card: name, UUID, bus ID, utilization, memory utilization, VRAM, temperature, power and
 power limits, persistence mode, clocks, fan, current and maximum PCIe link, PCIe throughput, the compute processes,
@@ -199,10 +199,10 @@ The typed `dlopen()` checks the `NvmlSymbols` interface against the symbol defin
 `node:ffi` is experimental in Node 26: the sampler starts with `--disable-warning=ExperimentalWarning`, so its warning
 does not print on every start. `workerPath()` (`nvml/Nvml.ts`) finds its module next to the one that starts it:
 
-| Run | Sampler |
-| --- | --- |
-| `pnpm dev`, unit tests | `nvml/worker.ts`, run as is by Node (type stripping: its imports keep their `.ts` extension) |
-| `node app/.output/llama-webui.mjs` | `app/.output/server/nvml-worker.mjs`, built by Rolldown in `app/build/server.ts` |
+| Run                                | Sampler                                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| `pnpm dev`, unit tests             | `nvml/worker.ts`, run as is by Node (type stripping: its imports keep their `.ts` extension) |
+| `node app/.output/llama-webui.mjs` | `app/.output/server/nvml-worker.mjs`, built by Rolldown in `app/build/server.ts`             |
 
 The sampler ends at the end of its stdin, so a sampler whose server is gone, even killed, exits. It costs a process
 of its own, about 116 MiB of RSS with NVML loaded.
@@ -307,7 +307,7 @@ context, after the lines of a draft model):
   nothing, so the supervisor writes `P2P_LOG_LINE` after the launch line when the variable is in the server's
   environment. NCCL, built in and run with `NCCL_DEBUG=INFO`, says what really happens, which depends on the same
   driver capability: a `Channel … via P2P/…` line gives `active`; with the variable set, `P2P is disabled between
-  connected GPUs` or a channel `via SHM/…` gives `unavailable`, and no NCCL line gives `requested`.
+connected GPUs` or a channel `via SHM/…` gives `unavailable`, and no NCCL line gives `requested`.
 - **PCI addresses of CUDA devices** (`ncclBusIds()`). NCCL's `ncclCommInitAll … cudaDev N nvmlDev N busId X` lines
   give the address of `CUDA<N>` as hex digits (`3000` is `0000:03:00.0`). An address from a `using device` line wins;
   with `-sm tensor`, which only logs the `Meta()` device, this is the only one.

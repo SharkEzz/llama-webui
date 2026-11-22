@@ -78,6 +78,7 @@
 
   `shared/src/models.test.ts` : `profileModelPath("/h/Modèles/q/a.gguf", { modelsDir: "~/Modèles", home: "/h" })` → `{ cwd: "~/Modèles", model: "q/a.gguf" }` ; avec `cwd: "~/Modèles/q"` → `{ cwd: "~/Modèles/q", model: "a.gguf" }` ; avec `cwd: "/autre"` → `{ cwd: "/autre", model: "/h/Modèles/q/a.gguf" }`.
   Run : `bun test server/models shared/src/models.test.ts` — Expected : FAIL (modules absents ; les tests GGUF copiés passent dès la copie, sauf le cas mmproj).
+
 - [ ] **Step 3 : Implémenter** `shared/models.ts`, la migration, `ModelCacheRepo`, `scan.ts`, les routes.
 - [ ] **Step 4 : Vérifier** — `bun test` et `bun run check` verts ; `curl -s localhost:7860/api/models` sur la vraie `~/Modèles` (lecture seule) liste Qwen3.8-27B (`qwen35`, `IQ3_S`, ctx 262 144, `hasChatTemplate: true`) et le mmproj (`kind: "mmproj"`) ; 2e appel en < 50 ms ; `/api/models/info?path=…` donne `weights.totalBytes` proche de la taille du fichier.
 - [ ] **Step 5 : Commit** — `J4: lecture GGUF et scan des modèles`.
@@ -167,6 +168,7 @@
   ```
 
   `send` : enregistre le message utilisateur (titre auto si c'est le premier), crée la réponse `streaming` (`model` = cible), POST `http://127.0.0.1:<port>/v1/chat/completions`, lit le flux avec `SseParser` (`choices[0].delta.content` / `.reasoning_content`, `timings` du dernier morceau, `[DONE]`), mesure le TTFT au premier delta, écrit en base toutes les `flushMs` et à la fin (`done` + stats ; abort → `stopped` ; HTTP non 2xx → `error` avec le message de llama-server ; coupure réseau → `error`, texte partiel gardé). `subscribe` rejoue `start` puis un `delta` cumulé, puis le direct ; se désabonner ne coupe **jamais** la génération.
+
 - Routes : `POST /api/chat/:id/messages { content }` et `POST /api/chat/:id/regenerate` → SSE des `ChatEvent` (`event: <type>`) ; `POST /api/chat/:id/stop` → 204, 409 si rien ne tourne ; `GET /api/chat/:id/stream` → SSE si une génération tourne, sinon 204 ; `live` renseigné dans la liste et le détail ; `DELETE` arrête d'abord la génération. `index.ts` crée `ChatRuns` (cible = état `ready`/`external` du superviseur) et l'arrête dans le dispose.
 - Faux serveur : `POST /v1/chat/completions` en stream — 5 deltas `reasoning_content` puis une réponse Markdown (titre, liste, tableau, bloc `ts`, `<b>html</b>`, lien), un delta toutes les `FAKE_CHAT_DELAY_MS` (défaut 60 ms), dernier morceau avec `timings` ; respecte l'abort ; `enable_thinking: false` → pas de réflexion.
 

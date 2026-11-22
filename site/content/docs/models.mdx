@@ -32,15 +32,15 @@ in Settings.
 Each row is one model. The **File** column shows the path relative to the models folder, with the model name from the
 header below it.
 
-| Column         | What it shows                                                                                         |
-| -------------- | ----------------------------------------------------------------------------------------------------- |
-| **Arch**       | The architecture recorded in the file (`llama`, `qwen3moe`, `clip` for a projector…).                 |
-| **Quant**      | The quantization type of the file (`Q4_K_M`, `IQ3_S`, `BF16`…), `?` when the header does not say.    |
-| **Size**       | Size on disk, all parts included for a split model.                                                    |
-| **Parameters** | Parameter count, in millions (`M`) or billions (`B`).                                                 |
-| **Layers**     | Number of transformer blocks.                                                                         |
-| **Context**    | The context length the model was trained for, `—` when unknown.                                       |
-| **Experts**    | For a mixture-of-experts model, total experts / experts used per token (`512 / 10`); `—` otherwise.   |
+| Column         | What it shows                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| **Arch**       | The architecture recorded in the file (`llama`, `qwen3moe`, `clip` for a projector…).               |
+| **Quant**      | The quantization type of the file (`Q4_K_M`, `IQ3_S`, `BF16`…), `?` when the header does not say.   |
+| **Size**       | Size on disk, all parts included for a split model.                                                 |
+| **Parameters** | Parameter count, in millions (`M`) or billions (`B`).                                               |
+| **Layers**     | Number of transformer blocks.                                                                       |
+| **Context**    | The context length the model was trained for, `—` when unknown.                                     |
+| **Experts**    | For a mixture-of-experts model, total experts / experts used per token (`512 / 10`); `—` otherwise. |
 
 Type in the search box to filter on the file path, model name, architecture or quantization. The tabs choose what is
 listed: **Models** (the default), **Projectors** or **All**.

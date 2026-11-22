@@ -16,12 +16,12 @@ is empty). A side panel opens: **Download from Hugging Face**.
 
 Type in the search box. What you type decides what the panel shows:
 
-| You type                                                       | The panel shows                                                                    |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Words, such as `qwen 27b`                                      | GGUF repositories that match, most downloaded first (30 at most).                  |
-| A repository id, `org/name`                                    | That repository's files. If no repository has that id, an error and the search results for that text. |
-| `org/name:Q4_K_M` (the syntax of `llama-server -hf`)           | The repository, with that quantization highlighted.                               |
-| A Hugging Face URL (`huggingface.co/…` or `hf.co/…`)           | The repository. A link to a file (`…/blob/main/…`) highlights that file.           |
+| You type                                             | The panel shows                                                                                       |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Words, such as `qwen 27b`                            | GGUF repositories that match, most downloaded first (30 at most).                                     |
+| A repository id, `org/name`                          | That repository's files. If no repository has that id, an error and the search results for that text. |
+| `org/name:Q4_K_M` (the syntax of `llama-server -hf`) | The repository, with that quantization highlighted.                                                   |
+| A Hugging Face URL (`huggingface.co/…` or `hf.co/…`) | The repository. A link to a file (`…/blob/main/…`) highlights that file.                              |
 
 Each search result shows its download and like counts, and a lock when the repository is gated. Click a result to open
 it; **Results** takes you back to the list.
@@ -76,12 +76,12 @@ on the [Models](/docs/models/) page, which is rescanned by itself, so you can go
 
 ### Cancel, retry and clear
 
-| Action                         | Where                           | Effect                                                                                     |
-| ------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------ |
-| Cancel (the cross)             | A queued or running item        | Stops it and deletes what it wrote: partial files, and files it had already completed. A file another download of the list also needs (a projector shared by two variants) is kept. |
-| Retry (the circular arrow)     | A failed or canceled item       | Puts it back in the queue. Files that are still complete on disk are kept.                 |
-| Remove from the list (the bin) | A finished, failed or canceled item | Removes the row only. Downloaded files stay.                                            |
-| **Clear finished**             | Above the list                  | Removes every finished, failed and canceled row. Downloaded files stay.                    |
+| Action                         | Where                               | Effect                                                                                                                                                                              |
+| ------------------------------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cancel (the cross)             | A queued or running item            | Stops it and deletes what it wrote: partial files, and files it had already completed. A file another download of the list also needs (a projector shared by two variants) is kept. |
+| Retry (the circular arrow)     | A failed or canceled item           | Puts it back in the queue. Files that are still complete on disk are kept.                                                                                                          |
+| Remove from the list (the bin) | A finished, failed or canceled item | Removes the row only. Downloaded files stay.                                                                                                                                        |
+| **Clear finished**             | Above the list                      | Removes every finished, failed and canceled row. Downloaded files stay.                                                                                                             |
 
 There is no pause button. A download interrupted by a restart of llama-webui resumes on its own at the next start
 (see below).

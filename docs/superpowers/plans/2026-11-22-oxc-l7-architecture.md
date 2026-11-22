@@ -16,7 +16,7 @@ conventions").
 
 ## Global Constraints
 
-- Starts once the L6 PR is merged. Branch `chore/lint-architecture` from `master`; one PR; green on `pnpm lint`,
+- Branch `chore/lint-architecture` from `chore/lint-tailwind` (stacked; the PR is based on it); one PR; green on `pnpm lint`,
   `pnpm check`, `pnpm test`.
 - **No source change.** The tests that check the same boundaries on the build stay as they are
   (`app/server/build.test.ts`, `scripts/package.test.ts`, `packages/llamacpp-js/tests/package.test.ts`).
@@ -59,6 +59,7 @@ conventions").
 
   Before writing a row, `git grep` the imports it would ban: a row that would report on today's code is narrowed to
   what the code does (and the difference noted in the PR), never fixed by changing code.
+
 - [ ] **Step 2:** `import/no-cycle: 'error'` in the base. Expected: 0 report (measured in the spike). A cycle found
       now that the run is complete: report it in the PR and leave the rule off with a `// TODO(cycle): <files>` comment
       rather than restructure code in this milestone.
@@ -74,7 +75,7 @@ conventions").
 
 - Modify: `CLAUDE.md`, `README.md`, `site/content/developers/contributing/conventions.mdx`,
   `site/content/developers/contributing/workflow.mdx`, `site/content/developers/getting-started.mdx`,
-  `site/content/developers/frontend.mdx`, `.git-blame-ignore-revs`
+  `site/content/developers/frontend.mdx`
 
 - [ ] **Step 1:** Go through the table "What leaves the written conventions" of the spec, row by row, and through
       `CLAUDE.md` from top to bottom. A sentence that states what a lint rule now enforces is replaced by the name of the
@@ -86,7 +87,6 @@ conventions").
       rules per project and the import bans table; `workflow.mdx`: a row in "Keep the docs in sync" for the lint
       configuration (`oxlint*.ts`, `oxfmt.config.ts`, `scripts/oxlint/` → `contributing/conventions.mdx`).
 - [ ] **Step 3:** `git grep -n -i 'biome' -- ':!docs/superpowers'`. Expected: nothing.
-- [ ] **Step 4:** Add the L6 squash commit to `.git-blame-ignore-revs`.
 - [ ] **Step 5:** `pnpm format`; `pnpm site:build && pnpm --dir site check-links`; `pnpm lint && pnpm check && pnpm test`;
       `pnpm build && node scripts/smoke.ts`. Commit: `docs: conventions the linter enforces leave the written rules`.
 

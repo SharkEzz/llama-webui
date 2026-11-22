@@ -36,31 +36,31 @@ item become `interrupted`, and `POST /api/sweeps/:id/resume` picks them up.
 Progress goes over the [WebSocket](/developers/api/websocket/), next to the `bench-run` and `bench-progress` messages
 of each item:
 
-| Message          | Payload               | When                                                                |
-| ---------------- | --------------------- | ------------------------------------------------------------------- |
-| `sweep`          | `Sweep`               | On every change: start, after each item, cancel, end.               |
-| `sweep-progress` | `SweepLive` \| null    | When an item starts; null when the sweep ends.                      |
-| `sweep-deleted`  | `{ id: number }`      | A sweep was deleted.                                                |
+| Message          | Payload             | When                                                  |
+| ---------------- | ------------------- | ----------------------------------------------------- |
+| `sweep`          | `Sweep`             | On every change: start, after each item, cancel, end. |
+| `sweep-progress` | `SweepLive` \| null | When an item starts; null when the sweep ends.        |
+| `sweep-deleted`  | `{ id: number }`    | A sweep was deleted.                                  |
 
 ## The sweep spec
 
 `SweepSpec` (`SweepSpecSchema`, `packages/webui-shared/src/sweep.ts`), strict. `modelPath`, `mmprojPath`, `profileId`, `p`, `n`, `r`
 and `serverArgs` have the same rules as in a [run spec](/developers/api/bench/#the-run-spec).
 
-| Field          | Type            | Required | Description                                                                                  |
-| -------------- | --------------- | -------- | -------------------------------------------------------------------------------------------- |
-| `name`         | string          | yes      | Trimmed, 1 to 80 characters.                                                                 |
-| `modelPath`    | string          | yes      | Absolute path ending in `.gguf`.                                                             |
-| `mmprojPath`   | string \| null   | no       | Projector, default null: counted by the estimator, loaded by the `server` validations.       |
-| `profileId`    | integer \| null  | no       | Source profile (environment, working directory), default null.                               |
-| `p`            | integer         | no       | Prompt tokens, 1 to 32,768, default 512.                                                     |
-| `n`            | integer         | no       | Generated tokens, 1 to 4096, default 128.                                                    |
-| `r`            | integer         | no       | Repetitions per item, 1 to 20, default 3.                                                    |
+| Field          | Type            | Required | Description                                                                                                                                             |
+| -------------- | --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`         | string          | yes      | Trimmed, 1 to 80 characters.                                                                                                                            |
+| `modelPath`    | string          | yes      | Absolute path ending in `.gguf`.                                                                                                                        |
+| `mmprojPath`   | string \| null  | no       | Projector, default null: counted by the estimator, loaded by the `server` validations.                                                                  |
+| `profileId`    | integer \| null | no       | Source profile (environment, working directory), default null.                                                                                          |
+| `p`            | integer         | no       | Prompt tokens, 1 to 32,768, default 512.                                                                                                                |
+| `n`            | integer         | no       | Generated tokens, 1 to 4096, default 128.                                                                                                               |
+| `r`            | integer         | no       | Repetitions per item, 1 to 20, default 3.                                                                                                               |
 | `preset`       | string          | yes      | Tuning preset that sets the context and ranks the results: `chat`, `agent`, `context`, `fit` or `big` (see [Presets](/developers/api/tuning/#presets)). |
-| `base`         | `BenchParams`   | no       | Values shared by every item, default `{}`.                                                   |
-| `space`        | `SweepSpace`    | no       | The values to try, default `{}`.                                                             |
-| `serverArgs`   | string[]        | no       | Other `llama-server` flags, default `[]`: they set the context (`-c`) and are passed to the `server` validations. |
-| `includeUnfit` | boolean         | no       | Keep the combinations the estimator says do not fit. Default `false`.                       |
+| `base`         | `BenchParams`   | no       | Values shared by every item, default `{}`.                                                                                                              |
+| `space`        | `SweepSpace`    | no       | The values to try, default `{}`.                                                                                                                        |
+| `serverArgs`   | string[]        | no       | Other `llama-server` flags, default `[]`: they set the context (`-c`) and are passed to the `server` validations.                                       |
+| `includeUnfit` | boolean         | no       | Keep the combinations the estimator says do not fit. Default `false`.                                                                                   |
 
 ### The space
 
@@ -94,27 +94,27 @@ minimum context), with the item's `ctk` and
 
 `Sweep`:
 
-| Field        | Type            | Description                                                                         |
-| ------------ | --------------- | ----------------------------------------------------------------------------------- |
-| `id`         | number          | Sweep id.                                                                           |
-| `name`       | string          | Name.                                                                               |
-| `status`     | string          | `running`, `done`, `cancelled` or `interrupted`.                                   |
-| `spec`       | `SweepSpec`     | The spec; `profileId` becomes null if the profile was deleted since.                |
-| `bestRunId`  | number \| null   | Best run, set when the sweep ends.                                                  |
-| `best`       | object \| null   | Summary of the best run: `label`, `kind`, `ppTps`, `tgTps`.                         |
-| `counts`     | object          | Items per status: `total`, `queued`, `running`, `ok`, `failed`, `cancelled`, `interrupted`. |
-| `createdAt`  | number          | Epoch ms.                                                                           |
-| `finishedAt` | number \| null   | Epoch ms; reset to null when the sweep runs again.                                  |
+| Field        | Type           | Description                                                                                 |
+| ------------ | -------------- | ------------------------------------------------------------------------------------------- |
+| `id`         | number         | Sweep id.                                                                                   |
+| `name`       | string         | Name.                                                                                       |
+| `status`     | string         | `running`, `done`, `cancelled` or `interrupted`.                                            |
+| `spec`       | `SweepSpec`    | The spec; `profileId` becomes null if the profile was deleted since.                        |
+| `bestRunId`  | number \| null | Best run, set when the sweep ends.                                                          |
+| `best`       | object \| null | Summary of the best run: `label`, `kind`, `ppTps`, `tgTps`.                                 |
+| `counts`     | object         | Items per status: `total`, `queued`, `running`, `ok`, `failed`, `cancelled`, `interrupted`. |
+| `createdAt`  | number         | Epoch ms.                                                                                   |
+| `finishedAt` | number \| null | Epoch ms; reset to null when the sweep runs again.                                          |
 
 `SweepLive`, the payload of `sweep-progress`:
 
-| Field     | Type                        | Description                                       |
-| --------- | --------------------------- | ------------------------------------------------- |
-| `sweepId` | number                      | Running sweep.                                    |
-| `runId`   | number \| null               | Item being run.                                   |
-| `index`   | number                      | Position of the item, 1-based.                    |
-| `total`   | number                      | Items in the sweep.                               |
-| `stage`   | `"explore"` \| `"validate"`  | `bench` item or `server` validation.              |
+| Field     | Type                        | Description                          |
+| --------- | --------------------------- | ------------------------------------ |
+| `sweepId` | number                      | Running sweep.                       |
+| `runId`   | number \| null              | Item being run.                      |
+| `index`   | number                      | Position of the item, 1-based.       |
+| `total`   | number                      | Items in the sweep.                  |
+| `stage`   | `"explore"` \| `"validate"` | `bench` item or `server` validation. |
 
 ### Ranking
 
@@ -134,10 +134,10 @@ it. The sweep and its items are written only once the gate is taken: a refused r
 
 **Body**:
 
-| Field        | Type        | Required | Description                                                                   |
-| ------------ | ----------- | -------- | ----------------------------------------------------------------------------- |
+| Field        | Type        | Required | Description                                                                      |
+| ------------ | ----------- | -------- | -------------------------------------------------------------------------------- |
 | `spec`       | `SweepSpec` | yes      | [The sweep spec](#the-sweep-spec). Its issues have paths that start with `spec`. |
-| `stopServer` | boolean     | no       | `true` allows stopping the managed server (restarted at the end).             |
+| `stopServer` | boolean     | no       | `true` allows stopping the managed server (restarted at the end).                |
 
 **Response**: `202` with `{ sweep: Sweep, items: number, excluded: number }`: the sweep (status `running`), the number
 of queued items, and the number of combinations dropped by the estimator.
@@ -258,10 +258,10 @@ sweep's interrupted items are requeued with them. The sweep then runs again, in 
 
 **Body**: a JSON object, required (`{}` for the defaults), strict.
 
-| Field        | Type    | Required | Description                                          |
-| ------------ | ------- | -------- | ---------------------------------------------------- |
-| `n`          | integer | no       | Configurations to validate, 1 to 5, default 3.       |
-| `stopServer` | boolean | no       | `true` allows stopping the managed server.           |
+| Field        | Type    | Required | Description                                    |
+| ------------ | ------- | -------- | ---------------------------------------------- |
+| `n`          | integer | no       | Configurations to validate, 1 to 5, default 3. |
+| `stopServer` | boolean | no       | `true` allows stopping the managed server.     |
 
 **Response**: `202` with the `Sweep` (status `running`).
 

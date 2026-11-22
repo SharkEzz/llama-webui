@@ -28,19 +28,19 @@ Each row is a flag. Every value you add to a row overrides the base for that fla
 configurations; an empty row has no effect. Type a value and press <Kbd>Enter</Kbd> (or leave the field) to add it, click
 a suggestion to add it, and click × on a value to remove it.
 
-| Row      | Values                                              | Suggestions                                                                   |
-| -------- | --------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `-ngl`   | A number of layers or `all`                         | `all`                                                                         |
-| `-ncmoe` | Whole numbers                                       | Around the estimate (N−8, N−4, N, N+4, N+8) when it uses `-ncmoe`, otherwise 0, 4, 8, 16 |
-| `-dev`   | Device sets: check cards, then **Add this set**     | **each card alone**, **all CUDA** (two CUDA cards or more), **all** (two cards or more) |
-| `-ts`    | Proportions such as `3,1`                           | None. A value only applies to `-dev` sets with as many cards.                 |
-| `-ot`    | One `pattern=buffer` rule per value                 | `exps=CPU`, `blk\.(\d\|1\d)\.ffn_.*_exps=CPU`, `blk\.[0-9]\.ffn_.*_exps=CPU`, then `ffn_.*_exps=<id>` for each of your cards |
-| `-fa`    | Toggle `on`, `off`, `auto`                          |                                                                               |
-| `-ctk`, `-ctv` | Toggle any KV cache type                      |                                                                               |
-| `-sm`    | Toggle `none`, `layer`, `row`, `tensor`             |                                                                               |
-| `-ub`    | Whole numbers                                       | 256, 512, 1024, 2048                                                          |
-| `-b`     | Whole numbers                                       | 512, 2048, 4096                                                               |
-| `-t`     | Whole numbers                                       | Your physical core count and thread count                                    |
+| Row            | Values                                          | Suggestions                                                                                                                  |
+| -------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `-ngl`         | A number of layers or `all`                     | `all`                                                                                                                        |
+| `-ncmoe`       | Whole numbers                                   | Around the estimate (N−8, N−4, N, N+4, N+8) when it uses `-ncmoe`, otherwise 0, 4, 8, 16                                     |
+| `-dev`         | Device sets: check cards, then **Add this set** | **each card alone**, **all CUDA** (two CUDA cards or more), **all** (two cards or more)                                      |
+| `-ts`          | Proportions such as `3,1`                       | None. A value only applies to `-dev` sets with as many cards.                                                                |
+| `-ot`          | One `pattern=buffer` rule per value             | `exps=CPU`, `blk\.(\d\|1\d)\.ffn_.*_exps=CPU`, `blk\.[0-9]\.ffn_.*_exps=CPU`, then `ffn_.*_exps=<id>` for each of your cards |
+| `-fa`          | Toggle `on`, `off`, `auto`                      |                                                                                                                              |
+| `-ctk`, `-ctv` | Toggle any KV cache type                        |                                                                                                                              |
+| `-sm`          | Toggle `none`, `layer`, `row`, `tensor`         |                                                                                                                              |
+| `-ub`          | Whole numbers                                   | 256, 512, 1024, 2048                                                                                                         |
+| `-b`           | Whole numbers                                   | 512, 2048, 4096                                                                                                              |
+| `-t`           | Whole numbers                                   | Your physical core count and thread count                                                                                    |
 
 **Start from the recommendation** fills in a few rows for you: `-ncmoe` around the recommended value when the model keeps
 experts in RAM; a few `-dev` sets (the recommended one, all cards, all CUDA cards, the largest card alone) when there is
@@ -52,12 +52,12 @@ layers. The others send every expert to one of your dedicated cards, one suggest
 
 ### Run settings
 
-| Field              | Default                               | Notes                                                                 |
-| ------------------ | ------------------------------------- | --------------------------------------------------------------------- |
-| **Sweep name**     | Automatic: model · preset · date      | Up to 80 characters.                                                  |
-| **p (prompt)**     | 512                                   | Prompt tokens per measurement.                                        |
-| **n (generation)** | 128                                   | Generated tokens per measurement.                                     |
-| **r (repetitions)**| 3                                     | Keep 3 or more for the standard deviation to mean something.          |
+| Field               | Default                          | Notes                                                        |
+| ------------------- | -------------------------------- | ------------------------------------------------------------ |
+| **Sweep name**      | Automatic: model · preset · date | Up to 80 characters.                                         |
+| **p (prompt)**      | 512                              | Prompt tokens per measurement.                               |
+| **n (generation)**  | 128                              | Generated tokens per measurement.                            |
+| **r (repetitions)** | 3                                | Keep 3 or more for the standard deviation to mean something. |
 
 **Include configurations that do not fit (they will most likely end in “Out of memory”)** keeps the configurations the
 estimator rejects. Leave it unchecked unless you want to see where the limit really is.
@@ -111,16 +111,16 @@ Validation adds one server run per configuration you validate.
 The sweep card keeps two rankings apart, never mixed: **Validation (server)**, once you have validated, and
 **Exploration (llama-bench)**.
 
-| Column            | Shows                                                                     |
-| ----------------- | ------------------------------------------------------------------------- |
-| **Rank**          | The position by the preset's score; `1=` for a tie with the first.        |
-| **Configuration** | The flags that vary; a star marks the best run.                           |
-| **Estimated**     | The estimator's verdict when the sweep was planned.                       |
-| **Status**        | **Done**, **Failed**, **out of memory**…; hover for the error.            |
-| **Prompt**, **Generation** | Speeds in tok/s, with the standard deviation below.              |
-| **Draft**         | Validation only: draft acceptance with speculative decoding.              |
-| **Peak VRAM**     | VRAM the run added, summed over the cards.                                |
-| **Duration**      | The whole run, model loading included.                                    |
+| Column                     | Shows                                                              |
+| -------------------------- | ------------------------------------------------------------------ |
+| **Rank**                   | The position by the preset's score; `1=` for a tie with the first. |
+| **Configuration**          | The flags that vary; a star marks the best run.                    |
+| **Estimated**              | The estimator's verdict when the sweep was planned.                |
+| **Status**                 | **Done**, **Failed**, **out of memory**…; hover for the error.     |
+| **Prompt**, **Generation** | Speeds in tok/s, with the standard deviation below.                |
+| **Draft**                  | Validation only: draft acceptance with speculative decoding.       |
+| **Peak VRAM**              | VRAM the run added, summed over the cards.                         |
+| **Duration**               | The whole run, model loading included.                             |
 
 The score depends on the preset (see [Presets](/docs/tuning/#presets)): generation speed for most of them,
 0.6 × prompt speed + 0.4 × generation speed for **Agent & RAG**. Successful runs are ranked by score; the others follow

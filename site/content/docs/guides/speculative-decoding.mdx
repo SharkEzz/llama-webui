@@ -23,30 +23,30 @@ too few drafts are kept, drafting costs more than it saves and generation gets s
 
 `--spec-type` turns it on, with one or more types separated by commas (default: `none`):
 
-| Type                                           | Where the drafts come from                                                            | What it needs                                    |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `draft-simple`                                 | A much smaller model of the same family.                                              | A draft model, given with `-md`.                 |
-| `draft-mtp`                                    | The main model's own MTP (multi-token prediction) layers.                             | A GGUF that contains MTP layers.                 |
-| `draft-eagle3`, `draft-dflash`, `draft-dspark` | Small draft models trained for one specific main model.                               | The matching draft model, given with `-md`.      |
-| `ngram-simple`, `ngram-map-k`, `ngram-map-k4v`, `ngram-mod`, `ngram-cache` | Token sequences already present in the context.                | Nothing: no second model.                        |
+| Type                                                                       | Where the drafts come from                                | What it needs                               |
+| -------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------- |
+| `draft-simple`                                                             | A much smaller model of the same family.                  | A draft model, given with `-md`.            |
+| `draft-mtp`                                                                | The main model's own MTP (multi-token prediction) layers. | A GGUF that contains MTP layers.            |
+| `draft-eagle3`, `draft-dflash`, `draft-dspark`                             | Small draft models trained for one specific main model.   | The matching draft model, given with `-md`. |
+| `ngram-simple`, `ngram-map-k`, `ngram-map-k4v`, `ngram-mod`, `ngram-cache` | Token sequences already present in the context.           | Nothing: no second model.                   |
 
 To know whether a model has MTP layers, click it on the [Models](/docs/models/) page: the **MTP layers** row of its
 details gives their number, or `—` when it has none.
 
 The settings that matter most:
 
-| Flag                                              | Default              | What it sets                                                                    |
-| ------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------- |
-| `-md`, `--spec-draft-model`, `--model-draft`       | unused               | The draft model file.                                                           |
-| `--spec-draft-n-max`                              | `3`                  | The number of tokens to draft each time.                                        |
-| `--spec-draft-n-min`                              | `0`                  | The minimum number of draft tokens to use.                                      |
-| `--spec-draft-p-min`                              | `0.00`               | The minimum probability for a drafted token (greedy drafting).                  |
-| `-ngld`, `--spec-draft-ngl`                       | `auto`               | How many draft model layers go to VRAM: a number, `auto` or `all`.              |
-| `-devd`, `--spec-draft-device`                    | follows `--device`   | The devices for the draft model.                                                |
-| `-ctkd`, `-ctvd`                                  | `f16`                | The KV cache types of the draft model.                                          |
-| `--spec-draft-sampling`                           | `greedy`             | `greedy` takes the draft's top token; `probabilistic` samples it.               |
-| `--spec-ngram-mod-n-match`                        | `24`                 | The lookup length of `ngram-mod`.                                               |
-| `--spec-ngram-mod-n-min`, `--spec-ngram-mod-n-max` | `48`, `64`          | The minimum and maximum number of n-gram tokens `ngram-mod` drafts.             |
+| Flag                                               | Default            | What it sets                                                        |
+| -------------------------------------------------- | ------------------ | ------------------------------------------------------------------- |
+| `-md`, `--spec-draft-model`, `--model-draft`       | unused             | The draft model file.                                               |
+| `--spec-draft-n-max`                               | `3`                | The number of tokens to draft each time.                            |
+| `--spec-draft-n-min`                               | `0`                | The minimum number of draft tokens to use.                          |
+| `--spec-draft-p-min`                               | `0.00`             | The minimum probability for a drafted token (greedy drafting).      |
+| `-ngld`, `--spec-draft-ngl`                        | `auto`             | How many draft model layers go to VRAM: a number, `auto` or `all`.  |
+| `-devd`, `--spec-draft-device`                     | follows `--device` | The devices for the draft model.                                    |
+| `-ctkd`, `-ctvd`                                   | `f16`              | The KV cache types of the draft model.                              |
+| `--spec-draft-sampling`                            | `greedy`           | `greedy` takes the draft's top token; `probabilistic` samples it.   |
+| `--spec-ngram-mod-n-match`                         | `24`               | The lookup length of `ngram-mod`.                                   |
+| `--spec-ngram-mod-n-min`, `--spec-ngram-mod-n-max` | `48`, `64`         | The minimum and maximum number of n-gram tokens `ngram-mod` drafts. |
 
 `--spec-default` turns on llama.cpp's default speculative configuration.
 

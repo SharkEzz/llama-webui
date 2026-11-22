@@ -82,13 +82,13 @@ the names in the list before writing `-dev`.
 
 ## The flags that place the model
 
-| Flag                          | Value                                    | What it does                                                                                                                           |
-| ----------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `-dev`, `--device`            | `CUDA0,ROCm0`, or `none`                 | The devices to offload to, comma-separated; `none` keeps everything on the CPU. Without it, llama.cpp picks the GPUs itself.           |
-| `-ts`, `--tensor-split`       | `3,1`                                    | The share of the model each device gets, as proportions, in the order of `-dev`. Without it, the split follows each device's memory.   |
-| `-sm`, `--split-mode`         | `none`, `layer`, `row`, `tensor`         | How the model is split across the GPUs (below). Default: `layer`.                                                                      |
-| `-mg`, `--main-gpu`           | an index, default `0`                    | The GPU that holds the whole model with `-sm none`, or the intermediate results and KV cache with `-sm row`.                           |
-| `-ngl`, `--n-gpu-layers`      | a number, `auto` or `all`                | How many layers go to the GPUs at all. Default: `auto`.                                                                                |
+| Flag                     | Value                            | What it does                                                                                                                         |
+| ------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `-dev`, `--device`       | `CUDA0,ROCm0`, or `none`         | The devices to offload to, comma-separated; `none` keeps everything on the CPU. Without it, llama.cpp picks the GPUs itself.         |
+| `-ts`, `--tensor-split`  | `3,1`                            | The share of the model each device gets, as proportions, in the order of `-dev`. Without it, the split follows each device's memory. |
+| `-sm`, `--split-mode`    | `none`, `layer`, `row`, `tensor` | How the model is split across the GPUs (below). Default: `layer`.                                                                    |
+| `-mg`, `--main-gpu`      | an index, default `0`            | The GPU that holds the whole model with `-sm none`, or the intermediate results and KV cache with `-sm row`.                         |
+| `-ngl`, `--n-gpu-layers` | a number, `auto` or `all`        | How many layers go to the GPUs at all. Default: `auto`.                                                                              |
 
 `-mg` counts in the list of devices in use: with `-dev CUDA1,ROCm0 -sm none -mg 1`, the model goes to `ROCm0`.
 

@@ -31,17 +31,17 @@ The server's entry point is `app/server/main.ts`, run from source in development
 
 The services are layers, built in tiers (`Services` in `app/server/App.ts`), each tier after the ones below it:
 
-| Tier | Layers | What their build does |
-| --- | --- | --- |
-| 1 | `Db.layer` | Creates the data directory, opens `llama-webui.sqlite` (`@effect/sql-sqlite-node`, on `node:sqlite`) in WAL mode with foreign keys on, and runs the migrations (`app/server/db/migrations.ts`). |
-| 2 | `AppInfo` | The version and the boot id (a random UUID), the start time `/api/health` counts from. |
-| 3 | `WsHub`, the repositories, `GgufReader`, `ActiveWrites` | The WebSocket hub; the settings, profiles, conversations, model cache, downloads, bench run and sweep repositories. |
-| 4 | `LogRing`, `LlamaHttp`, `CpuInfo`, `PciIds`, `HfClient` on `HfHttp` | The ring of the last 10,000 log lines; the HTTP clients of llama-server and of Hugging Face; the CPU details and the PCI ID database, both read on first use and cached. |
-| 5 | `Flags`, `BenchHardware` | The flag catalogue of `llama-server --help` and the bench's device listing, both read on demand and cached. |
-| 6 | `Supervisor` | The supervisor of `llama-server`; nothing runs until a start. |
-| 7 | `Monitor`, `Placement`, `ChatRuns`, `Downloads` | The monitor starts its collectors in a fiber (`LLAMA_WEBUI_TEST_MONITOR=stub`, a setting of the contract suite, gives a monitor without them); the placement follows the log ring; `ChatRuns` marks the replies left `streaming` by the previous process `stopped`; the download queue picks up the items left queued or downloading. |
-| 8 | `BenchRunner`, `TuningHardware`, `TuningMemo` | The runner marks the runs and sweeps left `running` `interrupted`. |
-| 9 | `ExternalWatch` | Looks for a `llama-server` started by hand at once, then every 2 seconds, one look at a time; it skips its looks while the bench runner is busy, since the `llama-server` a benchmark starts on the settings port is not an external server. |
+| Tier | Layers                                                              | What their build does                                                                                                                                                                                                                                                                                                                 |
+| ---- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `Db.layer`                                                          | Creates the data directory, opens `llama-webui.sqlite` (`@effect/sql-sqlite-node`, on `node:sqlite`) in WAL mode with foreign keys on, and runs the migrations (`app/server/db/migrations.ts`).                                                                                                                                       |
+| 2    | `AppInfo`                                                           | The version and the boot id (a random UUID), the start time `/api/health` counts from.                                                                                                                                                                                                                                                |
+| 3    | `WsHub`, the repositories, `GgufReader`, `ActiveWrites`             | The WebSocket hub; the settings, profiles, conversations, model cache, downloads, bench run and sweep repositories.                                                                                                                                                                                                                   |
+| 4    | `LogRing`, `LlamaHttp`, `CpuInfo`, `PciIds`, `HfClient` on `HfHttp` | The ring of the last 10,000 log lines; the HTTP clients of llama-server and of Hugging Face; the CPU details and the PCI ID database, both read on first use and cached.                                                                                                                                                              |
+| 5    | `Flags`, `BenchHardware`                                            | The flag catalogue of `llama-server --help` and the bench's device listing, both read on demand and cached.                                                                                                                                                                                                                           |
+| 6    | `Supervisor`                                                        | The supervisor of `llama-server`; nothing runs until a start.                                                                                                                                                                                                                                                                         |
+| 7    | `Monitor`, `Placement`, `ChatRuns`, `Downloads`                     | The monitor starts its collectors in a fiber (`LLAMA_WEBUI_TEST_MONITOR=stub`, a setting of the contract suite, gives a monitor without them); the placement follows the log ring; `ChatRuns` marks the replies left `streaming` by the previous process `stopped`; the download queue picks up the items left queued or downloading. |
+| 8    | `BenchRunner`, `TuningHardware`, `TuningMemo`                       | The runner marks the runs and sweeps left `running` `interrupted`.                                                                                                                                                                                                                                                                    |
+| 9    | `ExternalWatch`                                                     | Looks for a `llama-server` started by hand at once, then every 2 seconds, one look at a time; it skips its looks while the bench runner is busy, since the `llama-server` a benchmark starts on the settings port is not an external server.                                                                                          |
 
 Only then is the port bound (`HttpLive`, `app/server/http/HttpLive.ts`), and the server prints
 `ready (<version>) on http://127.0.0.1:7860`: `dev` from source, the build's version in production. There is no
@@ -52,14 +52,14 @@ A service that others follow exposes its changes as a stream (`changes` of the s
 and a service publishes its own `/ws` messages with `WsHub.publish`, in the step that changes its state, so the
 messages leave in the order of the changes:
 
-| Publisher | Messages |
-| --- | --- |
-| `Supervisor` | `server-state` |
-| `LogRing` | `log` (one batch per turn of its fiber) |
-| `Monitor` | `snapshot` |
-| `Placement` | `placement` |
+| Publisher     | Messages                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------ |
+| `Supervisor`  | `server-state`                                                                             |
+| `LogRing`     | `log` (one batch per turn of its fiber)                                                    |
+| `Monitor`     | `snapshot`                                                                                 |
+| `Placement`   | `placement`                                                                                |
 | `BenchRunner` | `bench-progress`, `bench-run`, `bench-deleted`, `sweep`, `sweep-progress`, `sweep-deleted` |
-| `Downloads` | `download`, `download-progress`, `download-deleted` |
+| `Downloads`   | `download`, `download-progress`, `download-deleted`                                        |
 
 ## Requests
 
@@ -113,11 +113,11 @@ is answered with its own status and `{ _tag, message }`, plus its other fields. 
 
 The browser talks to llama-webui over three channels, all on the same port.
 
-| Channel | Direction | Used for |
-| --- | --- | --- |
-| REST, `/api/*` | request, response | Every read and every command: settings, profiles, starting the server, launching a benchmark, the history dump, the log replay. JSON in both directions. |
-| WebSocket, `/ws` | server to browser | Live state pushed to every open tab: snapshots on every monitor tick, log lines, server state changes, benchmark, sweep and download progress, model placement. |
-| SSE, `text/event-stream` | server to browser, per request | Chat generations only: the response of `POST /api/chat/:id/messages`, `POST /api/chat/:id/regenerate` and `GET /api/chat/:id/stream`. |
+| Channel                  | Direction                      | Used for                                                                                                                                                        |
+| ------------------------ | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| REST, `/api/*`           | request, response              | Every read and every command: settings, profiles, starting the server, launching a benchmark, the history dump, the log replay. JSON in both directions.        |
+| WebSocket, `/ws`         | server to browser              | Live state pushed to every open tab: snapshots on every monitor tick, log lines, server state changes, benchmark, sweep and download progress, model placement. |
+| SSE, `text/event-stream` | server to browser, per request | Chat generations only: the response of `POST /api/chat/:id/messages`, `POST /api/chat/:id/regenerate` and `GET /api/chat/:id/stream`.                           |
 
 ### WebSocket
 
@@ -232,12 +232,12 @@ written `"1"`, an unknown key in a body); the [API overview](/developers/api/ove
 environment variable, else a default (`AppConfig`, `app/server/config/AppConfig.ts`). An empty variable counts as
 unset.
 
-| Flag | Variable | Default |
-| --- | --- | --- |
-| `--host <address>` | `LLAMA_WEBUI_HOST` | `127.0.0.1` |
-| `--port <port>` | `LLAMA_WEBUI_PORT` | `7860` (an integer from 1 to 65535) |
-| `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR` | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` |
-| `--env-override` | `LLAMA_WEBUI_ENV_OVERRIDE=1` | off: `.env` only fills what the environment lacks |
+| Flag                | Variable                     | Default                                                         |
+| ------------------- | ---------------------------- | --------------------------------------------------------------- |
+| `--host <address>`  | `LLAMA_WEBUI_HOST`           | `127.0.0.1`                                                     |
+| `--port <port>`     | `LLAMA_WEBUI_PORT`           | `7860` (an integer from 1 to 65535)                             |
+| `--data-dir <path>` | `LLAMA_WEBUI_DATA_DIR`       | `$XDG_DATA_HOME/llama-webui`, else `~/.local/share/llama-webui` |
+| `--env-override`    | `LLAMA_WEBUI_ENV_OVERRIDE=1` | off: `.env` only fills what the environment lacks               |
 
 `-h`/`--help` prints the help and exits with code 0, `-v`/`--version` prints `llama-webui v<version>`. An unknown flag
 or an invalid value prints the help, then the error, and exits with code 1. In development, `vite dev` starts the
@@ -293,20 +293,20 @@ The DevTools of the VS Code extension (0.10.0) still decode the metrics in the s
 (`app/server/runtime/DevToolsWire.ts`) rewrites its snapshots, and its span events without attributes, into that shape
 before they leave, as the extension's own debugger instrumentation does.
 
-| Group | What it measures |
-| --- | --- |
-| `HttpMetrics` | every response by method and class of status (`2xx`…, `aborted`), its duration, the defects (500), the requests the guard refused, the ones that did not decode (by part) |
-| `WsMetrics` | the `/ws` clients connected, the messages published by type, the messages and bytes written, the clients closed by the heartbeat |
-| `ChatMetrics` | the replies being written, the replies saved by status, the failures by cause, the refusals by tag, the time to the first token, the speeds (tg and pp) and the tokens of each reply |
-| `LlamaMetrics` | the states the supervised `llama-server` entered, whether it is ready, the time to ready, the time a stop took, the stops that needed SIGKILL |
-| `DownloadMetrics` | the bytes received, the current speed, the files resumed, the retries, the items ended by status, the errors by code, the time an item ran |
-| `MonitorMetrics` | the time a tick took, the ticks longer than the interval, the ticks that failed, the readers that died, the source of the NVIDIA cards, the NVML sampler's stops and restarts |
-| `BenchMetrics` | the runs ended by kind and status and their duration, the sweeps ended by status, the works that died, the refusals of the gate, the failed restarts of `llama-server`, the time a trial server took to load |
-| `HfMetrics` | the requests to the Hub API by result (`ok` or the error's tag), their duration |
-| `LlamaHttpMetrics` | the requests to a `llama-server` (the monitor's polls, the chat, the trials) by class of status, `failed` or `aborted`, and the time to their headers |
-| `CacheMetrics` | the lookups and the loads of each cache (`gguf`, `flags`, `bench_build`, `bench_devices`, `model_cache`, `whoami`: a hit is a lookup that loaded nothing), the time a GGUF header and a `--help` took to read, the device listings that fell back to the last good one |
-| `ModelMetrics` | the time a scan of the models folder took, the models it found and could not read, the `model_cache` rows pruned |
-| `ShutdownMetrics` | the time the shutdown steps took, the steps that failed |
+| Group              | What it measures                                                                                                                                                                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `HttpMetrics`      | every response by method and class of status (`2xx`…, `aborted`), its duration, the defects (500), the requests the guard refused, the ones that did not decode (by part)                                                                                              |
+| `WsMetrics`        | the `/ws` clients connected, the messages published by type, the messages and bytes written, the clients closed by the heartbeat                                                                                                                                       |
+| `ChatMetrics`      | the replies being written, the replies saved by status, the failures by cause, the refusals by tag, the time to the first token, the speeds (tg and pp) and the tokens of each reply                                                                                   |
+| `LlamaMetrics`     | the states the supervised `llama-server` entered, whether it is ready, the time to ready, the time a stop took, the stops that needed SIGKILL                                                                                                                          |
+| `DownloadMetrics`  | the bytes received, the current speed, the files resumed, the retries, the items ended by status, the errors by code, the time an item ran                                                                                                                             |
+| `MonitorMetrics`   | the time a tick took, the ticks longer than the interval, the ticks that failed, the readers that died, the source of the NVIDIA cards, the NVML sampler's stops and restarts                                                                                          |
+| `BenchMetrics`     | the runs ended by kind and status and their duration, the sweeps ended by status, the works that died, the refusals of the gate, the failed restarts of `llama-server`, the time a trial server took to load                                                           |
+| `HfMetrics`        | the requests to the Hub API by result (`ok` or the error's tag), their duration                                                                                                                                                                                        |
+| `LlamaHttpMetrics` | the requests to a `llama-server` (the monitor's polls, the chat, the trials) by class of status, `failed` or `aborted`, and the time to their headers                                                                                                                  |
+| `CacheMetrics`     | the lookups and the loads of each cache (`gguf`, `flags`, `bench_build`, `bench_devices`, `model_cache`, `whoami`: a hit is a lookup that loaded nothing), the time a GGUF header and a `--help` took to read, the device listings that fell back to the last good one |
+| `ModelMetrics`     | the time a scan of the models folder took, the models it found and could not read, the `model_cache` rows pruned                                                                                                                                                       |
+| `ShutdownMetrics`  | the time the shutdown steps took, the steps that failed                                                                                                                                                                                                                |
 
 An attribute is always a value from a closed set (a status, a kind, a tag): never an id, a path or a model, which would
 make one series per value.

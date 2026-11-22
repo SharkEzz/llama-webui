@@ -14,14 +14,14 @@ and the **History** of past runs.
 
 A run uses one of two tools, picked with the **Tool** tabs of the form.
 
-| Tool                | **llama-bench**                                                        | **Server**                                                                         |
-| ------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| What runs           | llama.cpp's own benchmark, `llama-bench`                               | A temporary `llama-server`, started for the measurement and stopped afterwards     |
-| What it measures    | Raw prompt and generation speed for the flags in the fields            | Real chat requests, with every flag of the run                                      |
-| Context (`-c`)      | Not allocated                                                          | Allocated, as in daily use                                                         |
-| Speculative decoding | Not measured                                                          | Measured, with the draft acceptance rate in the **Draft** column                   |
-| Projector           | Ignored                                                                | Loaded                                                                             |
-| Needs               | `llama-bench` next to `llama-server`                                   | `llama-server` only                                                                |
+| Tool                 | **llama-bench**                                             | **Server**                                                                     |
+| -------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| What runs            | llama.cpp's own benchmark, `llama-bench`                    | A temporary `llama-server`, started for the measurement and stopped afterwards |
+| What it measures     | Raw prompt and generation speed for the flags in the fields | Real chat requests, with every flag of the run                                 |
+| Context (`-c`)       | Not allocated                                               | Allocated, as in daily use                                                     |
+| Speculative decoding | Not measured                                                | Measured, with the draft acceptance rate in the **Draft** column               |
+| Projector            | Ignored                                                     | Loaded                                                                         |
+| Needs                | `llama-bench` next to `llama-server`                        | `llama-server` only                                                            |
 
 Use **llama-bench** to compare placement and memory flags quickly and repeatably (`-ngl`, `-ncmoe`, `-dev`, `-ts`,
 cache types): it is what [sweeps](/docs/sweeps/) use to explore. Use **Server** for the numbers you will actually see in
@@ -48,24 +48,24 @@ without speculative decoding.
 
 Fill in the **New benchmark** form, then click **Run**.
 
-| Field                     | What it does                                                                                                           | Default                |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| **Start from a profile**  | Prefills the model, the projector and the flags from a profile. The profile is not modified.                          | **None: model and flags** |
-| **Tool**                  | **llama-bench** or **Server**.                                                                                         | **llama-bench**        |
-| **Model**                 | Absolute path to the `.gguf` file. The folder button at the end of the field lists your models.                        | Empty                  |
-| **Projector (optional)**  | A multimodal projector. llama-bench ignores it, but it is kept for **Create profile** and **Rerun**.                  | Empty                  |
-| `-ngl`                    | Layers on the GPUs: a number, `all` or `auto`.                                                                         | Tool default           |
-| `-ncmoe`                  | Keeps the MoE experts of the first N layers in RAM.                                                                    | Tool default           |
-| `-t`, `-b`, `-ub`         | Threads, batch size, micro-batch size.                                                                                 | Tool default           |
-| `-sm`                     | Split mode: `none`, `layer`, `row` or `tensor`.                                                                        | Tool default           |
-| `-fa`                     | Flash attention: `on`, `off` or `auto`.                                                                                | Tool default           |
-| `-ctk`, `-ctv`            | KV cache types: `f32`, `f16`, `bf16`, `f8_e4m3`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`. `f8_e4m3` needs a recent llama.cpp build and runs on CUDA and the CPU only. | Tool default           |
-| **-dev and -ts**          | One checkbox per device, then a proportion box next to each checked device. With nothing checked, one `-ts` field (for example `3,1`) applies in the tool's device order. | Automatic |
-| `-ot`                     | Tensor overrides, one `pattern=buffer` rule per line, for example `exps=CPU`.                                          | None                   |
-| `-p`                      | Prompt tokens, 1 to 32,768.                                                                                            | 512                    |
-| `-n`                      | Generated tokens, 1 to 4,096.                                                                                          | 128                    |
-| `-r`                      | Repetitions, 1 to 20.                                                                                                  | 3                      |
-| **Other server flags**    | Any other `llama-server` flag, passed as is to a server run. llama-bench ignores them, but they are kept for a server run or a profile. | Empty |
+| Field                    | What it does                                                                                                                                                                   | Default                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------- |
+| **Start from a profile** | Prefills the model, the projector and the flags from a profile. The profile is not modified.                                                                                   | **None: model and flags** |
+| **Tool**                 | **llama-bench** or **Server**.                                                                                                                                                 | **llama-bench**           |
+| **Model**                | Absolute path to the `.gguf` file. The folder button at the end of the field lists your models.                                                                                | Empty                     |
+| **Projector (optional)** | A multimodal projector. llama-bench ignores it, but it is kept for **Create profile** and **Rerun**.                                                                           | Empty                     |
+| `-ngl`                   | Layers on the GPUs: a number, `all` or `auto`.                                                                                                                                 | Tool default              |
+| `-ncmoe`                 | Keeps the MoE experts of the first N layers in RAM.                                                                                                                            | Tool default              |
+| `-t`, `-b`, `-ub`        | Threads, batch size, micro-batch size.                                                                                                                                         | Tool default              |
+| `-sm`                    | Split mode: `none`, `layer`, `row` or `tensor`.                                                                                                                                | Tool default              |
+| `-fa`                    | Flash attention: `on`, `off` or `auto`.                                                                                                                                        | Tool default              |
+| `-ctk`, `-ctv`           | KV cache types: `f32`, `f16`, `bf16`, `f8_e4m3`, `q8_0`, `q4_0`, `q4_1`, `iq4_nl`, `q5_0`, `q5_1`. `f8_e4m3` needs a recent llama.cpp build and runs on CUDA and the CPU only. | Tool default              |
+| **-dev and -ts**         | One checkbox per device, then a proportion box next to each checked device. With nothing checked, one `-ts` field (for example `3,1`) applies in the tool's device order.      | Automatic                 |
+| `-ot`                    | Tensor overrides, one `pattern=buffer` rule per line, for example `exps=CPU`.                                                                                                  | None                      |
+| `-p`                     | Prompt tokens, 1 to 32,768.                                                                                                                                                    | 512                       |
+| `-n`                     | Generated tokens, 1 to 4,096.                                                                                                                                                  | 128                       |
+| `-r`                     | Repetitions, 1 to 20.                                                                                                                                                          | 3                         |
+| **Other server flags**   | Any other `llama-server` flag, passed as is to a server run. llama-bench ignores them, but they are kept for a server run or a profile.                                        | Empty                     |
 
 An empty field leaves the flag out, so the tool uses its own default. The device list comes from
 `llama-bench --list-devices`; when it cannot be read, the form says so and the choice stays automatic. As on the
@@ -85,12 +85,12 @@ profile.
 With **llama-bench** selected, the form warns **llama-bench will not reproduce the whole profile** when **Other server
 flags** contains a flag that changes speed or memory but that llama-bench does not apply:
 
-| Flag                                                         | Why it is listed                    |
-| ------------------------------------------------------------ | ----------------------------------- |
-| `-c`, `--ctx-size`                                           | context not allocated               |
+| Flag                                                                                                                      | Why it is listed                  |
+| ------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `-c`, `--ctx-size`                                                                                                        | context not allocated             |
 | `--spec-…` (`--spec-type`, `--spec-draft-n-max`, `--spec-default`…), `-md`, `--model-draft`, `--draft…`, `-ngld`, `-devd` | speculative decoding not measured |
-| `-cmoe`, `--cpu-moe`                                         | use `-ncmoe`                        |
-| `-np`, `--parallel`                                          | parallel slots                      |
+| `-cmoe`, `--cpu-moe`                                                                                                      | use `-ncmoe`                      |
+| `-np`, `--parallel`                                                                                                       | parallel slots                    |
 
 Switch the tool to **Server** to measure them.
 
@@ -132,19 +132,19 @@ The **History** card lists the latest 500 runs, newest first. Four filters narro
 **Running**, **Done**, **Failed**, **Cancelled**, **Interrupted**), and sweeps. **Without sweeps**, the default, hides the
 runs that belong to a [sweep](/docs/sweeps/); **With sweeps** shows them and adds a **Sweep** column.
 
-| Column         | Shows                                                                                      |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| **Run**        | The run number and its date.                                                               |
-| **Tool**       | `llama-bench` or `server`.                                                                 |
-| **Model**      | The file name; hover for the full path.                                                    |
-| **Flags**      | The run's flags in the tool's syntax; hover for the full command.                          |
-| **Sweep**      | With sweeps only: the sweep number and the configuration, linked to the sweep on Tuning.   |
-| **Prompt**     | Prompt processing speed in tok/s, with the standard deviation below.                       |
-| **Generation** | Generation speed in tok/s, with the standard deviation below.                              |
+| Column         | Shows                                                                                         |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| **Run**        | The run number and its date.                                                                  |
+| **Tool**       | `llama-bench` or `server`.                                                                    |
+| **Model**      | The file name; hover for the full path.                                                       |
+| **Flags**      | The run's flags in the tool's syntax; hover for the full command.                             |
+| **Sweep**      | With sweeps only: the sweep number and the configuration, linked to the sweep on Tuning.      |
+| **Prompt**     | Prompt processing speed in tok/s, with the standard deviation below.                          |
+| **Generation** | Generation speed in tok/s, with the standard deviation below.                                 |
 | **Draft**      | Draft acceptance rate of a server run with speculative decoding (MTP, draft model or n-gram). |
-| **Peak VRAM**  | VRAM the run added, summed over the cards; hover for each card.                            |
-| **Duration**   | The whole run, model loading included.                                                     |
-| **Status**     | **Done**, **Failed**, **Cancelled**, **Interrupted**…; hover a failed run for its error.   |
+| **Peak VRAM**  | VRAM the run added, summed over the cards; hover for each card.                               |
+| **Duration**   | The whole run, model loading included.                                                        |
+| **Status**     | **Done**, **Failed**, **Cancelled**, **Interrupted**…; hover a failed run for its error.      |
 
 The **…** menu of each row has **Rerun**, **Create profile**, **Copy command** and **Delete**. **Delete failed**, at
 the top of the card, removes every failed, cancelled and interrupted run in one go; runs that belong to a sweep stay

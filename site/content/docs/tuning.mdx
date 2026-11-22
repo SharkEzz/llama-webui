@@ -57,13 +57,13 @@ and parameter count), **Size**, **Layers**, **Experts** (for example `8 active o
 The **Preset** card sets the goal. It changes the context the estimator aims for, the KV cache type, the micro-batch
 size, and how [sweep](/docs/sweeps/) results are ranked.
 
-| Preset                 | Shown as                                              | Context (target, minimum)           | KV cache        | `-ub`        | Sweeps rank by                       |
-| ---------------------- | ----------------------------------------------------- | ----------------------------------- | --------------- | ------------ | ------------------------------------ |
-| **Responsive chat**    | generation throughput first, 32k context              | 32,768, 8,192                       | f16, else q8_0  | 512          | Generation speed                     |
-| **Agent & RAG**        | long prompts: prompt processing and generation        | 65,536, 16,384                      | q8_0            | 2048, else 512 | 0.6 × prompt speed + 0.4 × generation speed |
-| **Max context**        | the largest context that fits, then generation        | The largest that fits, 8,192        | q8_0            | 512          | Context, then generation speed       |
-| **Make the model fit** | get it to start and reply, even slowly                | 8,192, 8,192                        | q8_0            | 512          | Generation speed                     |
-| **100 GB model**       | MoE experts in RAM, attention and norms on all cards  | 32,768, 8,192                       | q8_0            | 512          | Generation speed                     |
+| Preset                 | Shown as                                             | Context (target, minimum)    | KV cache       | `-ub`          | Sweeps rank by                              |
+| ---------------------- | ---------------------------------------------------- | ---------------------------- | -------------- | -------------- | ------------------------------------------- |
+| **Responsive chat**    | generation throughput first, 32k context             | 32,768, 8,192                | f16, else q8_0 | 512            | Generation speed                            |
+| **Agent & RAG**        | long prompts: prompt processing and generation       | 65,536, 16,384               | q8_0           | 2048, else 512 | 0.6 × prompt speed + 0.4 × generation speed |
+| **Max context**        | the largest context that fits, then generation       | The largest that fits, 8,192 | q8_0           | 512            | Context, then generation speed              |
+| **Make the model fit** | get it to start and reply, even slowly               | 8,192, 8,192                 | q8_0           | 512            | Generation speed                            |
+| **100 GB model**       | MoE experts in RAM, attention and norms on all cards | 32,768, 8,192                | q8_0           | 512            | Generation speed                            |
 
 The target context is capped at the model's own maximum. All presets except **100 GB model** require the weights placed in
 RAM to fit in the available RAM. **100 GB model** works differently: it goes straight to all your cards with the MoE
@@ -75,20 +75,20 @@ experts in RAM, and accepts a model larger than your RAM, re-read from disk. See
 The **Recommendation (estimate)** card updates as soon as you change the model, the preset or a pinned value. Its table
 has three columns: **Flag**, **Value** and **Why**.
 
-| Flag                  | When it appears                                     | What the value means                                                                  |
-| --------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `-ncmoe`              | MoE model with part of its experts in RAM           | The experts of the first N layers stay in RAM.                                        |
-| `-ngl`                | Always                                              | `all` layers on the cards, a number of layers (the rest in RAM), or `0`.             |
-| `-dev`                | At least one card is used                           | The cards, in order. With several, the first one holds the compute buffers.          |
-| `-ts`                 | Several cards                                       | The split, in proportion to each card's usable VRAM.                                  |
-| `-c`                  | Always                                              | The context. **Why** gives the total memory estimated for the whole configuration.    |
-| `-fa`                 | Always                                              | `on`: faster attention, and required for a quantized KV cache.                        |
-| `-ctk / -ctv`         | Always                                              | The KV cache type: `f16`, or `q8_0` (half the size, negligible loss). With `-fa off` pinned, `f8_e4m3` when `f16` does not fit (half the size, no flash attention needed; CUDA cards only). |
-| `-t`                  | Always                                              | The number of physical CPU cores.                                                     |
-| `-b / -ub`            | Always                                              | Batch 2048, micro-batch from the preset.                                              |
-| `--fit`               | Always                                              | `off`: what gets measured is exactly what gets written.                               |
-| `--load-mode mmap+mlock` | `-ngl` leaves whole layers in RAM                | Locks the model in memory. Only when no `-ncmoe` is used, nothing overflows RAM and at least 2 GiB of RAM is left. |
-| `--numa`              | The CPU has several NUMA nodes                      | `distribute`.                                                                         |
+| Flag                     | When it appears                           | What the value means                                                                                                                                                                        |
+| ------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-ncmoe`                 | MoE model with part of its experts in RAM | The experts of the first N layers stay in RAM.                                                                                                                                              |
+| `-ngl`                   | Always                                    | `all` layers on the cards, a number of layers (the rest in RAM), or `0`.                                                                                                                    |
+| `-dev`                   | At least one card is used                 | The cards, in order. With several, the first one holds the compute buffers.                                                                                                                 |
+| `-ts`                    | Several cards                             | The split, in proportion to each card's usable VRAM.                                                                                                                                        |
+| `-c`                     | Always                                    | The context. **Why** gives the total memory estimated for the whole configuration.                                                                                                          |
+| `-fa`                    | Always                                    | `on`: faster attention, and required for a quantized KV cache.                                                                                                                              |
+| `-ctk / -ctv`            | Always                                    | The KV cache type: `f16`, or `q8_0` (half the size, negligible loss). With `-fa off` pinned, `f8_e4m3` when `f16` does not fit (half the size, no flash attention needed; CUDA cards only). |
+| `-t`                     | Always                                    | The number of physical CPU cores.                                                                                                                                                           |
+| `-b / -ub`               | Always                                    | Batch 2048, micro-batch from the preset.                                                                                                                                                    |
+| `--fit`                  | Always                                    | `off`: what gets measured is exactly what gets written.                                                                                                                                     |
+| `--load-mode mmap+mlock` | `-ngl` leaves whole layers in RAM         | Locks the model in memory. Only when no `-ncmoe` is used, nothing overflows RAM and at least 2 GiB of RAM is left.                                                                          |
+| `--numa`                 | The CPU has several NUMA nodes            | `distribute`.                                                                                                                                                                               |
 
 Warnings below the table point out what costs speed: layers or experts left in RAM, a model that overflows RAM, a card
 with a thin margin, or a device or `-ot` pattern the estimator does not recognize.
@@ -146,12 +146,12 @@ total memory, and a tick marks the usable budget. When another program holds mem
 the end of the bar shows it, with **… used by other processes** below. Hover a bar for the device name and the
 estimated, usable and total amounts.
 
-| Message                                    | Meaning                                                                    |
-| ------------------------------------------ | -------------------------------------------------------------------------- |
-| None                                       | Under 95% of the usable budget.                                            |
-| **tight: less than 5% headroom**           | Between 95% and 100% of the usable budget.                                 |
-| **… over**                                 | Over the usable budget: the configuration does not fit.                    |
-| **… over: read back from disk (mmap)**     | RAM only: weights beyond the available RAM are re-read from the model file. |
+| Message                                | Meaning                                                                     |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| None                                   | Under 95% of the usable budget.                                             |
+| **tight: less than 5% headroom**       | Between 95% and 100% of the usable budget.                                  |
+| **… over**                             | Over the usable budget: the configuration does not fit.                     |
+| **… over: read back from disk (mmap)** | RAM only: weights beyond the available RAM are re-read from the model file. |
 
 When the RAM overflows (only possible with **100 GB model**), a line under the bars gives the overflow and the disk
 reads it implies at 10 tok/s, for example `Overflow of 35.6 GiB: at 10 t/s, NVMe reads ≈ 22.2 GiB/s`. If you measured
@@ -188,29 +188,29 @@ The checks look at the model picked in that card and at the last recommendation 
 memlock limit is only checked when `--load-mode mmap+mlock` is recommended, and swappiness and swap are only flagged when the
 recommendation leaves part of the model in RAM.
 
-| Check                         | To improve when                                          | Fix shown                                                                       |
-| ----------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Persistence (NVIDIA)          | Persistence mode is off                                  | `sudo nvidia-smi -i <card> -pm 1`                                               |
-| Power limit (NVIDIA)          | The limit is below the card's default                    | `sudo nvidia-smi -i <card> -pl <default watts>`                                 |
-| Resizable BAR (NVIDIA)        | BAR1 is smaller than the VRAM                            | Enable Resizable BAR / Above 4G decoding in the BIOS                            |
-| NVIDIA driver                 | Too old for the build's CUDA                             | Update the driver                                                               |
-| Module nvidia_uvm             | The module is not loaded                                 | `sudo modprobe nvidia_uvm`                                                      |
-| DPM level (AMD)               | The level is `auto`                                      | `echo high \| sudo tee /sys/class/drm/<card>/device/power_dpm_force_performance_level` |
-| Backend ROCm/HIP (AMD)        | The build has no HIP backend                             | Rebuild llama.cpp with `-DGGML_HIP=ON`                                          |
-| ROCm target (AMD), per card   | ROCm does not see the card, or the HIP build does not include its gfx target | Rebuild with `-DAMDGPU_TARGETS=<gfx>`, or set `HSA_OVERRIDE_GFX_VERSION` |
-| PCIe link                     | The link runs below its maximum under load               | Check the slot, riser or BIOS                                                   |
-| CPU governor                  | A core is not on `performance`                           | `echo performance \| sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor` |
-| Transparent hugepages         | Set to `never`                                           | `echo madvise \| sudo tee /sys/kernel/mm/transparent_hugepage/enabled`          |
-| memlock limit                 | Lower than the model while `mmap+mlock` is recommended   | `ulimit -l unlimited`                                                           |
-| vm.swappiness                 | Above 10 while the model spills into RAM                 | `sudo sysctl vm.swappiness=10`                                                  |
-| NUMA nodes                    | Several nodes without `--numa`                           | Add `--numa distribute` to the profile                                          |
-| Backend CUDA                  | An NVIDIA card but no CUDA backend                       | Rebuild llama.cpp with `-DGGML_CUDA=ON`                                         |
-| Build SIMD instructions       | AVX2 or AVX-512 available but unused                     | Rebuild with `-DGGML_NATIVE=ON`                                                 |
-| Build age                     | The build is older than 60 days                          | `git pull && cmake --build build`                                               |
-| IOMMU                         | Active without passthrough, with several cards           | Add `iommu=pt` to the kernel command line                                       |
-| Model disk                    | A spinning disk or a network file system                 | Move the model to a local SSD                                                   |
-| Model disk bandwidth          | Under 2 GiB/s (unknown until measured)                   | Click **Measure disk** to measure it                                            |
-| Swap                          | Swap in use while the model spills into RAM              | Lower `-c` or raise `--n-cpu-moe`                                               |
+| Check                       | To improve when                                                              | Fix shown                                                                              |
+| --------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Persistence (NVIDIA)        | Persistence mode is off                                                      | `sudo nvidia-smi -i <card> -pm 1`                                                      |
+| Power limit (NVIDIA)        | The limit is below the card's default                                        | `sudo nvidia-smi -i <card> -pl <default watts>`                                        |
+| Resizable BAR (NVIDIA)      | BAR1 is smaller than the VRAM                                                | Enable Resizable BAR / Above 4G decoding in the BIOS                                   |
+| NVIDIA driver               | Too old for the build's CUDA                                                 | Update the driver                                                                      |
+| Module nvidia_uvm           | The module is not loaded                                                     | `sudo modprobe nvidia_uvm`                                                             |
+| DPM level (AMD)             | The level is `auto`                                                          | `echo high \| sudo tee /sys/class/drm/<card>/device/power_dpm_force_performance_level` |
+| Backend ROCm/HIP (AMD)      | The build has no HIP backend                                                 | Rebuild llama.cpp with `-DGGML_HIP=ON`                                                 |
+| ROCm target (AMD), per card | ROCm does not see the card, or the HIP build does not include its gfx target | Rebuild with `-DAMDGPU_TARGETS=<gfx>`, or set `HSA_OVERRIDE_GFX_VERSION`               |
+| PCIe link                   | The link runs below its maximum under load                                   | Check the slot, riser or BIOS                                                          |
+| CPU governor                | A core is not on `performance`                                               | `echo performance \| sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor`   |
+| Transparent hugepages       | Set to `never`                                                               | `echo madvise \| sudo tee /sys/kernel/mm/transparent_hugepage/enabled`                 |
+| memlock limit               | Lower than the model while `mmap+mlock` is recommended                       | `ulimit -l unlimited`                                                                  |
+| vm.swappiness               | Above 10 while the model spills into RAM                                     | `sudo sysctl vm.swappiness=10`                                                         |
+| NUMA nodes                  | Several nodes without `--numa`                                               | Add `--numa distribute` to the profile                                                 |
+| Backend CUDA                | An NVIDIA card but no CUDA backend                                           | Rebuild llama.cpp with `-DGGML_CUDA=ON`                                                |
+| Build SIMD instructions     | AVX2 or AVX-512 available but unused                                         | Rebuild with `-DGGML_NATIVE=ON`                                                        |
+| Build age                   | The build is older than 60 days                                              | `git pull && cmake --build build`                                                      |
+| IOMMU                       | Active without passthrough, with several cards                               | Add `iommu=pt` to the kernel command line                                              |
+| Model disk                  | A spinning disk or a network file system                                     | Move the model to a local SSD                                                          |
+| Model disk bandwidth        | Under 2 GiB/s (unknown until measured)                                       | Click **Measure disk** to measure it                                                   |
+| Swap                        | Swap in use while the model spills into RAM                                  | Lower `-c` or raise `--n-cpu-moe`                                                      |
 
 Some checks can only be answered once a server has run: the PCIe link is measured under load, and the SIMD check reads
 the `system_info` line of the server's logs.

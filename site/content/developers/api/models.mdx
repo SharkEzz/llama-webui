@@ -32,13 +32,13 @@ not exist gives an empty list, not an error.
 
 **Response**: `200` with a `ModelList`.
 
-| Field       | Type           | Description                                                      |
-| ----------- | -------------- | ---------------------------------------------------------------- |
-| `dir`       | string         | The models folder, expanded (absolute).                          |
-| `setting`   | string         | The `modelsDir` setting as typed (`~` included).                 |
-| `home`      | string         | The home directory of the user running llama-webui.              |
-| `scannedAt` | number         | When the scan ran (epoch ms).                                    |
-| `models`    | `ModelEntry[]` | One entry per model (a split model counts once).                 |
+| Field       | Type           | Description                                         |
+| ----------- | -------------- | --------------------------------------------------- |
+| `dir`       | string         | The models folder, expanded (absolute).             |
+| `setting`   | string         | The `modelsDir` setting as typed (`~` included).    |
+| `home`      | string         | The home directory of the user running llama-webui. |
+| `scannedAt` | number         | When the scan ran (epoch ms).                       |
+| `models`    | `ModelEntry[]` | One entry per model (a split model counts once).    |
 
 `home` and `setting` let a client write paths the way a profile stores them (`profileModelPath()`,
 `packages/webui-shared/src/models.ts`).
@@ -62,28 +62,28 @@ file:
 What the header of a GGUF says (`toSummary()`, `app/server/models/scan.ts`). `<arch>` is the value of
 `general.architecture`.
 
-| Field             | Type                     | Description                                                                                               |
-| ----------------- | ------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `path`            | string                   | Absolute path of the file (the first part of a split model).                                              |
-| `relPath`         | string                   | Path relative to the models folder.                                                                       |
-| `files`           | string[]                 | Absolute paths of every part, in order.                                                                   |
-| `fileBytes`       | number                   | Total size of the parts, in bytes.                                                                        |
-| `kind`            | `'model' \| 'mmproj'`    | `mmproj` for a multimodal projector (`general.type` is `mmproj`, or the architecture is `clip`).          |
-| `arch`            | string                   | `general.architecture`, `?` when missing.                                                                 |
-| `name`            | string                   | `general.name`, empty when missing.                                                                       |
-| `quant`           | string                   | The label of `general.file_type` (`Q4_K_M`, `IQ3_S`…), `?` when unknown.                                  |
-| `params`          | number                   | Parameter count, computed from the tensors.                                                               |
-| `blockCount`      | number                   | `<arch>.block_count`: number of layers.                                                                   |
-| `contextLength`   | number                   | `<arch>.context_length`: the context the model was trained for, `0` when missing.                         |
-| `embeddingLength` | number                   | `<arch>.embedding_length`.                                                                                |
-| `headCount`       | number                   | `<arch>.attention.head_count`.                                                                            |
-| `headCountKv`     | number                   | `<arch>.attention.head_count_kv`, the maximum across layers.                                              |
-| `expertCount`     | number                   | `<arch>.expert_count`, `0` for a dense model.                                                             |
-| `expertUsedCount` | number                   | `<arch>.expert_used_count`: experts used per token.                                                       |
-| `nextnLayers`     | number                   | `<arch>.nextn_predict_layers`: multi-token prediction layers, `0` when none.                              |
-| `recurrent`       | boolean                  | The model has a `blk.N.ssm_*` tensor, or a `blk.N.` tensor whose name contains `linear_attn`.             |
-| `slidingWindow`   | number \| null           | `<arch>.attention.sliding_window`, `null` when the model has none.                                       |
-| `hasChatTemplate` | boolean                  | The header has a `tokenizer.chat_template`.                                                               |
+| Field             | Type                  | Description                                                                                      |
+| ----------------- | --------------------- | ------------------------------------------------------------------------------------------------ |
+| `path`            | string                | Absolute path of the file (the first part of a split model).                                     |
+| `relPath`         | string                | Path relative to the models folder.                                                              |
+| `files`           | string[]              | Absolute paths of every part, in order.                                                          |
+| `fileBytes`       | number                | Total size of the parts, in bytes.                                                               |
+| `kind`            | `'model' \| 'mmproj'` | `mmproj` for a multimodal projector (`general.type` is `mmproj`, or the architecture is `clip`). |
+| `arch`            | string                | `general.architecture`, `?` when missing.                                                        |
+| `name`            | string                | `general.name`, empty when missing.                                                              |
+| `quant`           | string                | The label of `general.file_type` (`Q4_K_M`, `IQ3_S`…), `?` when unknown.                         |
+| `params`          | number                | Parameter count, computed from the tensors.                                                      |
+| `blockCount`      | number                | `<arch>.block_count`: number of layers.                                                          |
+| `contextLength`   | number                | `<arch>.context_length`: the context the model was trained for, `0` when missing.                |
+| `embeddingLength` | number                | `<arch>.embedding_length`.                                                                       |
+| `headCount`       | number                | `<arch>.attention.head_count`.                                                                   |
+| `headCountKv`     | number                | `<arch>.attention.head_count_kv`, the maximum across layers.                                     |
+| `expertCount`     | number                | `<arch>.expert_count`, `0` for a dense model.                                                    |
+| `expertUsedCount` | number                | `<arch>.expert_used_count`: experts used per token.                                              |
+| `nextnLayers`     | number                | `<arch>.nextn_predict_layers`: multi-token prediction layers, `0` when none.                     |
+| `recurrent`       | boolean               | The model has a `blk.N.ssm_*` tensor, or a `blk.N.` tensor whose name contains `linear_attn`.    |
+| `slidingWindow`   | number \| null        | `<arch>.attention.sliding_window`, `null` when the model has none.                               |
+| `hasChatTemplate` | boolean               | The header has a `tokenizer.chat_template`.                                                      |
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/models
@@ -143,21 +143,21 @@ memory (the 8 most recent, as long as the parts are unchanged), not in the datab
 
 **Query**
 
-| Parameter | Type   | Required | Description                               |
-| --------- | ------ | -------- | ----------------------------------------- |
+| Parameter | Type   | Required | Description                                     |
+| --------- | ------ | -------- | ----------------------------------------------- |
 | `path`    | string | yes      | Absolute path of the `.gguf` file, URL-encoded. |
 
 **Response**: `200` with a `ModelDetail`: every field of a [`ModelSummary`](#modelsummary), plus:
 
-| Field                 | Type   | Description                                                                                             |
-| --------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
-| `tensorCount`         | number | Number of tensors, across every part.                                                                   |
-| `weights.embedBytes`  | number | `token_embd.*` tensors.                                                                                 |
-| `weights.outputBytes` | number | `output.*` tensors.                                                                                     |
-| `weights.layersBytes` | number | The `blk.N.*` tensors that are not experts, all layers together.                                       |
-| `weights.expertsBytes`| number | The expert tensors (`ffn_gate_exps`, `ffn_up_exps`, `ffn_down_exps` and their `_chexps` forms): what `--n-cpu-moe` moves to the CPU. Shared experts (`_shexp`) count as layers. |
-| `weights.otherBytes`  | number | Every other tensor.                                                                                     |
-| `weights.totalBytes`  | number | All tensors.                                                                                            |
+| Field                  | Type   | Description                                                                                                                                                                     |
+| ---------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tensorCount`          | number | Number of tensors, across every part.                                                                                                                                           |
+| `weights.embedBytes`   | number | `token_embd.*` tensors.                                                                                                                                                         |
+| `weights.outputBytes`  | number | `output.*` tensors.                                                                                                                                                             |
+| `weights.layersBytes`  | number | The `blk.N.*` tensors that are not experts, all layers together.                                                                                                                |
+| `weights.expertsBytes` | number | The expert tensors (`ffn_gate_exps`, `ffn_up_exps`, `ffn_down_exps` and their `_chexps` forms): what `--n-cpu-moe` moves to the CPU. Shared experts (`_shexp`) count as layers. |
+| `weights.otherBytes`   | number | Every other tensor.                                                                                                                                                             |
+| `weights.totalBytes`   | number | All tensors.                                                                                                                                                                    |
 
 All sizes are bytes. A tensor's size is the distance from its offset to the next tensor's in the same file
 (`tensorBytes()`), the last one ending at the end of the file. `relPath` is relative to the models folder when the file is inside it, otherwise
@@ -215,19 +215,19 @@ refused while the files are in use:
 
 **Query**
 
-| Parameter | Description                                  |
-| --------- | -------------------------------------------- |
-| `path`    | The `path` of a `ModelEntry` (absolute).     |
+| Parameter | Description                              |
+| --------- | ---------------------------------------- |
+| `path`    | The `path` of a `ModelEntry` (absolute). |
 
 **Response**: `200` with a `ModelUsage`.
 
-| Field       | Type                  | Description                                                                         |
-| ----------- | --------------------- | ----------------------------------------------------------------------------------- |
-| `path`      | string                | The entry's path.                                                                   |
-| `files`     | string[]              | Every file that would be deleted.                                                   |
-| `fileBytes` | number                | Their total size.                                                                   |
-| `profiles`  | `ModelProfileUse[]`   | The profiles using it: `{ id, name, role }`, `role` being `model` or `mmproj`.      |
-| `blocked`   | string \| null        | Why the deletion is refused right now (the reason of the `409` below), else `null`. |
+| Field       | Type                | Description                                                                         |
+| ----------- | ------------------- | ----------------------------------------------------------------------------------- |
+| `path`      | string              | The entry's path.                                                                   |
+| `files`     | string[]            | Every file that would be deleted.                                                   |
+| `fileBytes` | number              | Their total size.                                                                   |
+| `profiles`  | `ModelProfileUse[]` | The profiles using it: `{ id, name, role }`, `role` being `model` or `mmproj`.      |
+| `blocked`   | string \| null      | Why the deletion is refused right now (the reason of the `409` below), else `null`. |
 
 **Errors**: `400` `RequestInvalid` `Invalid data: path required (path)`, `404` `ModelNotFound` `Model not found`.
 

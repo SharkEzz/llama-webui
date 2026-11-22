@@ -344,6 +344,7 @@ JSON differs from the held one is held and published as `placement`.
       readonly configure: (o: { readonly intervalMs: number; readonly needs: GpuNeeds }) => Effect.Effect<void>;
     }
     ```
+
   - `system.ts`: `parseProcStat`, `cpuPct(prev, cur)`, `parseMeminfo`, `parseLoadavg`, and
     `makeSystemSampler(options?: { procRoot?: string; sysRoot?: string }): Effect.Effect<{ readonly sample:
     Effect.Effect<SystemSample> }, never, FileSystem | Path>` (the previous CPU times in a `Ref`, 0 % on the first
@@ -603,6 +604,7 @@ it does not.
     The series rules are the E4 lines "Every tick appends one point…", "A tick without an active server…" and the
     `known`/`push`/`finish` logic of `app/server-legacy/lib/monitor/monitor.ts`. Every number of the snapshot is finite:
     a non-finite value becomes `null` where the field is nullable, else `0`.
+
   - `class Monitor extends Context.Service<Monitor, { readonly latest: Effect.Effect<Snapshot | null>; readonly history:
     Effect.Effect<HistoryDump>; readonly nvidiaSource: NvidiaSource; readonly nvmlSystem: Effect.Effect<NvmlSystem |
     null>; readonly configure: (settings: MonitorSettings) => Effect.Effect<void, CollectorsNotApplied> }>`, with

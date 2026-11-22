@@ -25,7 +25,7 @@ the item keeps the reason as a string in `DownloadItem.code` (the right column).
 | `403`  | `HfGated`        | `hf-gated`          | `GatedRepo`, or a `403`: the license of the repository was not accepted on Hugging Face.     |
 | `404`  | `HfNotFound`     | `hf-not-found`      | `RepoNotFound`, `RevisionNotFound`, `EntryNotFound`, or a `404` (also a private repository). |
 | `401`  | `HfUnauthorized` | `hf-unauthorized`   | Hugging Face rejected the token.                                                             |
-| `429`  | `HfRateLimited`  |                     | Hugging Face rate limit (a download retries instead).                                       |
+| `429`  | `HfRateLimited`  |                     | Hugging Face rate limit (a download retries instead).                                        |
 | `502`  | `HfUnreachable`  | `hf-unreachable`    | Network failure, timeout, any other status, or a response that is not JSON.                  |
 
 Without a token, the messages of `HfGated` and `HfNotFound` say where to set one. Under
@@ -51,12 +51,12 @@ network failure is not cached and is retried on the next call.
 
 **Response**: `200` with an `HfStatus`.
 
-| Field          | Type                       | Description                                                                         |
-| -------------- | -------------------------- | ----------------------------------------------------------------------------------- |
-| `token`        | `"env"` \| `"file"` \| null | Where the token was found: the environment, the token file, or no token.           |
-| `user`         | string \| null              | Account name of the token; null without a token or when it could not be checked.   |
-| `tokenInvalid` | boolean                    | Hugging Face rejected the token (`401`).                                            |
-| `endpoint`     | string                     | Hub endpoint: `HF_ENDPOINT`, default `https://huggingface.co`, no trailing slash.  |
+| Field          | Type                        | Description                                                                       |
+| -------------- | --------------------------- | --------------------------------------------------------------------------------- |
+| `token`        | `"env"` \| `"file"` \| null | Where the token was found: the environment, the token file, or no token.          |
+| `user`         | string \| null              | Account name of the token; null without a token or when it could not be checked.  |
+| `tokenInvalid` | boolean                     | Hugging Face rejected the token (`401`).                                          |
+| `endpoint`     | string                      | Hub endpoint: `HF_ENDPOINT`, default `https://huggingface.co`, no trailing slash. |
 
 ```bash title="Terminal"
 curl http://127.0.0.1:7860/api/hf/status
@@ -74,19 +74,19 @@ Searches the Hub's model repositories that hold GGUF files (`filter=gguf`), most
 
 **Query parameters**
 
-| Parameter | Required | Description                                       |
-| --------- | -------- | ------------------------------------------------- |
-| `q`       | yes      | Search text, trimmed: 1 to 200 characters.        |
+| Parameter | Required | Description                                |
+| --------- | -------- | ------------------------------------------ |
+| `q`       | yes      | Search text, trimmed: 1 to 200 characters. |
 
 **Response**: `200` with an array of `HfSearchHit`.
 
-| Field          | Type           | Description                                      |
-| -------------- | -------------- | ------------------------------------------------ |
-| `id`           | string         | Repository id, `org/name`.                       |
-| `downloads`    | number         | Download count reported by the Hub.              |
-| `likes`        | number         | Like count.                                      |
-| `lastModified` | string \| null | ISO date of the last change.                     |
-| `gated`        | boolean        | The repository requires accepting a license.     |
+| Field          | Type           | Description                                  |
+| -------------- | -------------- | -------------------------------------------- |
+| `id`           | string         | Repository id, `org/name`.                   |
+| `downloads`    | number         | Download count reported by the Hub.          |
+| `likes`        | number         | Like count.                                  |
+| `lastModified` | string \| null | ISO date of the last change.                 |
+| `gated`        | boolean        | The repository requires accepting a license. |
 
 **Errors**: `400` `RequestInvalid` `Invalid data: Search text expected (200 characters at most) (q)` when `q` is
 missing, blank or too long; the
@@ -109,34 +109,34 @@ Grouping (`groupRepoFiles()` in `app/server/hf/variants.ts`): one variant per `.
 
 **Query parameters**
 
-| Parameter  | Required | Description                                                                 |
-| ---------- | -------- | --------------------------------------------------------------------------- |
-| `id`       | yes      | Repository id, `org/name` (`HF_REPO_RE`).                                    |
-| `revision` | no       | Branch, tag or commit to list; `main` when omitted.                          |
+| Parameter  | Required | Description                                         |
+| ---------- | -------- | --------------------------------------------------- |
+| `id`       | yes      | Repository id, `org/name` (`HF_REPO_RE`).           |
+| `revision` | no       | Branch, tag or commit to list; `main` when omitted. |
 
 **Response**: `200` with an `HfRepo`.
 
-| Field        | Type          | Description                                                                         |
-| ------------ | ------------- | ----------------------------------------------------------------------------------- |
-| `id`         | string        | Repository id as the Hub spells it.                                                 |
+| Field        | Type          | Description                                                                                        |
+| ------------ | ------------- | -------------------------------------------------------------------------------------------------- |
+| `id`         | string        | Repository id as the Hub spells it.                                                                |
 | `sha`        | string        | Commit the files were listed at. A download request must send it back: downloads are pinned to it. |
-| `gated`      | boolean       | Gated repository.                                                                   |
-| `url`        | string        | Repository page on the Hub endpoint.                                                |
-| `dir`        | string        | Local folder of its downloads: `<modelsDir>/<org>/<name>`.                          |
-| `variants`   | `HfVariant[]` | Models, smallest first.                                                             |
-| `projectors` | `HfVariant[]` | Multimodal projectors (mmproj), smallest first.                                     |
+| `gated`      | boolean       | Gated repository.                                                                                  |
+| `url`        | string        | Repository page on the Hub endpoint.                                                               |
+| `dir`        | string        | Local folder of its downloads: `<modelsDir>/<org>/<name>`.                                         |
+| `variants`   | `HfVariant[]` | Models, smallest first.                                                                            |
+| `projectors` | `HfVariant[]` | Multimodal projectors (mmproj), smallest first.                                                    |
 
 `HfVariant`:
 
-| Field        | Type                                      | Description                                                              |
-| ------------ | ----------------------------------------- | ------------------------------------------------------------------------ |
-| `key`        | string                                    | Path of its first file in the repository: identifies the variant.       |
-| `name`       | string                                    | File name without folder, shard suffix or extension.                    |
-| `quant`      | string \| null                             | Quantization read from the file name (`Q4_K_M`, `UD-Q4_K_XL`, `BF16`…). |
-| `kind`       | `"model"` \| `"mmproj"`                    | Model or projector.                                                      |
-| `files`      | `HfFile[]`                                | `path`, `size` and `sha256` (the LFS hash; null for a non-LFS file).    |
-| `totalBytes` | number                                    | Sum of the file sizes.                                                   |
-| `present`    | `"none"` \| `"partial"` \| `"complete"`     | Local state: all files with the right size, some of them (or a `.part`), or none. |
+| Field        | Type                                    | Description                                                                       |
+| ------------ | --------------------------------------- | --------------------------------------------------------------------------------- |
+| `key`        | string                                  | Path of its first file in the repository: identifies the variant.                 |
+| `name`       | string                                  | File name without folder, shard suffix or extension.                              |
+| `quant`      | string \| null                          | Quantization read from the file name (`Q4_K_M`, `UD-Q4_K_XL`, `BF16`…).           |
+| `kind`       | `"model"` \| `"mmproj"`                 | Model or projector.                                                               |
+| `files`      | `HfFile[]`                              | `path`, `size` and `sha256` (the LFS hash; null for a non-LFS file).              |
+| `totalBytes` | number                                  | Sum of the file sizes.                                                            |
+| `present`    | `"none"` \| `"partial"` \| `"complete"` | Local state: all files with the right size, some of them (or a `.part`), or none. |
 
 **Errors**: `400` `RequestInvalid` `Invalid data: Invalid repository id: <id> (id)` when `id` is missing or
 malformed; `400` `HfInvalidPath` when a file path of the repository would leave its folder; the
@@ -183,44 +183,44 @@ renamed into place. Items are rows of the `downloads` table (`DownloadsRepo`), s
 
 Every change is pushed over the [WebSocket](/developers/api/websocket/):
 
-| Message             | Payload                     | When                                                                   |
-| ------------------- | --------------------------- | ---------------------------------------------------------------------- |
-| `download`          | `DownloadItem`              | An item is queued, starts, ends, is canceled or requeued.              |
-| `download-progress` | `DownloadLive` \| null       | Progress of the running item: phase changes at once, byte progress at most every 250 ms; null when an item ends (the next one then sends its own). |
-| `download-deleted`  | `{ ids: number[] }`         | Items removed from the list.                                           |
+| Message             | Payload                | When                                                                                                                                               |
+| ------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `download`          | `DownloadItem`         | An item is queued, starts, ends, is canceled or requeued.                                                                                          |
+| `download-progress` | `DownloadLive` \| null | Progress of the running item: phase changes at once, byte progress at most every 250 ms; null when an item ends (the next one then sends its own). |
+| `download-deleted`  | `{ ids: number[] }`    | Items removed from the list.                                                                                                                       |
 
 `DownloadItem`:
 
-| Field        | Type                 | Description                                                                         |
-| ------------ | -------------------- | ----------------------------------------------------------------------------------- |
-| `id`         | number               | Item id.                                                                            |
-| `repo`       | string               | Repository id.                                                                      |
-| `revision`   | string               | Commit the files are downloaded from.                                               |
-| `key`        | string               | Key of the variant (`HfVariant.key`).                                               |
-| `name`       | string               | Variant name.                                                                       |
-| `quant`      | string \| null        | Quantization.                                                                       |
-| `kind`       | `"model"` \| `"mmproj"` | Model or projector.                                                              |
-| `dir`        | string               | Absolute destination folder, fixed when the item was queued.                        |
-| `files`      | `DownloadFile[]`     | The files to download (`HfFile` plus `done`); those already in place were left out. |
-| `status`     | string               | `queued`, `downloading`, `done`, `error` or `canceled`.                             |
-| `bytesDone`  | number               | Bytes of the finished files (live progress comes in `DownloadLive`).               |
-| `totalBytes` | number               | Bytes of all its files.                                                             |
-| `error`      | string \| null        | Error message of a failed item.                                                     |
-| `code`       | string \| null        | Machine-readable reason of the error: a [Hub error](#hub-errors) code, `checksum-mismatch`, `disk-full`, `download-failed`. |
-| `createdAt`  | number               | Epoch ms.                                                                           |
-| `finishedAt` | number \| null        | Epoch ms.                                                                           |
+| Field        | Type                    | Description                                                                                                                 |
+| ------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | number                  | Item id.                                                                                                                    |
+| `repo`       | string                  | Repository id.                                                                                                              |
+| `revision`   | string                  | Commit the files are downloaded from.                                                                                       |
+| `key`        | string                  | Key of the variant (`HfVariant.key`).                                                                                       |
+| `name`       | string                  | Variant name.                                                                                                               |
+| `quant`      | string \| null          | Quantization.                                                                                                               |
+| `kind`       | `"model"` \| `"mmproj"` | Model or projector.                                                                                                         |
+| `dir`        | string                  | Absolute destination folder, fixed when the item was queued.                                                                |
+| `files`      | `DownloadFile[]`        | The files to download (`HfFile` plus `done`); those already in place were left out.                                         |
+| `status`     | string                  | `queued`, `downloading`, `done`, `error` or `canceled`.                                                                     |
+| `bytesDone`  | number                  | Bytes of the finished files (live progress comes in `DownloadLive`).                                                        |
+| `totalBytes` | number                  | Bytes of all its files.                                                                                                     |
+| `error`      | string \| null          | Error message of a failed item.                                                                                             |
+| `code`       | string \| null          | Machine-readable reason of the error: a [Hub error](#hub-errors) code, `checksum-mismatch`, `disk-full`, `download-failed`. |
+| `createdAt`  | number                  | Epoch ms.                                                                                                                   |
+| `finishedAt` | number \| null          | Epoch ms.                                                                                                                   |
 
 `DownloadLive`:
 
-| Field        | Type                                              | Description                                              |
-| ------------ | ------------------------------------------------- | -------------------------------------------------------- |
-| `id`         | number                                            | Item being downloaded.                                   |
-| `phase`      | `"downloading"` \| `"verifying"` \| `"retrying"`     | `verifying` rehashes an existing `.part` before resuming it; `retrying` waits before the next attempt. |
-| `file`       | string                                            | File being downloaded (path in the repository).          |
-| `bytesDone`  | number                                            | Bytes of the item written so far.                        |
-| `totalBytes` | number                                            | Bytes of the item.                                       |
-| `bps`        | number                                            | Smoothed throughput, bytes/s.                            |
-| `retryAt`    | number \| null                                     | `retrying`: when the next attempt starts (epoch ms).     |
+| Field        | Type                                             | Description                                                                                            |
+| ------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `id`         | number                                           | Item being downloaded.                                                                                 |
+| `phase`      | `"downloading"` \| `"verifying"` \| `"retrying"` | `verifying` rehashes an existing `.part` before resuming it; `retrying` waits before the next attempt. |
+| `file`       | string                                           | File being downloaded (path in the repository).                                                        |
+| `bytesDone`  | number                                           | Bytes of the item written so far.                                                                      |
+| `totalBytes` | number                                           | Bytes of the item.                                                                                     |
+| `bps`        | number                                           | Smoothed throughput, bytes/s.                                                                          |
+| `retryAt`    | number \| null                                   | `retrying`: when the next attempt starts (epoch ms).                                                   |
 
 ### List downloads
 
@@ -245,10 +245,10 @@ size are left out, and a variant with nothing left to download is skipped: the r
 
 **Body**: `DownloadRequest` (`packages/webui-shared/src/hf.ts`), strict.
 
-| Field      | Type     | Required | Description                                                                     |
-| ---------- | -------- | -------- | ------------------------------------------------------------------------------- |
-| `repo`     | string   | yes      | Repository id, `org/name`.                                                      |
-| `revision` | string   | yes      | Commit sha, 40 lowercase hex characters: the `sha` of `GET /api/hf/repo`.       |
+| Field      | Type     | Required | Description                                                                             |
+| ---------- | -------- | -------- | --------------------------------------------------------------------------------------- |
+| `repo`     | string   | yes      | Repository id, `org/name`.                                                              |
+| `revision` | string   | yes      | Commit sha, 40 lowercase hex characters: the `sha` of `GET /api/hf/repo`.               |
 | `keys`     | string[] | yes      | Keys of the variants to download (`HfVariant.key`): 1 to 16, each 1 to 1024 characters. |
 
 The disk check adds what the new items still need (a `.part` counts as written) to what the active items still have

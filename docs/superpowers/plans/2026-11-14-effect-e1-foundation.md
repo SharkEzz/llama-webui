@@ -59,6 +59,7 @@ Task 11):
   Any other rule that seems wrong for a piece of code: stop and report, do not lower it. Consequences to know before
   writing: a Schema class takes the brand the rule asks for and is built with `X.make(…)`, not `new X(…)`; a service
   key is `@llama-webui/app/server/<path>/<Name>`.
+
 - `app/server-legacy/` (created by Task 3) is a read-only reference, like `repos/`: port its behaviour, not its
   structure. No bridge code between the two servers, in either direction.
 - Server and shared code runs under Node as it is: relative imports end in `.ts`, erasable syntax only (no `enum`, no

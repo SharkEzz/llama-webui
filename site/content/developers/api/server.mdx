@@ -17,14 +17,14 @@ described on [Server](/docs/server/).
 
 The supervisor's state, a union on `kind` (`packages/webui-shared/src/server.ts`):
 
-| `kind`     | Other fields                                                        | Meaning                                                                                                             |
-| ---------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `idle`     |                                                                     | No server is running.                                                                                               |
-| `starting` | `profile`, `profileId`, `pid`, `host`, `port`, `since`              | The process runs; the supervisor polls its `/health` every 500 ms until it answers `200`.                           |
-| `ready`    | `profile`, `profileId`, `pid`, `host`, `port`, `since`              | `/health` answered `200`: the model is loaded.                                                                      |
-| `stopping` | `profile`, `profileId`, `pid`, `host`, `port`                       | `SIGTERM` was sent; `SIGKILL` follows after 5 seconds.                                                              |
-| `crashed`  | `profile`, `profileId`, `exitCode`, `signal`, `at`, `message?`      | The process exited without being asked to, or could not be launched (`message`: why, for example `directory not found: <cwd>`). |
-| `external` | `pid` (number \| null), `port`                                      | A `llama-server` llama-webui did not start answers on the port (reached on loopback); `pid` is `null` when it cannot be found. |
+| `kind`     | Other fields                                                   | Meaning                                                                                                                         |
+| ---------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `idle`     |                                                                | No server is running.                                                                                                           |
+| `starting` | `profile`, `profileId`, `pid`, `host`, `port`, `since`         | The process runs; the supervisor polls its `/health` every 500 ms until it answers `200`.                                       |
+| `ready`    | `profile`, `profileId`, `pid`, `host`, `port`, `since`         | `/health` answered `200`: the model is loaded.                                                                                  |
+| `stopping` | `profile`, `profileId`, `pid`, `host`, `port`                  | `SIGTERM` was sent; `SIGKILL` follows after 5 seconds.                                                                          |
+| `crashed`  | `profile`, `profileId`, `exitCode`, `signal`, `at`, `message?` | The process exited without being asked to, or could not be launched (`message`: why, for example `directory not found: <cwd>`). |
+| `external` | `pid` (number \| null), `port`                                 | A `llama-server` llama-webui did not start answers on the port (reached on loopback); `pid` is `null` when it cannot be found.  |
 
 `profile` is the profile's name at launch, `host` its `--host` (the probes reach it there, loopback for `0.0.0.0`),
 `since` and `at` are epoch milliseconds, `exitCode` and `signal` are `null` when unknown. llama-webui looks for an
@@ -36,11 +36,11 @@ state is `idle`, `crashed` or `external`, except during a benchmark (`ExternalWa
 
 What the routes and the [`server-state`](/developers/api/websocket/#server-state) message send:
 
-| Field       | Type             | Description                                                                                                   |
-| ----------- | ---------------- | ------------------------------------------------------------------------------------------------------------- |
-| `state`     | `ServerState`    | The current state.                                                                                            |
-| `command`   | string \| null   | The last launched command, shell-quoted, without the `setpriv` prefix; `null` before the first launch.       |
-| `profileId` | number \| null   | The state's profile, otherwise the last launched one; `null` when there is none.                              |
+| Field       | Type           | Description                                                                                            |
+| ----------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| `state`     | `ServerState`  | The current state.                                                                                     |
+| `command`   | string \| null | The last launched command, shell-quoted, without the `setpriv` prefix; `null` before the first launch. |
+| `profileId` | number \| null | The state's profile, otherwise the last launched one; `null` when there is none.                       |
 
 ```json
 {
@@ -58,10 +58,10 @@ What a client needs to resync after it connects: the server view, the log positi
 
 **Response**: `200`
 
-| Field    | Type         | Description                                                                 |
-| -------- | ------------ | --------------------------------------------------------------------------- |
-| `server` | `ServerView` | As above.                                                                   |
-| `logSeq` | number       | The number the next log line will get.                                      |
+| Field    | Type         | Description                                                                              |
+| -------- | ------------ | ---------------------------------------------------------------------------------------- |
+| `server` | `ServerView` | As above.                                                                                |
+| `logSeq` | number       | The number the next log line will get.                                                   |
 | `bootId` | string       | This llama-webui process (see [WebSocket](/developers/api/websocket/#hello-and-bootid)). |
 
 ```bash title="Terminal"
@@ -84,13 +84,13 @@ report `ready` or `crashed` later. Stop answers once the process has exited.
 
 The four endpoints share these `409` refusals:
 
-| `_tag`                 | Message                                                    | When                                                                                                           |
-| ---------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `BenchRunning`         | `A benchmark is running`                                   | A benchmark or a sweep owns the GPUs (`BenchRunner.busy`); it stops and restarts `llama-server` itself.        |
-| `OperationInProgress`  | `operation in progress, try again`                         | Another start, switch, restart or stop is in progress: the supervisor runs one lifecycle operation at a time.  |
-| `ServerAlreadyRunning` | `a server is already running`                              | Start while a managed server runs: use switch.                                                                 |
-| `PortInUse`            | `port in use by an external server (PID <pid>)`            | An external server still answers (state `external`), or a `llama-server` already answers on the profile's port, which makes the state `external`. The PID is `unknown` when it cannot be found. |
-| `PortInUse`            | `port <port> is in use by another service`                 | Something that is not a `llama-server` answers HTTP on the profile's port. The state does not change.           |
+| `_tag`                 | Message                                         | When                                                                                                                                                                                            |
+| ---------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BenchRunning`         | `A benchmark is running`                        | A benchmark or a sweep owns the GPUs (`BenchRunner.busy`); it stops and restarts `llama-server` itself.                                                                                         |
+| `OperationInProgress`  | `operation in progress, try again`              | Another start, switch, restart or stop is in progress: the supervisor runs one lifecycle operation at a time.                                                                                   |
+| `ServerAlreadyRunning` | `a server is already running`                   | Start while a managed server runs: use switch.                                                                                                                                                  |
+| `PortInUse`            | `port in use by an external server (PID <pid>)` | An external server still answers (state `external`), or a `llama-server` already answers on the profile's port, which makes the state `external`. The PID is `unknown` when it cannot be found. |
+| `PortInUse`            | `port <port> is in use by another service`      | Something that is not a `llama-server` answers HTTP on the profile's port. The state does not change.                                                                                           |
 
 `PortInUse` also carries `port`, `by` (`llama-server` or `other`) and `pid` (a number, or `null`). Stop only gets the
 first one: it waits for an operation in progress instead of refusing. The user-side view of an external server is on [Server](/docs/server/#an-external-server).
@@ -203,12 +203,12 @@ editor uses it for completion, help and warnings: nothing is refused on its word
 
 **Response**: `200` with `{ "flags": Flag[] }`.
 
-| Field     | Type     | Description                                                                         |
-| --------- | -------- | ----------------------------------------------------------------------------------- |
-| `names`   | string[] | Every name as listed, the short form first, `--no-…` forms included.               |
-| `value`   | string   | The value's placeholder (`N`, `FNAME`, `[on\|off\|auto]`…); absent for a switch.    |
-| `help`    | string   | The help text on one line.                                                          |
-| `section` | string   | The help section that lists it (`common params`, `sampling params`…).               |
+| Field     | Type     | Description                                                                      |
+| --------- | -------- | -------------------------------------------------------------------------------- |
+| `names`   | string[] | Every name as listed, the short form first, `--no-…` forms included.             |
+| `value`   | string   | The value's placeholder (`N`, `FNAME`, `[on\|off\|auto]`…); absent for a switch. |
+| `help`    | string   | The help text on one line.                                                       |
+| `section` | string   | The help section that lists it (`common params`, `sampling params`…).            |
 
 **Errors**: `503` `FlagsUnavailable` `llama-server --help failed (<binary>)` when the binary cannot run, exits with an error, or lists no
 flag.
@@ -244,17 +244,17 @@ it. New lines are pushed as
 
 **Query**
 
-| Parameter | Type    | Default | Description                                                                                                   |
-| --------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| Parameter | Type    | Default | Description                                                                                                                                                        |
+| --------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `since`   | integer | `0`     | First line number wanted, written in digits. Lines no longer in the ring are skipped; a value that is not a line number (`abc`, `-1`) is a `400` `RequestInvalid`. |
 
 **Response**: `200`
 
-| Field    | Type        | Description                                                    |
-| -------- | ----------- | -------------------------------------------------------------- |
-| `lines`  | `LogLine[]` | The lines still in the ring whose `seq` is at least `since`.   |
-| `seq`    | number      | The number the next line will get.                             |
-| `bootId` | string      | The boot the numbering belongs to.                             |
+| Field    | Type        | Description                                                  |
+| -------- | ----------- | ------------------------------------------------------------ |
+| `lines`  | `LogLine[]` | The lines still in the ring whose `seq` is at least `since`. |
+| `seq`    | number      | The number the next line will get.                           |
+| `bootId` | string      | The boot the numbering belongs to.                           |
 
 A `LogLine` is `{ seq, text, level, kind }`: see [`log`](/developers/api/websocket/#log). The numbering starts at 0 on
 every boot: compare `bootId` with the one you hold before you trust `since` (see

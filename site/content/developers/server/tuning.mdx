@@ -9,25 +9,25 @@ searches for the placement a preset prefers. It also reviews the system settings
 `app/server/tuning/`, with the presets and result types in `packages/webui-shared/src/tuning.ts`. For what users see, read
 [Tuning](/docs/tuning/).
 
-| File | Role |
-| --- | --- |
-| `app/server/tuning/estimate.ts` | `estimate()`: the search, the recommended flags, the "why" strings and the warnings |
-| `app/server/tuning/placement.ts` | `measurePlacement()` and `fitOf()`: every tensor on a device or in RAM, then a verdict |
-| `app/server/tuning/memory.ts` | KV cache per layer, recurrent state, compute buffers, margins |
-| `app/server/tuning/space.ts` | `planSweep()`: a sweep's items with their verdict |
-| `app/server/tuning/match.ts` | `matchGpus()`, `withLiveMemory()`, `retainedBusIds()`: the device list against the monitored cards |
-| `app/server/tuning/TuningHardware.ts` | `TuningHardware`: devices, CPU, RAM |
-| `app/server/tuning/models.ts` | `loadModel()` and `mmprojBytes()`: the parsed GGUF and the projector size |
-| `app/server/tuning/checks.ts` | `runChecks()` and `summarize()`: the system checks |
-| `app/server/tuning/sysinfo.ts` | `readSys()`: the `/proc`, `/sys` and log readings the checks need |
-| `app/server/tuning/disk.ts` | `measureDiskSpeed()`: sequential read speed of the model's disk |
-| `app/server/tuning/TuningMemo.ts` | `TuningMemo`: the last estimate and disk measurement of each model, for the checks |
-| `app/server/tuning/http.ts`, `setup.ts` | `TuningHandlers` and `SetupHandlers` |
-| `app/server/hardware/CpuInfo.ts`, `cpu.ts` | `CpuInfo` on `readCpuInfo()`: model, cores, threads, flags, NUMA nodes |
-| `app/server/models/GgufReader.ts`, `gguf.ts` | `GgufReader`: GGUF header to `ModelInfo`, cached |
-| `app/server/models/sizes.ts` | `tensorBytes()`, `EXPERTS` |
-| `app/server/testing/tuning.ts` | `fakeModel()` and `hw3()`, for tests |
-| `packages/webui-shared/src/tuning.ts` | `PRESETS`, `NOISE`, `deviceRole()`, `gpuDevices()`, `Estimate`, `Fit`, `Check`… |
+| File                                         | Role                                                                                               |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `app/server/tuning/estimate.ts`              | `estimate()`: the search, the recommended flags, the "why" strings and the warnings                |
+| `app/server/tuning/placement.ts`             | `measurePlacement()` and `fitOf()`: every tensor on a device or in RAM, then a verdict             |
+| `app/server/tuning/memory.ts`                | KV cache per layer, recurrent state, compute buffers, margins                                      |
+| `app/server/tuning/space.ts`                 | `planSweep()`: a sweep's items with their verdict                                                  |
+| `app/server/tuning/match.ts`                 | `matchGpus()`, `withLiveMemory()`, `retainedBusIds()`: the device list against the monitored cards |
+| `app/server/tuning/TuningHardware.ts`        | `TuningHardware`: devices, CPU, RAM                                                                |
+| `app/server/tuning/models.ts`                | `loadModel()` and `mmprojBytes()`: the parsed GGUF and the projector size                          |
+| `app/server/tuning/checks.ts`                | `runChecks()` and `summarize()`: the system checks                                                 |
+| `app/server/tuning/sysinfo.ts`               | `readSys()`: the `/proc`, `/sys` and log readings the checks need                                  |
+| `app/server/tuning/disk.ts`                  | `measureDiskSpeed()`: sequential read speed of the model's disk                                    |
+| `app/server/tuning/TuningMemo.ts`            | `TuningMemo`: the last estimate and disk measurement of each model, for the checks                 |
+| `app/server/tuning/http.ts`, `setup.ts`      | `TuningHandlers` and `SetupHandlers`                                                               |
+| `app/server/hardware/CpuInfo.ts`, `cpu.ts`   | `CpuInfo` on `readCpuInfo()`: model, cores, threads, flags, NUMA nodes                             |
+| `app/server/models/GgufReader.ts`, `gguf.ts` | `GgufReader`: GGUF header to `ModelInfo`, cached                                                   |
+| `app/server/models/sizes.ts`                 | `tensorBytes()`, `EXPERTS`                                                                         |
+| `app/server/testing/tuning.ts`               | `fakeModel()` and `hw3()`, for tests                                                               |
+| `packages/webui-shared/src/tuning.ts`        | `PRESETS`, `NOISE`, `deviceRole()`, `gpuDevices()`, `Estimate`, `Fit`, `Check`…                    |
 
 The estimator, the placement, the memory model, `planSweep()` and the checks are pure functions: data in, result out,
 which is what the tests rely on. Only `TuningHardware`, `loadModel()`, `readSys()` and `measureDiskSpeed()` touch
@@ -51,20 +51,20 @@ while the stamp of its parts (size and modification time of every part) is the s
 A tensor's size is not in the header: `tensorBytes()` takes the gap between consecutive offsets, and the last tensor
 ends at the end of the file. The estimator uses these `ModelInfo` fields:
 
-| Field                                  | From the GGUF                                                                          | Used for                     |
-| -------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------- |
-| `tensors` (name, bytes)                | Tensor infos of every shard                                                            | Placement                    |
-| `blockCount`                           | `<arch>.block_count`                                                                   | Layers                       |
-| `headCountKv`                          | `<arch>.attention.head_count_kv`, an array or a scalar (default: `head_count`)         | KV cache                     |
-| `keyLength`, `valueLength`             | `<arch>.attention.key_length`, `value_length` (default: `embedding_length / head_count`) | KV cache                   |
-| `slidingWindow`, `swaPattern`          | `<arch>.attention.sliding_window`, `sliding_window_pattern`                            | Sliding-window layers        |
-| `fullAttentionInterval`                | `<arch>.full_attention_interval`                                                       | Hybrid models                |
-| `nextnLayers`                          | `<arch>.nextn_predict_layers`                                                          | MTP layers (no KV cache)     |
-| `recurrent`, `ssmStateBytesPerSeq`     | `blk.N.ssm_*` or `*linear_attn*` tensors; `ssm.inner_size`, `state_size`, `conv_kernel` | Recurrent state             |
-| `embeddingLength`, `vocabSize`         | `<arch>.embedding_length`; `<arch>.vocab_size`, else the tokenizer's token count, else the output (or embedding) tensor's second dimension | Compute buffers |
-| `expertCount`, `expertUsedCount`       | `<arch>.expert_count`, `expert_used_count`                                             | MoE, disk reads per token    |
-| `contextLength`                        | `<arch>.context_length`                                                                | Largest context tried        |
-| `fileBytes`                            | Sum of the parts' sizes                                                                | Sweep duration, memlock check |
+| Field                              | From the GGUF                                                                                                                              | Used for                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- |
+| `tensors` (name, bytes)            | Tensor infos of every shard                                                                                                                | Placement                     |
+| `blockCount`                       | `<arch>.block_count`                                                                                                                       | Layers                        |
+| `headCountKv`                      | `<arch>.attention.head_count_kv`, an array or a scalar (default: `head_count`)                                                             | KV cache                      |
+| `keyLength`, `valueLength`         | `<arch>.attention.key_length`, `value_length` (default: `embedding_length / head_count`)                                                   | KV cache                      |
+| `slidingWindow`, `swaPattern`      | `<arch>.attention.sliding_window`, `sliding_window_pattern`                                                                                | Sliding-window layers         |
+| `fullAttentionInterval`            | `<arch>.full_attention_interval`                                                                                                           | Hybrid models                 |
+| `nextnLayers`                      | `<arch>.nextn_predict_layers`                                                                                                              | MTP layers (no KV cache)      |
+| `recurrent`, `ssmStateBytesPerSeq` | `blk.N.ssm_*` or `*linear_attn*` tensors; `ssm.inner_size`, `state_size`, `conv_kernel`                                                    | Recurrent state               |
+| `embeddingLength`, `vocabSize`     | `<arch>.embedding_length`; `<arch>.vocab_size`, else the tokenizer's token count, else the output (or embedding) tensor's second dimension | Compute buffers               |
+| `expertCount`, `expertUsedCount`   | `<arch>.expert_count`, `expert_used_count`                                                                                                 | MoE, disk reads per token     |
+| `contextLength`                    | `<arch>.context_length`                                                                                                                    | Largest context tried         |
+| `fileBytes`                        | Sum of the parts' sizes                                                                                                                    | Sweep duration, memlock check |
 
 `EXPERTS = /ffn_(gate|up|down)_(ch)?exps/` (`app/server/models/sizes.ts`) matches the tensors that `--n-cpu-moe` moves to
 the CPU, as in llama.cpp; shared experts (`_shexp`) stay. For the estimator, a model is a MoE when `expertCount > 0`
@@ -90,12 +90,12 @@ and at least one tensor matches.
 
 Each device gets a role from `deviceRole(d, all)` (`packages/webui-shared/src/tuning.ts`):
 
-| Role         | Rule                                                                   |
-| ------------ | ---------------------------------------------------------------------- |
-| `host`       | Backend `BLAS` or `CPU`, or no memory (`totalMib ≤ 0`: ZenDNN, BLAS)   |
-| `integrated` | The name matches `processor` or `APU` (Vulkan names an iGPU after the CPU), or is `AMD Radeon Graphics` with no model number (ROCm's name for the desktop Ryzen iGPU) |
+| Role         | Rule                                                                                                                                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `host`       | Backend `BLAS` or `CPU`, or no memory (`totalMib ≤ 0`: ZenDNN, BLAS)                                                                                                                                       |
+| `integrated` | The name matches `processor` or `APU` (Vulkan names an iGPU after the CPU), or is `AMD Radeon Graphics` with no model number (ROCm's name for the desktop Ryzen iGPU)                                      |
 | `duplicate`  | The same card already listed through a better ranked backend (CUDA, then ROCm, then Vulkan), names compared without the Vulkan driver suffix (`(RADV GFX1201)`): the Vulkan copy of an NVIDIA or ROCm card |
-| `gpu`        | Anything else                                                          |
+| `gpu`        | Anything else                                                                                                                                                                                              |
 
 The large APUs (`Radeon 8060S Graphics`, `Radeon 780M Graphics`) carry a model number: they stay `gpu`, since they
 are the only usable GPU of such a machine. `DEVICE_ROLE_BADGE` gives the badge the Hardware card and the Benchmark
@@ -121,13 +121,13 @@ An unmatched device (iGPU, unknown vendor, no Monitor sample) keeps the list's v
 
 `PRESETS` in `packages/webui-shared/src/tuning.ts`:
 
-| Id        | Label              | `ctxTarget`            | `ctxMin` | `kvPreferred` | `ub`  | `score`                 |
-| --------- | ------------------ | ---------------------- | -------- | ------------- | ----- | ----------------------- |
-| `chat`    | Responsive chat    | 32,768                 | 8,192    | `f16`         | 512   | `tgTps`                 |
-| `agent`   | Agent & RAG        | 65,536                 | 16,384   | `q8_0`        | 2,048 | `0.6 × ppTps + 0.4 × tgTps` |
-| `context` | Max context        | Infinity (the largest that fits) | 8,192 | `q8_0`   | 512   | `ctx × 1e6 + tgTps`     |
-| `fit`     | Make the model fit | 8,192                  | 8,192    | `q8_0`        | 512   | `tgTps`                 |
-| `big`     | 100 GB model       | 32,768                 | 8,192    | `q8_0`        | 512   | `tgTps`                 |
+| Id        | Label              | `ctxTarget`                      | `ctxMin` | `kvPreferred` | `ub`  | `score`                     |
+| --------- | ------------------ | -------------------------------- | -------- | ------------- | ----- | --------------------------- |
+| `chat`    | Responsive chat    | 32,768                           | 8,192    | `f16`         | 512   | `tgTps`                     |
+| `agent`   | Agent & RAG        | 65,536                           | 16,384   | `q8_0`        | 2,048 | `0.6 × ppTps + 0.4 × tgTps` |
+| `context` | Max context        | Infinity (the largest that fits) | 8,192    | `q8_0`        | 512   | `ctx × 1e6 + tgTps`         |
+| `fit`     | Make the model fit | 8,192                            | 8,192    | `q8_0`        | 512   | `tgTps`                     |
+| `big`     | 100 GB model       | 32,768                           | 8,192    | `q8_0`        | 512   | `tgTps`                     |
 
 The estimator uses the context, cache and `-ub` settings; `score` ranks sweep results
 ([Ranking](/developers/server/bench/#ranking)). `NOISE = { pp: 0.1, tg: 0.02 }` is `llama-bench`'s relative
@@ -216,12 +216,12 @@ first device when at least one layer is on a GPU, otherwise to RAM.
 
 `fitOf(input, measured)` then gives the verdict (`Fit`), with each device's estimate, budget and total:
 
-| Verdict | When                                                                                     | `reason`                                                     |
-| ------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `no`    | An unknown device, or a device over its budget                                           | `unknown device: CUDA7`, `CUDA0: 17.1 GiB for 14.7 GiB usable` |
-| `tight` | RAM above what is available: `mmap` reads the rest from disk, slow but not a failure     | `RAM: … for … available, the rest is re-read from disk`      |
-| `tight` | A device above `MIN_FREE_RATIO = 0.95` of its budget                                     | `CUDA0: … for … usable, thin margin`                         |
-| `fits`  | Everything else                                                                          | `null`                                                       |
+| Verdict | When                                                                                 | `reason`                                                       |
+| ------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `no`    | An unknown device, or a device over its budget                                       | `unknown device: CUDA7`, `CUDA0: 17.1 GiB for 14.7 GiB usable` |
+| `tight` | RAM above what is available: `mmap` reads the rest from disk, slow but not a failure | `RAM: … for … available, the rest is re-read from disk`        |
+| `tight` | A device above `MIN_FREE_RATIO = 0.95` of its budget                                 | `CUDA0: … for … usable, thin margin`                           |
+| `fits`  | Everything else                                                                      | `null`                                                         |
 
 ## The estimator
 
@@ -250,12 +250,12 @@ in a fixed order and keeps the first configuration that passes `fitOf()`, then e
 
 A family turns into flags this way:
 
-| Family    | Flags tried                                                                                       |
-| --------- | ------------------------------------------------------------------------------------------------- |
-| `gpu`     | `-ngl all`, `-dev` the set, `-ts` for two cards or more                                           |
+| Family    | Flags tried                                                                                        |
+| --------- | -------------------------------------------------------------------------------------------------- |
+| `gpu`     | `-ngl all`, `-dev` the set, `-ts` for two cards or more                                            |
 | `moe-cpu` | The same, with `-ncmoe` from 1 up to the layer count: the smallest that fits (or the pinned value) |
-| `partial` | The same, with `-ngl` from `L − 1` down to 1: the largest that fits (or the pinned value)         |
-| `cpu`     | `-ngl 0 -dev none`                                                                               |
+| `partial` | The same, with `-ngl` from `L − 1` down to 1: the largest that fits (or the pinned value)          |
+| `cpu`     | `-ngl 0 -dev none`                                                                                 |
 
 Every candidate also gets `-fa on` (unless `-fa off` is pinned), `-ctk` and `-ctv` set to the cache type, `-t` (the
 physical cores), `-b` (`DEFAULT_BATCH = 2048`) and `-ub`. `-ts` gives each card its budget, minus the compute buffers
@@ -286,20 +286,20 @@ The result (`Estimate`) has the flags (`params`), `ctx`, `kv` (the final K cache
 and one row per flag with a "why" string. The rows are built from the final flags, after the pinned values: a pinned
 `-fa` or cache type shows as such.
 
-| Flag                 | Why                                                                                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `-ncmoe`             | `experts of the first N layers in RAM (…)`; with `big`: `…; attention, norms and remaining experts on <cards>`                                         |
-| `-ngl`               | `all`: `… of weights fit in … usable`, or `all layers on GPU, except the experts above` with `-ncmoe`; a number: `N of L layers fit, the rest in RAM`; `0`: `not a single layer fits: everything in RAM` |
-| `-dev`               | `single card: no PCIe hop`, or `N cards, <first> gets the compute buffers`                                                                             |
-| `-ts`                | `split by the usable VRAM of each card`                                                                                                                |
-| `-c`                 | `… estimated in total, <kv> KV cache included, margin kept`                                                                                            |
-| `-fa`                | The final value. `on`: `faster attention, smaller compute buffers` (`f32`, `f16`, `bf16`, `f8_e4m3`), `required for the quantized KV cache` (any other type); pinned `auto`: `pinned: llama.cpp decides`; pinned `off`: `pinned: attention without flash attention` |
-| `-ctk / -ctv`        | The final types (`q4_0 / q8_0` when they differ). `pinned`, or `the budget allows it, no loss` (`f16`), `cache halved, negligible loss` (quantized), `cache halved, works without flash attention` (`f8_e4m3`) |
-| `-t`                 | `N physical cores`                                                                                                                                     |
-| `-b / -ub`           | `default` for 2048 / 512, otherwise `faster prompt processing, enough VRAM headroom`                                                                   |
-| `--fit`              | `what gets measured is exactly what gets written`                                                                                                      |
-| `--load-mode`        | `whole model locked in memory, enough RAM`                                                                                                             |
-| `--numa distribute`  | `several NUMA nodes`                                                                                                                                   |
+| Flag                | Why                                                                                                                                                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-ncmoe`            | `experts of the first N layers in RAM (…)`; with `big`: `…; attention, norms and remaining experts on <cards>`                                                                                                                                                      |
+| `-ngl`              | `all`: `… of weights fit in … usable`, or `all layers on GPU, except the experts above` with `-ncmoe`; a number: `N of L layers fit, the rest in RAM`; `0`: `not a single layer fits: everything in RAM`                                                            |
+| `-dev`              | `single card: no PCIe hop`, or `N cards, <first> gets the compute buffers`                                                                                                                                                                                          |
+| `-ts`               | `split by the usable VRAM of each card`                                                                                                                                                                                                                             |
+| `-c`                | `… estimated in total, <kv> KV cache included, margin kept`                                                                                                                                                                                                         |
+| `-fa`               | The final value. `on`: `faster attention, smaller compute buffers` (`f32`, `f16`, `bf16`, `f8_e4m3`), `required for the quantized KV cache` (any other type); pinned `auto`: `pinned: llama.cpp decides`; pinned `off`: `pinned: attention without flash attention` |
+| `-ctk / -ctv`       | The final types (`q4_0 / q8_0` when they differ). `pinned`, or `the budget allows it, no loss` (`f16`), `cache halved, negligible loss` (quantized), `cache halved, works without flash attention` (`f8_e4m3`)                                                      |
+| `-t`                | `N physical cores`                                                                                                                                                                                                                                                  |
+| `-b / -ub`          | `default` for 2048 / 512, otherwise `faster prompt processing, enough VRAM headroom`                                                                                                                                                                                |
+| `--fit`             | `what gets measured is exactly what gets written`                                                                                                                                                                                                                   |
+| `--load-mode`       | `whole model locked in memory, enough RAM`                                                                                                                                                                                                                          |
+| `--numa distribute` | `several NUMA nodes`                                                                                                                                                                                                                                                |
 
 `--load-mode mmap+mlock` is recommended when `-ngl` is not `all`, some weights are in RAM, `-ncmoe` is not used, RAM does not overflow
 and at least 2 GiB of RAM remain. `--numa distribute` is added when the CPU has several NUMA nodes.
@@ -345,48 +345,48 @@ a `family` (`nvidia`, `amd`, `cpu`, `build`, `kernel`), a `label`, a `state` (`o
 `readSys(options)` (`app/server/tuning/sysinfo.ts`) gathers the readings; each one is tolerant and gives `null` or an
 empty value when it cannot read, it never fails.
 
-| Reading                   | Source                                                                                  |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| `governors`               | `/sys/devices/system/cpu/cpuN/cpufreq/scaling_governor`                                 |
-| `thp`                     | The bracketed value of `/sys/kernel/mm/transparent_hugepage/enabled`                    |
-| `memlockLimitBytes`       | "Max locked memory" in `/proc/self/limits` (`Infinity` for `unlimited`)                 |
-| `swappiness`, `cmdline`, `modules` | `/proc/sys/vm/swappiness`, `/proc/cmdline`, `/proc/modules`                    |
-| `iommuActive`             | Whether `/sys/class/iommu` has entries                                                  |
-| `backendLibs`             | The `libggml-*.so` files next to the binary, after resolving symlinks                   |
-| `buildDate`               | `git log -1 --format=%ct` in the git checkout holding the binary (its folder or one of its three parents) |
-| `driver`, `cudaDriver`    | NVML, else `/sys/module/nvidia/version` for the driver                                  |
-| `bar1Bytes`               | The largest of the first six BARs in `/sys/bus/pci/devices/<busId>/resource`            |
-| `amdDpm`                  | `/sys/class/drm/cardN/device/power_dpm_force_performance_level`, by bus id              |
-| `amdGfx`                  | The gfx target of each card ROCm sees, by bus id: `gfx_target_version` (`MMmmss`, minor and stepping in hex: `120001` is `gfx1201`), `domain` and `location_id` of `/sys/class/kfd/kfd/topology/nodes/*/properties` |
-| `hipTargets`              | The targets `libggml-hip.so` next to the binary was built for (`amdgcn-amd-amdhsa--gfx…` in its offload bundles), read in one pass and kept while the file's path, size and modification time do not change; `null` without the library |
-| `systemInfo`, `cudaDriverError` | The last `system_info:` log line; a log line saying `driver version is insufficient` |
-| `modelDisk`               | `queue/rotational` of the model's disk, and the file system type from `/proc/mounts`    |
+| Reading                            | Source                                                                                                                                                                                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `governors`                        | `/sys/devices/system/cpu/cpuN/cpufreq/scaling_governor`                                                                                                                                                                                 |
+| `thp`                              | The bracketed value of `/sys/kernel/mm/transparent_hugepage/enabled`                                                                                                                                                                    |
+| `memlockLimitBytes`                | "Max locked memory" in `/proc/self/limits` (`Infinity` for `unlimited`)                                                                                                                                                                 |
+| `swappiness`, `cmdline`, `modules` | `/proc/sys/vm/swappiness`, `/proc/cmdline`, `/proc/modules`                                                                                                                                                                             |
+| `iommuActive`                      | Whether `/sys/class/iommu` has entries                                                                                                                                                                                                  |
+| `backendLibs`                      | The `libggml-*.so` files next to the binary, after resolving symlinks                                                                                                                                                                   |
+| `buildDate`                        | `git log -1 --format=%ct` in the git checkout holding the binary (its folder or one of its three parents)                                                                                                                               |
+| `driver`, `cudaDriver`             | NVML, else `/sys/module/nvidia/version` for the driver                                                                                                                                                                                  |
+| `bar1Bytes`                        | The largest of the first six BARs in `/sys/bus/pci/devices/<busId>/resource`                                                                                                                                                            |
+| `amdDpm`                           | `/sys/class/drm/cardN/device/power_dpm_force_performance_level`, by bus id                                                                                                                                                              |
+| `amdGfx`                           | The gfx target of each card ROCm sees, by bus id: `gfx_target_version` (`MMmmss`, minor and stepping in hex: `120001` is `gfx1201`), `domain` and `location_id` of `/sys/class/kfd/kfd/topology/nodes/*/properties`                     |
+| `hipTargets`                       | The targets `libggml-hip.so` next to the binary was built for (`amdgcn-amd-amdhsa--gfx…` in its offload bundles), read in one pass and kept while the file's path, size and modification time do not change; `null` without the library |
+| `systemInfo`, `cudaDriverError`    | The last `system_info:` log line; a log line saying `driver version is insufficient`                                                                                                                                                    |
+| `modelDisk`                        | `queue/rotational` of the model's disk, and the file system type from `/proc/mounts`                                                                                                                                                    |
 
 ### The checks
 
-| Id                           | `warn` when                                                                 | Command                                                                          | Persistence |
-| ---------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------- |
-| `nvidia.persistence.<busId>` | Persistence mode is off                                                     | `sudo nvidia-smi -i <uuid> -pm 1`                                                | session     |
-| `nvidia.powerlimit.<busId>`  | The limit is more than 1 W below the default                                | `sudo nvidia-smi -i <uuid> -pl <default W>`                                      | session     |
-| `nvidia.pcie.<busId>`, `amd.pcie.<busId>` | The current generation or width is below the maximum           |                                                                                  | permanent   |
-| `nvidia.rebar.<busId>`       | BAR1 is smaller than the VRAM                                               |                                                                                  | permanent   |
-| `nvidia.driver`              | The logs say the driver is too old for the build's CUDA                     |                                                                                  | permanent   |
-| `nvidia.uvm`                 | `nvidia_uvm` is not loaded                                                  | `sudo modprobe nvidia_uvm`                                                       | session     |
-| `amd.dpm.<busId>`            | The level is `auto`                                                         | `echo high \| sudo tee <file>`                                                   | session     |
-| `amd.hip`                    | No `libggml-hip*` next to the binary                                        |                                                                                  | permanent   |
-| `amd.rocm-gfx.<busId>`       | The card has no KFD node (ROCm does not see it), or its gfx target is not in `hipTargets`, exactly or through its generic target (`gfx12-generic`…, `genericOf()`); `unknown` without the HIP library or when its targets cannot be read | `-DAMDGPU_TARGETS=<gfx>` at the build, or `HSA_OVERRIDE_GFX_VERSION` | permanent |
-| `cpu.governor`               | A core is not on `performance`                                              | `echo performance \| sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor` | session |
-| `cpu.thp`                    | `never`                                                                     | `echo madvise \| sudo tee /sys/kernel/mm/transparent_hugepage/enabled`           | session     |
-| `cpu.memlock`                | `mmap+mlock` is recommended and the limit is below the model's size         | `ulimit -l unlimited`                                                            | session     |
-| `cpu.swappiness`             | Above 10 while the model spills into RAM                                    | `sudo sysctl vm.swappiness=10`                                                   | session     |
-| `cpu.numa`                   | Several NUMA nodes without `--numa` in the recommendation                   |                                                                                  | permanent   |
-| `build.cuda`                 | An NVIDIA card, no CUDA device listed and no `libggml-cuda*`               |                                                                                  | permanent   |
-| `build.simd`                 | The CPU has AVX2 or AVX-512 and `system_info` does not show `AVX2 = 1` or `AVX512 = 1` |                                                       | permanent   |
-| `build.age`                  | The last commit is older than 60 days (`OLD_BUILD_MS`)                      | `git pull && cmake --build build`                                                | permanent   |
-| `kernel.iommu`               | Active without passthrough (`iommu=pt`, `amd_iommu=off`, `intel_iommu=off`) with two cards or more |                                           | permanent   |
-| `kernel.disk`                | A spinning disk or a network file system (`NETWORK_FS`)                     |                                                                                  | permanent   |
-| `kernel.disk-speed`          | Sequential read under `DISK_OK_BPS = 2 GiB/s`; `unknown` until measured     |                                                                                  |             |
-| `kernel.swap`                | Swap in use while the model spills into RAM                                 |                                                                                  |             |
+| Id                                        | `warn` when                                                                                                                                                                                                                              | Command                                                                              | Persistence |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ----------- |
+| `nvidia.persistence.<busId>`              | Persistence mode is off                                                                                                                                                                                                                  | `sudo nvidia-smi -i <uuid> -pm 1`                                                    | session     |
+| `nvidia.powerlimit.<busId>`               | The limit is more than 1 W below the default                                                                                                                                                                                             | `sudo nvidia-smi -i <uuid> -pl <default W>`                                          | session     |
+| `nvidia.pcie.<busId>`, `amd.pcie.<busId>` | The current generation or width is below the maximum                                                                                                                                                                                     |                                                                                      | permanent   |
+| `nvidia.rebar.<busId>`                    | BAR1 is smaller than the VRAM                                                                                                                                                                                                            |                                                                                      | permanent   |
+| `nvidia.driver`                           | The logs say the driver is too old for the build's CUDA                                                                                                                                                                                  |                                                                                      | permanent   |
+| `nvidia.uvm`                              | `nvidia_uvm` is not loaded                                                                                                                                                                                                               | `sudo modprobe nvidia_uvm`                                                           | session     |
+| `amd.dpm.<busId>`                         | The level is `auto`                                                                                                                                                                                                                      | `echo high \| sudo tee <file>`                                                       | session     |
+| `amd.hip`                                 | No `libggml-hip*` next to the binary                                                                                                                                                                                                     |                                                                                      | permanent   |
+| `amd.rocm-gfx.<busId>`                    | The card has no KFD node (ROCm does not see it), or its gfx target is not in `hipTargets`, exactly or through its generic target (`gfx12-generic`…, `genericOf()`); `unknown` without the HIP library or when its targets cannot be read | `-DAMDGPU_TARGETS=<gfx>` at the build, or `HSA_OVERRIDE_GFX_VERSION`                 | permanent   |
+| `cpu.governor`                            | A core is not on `performance`                                                                                                                                                                                                           | `echo performance \| sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor` | session     |
+| `cpu.thp`                                 | `never`                                                                                                                                                                                                                                  | `echo madvise \| sudo tee /sys/kernel/mm/transparent_hugepage/enabled`               | session     |
+| `cpu.memlock`                             | `mmap+mlock` is recommended and the limit is below the model's size                                                                                                                                                                      | `ulimit -l unlimited`                                                                | session     |
+| `cpu.swappiness`                          | Above 10 while the model spills into RAM                                                                                                                                                                                                 | `sudo sysctl vm.swappiness=10`                                                       | session     |
+| `cpu.numa`                                | Several NUMA nodes without `--numa` in the recommendation                                                                                                                                                                                |                                                                                      | permanent   |
+| `build.cuda`                              | An NVIDIA card, no CUDA device listed and no `libggml-cuda*`                                                                                                                                                                             |                                                                                      | permanent   |
+| `build.simd`                              | The CPU has AVX2 or AVX-512 and `system_info` does not show `AVX2 = 1` or `AVX512 = 1`                                                                                                                                                   |                                                                                      | permanent   |
+| `build.age`                               | The last commit is older than 60 days (`OLD_BUILD_MS`)                                                                                                                                                                                   | `git pull && cmake --build build`                                                    | permanent   |
+| `kernel.iommu`                            | Active without passthrough (`iommu=pt`, `amd_iommu=off`, `intel_iommu=off`) with two cards or more                                                                                                                                       |                                                                                      | permanent   |
+| `kernel.disk`                             | A spinning disk or a network file system (`NETWORK_FS`)                                                                                                                                                                                  |                                                                                      | permanent   |
+| `kernel.disk-speed`                       | Sequential read under `DISK_OK_BPS = 2 GiB/s`; `unknown` until measured                                                                                                                                                                  |                                                                                      |             |
+| `kernel.swap`                             | Swap in use while the model spills into RAM                                                                                                                                                                                              |                                                                                      |             |
 
 The NVIDIA commands name the card by its UUID (from the Monitor's key), because `nvidia-smi`'s own index need not match
 llama-webui's order. "The model spills into RAM" means the last estimate is `ok` and either `-ngl` is not `all` or it

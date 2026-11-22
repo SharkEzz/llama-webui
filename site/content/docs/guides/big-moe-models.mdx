@@ -23,16 +23,16 @@ same proportion: the active share of the experts left in RAM.
 
 ## The flags involved
 
-| Flag                        | Long form                          | What it does in llama.cpp                                              | How llama-webui uses it                                                                                     |
-| --------------------------- | ---------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `-ncmoe N`                  | `--n-cpu-moe N`                    | Keeps the MoE weights of the first N layers on the CPU.                | The preset's main lever: it picks N for you. A field on the Benchmark page, a row in sweeps.                |
-| `-cmoe`                     | `--cpu-moe`                        | Keeps all MoE weights on the CPU.                                      | Never recommended. A llama-bench run ignores it and the form suggests `-ncmoe` (the layer count moves every expert). |
-| `-ngl`                      | `--gpu-layers`, `--n-gpu-layers`   | Maximum number of layers in VRAM: a number, `auto` or `all`.           | `all`: every layer on the GPUs, except the experts `-ncmoe` moves to RAM.                                   |
-| `-ot`                       | `--override-tensor`                | Puts the tensors whose name matches a pattern on a given buffer (`pattern=buffer`). | Never recommended, but counted by the estimator (the first matching rule wins). Sweeps suggest expert patterns. |
-| `-dev`, `-ts`               | `--device`, `--tensor-split`       | The cards to use, and each card's share of the layers.                 | Every dedicated card, split by usable VRAM.                                                                 |
-| `-ctk`, `-ctv`, `-fa`       | `--cache-type-k`, `--cache-type-v`, `--flash-attn` | KV cache types; flash attention.                       | `q8_0` with `-fa on`: half the KV cache of `f16`.                                                           |
-| `--fit off`                 |                                    |                                                                        | Always added: what gets measured is exactly what gets written.                                              |
-| `--load-mode mmap+mlock`    |                                    | Locks the model in RAM.                                                | Never added together with `-ncmoe`.                                                                         |
+| Flag                     | Long form                                          | What it does in llama.cpp                                                           | How llama-webui uses it                                                                                              |
+| ------------------------ | -------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `-ncmoe N`               | `--n-cpu-moe N`                                    | Keeps the MoE weights of the first N layers on the CPU.                             | The preset's main lever: it picks N for you. A field on the Benchmark page, a row in sweeps.                         |
+| `-cmoe`                  | `--cpu-moe`                                        | Keeps all MoE weights on the CPU.                                                   | Never recommended. A llama-bench run ignores it and the form suggests `-ncmoe` (the layer count moves every expert). |
+| `-ngl`                   | `--gpu-layers`, `--n-gpu-layers`                   | Maximum number of layers in VRAM: a number, `auto` or `all`.                        | `all`: every layer on the GPUs, except the experts `-ncmoe` moves to RAM.                                            |
+| `-ot`                    | `--override-tensor`                                | Puts the tensors whose name matches a pattern on a given buffer (`pattern=buffer`). | Never recommended, but counted by the estimator (the first matching rule wins). Sweeps suggest expert patterns.      |
+| `-dev`, `-ts`            | `--device`, `--tensor-split`                       | The cards to use, and each card's share of the layers.                              | Every dedicated card, split by usable VRAM.                                                                          |
+| `-ctk`, `-ctv`, `-fa`    | `--cache-type-k`, `--cache-type-v`, `--flash-attn` | KV cache types; flash attention.                                                    | `q8_0` with `-fa on`: half the KV cache of `f16`.                                                                    |
+| `--fit off`              |                                                    |                                                                                     | Always added: what gets measured is exactly what gets written.                                                       |
+| `--load-mode mmap+mlock` |                                                    | Locks the model in RAM.                                                             | Never added together with `-ncmoe`.                                                                                  |
 
 ## How llama-webui picks the split
 
@@ -104,13 +104,13 @@ a model, and add RAM or pick a smaller quantization for daily use.
 This is the case llama-webui's own estimator tests use. The model is synthetic: a 106.1 GiB MoE GGUF with 48 layers and
 128 experts, 8 of them active, with about 2.1 GiB of experts and 100 MiB of other weights per layer. The machine has:
 
-| Device    | Card                                | Memory                     |
-| --------- | ----------------------------------- | -------------------------- |
-| `CUDA0`   | NVIDIA GeForce RTX 5070 Ti          | 15.6 GiB                   |
-| `CUDA1`   | NVIDIA GeForce RTX 5060 Ti          | 15.6 GiB                   |
-| `Vulkan3` | AMD Radeon RX 9070 XT (Vulkan)      | 15.9 GiB                   |
-| RAM       |                                     | 55.0 GiB available of 61.0 GiB |
-| CPU       | AMD Ryzen 5 9600X                   | 6 physical cores           |
+| Device    | Card                           | Memory                         |
+| --------- | ------------------------------ | ------------------------------ |
+| `CUDA0`   | NVIDIA GeForce RTX 5070 Ti     | 15.6 GiB                       |
+| `CUDA1`   | NVIDIA GeForce RTX 5060 Ti     | 15.6 GiB                       |
+| `Vulkan3` | AMD Radeon RX 9070 XT (Vulkan) | 15.9 GiB                       |
+| RAM       |                                | 55.0 GiB available of 61.0 GiB |
+| CPU       | AMD Ryzen 5 9600X              | 6 physical cores               |
 
 With **100 GB model**, the recommendation is:
 
@@ -118,12 +118,12 @@ With **100 GB model**, the recommendation is:
 -ngl all -ncmoe 43 -dev CUDA0,CUDA1,Vulkan3 -ts 56,58,59 -fa on -ctk q8_0 -ctv q8_0 -t 6 -b 2048 -ub 512 -c 32768 --fit off
 ```
 
-| Device    | Estimated | Budget              |
-| --------- | --------- | ------------------- |
-| `CUDA0`   | 2.6 GiB   | 14.4 GiB usable     |
-| `CUDA1`   | 2.1 GiB   | 14.4 GiB usable     |
-| `Vulkan3` | 12.9 GiB  | 14.8 GiB usable     |
-| RAM       | 90.6 GiB  | 55.0 GiB available  |
+| Device    | Estimated | Budget             |
+| --------- | --------- | ------------------ |
+| `CUDA0`   | 2.6 GiB   | 14.4 GiB usable    |
+| `CUDA1`   | 2.1 GiB   | 14.4 GiB usable    |
+| `Vulkan3` | 12.9 GiB  | 14.8 GiB usable    |
+| RAM       | 90.6 GiB  | 55.0 GiB available |
 
 What the numbers say:
 
