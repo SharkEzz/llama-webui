@@ -45,6 +45,13 @@ On every new connection, the hub sends `hello` to that client before anything el
 { "type": "hello", "payload": { "serverTime": 1794210000000, "bootId": "1b0f6c52-8a7e-4f4e-9d0b-3f2a5c7e9a14" } }
 ```
 
+Right after `hello`, the hub sends that client the last [`snapshot`](#snapshot) published, so a page shows live
+values as soon as it connects instead of waiting for the next monitor tick. Before the first tick (or with the monitor
+stubbed by `LLAMA_WEBUI_TEST_MONITOR=stub`) there is none, and nothing is sent. The client then gets every message
+published after that snapshot, none twice: the hub keeps the snapshot and publishes it in one step, and subscribes a
+client and reads it in another, under the same lock. No other message is kept: the rest of the state is read over REST
+after a connection.
+
 `bootId` identifies the llama-webui process (a random UUID drawn by `AppInfo`, `app/server/config/AppInfo.ts`, when
 the services are built). It changes when llama-webui restarts, and in development whenever a save of a server file
 (`app/server/` or `packages/`) restarts the server (see
@@ -78,7 +85,7 @@ clients reconnect once llama-webui is back, to a new `bootId`. A development res
 | [`hello`](#hello)                         | server to client | `{ serverTime, bootId }`                 | Once, when the client connects.                                                   |
 | [`ping`](#ping-and-pong)                  | both             | none                                     | Every 15 seconds by the server; by a client when it wants.                        |
 | [`pong`](#ping-and-pong)                  | both             | none                                     | In answer to a `ping`.                                                            |
-| [`snapshot`](#snapshot)                   | server to all    | `Snapshot` (`monitor.ts`)                | At every monitor tick (`pollIntervalMs`, 1000 ms by default).                     |
+| [`snapshot`](#snapshot)                   | server to all    | `Snapshot` (`monitor.ts`)                | At every tick (`pollIntervalMs`, 1000 ms by default); the last one after `hello`. |
 | [`log`](#log)                             | server to all    | `LogLine[]` (`logs.ts`)                  | When lines reach the log ring, batched.                                           |
 | [`server-state`](#server-state)           | server to all    | `ServerView` (`server.ts`)               | On every change of the supervisor's state.                                        |
 | [`bench-progress`](#bench-progress)       | server to all    | `BenchLive \| null` (`bench.ts`)         | On every change of the running benchmark's progress; `null` when the run is over. |
@@ -106,7 +113,8 @@ No payload: `{ "type": "ping" }` and `{ "type": "pong" }`. See [Heartbeat](#hear
 ### `snapshot`
 
 The monitor's state at a tick (`app/server/monitor/tick.ts`, run by `Monitor`, `app/server/monitor/Monitor.ts`); `GET /api/monitor/snapshot` returns the
-latest one. Its main fields:
+latest one. A client that connects gets the latest one right after `hello`: it is at most one `pollIntervalMs` old,
+since the monitor ticks whether a client is connected or not (its `at` tells when it was taken). Its main fields:
 
 | Field            | Type                                             | Description                                                                 |
 | ---------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |

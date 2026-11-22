@@ -7,11 +7,13 @@ import {
   Effect,
   Layer,
   Metric,
+  Option,
   PubSub,
   Ref,
   Schedule,
   Schema,
   String as Str,
+  SynchronizedRef,
 } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/http';
 import { Socket } from 'effect/socket';
@@ -34,11 +36,14 @@ const encode = Schema.encodeEffect(Schema.fromJsonString(WsMessage));
 /** What a client may send: anything else, JSON or not, is ignored. */
 const decodeClient = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Union([WsPing, WsPong])));
 
-/** The push channel of `/ws`: every connected client gets each published message. */
+/**
+ * The push channel of `/ws`: every connected client gets each published message. A client that connects gets `hello`,
+ * then the last `snapshot` published (none before the first tick), then what is published after it.
+ */
 export class WsHub extends Context.Service<
   WsHub,
   {
-    /** Sends a message to every connected client. */
+    /** Sends a message to every connected client; a `snapshot` is also kept for the clients that connect later. */
     readonly publish: (message: WsMessage) => Effect.Effect<void>;
     /** The number of connected clients. */
     readonly size: Effect.Effect<number>;
@@ -61,6 +66,11 @@ export class WsHub extends Context.Service<
         // One Deferred per connected client, completed once it took `Flush` (or left). A native set: Effect's
         // `HashSet` compares structurally, and two pending Deferreds are equal there.
         const clients = yield* Ref.make<ReadonlySet<Deferred.Deferred<void>>>(new Set());
+        // The last snapshot published, sent to a client right after its hello: the monitor ticks every second or
+        // more, and a page would wait that long for its first values. Published and kept in one step under its lock,
+        // and read in the step that subscribes a client: the client gets it then every message published after it,
+        // none twice and none missed.
+        const lastSnapshot = yield* SynchronizedRef.make<Option.Option<WsMessage>>(Option.none());
 
         yield* shutdown.before(
           Effect.gen(function* () {
@@ -94,7 +104,11 @@ export class WsHub extends Context.Service<
                 }),
               );
             // Subscribed before it is counted: a flush that waits for this client finds `Flush` in its queue.
-            const messages = yield* PubSub.subscribe(pubsub);
+            const [messages, greeting] = yield* SynchronizedRef.modifyEffect(lastSnapshot, (last) =>
+              PubSub.subscribe(pubsub).pipe(
+                Effect.map((subscription) => [[subscription, last] as const, last] as const),
+              ),
+            );
             const flushed = yield* Deferred.make<void>();
             yield* Effect.acquireRelease(
               Ref.updateAndGet(clients, (set) => new Set(set).add(flushed)).pipe(
@@ -113,6 +127,7 @@ export class WsHub extends Context.Service<
 
             const serverTime = yield* Clock.currentTimeMillis;
             yield* send({ type: 'hello', payload: { serverTime, bootId: info.bootId } });
+            if (Option.isSome(greeting)) yield* send(greeting.value);
 
             yield* PubSub.take(messages).pipe(
               Effect.flatMap((item) => (item === Flush ? Deferred.succeed(flushed, undefined) : send(item))),
@@ -151,8 +166,13 @@ export class WsHub extends Context.Service<
         return {
           publish: Effect.fn((message) =>
             Metric.update(WsMetrics.published, message.type).pipe(
-              Effect.andThen(PubSub.publish(pubsub, message)),
-              Effect.asVoid,
+              Effect.andThen(
+                SynchronizedRef.updateEffect(lastSnapshot, (last) =>
+                  PubSub.publish(pubsub, message).pipe(
+                    Effect.as(message.type === 'snapshot' ? Option.some(message) : last),
+                  ),
+                ),
+              ),
             ),
           ),
           size: Ref.get(clients).pipe(Effect.map((set) => set.size)),

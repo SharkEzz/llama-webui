@@ -168,7 +168,9 @@ effects and the sync functions.
 update, and `useSeries(key)` re-renders on it. Each `snapshot` carries the values of its tick in `points`, and the
 history's `intervalMs` and `capacity`: when they no longer match the local copy (the polling interval or history
 length changed in Settings), the client reloads the whole history. Snapshots that arrive during a reload are queued and
-appended afterwards.
+appended afterwards. The first snapshot of a connection comes right after `hello` (the latest one the hub kept), so the
+gauges fill as soon as the WebSocket opens; its point is already in the history that the connection reloads, and
+`append()` skips a point whose time is not after the last one.
 
 ### Chat streaming
 

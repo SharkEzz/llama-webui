@@ -12,6 +12,7 @@ import {
   Layer,
   Logger,
   Metric,
+  Ref,
   Schedule,
   Schema,
   Scope,
@@ -312,5 +313,115 @@ it.effect('a client that does not read does not hold the stop past the timeout',
     const elapsed = (yield* Clock.currentTimeMillis) - startedAt;
     assert.isAtLeast(elapsed, 500);
     assert.isBelow(elapsed, 600);
+  }),
+);
+
+/** A `snapshot` message of tick `tick`, every other field empty. */
+const snapshot = (tick: number): WsMessage => ({
+  type: 'snapshot',
+  payload: {
+    at: 1_700_000_000_000 + tick * 1000,
+    tick,
+    health: null,
+    rates: { genTps: 0, ppTps: 0 },
+    slots: null,
+    kv: null,
+    queue: null,
+    lastRequest: null,
+    spec: null,
+    recentRequests: [],
+    gpus: [],
+    allGpus: [],
+    proc: null,
+    system: null,
+    disk: null,
+    points: {},
+    history: { intervalMs: 1000, capacity: 300 },
+  },
+});
+
+/** The `type` of a message, and its tick for a snapshot. */
+const label = (message: unknown) => {
+  const { type, payload } = message as { type: string; payload?: { tick?: number } };
+  return type === 'snapshot' ? `snapshot ${payload?.tick}` : type;
+};
+
+/** Every message `client` got until a `pong` published once it is counted: what it was sent on connection. */
+const greeting = Effect.fnUntraced(function* (hub: WsHub['Service'], client: WsClient) {
+  yield* sizeIs(hub, 1);
+  yield* hub.publish({ type: 'pong' });
+  yield* next(client, 'pong');
+  return Arr.map(client.messages.slice(0, -1), label);
+});
+
+it.live('a client that connects after a snapshot gets hello, then that snapshot', () =>
+  Effect.gen(function* () {
+    const { open, hub } = yield* start();
+    yield* hub.publish(snapshot(1));
+    const client = yield* open();
+    const got = yield* greeting(hub, client);
+    assert.deepStrictEqual(got, ['hello', 'snapshot 1']);
+    assert.deepStrictEqual(client.messages[1], snapshot(1));
+  }),
+);
+
+it.live('a client that connects before any snapshot gets only hello', () =>
+  Effect.gen(function* () {
+    const { open, hub } = yield* start();
+    const client = yield* open();
+    const got = yield* greeting(hub, client);
+    assert.deepStrictEqual(got, ['hello']);
+  }),
+);
+
+it.live('a client that connects gets only the latest snapshot', () =>
+  Effect.gen(function* () {
+    const { open, hub } = yield* start();
+    yield* hub.publish(snapshot(1));
+    yield* hub.publish(snapshot(2));
+    const client = yield* open();
+    const got = yield* greeting(hub, client);
+    assert.deepStrictEqual(got, ['hello', 'snapshot 2']);
+  }),
+);
+
+it.live('only the snapshot is sent again to a client that connects, not the other messages', () =>
+  Effect.gen(function* () {
+    const { open, hub } = yield* start();
+    yield* hub.publish(snapshot(1));
+    yield* hub.publish({ type: 'download-deleted', payload: { ids: [7] } });
+    yield* hub.publish({ type: 'placement', payload: null });
+    yield* hub.publish({ type: 'ping' });
+    const client = yield* open();
+    const got = yield* greeting(hub, client);
+    assert.deepStrictEqual(got, ['hello', 'snapshot 1']);
+  }),
+);
+
+it.live('a client that connects while snapshots are published gets each one once, in order', () =>
+  Effect.gen(function* () {
+    const { open, hub } = yield* start();
+    // A tick every millisecond while the clients connect: some land around a subscription and its greeting.
+    const last = yield* Ref.make(0);
+    const ticking = yield* Ref.updateAndGet(last, (n) => n + 1).pipe(
+      Effect.flatMap((tick) => hub.publish(snapshot(tick))),
+      Effect.andThen(Effect.sleep('1 millis')),
+      Effect.forever,
+      Effect.forkChild,
+    );
+    const clients = yield* Effect.forEach(Arr.range(1, 8), () => open(), { concurrency: 'unbounded' });
+    yield* sizeIs(hub, clients.length);
+    yield* Effect.sleep('20 millis');
+    yield* Fiber.interrupt(ticking);
+    const final = yield* Ref.get(last);
+    yield* hub.publish({ type: 'pong' });
+    for (const client of clients) {
+      yield* next(client, 'pong');
+      const [hello, ...rest] = Arr.map(client.messages.slice(0, -1), label);
+      assert.strictEqual(hello, 'hello');
+      const ticks = Arr.map(rest, (text) => Number(Str.split(' ')(text)[1]));
+      const first = ticks[0] ?? 0;
+      assert.deepStrictEqual(ticks, Arr.range(first, final));
+    }
   }),
 );

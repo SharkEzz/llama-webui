@@ -15,12 +15,14 @@ endpoints takes a parameter or a body.
 
 The monitor (`Monitor` in `app/server/monitor/Monitor.ts`) ticks every `pollIntervalMs` (setting, 1000 ms by default),
 whether a client is connected or not. Each tick builds a `Snapshot`, broadcasts it as the `snapshot` message of the
-[WebSocket](/developers/api/websocket/), and appends one point to every history series.
+[WebSocket](/developers/api/websocket/), and appends one point to every history series. A client that connects gets
+the latest snapshot right after `hello`, without waiting for the next tick.
 
 A client keeps a live copy of the history this way (`app/src/lib/monitor.ts`):
 
 1. On every WebSocket connection, `GET /api/monitor/history` loads the whole history.
-2. Each `snapshot` message carries the values added on that tick in `points`: append them to the copy.
+2. Each `snapshot` message carries the values added on that tick in `points`: append them to the copy, unless its
+   `at` is not after the copy's last time (the snapshot sent after `hello` is already in the history just loaded).
 3. When `snapshot.history` (`intervalMs`, `capacity`) differs from the copy's, the settings changed the history's
    shape: load it again.
 4. When the `hello` message brings another `bootId`, llama-webui restarted: drop the copy.

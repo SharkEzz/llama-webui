@@ -139,7 +139,8 @@ left with `null` for a series that started after the oldest timestamp.
 ## How snapshots reach the browser
 
 The monitor publishes each snapshot on the hub (`WsHub`, `app/server/ws/WsHub.ts`) as a `snapshot` WebSocket
-message ([WebSocket](/developers/api/websocket/)). The web app (`app/src/lib/monitor.ts`):
+message ([WebSocket](/developers/api/websocket/)). The hub keeps the latest one and sends it to a client right after
+its `hello`, so a page has values as soon as it connects. The web app (`app/src/lib/monitor.ts`):
 
 - reads `GET /api/monitor/history` when the WebSocket opens, and replays the snapshots that arrived during that
   request;
