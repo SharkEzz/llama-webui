@@ -16,7 +16,7 @@ export function RankBars({ ranked }: { ranked: Ranked[] }) {
   );
 }
 
-function Panel({ title, ranked, pick }: { title: string; ranked: Ranked[]; pick(r: Ranked): Measure | null }) {
+function Panel({ title, ranked, pick }: { title: string; ranked: Ranked[]; pick: (r: Ranked) => Measure | null }) {
   const max = Math.max(1, ...ranked.map((r) => (pick(r)?.tps ?? 0) + (pick(r)?.stddev ?? 0)));
   const pct = (x: number) => `${Math.max(0, Math.min(100, (x / max) * 100))}%`;
   return (

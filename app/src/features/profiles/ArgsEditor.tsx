@@ -16,7 +16,7 @@ import { highlightArgs } from './highlight';
 interface ArgsEditorProps {
   id?: string;
   value: string;
-  onChange(text: string): void;
+  onChange: (text: string) => void;
 }
 
 /** Arguments in shell syntax, with flag autocompletion, help for the flag under the cursor, and warnings. */

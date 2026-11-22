@@ -63,7 +63,7 @@ export const selectUsedGpus = (gpus: ReadonlyArray<GpuSample>): ReadonlyArray<Gp
   pipe(
     gpus,
     Arr.filter((g) => g.procVramBytes > USED_GPU_THRESHOLD_BYTES),
-    Arr.sort(Order.mapInput(Order.String, (g: GpuSample) => g.busId)),
+    Arr.sortWith((g: GpuSample) => g.busId, Order.String),
   );
 
 /** A process on a card (`key`), as an NVIDIA reader reports it: its VRAM there, null when the driver cannot tell. */

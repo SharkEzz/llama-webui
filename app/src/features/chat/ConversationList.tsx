@@ -23,7 +23,7 @@ import { useChat } from '@/lib/chat';
 import { cn } from '@/lib/utils';
 
 /** Conversations, most recent first; rename and delete from each row's menu. */
-export function ConversationList({ onNew, onDeleted }: { onNew(): void; onDeleted(id: number): void }) {
+export function ConversationList({ onNew, onDeleted }: { onNew: () => void; onDeleted: (id: number) => void }) {
   const list = useChat((s) => s.list);
   const currentId = useChat((s) => s.current?.id);
   const rename = useChat((s) => s.rename);

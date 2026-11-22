@@ -11,7 +11,7 @@
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import puppeteer from 'puppeteer-core';
+import { launch } from 'puppeteer-core';
 import sharp from 'sharp';
 import { cliArgs } from './argv.ts';
 import { SHOTS } from './shots.ts';
@@ -44,7 +44,7 @@ async function api(path: string, init?: RequestInit) {
 const failures: string[] = [];
 const { theme: initialTheme } = (await api('/api/settings')) as { theme: string };
 await mkdir(outDir, { recursive: true });
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: '/usr/bin/chromium',
   headless: true,
   defaultViewport: VIEWPORT,

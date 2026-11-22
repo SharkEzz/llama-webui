@@ -17,8 +17,8 @@ export function StopServerDialog({
   onConfirm,
 }: {
   open: boolean;
-  onOpenChange(o: boolean): void;
-  onConfirm(): void;
+  onOpenChange: (o: boolean) => void;
+  onConfirm: () => void;
 }) {
   const state = useServer((s) => s.view?.state);
   const profile = state && 'profile' in state ? state.profile : null;

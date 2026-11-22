@@ -216,21 +216,21 @@ interface BenchState {
   errors: Partial<Record<FormField, string>>;
   selected: number[];
   launching: boolean;
-  load(): Promise<void>;
-  loadDevices(): Promise<void>;
-  setFilters(f: Partial<BenchFilters>): void;
-  setForm(patch: Partial<BenchForm>): void;
-  fromProfile(id: number | null): Promise<void>;
-  rerun(run: BenchRun): void;
+  load: () => Promise<void>;
+  loadDevices: () => Promise<void>;
+  setFilters: (f: Partial<BenchFilters>) => void;
+  setForm: (patch: Partial<BenchForm>) => void;
+  fromProfile: (id: number | null) => Promise<void>;
+  rerun: (run: BenchRun) => void;
   /** “confirm”: the managed server is running, the client must ask before retrying with stopServer. */
-  launch(stopServer?: boolean): Promise<'ok' | 'confirm' | 'error'>;
-  cancel(): Promise<void>;
-  remove(id: number): Promise<void>;
-  removeFailed(): Promise<void>;
-  toProfile(id: number): Promise<Profile | null>;
-  toggle(id: number): void;
+  launch: (stopServer?: boolean) => Promise<'ok' | 'confirm' | 'error'>;
+  cancel: () => Promise<void>;
+  remove: (id: number) => Promise<void>;
+  removeFailed: () => Promise<void>;
+  toProfile: (id: number) => Promise<Profile | null>;
+  toggle: (id: number) => void;
   /** A message of the runs (`bench-run`, `bench-progress`, `bench-deleted`). */
-  receive(m: BenchMessage): void;
+  receive: (m: BenchMessage) => void;
 }
 
 /** The messages of the runs on the push channel. */

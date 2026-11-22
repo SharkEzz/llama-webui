@@ -6,7 +6,7 @@ import { plural } from './format';
 interface ProfilesStore {
   profiles: readonly Profile[];
   loaded: boolean;
-  reload(): Promise<void>;
+  reload: () => Promise<void>;
 }
 
 export const useProfiles = create<ProfilesStore>()((set) => ({

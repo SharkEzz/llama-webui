@@ -30,8 +30,8 @@ import { highlightEnv } from './highlight';
 interface ProfileFormProps {
   profile: Profile | null;
   settings: Settings | null;
-  onSaved(p: Profile): void;
-  onDeleted(): void;
+  onSaved: (p: Profile) => void;
+  onDeleted: () => void;
   /** Initial values of a new profile (“Create profile” from the Models page). */
   initial?: Partial<Draft> | undefined;
 }
@@ -180,7 +180,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
           aria-invalid={'error' in env}
         />
         {'error' in env ? (
-          <p className="text-sm text-destructive">{String(env.error)}</p>
+          <p className="text-sm text-destructive">{env.error}</p>
         ) : (
           <p className="text-xs text-muted-foreground">
             One variable per line, KEY=value. Added to the variables of Settings, which they override.

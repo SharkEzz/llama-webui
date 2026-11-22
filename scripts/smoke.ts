@@ -120,15 +120,15 @@ function firstMessage(): Promise<{ type?: string }> {
   return new Promise((done, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
     const timer = setTimeout(() => reject(new Error('/ws: no message within 5 s')), 5000);
-    ws.onmessage = (e) => {
+    ws.addEventListener('message', (e) => {
       clearTimeout(timer);
       ws.close();
       done(JSON.parse(String(e.data)) as { type?: string });
-    };
-    ws.onerror = () => {
+    });
+    ws.addEventListener('error', () => {
       clearTimeout(timer);
       reject(new Error('/ws: connection failed'));
-    };
+    });
   });
 }
 

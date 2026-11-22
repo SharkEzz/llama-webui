@@ -6,9 +6,9 @@ const BOX = 'rounded-lg border px-2.5 py-2 font-mono text-xs leading-5 whitespac
 
 interface CodeTextareaProps extends Omit<ComponentProps<'textarea'>, 'value' | 'onChange'> {
   value: string;
-  onChange(value: string, el: HTMLTextAreaElement): void;
+  onChange: (value: string, el: HTMLTextAreaElement) => void;
   /** Highlighted rendering of the text (same characters, in the same order). */
-  highlight(text: string): ReactNode;
+  highlight: (text: string) => ReactNode;
 }
 
 /**

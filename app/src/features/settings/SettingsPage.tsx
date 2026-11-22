@@ -62,7 +62,7 @@ export function SettingsPage() {
 
 interface SectionProps {
   settings: Settings;
-  save(patch: Partial<Settings>): Promise<boolean>;
+  save: (patch: Partial<Settings>) => Promise<boolean>;
 }
 
 function General({ settings, errors, save }: SectionProps & { errors: SettingsErrors }) {

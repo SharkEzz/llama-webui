@@ -34,7 +34,7 @@ cpSync(join(client, 'index.html'), join(dist, '404.html'));
 
 const pages = globSync('**/index.html', { cwd: dist })
   .map((file) => relative('.', file).replace(/index\.html$/, ''))
-  .sort();
+  .toSorted();
 const urls = pages.map((page) => `  <url><loc>${SITE.url}/${page}</loc></url>`).join('\n');
 writeFileSync(
   join(dist, 'sitemap.xml'),

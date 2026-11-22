@@ -8,8 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 interface ComposerProps {
   canSend: boolean;
   streaming: boolean;
-  onSend(text: string): void;
-  onStop(): void;
+  onSend: (text: string) => void;
+  onStop: () => void;
 }
 
 /** Input box: Enter sends, Shift+Enter adds a new line; Stop during a reply. */

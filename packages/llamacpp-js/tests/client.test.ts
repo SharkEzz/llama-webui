@@ -109,7 +109,7 @@ describe('streamChatCompletion', () => {
   test('posts the body with stream on and yields each chunk until [DONE]', async () => {
     const f = fakeFetch([
       data({ choices: [{ delta: { content: 'He' } }] }),
-      `${data({ choices: [{ delta: { content: 'llo' } }] }).slice(0, 10)}`,
+      data({ choices: [{ delta: { content: 'llo' } }] }).slice(0, 10),
       `${data({ choices: [{ delta: { content: 'llo' } }] }).slice(10)}: keep-alive\n\n`,
       data({
         choices: [{ delta: {} }],

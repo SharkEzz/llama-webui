@@ -226,11 +226,7 @@ export function RepoView({
         <>
           {offerProjector && projector && repo.variants.length > 0 && (
             <div className="flex items-center gap-2">
-              <Checkbox
-                id="hf-with-projector"
-                checked={withProjector}
-                onCheckedChange={(v) => setWithProjector(v === true)}
-              />
+              <Checkbox id="hf-with-projector" checked={withProjector} onCheckedChange={(v) => setWithProjector(v)} />
               <Label htmlFor="hf-with-projector" className="font-normal">
                 Also download the projector ({projector.quant ?? projector.name}, {formatBytes(projector.totalBytes)})
                 for image input
@@ -263,7 +259,7 @@ function VariantRow({
   fit: VramFit | null;
   highlight: boolean;
   busy: boolean;
-  onDownload(): void;
+  onDownload: () => void;
 }) {
   return (
     <div

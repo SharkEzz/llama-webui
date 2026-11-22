@@ -66,7 +66,7 @@ export const parseLoadavg = (text: string): readonly [number, number, number] | 
     : null;
 };
 
-const CPU_SENSORS = ['k10temp', 'coretemp'];
+const CPU_SENSORS: ReadonlySet<string> = new Set(['k10temp', 'coretemp']);
 
 /** Machine-wide CPU, memory, load, frequency and CPU temperature: each read that fails is a null field. */
 export const makeSystemSampler = Effect.fn('SystemSampler.make')(function* (
@@ -87,7 +87,7 @@ export const makeSystemSampler = Effect.fn('SystemSampler.make')(function* (
       Order.make<string>((a, b) => Str.localeCompare(b, undefined, { numeric: true })(a)),
     );
     return yield* Effect.findFirst(sorted, (e) =>
-      readText(path.join(dir, e, 'name')).pipe(Effect.map((name) => CPU_SENSORS.includes(Str.trim(name ?? '')))),
+      readText(path.join(dir, e, 'name')).pipe(Effect.map((name) => CPU_SENSORS.has(Str.trim(name ?? '')))),
     ).pipe(Effect.map(Option.map((e) => path.join(dir, e, 'temp1_input'))));
   });
   const tempPath = yield* Effect.cached(findTempPath);

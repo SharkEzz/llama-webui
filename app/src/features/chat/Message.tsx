@@ -13,7 +13,7 @@ interface MessageProps {
   /** Text being written (streaming reply). */
   live?: { content: string; reasoning: string } | undefined;
   canRegenerate: boolean;
-  onRegenerate(): void;
+  onRegenerate: () => void;
 }
 
 export function Message({ message, live, canRegenerate, onRegenerate }: MessageProps) {

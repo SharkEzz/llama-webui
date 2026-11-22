@@ -6,7 +6,7 @@ import { Effect, Option, Path } from 'effect';
 const statFree = (dir: string): Effect.Effect<Option.Option<number>> =>
   Effect.promise(() =>
     statfs(dir).then(
-      (stats) => Option.some(Number(stats.bavail) * Number(stats.bsize)),
+      (stats) => Option.some(stats.bavail * stats.bsize),
       () => Option.none(),
     ),
   );

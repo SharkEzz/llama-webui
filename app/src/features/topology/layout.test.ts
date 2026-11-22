@@ -48,7 +48,7 @@ const overlap = (a: { pos: number[]; size: number[] }, b: { pos: number[]; size:
 
 test('layoutGraph: every node is placed, none overlap on the ground plane', () => {
   const l = layoutGraph(graph);
-  expect([...l.nodes.keys()].sort()).toEqual(graph.nodes.map((n) => n.id).sort());
+  expect([...l.nodes.keys()].toSorted()).toEqual(graph.nodes.map((n) => n.id).toSorted());
   const placed = [...l.nodes.values()];
   for (let i = 0; i < placed.length; i++)
     for (let j = i + 1; j < placed.length; j++) expect(overlap(placed[i]!, placed[j]!)).toBe(false);
@@ -123,7 +123,7 @@ test('layoutGraph: bounds cover every node; fitCamera looks at the middle from a
 
 test('layoutGraph: one path per link, from a facing side to the other, arcing above both ends', () => {
   const l = layoutGraph(graph);
-  expect([...l.paths.keys()].sort()).toEqual(graph.links.map((x) => x.id).sort());
+  expect([...l.paths.keys()].toSorted()).toEqual(graph.links.map((x) => x.id).toSorted());
   for (const x of graph.links) {
     const path = l.paths.get(x.id)!;
     const from = l.nodes.get(x.from)!;

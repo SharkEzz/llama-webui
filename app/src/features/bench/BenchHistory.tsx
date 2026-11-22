@@ -76,7 +76,7 @@ export function BenchHistory() {
     focusRun(focus);
   }, [focus, filters.sweeps, runs, setFilters]);
 
-  const models = useMemo(() => [...new Set(runs.map((r) => r.spec.modelPath))].sort(), [runs]);
+  const models = useMemo(() => [...new Set(runs.map((r) => r.spec.modelPath))].toSorted(), [runs]);
   const shown = runs.filter(
     (r) =>
       (filters.kind === 'all' || r.kind === filters.kind) &&
@@ -349,7 +349,7 @@ function FilterSelect(props: {
   label: string;
   value: string;
   items: { value: string; label: string }[];
-  onChange(v: string): void;
+  onChange: (v: string) => void;
   wide?: boolean;
 }) {
   return (

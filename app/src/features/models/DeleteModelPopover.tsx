@@ -23,7 +23,7 @@ import { stem } from '@/lib/stem';
  * Delete button of a model, confirmed in a popover that lists the files and the profiles using it: the user chooses
  * whether those profiles go too (a kept profile cannot start until it gets another model).
  */
-export function DeleteModelPopover({ path, onDeleted }: { path: string; onDeleted(): void }) {
+export function DeleteModelPopover({ path, onDeleted }: { path: string; onDeleted: () => void }) {
   const [open, setOpen] = useState(false);
   const [usage, setUsage] = useState<ModelUsage | null>(null);
   const [error, setError] = useState<string | null>(null);

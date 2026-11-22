@@ -19,7 +19,7 @@ export interface StepProps {
   settings: Settings;
   errors: SettingsErrors;
   /** Saves a setting, then re-reads the report. */
-  save(patch: Partial<Settings>): Promise<unknown>;
+  save: (patch: Partial<Settings>) => Promise<unknown>;
 }
 
 const Path = ({ children }: { children: string }) => <span className="font-mono text-xs break-all">{children}</span>;

@@ -95,12 +95,12 @@ test('a second instance on the same port and data dir leaves the first one', asy
   await using first = await launch({ dataDir: data });
   const health = async () => (await (await fetch(`${first.base}/api/health`)).json()) as { bootId: string };
   const { bootId } = await health();
-  const files = readdirSync(data).sort();
+  const files = readdirSync(data).toSorted();
   const second = run(['--host', '127.0.0.1', '--port', String(first.port), '--data-dir', data], data);
   expect(await exitCode(second)).toBe(1);
   expect(second.stdout()).not.toContain('ready (');
   expect((await health()).bootId).toBe(bootId);
-  expect(readdirSync(data).sort()).toEqual(files);
+  expect(readdirSync(data).toSorted()).toEqual(files);
 }, 30_000);
 
 /**

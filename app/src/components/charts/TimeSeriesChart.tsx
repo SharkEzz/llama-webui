@@ -25,7 +25,7 @@ interface TimeSeriesChartProps {
   /** Fixed upper bound (100 for a percentage); otherwise follows the data. */
   yMax?: number;
   /** Y axis and legend values. */
-  format?(v: number): string;
+  format?: (v: number) => string;
   /** Compact version (sparkline): no axes, no legend. */
   compact?: boolean;
   /** Charts with the same key share their cursor: hovering one moves the cursor and the legend of the others. */

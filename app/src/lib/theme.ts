@@ -31,7 +31,7 @@ interface ThemeState {
   mode: ThemeMode;
   resolved: 'light' | 'dark';
   /** Applies the theme and stores it in the browser and the database. */
-  setMode(mode: ThemeMode): void;
+  setMode: (mode: ThemeMode) => void;
 }
 
 export const useTheme = create<ThemeState>((set) => {

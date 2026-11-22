@@ -8,10 +8,8 @@ import { PlanRequest, TuningApi } from './api/TuningApi.ts';
 import { STRICT } from './profile.ts';
 import { DiskSpeedRequest, EstimateRequest } from './tuning.ts';
 
-const refusedBy =
-  <S extends Schema.Decoder<unknown>>(schema: S) =>
-  (input: unknown) =>
-    Option.map(Exit.findErrorOption(Schema.decodeUnknownExit(schema, STRICT)(input)), (error) => issuesOf(error.issue));
+const refusedBy = (schema: Schema.Decoder<unknown>) => (input: unknown) =>
+  Option.map(Exit.findErrorOption(Schema.decodeUnknownExit(schema, STRICT)(input)), (error) => issuesOf(error.issue));
 
 test('EstimateRequest takes a model, a preset, pinned flags and a context between 512 and 10000000', () => {
   const decode = Schema.decodeUnknownExit(EstimateRequest, STRICT);

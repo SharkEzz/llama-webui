@@ -19,7 +19,7 @@ const COMMAND_SPACING = [
 ].join(' ');
 
 /** Picks a GGUF from the models folder (button to place inside an InputGroup). */
-export function ModelPicker({ kind, onSelect }: { kind: ModelKind; onSelect(path: string): void }) {
+export function ModelPicker({ kind, onSelect }: { kind: ModelKind; onSelect: (path: string) => void }) {
   const [open, setOpen] = useState(false);
   const list = useModels((s) => s.list);
   const refresh = useModels((s) => s.refresh);

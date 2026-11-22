@@ -91,7 +91,7 @@ const byLongThenName = (a: string, b: string) =>
  * starts share. `candidates`: those names.
  */
 export function complete(catalog: FlagCatalog, prefix: string): { insert: string; candidates: string[] } {
-  const candidates = [...catalog.byName.keys()].filter((n) => n.startsWith(prefix)).sort(byLongThenName);
+  const candidates = [...catalog.byName.keys()].filter((n) => n.startsWith(prefix)).toSorted(byLongThenName);
   if (candidates.length === 0) return { insert: '', candidates };
   if (candidates.length === 1) return { insert: `${candidates[0]!.slice(prefix.length)} `, candidates };
   let common = candidates[0]!;

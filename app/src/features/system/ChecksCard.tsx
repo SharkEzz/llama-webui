@@ -187,7 +187,7 @@ export function CheckList({ checks }: { checks: ReadonlyArray<Check> }) {
     <div className="gap-x-8 lg:columns-2">
       {families.map(({ family, checks }) => {
         const ok = checks.filter((c) => c.state === 'ok');
-        const rest = checks.filter((c) => c.state !== 'ok').sort((a, b) => order(a.state) - order(b.state));
+        const rest = checks.filter((c) => c.state !== 'ok').toSorted((a, b) => order(a.state) - order(b.state));
         return (
           <section key={family} className="mb-5 flex break-inside-avoid flex-col gap-2">
             <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{FAMILY[family]}</h3>

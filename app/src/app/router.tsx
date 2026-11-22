@@ -43,7 +43,7 @@ export const router = createBrowserRouter([
       { path: 'tuning', ...page(() => import('@/features/tuning/TuningPage'), 'TuningPage') },
       ...ROUTES.filter((r) => r.path in MILESTONE_BY_PATH).map((r) => ({
         path: r.path.slice(1),
-        ...placeholder(r.label),
+        lazy: placeholder(r.label).lazy,
       })),
       { path: '*', ...placeholder('Page not found') },
     ],

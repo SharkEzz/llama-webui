@@ -48,7 +48,7 @@ function TokenLine({ status }: { status: HfStatus | null }) {
 }
 
 /** Search results for `q`; mount with `key={q}` (no hits or error of the previous text under the new one). */
-function SearchResults({ q, onPick }: { q: string; onPick(id: string): void }) {
+function SearchResults({ q, onPick }: { q: string; onPick: (id: string) => void }) {
   const [hits, setHits] = useState<ReadonlyArray<HfSearchHit> | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -107,8 +107,8 @@ export function DownloadSheet({
   onShow,
 }: {
   open: boolean;
-  onOpenChange(open: boolean): void;
-  onShow(path: string): void;
+  onOpenChange: (open: boolean) => void;
+  onShow: (path: string) => void;
 }) {
   const [input, setInput] = useState('');
   /** Repo picked from the search results (a pasted repo id or URL is used directly). */

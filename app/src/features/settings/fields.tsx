@@ -14,13 +14,13 @@ export function EnvField(props: {
   hint: ReactNode;
   value: Record<string, string>;
   error?: string | undefined;
-  onCommit(env: Record<string, string>): void;
+  onCommit: (env: Record<string, string>) => void;
 }) {
   const saved = formatEnv(props.value);
   const [draft, setDraft] = useState(saved);
   useEffect(() => setDraft(saved), [saved]);
   const parsed = parseEnv(draft);
-  const error = 'error' in parsed ? String(parsed.error) : props.error;
+  const error = 'error' in parsed ? parsed.error : props.error;
   return (
     <div className="flex flex-col gap-1.5">
       <CodeTextarea
@@ -53,7 +53,7 @@ export function TextField(props: {
   error?: string | undefined;
   inputMode?: 'numeric' | undefined;
   placeholder?: string | undefined;
-  onCommit(v: string): void;
+  onCommit: (v: string) => void;
 }) {
   const [draft, setDraft] = useState(props.value);
   useEffect(() => setDraft(props.value), [props.value]);
@@ -88,7 +88,7 @@ export function SwitchRow(props: {
   label: string;
   hint?: string;
   checked: boolean;
-  onChange(on: boolean): void;
+  onChange: (on: boolean) => void;
 }) {
   return (
     <div className="flex items-start justify-between gap-4">
@@ -109,7 +109,7 @@ export function GpuSwitches({
 }: {
   gpus: readonly { busId: string; name: string; vramTotalBytes: number }[];
   hidden: readonly string[];
-  onChange(hidden: string[]): void;
+  onChange: (hidden: string[]) => void;
 }) {
   return gpus.map((g) => (
     <SwitchRow

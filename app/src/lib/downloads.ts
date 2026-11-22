@@ -25,24 +25,24 @@ type DownloadMessage = Extract<WsMessage, { type: 'download' | 'download-progres
 interface DownloadsState {
   items: ReadonlyArray<DownloadItem>;
   live: DownloadLive | null;
-  load(): Promise<void>;
+  load: () => Promise<void>;
   /** Queues variants of a repo (pinned to `revision`) and adds those not listed yet; false if refused (message shown). */
-  enqueue(repo: string, revision: string, keys: ReadonlyArray<string>): Promise<boolean>;
-  cancel(id: number): Promise<void>;
-  retry(id: number): Promise<void>;
-  remove(id: number): Promise<void>;
-  clearFinished(): Promise<void>;
+  enqueue: (repo: string, revision: string, keys: ReadonlyArray<string>) => Promise<boolean>;
+  cancel: (id: number) => Promise<void>;
+  retry: (id: number) => Promise<void>;
+  remove: (id: number) => Promise<void>;
+  clearFinished: () => Promise<void>;
   /** A message of the queue (`download`, `download-progress`, `download-deleted`). */
-  receive(m: DownloadMessage): void;
+  receive: (m: DownloadMessage) => void;
   /**
    * A repository's GGUF variants (`revision` omitted: its default branch). Rejects with the Hub's tagged error
    * (`HfGated`, `HfNotFound`, `HfUnauthorized`, `HfRateLimited`, `HfUnreachable`, `HfInvalidPath`).
    */
-  repo(id: string, signal?: AbortSignal): Promise<HfRepo>;
+  repo: (id: string, signal?: AbortSignal) => Promise<HfRepo>;
   /** The GGUF repositories matching `q`. */
-  search(q: string, signal?: AbortSignal): Promise<ReadonlyArray<HfSearchHit>>;
+  search: (q: string, signal?: AbortSignal) => Promise<ReadonlyArray<HfSearchHit>>;
   /** The token in use and its account. */
-  status(): Promise<HfStatus>;
+  status: () => Promise<HfStatus>;
 }
 
 /** The calls the store makes: the web's, or in a test the same calls on a fake `fetch` (`makeCall(Api, fetchImpl)`). */

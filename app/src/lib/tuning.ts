@@ -57,27 +57,27 @@ interface TuningState {
   diskSpeed: DiskSpeed | null;
   measuring: boolean;
 
-  loadHardware(): Promise<void>;
-  setModel(path: string | null, mmproj?: string | null): void;
-  fromProfile(id: number | null): Promise<void>;
-  setPreset(id: PresetId): void;
-  pin(patch: Partial<BenchParams>): void;
-  unpin(key: keyof BenchParams): void;
-  setSpace(patch: Partial<SweepSpace>): void;
-  setBase(base: BenchParams): void;
-  setIncludeUnfit(v: boolean): void;
-  setRun(patch: Partial<TuningState['run']>): void;
-  suggestSpace(): void;
-  launch(stopServer?: boolean): Promise<'ok' | 'confirm' | 'error'>;
-  loadSweeps(): Promise<void>;
-  open(id: number | null): Promise<void>;
-  cancelSweep(id: number): Promise<void>;
-  resume(id: number, stopServer?: boolean): Promise<'ok' | 'confirm' | 'error'>;
-  validate(id: number, n: number, stopServer?: boolean): Promise<'ok' | 'confirm' | 'error'>;
-  removeSweep(id: number): Promise<void>;
-  toProfile(runId: number): Promise<Profile | null>;
-  loadChecks(modelPath: string | null): Promise<void>;
-  measureDisk(modelPath: string): Promise<void>;
+  loadHardware: () => Promise<void>;
+  setModel: (path: string | null, mmproj?: string | null) => void;
+  fromProfile: (id: number | null) => Promise<void>;
+  setPreset: (id: PresetId) => void;
+  pin: (patch: Partial<BenchParams>) => void;
+  unpin: (key: keyof BenchParams) => void;
+  setSpace: (patch: Partial<SweepSpace>) => void;
+  setBase: (base: BenchParams) => void;
+  setIncludeUnfit: (v: boolean) => void;
+  setRun: (patch: Partial<TuningState['run']>) => void;
+  suggestSpace: () => void;
+  launch: (stopServer?: boolean) => Promise<'ok' | 'confirm' | 'error'>;
+  loadSweeps: () => Promise<void>;
+  open: (id: number | null) => Promise<void>;
+  cancelSweep: (id: number) => Promise<void>;
+  resume: (id: number, stopServer?: boolean) => Promise<'ok' | 'confirm' | 'error'>;
+  validate: (id: number, n: number, stopServer?: boolean) => Promise<'ok' | 'confirm' | 'error'>;
+  removeSweep: (id: number) => Promise<void>;
+  toProfile: (runId: number) => Promise<Profile | null>;
+  loadChecks: (modelPath: string | null) => Promise<void>;
+  measureDisk: (modelPath: string) => Promise<void>;
 }
 
 const fail = (e: unknown) => void toast.error(errorMessage(e));
@@ -127,7 +127,7 @@ export function suggestedSpace(e: Estimate, hw: TuningHardware, preset: PresetId
   const n = e.params.ncmoe;
   if (n !== undefined && n > 0) space.ncmoe = [...new Set([n - 8, n - 4, n, n + 4, n + 8].filter((x) => x >= 0))];
   const gpus = gpuDevices(hw.devices);
-  const biggest = [...gpus].sort((a, b) => b.totalMib - a.totalMib)[0];
+  const biggest = gpus.toSorted((a, b) => b.totalMib - a.totalMib)[0];
   const sets = [
     e.params.dev,
     gpus.map((d) => d.id),
@@ -439,7 +439,7 @@ export function startTuningSync(): void {
     const i = current.runs.findIndex((r) => r.id === run.id);
     const runs =
       i === -1
-        ? [...current.runs, run].sort((a, b) => a.id - b.id)
+        ? [...current.runs, run].toSorted((a, b) => a.id - b.id)
         : current.runs.map((r) => (r.id === run.id ? run : r));
     useTuning.setState({ current: { ...current, runs } });
   });

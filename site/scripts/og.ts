@@ -4,7 +4,7 @@
  */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import puppeteer from 'puppeteer-core';
+import { launch } from 'puppeteer-core';
 
 const root = join(import.meta.dirname, '..');
 const font = join(root, 'node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2');
@@ -46,7 +46,7 @@ h1 { position: absolute; left: 64px; top: 124px; width: 1000px; font-size: 62px;
 
 const file = '/tmp/llama-webui-og.html';
 writeFileSync(file, html);
-const browser = await puppeteer.launch({
+const browser = await launch({
   executablePath: '/usr/bin/chromium',
   args: ['--allow-file-access-from-files'],
 });

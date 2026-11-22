@@ -24,8 +24,8 @@ export function SetupChecklist({
 }: {
   settings: Settings;
   errors: SettingsErrors;
-  save(patch: Partial<Settings>, o?: { quiet?: boolean }): Promise<boolean>;
-  onFinish(): void;
+  save: (patch: Partial<Settings>, o?: { quiet?: boolean }) => Promise<boolean>;
+  onFinish: () => void;
 }) {
   const [report, setReport] = useState<SetupReport | null>(null);
   const [loading, setLoading] = useState(false);
