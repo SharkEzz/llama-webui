@@ -202,20 +202,25 @@ Before a commit, a pull request or the end of a milestone, `pnpm lint` must repo
 
 `oxlint.tailwind.ts` lints the classes of the web app and of the site with `oxlint-tailwindcss`, which reads the
 design system of the project's stylesheet (`settings.tailwindcss.entryPoint`), so it knows the theme's tokens and the
-project's own utilities. Its sixteen recommended rules are on, in `error`: an unknown class, two conflicting classes,
-a variant made useless by the base class, a duplicate, a class built at runtime, a deprecated or non-canonical
-spelling (`[container-type:size]` is `@container-size`), an arbitrary value a named class already gives, axes a
-shorthand covers (`px-4 py-4` is `p-4`), variants out of order, and a hard-coded colour. Two rules stay off,
-`enforce-sort-order` and `enforce-consistent-line-wrapping`: oxfmt is the single owner of the class order and of the
-wrapping.
+project's own utilities. Sixteen of its seventeen recommended rules are on, in `error`: an unknown class, two
+conflicting classes, a variant made useless by the base class, a duplicate, a class built at runtime, a deprecated or
+non-canonical spelling (`[container-type:size]` is `@container-size`), an arbitrary value a named class already
+gives, axes a shorthand covers (`px-4 py-4` is `p-4`), variants out of order, and a hard-coded color. The
+seventeenth, `enforce-sort-order`, stays off, and so does `enforce-consistent-line-wrapping` (not recommended, off as
+a guard): oxfmt is the single owner of the class order and of the wrapping.
+
+The plugin caches each stylesheet's design system in `oxlint-tailwindcss-<uid>` under the system temp directory
+(`$TMPDIR`, `/tmp` by default), keyed by the stylesheet and the versions of the packages it imports, not by the
+content of `@llama-webui/theme`: after editing `packages/webui-theme/theme.css`, delete that directory (or run with a
+fresh `OXLINT_TAILWINDCSS_CACHE_DIR`) before trusting `pnpm lint` or the editor, since CI always starts cold.
 
 | Case                                      | What to do                                                                                                                                                                                              |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A plain class of the theme, not a utility | Add it by name to the `allowlist` of `tailwindcss/no-unknown-classes` in `oxlint.tailwind.ts` (today `aurora` and `glow`, `glow-1` to `glow-3`, from `packages/webui-theme/theme.css`); never delete it |
 | A shorthand, a canonical spelling         | Take the form the rule proposes once it is the same CSS; a shorthand under a variant is not always one (`sm:top-2 bottom-2` is not `inset-y-2`)                                                         |
-| A hard-coded colour                       | Use the theme token of exactly that value; without one, keep the value under a suppression that says what it reproduces, and add no token                                                               |
+| A hard-coded color                        | Use the theme token of exactly that value; without one, keep the value under a suppression that says what it reproduces, and add no token                                                               |
 
-The landing page reproduces screens and a terminal with their own colours, so a few colours stay:
+The landing page reproduces screens and a terminal with their own colors, so a few colors stay:
 
 ```tsx title="site/src/components/Logo.tsx"
 {/* oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- the blue of the logo mark's first bar (fill above, as in the favicon) */}
