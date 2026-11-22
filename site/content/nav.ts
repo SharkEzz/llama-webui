@@ -132,6 +132,7 @@ export const NAV: NavSection[] = [
           { path: 'developers/contributing/conventions', title: 'Conventions' },
           { path: 'developers/contributing/testing', title: 'Testing' },
           { path: 'developers/contributing/how-to', title: 'How-to guides' },
+          { path: 'developers/contributing/profiling', title: 'Profiling' },
           { path: 'developers/contributing/workflow', title: 'Docs, commits and PRs' },
         ],
       },

@@ -19,6 +19,8 @@
     "format": "oxfmt",
     "lint": "oxfmt --check && oxlint --deny-warnings --report-unused-disable-directives",
     "lint:fix": "oxlint --fix && oxfmt",
+    "profiling": "node scripts/profiling/cli.ts",
+    "profiling:report": "node scripts/profiling/cli.ts report",
     "prepack": "node scripts/prepack.ts",
     "prepare": "effect-tsgo patch --typescript --no-oxlint && node scripts/vendored.ts",
     "release": "node scripts/release.ts",
@@ -38,6 +40,7 @@
     "oxlint-plugin-react-doctor": "catalog:",
     "oxlint-tailwindcss": "catalog:",
     "oxlint-tsgolint": "7.0.2008",
+    "puppeteer-core": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "5.1.1"

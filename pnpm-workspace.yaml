@@ -11,6 +11,8 @@ catalog:
   vite: ^8.3.8
   shiki: ^4.6.0
   "@types/node": ^26.6.6
+  # The profiling tool (root scripts/profiling) and the site's screenshots drive the same Chromium
+  puppeteer-core: ^25.18.1
   # Effect: same version as the vendored reference (repos/effect), every @effect/* package moves with it
   effect: 4.1.5
   "@effect/platform-node": 4.1.5
