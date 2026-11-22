@@ -5,6 +5,15 @@ export default defineConfig({
   singleQuote: true,
   sortImports: { newlinesBetween: false },
   sortPackageJson: true,
+  semi: true,
+  useTabs: false,
+  trailingComma: 'all',
+  arrowParens: 'always',
+  tabWidth: 2,
+  endOfLine: 'lf',
+  quoteProps: 'as-needed',
+  insertFinalNewline: true,
+  objectWrap: 'preserve',
   overrides: [
     { files: ['**/*.css', '**/*.yaml', '**/*.yml'], options: { singleQuote: false } },
     // Fenced code blocks of the site's pages and of the Markdown stay as written
