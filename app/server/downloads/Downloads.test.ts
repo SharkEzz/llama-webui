@@ -304,9 +304,7 @@ const messages = Effect.gen(function* () {
 const statuses = (id: number) =>
   Effect.map(messages, (all) =>
     Arr.getSomes(
-      Arr.map(all, ([type, of, status]) =>
-        type === 'download' && of === id && status !== null ? Option.some(status) : Option.none(),
-      ),
+      Arr.map(all, ([type, of, status]) => (type === 'download' && of === id ? Option.some(status) : Option.none())),
     ),
   );
 

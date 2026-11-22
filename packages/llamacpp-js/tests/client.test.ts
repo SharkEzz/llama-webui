@@ -83,9 +83,9 @@ test('the client reads a llama-server over HTTP: health, /slots, /metrics, /prop
 /** A fetch that answers `body` (a string, or the chunks of a stream) with `status`, and records the request. */
 function fakeFetch(body: string | string[], status = 200) {
   const seen: { url: string; init: RequestInit | undefined }[] = [];
-  const impl = (async (url: string | URL, init?: RequestInit) => {
+  const impl = ((url: string | URL, init?: RequestInit) => {
     seen.push({ url: String(url), init });
-    if (typeof body === 'string') return new Response(body, { status });
+    if (typeof body === 'string') return Promise.resolve(new Response(body, { status }));
     const enc = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       start(c) {
@@ -93,7 +93,7 @@ function fakeFetch(body: string | string[], status = 200) {
         c.close();
       },
     });
-    return new Response(stream, { status });
+    return Promise.resolve(new Response(stream, { status }));
   }) as typeof fetch;
   return { impl, seen };
 }

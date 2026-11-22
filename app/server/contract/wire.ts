@@ -27,10 +27,10 @@ function encode(base: string, r: WireRequest): Buffer {
   const given = Object.entries(r.headers ?? {});
   if (!given.some(([k]) => k.toLowerCase() === 'host')) headers.push(['Host', url.host]);
   headers.push(...given, ['Connection', 'close']);
-  const body = r.body === undefined ? null : Buffer.from(r.body);
-  if (body) headers.push(['Content-Length', String(body.length)]);
+  const bytes = r.body === undefined ? null : Buffer.from(r.body);
+  if (bytes) headers.push(['Content-Length', String(bytes.length)]);
   const head = `${r.method} ${r.path} HTTP/1.1\r\n${headers.map(([k, v]) => `${k}: ${v}\r\n`).join('')}\r\n`;
-  return body ? Buffer.concat([Buffer.from(head), body]) : Buffer.from(head);
+  return bytes ? Buffer.concat([Buffer.from(head), bytes]) : Buffer.from(head);
 }
 
 interface Head {

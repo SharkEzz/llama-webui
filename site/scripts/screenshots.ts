@@ -33,7 +33,7 @@ const base = values.base.replace(/\/$/, '');
 const themes = values.themes.split(',');
 const shots = positionals.length
   ? SHOTS.filter((s) => positionals.includes(s.name))
-  : SHOTS.filter((s) => !s.manual && !!s.live === values.live);
+  : SHOTS.filter((s) => !s.manual && Boolean(s.live) === values.live);
 if (shots.length === 0) throw new Error(`No shot named ${positionals.join(', ')}`);
 
 async function api(path: string, init?: RequestInit): Promise<unknown> {
@@ -66,7 +66,7 @@ try {
         if (shot.readyText) await page.waitForSelector(`::-p-text(${shot.readyText})`, { timeout: 15_000 });
         if (shot.goneText) {
           await page.waitForFunction(
-            (text) => !document.body.textContent?.includes(text),
+            (text) => !document.body.textContent.includes(text),
             { timeout: 30_000 },
             shot.goneText,
           );

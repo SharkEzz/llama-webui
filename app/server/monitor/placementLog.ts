@@ -26,9 +26,9 @@ const LAYERS = /offloaded (\d+)\/(\d+) layers to GPU/;
 /** `RS`: state of a hybrid model's recurrent layers (Mamba, DeltaNet…), the equivalent of their KV cache. */
 const BUFFER = /(\S+) (model|KV|RS|compute) buffer size =\s*([\d.]+) MiB/;
 /** A new context (the main one, then the draft's or the MTP's): it has its own compute buffers. */
-const CONTEXT = /llama_context: constructing llama_context/;
+const CONTEXT = 'llama_context: constructing llama_context';
 /** New reservation of the current context: its compute buffers replace those of the previous one. */
-const RESERVE = /sched_reserve: reserving/;
+const RESERVE = 'sched_reserve: reserving';
 /** Multimodal projector buffers (mmproj, clip.cpp): not the model, and estimated before it is even loaded. */
 const MMPROJ = /^(?:clip\w*|(?:reserve|alloc)_compute_meta):/;
 /**
@@ -36,11 +36,11 @@ const MMPROJ = /^(?:clip\w*|(?:reserve|alloc)_compute_meta):/;
  * load the model without allocating (layers, 0 MiB buffers, contexts, then the draft or the MTP): at -lv 5, their lines
  * come out in between and are not the real load.
  */
-const FIT_START = /fitting params to device memory \.\.\./;
-const FIT_DONE = /common_fit_params: fitting params to free memory took/;
+const FIT_START = 'fitting params to device memory ...';
+const FIT_DONE = 'common_fit_params: fitting params to free memory took';
 /** One device of the Meta device that -sm tensor creates: its buffers are logged as `Meta()`, at their largest. */
 const META_MEMBER = /llama_prepare_model_devices: - device \d+: (\S+)/;
-const META = /^Meta\(/;
+const META = 'Meta(';
 /** -ts / --tensor-split on the launch line: “3,1”, “3/1”, “-ts=3,1”. */
 const TENSOR_SPLIT = /(?:^|\s)(?:-ts|--tensor-split)(?:=|\s+)(\S+)/;
 
@@ -105,10 +105,10 @@ const placementAt = (lines: ReadonlyArray<LogLine>, start: number, launch: LogLi
   const metaMembers: Array<string> = [];
   for (const line of after) {
     const body = Str.replace(PREFIX, '')(line.text);
-    if (FIT_START.test(body)) fitting = true;
-    else if (FIT_DONE.test(body)) fitting = false;
+    if (Str.includes(FIT_START)(body)) fitting = true;
+    else if (Str.includes(FIT_DONE)(body)) fitting = false;
     if (fitting) continue;
-    if (CONTEXT.test(body)) {
+    if (Str.includes(CONTEXT)(body)) {
       if (constructed) {
         context = new Map();
         contexts.push(context);
@@ -116,7 +116,7 @@ const placementAt = (lines: ReadonlyArray<LogLine>, start: number, launch: LogLi
       constructed = true;
       continue;
     }
-    if (RESERVE.test(body)) {
+    if (Str.includes(RESERVE)(body)) {
       context.clear();
       continue;
     }
@@ -192,7 +192,7 @@ const ncclBusIds = (lines: ReadonlyArray<LogLine>): Map<string, string> => {
 
 /** NCCL (with `NCCL_DEBUG=INFO`): transport of a channel between two GPUs, “P2P/CUMEM”, “SHM/direct”… */
 const NCCL_CHANNEL = /NCCL INFO Channel \d+ : \d+\[\d+\] -> \d+\[\d+\] via (\S+)/;
-const NCCL_NO_P2P = /NCCL INFO P2P is disabled between connected GPUs/;
+const NCCL_NO_P2P = 'NCCL INFO P2P is disabled between connected GPUs';
 
 /**
  * Peer-to-peer of the launch whose lines are `lines`. llama.cpp enables it where the driver allows as soon as
@@ -206,7 +206,7 @@ const parseP2p = (lines: ReadonlyArray<LogLine>): Option.Option<P2pStatus> => {
   let refused = false;
   for (const { text } of lines) {
     if (text === P2P_LOG_LINE) requested = true;
-    else if (NCCL_NO_P2P.test(text)) refused = true;
+    else if (Str.includes(NCCL_NO_P2P)(text)) refused = true;
     else {
       const via = Option.fromNullishOr(NCCL_CHANNEL.exec(text)?.[1]);
       if (Option.exists(via, Str.startsWith('P2P'))) direct = true;
@@ -229,7 +229,7 @@ const spreadMeta = (
   launch: string,
   busIds: ReadonlyMap<string, string>,
 ): ReadonlyArray<Tally> => {
-  const isMeta = (b: Tally) => META.test(b.device);
+  const isMeta = (b: Tally) => Str.startsWith(META)(b.device);
   const meta = Arr.filter(buffers, isMeta);
   if (!Arr.isReadonlyArrayNonEmpty(meta) || !Arr.isReadonlyArrayNonEmpty(members)) return buffers;
   const split = Option.fromNullishOr(TENSOR_SPLIT.exec(launch)?.[1]).pipe(

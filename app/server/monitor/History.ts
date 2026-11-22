@@ -27,7 +27,7 @@ export class Ring {
 
   constructor(capacity: number) {
     this.capacity = capacity;
-    this.buf = new Array<number>(capacity).fill(0);
+    this.buf = Array.from({ length: capacity }, () => 0);
   }
 
   /** A ring of `capacity` holding the newest of these values. */
@@ -129,7 +129,7 @@ export class History {
     const series: Record<string, ReadonlyArray<number | null>> = {};
     for (const [key, ring] of this.rings) {
       const values = Arr.map(Arr.takeRight(ring.values(), times.length), (v) => (Number.isFinite(v) ? v : null));
-      series[key] = [...new Array<null>(times.length - values.length).fill(null), ...values];
+      series[key] = [...Array.from({ length: times.length - values.length }, () => null), ...values];
     }
     return Option.match(Arr.last(times), {
       onSome: (at) => Effect.succeed(at),

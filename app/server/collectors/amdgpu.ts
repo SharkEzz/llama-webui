@@ -83,7 +83,7 @@ export const readProcAmdVram = Effect.fn('amdgpu.readProcAmdVram')(function* (
       }),
     { concurrency: 'unbounded' },
   );
-  return perCard as ReadonlyMap<string, number>;
+  return perCard;
 });
 
 /** The cards of `/sys/class/drm` whose vendor is AMD, with their name, DRM nodes and slot link. */
@@ -128,7 +128,7 @@ export const discoverAmdCards = Effect.fn('amdgpu.discoverAmdCards')(function* (
       ...(yield* slotLink({ devicePath })),
     });
   }
-  return found as ReadonlyArray<AmdCard>;
+  return found;
 });
 
 const readWith = Effect.fnUntraced(function* <T>(file: string | null, parse: (text: string) => T) {

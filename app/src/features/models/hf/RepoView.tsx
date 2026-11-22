@@ -171,7 +171,7 @@ export function RepoView({
     projector !== null && !repo.projectors.some((p) => p.present === 'complete' || queued.has(p.key));
   const download = async (v: HfVariant) => {
     const keys = [v.key];
-    if (v.kind === 'model' && offerProjector && withProjector && projector) keys.push(projector.key);
+    if (v.kind === 'model' && offerProjector && withProjector) keys.push(projector.key);
     setBusy(true);
     await enqueue(repo.id, repo.sha, keys);
     setBusy(false);
@@ -224,7 +224,7 @@ export function RepoView({
         <p className="text-sm text-muted-foreground">No GGUF file in this repository.</p>
       ) : (
         <>
-          {offerProjector && projector && repo.variants.length > 0 && (
+          {offerProjector && repo.variants.length > 0 && (
             <div className="flex items-center gap-2">
               <Checkbox id="hf-with-projector" checked={withProjector} onCheckedChange={(v) => setWithProjector(v)} />
               <Label htmlFor="hf-with-projector" className="font-normal">

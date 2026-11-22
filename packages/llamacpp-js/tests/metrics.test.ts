@@ -125,7 +125,7 @@ test('specStats', () => {
 
 describe('fetchLlama', () => {
   test('503 → loading, no slots', async () => {
-    const f = (async () => new Response('', { status: 503 })) as unknown as typeof fetch;
+    const f = (() => Promise.resolve(new Response('', { status: 503 }))) as unknown as typeof fetch;
     const r = await fetchLlama('http://x', f);
     assert.equal(r.health, 'loading');
     assert.equal(r.slots, null);
@@ -136,8 +136,8 @@ describe('fetchLlama', () => {
       '/slots': await fixture('slots-busy.json'),
       '/metrics': await fixture('metrics-after.txt'),
     };
-    const f = (async (u: string) =>
-      new Response(body[new URL(u).pathname as keyof typeof body])) as unknown as typeof fetch;
+    const f = ((u: string) =>
+      Promise.resolve(new Response(body[new URL(u).pathname as keyof typeof body]))) as unknown as typeof fetch;
     const r = await fetchLlama('http://x', f);
     assert.equal(r.health, 'ok');
     assert.equal(r.slots?.[0]?.nDecoded, 21);
@@ -154,9 +154,7 @@ describe('fetchLlama', () => {
     assert.ok(Date.now() - t0 < 200);
   });
   test('network error → down', async () => {
-    const f = (async () => {
-      throw new Error('ECONNREFUSED');
-    }) as unknown as typeof fetch;
+    const f = (() => Promise.reject(new Error('ECONNREFUSED'))) as unknown as typeof fetch;
     assert.equal((await fetchLlama('http://x', f)).health, 'down');
   });
 });
@@ -186,7 +184,7 @@ describe('mergeRequestStats (prompt and generation counters land on different ti
 });
 
 describe('context usage and recent requests', () => {
-  const slot = (p: number, d: number, ctx: number): SlotView => ({
+  const busy = (p: number, d: number, ctx: number): SlotView => ({
     id: 0,
     nCtx: ctx,
     processing: true,
@@ -199,10 +197,10 @@ describe('context usage and recent requests', () => {
 
   test('kvUsage sums slots; generated tokens are already in n_prompt_tokens', () => {
     // Real slot mid-generation: a 29-token prompt, 1110 generated, n_prompt_tokens 1142.
-    assert.deepEqual(kvUsage([slot(1142, 1110, 64512), slot(0, 0, 64512)]), { usedTokens: 1142, totalTokens: 129024 });
+    assert.deepEqual(kvUsage([busy(1142, 1110, 64512), busy(0, 0, 64512)]), { usedTokens: 1142, totalTokens: 129024 });
     assert.equal(kvUsage([]), null);
     assert.equal(kvUsage(null), null);
-    assert.equal(kvUsage([slot(0, 0, 0)]), null);
+    assert.equal(kvUsage([busy(0, 0, 0)]), null);
   });
 
   const metricsMap = (o: Record<string, number>) => new Map(Object.entries(o).map(([k, v]) => [`llamacpp:${k}`, v]));

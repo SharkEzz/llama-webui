@@ -71,7 +71,7 @@ export class PciIds extends Context.Service<
         // Unknown is kept once some file was read (it lists the device or does not); no file at all is not.
         const entries = yield* Cache.makeWith(
           Effect.fnUntraced(function* (key: string) {
-            const [vendor = '', device = ''] = Str.split(key, ':');
+            const [vendor, device = ''] = Str.split(key, ':');
             let readOne = false;
             for (const file of options.files) {
               const text = yield* Cache.get(texts, file).pipe(Effect.option);

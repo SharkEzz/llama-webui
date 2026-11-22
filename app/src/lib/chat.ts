@@ -71,18 +71,18 @@ export const makeChatStore = ({ call, callStream }: ChatCalls) =>
         set({ streaming: { ...s, content: s.content + pending.content, reasoning: s.reasoning + pending.reasoning } });
         pending = { content: '', reasoning: '' };
       };
-      let ended = false;
+      // Typed by its assertion: set by `onEvent`, which a narrowing to `false` would not see
+      let ended = false as boolean;
       const onEvent = (e: ChatEvent) => {
         if (ctl.signal.aborted) return;
         const cur = get().current;
         if (e.type === 'start') {
           if (cur?.id === conversationId) {
             // Regeneration: the last reply goes away (the server deleted it).
-            let messages = e.user
-              ? cur.messages
+            const messages = e.user
+              ? [...cur.messages]
               : cur.messages.slice(0, cur.messages.findLastIndex((m) => m.role === 'user') + 1);
-            for (const m of [e.user, e.assistant])
-              if (m && !messages.some((x) => x.id === m.id)) messages = [...messages, m];
+            for (const m of [e.user, e.assistant]) if (m && !messages.some((x) => x.id === m.id)) messages.push(m);
             set({ current: { ...cur, messages, live: true } });
           }
           pending = { content: '', reasoning: '' };

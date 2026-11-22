@@ -43,6 +43,19 @@ interface Seen {
   init: RequestInit | undefined;
 }
 
+/**
+ * A reply that never comes: it rejects, as fetch does, with the reason of the request's signal once it is aborted.
+ * That reason is an `AbortError` (a `DOMException`, an `Error`); anything else is wrapped, as its `cause`.
+ */
+const untilAborted = ({ init }: Seen) =>
+  new Promise<Response>((_, reject) => {
+    const signal = init?.signal;
+    signal?.addEventListener('abort', () => {
+      const reason: unknown = signal.reason;
+      reject(reason instanceof Error ? reason : new Error('the request was aborted', { cause: reason }));
+    });
+  });
+
 /** A `fetch` that answers `reply` (or rejects with it) and records what it was given. */
 function stub(reply: (seen: Seen) => Promise<Response>) {
   const seen: Seen[] = [];
@@ -54,8 +67,8 @@ function stub(reply: (seen: Seen) => Promise<Response>) {
   return { call: makeCall(TestApi, fetchImpl), callStream: makeCallStream(TestApi, fetchImpl), seen };
 }
 
-const json = (status: number, body: unknown) => () =>
-  Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
+const json = (status: number, value: unknown) => () =>
+  Promise.resolve(new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } }));
 
 test('call() resolves with the decoded reply of the endpoint', async () => {
   const { call } = stub(json(200, { id: 7, name: 'seven' }));
@@ -118,10 +131,7 @@ test('a payload the client refuses to send rejects as the RequestInvalid the ser
 });
 
 test('call() passes its signal: an abort reaches fetch and rejects the call', async () => {
-  const { call, seen } = stub(
-    ({ init }) =>
-      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))),
-  );
+  const { call, seen } = stub(untilAborted);
   const controller = new AbortController();
   const pending = call((api) => api.t.get({ params: { id: 7 }, query: {} }), { signal: controller.signal });
   await vi.waitFor(() => expect(seen).toHaveLength(1));
@@ -130,8 +140,8 @@ test('call() passes its signal: an abort reaches fetch and rejects the call', as
   expect(seen[0]?.init?.signal?.aborted).toBe(true);
 });
 
-const sse = (body: ReadableStream<Uint8Array>) => () =>
-  Promise.resolve(new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }));
+const sse = (stream: ReadableStream<Uint8Array>) => () =>
+  Promise.resolve(new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } }));
 
 /** A body that sends `chunks` one per read, then ends, fails with `end`, or stays open (`'open'`). */
 function body(chunks: string[], end: 'close' | 'open' | Error = 'close') {
@@ -221,10 +231,7 @@ test('an event that does not decode rejects callStream() as an invalid reply, no
 });
 
 test('an abort before the response headers ends callStream() without an error and aborts its request', async () => {
-  const { callStream, seen } = stub(
-    ({ init }) =>
-      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))),
-  );
+  const { callStream, seen } = stub(untilAborted);
   const controller = new AbortController();
   const onEvent = vi.fn();
   const pending = callStream((api) => api.t.events({ params: { id: 7 } }), onEvent, { signal: controller.signal });

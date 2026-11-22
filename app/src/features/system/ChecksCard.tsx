@@ -185,9 +185,9 @@ export function CheckList({ checks }: { checks: ReadonlyArray<Check> }) {
     .filter((g) => g.checks.length > 0);
   return (
     <div className="gap-x-8 lg:columns-2">
-      {families.map(({ family, checks }) => {
-        const ok = checks.filter((c) => c.state === 'ok');
-        const rest = checks.filter((c) => c.state !== 'ok').toSorted((a, b) => order(a.state) - order(b.state));
+      {families.map(({ family, checks: inFamily }) => {
+        const ok = inFamily.filter((c) => c.state === 'ok');
+        const rest = inFamily.filter((c) => c.state !== 'ok').toSorted((a, b) => order(a.state) - order(b.state));
         return (
           <section key={family} className="mb-5 flex break-inside-avoid flex-col gap-2">
             <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{FAMILY[family]}</h3>

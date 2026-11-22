@@ -111,7 +111,7 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const go = (url: string) => {
     onOpenChange(false);
     setQuery('');
-    navigate(url.startsWith(BASE) ? `/${url.slice(BASE.length)}` : url);
+    void navigate(url.startsWith(BASE) ? `/${url.slice(BASE.length)}` : url);
   };
 
   return (

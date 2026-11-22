@@ -24,8 +24,9 @@ import {
 const GOLDEN = resolve(import.meta.dirname, process.env.GOLDEN ?? 'golden.json');
 const REPO = resolve(import.meta.dirname, '../../..');
 
-let dir: TempDir;
-let app: Launched;
+// Unset when `beforeAll` fails before it reaches them: `afterAll` runs all the same
+let dir: TempDir | undefined;
+let app: Launched | undefined;
 let ctx: NormalizeCtx;
 let fixtures: Fixtures & { livePort: number };
 let outcomes: Record<string, Outcome> = {};
@@ -91,13 +92,13 @@ afterAll(async () => {
 });
 
 test('the cases cover every endpoint of the API definition', async () => {
-  const all = cases({ base: app.base, asset: await assetOf(app.base), ...fixtures });
+  const all = cases({ base: app!.base, asset: await assetOf(app!.base), ...fixtures });
   expect(endpoints().filter((endpoint) => !all.some((c) => covers(endpoint, c.req)))).toEqual([]);
 });
 
 test('no case that breaks a payload or the guard, or that the domain refuses, succeeds', async () => {
   const kinds = new Map(
-    cases({ base: app.base, asset: await assetOf(app.base), ...fixtures }).map((c) => [c.name, c.kind]),
+    cases({ base: app!.base, asset: await assetOf(app!.base), ...fixtures }).map((c) => [c.name, c.kind]),
   );
   const breaking = new Set(['violation', 'refusal', 'body', 'guard']);
   const wrong = Object.entries(outcomes).filter(([name, o]) => breaking.has(kinds.get(name) ?? '') && o.status < 400);

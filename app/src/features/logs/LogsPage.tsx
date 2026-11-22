@@ -78,7 +78,7 @@ export function LogsPage() {
       </header>
 
       <div className={cn(GLASS, 'flex flex-wrap items-center gap-3 p-3')}>
-        <Select items={LEVELS} value={minLevel} onValueChange={(v) => v && setMinLevel(v as LogLevel)}>
+        <Select items={LEVELS} value={minLevel} onValueChange={(v) => v && setMinLevel(v)}>
           <SelectTrigger className="w-56" aria-label="Minimum level">
             <SelectValue />
           </SelectTrigger>
@@ -119,7 +119,7 @@ export function LogsPage() {
           size="sm"
           disabled={lines.length === 0}
           onClick={() =>
-            copyText(lines.map((l) => l.text).join('\n')).then(
+            void copyText(lines.map((l) => l.text).join('\n')).then(
               () => toast.success(`${lines.length} ${plural(lines.length, 'line')} copied`),
               (e: unknown) => toast.error(errorMessage(e)),
             )

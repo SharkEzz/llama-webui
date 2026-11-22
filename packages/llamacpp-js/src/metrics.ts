@@ -210,7 +210,8 @@ export function specStats(m: Map<string, number>): SpecStats {
   const drafts = m0(m, 'spec_decode_num_drafts_total');
   const draftTokens = m0(m, 'spec_decode_num_draft_tokens_total');
   const accepted = m0(m, 'spec_decode_num_accepted_tokens_total');
-  const perPos: number[] = [];
+  // Filled by index: a position missing from the metrics leaves a hole, which reads as `undefined`
+  const perPos: (number | undefined)[] = [];
   for (const [k, v] of m) {
     const match = POS_RE.exec(k);
     if (match) perPos[Number(match[1])] = drafts > 0 ? v / drafts : 0;

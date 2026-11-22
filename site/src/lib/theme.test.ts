@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm';
 import { describe, expect, test } from 'vitest';
 import { DEFAULT_THEME, type ResolvedTheme, resolveTheme, THEME_INIT_SCRIPT, type ThemeMode } from './theme';
 
@@ -15,12 +16,8 @@ function runInitScript(options: { stored?: string | null; prefersDark?: boolean;
   const matchMedia = (query: string) => ({
     matches: query === '(prefers-color-scheme: dark)' && (options.prefersDark ?? false),
   });
-  const init = new Function('document', 'localStorage', 'matchMedia', THEME_INIT_SCRIPT) as (
-    document: unknown,
-    localStorage: unknown,
-    matchMedia: unknown,
-  ) => void;
-  init({ documentElement: html }, storage, matchMedia);
+  // Its own context: the script sees these globals only, as the page's would be
+  runInNewContext(THEME_INIT_SCRIPT, { document: { documentElement: html }, localStorage: storage, matchMedia });
   return html.className;
 }
 

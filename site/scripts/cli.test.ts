@@ -10,11 +10,11 @@ test('a script takes its flags after the -- that npm habits add (pnpm passes it 
   });
   let out = '';
   child.stdout.on('data', (c: Buffer) => {
-    out += c;
+    out += String(c);
     if (out.includes('Serving dist/')) child.kill();
   });
   child.stderr.on('data', (c: Buffer) => {
-    out += c;
+    out += String(c);
   });
   await once(child, 'exit');
   expect(out).toContain('Serving dist/');

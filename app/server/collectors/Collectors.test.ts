@@ -54,7 +54,7 @@ const workspace = Effect.gen(function* () {
     const text = yield* fs.readFileString(file('calls'));
     // The shell creates the file before it writes its line: an empty file is no start yet.
     return Arr.map(Arr.filter(Str.split(Str.trim(text), '\n'), Str.isNonEmpty), (line): Call => {
-      const [name = '', pid = '', ...args] = Str.split(line, ' ');
+      const [name, pid = '', ...args] = Str.split(line, ' ');
       return { name, pid: Number(pid), args };
     });
   }).pipe(Effect.orDie);
@@ -480,8 +480,8 @@ layer(Platform, { excludeTestServices: true })('Collectors', (it) => {
         );
         yield* ws.assertAllDead;
         // The real sampler, tried with the missing library, is gone too.
-        const samplers = yield* realSamplers;
-        assert.deepStrictEqual(samplers, []);
+        const left = yield* realSamplers;
+        assert.deepStrictEqual(left, []);
       }),
     ),
   );

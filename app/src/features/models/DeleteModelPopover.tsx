@@ -58,7 +58,7 @@ export function DeleteModelPopover({ path, onDeleted }: { path: string; onDelete
   };
 
   const profiles = usage?.profiles ?? [];
-  const disabled = busy || !usage || usage.blocked !== null;
+  const disabled = busy || usage?.blocked !== null;
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger render={<Button variant="destructive" className="sm:mr-auto" />}>

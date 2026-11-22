@@ -163,7 +163,10 @@ export function devServer(): Plugin {
       link = serving;
       server.middlewares.use((req, _res, next) => {
         const up = API.test(req.url ?? '') ? serving.up(SERVER_WAIT_MS) : true;
-        if (up === true) return next();
+        if (up === true) {
+          next();
+          return;
+        }
         void up.then((ok) => {
           if (!ok) {
             server.config.logger.error(

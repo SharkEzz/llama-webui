@@ -118,8 +118,8 @@ export const makeGate = Effect.fn('makeGate')(function* (options: {
       // Forked and recorded at once: an interruption in between would lose the stop to wait for.
       yield* Effect.uninterruptible(
         Effect.gen(function* () {
-          const stopping = yield* Effect.forkIn(supervisor.stop, scope);
-          yield* Ref.set(state, { ...FREE, held: true, stopped: last, stopping: Option.some(stopping) });
+          const stop = yield* Effect.forkIn(supervisor.stop, scope);
+          yield* Ref.set(state, { ...FREE, held: true, stopped: last, stopping: Option.some(stop) });
         }),
       );
     },
@@ -127,9 +127,9 @@ export const makeGate = Effect.fn('makeGate')(function* (options: {
   );
 
   const ready = Effect.gen(function* () {
-    const { stopping } = yield* Ref.get(state);
-    if (Option.isNone(stopping)) return;
-    const ended = yield* Fiber.await(stopping.value);
+    const { stopping: stop } = yield* Ref.get(state);
+    if (Option.isNone(stop)) return;
+    const ended = yield* Fiber.await(stop.value);
     if (Exit.isSuccess(ended)) return;
     // Not stopped: nothing to restart.
     yield* Ref.update(state, (s) => ({ ...s, stopped: Option.none() }));
@@ -140,8 +140,8 @@ export const makeGate = Effect.fn('makeGate')(function* (options: {
   const restart = Effect.fn('Gate.restart')(function* (
     rebuild: (stopped: BuiltCommand) => Effect.Effect<Option.Option<BuiltCommand>>,
   ) {
-    const { stopping } = yield* Ref.get(state);
-    if (Option.isSome(stopping)) yield* Fiber.await(stopping.value);
+    const { stopping: stop } = yield* Ref.get(state);
+    if (Option.isSome(stop)) yield* Fiber.await(stop.value);
     const { stopped } = yield* Ref.get(state);
     if (Option.isNone(stopped)) return;
     const rebuilt = yield* rebuild(stopped.value);

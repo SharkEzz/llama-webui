@@ -52,7 +52,7 @@ async function scrollTo(page: Page, text: string, block: 'start' | 'center' | 'e
   await page.waitForFunction(
     (t, b) => {
       const matches = [...document.querySelectorAll<HTMLElement>('body *')].filter(
-        (e) => e.childElementCount === 0 && e.offsetParent !== null && e.textContent?.trim().startsWith(t),
+        (e) => e.childElementCount === 0 && e.offsetParent !== null && e.textContent.trim().startsWith(t),
       );
       matches[0]?.scrollIntoView({ block: b as ScrollLogicalPosition });
       return matches.length > 0;
@@ -67,9 +67,9 @@ async function scrollTo(page: Page, text: string, block: 'start' | 'center' | 'e
 async function clickButton(page: Page, label: string) {
   await page.waitForFunction(
     (text) => {
-      const button = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === text);
+      const button = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === text);
       button?.click();
-      return !!button;
+      return Boolean(button);
     },
     { timeout: 15_000 },
     label,
@@ -95,7 +95,7 @@ async function selectOption(page: Page, trigger: string, option: string) {
 async function scrollMainToBottom(page: Page) {
   await page.evaluate(() => {
     for (const el of document.querySelectorAll('*')) {
-      if (el.scrollHeight > el.clientHeight + 20 && getComputedStyle(el).overflowY.match(/auto|scroll/)) {
+      if (el.scrollHeight > el.clientHeight + 20 && /auto|scroll/.exec(getComputedStyle(el).overflowY)) {
         el.scrollTop = el.scrollHeight;
       }
     }
@@ -119,7 +119,7 @@ export const SHOTS: Shot[] = [
         const area = [...document.querySelectorAll('textarea')].find((t) => t.value.includes('--spec-type'));
         area?.focus();
         area?.setSelectionRange(area.value.length, area.value.length);
-        return !!area;
+        return Boolean(area);
       });
       await page.keyboard.type('\n--f', { delay: 60 });
       await page.waitForSelector('[cmdk-item]');
@@ -168,7 +168,7 @@ export const SHOTS: Shot[] = [
       await page.waitForSelector(byText('CUDA0,CUDA1,ROCm0'), { timeout: 30_000 });
       await page.waitForFunction(
         () => {
-          const label = [...document.querySelectorAll('label')].find((l) => l.textContent?.includes('100 GB model'));
+          const label = [...document.querySelectorAll('label')].find((l) => l.textContent.includes('100 GB model'));
           const radio = label?.querySelector('input');
           if (radio && !radio.checked) radio.click();
           return radio?.checked;

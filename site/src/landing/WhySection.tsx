@@ -24,7 +24,10 @@ const PILLARS: readonly { title: string; text: string; tone: Tone; bar: string }
   },
 ];
 
-type Line = { kind: 'cmd' | 'out' | 'err'; text: string };
+interface Line {
+  kind: 'cmd' | 'out' | 'err';
+  text: string;
+}
 
 /** A first try at fitting a 70 GB model on three cards. Error lines as llama.cpp prints them. */
 const SESSION: Line[] = [

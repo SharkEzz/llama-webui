@@ -105,12 +105,14 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
           <Button
             variant="ghost"
             disabled={!path}
-            onClick={() => path && copyText(path).then(() => toast.success('Path copied'))}
+            onClick={() => {
+              if (path) void copyText(path).then(() => toast.success('Path copied'));
+            }}
           >
             <Copy /> Copy path
           </Button>
           {detail?.kind === 'model' && (
-            <Button onClick={() => navigate(`/profiles?new=1&model=${encodeURIComponent(detail.path)}`)}>
+            <Button onClick={() => void navigate(`/profiles?new=1&model=${encodeURIComponent(detail.path)}`)}>
               <Plus /> Create profile
             </Button>
           )}

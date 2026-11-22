@@ -141,21 +141,21 @@ export function createSimulation(seed = 7, warmup = WARMUP_SECONDS): Simulation 
   let current: Frame;
 
   function startJob(): Job {
-    const step = SCRIPT[scriptIndex % SCRIPT.length]!;
+    const line = SCRIPT[scriptIndex % SCRIPT.length]!;
     // A new conversation every time the script loops: the context starts over.
     if (scriptIndex % SCRIPT.length === 0) ctxUsed = 0;
     scriptIndex++;
     return {
       id: nextId++,
       at,
-      prompt: step.prompt,
+      prompt: line.prompt,
       cached: ctxUsed,
-      generated: step.generated,
-      ppRate: step.ppRate * jitter(0.05),
-      genRate: step.genRate * jitter(0.04),
-      accept: clamp(step.accept * jitter(0.06), 0, 1),
-      promptLeft: step.prompt,
-      genLeft: step.generated,
+      generated: line.generated,
+      ppRate: line.ppRate * jitter(0.05),
+      genRate: line.genRate * jitter(0.04),
+      accept: clamp(line.accept * jitter(0.06), 0, 1),
+      promptLeft: line.prompt,
+      genLeft: line.generated,
     };
   }
 

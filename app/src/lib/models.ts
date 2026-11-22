@@ -67,7 +67,7 @@ function projectorBase(path: string): string {
     .replace(/^mmproj[-_.]?/i, '')
     .replace(/[-_.]?mmproj$/i, '')
     .split('-');
-  if (parts.length > 1 && QUANT.test(parts[parts.length - 1]!)) parts.pop();
+  if (parts.length > 1 && QUANT.test(parts.at(-1)!)) parts.pop();
   return parts.join('-').toLowerCase();
 }
 

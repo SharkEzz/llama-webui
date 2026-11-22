@@ -16,8 +16,8 @@ layer(NodeServices.layer, { excludeTestServices: true })('freeBytesOf', (it) => 
       const missing = yield* freeBytesOf(path.join(dir, 'org', 'repo', 'Q8_0'));
       assert.isNotNull(parent);
       assert.isNotNull(missing);
-      assert.isAbove(parent ?? 0, 0);
-      assert.isBelow(Math.abs((missing ?? 0) - (parent ?? 0)), SLACK);
+      assert.isAbove(parent, 0);
+      assert.isBelow(Math.abs(missing - parent), SLACK);
     }).pipe(Effect.scoped),
   );
 });

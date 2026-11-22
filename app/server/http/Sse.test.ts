@@ -21,7 +21,10 @@ import { ServerTest, ServerWithClient } from '../testing/http.ts';
 import { serve } from './HttpLive.ts';
 import { sseResponse } from './Sse.ts';
 
-type Event = { readonly event?: string; readonly data: string };
+interface Event {
+  readonly event?: string;
+  readonly data: string;
+}
 
 /** `GET /events` (and the other `routes`) served as the app serves them, with `Shutdown` outermost as in `App`. */
 const appWith = <E, R, E2, R2>(

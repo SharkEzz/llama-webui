@@ -175,16 +175,16 @@ layer(NodeServices.layer)('machine samplers', (it) => {
       Effect.scoped(
         Effect.gen(function* () {
           const { proc, path } = yield* tmp;
-          const stat = (ticks: number) =>
+          const procStat = (ticks: number) =>
             `42 (llama server) S 1 1 1 0 -1 0 0 0 0 0 ${ticks} ${ticks} 0 0 20 0 1 0 1 0 0\n`;
           const dir = path.join(proc, '42');
           yield* write(path.join(dir, 'status'), 'Name:\tllama\nVmRSS:\t   2048 kB\n');
-          yield* write(path.join(dir, 'stat'), stat(100));
+          yield* write(path.join(dir, 'stat'), procStat(100));
           const sampler = yield* makeProcSampler({ procRoot: proc });
           const first = yield* sampler.sample(42);
           assert.deepStrictEqual(first, Option.some({ cpuPct: 0, rssBytes: 2048 * 1024 }));
           yield* TestClock.adjust('2 seconds');
-          yield* write(path.join(dir, 'stat'), stat(150));
+          yield* write(path.join(dir, 'stat'), procStat(150));
           const second = yield* sampler.sample(42);
           // 100 more ticks in 2 s of 100 ticks/s: one core at 50 %.
           assert.deepStrictEqual(second, Option.some({ cpuPct: 50, rssBytes: 2048 * 1024 }));

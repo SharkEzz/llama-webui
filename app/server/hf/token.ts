@@ -4,7 +4,10 @@ import { homeDir } from '../config/Home.ts';
 import { withoutTrailingSlash } from '../config/paths.ts';
 
 /** The Hugging Face token and where it came from (`env`, `file`, or none). */
-export type HfToken = { readonly token: string | null; readonly source: HfTokenSource };
+export interface HfToken {
+  readonly token: string | null;
+  readonly source: HfTokenSource;
+}
 
 const DEFAULT_ENDPOINT = 'https://huggingface.co';
 const USER_AGENT = 'llama-webui';

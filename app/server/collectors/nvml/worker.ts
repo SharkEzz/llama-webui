@@ -25,7 +25,8 @@ class NvmlFailed extends Schema.TaggedError<NvmlFailed, { readonly NvmlFailed: u
 
 const MIN_INTERVAL_MS = 100;
 
-const failed = (cause: unknown) => NvmlFailed.make({ message: Predicate.isError(cause) ? cause.message : `${cause}` });
+const failed = (cause: unknown) =>
+  NvmlFailed.make({ message: Predicate.isError(cause) ? cause.message : String(cause) });
 
 /** The library at `path` (else the system's), opened and initialized; shut down with the scope. */
 const open = Effect.fnUntraced(function* (path: string | undefined) {

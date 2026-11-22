@@ -20,7 +20,7 @@
     "lint": "oxfmt --check && oxlint --deny-warnings --report-unused-disable-directives",
     "lint:fix": "oxlint --fix && oxfmt",
     "prepack": "node scripts/prepack.ts",
-    "prepare": "effect-tsgo patch --typescript --no-oxlint",
+    "prepare": "effect-tsgo patch --typescript --no-oxlint && node scripts/vendored.ts",
     "release": "node scripts/release.ts",
     "site:build": "pnpm --filter llama-webui-site build",
     "site:dev": "pnpm --filter llama-webui-site dev",
@@ -28,7 +28,7 @@
     "start": "pnpm build && node app/.output/llama-webui.mjs",
     "test": "pnpm test:unit && pnpm --filter llamacpp-js test",
     "test:unit": "vitest run",
-    "typecheck": "tsc -p scripts"
+    "typecheck": "tsc -p . && tsc -p scripts"
   },
   "devDependencies": {
     "@effect/tsgo": "0.73.2",

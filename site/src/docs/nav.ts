@@ -31,7 +31,7 @@ export function flatten(nav: readonly NavSection[]): NavEntry[] {
 }
 
 /** "/docs/a/b/" or "docs/a/b" → "docs/a/b". */
-export const normalizePath = (pathname: string) => pathname.replace(/^\/+|\/+$/g, '');
+export const normalizePath = (pathname: string) => pathname.replaceAll(/^\/+|\/+$/g, '');
 
 /** The section a path belongs to (by its first segment), or null. */
 export function sectionOf(nav: readonly NavSection[], pathname: string): NavSection | null {

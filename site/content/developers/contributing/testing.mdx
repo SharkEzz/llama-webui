@@ -142,8 +142,9 @@ describe('SettingsRepo', () => {
 - **Ports**: a test takes a free port, never 7860, 7861 or 8080 (where the user's own app and `llama-server` run).
 - **Environment variables** a test sets are owned by its scope (`ownVariable(name, value)`), so they are restored
   when it ends.
-- **Promises**, in a plain Vitest test, are awaited: `await expect(p).rejects.toThrow()`. Vitest fails a test that
-  leaves a `.resolves` or `.rejects` assertion unawaited.
+- **Promises**, in a plain Vitest test, are awaited: `await expect(p).rejects.toThrow()`. The lint enforces it:
+  `vitest/valid-expect` reports a `.resolves` or `.rejects` assertion left unawaited (Vitest fails the test too), and
+  `typescript/no-floating-promises` any other promise neither awaited, returned, handled nor discarded with `void`.
 
 ### Build, shutdown and development loop
 
@@ -448,18 +449,20 @@ pnpm check
 
 The `check` script is `pnpm -r --parallel --include-workspace-root typecheck`: it runs the `typecheck` script of
 every workspace package at the same time. That script is `tsc` in `packages/*`, `tsc && tsc -p server` in `app/`
-(its two projects), `tsc -p scripts` in the root package and `react-router typegen && tsc` in `site/`. One package alone:
+(its two projects), `tsc -p . && tsc -p scripts` in the root package (its config files, then `scripts/`) and `react-router typegen && tsc` in `site/`. One package alone:
 `pnpm --filter <name> typecheck`. `tsc` is TypeScript 7, the native compiler.
 
-There is no root `tsconfig.json` and no TypeScript project reference: each code base has its own `tsconfig.json`,
-which extends `tsconfig.base.json` (the shared options, `noEmit` among them), directly or through
-`tsconfig.effect.json`, and adds its types and its files.
+There is no TypeScript project reference: each code base has its own `tsconfig.json`, which extends
+`tsconfig.base.json` (the shared options, `noEmit` among them), directly or through `tsconfig.effect.json`, and adds
+its types and its files. The root `tsconfig.json` covers the config files of the root only (`./*.config.ts`,
+`./oxlint.*.ts`), with options of its own, and the root `typecheck` runs it before `scripts/`.
 
 | Project                               | Covers                                                                                                                        | Types                                             |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | `packages/llamacpp-js/tsconfig.json`  | The library's sources and its tests (`tests/`), as a Node user compiles them: NodeNext resolution                             | Node only (no DOM): a browser-only API fails here |
 | `packages/webui-shared/tsconfig.json` | `@llama-webui/shared` and its tests, with the Effect diagnostics                                                              | Node, no DOM: a browser-only API fails here       |
 | `app/server/tsconfig.json`            | `app/server/` and its tests, with the Effect diagnostics                                                                      | Node                                              |
+| `tsconfig.json` (root)                | The root config files: `./*.config.ts` and `./oxlint.*.ts` (oxfmt, Vitest, oxlint and its fragments)                          | Node                                              |
 | `scripts/tsconfig.json`               | `scripts/`                                                                                                                    | Node                                              |
 | `app/tsconfig.json`                   | `app/src/` (tests included), `app/build/` and `app/vite.config.ts`                                                            | DOM and Node                                      |
 | `site/tsconfig.json`                  | `site/src/`, `site/content/nav.ts`, `site/scripts/` and the config files, after `react-router typegen` writes the route types | DOM and Node                                      |

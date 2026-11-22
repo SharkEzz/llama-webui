@@ -33,7 +33,7 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string | undefi
           size="icon-xs"
           aria-label="Copy code"
           onClick={() =>
-            copyText(code).then(() => {
+            void copyText(code).then(() => {
               setCopied(true);
               setTimeout(() => setCopied(false), 1500);
             })

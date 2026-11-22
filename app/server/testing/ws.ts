@@ -21,8 +21,8 @@ export const ofType =
 
 /** Opens `url`; rejects if the connection fails before it opens. `headers` go with the upgrade request. */
 export function openWs(url: string, headers: Record<string, string> = {}): Promise<WsClient> {
-  // Node's WebSocket (undici) takes headers in its second argument; the DOM typings do not know it.
-  const socket = new WebSocket(url, { headers } as unknown as string[]);
+  // Node's WebSocket (undici) takes the upgrade's headers in its second argument.
+  const socket = new WebSocket(url, { headers });
   const messages: Array<unknown> = [];
   let taken = 0;
   const waiters = new Set<() => void>();

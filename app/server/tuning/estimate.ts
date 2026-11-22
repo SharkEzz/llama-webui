@@ -163,7 +163,8 @@ export const estimate = (input: EstimateInput): Estimate => {
   };
 
   /** The smallest RAM need among the candidates that fit in VRAM but not in RAM: why nothing fits, if nothing does. */
-  let ramBlocked: number | null = null;
+  // Typed by its assertion: set inside `tryParams`, which a declared type's narrowing to `null` would not see
+  let ramBlocked = null as number | null;
 
   const tryParams = (params: BenchParams, ctx: number, kv: Kv, ub: number): Option.Option<Tried> => {
     const p: BenchParams = { ...params, ...pinned };
@@ -331,10 +332,9 @@ export const estimate = (input: EstimateInput): Estimate => {
     const fit = fitOf({ ...pi, measured: m });
     // The placements with weights in RAM fitted in VRAM but not in RAM: that is the limit to report, not the VRAM of
     // the all-GPU fallback shown below (#25).
-    const blocked: number | null = ramBlocked;
     const reason =
-      blocked !== null
-        ? `not enough RAM: ${fmtBytes(blocked)} needed with weights in RAM, ${fmtBytes(hw.ramAvailableBytes)} available`
+      ramBlocked !== null
+        ? `not enough RAM: ${fmtBytes(ramBlocked)} needed with weights in RAM, ${fmtBytes(hw.ramAvailableBytes)} available`
         : (fit.reason ??
           `model too large: ${fmtBytes(m.ram)} of RAM needed, ${fmtBytes(hw.ramAvailableBytes)} available`);
     return {

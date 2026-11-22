@@ -60,7 +60,7 @@ export function ChatPage() {
     let target = current?.id;
     if (target === undefined) {
       target = await create();
-      navigate(`/chat/${target}`, { replace: true });
+      void navigate(`/chat/${target}`, { replace: true });
     }
     await send(text);
   };
@@ -72,7 +72,9 @@ export function ChatPage() {
       <aside className={cn(GLASS, 'flex min-h-0 flex-col p-2')}>
         <ConversationList
           onNew={() => void create().then((n) => navigate(`/chat/${n}`))}
-          onDeleted={(d) => d === convId && navigate('/chat', { replace: true })}
+          onDeleted={(d) => {
+            if (d === convId) void navigate('/chat', { replace: true });
+          }}
         />
       </aside>
 

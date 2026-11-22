@@ -37,12 +37,12 @@ export const matchGpus: {
     const name = baseName(d.name);
     const g = Arr.findFirst(
       sorted,
-      (g) =>
-        g.vendor === vendor.value &&
-        !used.has(g.key) &&
+      (gpu) =>
+        gpu.vendor === vendor.value &&
+        !used.has(gpu.key) &&
         (vendor.value === 'nvidia'
-          ? g.name === name
-          : Math.abs(g.vramTotalBytes / MiB - d.totalMib) <= 0.02 * d.totalMib),
+          ? gpu.name === name
+          : Math.abs(gpu.vramTotalBytes / MiB - d.totalMib) <= 0.02 * d.totalMib),
     );
     if (Option.isNone(g)) continue;
     used.add(g.value.key);

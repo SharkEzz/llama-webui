@@ -6,7 +6,7 @@ import { BenchHardware } from '../bench/BenchHardware.ts';
 import { which } from '../bench/which.ts';
 import { readTrimmed } from '../collectors/read.ts';
 import { AppConfig } from '../config/AppConfig.ts';
-import { expandHome, type homeDir } from '../config/Home.ts';
+import { expandHome } from '../config/Home.ts';
 import type { GgufReader } from '../models/GgufReader.ts';
 import type { ModelCacheRepo } from '../models/ModelCacheRepo.ts';
 import { scanModels } from '../models/scan.ts';
@@ -17,12 +17,7 @@ import { resolveBinary } from './sysinfo.ts';
 /** Where the kernel says who may read the performance counters (the memory bandwidth of the System page). */
 const PERF_PARANOID = '/proc/sys/kernel/perf_event_paranoid';
 
-type Taken =
-  | FileSystem.FileSystem
-  | GgufReader
-  | ModelCacheRepo
-  | Effect.Services<typeof homeDir>
-  | Effect.Services<ReturnType<typeof which>>;
+type Taken = FileSystem.FileSystem | GgufReader | ModelCacheRepo | Effect.Services<ReturnType<typeof which>>;
 
 /** `kernel.perf_event_paranoid`, null when unreadable. */
 const readPerfParanoid = Effect.map(readTrimmed(PERF_PARANOID), (text) => {

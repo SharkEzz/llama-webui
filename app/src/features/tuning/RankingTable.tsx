@@ -105,7 +105,7 @@ function Ranking({
   const [unfit, setUnfit] = useState<BenchRun | null>(null);
   const toProfile = async (run: BenchRun) => {
     const p = await useTuning.getState().toProfile(run.id);
-    if (p) navigate(`/profiles?id=${p.id}`);
+    if (p) void navigate(`/profiles?id=${p.id}`);
   };
   return (
     <section className="flex flex-col gap-2">
@@ -198,7 +198,7 @@ function Ranking({
                         <DropdownMenuItem disabled={!r.run.command} onClick={() => void copyText(r.run.command)}>
                           <Copy /> Copy command
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => navigate(`/bench?run=${r.run.id}`)}>
+                        <DropdownMenuItem onClick={() => void navigate(`/bench?run=${r.run.id}`)}>
                           <ExternalLink /> View in Benchmark
                         </DropdownMenuItem>
                       </DropdownMenuContent>

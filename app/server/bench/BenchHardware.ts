@@ -164,8 +164,8 @@ export class BenchHardware extends Context.Service<
 
         const readBuild = (key: Key) =>
           Effect.andThen(cacheLoad('bench_build'), output(key.binary, '--version', options.versionTimeout)).pipe(
-            Effect.map((text) =>
-              Option.fromNullishOr(VERSION.exec(text)).pipe(
+            Effect.map((version) =>
+              Option.fromNullishOr(VERSION.exec(version)).pipe(
                 Option.map((m) => `b${m[1]} (${m[2]})`),
                 Option.getOrNull,
               ),

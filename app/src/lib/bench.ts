@@ -113,7 +113,7 @@ export function formFromSpec(
 }
 
 /** Flags from a textarea: line breaks separate like spaces. */
-export const splitArgs = (text: string) => shellSplit(text.replace(/\r?\n/g, ' '));
+export const splitArgs = (text: string) => shellSplit(text.replaceAll(/\r?\n/g, ' '));
 
 /** Typed number (empty = absent; unparsable text is sent as is so the server explains). */
 const num = (v: string): number | string | undefined => {

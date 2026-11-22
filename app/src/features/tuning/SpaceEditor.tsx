@@ -227,7 +227,10 @@ function ValuesRow<T>(props: {
   const submit = () => {
     if (!text.trim()) return;
     const v = props.parse(text);
-    if (isError(v)) return setError(v);
+    if (isError(v)) {
+      setError(v);
+      return;
+    }
     add(v);
     setText('');
   };

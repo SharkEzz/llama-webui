@@ -146,13 +146,16 @@ test('linkFlows: memory activity is a share of the whole machine (0–100), for 
   // llama-server at 140% (1.4 cores) on the 12 threads of the CPU node.
   expect(linkFlows(graph, snapshot).get('cpu-ram')!.activity).toBeCloseTo(140 / 12, 5);
   // Thread count from the live per-core sample when there is one.
-  const sampled = { ...snapshot, system: { ...snapshot.system, corePct: Array(16).fill(0) } } as Snapshot;
+  const sampled = {
+    ...snapshot,
+    system: { ...snapshot.system, corePct: Array.from({ length: 16 }, () => 0) },
+  } as Snapshot;
   expect(linkFlows(graph, sampled).get('cpu-ram')!.activity).toBeCloseTo(140 / 16, 5);
   // Every thread busy: 100, not 1200.
   const full = { ...snapshot, proc: { cpuPct: 1200, rssBytes: 0 } } as Snapshot;
   expect(linkFlows(graph, full).get('cpu-ram')!.activity).toBe(100);
   // No managed server: the machine's own load.
-  expect(linkFlows(graph, { ...snapshot, proc: null } as Snapshot).get('cpu-ram')!.activity).toBe(18);
+  expect(linkFlows(graph, { ...snapshot, proc: null }).get('cpu-ram')!.activity).toBe(18);
 });
 
 test('linkFlows / nodeLive: with perf, the memory link carries measured DRAM traffic (writes forward, reads back)', () => {
@@ -253,10 +256,14 @@ test('placementSeries: GPUs in graph order with their tone, host last, none when
 });
 
 const GIB = 1024 ** 3;
-const withGpu = (o: Partial<GpuSample>): Snapshot =>
-  ({ ...snapshot, allGpus: [{ ...snapshot.allGpus[0]!, ...o }, ...snapshot.allGpus.slice(1)] }) as Snapshot;
-const withDisk = (readBps: number, writeBps: number): Snapshot =>
-  ({ ...snapshot, disk: { ...snapshot.disk!, perDisk: { nvme0n1: { readBps, writeBps } } } }) as Snapshot;
+const withGpu = (o: Partial<GpuSample>): Snapshot => ({
+  ...snapshot,
+  allGpus: [{ ...snapshot.allGpus[0]!, ...o }, ...snapshot.allGpus.slice(1)],
+});
+const withDisk = (readBps: number, writeBps: number): Snapshot => ({
+  ...snapshot,
+  disk: { ...snapshot.disk!, perDisk: { nvme0n1: { readBps, writeBps } } },
+});
 
 test('levelOf: ok below the warning threshold, unknown is ok', () => {
   expect(levelOf(0.69, 0.7, 0.9)).toBe('ok');
@@ -547,7 +554,7 @@ test('nodeLive: a GPU says what is known of its peer-to-peer, and with which car
 
 test('linkShown: at rest only from 8 MiB/s in the busier direction, from 100 kB/s while llama-server works', () => {
   const mib = 1024 ** 2;
-  expect(linkShown({ fwdBps: 4 * mib, backBps: 1 * mib }, false)).toBe(false);
+  expect(linkShown({ fwdBps: 4 * mib, backBps: mib }, false)).toBe(false);
   expect(linkShown({ fwdBps: 0, backBps: 8 * mib }, false)).toBe(true);
   expect(linkShown({ fwdBps: 4 * mib, backBps: null }, true)).toBe(true);
   expect(linkShown({ fwdBps: 50e3, backBps: 50e3 }, true)).toBe(false);

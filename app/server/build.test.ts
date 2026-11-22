@@ -114,9 +114,9 @@ test('the server finds the NVML sampler: the module that names it sits next to i
   expect(readdirSync(server)).toEqual(expect.arrayContaining(['index.mjs', 'nvml-worker.mjs']));
   // `workerPath(import.meta.url)` resolves `./nvml-worker.mjs` against its own module: in a module anywhere else, it
   // would look there, and the collectors would fall back to nvidia-smi without a word.
-  const modules = (dir: string): ReadonlyArray<string> =>
-    Arr.flatMap(readdirSync(dir, { withFileTypes: true }), (e) =>
-      e.isDirectory() ? modules(join(dir, e.name)) : Str.endsWith('.mjs')(e.name) ? [join(dir, e.name)] : [],
+  const modules = (folder: string): ReadonlyArray<string> =>
+    Arr.flatMap(readdirSync(folder, { withFileTypes: true }), (e) =>
+      e.isDirectory() ? modules(join(folder, e.name)) : Str.endsWith('.mjs')(e.name) ? [join(folder, e.name)] : [],
     );
   const referrers = Arr.filter(
     modules(OUTPUT),
@@ -135,11 +135,11 @@ test('the NVML sampler ships next to the server entry and starts from the bundle
   });
   try {
     const lines = createInterface({ input: child.stdout });
-    const first = new Promise<string>((resolve, reject) => {
+    const first = new Promise<string>((settle, reject) => {
       const timer = setTimeout(() => reject(new Error('the bundled NVML sampler wrote no line within 5 s')), 5000);
       lines.once('line', (line) => {
         clearTimeout(timer);
-        resolve(line);
+        settle(line);
       });
     });
     const start = { type: 'start', intervalMs: 1000, needs: { pcie: true, skipGpus: [] } };
@@ -148,7 +148,7 @@ test('the NVML sampler ships next to the server entry and starts from the bundle
     expect(reply).toMatchObject({ type: 'error' });
     expect(reply).toHaveProperty('message', expect.stringContaining('/no/such/'));
     // It exits once its stdin ends.
-    const exited = new Promise<number | null>((resolve) => child.once('exit', resolve));
+    const exited = new Promise<number | null>((settle) => child.once('exit', settle));
     child.stdin.end();
     expect(await exited).toBe(0);
   } finally {

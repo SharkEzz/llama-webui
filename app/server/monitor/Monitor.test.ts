@@ -137,13 +137,13 @@ const monitorLayer = Effect.fnUntraced(function* (options: Options) {
         ).pipe(Layer.provide(found));
   const delay = options.buildDelay;
   const collectors = delay === undefined ? changed : Layer.unwrap(Effect.as(Effect.sleep(delay), changed));
-  const layer = Monitor.layerWith({
+  const monitorLive = Monitor.layerWith({
     modelDiskRetry: '30 seconds',
     appsEvery: 5,
     collectors,
     ...(options.collectorsWait === undefined ? {} : { collectorsWait: options.collectorsWait }),
   });
-  return { layer, settings };
+  return { monitorLive, settings };
 });
 
 /** `test` with a monitor on collectors that find no program, the settings of `options` stored first. */
@@ -152,8 +152,8 @@ const withMonitor = Effect.fnUntraced(
     options: Options,
     test: (monitor: Monitor['Service'], settings: Settings) => Effect.Effect<A, E, Services>,
   ) {
-    const { layer, settings } = yield* monitorLayer(options);
-    const context = yield* Layer.build(layer);
+    const { monitorLive, settings } = yield* monitorLayer(options);
+    const context = yield* Layer.build(monitorLive);
     return yield* test(Context.get(context, Monitor), settings);
   },
   (_) => Effect.scoped(_),
@@ -256,7 +256,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
         const shrunk = yield* monitor.history;
         assert.deepStrictEqual([shrunk.intervalMs, shrunk.capacity, shrunk.times.length], [10_000, 3, 3]);
         // The newest points: none older than the third newest before the change.
-        assert.isAtLeast(shrunk.times[0] ?? 0, before.times[before.times.length - 3] ?? Number.POSITIVE_INFINITY);
+        assert.isAtLeast(shrunk.times[0] ?? 0, before.times.at(-3) ?? Number.POSITIVE_INFINITY);
         for (const values of Rec.values(shrunk.series)) assert.lengthOf(values, 3);
         // At 10 s, no tick comes now.
         yield* Effect.sleep('300 millis');
@@ -320,7 +320,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
           const snapshots = yield* Effect.all([next(), next(), next()]);
           for (const s of snapshots) {
             assert.isNotNull(s.disk);
-            assert.isNull(s.disk?.model);
+            assert.isNull(s.disk.model);
           }
           const count = yield* Ref.get(lookups);
           assert.strictEqual(count, 1);
@@ -478,13 +478,13 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
       const dir = yield* fs.makeTempDirectoryScoped({ prefix: 'lw-monitor-' });
       const fake = path.resolve(import.meta.dirname, '../testing/fixtures/fakeNvml.ts');
       const stuck = yield* stuckRelease;
-      const { layer } = yield* monitorLayer({
+      const { monitorLive } = yield* monitorLayer({
         patch: { collectors: { nvml: true, system: true, disk: true } },
         nvmlCommand: { cmd: process.execPath, args: [fake, 'ready-then-sample', dir] },
         spawner: stuck.spawner,
       });
       const scope = yield* Scope.make();
-      const context = yield* Layer.buildWithScope(layer, scope);
+      const context = yield* Layer.buildWithScope(monitorLive, scope);
       const source = yield* Context.get(context, Monitor).nvidiaSource;
       assert.strictEqual(source, 'nvml');
       yield* next('3 seconds');

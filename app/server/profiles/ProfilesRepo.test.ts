@@ -151,7 +151,6 @@ describe('ProfilesRepo', () => {
         const { imported } = yield* repo.importMany({ inputs: [input('T')], source: 'llama-tui' });
         const [tui] = imported;
         assert.isDefined(tui);
-        if (tui === undefined) return;
         const copy = yield* repo.duplicate(tui.id);
         assert.strictEqual(copy.source, 'import');
         assert.strictEqual(copy.name, 'T (copy)');

@@ -153,7 +153,7 @@ const chipsetCard = Effect.fn('chipsetCard')(function* (
   const drmRoot = yield* drmCard(root, 'card1', gpu);
   const [card] = yield* discoverAmdCards({ drmRoot });
   assert.isDefined(card);
-  return { card: card as AmdCard, slot: path.join(root, 'devices', 'pci0000:00', chip), up };
+  return { card, slot: path.join(root, 'devices', 'pci0000:00', chip), up };
 });
 
 const nums = (g: {
@@ -210,9 +210,9 @@ layer(NO_IDS)('amdgpu', (it) => {
         );
         const [card] = cards;
         assert.isDefined(card);
-        assert.strictEqual(card?.pdev, '0000:08:00.0');
-        assert.strictEqual(card?.name, 'AMD GPU 0000:08:00.0');
-        const s = yield* readAmdCard(card as AmdCard);
+        assert.strictEqual(card.pdev, '0000:08:00.0');
+        assert.strictEqual(card.name, 'AMD GPU 0000:08:00.0');
+        const s = yield* readAmdCard(card);
         assert.deepStrictEqual(s, {
           key: 'amd:0000:08:00.0',
           vendor: 'amd',

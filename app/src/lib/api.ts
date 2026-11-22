@@ -29,6 +29,7 @@ export class ApiReplyInvalid extends Error {
 const streamFailure = <E>(e: E) => {
   if (HttpClientError.isHttpClientError(e)) return new ApiUnreachable({ cause: e });
   if (Schema.isSchemaError(e) || Predicate.isTagged(e, 'SseError') || Predicate.isTagged(e, 'Retry')) {
+    // oxlint-disable-next-line no-console -- an event of the server that does not decode: the page has no other place to say why the stream failed
     console.error('llama-webui: an event of the reply does not decode', e);
     return new ApiReplyInvalid({ cause: e });
   }

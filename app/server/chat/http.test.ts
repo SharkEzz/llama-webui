@@ -159,7 +159,7 @@ const writtenWhen = Effect.fnUntraced(function* (id: number, content: string) {
     // The start, then the delta of what was written so far.
     const replay = yield* reply.events.pipe(Stream.take(2), Stream.runCollect);
     return Arr.findFirst(replay, (e) => e.type === 'delta').pipe(
-      Option.flatMap((e) => (e.type === 'delta' ? Option.fromNullishOr(e.content) : Option.none())),
+      Option.flatMap((e) => Option.fromNullishOr(e.content)),
       Option.getOrElse(() => ''),
     );
   });

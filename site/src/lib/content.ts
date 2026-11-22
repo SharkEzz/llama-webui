@@ -33,6 +33,6 @@ export function contentRoutes(files: readonly string[]): ContentRoute[] {
 
 /** Canonical URL form used everywhere on the site: leading and trailing slash ("/docs/x/"). */
 export function href(path: string): string {
-  const trimmed = path.replace(/^\/+|\/+$/g, '');
+  const trimmed = path.replaceAll(/^\/+|\/+$/g, '');
   return trimmed === '' ? '/' : `/${trimmed}/`;
 }

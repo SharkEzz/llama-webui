@@ -214,7 +214,7 @@ layer(served, { excludeTestServices: true, buildPerTest: true })('/api/tuning ov
 
       const after = yield* checksOf(path);
       const disk = Option.getOrThrow(checkOf(after, 'kernel.disk-speed'));
-      assert.isTrue(Str.startsWith('sequential read')(disk.detail ?? ''), disk.detail ?? '');
+      assert.isTrue(Str.startsWith('sequential read')(disk.detail), disk.detail);
       // The memlock check follows the estimate kept: it reads `--load-mode mmap+mlock` in its args.
       const memlock = Option.getOrThrow(checkOf(after, 'cpu.memlock'));
       assert.strictEqual(

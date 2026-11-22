@@ -69,9 +69,7 @@ export const slotLink = Effect.fn('pci.slotLink')(function* (options: {
     link = parent;
   }
   const port = path.dirname(link);
-  return isHostBridge(port) || port === link
-    ? ({ linkPath: link } as { linkPath: string; portPath?: string })
-    : { linkPath: link, portPath: port };
+  return isHostBridge(port) || port === link ? { linkPath: link } : { linkPath: link, portPath: port };
 });
 
 const readSpeed = Effect.fnUntraced(function* (dir: string | null, file: string) {

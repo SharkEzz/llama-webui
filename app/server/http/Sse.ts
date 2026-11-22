@@ -10,7 +10,7 @@ export interface SseEvent {
 
 /** As h3's `createEventStream` wrote it: a single-line `event:`, one `data:` per line, a blank line. */
 const format = ({ event, data }: SseEvent): string => {
-  const name = event === undefined || event === '' ? '' : `event: ${Str.replace(/[\r\n]/g, '')(event)}\n`;
+  const name = event === undefined || event === '' ? '' : `event: ${Str.replaceAll(/[\r\n]/g, '')(event)}\n`;
   const lines = Arr.join(
     Arr.map(Str.split(data, /\r\n|\r|\n/), (line) => `data: ${line}\n`),
     '',

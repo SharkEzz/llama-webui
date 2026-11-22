@@ -12,7 +12,7 @@ import { Array as Arr, Effect, type FileSystem, type Path } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import { SqlClient } from 'effect/sql';
 import { benchBinary } from 'llamacpp-js/node';
-import { expandHome, type homeDir } from '../config/Home.ts';
+import { expandHome } from '../config/Home.ts';
 import { checkModelPaths } from '../models/allowedPath.ts';
 import type { GgufReader } from '../models/GgufReader.ts';
 import type { ProfilesRepo } from '../profiles/ProfilesRepo.ts';
@@ -27,14 +27,7 @@ import { BenchRunsRepo, runFilters } from './BenchRunsRepo.ts';
 import { SweepsRepo } from './SweepsRepo.ts';
 import { fromProfile, toProfile } from './toProfile.ts';
 
-type Taken =
-  | FileSystem.FileSystem
-  | Path.Path
-  | ProfilesRepo
-  | SweepsRepo
-  | BenchRunsRepo
-  | SettingsRepo
-  | Effect.Services<typeof homeDir>;
+type Taken = FileSystem.FileSystem | Path.Path | ProfilesRepo | SweepsRepo | BenchRunsRepo | SettingsRepo;
 
 /**
  * The endpoints of `/api/bench`: the devices llama-bench sees, a draft from a profile, the runs, a run started in the

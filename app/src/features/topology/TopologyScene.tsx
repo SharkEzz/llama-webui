@@ -331,7 +331,7 @@ function Projector({ layout, peerPaths, layer }: ProjectorProps) {
       const first = el.firstElementChild;
       const stack = first instanceof HTMLElement ? first : null;
       const tip = stack?.querySelector<HTMLElement>(':scope > dl');
-      el.classList.toggle('tip-below', !!stack && !!tip && y - stack.offsetHeight - tip.offsetHeight < 16);
+      el.classList.toggle('tip-below', Boolean(stack && tip && y - stack.offsetHeight - tip.offsetHeight < 16));
     }
   });
   return null;

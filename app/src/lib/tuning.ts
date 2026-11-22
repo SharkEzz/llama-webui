@@ -110,7 +110,7 @@ export function replacedProfileParams(profile: BenchParams, pinned: Partial<Benc
   const out: Record<string, unknown> = {};
   const pins: Readonly<Record<string, unknown>> = pinned;
   for (const [k, v] of Object.entries(profile)) if (JSON.stringify(pins[k]) !== JSON.stringify(v)) out[k] = v;
-  return out as BenchParams;
+  return out;
 }
 
 /** Static -ot patterns: they send MoE experts to RAM (llama.cpp applies the first matching rule). */
@@ -137,7 +137,7 @@ export function suggestedSpace(e: Estimate, hw: TuningHardware, preset: PresetId
   const seen = new Set<string>();
   const dev = sets.filter(
     (s): s is ReadonlyArray<string> =>
-      !!s && s.length > 0 && s[0] !== 'none' && !seen.has(s.join()) && !!seen.add(s.join()),
+      s !== undefined && s.length > 0 && s[0] !== 'none' && !seen.has(s.join()) && Boolean(seen.add(s.join())),
   );
   if (dev.length > 1) space.dev = dev;
   if (preset === 'agent') space.ub = [512, 2048];
@@ -151,7 +151,10 @@ export const useTuning = create<TuningState>()((set, get) => {
   };
   const runEstimate = async () => {
     const { modelPath, mmprojPath, preset, pinned } = get();
-    if (!modelPath) return set({ estimate: null, estimating: false, estimateError: null });
+    if (!modelPath) {
+      set({ estimate: null, estimating: false, estimateError: null });
+      return;
+    }
     const seq = ++estimateSeq;
     set({ estimating: true });
     using _estimating = defer(() => {
@@ -189,7 +192,10 @@ export const useTuning = create<TuningState>()((set, get) => {
   };
   const runPlan = async () => {
     const { modelPath } = get();
-    if (!modelPath) return set({ plan: null, planError: null });
+    if (!modelPath) {
+      set({ plan: null, planError: null });
+      return;
+    }
     const seq = ++planSeq;
     set({ planning: true });
     using _planning = defer(() => {
@@ -252,7 +258,10 @@ export const useTuning = create<TuningState>()((set, get) => {
     },
 
     async fromProfile(id) {
-      if (id === null) return set({ profileId: null, serverArgs: [], profileParams: {} });
+      if (id === null) {
+        set({ profileId: null, serverArgs: [], profileParams: {} });
+        return;
+      }
       try {
         const d = await call((api) => api.bench.fromProfile({ params: { id } }));
         set({
@@ -292,7 +301,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       for (const k of Object.keys(space))
         if (space[k] === undefined || (Array.isArray(space[k]) && (space[k] as unknown[]).length === 0))
           delete space[k];
-      set({ space: space as SweepSpace });
+      set({ space });
       schedulePlan();
     },
 
@@ -342,7 +351,10 @@ export const useTuning = create<TuningState>()((set, get) => {
     },
 
     async open(id) {
-      if (id === null) return set({ current: null });
+      if (id === null) {
+        set({ current: null });
+        return;
+      }
       try {
         set({ current: await call((api) => api.sweeps.get({ params: { id } })) });
       } catch (e) {

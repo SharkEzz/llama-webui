@@ -118,6 +118,6 @@ export function unknownFlags(catalog: FlagCatalog, args: string[]): string[] {
 
 /** One line: names, value, help, without the environment variable that sets it. */
 export function describeFlag(flag: Flag): string {
-  const help = flag.help.replace(/\s*\(env: [A-Z0-9_]+\)/g, '').trim();
+  const help = flag.help.replaceAll(/\s*\(env: [A-Z0-9_]+\)/g, '').trim();
   return `${flag.names.join(', ')}${flag.value ? ` ${flag.value}` : ''}${help ? ` — ${help}` : ''}`;
 }

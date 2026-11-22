@@ -8,6 +8,8 @@ export default defineConfig({
   rules: {
     // A generator passed to `Effect.gen` or `Effect.fn` does not always yield
     'require-yield': 'off',
+    // A log goes through Effect's logger (`Effect.log*`), never straight to the console
+    'no-console': 'error',
   },
   overrides: [
     {
