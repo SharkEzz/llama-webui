@@ -15,7 +15,7 @@ export const aurora: Section = (results, cell) => {
     return figure(bars(rows, { title, labelWidth: 300, ...(color === undefined ? {} : { color }) }), title);
   };
   const cards = [...new Set(variants.flatMap((w) => Object.keys(w.procs.gpuBusyPct)))];
-  const head = ['Variant', ...MAIN_GROUPS.map(groupLabel), ...cards.map((c) => `gpu_busy ${esc(c)}`)];
+  const head = ['Variant', ...MAIN_GROUPS.map(groupLabel), ...cards.map((c) => `AMD GPU busy, ${esc(c)}`)];
   const rows = variants.map((w) => [
     esc(w.label),
     ...MAIN_GROUPS.map((g) => cell(`aurora.${w.id}.cpu.${g}`)),

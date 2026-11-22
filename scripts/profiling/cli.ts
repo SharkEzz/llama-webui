@@ -4,6 +4,7 @@ import { compare, VersionMismatch } from './compare.ts';
 import { listScenarios, type Options, parseOptions, UsageError, USAGE } from './options.ts';
 import { renderReport } from './report/render.ts';
 import { runDir } from './run-dir.ts';
+import { runCommand } from './run.ts';
 
 /** Rewrites a run's report from its results.json, against a reference run when asked. */
 function report(options: Options): number {
@@ -38,7 +39,7 @@ function report(options: Options): number {
   return 0;
 }
 
-function main(): number {
+async function main(): Promise<number> {
   let options;
   try {
     options = parseOptions(process.argv.slice(2), new Date());
@@ -54,8 +55,15 @@ function main(): number {
     return 0;
   }
   if (options.command === 'report') return report(options);
-  process.stderr.write('profiling: not implemented yet\n');
-  return 1;
+  try {
+    return await runCommand(options);
+  } catch (error) {
+    if (error instanceof UsageError) {
+      process.stderr.write(`profiling: ${error.message}\n`);
+      return 2;
+    }
+    throw error;
+  }
 }
 
-process.exitCode = main();
+process.exitCode = await main();

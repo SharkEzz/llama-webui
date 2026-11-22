@@ -155,7 +155,7 @@ export function windowBlock(scenario: ScenarioName, w: Window, cell: Cell): stri
   const tags = [
     w.profiled ? '<span class="tag">under a profiler</span>' : '',
     `<span class="tag">${num(w.procs.wallMs / 1000)} s</span>`,
-    `<span class="tag">server up ${num(w.serverUptimeS)} s, ${num(w.historyPoints)} history points</span>`,
+    `<span class="tag">server up ${num(w.serverUptimeS)} s, ${num(w.historyPoints)} history ${w.historyPoints === 1 ? 'point' : 'points'}</span>`,
   ].join('');
   const main = MAIN_GROUPS.filter((g) => w.procs.cpuPct[g] !== undefined).map((g) => ({
     label: `CPU, ${groupLabel(g)}`,
@@ -163,7 +163,7 @@ export function windowBlock(scenario: ScenarioName, w: Window, cell: Cell): stri
   }));
   if (w.eventLoopUtilization !== null) main.push({ label: 'server event loop', value: cell(`${prefix}.elu`) });
   const gpus = Object.keys(w.procs.gpuBusyPct).map((card) => ({
-    label: `gpu_busy_percent ${esc(card)}`,
+    label: `AMD GPU busy, ${esc(card)}`,
     value: cell(`${prefix}.gpu.${card}`),
   }));
   const profiles = [

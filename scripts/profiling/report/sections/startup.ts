@@ -15,7 +15,7 @@ export const startup: Section = (results, cell) => {
   return section(
     'startup',
     'Startup and shutdown',
-    'The production build started on a free port with an empty data directory, timed from spawn to the first answer of <code>/api/health</code>, then from SIGTERM to its exit; bare Node is the same spawn of an empty script.',
+    'The production build started on the address and data directory of the run, timed from spawn to the first answer of <code>/api/health</code>, then from SIGTERM to its exit; bare Node is the same spawn of an empty script.',
     `${tiles([
       { label: 'start to /api/health (median)', value: cell('startup.startMs') },
       { label: 'SIGTERM to exit (median)', value: cell('startup.stopMs') },
