@@ -232,6 +232,9 @@ importers:
       oxlint-plugin-react-doctor:
         specifier: 0.9.23
         version: 0.9.23
+      oxlint-tailwindcss:
+        specifier: 1.17.2
+        version: 1.17.2
       oxlint-tsgolint:
         specifier: 7.0.2008
         version: 7.0.2008
@@ -3620,6 +3623,10 @@ packages:
   oxlint-plugin-react-doctor@0.9.23:
     resolution: {integrity: sha512-AWC9/Jiki6s7e8b8xqTs0T/Hph8ISEDmoMUDwPkEzTrE0996ZWjwg7Ifaz5vPJQnefnOI9SDQQ/EvwvaZt4Tvg==}
     engines: {node: ^20.19.0 || >=22.13.0}
+
+  oxlint-tailwindcss@1.17.2:
+    resolution: {integrity: sha512-L19t/iFDQgEvwoje2H4eC1ClSe/Pr4V824eejb0FmQB14kixJ+0+Ed6diY2G/1qILHX6vXPHovf0XFvr1shTQQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
 
   oxlint-tsgolint@7.0.2008:
     resolution: {integrity: sha512-QuRK+gdriCwpOs+1PGq6/aImEEEK+EClNptdVtI0y4bDOhJ0uH/v3noz+yPKe+DYOTdkej75/5f3ouOGP5EGrQ==}
@@ -7325,6 +7332,11 @@ snapshots:
       eslint-visitor-keys: 5.0.1
       lightningcss: 1.33.0
       oxc-parser: 0.148.0
+
+  oxlint-tailwindcss@1.17.2:
+    dependencies:
+      '@tailwindcss/node': 4.3.5
+      tailwindcss: 4.3.5
 
   oxlint-tsgolint@7.0.2008:
     optionalDependencies:
