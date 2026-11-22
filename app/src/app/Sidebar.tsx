@@ -49,7 +49,7 @@ function Item({ route, collapsed }: { route: AppRoute; collapsed: boolean }) {
           cn(
             ROW,
             isActive &&
-              'bg-sidebar-primary/14 text-sidebar-accent-foreground inset-shadow-highlight shadow-[0_0_20px_-8px] shadow-sidebar-primary/50 hover:bg-sidebar-primary/18',
+              'bg-sidebar-primary/14 text-sidebar-accent-foreground shadow-[0_0_20px_-8px] inset-shadow-highlight shadow-sidebar-primary/50 hover:bg-sidebar-primary/18',
           )
         }
       >

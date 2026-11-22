@@ -71,7 +71,7 @@ function Boxes({ nodes, className }: { nodes: Node[]; className: string }) {
  */
 export function ArchitectureDiagram() {
   return (
-    <figure className="not-prose @container my-8 rounded-2xl bg-well p-3 text-sm inset-shadow-well ring-1 ring-border sm:p-4">
+    <figure className="not-prose @container my-8 rounded-2xl bg-well p-3 text-sm ring-1 inset-shadow-well ring-border sm:p-4">
       <Tier title="Browser">
         <div className={BOX}>
           <p className="font-medium">React app</p>

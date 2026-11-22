@@ -60,7 +60,7 @@ function Panel({ title, runs, pick }: { title: string; runs: BenchRun[]; pick: (
                     />
                   )}
                 </span>
-                <span className="num text-right text-xs">{m ? fmt(m.tps, 1) : '—'}</span>
+                <span className="text-right num text-xs">{m ? fmt(m.tps, 1) : '—'}</span>
               </TooltipTrigger>
               <TooltipContent>
                 #{r.id} · {KIND_LABEL[r.kind]}: {formatMeasure(m)}

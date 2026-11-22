@@ -64,7 +64,7 @@ export function DeleteModelPopover({ path, onDeleted }: { path: string; onDelete
       <PopoverTrigger render={<Button variant="destructive" className="sm:mr-auto" />}>
         <Trash2 /> Delete
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" className="w-[26rem] max-w-[calc(100vw-2rem)]">
+      <PopoverContent side="top" align="start" className="w-104 max-w-[calc(100vw-2rem)]">
         <PopoverHeader>
           <PopoverTitle className="break-all">Delete “{stem(path)}”?</PopoverTitle>
           <PopoverDescription>
@@ -84,7 +84,7 @@ export function DeleteModelPopover({ path, onDeleted }: { path: string; onDelete
             {usage.files.length > 1 && (
               <div className="flex max-h-24 flex-col gap-0.5 overflow-y-auto">
                 {usage.files.map((f) => (
-                  <p key={f} className="break-all font-mono text-xs text-muted-foreground">
+                  <p key={f} className="font-mono text-xs break-all text-muted-foreground">
                     {f.split('/').pop()}
                   </p>
                 ))}

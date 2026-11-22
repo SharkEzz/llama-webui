@@ -117,7 +117,7 @@ export function RecommendationCard() {
             {estimate.ok ? (
               <RowsTable estimate={estimate} pinned={pinned} />
             ) : (
-              <code className="self-start rounded-md bg-well inset-shadow-well p-3 font-mono text-xs break-all">
+              <code className="self-start rounded-md bg-well p-3 font-mono text-xs break-all inset-shadow-well">
                 {estimate.serverArgs.join(' ')}
               </code>
             )}

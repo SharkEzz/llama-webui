@@ -137,7 +137,7 @@ export function LogsPage() {
         <section
           ref={scroller}
           aria-label="Logs"
-          className="h-full overflow-auto bg-well inset-shadow-well p-3"
+          className="h-full overflow-auto bg-well p-3 inset-shadow-well"
           // Following only stops on a user gesture: a filter that changes the height must not stop it.
           onWheel={(e) => {
             if (e.deltaY < 0) userScroll.current = true;

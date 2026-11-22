@@ -25,7 +25,7 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string | undefi
   }, [code, lang]);
 
   return (
-    <div className="my-3 overflow-hidden rounded-md bg-well inset-shadow-well ring-1 ring-border">
+    <div className="my-3 overflow-hidden rounded-md bg-well ring-1 inset-shadow-well ring-border">
       <div className="flex items-center justify-between border-b border-border px-3 py-1">
         <span className="font-mono text-xs text-muted-foreground">{lang || 'text'}</span>
         <Button

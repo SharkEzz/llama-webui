@@ -31,7 +31,7 @@ export function GlassCard({ tone, reveal = true, as = 'article', className, chil
     <Tag
       onPointerMove={onPointerMove}
       style={style}
-      className={cn('glass spotlight-card overflow-hidden', reveal && 'scroll-reveal', className)}
+      className={cn('spotlight-card overflow-hidden glass', reveal && 'scroll-reveal', className)}
     >
       {children}
     </Tag>

@@ -134,7 +134,7 @@ function NumberField(props: {
         step={props.step}
         placeholder={props.placeholder}
         aria-invalid={Boolean(props.error)}
-        className="num h-8"
+        className="h-8 num"
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === 'Enter' && commit()}

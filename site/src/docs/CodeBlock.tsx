@@ -16,7 +16,7 @@ export function CodeBlock({ children, className, 'data-title': title, 'data-lang
   };
 
   return (
-    <figure className="not-prose group relative my-6 overflow-hidden rounded-xl bg-well inset-shadow-well ring-1 ring-border">
+    <figure className="not-prose group relative my-6 overflow-hidden rounded-xl bg-well ring-1 inset-shadow-well ring-border">
       {title && (
         <figcaption className="border-b border-border px-4 py-2 font-mono text-xs text-muted-foreground">
           {title}

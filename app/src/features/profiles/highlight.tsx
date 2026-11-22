@@ -50,7 +50,7 @@ export function highlightEnv(text: string): ReactNode {
       return (
         // oxlint-disable-next-line react/no-array-index-key -- positional tokens recomputed on every render
         <span key={i}>
-          <span className="text-tone-rose underline decoration-wavy decoration-tone-rose/70">{line}</span>
+          <span className="text-tone-rose underline decoration-tone-rose/70 decoration-wavy">{line}</span>
           {nl}
         </span>
       );

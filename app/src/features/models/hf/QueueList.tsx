@@ -149,7 +149,7 @@ function Running({ item }: { item: DownloadItem }) {
   return (
     <div className="flex flex-col gap-1">
       <Progress value={pct} />
-      <p className="num flex justify-between gap-2 text-xs text-muted-foreground">
+      <p className="flex justify-between gap-2 num text-xs text-muted-foreground">
         <span className="truncate">{detail}</span>
         <span>
           {parts > 0 && `part ${parts}/${item.files.length} · `}

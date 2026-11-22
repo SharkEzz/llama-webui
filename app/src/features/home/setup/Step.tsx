@@ -55,7 +55,7 @@ export function Step({
 /** A shell command to run by hand, with a copy button. */
 export function Command({ children }: { children: string }) {
   return (
-    <div className="flex items-start gap-1.5 rounded-md bg-well inset-shadow-well py-1 pr-1 pl-2.5">
+    <div className="flex items-start gap-1.5 rounded-md bg-well py-1 pr-1 pl-2.5 inset-shadow-well">
       <code className="min-w-0 flex-1 py-0.5 font-mono text-xs break-all">{children}</code>
       <Button variant="ghost" size="icon-xs" onClick={() => void copyText(children)} aria-label="Copy command">
         <Copy />

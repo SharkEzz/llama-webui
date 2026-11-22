@@ -59,7 +59,7 @@ export function StatTile({
         <span className="truncate">{label}</span>
       </div>
       <div className="flex items-baseline gap-1.5">
-        <span className="num truncate text-2xl font-medium leading-none tracking-tight">{value}</span>
+        <span className="truncate num text-2xl leading-none font-medium tracking-tight">{value}</span>
         {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
       </div>
       {hint && <p className="truncate text-xs text-muted-foreground">{hint}</p>}

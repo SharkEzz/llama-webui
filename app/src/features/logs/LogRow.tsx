@@ -18,7 +18,7 @@ export function LogRow({ line, query, className }: { line: LogLine; query?: stri
           {line.kind}
         </span>
       )}
-      <span className={cn('min-w-0 whitespace-pre-wrap break-all', own ? 'text-primary-ink' : LEVEL[line.level])}>
+      <span className={cn('min-w-0 break-all whitespace-pre-wrap', own ? 'text-primary-ink' : LEVEL[line.level])}>
         <Highlight text={line.text} query={query} />
       </span>
     </div>

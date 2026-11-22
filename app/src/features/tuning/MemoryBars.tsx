@@ -55,7 +55,7 @@ function Bar({ d, name, ram = false }: { d: DeviceBudget; name: string; ram?: bo
       >
         <div className="flex items-baseline gap-2 text-sm">
           <span className="font-mono font-medium">{d.device}</span>
-          <span className="num ml-auto text-xs whitespace-nowrap">
+          <span className="ml-auto num text-xs whitespace-nowrap">
             {formatBytes(d.bytes)}{' '}
             <span className="text-muted-foreground">
               / {formatBytes(d.budget)} {ram ? 'available' : 'usable'}

@@ -23,7 +23,7 @@ export function HardwareBand() {
             {GROUPS.map(([title, text]) => (
               <div key={title} className="rounded-xl bg-well p-4 ring-1 ring-border">
                 <dt className="text-sm font-medium">{title}</dt>
-                <dd className="mt-1 text-sm text-muted-foreground text-pretty">{text}</dd>
+                <dd className="mt-1 text-sm text-pretty text-muted-foreground">{text}</dd>
               </div>
             ))}
           </dl>
