@@ -6,7 +6,7 @@ import {
   reservedFlagMessage,
   unknownFlags,
 } from '@llama-webui/shared';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CodeTextarea } from '@/components/CodeTextarea';
 import { Command, CommandItem, CommandList } from '@/components/ui/command';
 import { useFlags } from '@/lib/flags';
@@ -59,19 +59,30 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   };
 
   const open = suggestions.length > 0;
-  // oxlint-disable-next-line react-hooks/exhaustive-deps -- runs after every render on purpose: it reads the ids cmdk sets in the DOM, and setAria only runs when they change
-  useLayoutEffect(() => {
-    const list = open ? listRef.current?.id || undefined : undefined;
-    const selected = open
-      ? listRef.current?.querySelector<HTMLElement>('[cmdk-item][data-selected=true]')?.id || undefined
-      : undefined;
-    if (list !== aria.list || selected !== aria.active) setAria({ list, active: selected });
-  });
+  // While the list is mounted, follow the ids cmdk sets in the DOM: the list's, and the selected option's as cmdk
+  // moves its `data-selected`. Stable, so React attaches it once per list.
+  const followList = useCallback((el: HTMLDivElement | null) => {
+    listRef.current = el;
+    if (!el) return;
+    const read = () => {
+      const list = el.id || undefined;
+      const selected = el.querySelector<HTMLElement>('[cmdk-item][data-selected=true]')?.id || undefined;
+      setAria((a) => (a.list === list && a.active === selected ? a : { list, active: selected }));
+    };
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-selected'] });
+    return () => {
+      observer.disconnect();
+      listRef.current = null;
+      setAria({});
+    };
+  }, []);
 
   // Every matching flag is listed: keep the highlighted one in view while the arrows move through the list.
-  // `active` is the trigger (cmdk marks the item from it)
   useLayoutEffect(() => {
     if (open) listRef.current?.querySelector('[cmdk-item][data-selected=true]')?.scrollIntoView({ block: 'nearest' });
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- active is a trigger: cmdk marks the item from it
   }, [open, active]);
 
   const track = () => setCursor(ref.current?.selectionStart ?? 0);
@@ -136,7 +147,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
             onMouseDown={(e) => e.preventDefault()}
             className="absolute inset-x-0 top-full z-20 mt-1 h-auto rounded-lg! border border-border shadow-surface inset-shadow-highlight backdrop-blur-(--surface-blur)"
           >
-            <CommandList ref={listRef} aria-label="Suggested flags">
+            <CommandList ref={followList} aria-label="Suggested flags">
               {suggestions.map((name) => {
                 const flag = catalog ? flagOf(catalog, name) : undefined;
                 return (

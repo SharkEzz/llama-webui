@@ -7,7 +7,7 @@ import {
   vramFit,
 } from '@llama-webui/shared';
 import { ArrowLeft, Check, Download, ExternalLink, Lock } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { TONE_VAR, type Tone } from '@/components/glass/tones';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -99,33 +99,32 @@ export function RepoView({
 
   /** Only the first load waits for `delayMs`: a reload after a download is not typing. */
   const firstLoad = useRef(true);
+  // Read when the load is planned, without planning another when it changes.
+  const delay = useEffectEvent(() => (firstLoad.current ? delayMs : 0));
 
   useEffect(() => {
     const ac = new AbortController();
-    const t = setTimeout(
-      () => {
-        firstLoad.current = false;
-        useDownloads
-          .getState()
-          .repo(id, ac.signal)
-          .then(
-            (r) => {
-              setRepo(r);
-              setError(null);
-            },
-            (e: unknown) => {
-              if (ac.signal.aborted) return;
-              setError({ message: errorMessage(e), tag: errorTag(e) });
-            },
-          );
-      },
-      firstLoad.current ? delayMs : 0,
-    );
+    const t = setTimeout(() => {
+      firstLoad.current = false;
+      useDownloads
+        .getState()
+        .repo(id, ac.signal)
+        .then(
+          (r) => {
+            setRepo(r);
+            setError(null);
+          },
+          (e: unknown) => {
+            if (ac.signal.aborted) return;
+            setError({ message: errorMessage(e), tag: errorTag(e) });
+          },
+        );
+    }, delay());
     return () => {
       clearTimeout(t);
       ac.abort();
     };
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- doneHere is a trigger (reload when a download of this repo finishes); delayMs is only read for the first load
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- doneHere is a trigger: reload when a download of this repo finishes
   }, [id, doneHere]);
 
   const queued = new Set(items.filter((i) => ofRepo(i) && isDownloadActive(i.status)).map((i) => i.key));

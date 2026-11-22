@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { Tone } from '@/components/glass/tones';
@@ -36,6 +36,15 @@ interface TimeSeriesChartProps {
 
 const defaultFormat = (v: number) => num(1, 0).format(v);
 
+/** The chart's data: the history's arrays (mutable, shared with the store), a gap for a series it does not hold. */
+function chartData(series: ChartSeries[]): uPlot.AlignedData {
+  const { times, series: all } = useMonitor.getState().history;
+  return [
+    times,
+    ...series.map((s) => all.get(s.key) ?? Array.from({ length: times.length }, (): number | null => null)),
+  ];
+}
+
 /**
  * Time series from the monitoring history (uPlot). The chart is created once per series set and theme, then only
  * fed (setData) on each tick; null = gap. Live legend = values under the cursor.
@@ -57,24 +66,16 @@ export function TimeSeriesChart({
   const resolved = useTheme((s) => s.resolved);
   const version = useMonitor((s) => s.version);
   const signature = series.map((s) => `${s.key}:${s.tone}:${s.label}`).join('|');
+  // The axis and legend values read the latest format; uPlot calls them outside React, after the commit.
   const fmt = useRef(format);
-  fmt.current = format;
+  useLayoutEffect(() => {
+    fmt.current = format;
+  }, [format]);
 
-  const data = useMemo((): uPlot.AlignedData => {
-    const { times, series: all } = useMonitor.getState().history;
-    return [
-      times,
-      ...series.map((s) => all.get(s.key) ?? Array.from({ length: times.length }, (): number | null => null)),
-    ];
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- version triggers the history reread (read outside the closure); signature sums up `series`
-  }, [version, signature]);
-
-  // Current series and data, read at creation without rerunning it: data is pushed by the next effect
-  // (no re-creation on every tick), series are summed up by `signature`.
-  const latest = useEffectEvent(() => ({ series, data }));
+  // Current series, read by the effects without rerunning them: `signature` sums them up.
+  const latest = useEffectEvent(() => series);
 
   // Creation: per series set, theme (colors read from CSS variables) and shape.
-  // signature and resolved are triggers (series read via latest, colors via readChartTheme)
   useEffect(() => {
     const el = host.current;
     if (!el) return;
@@ -121,7 +122,7 @@ export function TimeSeriesChart({
       series: [
         // uPlot types the value as a number; it passes null where the series has no point (the legend off the data)
         { label: 'Time', value: (_u, v: number | null) => (v == null ? '—' : formatTime(v * 1000)) },
-        ...now.series.map((s): uPlot.Series => ({
+        ...now.map((s): uPlot.Series => ({
           label: s.label,
           stroke: theme.series[s.tone],
           fill: withAlpha(theme.series[s.tone], 0.1),
@@ -131,7 +132,7 @@ export function TimeSeriesChart({
         })),
       ],
     };
-    const u = new uPlot(opts, now.data, el);
+    const u = new uPlot(opts, chartData(now), el);
     plot.current = u;
     const size = () => {
       const width = Math.max(1, el.clientWidth);
@@ -148,11 +149,14 @@ export function TimeSeriesChart({
       u.destroy();
       plot.current = null;
     };
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- signature and resolved are triggers: series read via latest, colors via readChartTheme
   }, [signature, resolved, height, fill, yMax, compact, syncKey, legendTarget]);
 
+  // Feeding: the history's arrays grew (version) or the series set changed (signature); no re-creation on a tick.
   useEffect(() => {
-    plot.current?.setData(data);
-  }, [data]);
+    plot.current?.setData(chartData(latest()));
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies -- version and signature are triggers: the history is read from the store, the series via latest
+  }, [version, signature]);
 
   return (
     <div

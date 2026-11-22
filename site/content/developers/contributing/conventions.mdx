@@ -223,7 +223,7 @@ The web app and the site use React 19. The lint enforces the idioms below: the R
     `useCallback` it also reports a dependency that is listed but not read. In an effect it does not.
   - `react/exhaustive-effect-dependencies` reports an effect's array: "Found missing effect dependencies" for a value
     read but not listed, and "Found extra effect dependencies" for a value listed but not read. A deliberate trigger
-    is the second case. All six suppressions of the code are that case.
+    is the second case, and every suppression in the code is that case.
 
   When the dependency is a deliberate trigger (the effect must run again when it changes), keep it. Suppress the
   report with the rule it names, above the dependency array, with a reason that says what it triggers:
@@ -240,23 +240,11 @@ The web app and the site use React 19. The lint enforces the idioms below: the R
   dependency that is a real bug. A hook with no array (an effect that runs after every render) takes the directive
   above the hook.
 
-  An effect or memo that also leaves out a value it reads on purpose is reported by `react-hooks/exhaustive-deps` and
-  takes that directive. In `features/models/hf/RepoView.tsx`, `delayMs` is only read for the first load. A
-  `react-hooks/…` directive also makes the React Compiler-based rules (`react/hooks`,
-  `react/exhaustive-effect-dependencies`, `react/memo-dependencies`, `react/set-state-in-effect`,
-  `react/immutability`…) skip the whole component, as the React Compiler itself does. Keep these directives rare.
-  In the chart below, `useMonitor.getState()` inside the `useMemo` is not reported for that reason:
-
-  ```tsx title="app/src/components/charts/TimeSeriesChart.tsx"
-  const data = useMemo((): uPlot.AlignedData => {
-    const { times, series: all } = useMonitor.getState().history;
-    return [
-      times,
-      ...series.map((s) => all.get(s.key) ?? Array.from({ length: times.length }, (): number | null => null)),
-    ];
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- version triggers the history reread (read outside the closure); signature sums up `series`
-  }, [version, signature]);
-  ```
+  A value an effect reads but must not re-run it for is not left out with a suppression: read it through
+  `useEffectEvent` (next point). Do not suppress `react-hooks/exhaustive-deps` either: a `react-hooks/…` directive
+  makes the React Compiler-based rules (`react/hooks`, `react/exhaustive-effect-dependencies`,
+  `react/memo-dependencies`, `react/set-state-in-effect`, `react/immutability`…) skip the whole component, as the
+  React Compiler itself does. The code has none.
 
 - **Read the latest value without re-running the effect.** Use `useEffectEvent` rather than leaving the value out of
   the dependencies with a suppression:
@@ -293,8 +281,7 @@ The web app and the site use React 19. The lint enforces the idioms below: the R
 
 - **Zustand is read through selectors.** Two rules apply:
   - `react/hooks` reports `useStore.getState()` called where the component renders: its body, or a `useMemo` callback.
-    It does not report a call in a handler or an effect, and a component with a `react-hooks/…` directive is skipped,
-    as above.
+    It does not report a call in a handler or an effect.
   - react-doctor's `zustand-no-whole-store-destructure` reports a component that takes the whole store.
 
   Select each field and each action (`useBench((s) => s.remove)`). `getState()` stays for handlers and effects.
