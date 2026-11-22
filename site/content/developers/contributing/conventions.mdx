@@ -217,11 +217,16 @@ The web app and the site use React 19. The lint enforces the idioms below: the R
 `react/immutability`, `react/refs`, all on in `error`, next to `react/exhaustive-deps`) and ten rules of
 [react-doctor](#react-doctor).
 
-- **Trigger dependencies.** `react/exhaustive-deps` (written `react-hooks/exhaustive-deps` in a directive) reports a
-  value a hook reads but does not list, and a dependency that a `useMemo` or a `useCallback` lists but does not read.
-  `react/exhaustive-effect-dependencies` reports the same in an effect: an effect that lists a value it does not read.
-  When that value is a deliberate trigger (the effect must run again when it changes), keep it and suppress the report
-  above the dependency array, the reason saying what it triggers:
+- **Trigger dependencies.** Two rules read an effect's dependency array:
+  - `react/exhaustive-deps` (named `react-hooks/exhaustive-deps` in its reports and directives) reports, in any hook,
+    a value the hook reads but does not list, and an effect with no array that sets state. In a `useMemo` or a
+    `useCallback` it also reports a dependency that is listed but not read. In an effect it does not.
+  - `react/exhaustive-effect-dependencies` reports an effect's array: "Found missing effect dependencies" for a value
+    read but not listed, and "Found extra effect dependencies" for a value listed but not read. A deliberate trigger
+    is the second case. All six suppressions of the code are that case.
+
+  When the dependency is a deliberate trigger (the effect must run again when it changes), keep it. Suppress the
+  report with the rule it names, above the dependency array, with a reason that says what it triggers:
 
   ```tsx title="app/src/features/chat/Thread.tsx"
   useLayoutEffect(() => {
@@ -231,9 +236,16 @@ The web app and the site use React 19. The lint enforces the idioms below: the R
   ```
 
   The directive above a dependency array silences every report of that rule for the hook, a missing dependency
-  included, although the report prints the line where the value is used: suppress a deliberate list, never a missing
+  included, although the report prints the line where the value is used. Suppress a deliberate list, never a missing
   dependency that is a real bug. A hook with no array (an effect that runs after every render) takes the directive
-  above the hook:
+  above the hook.
+
+  An effect or memo that also leaves out a value it reads on purpose is reported by `react-hooks/exhaustive-deps` and
+  takes that directive. In `features/models/hf/RepoView.tsx`, `delayMs` is only read for the first load. A
+  `react-hooks/…` directive also makes the React Compiler-based rules (`react/hooks`,
+  `react/exhaustive-effect-dependencies`, `react/memo-dependencies`, `react/set-state-in-effect`,
+  `react/immutability`…) skip the whole component, as the React Compiler itself does. Keep these directives rare.
+  In the chart below, `useMonitor.getState()` inside the `useMemo` is not reported for that reason:
 
   ```tsx title="app/src/components/charts/TimeSeriesChart.tsx"
   const data = useMemo((): uPlot.AlignedData => {
@@ -279,9 +291,13 @@ The web app and the site use React 19. The lint enforces the idioms below: the R
   passed down as a prop is named `…Ref` (the rule recognises it by its name: `pacerRef` in
   `features/topology/TopologyScene.tsx`).
 
-- **Zustand is read through selectors.** `react/hooks` reports `useStore.getState()` read during render, and
-  react-doctor's `zustand-no-whole-store-destructure` a component that takes the whole store: select each field and
-  each action (`useBench((s) => s.remove)`); `getState()` stays for handlers and effects.
+- **Zustand is read through selectors.** Two rules apply:
+  - `react/hooks` reports `useStore.getState()` called where the component renders: its body, or a `useMemo` callback.
+    It does not report a call in a handler or an effect, and a component with a `react-hooks/…` directive is skipped,
+    as above.
+  - react-doctor's `zustand-no-whole-store-destructure` reports a component that takes the whole store.
+
+  Select each field and each action (`useBench((s) => s.remove)`). `getState()` stays for handlers and effects.
 
 ### react-doctor
 

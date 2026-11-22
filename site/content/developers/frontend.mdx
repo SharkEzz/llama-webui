@@ -139,8 +139,9 @@ export function startServerSync() {
 The WebSocket only pushes changes; the REST read on (re)connection fills whatever was missed while disconnected.
 
 A component reads a store through one selector per field or action (`useBench((s) => s.runs)`,
-`useBench((s) => s.toggle)`), never the whole store nor `getState()` during render: the lint reports both
-([React](/developers/contributing/conventions/#react)). `getState()` is for handlers, effects and the sync functions.
+`useBench((s) => s.toggle)`). It never takes the whole store, and never calls `getState()` in its body or in a
+`useMemo`; the lint reports both ([React](/developers/contributing/conventions/#react)). `getState()` is for handlers,
+effects and the sync functions.
 
 | Module         | Store                                    | Fed by                                                                                                                         |
 | -------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
