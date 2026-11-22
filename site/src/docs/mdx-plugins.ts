@@ -13,7 +13,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { parse as parseJs } from 'acorn';
-import type { Element, Root as HastRoot } from 'hast';
+import type { Program } from 'acorn';
+import type { Data, Element, Root as HastRoot, Literal } from 'hast';
 import { toString as hastToString } from 'hast-util-to-string';
 import type { Root as MdastRoot } from 'mdast';
 import { visit } from 'unist-util-visit';
@@ -29,16 +30,41 @@ interface Frontmatter {
   description: string;
 }
 
+/** The hast node of an ESM block, as MDX reads it (`mdast-util-mdxjs-esm`, not a dependency of the site). */
+interface MdxjsEsm extends Literal {
+  type: 'mdxjsEsm';
+  data?: Data & { estree?: Program | null | undefined };
+}
+
+declare module 'hast' {
+  interface RootContentMap {
+    mdxjsEsm: MdxjsEsm;
+  }
+}
+
+declare module 'vfile' {
+  interface DataMap {
+    /** Set by `remarkDocFrontmatter`, read by `rehypeDocExports`. */
+    frontmatter: Frontmatter;
+  }
+}
+
+/** A field of parsed YAML, read as it is written; undefined for another value. */
+const field = (yaml: unknown, key: string): unknown =>
+  typeof yaml === 'object' && yaml !== null ? Reflect.get(yaml, key) : undefined;
+
 export function remarkDocFrontmatter() {
   return (tree: MdastRoot, file: VFile) => {
     const index = tree.children.findIndex((n) => n.type === 'yaml');
     const node = tree.children[index];
-    const data = node && 'value' in node ? (parseYaml(node.value) as Partial<Frontmatter> | null) : null;
-    if (!data?.title || !data.description) {
+    const data: unknown = node && 'value' in node ? parseYaml(node.value) : null;
+    const title = field(data, 'title');
+    const description = field(data, 'description');
+    if (typeof title !== 'string' || !title || typeof description !== 'string' || !description) {
       file.fail('Front matter needs a title and a description (--- title: … description: … ---)');
     }
     tree.children.splice(index, 1);
-    file.data.frontmatter = { title: data.title, description: data.description };
+    file.data.frontmatter = { title, description };
   };
 }
 
@@ -48,8 +74,8 @@ function titleCounts(contentDir: string): Map<string, number> {
   for (const f of readdirSync(contentDir, { recursive: true, encoding: 'utf8' })) {
     if (!f.endsWith('.mdx')) continue;
     const fm = /^---\n([\s\S]*?)\n---/.exec(readFileSync(join(contentDir, f), 'utf8'))?.[1];
-    const title = fm ? (parseYaml(fm) as Partial<Frontmatter> | null)?.title : undefined;
-    if (title) counts.set(title, (counts.get(title) ?? 0) + 1);
+    const title = fm ? field(parseYaml(fm), 'title') : undefined;
+    if (typeof title === 'string' && title) counts.set(title, (counts.get(title) ?? 0) + 1);
   }
   return counts;
 }
@@ -64,7 +90,8 @@ export function rehypeDocExports(options: { contentDir: string }) {
         toc.push({ id: node.properties.id, text: hastToString(node), depth: node.tagName === 'h2' ? 2 : 3 });
       }
     });
-    const fm = file.data.frontmatter as Frontmatter;
+    const fm = file.data.frontmatter;
+    if (!fm) return file.fail('No front matter: remarkDocFrontmatter runs first');
     const source = relative(options.contentDir, file.path).replaceAll('\\', '/');
     const route = contentRoute(source);
     if (!route) return file.fail(`Not a docs page: ${source}`);
@@ -80,7 +107,7 @@ export function rehypeDocExports(options: { contentDir: string }) {
     ].join('\n');
     const estree = parseJs(code, { ecmaVersion: 'latest', sourceType: 'module' });
     // mdxjsEsm nodes come from the MDX syntax tree types, which this hast Root does not list.
-    tree.children.unshift({ type: 'mdxjsEsm', value: code, data: { estree } } as never);
+    tree.children.unshift({ type: 'mdxjsEsm', value: code, data: { estree } });
   };
 }
 

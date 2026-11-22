@@ -100,7 +100,7 @@ export function ModelsPage() {
                   placeholder="File, name, architecture, quantization"
                 />
               </InputGroup>
-              <Tabs value={kind} onValueChange={(v) => setKind(v as KindFilter)}>
+              <Tabs value={kind} onValueChange={(v: KindFilter) => setKind(v)}>
                 <TabsList className="h-9 p-1 *:px-3">
                   <TabsTrigger value="model">Models</TabsTrigger>
                   <TabsTrigger value="mmproj">Projectors</TabsTrigger>

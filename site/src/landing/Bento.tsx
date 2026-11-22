@@ -21,10 +21,11 @@ export interface AppPage {
 
 /** Soft radial halo placed behind a feature chapter, tinted with the section's tone. */
 export function SectionHalo({ tone }: { tone: Tone }) {
+  const style: CSSProperties & { '--halo': string } = { '--halo': TONE_VAR[tone] };
   return (
     <div
       className="section-halo absolute top-10 left-1/2 -z-10 h-80 w-[min(58rem,90vw)] -translate-x-1/2 rounded-full"
-      style={{ '--halo': TONE_VAR[tone] } as CSSProperties}
+      style={style}
       aria-hidden="true"
     />
   );

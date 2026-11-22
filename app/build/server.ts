@@ -20,7 +20,8 @@ function version(): string {
   try {
     return execFileSync('git', ['describe', '--tags', '--always', '--dirty'], { cwd: r('.'), encoding: 'utf8' }).trim();
   } catch {
-    return (JSON.parse(readFileSync(r('package.json'), 'utf8')) as { version: string }).version;
+    const pkg: unknown = JSON.parse(readFileSync(r('package.json'), 'utf8'));
+    return String(typeof pkg === 'object' && pkg !== null ? Reflect.get(pkg, 'version') : undefined);
   }
 }
 

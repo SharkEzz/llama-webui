@@ -4,7 +4,14 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { expect, test } from 'vitest';
 
-const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8'));
+const pkg = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'package.json'), 'utf8')) as {
+  bin: unknown;
+  files: unknown;
+  os: unknown;
+  engines: { node: string };
+  dependencies?: unknown;
+  scripts: { prepack: string };
+};
 
 test('the root package is the one npm installs', () => {
   expect(pkg.bin).toEqual({ 'llama-webui': 'app/.output/llama-webui.mjs' });

@@ -10,7 +10,7 @@ import { DocsNav } from '@/docs/DocsNav';
 import { mdxComponents } from '@/docs/mdx-components';
 import { locate } from '@/docs/nav';
 import { Toc } from '@/docs/Toc';
-import type { DocHandle } from '@/docs/types';
+import { docOf } from '@/docs/types';
 import { href } from '@/lib/content';
 import { SITE } from '@/lib/site';
 import { NAV } from '../../content/nav';
@@ -18,7 +18,7 @@ import { NAV } from '../../content/nav';
 /** Documentation shell: section sidebar, the page (title, description, MDX), prev/next, edit link, table of contents. */
 export default function DocsLayout() {
   const { pathname } = useLocation();
-  const doc = (useMatches().at(-1)?.handle as DocHandle | undefined)?.doc;
+  const doc = docOf(useMatches().at(-1)?.handle);
   const place = locate(NAV, pathname);
   const [menuOpen, setMenuOpen] = useState(false);
 

@@ -119,16 +119,24 @@ export const base = defineConfig({
     // A function of an interface or a type literal is a property, so its parameters are checked strictly (no method
     // bivariance) and reading it off its object is safe (`typescript/unbound-method`)
     'typescript/method-signature-style': 'error',
+    // No `any` flows from `JSON.parse`, a catch variable or an untyped import: decode it or give it a type
+    'typescript/no-unsafe-assignment': 'error',
+    'typescript/no-unsafe-member-access': 'error',
+    'typescript/no-unsafe-argument': 'error',
+    'typescript/no-unsafe-return': 'error',
+    'typescript/no-unsafe-call': 'error',
+    // A cast is a decode, a guard, a `satisfies` or a narrower declaration (off in tests, see `overrides`)
+    'typescript/no-unsafe-type-assertion': 'error',
+    'typescript/use-unknown-in-catch-callback-variable': 'error',
+    'typescript/no-base-to-string': 'error',
 
     // --- Debt: off until its milestone ---
     // Rules on by category or parity rules that report on today's code; the milestone turns each on and fixes
     // its reports. L4: general and type-aware rules; L5: React (the Vitest rules have theirs in oxlint.tests.ts).
-    'typescript/no-unsafe-type-assertion': 'off', // L4: 145
     'typescript/no-floating-promises': 'off', // L4: 88
     'no-shadow': 'off', // L4: 40
     'typescript/no-misused-promises': 'off', // L4: 24
     'typescript/no-unnecessary-type-assertion': 'off', // L4: 19
-    'typescript/no-base-to-string': 'off', // L4: 17
     'typescript/no-useless-default-assignment': 'off', // L4: 6
     'typescript/prefer-optional-chain': 'off', // L4: 6
     'typescript/restrict-template-expressions': 'off', // L4: 4
@@ -156,6 +164,14 @@ export const base = defineConfig({
     'react/no-object-type-as-default-prop': 'off', // L5: 1
     // --- end of debt ---
   },
+  overrides: [
+    {
+      // A test casts its fixtures and its stubs to the type under test (the server's `testing/` too: its own
+      // config, since a glob is relative to the config that uses it)
+      files: ['**/*.test.ts', '**/*.test.tsx'],
+      rules: { 'typescript/no-unsafe-type-assertion': 'off' },
+    },
+  ],
 });
 
 // The root config. `ignorePatterns` do not travel through `extends`, and they are relative to the config that

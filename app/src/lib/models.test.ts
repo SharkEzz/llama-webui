@@ -54,7 +54,7 @@ const list = (models: ReadonlyArray<ModelEntry>): ModelList => ({
 function server(routes: Record<string, ReadonlyArray<Response | Error>>) {
   const seen: Array<{ route: string; body: string }> = [];
   const asked = new Map<string, number>();
-  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const fetchImpl = (async (input: string | URL, init?: RequestInit) => {
     const route = `${init?.method ?? 'GET'} ${new URL(String(input)).pathname}`;
     seen.push({ route, body: init?.body ? await new Response(init.body).text() : '' });
     const n = asked.get(route) ?? 0;

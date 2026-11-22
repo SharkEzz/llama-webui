@@ -46,7 +46,7 @@ interface Seen {
 /** A `fetch` that answers `reply` (or rejects with it) and records what it was given. */
 function stub(reply: (seen: Seen) => Promise<Response>) {
   const seen: Seen[] = [];
-  const fetchImpl = ((input: RequestInfo | URL, init?: RequestInit) => {
+  const fetchImpl = ((input: string | URL, init?: RequestInit) => {
     const s = { url: String(input), init };
     seen.push(s);
     return reply(s);
@@ -174,7 +174,9 @@ test('callStream() rejects with the tagged error of the endpoint', async () => {
 
 test('callStream() rejects with ApiUnreachable when fetch rejects or the stream breaks off', async () => {
   const refused = stub(() => Promise.reject(new TypeError('fetch failed')));
-  const error = await refused.callStream((api) => api.t.events({ params: { id: 7 } }), vi.fn()).catch((e) => e);
+  const error = await refused
+    .callStream((api) => api.t.events({ params: { id: 7 } }), vi.fn())
+    .catch((e: unknown) => e);
   expect(errorTag(error)).toBe('ApiUnreachable');
 
   const cut = stub(sse(body([item(1)], new TypeError('terminated'))));

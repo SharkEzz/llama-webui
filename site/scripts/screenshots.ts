@@ -29,20 +29,23 @@ const { values, positionals } = parseArgs({
 const VIEWPORT = { width: 1600, height: 1000, deviceScaleFactor: 2 };
 const outDir = join(import.meta.dirname, '..', 'public', 'screenshots');
 const base = values.base.replace(/\/$/, '');
-const themes = values.themes.split(',') as ('dark' | 'light')[];
+// Each is sent to PATCH /api/settings as it is written, which refuses an unknown theme
+const themes = values.themes.split(',');
 const shots = positionals.length
   ? SHOTS.filter((s) => positionals.includes(s.name))
   : SHOTS.filter((s) => !s.manual && !!s.live === values.live);
 if (shots.length === 0) throw new Error(`No shot named ${positionals.join(', ')}`);
 
-async function api(path: string, init?: RequestInit) {
+async function api(path: string, init?: RequestInit): Promise<unknown> {
   const res = await fetch(`${base}${path}`, { ...init, headers: { 'content-type': 'application/json' } });
   if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${path}: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
 const failures: string[] = [];
-const { theme: initialTheme } = (await api('/api/settings')) as { theme: string };
+const settings = await api('/api/settings');
+const initialTheme: unknown =
+  typeof settings === 'object' && settings !== null ? Reflect.get(settings, 'theme') : undefined;
 await mkdir(outDir, { recursive: true });
 const browser = await launch({
   executablePath: '/usr/bin/chromium',
@@ -79,7 +82,7 @@ try {
         console.log(`✓ ${shot.name}-${theme}`);
       } catch (error) {
         failures.push(`${shot.name}-${theme}`);
-        console.error(`✗ ${shot.name}-${theme}: ${(error as Error).message}`);
+        console.error(`✗ ${shot.name}-${theme}: ${error instanceof Error ? error.message : String(error)}`);
         await page.close();
       }
     }

@@ -144,7 +144,9 @@ test('the NVML sampler ships next to the server entry and starts from the bundle
     });
     const start = { type: 'start', intervalMs: 1000, needs: { pcie: true, skipGpus: [] } };
     child.stdin.write(`${JSON.stringify({ ...start, lib: '/no/such/libnvidia-ml.so' })}\n`);
-    expect(JSON.parse(await first)).toMatchObject({ type: 'error', message: expect.stringContaining('/no/such/') });
+    const reply: unknown = JSON.parse(await first);
+    expect(reply).toMatchObject({ type: 'error' });
+    expect(reply).toHaveProperty('message', expect.stringContaining('/no/such/'));
     // It exits once its stdin ends.
     const exited = new Promise<number | null>((resolve) => child.once('exit', resolve));
     child.stdin.end();

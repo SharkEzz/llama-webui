@@ -61,6 +61,14 @@ type Metadata = object;
 /** The value of `key` in the header, `undefined` when absent. */
 const field = (meta: Metadata, key: string): unknown => (Predicate.hasProperty(meta, key) ? meta[key] : undefined);
 
+/** A text field of the header (a string by the GGUF spec; a number written in its place as text), else `missing`. */
+const textField = (meta: Metadata, key: string, missing: string): string => {
+  const v = field(meta, key);
+  return Predicate.isString(v) || Predicate.isNumber(v) || Predicate.isBigInt(v) || Predicate.isBoolean(v)
+    ? String(v)
+    : missing;
+};
+
 /** What `@huggingface/gguf` parsed of one part. */
 export interface ParsedShard {
   readonly metadata: Metadata;
@@ -123,7 +131,7 @@ export const parseModel = ({
   parameterCount,
 }: ParseModelOptions): Omit<ModelInfo, 'files'> => {
   const meta: Metadata = Option.match(Arr.head(shards), { onNone: () => ({}), onSome: (s) => s.metadata });
-  const arch = String(field(meta, 'general.architecture') ?? '?');
+  const arch = textField(meta, 'general.architecture', '?');
   const k = (name: string) => `${arch}.${name}`;
   const tensors = Arr.flatten(
     Arr.map(shards, (s, i) => {
@@ -168,7 +176,7 @@ export const parseModel = ({
     hasChatTemplate: Predicate.isString(field(meta, 'tokenizer.chat_template')),
     fileBytes: Num.sumAll(fileSizes),
     arch,
-    name: String(field(meta, 'general.name') ?? ''),
+    name: textField(meta, 'general.name', ''),
     quant,
     params: parameterCount,
     blockCount,

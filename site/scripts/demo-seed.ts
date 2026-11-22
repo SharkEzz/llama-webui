@@ -104,6 +104,7 @@ async function api<T>(path: string, init?: { method?: string; body?: unknown }):
     body: init?.body === undefined ? undefined : JSON.stringify(init.body),
   });
   if (!res.ok) throw new Error(`${init?.method ?? 'GET'} ${path}: ${res.status} ${await res.text()}`);
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a seeding script of the demo instance: each call names the type the llama-webui API answers that route with
   return (res.status === 204 ? null : res.json()) as T;
 }
 

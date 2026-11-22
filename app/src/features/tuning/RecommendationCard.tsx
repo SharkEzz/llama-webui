@@ -27,6 +27,8 @@ import { MemoryBars } from './MemoryBars';
 const REF_TPS = 10;
 
 /** The recommended configuration, flag by flag, with its memory budgets; each value can be pinned. */
+const isParam = (key: string): key is keyof BenchParams => Object.hasOwn(PIN_LABEL, key);
+
 export function RecommendationCard() {
   const modelPath = useTuning((s) => s.modelPath);
   const estimate = useTuning((s) => s.estimate);
@@ -37,7 +39,8 @@ export function RecommendationCard() {
   const diskSpeed = useTuning((s) => s.diskSpeed);
   const navigate = useNavigate();
   const names = Object.fromEntries((hw?.devices ?? []).map((d) => [d.id, d.name]));
-  const pins = Object.entries(pinned) as [keyof BenchParams, unknown][];
+  // Every key of `pinned` is a flag: the guard only gives it its type
+  const pins = Object.entries(pinned).flatMap(([k, v]) => (isParam(k) ? [{ k, v }] : []));
 
   return (
     <GlassCard
@@ -86,7 +89,7 @@ export function RecommendationCard() {
           {pins.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">Pinned:</span>
-              {pins.map(([k, v]) => (
+              {pins.map(({ k, v }) => (
                 <Badge key={k} variant="secondary" className="gap-1 pr-0.5 font-mono">
                   {PIN_LABEL[k]} {pinValue(v)}
                   <Button

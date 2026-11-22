@@ -1,4 +1,4 @@
-import { memo, type ReactElement, type ReactNode } from 'react';
+import { isValidElement, memo, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -6,9 +6,11 @@ import { CodeBlock } from './CodeBlock';
 
 const components: Components = {
   pre: ({ children }) => {
-    const el = children as ReactElement<{ className?: string; children?: ReactNode }>;
-    const lang = /language-(\S+)/.exec(el?.props?.className ?? '')?.[1];
-    return <CodeBlock code={String(el?.props?.children ?? '').replace(/\n$/, '')} lang={lang} />;
+    // The `code` element react-markdown puts in a `pre`, its text as one string
+    const el = isValidElement<{ className?: string; children?: ReactNode }>(children) ? children : undefined;
+    const lang = /language-(\S+)/.exec(el?.props.className ?? '')?.[1];
+    const text = el?.props.children;
+    return <CodeBlock code={(typeof text === 'string' ? text : '').replace(/\n$/, '')} lang={lang} />;
   },
   code: ({ children }) => <code className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{children}</code>,
   a: ({ href, children }) => (

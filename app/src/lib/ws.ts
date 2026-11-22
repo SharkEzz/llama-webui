@@ -39,8 +39,13 @@ export function onWs<T extends WsMessage['type']>(
     set = new Set();
     listeners.set(type, set);
   }
-  set.add(fn as Listener);
-  return () => set.delete(fn as Listener);
+  // The dispatch gives a set only the messages of its type: the guard tells the compiler so
+  const isOfType = (msg: WsMessage): msg is Extract<WsMessage, { type: T }> => msg.type === type;
+  const listener: Listener = (msg) => {
+    if (isOfType(msg)) fn(msg);
+  };
+  set.add(listener);
+  return () => set.delete(listener);
 }
 
 let socket: WebSocket | undefined;

@@ -48,9 +48,12 @@ if (indexed.errors.length > 0) throw new Error(`pagefind: ${indexed.errors.join(
 await index.writeFiles({ outputPath: join(dist, 'pagefind') });
 await pagefind.close();
 // addDirectory counts every HTML file it read; the entry file counts the pages actually indexed (data-pagefind-body).
-const entry = JSON.parse(readFileSync(join(dist, 'pagefind/pagefind-entry.json'), 'utf8'));
-const searchable = Object.values(entry.languages as Record<string, { page_count: number }>).reduce(
-  (n, l) => n + l.page_count,
+const entry: unknown = JSON.parse(readFileSync(join(dist, 'pagefind/pagefind-entry.json'), 'utf8'));
+const field = (json: unknown, key: string): unknown =>
+  typeof json === 'object' && json !== null ? Reflect.get(json, key) : undefined;
+const languages = field(entry, 'languages');
+const searchable = Object.values(typeof languages === 'object' && languages !== null ? languages : {}).reduce(
+  (n: number, l: unknown) => n + Number(field(l, 'page_count')),
   0,
 );
 

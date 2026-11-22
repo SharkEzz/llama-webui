@@ -1,6 +1,5 @@
 import { type BenchParams, type BenchRun, benchArgs, serverArgs } from '@llama-webui/shared';
 import { TriangleAlert } from 'lucide-react';
-import type { ReactNode } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -47,10 +46,10 @@ export function BenchCompareDialog({
   const otherHardware = new Set(runs.map(hw)).size > 1;
   const gpuKeys = [...new Map(runs.flatMap((r) => r.vramPeak.map((v) => [v.key, v.name] as const))).entries()];
 
-  const row = (label: ReactNode, values: string[], highlight = true) => {
+  const row = (label: string, values: string[], highlight = true) => {
     const differs = highlight && new Set(values).size > 1;
     return (
-      <TableRow key={String(label)}>
+      <TableRow key={label}>
         <TableHead className="font-mono text-xs">{label}</TableHead>
         {values.map((v, i) => (
           <TableCell

@@ -55,7 +55,8 @@ test('the client reads a llama-server over HTTP: health, /slots, /metrics, /prop
     });
     req.on('end', () => {
       res.writeHead(200, { 'content-type': 'text/event-stream' });
-      if (JSON.parse(body).fail) return res.end(`data: ${JSON.stringify({ error: { message: 'boom' } })}\n\n`);
+      if ((JSON.parse(body) as { fail?: boolean }).fail)
+        return res.end(`data: ${JSON.stringify({ error: { message: 'boom' } })}\n\n`);
       res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Hi' } }] })}\n\n`);
       res.end('data: [DONE]\n\n');
     });
@@ -82,7 +83,7 @@ test('the client reads a llama-server over HTTP: health, /slots, /metrics, /prop
 /** A fetch that answers `body` (a string, or the chunks of a stream) with `status`, and records the request. */
 function fakeFetch(body: string | string[], status = 200) {
   const seen: { url: string; init: RequestInit | undefined }[] = [];
-  const impl = (async (url: string | URL | Request, init?: RequestInit) => {
+  const impl = (async (url: string | URL, init?: RequestInit) => {
     seen.push({ url: String(url), init });
     if (typeof body === 'string') return new Response(body, { status });
     const enc = new TextEncoder();
@@ -124,7 +125,29 @@ describe('streamChatCompletion', () => {
     );
     assert.equal(chunks[2]!.timings?.predicted_per_second, 4);
     assert.equal(f.seen[0]!.url, 'http://h:1/v1/chat/completions');
-    assert.deepEqual(JSON.parse(String(f.seen[0]!.init?.body)), { messages: [], stream: true });
+    const sent = f.seen[0]!.init?.body;
+    assert.ok(typeof sent === 'string');
+    assert.deepEqual(JSON.parse(sent), { messages: [], stream: true });
+  });
+
+  test('an event is read field by field: one of another type is left out, the text kept', async () => {
+    const f = fakeFetch([
+      data({ choices: [{ delta: { content: 'Hi', reasoning_content: 3 } }], timings: { prompt_n: 'x' } }),
+      data({
+        choices: [{ delta: 'x' }, 7],
+        timings: { prompt_n: 1, prompt_per_second: 2, predicted_n: 3, predicted_per_second: 4, cache_n: 'x' },
+      }),
+      data({ choices: 'x', timings: 5 }),
+      data(42),
+      'data: [DONE]\n\n',
+    ]);
+    const chunks = await collect(streamChatCompletion('http://h:1', {}, { fetch: f.impl }));
+    assert.deepEqual(chunks, [
+      { choices: [{ delta: { content: 'Hi' } }] },
+      { choices: [{}, {}], timings: { prompt_n: 1, prompt_per_second: 2, predicted_n: 3, predicted_per_second: 4 } },
+      {},
+      {},
+    ]);
   });
 
   test('an HTTP error carries the status and llama-server JSON error', async () => {
@@ -149,6 +172,13 @@ describe('streamChatCompletion', () => {
     await assert.rejects(collect(streamChatCompletion('http://h:1', {}, { fetch: event })), (e) => {
       assert.ok(e instanceof LlamaStreamError);
       assert.equal(e.error.message, 'boom');
+      return true;
+    });
+    // An error event throws even when some of its fields have another type: those are left out
+    const malformed = fakeFetch([data({ error: { message: 'boom', code: 'x' } })]).impl;
+    await assert.rejects(collect(streamChatCompletion('http://h:1', {}, { fetch: malformed })), (e) => {
+      assert.ok(e instanceof LlamaStreamError);
+      assert.deepEqual(e.error, { message: 'boom' });
       return true;
     });
     const cut = fakeFetch([data({ choices: [] })]).impl;

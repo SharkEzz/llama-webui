@@ -10,7 +10,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
-import { type AddressInfo, createServer } from 'node:net';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -22,6 +22,11 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: { tarball: { type: 'boolean', default: false } },
 });
+
+/** A field of a parsed JSON object, read as it is written; undefined for another value. */
+function field(json: unknown, key: string): unknown {
+  return typeof json === 'object' && json !== null ? Reflect.get(json, key) : undefined;
+}
 
 function fail(message: string): never {
   throw new Error(message);
@@ -65,15 +70,22 @@ function installTarball(given: string | undefined): string {
 
   // Nothing but the package: the build bundles every dependency (scripts/package.test.ts).
   const modules = join(prefix, 'node_modules');
-  const pkg = JSON.parse(readFileSync(join(modules, 'llama-webui/package.json'), 'utf8'));
-  const wanted: Record<string, string> = { 'llama-webui': pkg.version, ...pkg.dependencies };
+  const pkg: unknown = JSON.parse(readFileSync(join(modules, 'llama-webui/package.json'), 'utf8'));
+  const deps = field(pkg, 'dependencies');
+  const wanted: Record<string, unknown> = {
+    'llama-webui': field(pkg, 'version'),
+    ...(typeof deps === 'object' && deps !== null ? deps : {}),
+  };
   const installed = readdirSync(modules)
     .filter((d) => !d.startsWith('.'))
     .flatMap((d) => (d.startsWith('@') ? readdirSync(join(modules, d)).map((s) => `${d}/${s}`) : [d]));
   for (const name of installed) {
-    const { version } = JSON.parse(readFileSync(join(modules, name, 'package.json'), 'utf8'));
-    if (wanted[name] !== version)
-      fail(`npm installed ${name}@${version}, the package names ${wanted[name] ?? 'nothing'}`);
+    const version = field(JSON.parse(readFileSync(join(modules, name, 'package.json'), 'utf8')), 'version');
+    const named = wanted[name];
+    if (named !== version)
+      fail(
+        `npm installed ${name}@${String(version)}, the package names ${typeof named === 'string' ? named : 'nothing'}`,
+      );
   }
   if (installed.length !== Object.keys(wanted).length) fail(`npm installed ${installed.join(', ')}`);
   return join(modules, '.bin/llama-webui');
@@ -93,7 +105,9 @@ if (!help.stdout.toString().includes('llama-webui [options]')) fail('--help does
 async function freePort(): Promise<number> {
   const probe = createServer();
   await new Promise<void>((done) => probe.listen(0, '127.0.0.1', done));
-  const { port } = probe.address() as AddressInfo;
+  const address = probe.address();
+  if (address === null || typeof address === 'string') throw new Error('the probe listens on no TCP port');
+  const { port } = address;
   await new Promise((done) => probe.close(done));
   return port;
 }
@@ -123,7 +137,8 @@ function firstMessage(): Promise<{ type?: string }> {
     ws.addEventListener('message', (e) => {
       clearTimeout(timer);
       ws.close();
-      done(JSON.parse(String(e.data)) as { type?: string });
+      const type = field(JSON.parse(String(e.data)), 'type');
+      done(typeof type === 'string' ? { type } : {});
     });
     ws.addEventListener('error', () => {
       clearTimeout(timer);
@@ -139,21 +154,21 @@ try {
     if (!health) await sleep(100);
   }
   if (!health?.ok) fail('/api/health did not answer');
-  const { version } = (await health.json()) as { version: string };
-  if (!version || version === 'dev') fail(`no build version (${version})`);
+  const version = field(await health.json(), 'version');
+  if (typeof version !== 'string' || !version || version === 'dev') fail(`no build version (${String(version)})`);
   if (await fetch(`http://127.0.0.1:${decoy}/api/health`).catch(() => null)) fail(`listens on PORT=${decoy} too`);
 
   const page = await fetch(`${base}/chat/12`);
   if (!page.ok || !page.headers.get('content-type')?.includes('text/html')) fail(`deep URL: ${page.status}`);
   const html = await page.text();
-  const refs = [...html.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css|svg))"/g)].map((m) => m[1] as string);
+  const refs = [...html.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css|svg))"/g)].map((m) => m[1]!);
   if (!refs.some((r) => r.endsWith('.js')) || !refs.some((r) => r.endsWith('.css'))) fail('no script or stylesheet');
   // React DOM registers with the devtools with its bundle type: 0 in production, 1 in development.
   const bundleTypes = new Set<string>();
   for (const r of refs) {
     const res = await fetch(`${base}${r}`);
     if (!res.ok) fail(`${r}: ${res.status}`);
-    for (const m of (await res.text()).matchAll(/bundleType:(\d)/g)) bundleTypes.add(m[1] as string);
+    for (const m of (await res.text()).matchAll(/bundleType:(\d)/g)) bundleTypes.add(m[1]!);
   }
   if (bundleTypes.size !== 1 || !bundleTypes.has('0')) fail(`React is not the production build (${[...bundleTypes]})`);
 

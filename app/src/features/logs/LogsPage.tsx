@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { errorMessage } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatInt, plural } from '@/lib/format';
 import { hideCurrentLogs, useLogs } from '@/lib/logs';
@@ -120,7 +121,7 @@ export function LogsPage() {
           onClick={() =>
             copyText(lines.map((l) => l.text).join('\n')).then(
               () => toast.success(`${lines.length} ${plural(lines.length, 'line')} copied`),
-              (e: Error) => toast.error(e.message),
+              (e: unknown) => toast.error(errorMessage(e)),
             )
           }
         >

@@ -18,12 +18,31 @@ export interface BenchDevice {
 }
 
 interface BenchJsonEntry {
-  n_prompt?: number;
-  n_gen?: number;
-  avg_ts?: number;
-  stddev_ts?: number;
-  build_number?: number;
-  build_commit?: string;
+  n_prompt?: number | undefined;
+  n_gen?: number | undefined;
+  avg_ts?: number | undefined;
+  stddev_ts?: number | undefined;
+  build_number?: number | undefined;
+  build_commit?: string | undefined;
+}
+
+/** The fields of a report entry that have their type (a field of another type is read as missing). */
+function readEntry(e: unknown): BenchJsonEntry {
+  const at = (key: keyof BenchJsonEntry): unknown =>
+    typeof e === 'object' && e !== null ? Reflect.get(e, key) : undefined;
+  const n = (key: keyof BenchJsonEntry) => {
+    const v = at(key);
+    return typeof v === 'number' ? v : undefined;
+  };
+  const commit = at('build_commit');
+  return {
+    n_prompt: n('n_prompt'),
+    n_gen: n('n_gen'),
+    avg_ts: n('avg_ts'),
+    stddev_ts: n('stddev_ts'),
+    build_number: n('build_number'),
+    build_commit: typeof commit === 'string' ? commit : undefined,
+  };
 }
 
 /** pp and tg from a `llama-bench -o json` output; null if the JSON is missing or truncated (loading failed). */
@@ -41,7 +60,7 @@ export function parseBenchJson(
   let tg: BenchMeasure | null = null;
   let build: string | null = null;
   // model_filename is badly encoded by llama-bench (the path's UTF-8 is broken): never read.
-  for (const e of entries as BenchJsonEntry[]) {
+  for (const e of Array.from(entries, readEntry)) {
     const np = e.n_prompt ?? 0;
     const ng = e.n_gen ?? 0;
     const m = (tokens: number): BenchMeasure => ({ tps: e.avg_ts ?? 0, stddev: e.stddev_ts ?? 0, tokens });
@@ -65,8 +84,11 @@ export function parseBenchProgress(line: string): {
 } | null {
   const m = PROGRESS.exec(line.trim());
   if (!m) return null;
+  const phase = m[3];
+  // Always one of them when the line matches: the pattern lists them
+  if (phase !== 'warmup' && phase !== 'prompt' && phase !== 'generation') return null;
   return {
-    phase: m[3] as 'warmup' | 'prompt' | 'generation',
+    phase,
     test: Number(m[1]),
     tests: Number(m[2]),
     run: m[4] ? Number(m[4]) : null,

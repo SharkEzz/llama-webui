@@ -5,14 +5,15 @@ import { HScroll } from './HScroll';
 type El = ReactElement<{ children?: ReactNode }>;
 const isEl = (n: ReactNode): n is El => isValidElement(n);
 const tag = (n: ReactNode) => (isEl(n) && typeof n.type === 'string' ? n.type : null);
+const isTag = (n: ReactNode, name: string): n is El => tag(n) === name;
 
 /** A list item's own content (text, a leading `name`), without its nested list; loose items wrap it in a <p>. */
 function split(children: ReactNode): { own: ReactNode[]; nested: El | null } {
   const own: ReactNode[] = [];
   let nested: El | null = null;
   for (const c of Children.toArray(children)) {
-    if (tag(c) === 'ul') nested = c as El;
-    else if (tag(c) === 'p') own.push(...Children.toArray((c as El).props.children));
+    if (isTag(c, 'ul')) nested = c;
+    else if (isTag(c, 'p')) own.push(...Children.toArray(c.props.children));
     else own.push(c);
   }
   return { own, nested };
@@ -25,7 +26,9 @@ function Items({ list }: { list: El }) {
       {items.map((li, i) => {
         const { own, nested } = split(li.props.children);
         const [first, ...rest] = own;
-        const name = tag(first) === 'code' ? String((first as El).props.children) : null;
+        // The text of the leading `name` (a string: the Markdown of inline code)
+        const code = isTag(first, 'code') ? first.props.children : null;
+        const name = typeof code === 'string' ? code : null;
         const dir = name?.endsWith('/') ?? false;
         const Icon = dir ? Folder : File;
         return (
@@ -65,7 +68,7 @@ function Items({ list }: { list: El }) {
  * </FileTree>
  */
 export function FileTree({ children }: { children: ReactNode }) {
-  const list = Children.toArray(children).find((c) => tag(c) === 'ul') as El | undefined;
+  const list = Children.toArray(children).find((c) => isTag(c, 'ul'));
   return (
     <HScroll className="not-prose my-6 rounded-xl bg-well px-4 py-3 font-mono text-[0.8125rem] leading-6 inset-shadow-well ring-1 ring-border">
       {list ? <Items list={list} /> : children}

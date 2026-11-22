@@ -24,3 +24,33 @@ export interface DocInfo {
 export interface DocHandle {
   doc: DocInfo;
 }
+
+/** A field of `v`, read as it is written; undefined when `v` is not an object. */
+const field = (v: unknown, key: string): unknown =>
+  typeof v === 'object' && v !== null ? Reflect.get(v, key) : undefined;
+
+const isTocItem = (v: unknown): v is TocItem =>
+  typeof field(v, 'id') === 'string' &&
+  typeof field(v, 'text') === 'string' &&
+  (field(v, 'depth') === 2 || field(v, 'depth') === 3);
+
+/** `v` is a page's `DocInfo`: what `rehypeDocExports` writes. */
+function isDocInfo(v: unknown): v is DocInfo {
+  const text = (key: keyof DocInfo) => typeof field(v, key) === 'string';
+  const toc = field(v, 'toc');
+  return (
+    text('title') &&
+    text('metaTitle') &&
+    text('description') &&
+    text('path') &&
+    text('file') &&
+    Array.isArray(toc) &&
+    toc.every(isTocItem)
+  );
+}
+
+/** The `doc` of a route's `handle` when it is a page's (`DocHandle`), else undefined. */
+export function docOf(handle: unknown): DocInfo | undefined {
+  const doc = field(handle, 'doc');
+  return isDocInfo(doc) ? doc : undefined;
+}

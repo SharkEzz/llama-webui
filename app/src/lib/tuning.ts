@@ -108,8 +108,8 @@ async function guarded(fn: () => Promise<unknown>): Promise<'ok' | 'confirm' | '
 /** The profile's flags that the recommendation replaces: those not pinned to the same value. */
 export function replacedProfileParams(profile: BenchParams, pinned: Partial<BenchParams>): BenchParams {
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(profile))
-    if (JSON.stringify(pinned[k as keyof BenchParams]) !== JSON.stringify(v)) out[k] = v;
+  const pins: Readonly<Record<string, unknown>> = pinned;
+  for (const [k, v] of Object.entries(profile)) if (JSON.stringify(pins[k]) !== JSON.stringify(v)) out[k] = v;
   return out as BenchParams;
 }
 

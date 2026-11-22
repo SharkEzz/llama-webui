@@ -35,7 +35,7 @@ export function ThemeToggle() {
       <DropdownMenuContent align="end" className="w-36">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Theme</DropdownMenuLabel>
-          <DropdownMenuRadioGroup value={mode} onValueChange={(v) => setMode(v as ThemeMode)}>
+          <DropdownMenuRadioGroup value={mode} onValueChange={(v: ThemeMode) => setMode(v)}>
             {MODES.map(({ value, label, Icon }) => (
               <DropdownMenuRadioItem key={value} value={value} closeOnClick>
                 <Icon />

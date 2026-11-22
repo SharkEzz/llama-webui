@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { catalogFrom, complete, describeFlag, flagOf, flagSuggestions, parseHelp, unknownFlags } from '../src/flags.ts';
+import {
+  catalogFrom,
+  complete,
+  type Flag,
+  describeFlag,
+  flagOf,
+  flagSuggestions,
+  parseHelp,
+  unknownFlags,
+} from '../src/flags.ts';
 import { fixture } from './helpers.ts';
 
 const HELP = await fixture('llama-server-help.txt');
@@ -120,7 +129,7 @@ describe('describeFlag', () => {
 
 describe('catalogFrom', () => {
   test('rebuilds the name index from the flag list sent by the API', () => {
-    const c = catalogFrom(JSON.parse(JSON.stringify(catalog.flags)));
+    const c = catalogFrom(JSON.parse(JSON.stringify(catalog.flags)) as Flag[]);
     assert.equal(c.flags.length, 47);
     assert.equal(c.byName.get('-ngl'), c.byName.get('--n-gpu-layers')!);
   });

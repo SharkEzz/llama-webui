@@ -23,6 +23,15 @@ test('parseLlamaError keeps only a JSON error object', () => {
   assert.equal(parseLlamaError('<html>'), null);
 });
 
+test('parseLlamaError reads each field on its own: one of another type is left out, the others kept', () => {
+  const body = JSON.stringify({
+    error: { code: '400', message: 'too long', type: 7, n_prompt_tokens: 9000, n_ctx: null },
+  });
+  assert.deepEqual(parseLlamaError(body), { message: 'too long', n_prompt_tokens: 9000 });
+  assert.deepEqual(parseLlamaError('{"error":{"message":["x"]}}'), {});
+  assert.equal(new LlamaHttpError(400, body).message, 'too long');
+});
+
 test('LlamaHttpError takes the message of the JSON error, else the status', () => {
   const e = new LlamaHttpError(400, '{"error":{"message":"bad"}}');
   assert.deepEqual([e.name, e.message, e.status], ['LlamaHttpError', 'bad', 400]);

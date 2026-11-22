@@ -352,11 +352,12 @@ export function paramsFromServerArgs(args: ReadonlyArray<string>): { params: Ben
       taken.push(raw);
     }
     const value = raw === undefined ? Option.none() : readValue(field.key, raw);
-    if (Option.isNone(value)) {
+    if (raw === undefined || Option.isNone(value)) {
       rest.push(...taken);
       continue;
     }
-    if (field.key === 'ot') params.ot = [...(params.ot ?? []), ...(value.value as ReadonlyArray<string>)];
+    // Each `-ot` adds its rules (`readValue` reads them by `listOf`)
+    if (field.key === 'ot') params.ot = [...(params.ot ?? []), ...listOf(raw)];
     else (params as Record<string, unknown>)[field.key] = value.value;
   }
   return { params, rest };
@@ -393,8 +394,9 @@ function flagValue(key: Key, value: NonNullable<BenchParams[Key]>, tool: BenchKi
   if (key === 'ngl' && value === 'auto') return Option.none();
   if (Arr.isArray(value)) {
     if (!Arr.isArrayNonEmpty(value)) return Option.none();
-    if (key === 'ot') return Option.some(Arr.join(value as ReadonlyArray<string>, tool === 'bench' ? ';' : ','));
-    return Option.some(Arr.join(Arr.map(value, String), tool === 'bench' ? '/' : ','));
+    const parts = Arr.map(value, String);
+    if (key === 'ot') return Option.some(Arr.join(parts, tool === 'bench' ? ';' : ','));
+    return Option.some(Arr.join(parts, tool === 'bench' ? '/' : ','));
   }
   if (key === 'ngl' && value === 'all') return Option.some(tool === 'bench' ? '999' : 'all');
   return Option.some(String(value));

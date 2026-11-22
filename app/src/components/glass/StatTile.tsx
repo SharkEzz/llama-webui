@@ -18,7 +18,7 @@ interface StatTileProps {
 /** Number tile: frosted glass, tone-tinted cursor spotlight, glowing tone dot, tabular value, unit and hint. */
 export function StatTile({ label, value, unit, hint, tone = 'blue', mono = true, className }: StatTileProps) {
   const color = TONE_VAR[tone];
-  const style = { '--card-tone': color } as CSSProperties;
+  const style: CSSProperties & { '--card-tone': string } = { '--card-tone': color };
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse') return;

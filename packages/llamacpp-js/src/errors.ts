@@ -20,11 +20,35 @@ export function contextOverflow(e: LlamaError): { promptTokens: number | null; c
   };
 }
 
-/** The `error` of an HTTP error body, if the body is llama-server JSON. */
+/**
+ * llama-server's JSON error, field by field: a field of another type is left out, the others are kept. A value that
+ * is not an object has no field.
+ */
+export function readLlamaError(v: unknown): LlamaError {
+  const at = (key: keyof LlamaError): unknown =>
+    typeof v === 'object' && v !== null ? Reflect.get(v, key) : undefined;
+  const out: LlamaError = {};
+  const [code, message, type, nPrompt, nCtx] = [
+    at('code'),
+    at('message'),
+    at('type'),
+    at('n_prompt_tokens'),
+    at('n_ctx'),
+  ];
+  if (typeof code === 'number') out.code = code;
+  if (typeof message === 'string') out.message = message;
+  if (typeof type === 'string') out.type = type;
+  if (typeof nPrompt === 'number') out.n_prompt_tokens = nPrompt;
+  if (typeof nCtx === 'number') out.n_ctx = nCtx;
+  return out;
+}
+
+/** The `error` of an HTTP error body, if the body is llama-server JSON with an `error` object (read field by field). */
 export function parseLlamaError(body: string): LlamaError | null {
   try {
-    const e = (JSON.parse(body) as { error?: unknown } | null)?.error;
-    return typeof e === 'object' && e !== null ? (e as LlamaError) : null;
+    const json: unknown = JSON.parse(body);
+    const e = typeof json === 'object' && json !== null && 'error' in json ? json.error : undefined;
+    return typeof e === 'object' && e !== null ? readLlamaError(e) : null;
   } catch {
     return null;
   }

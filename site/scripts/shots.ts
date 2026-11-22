@@ -37,7 +37,9 @@ async function click(page: Page, selector: string) {
   // Text selectors can match an inner node (even an icon's SVG): click the interactive ancestor.
   await el?.evaluate((e) => {
     const target = e.closest('button, a, label, input, [role="checkbox"], [role="tab"], [role="radio"]') ?? e;
-    (target as HTMLElement).click();
+    // An SVG element has no click(): the call fails, as it did when the element was cast
+    if (!(target instanceof HTMLElement)) throw new Error(`no clickable element at ${target.tagName}`);
+    target.click();
   });
 }
 
