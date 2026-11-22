@@ -30,10 +30,7 @@
     ]
   },
   "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 120
+    "enabled": false
   },
   "linter": {
     "enabled": true,
@@ -51,11 +48,6 @@
     }
   },
   "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "semicolons": "always",
-      "quoteProperties": "asNeeded"
-    },
     "resolver": {
       "experimentalPnpmCatalogs": true
     }
@@ -63,15 +55,6 @@
   "css": {
     "parser": {
       "tailwindDirectives": true
-    }
-  },
-  "assist": {
-    "enabled": true,
-    "actions": {
-      "source": {
-        "organizeImports": "on",
-        "useSortedPackageJson": "on"
-      }
     }
   },
   "overrides": [
