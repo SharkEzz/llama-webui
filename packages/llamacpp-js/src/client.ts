@@ -3,12 +3,12 @@
  * `fetch` (injectable everywhere, for tests or another transport), so it runs in Node and in browsers.
  */
 import {
-  isLlamaError,
   type LlamaError,
   LlamaHttpError,
   LlamaReplyError,
   LlamaStreamCutError,
   LlamaStreamError,
+  readLlamaError,
 } from './errors.ts';
 import { type Health, type LlamaRaw, parsePrometheus, parseSlots } from './metrics.ts';
 import { SseParser } from './sse.ts';
@@ -133,50 +133,63 @@ export interface ChatCompletionChunk {
   error?: LlamaError;
 }
 
-/** `v` is a chunk: an object whose fields, when present, have their type. */
-function isChunk(v: unknown): v is ChatCompletionChunk {
-  if (typeof v !== 'object' || v === null) return false;
-  const field = (o: object, key: string): unknown => Reflect.get(o, key);
-  const isObject = (x: unknown): x is object => typeof x === 'object' && x !== null;
-  const text = (x: unknown) => x === undefined || x === null || typeof x === 'string';
-  const choice = (c: unknown) => {
-    if (!isObject(c)) return false;
+/** A field of `v`, read as it is written; undefined when `v` is not an object. */
+const field = (v: unknown, key: string): unknown =>
+  typeof v === 'object' && v !== null ? Reflect.get(v, key) : undefined;
+
+/** The `timings` of an event, when its four counts are numbers; the optional ones kept when they are. */
+function readTimings(t: unknown): LlamaTimings | undefined {
+  const n = (key: keyof LlamaTimings) => {
+    const x = field(t, key);
+    return typeof x === 'number' ? x : undefined;
+  };
+  const [prompt_n, prompt_per_second, predicted_n, predicted_per_second] = [
+    n('prompt_n'),
+    n('prompt_per_second'),
+    n('predicted_n'),
+    n('predicted_per_second'),
+  ];
+  if (prompt_n === undefined || prompt_per_second === undefined) return undefined;
+  if (predicted_n === undefined || predicted_per_second === undefined) return undefined;
+  const out: LlamaTimings = { prompt_n, prompt_per_second, predicted_n, predicted_per_second };
+  const [cache_n, draft_n, draft_n_accepted] = [n('cache_n'), n('draft_n'), n('draft_n_accepted')];
+  if (cache_n !== undefined) out.cache_n = cache_n;
+  if (draft_n !== undefined) out.draft_n = draft_n;
+  if (draft_n_accepted !== undefined) out.draft_n_accepted = draft_n_accepted;
+  return out;
+}
+
+type Choice = NonNullable<ChatCompletionChunk['choices']>[number];
+type Delta = NonNullable<Choice['delta']>;
+
+/**
+ * An event as a chunk, field by field: a field of another type is left out, the others are kept (the text of a
+ * delta survives a `timings` that is not one). The `error` is read apart (`streamChatCompletion`).
+ */
+function readChunk(v: unknown): ChatCompletionChunk {
+  const choice = (c: unknown): Choice => {
     const delta = field(c, 'delta');
-    return (
-      delta === undefined ||
-      (isObject(delta) && text(field(delta, 'content')) && text(field(delta, 'reasoning_content')))
-    );
+    if (typeof delta !== 'object' || delta === null) return {};
+    const out: Delta = {};
+    const [content, reasoning] = [field(delta, 'content'), field(delta, 'reasoning_content')];
+    if (typeof content === 'string' || content === null) out.content = content;
+    if (typeof reasoning === 'string' || reasoning === null) out.reasoning_content = reasoning;
+    return { delta: out };
   };
-  const timings = (t: unknown) => {
-    if (t === undefined) return true;
-    if (!isObject(t)) return false;
-    const n = (key: keyof LlamaTimings, optional: boolean) => {
-      const x = field(t, key);
-      return typeof x === 'number' || (optional && x === undefined);
-    };
-    return (
-      n('prompt_n', false) &&
-      n('prompt_per_second', false) &&
-      n('predicted_n', false) &&
-      n('predicted_per_second', false) &&
-      n('cache_n', true) &&
-      n('draft_n', true) &&
-      n('draft_n_accepted', true)
-    );
-  };
+  const out: ChatCompletionChunk = {};
   const choices = field(v, 'choices');
-  const error = field(v, 'error');
-  return (
-    (choices === undefined || (Array.isArray(choices) && choices.every(choice))) &&
-    timings(field(v, 'timings')) &&
-    (error === undefined || isLlamaError(error))
-  );
+  if (Array.isArray(choices)) out.choices = choices.map(choice);
+  const timings = readTimings(field(v, 'timings'));
+  if (timings) out.timings = timings;
+  return out;
 }
 
 /**
- * Streams `/v1/chat/completions` (`body` is sent as is, with `stream: true`): yields each chunk until `[DONE]`.
+ * Streams `/v1/chat/completions` (`body` is sent as is, with `stream: true`): yields each chunk until `[DONE]`, read
+ * field by field (a field of another type is left out; an event that is not JSON is skipped).
  * Throws the `fetch` error when the server cannot be reached, `LlamaHttpError` when it refuses the request,
- * `LlamaStreamError` on an error event, and `LlamaStreamCutError` when the stream ends or breaks before `[DONE]`.
+ * `LlamaStreamError` on an event with an `error` (its fields read the same way), `LlamaReplyError` when the body is
+ * not bytes, and `LlamaStreamCutError` when the stream ends or breaks before `[DONE]`.
  * Aborting `signal` stops the request; leaving the loop before `[DONE]` cancels the stream.
  */
 export async function* streamChatCompletion(
@@ -217,10 +230,9 @@ export async function* streamChatCompletion(
         } catch {
           continue;
         }
-        // An event that is not a chunk is skipped, like one that is not JSON
-        if (!isChunk(j)) continue;
-        if (j.error) throw new LlamaStreamError(j.error);
-        yield j;
+        const error = field(j, 'error');
+        if (error) throw new LlamaStreamError(readLlamaError(error));
+        yield readChunk(j);
       }
     }
   } finally {

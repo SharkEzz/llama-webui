@@ -130,6 +130,26 @@ describe('streamChatCompletion', () => {
     assert.deepEqual(JSON.parse(sent), { messages: [], stream: true });
   });
 
+  test('an event is read field by field: one of another type is left out, the text kept', async () => {
+    const f = fakeFetch([
+      data({ choices: [{ delta: { content: 'Hi', reasoning_content: 3 } }], timings: { prompt_n: 'x' } }),
+      data({
+        choices: [{ delta: 'x' }, 7],
+        timings: { prompt_n: 1, prompt_per_second: 2, predicted_n: 3, predicted_per_second: 4, cache_n: 'x' },
+      }),
+      data({ choices: 'x', timings: 5 }),
+      data(42),
+      'data: [DONE]\n\n',
+    ]);
+    const chunks = await collect(streamChatCompletion('http://h:1', {}, { fetch: f.impl }));
+    assert.deepEqual(chunks, [
+      { choices: [{ delta: { content: 'Hi' } }] },
+      { choices: [{}, {}], timings: { prompt_n: 1, prompt_per_second: 2, predicted_n: 3, predicted_per_second: 4 } },
+      {},
+      {},
+    ]);
+  });
+
   test('an HTTP error carries the status and llama-server JSON error', async () => {
     const body = JSON.stringify({ error: { code: 400, type: 'exceed_context_size_error', message: 'too long' } });
     await assert.rejects(collect(streamChatCompletion('http://h:1', {}, { fetch: fakeFetch(body, 400).impl })), {
@@ -152,6 +172,13 @@ describe('streamChatCompletion', () => {
     await assert.rejects(collect(streamChatCompletion('http://h:1', {}, { fetch: event })), (e) => {
       assert.ok(e instanceof LlamaStreamError);
       assert.equal(e.error.message, 'boom');
+      return true;
+    });
+    // An error event throws even when some of its fields have another type: those are left out
+    const malformed = fakeFetch([data({ error: { message: 'boom', code: 'x' } })]).impl;
+    await assert.rejects(collect(streamChatCompletion('http://h:1', {}, { fetch: malformed })), (e) => {
+      assert.ok(e instanceof LlamaStreamError);
+      assert.deepEqual(e.error, { message: 'boom' });
       return true;
     });
     const cut = fakeFetch([data({ choices: [] })]).impl;
