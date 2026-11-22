@@ -245,8 +245,8 @@ directory, along with profiles, conversations, benchmark runs and sweeps.
 
 ```bash
 pnpm install       # the whole workspace (site/ included), one pnpm-lock.yaml
-pnpm dev           # vite dev in app/: UI with HMR, the server in Nitro's dev worker, one port
-pnpm start         # vite build, then node app/.output/llama-webui.mjs
+pnpm dev           # vite dev in app/: UI with HMR, the server under node --watch, one port
+pnpm start         # build, then node app/.output/llama-webui.mjs
 pnpm check         # type check every package (tsc), in parallel
 pnpm test          # Vitest, then the llamacpp-js tests (node --test)
 pnpm lint          # oxfmt --check, then oxlint (read-only, a warning fails)
@@ -285,31 +285,31 @@ flowchart LR
   bench -- "spawn" --> lb["llama-bench"]
 ```
 
-| Piece                                                  | Role                                                                                                                                                                                                                                                                                               |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/server/` (Nitro)                                  | The Nitro server: one file per API route in `routes/api/`, `/ws` in `routes/ws.ts`, the middlewares in `middleware/`, and `plugins/runtime.ts`, which starts the runtime of `lib/boot.ts` (opens SQLite, builds the services below, wires their events to the WebSocket).                          |
-| **Supervisor** (`app/server/lib/supervisor/`)          | Owns the single managed `llama-server`: builds its argv from a profile (adding `--host`, `--port`, `--metrics`, `--slots`, `--props`), tracks its state (`idle`, `starting`, `ready`, `stopping`, `crashed`, or `external` for a server it did not launch) and pipes its output into the log ring. |
-| **Monitor** (`app/server/lib/monitor/`, `collectors/`) | Polls every collector once per tick (1 s by default) and merges the results into a `Snapshot`: `llama-server` `/metrics` and `/slots`, NVML through `node:ffi` in a child process (`nvidia-smi` as a fallback), AMD sysfs, `/proc`, disks and `perf`. History is kept in RAM only.                 |
-| **WsHub** (`app/server/lib/ws/`)                       | Pushes typed messages (`WsMessage` in `packages/webui-shared/src/ws.ts`): `snapshot`, `log`, `server-state`, `placement`, `bench-*`, `sweep-*`. The client reconnects with backoff and re-reads the current state over REST.                                                                       |
-| **ChatRuns** (`app/server/lib/chat/`)                  | Relays the OpenAI-compatible stream of `llama-server` as SSE and persists messages and stats. A generation is owned by the server, not by the HTTP request: leaving the page does not stop it.                                                                                                     |
-| **BenchRunner** (`app/server/lib/bench/`)              | Runs one benchmark at a time (`llama-bench -o json` or a temporary `llama-server`). The **bench gate** stops the managed server for the duration and restarts it afterwards. Sweeps are a queue stored in SQLite, resumed on startup.                                                              |
-| **Tuning** (`app/server/lib/tuning/`)                  | Memory estimator (GGUF header + devices), presets, sweep search space and system checks.                                                                                                                                                                                                           |
-| **SQLite** (`app/server/lib/db/`)                      | `node:sqlite`, migrations in `migrations.ts`, one repository per table: settings, profiles, conversations, benchmark runs, sweeps. Metrics and logs are never persisted.                                                                                                                           |
-| `packages/webui-shared/`                               | Types, zod schemas and pure functions (parsers, phase) used by both sides.                                                                                                                                                                                                                         |
-| `packages/llamacpp-js/`                                | The llama.cpp client: `llama-server` HTTP API, metrics, `--help` flags, `llama-bench` output. No app dependency, Node ≥ 24, tree-shakeable.                                                                                                                                                        |
-| `app/src/`                                             | React 19 SPA. One folder per page in `features/`, lazy-loaded by the router; the typed API client (`lib/api.ts`, typed by the generated `app/server/api.gen.ts`) and zustand stores per domain in `lib/`; shared glass components in `components/glass/`.                                          |
+| Piece                                              | Role                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/server/` (Effect)                             | The Effect server (`main.ts`): one folder per domain, each with its service and its HTTP handlers (`http.ts`). `App.ts` builds the services in stages, SQLite first, before the port opens; `http/HttpLive.ts` serves the API declared in `packages/webui-shared/src/api/`, the `/ws` WebSocket and the UI. |
+| **Supervisor** (`app/server/supervisor/`)          | Owns the single managed `llama-server`: builds its argv from a profile (adding `--host`, `--port`, `--metrics`, `--slots`, `--props`), tracks its state (`idle`, `starting`, `ready`, `stopping`, `crashed`, or `external` for a server it did not launch) and pipes its output into the log ring.          |
+| **Monitor** (`app/server/monitor/`, `collectors/`) | Polls every collector once per tick (1 s by default) and merges the results into a `Snapshot`: `llama-server` `/metrics` and `/slots`, NVML through `node:ffi` in a child process (`nvidia-smi` as a fallback), AMD sysfs, `/proc`, disks and `perf`. History is kept in RAM only.                          |
+| **WsHub** (`app/server/ws/`)                       | Pushes typed messages (`WsMessage` in `packages/webui-shared/src/ws.ts`): `snapshot`, `log`, `server-state`, `placement`, `bench-*`, `sweep-*`. The client reconnects with backoff and re-reads the current state over REST.                                                                                |
+| **ChatRuns** (`app/server/chat/`)                  | Relays the OpenAI-compatible stream of `llama-server` as SSE and persists messages and stats. A generation is owned by the server, not by the HTTP request: leaving the page does not stop it.                                                                                                              |
+| **BenchRunner** (`app/server/bench/`)              | Runs one benchmark at a time (`llama-bench -o json` or a temporary `llama-server`). The **bench gate** stops the managed server for the duration and restarts it afterwards. Sweeps are a queue stored in SQLite, resumed on startup.                                                                       |
+| **Tuning** (`app/server/tuning/`)                  | Memory estimator (GGUF header + devices), presets, sweep search space and system checks.                                                                                                                                                                                                                    |
+| **SQLite** (`app/server/db/`)                      | `SqlClient` of `@effect/sql-sqlite-node`, on `node:sqlite`; migrations in `migrations.ts`, one repository per table in its domain (`ProfilesRepo`, `SettingsRepo`, `ConversationsRepo`, `BenchRunsRepo`, `SweepsRepo`). Metrics and logs are never persisted.                                               |
+| `packages/webui-shared/`                           | Effect schemas, the API definition (`src/api/`: one group per domain, with the errors of each endpoint) and pure functions (parsers, phase) used by both sides.                                                                                                                                             |
+| `packages/llamacpp-js/`                            | The llama.cpp client: `llama-server` HTTP API, metrics, `--help` flags, `llama-bench` output. No app dependency, Node ≥ 24, tree-shakeable.                                                                                                                                                                 |
+| `app/src/`                                         | React 19 SPA. One folder per page in `features/`, lazy-loaded by the router; the typed API client (`lib/api.ts`, which calls the `Api` of `@llama-webui/shared`) and zustand stores per domain in `lib/`; shared glass components in `components/glass/`.                                                   |
 
-Every `/api/*` route goes through the middlewares of `app/server/middleware/`: startup wait, the guard of
-`lib/security.ts` (Host header, Origin, JSON-only writes) and the `405` table; `app/server/error.ts` turns errors into
-JSON responses.
+Every `/api/*` route and `/ws` go through the guard of `app/server/http/Guard.ts` (Host header, Origin, JSON-only
+writes), then the `308` of a trailing slash. An error answers `{ _tag, message }` as JSON, and the web tells errors
+apart by their `_tag`; an unknown route, or a method a route does not have, is a `404`.
 
 ### Dev vs production
 
-- `pnpm dev` is `vite dev` in `app/`: HMR for the UI, the server in Nitro's dev worker, re-evaluated on each save.
-  It takes no flags: `LLAMA_WEBUI_*` variables, or the `.env*` files of `app/`.
-- `pnpm build` (`vite build` in `app/`) writes `app/.output/`: the UI split per page in `public/`, the self-contained
-  server in `server/` (it imports only `node:*`) with the NVML sampler next to it, and the launcher `llama-webui.mjs`
-  (`.env`, the CLI flags). `pnpm start` builds, then runs it; it reports `git describe` as its version (`dev` in
+- `pnpm dev` is `vite dev` in `app/`: HMR for the UI, and the server run from its sources under `node --watch`,
+  behind Vite's proxy on the same port. It takes no flags: `LLAMA_WEBUI_*` variables, or the `.env` of `app/`.
+- `pnpm build` (`vite build`, then the server bundled by Rolldown, in `app/`) writes `app/.output/`: the UI split per
+  page in `public/`, the self-contained server in `server/` (it imports only `node:*`) with the NVML sampler next to
+  it, and the launcher `llama-webui.mjs`, which starts it (the server reads `.env` and the CLI flags). `pnpm start` builds, then runs it; it reports `git describe` as its version (`dev` in
   development).
 - A release is the npm package of the root (`bin` `llama-webui`, `files` `app/.output`, no dependencies).
   `.github/workflows/release.yml` builds, packs, smoke-tests the installed tarball and attaches it with its
@@ -317,9 +317,10 @@ JSON responses.
   (`pnpm release <version>`, merged first).
 
 > [!IMPORTANT]
-> **Development reloads.** A saved route file keeps the runtime and `llama-server`. Saved business code (under
-> `app/server/lib/`) rebuilds the runtime and stops `llama-server`, as any shutdown does: a running sweep becomes
-> interrupted (Resume continues it) and a chat reply is saved as stopped. A start that fails waits for the next save.
+> **Development reloads.** A saved file under `app/src/` is hot-reloaded and keeps the server and `llama-server`. A
+> saved file the server imports (under `app/server/` or `packages/`) restarts the server, as any shutdown does:
+> `llama-server` stops, a running sweep becomes interrupted (Resume continues it), a chat reply is saved as stopped
+> and a download resumes its `.part`. A start that fails waits for the next save.
 
 ### Conventions
 
