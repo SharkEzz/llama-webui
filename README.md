@@ -336,7 +336,7 @@ JSON responses.
 [React 19](https://react.dev) · [React Router](https://reactrouter.com) · [Tailwind CSS 4](https://tailwindcss.com) ·
 [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com) · [uPlot](https://github.com/leeoniya/uPlot) ·
 [react-three-fiber](https://r3f.docs.pmnd.rs) · [Shiki](https://shiki.style) · [Zustand](https://zustand.docs.pmnd.rs) ·
-[Zod](https://zod.dev) · [oxfmt and oxlint](https://oxc.rs)
+[Zod](https://zod.dev) · [oxfmt and oxlint](https://oxc.rs) · [react-doctor](https://github.com/millionco/react-doctor)
 
 ## License
 

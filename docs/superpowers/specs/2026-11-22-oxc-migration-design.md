@@ -235,7 +235,9 @@ purpose), `promise/always-return` (11: `.then` used for its effect).
 | react-doctor, ten rules                                                                                                                    |      12 |                                                        |
 
 Off: `react/hooks` (5: it reads `useMonitor.getState()` of Zustand as a hook used as a value),
-`react/exhaustive-effect-dependencies` (9: the same check as `react-hooks/exhaustive-deps`, which stays). Not
+`react/exhaustive-effect-dependencies` (9: the same check as `react-hooks/exhaustive-deps`, which stays).
+**Changed during L5 (user decision):** both are on in `error` instead, their reports fixed (selectors for `react/hooks`)
+and each deliberate trigger dependency suppressed with its reason (6). Not
 enabled: the `react-perf` plugin (449 reports: every inline handler, which only matters under `memo`) and
 `react/no-unknown-property` (49: the three.js elements of react-three-fiber).
 

@@ -51,6 +51,8 @@ appendix §2 and §6 (each react-doctor report with its file and line).
 - [ ] **Step 1:** Remove the `// L5` React lines from the debt block; in `oxlint.react.ts`, off with their reason:
       `react/hooks` (reads `useStore.getState()` of Zustand as a hook used as a value),
       `react/exhaustive-effect-dependencies` (same check as `react-hooks/exhaustive-deps`, which stays).
+      **Changed by the user during L5:** both are on in `error`, their reports fixed, each deliberate trigger
+      dependency suppressed with its reason.
       `react/no-unescaped-entities` on.
 - [ ] **Step 2:** `react/set-state-in-effect` (13: 11 web, 2 site). For each, in this order of preference: derive the
       value during render; reset with a `key`; move the update to the event that causes it; keep the effect when it
