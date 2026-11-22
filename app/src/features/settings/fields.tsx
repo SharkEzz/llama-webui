@@ -20,7 +20,7 @@ export function EnvField(props: {
   const [draft, setDraft] = useState(saved);
   useEffect(() => setDraft(saved), [saved]);
   const parsed = parseEnv(draft);
-  const error = 'error' in parsed ? String(parsed.error) : props.error;
+  const error = 'error' in parsed ? parsed.error : props.error;
   return (
     <div className="flex flex-col gap-1.5">
       <CodeTextarea

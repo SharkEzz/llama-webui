@@ -12,7 +12,7 @@ export const base = defineConfig({
   // tsgolint finds the tsconfig.json of each file; a file outside every project (the root files, app/bin) gets an
   // inferred one: no configuration error, and the type-aware rules still report there (checked at L3)
   options: { typeAware: true },
-  categories: { correctness: 'error' },
+  categories: { correctness: 'error', suspicious: 'error', perf: 'error' },
   rules: {
     // A suppression names its rule and states its reason
     'directives/require-reason': 'error',
@@ -99,11 +99,27 @@ export const base = defineConfig({
     // It refuses `void` as a type argument (`Deferred.make<void>()`)
     'typescript/no-invalid-void-type': 'off',
 
+    // Off inside `suspicious` and `perf`, wrong for this code
+    // `_tag` is Effect's discriminant (and the web tells errors apart by it)
+    'no-underscore-dangle': 'off',
+    // It misreads the generators of `Effect.gen` and `Effect.fn`
+    'typescript/consistent-return': 'off',
+    // A helper stays next to the code that reads it (tests, layers, components)
+    'unicorn/consistent-function-scoping': 'off',
+    // Sweeps, retries and tests are sequential on purpose
+    'no-await-in-loop': 'off',
+    // `.then` is used for its effect, its value discarded
+    'promise/always-return': 'off',
+    // A stylesheet is imported for its effect; so is the server bundle by the launcher (`app/bin/llama-webui.ts`)
+    'import/no-unassigned-import': ['error', { allow: ['**/*.css', '@llama-webui/theme/*', './server/index.mjs'] }],
+
     // --- Debt: off until its milestone ---
     // Rules on by category or parity rules that report on today's code; the milestone turns each on and fixes
     // its reports. L4: general and type-aware rules; L5: React (the Vitest rules have theirs in oxlint.tests.ts).
+    'typescript/no-unsafe-type-assertion': 'off', // L4: 145
     'typescript/no-floating-promises': 'off', // L4: 88
     'typescript/unbound-method': 'off', // L4: 82
+    'no-shadow': 'off', // L4: 40
     'typescript/no-misused-promises': 'off', // L4: 24
     'typescript/no-unnecessary-type-assertion': 'off', // L4: 19
     'typescript/no-base-to-string': 'off', // L4: 17
@@ -126,6 +142,8 @@ export const base = defineConfig({
     'unicorn/prefer-string-starts-ends-with': 'off', // L4: 1
     'react/immutability': 'off', // L5: 14
     'react/set-state-in-effect': 'off', // L5: 13
+    'react/exhaustive-effect-dependencies': 'off', // L5: 6
+    'react/hooks': 'off', // L5: 4
     'react/refs': 'off', // L5: 1
     'react/incompatible-library': 'off', // L5: 1
     'react/jsx-no-useless-fragment': 'off', // L5: 1

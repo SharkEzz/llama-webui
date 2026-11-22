@@ -16,7 +16,7 @@ if (!existsSync(join(dist, 'index.html'))) {
 }
 
 // 404.html is the SPA fallback (an empty shell, rendered in the browser): nothing to check in it.
-const files = globSync('**/index.html', { cwd: dist }).sort();
+const files = globSync('**/index.html', { cwd: dist }).toSorted();
 const pages = new Map<string, PageLinks>();
 for (const file of files) {
   pages.set(file.replace(/index\.html$/, ''), extractLinks(readFileSync(join(dist, file), 'utf8')));

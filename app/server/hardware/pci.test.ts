@@ -1,7 +1,7 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, describe, it, layer } from '@effect/vitest';
 import type { TopologyGraph } from '@llama-webui/shared';
-import { Array as Arr, Effect, FileSystem, Layer, Option, Path, Record } from 'effect';
+import { Array as Arr, Effect, FileSystem, Layer, Option, Order, Path, Record } from 'effect';
 import { chipsetLabel, cpuLabel, findPciIdsEntry, minKnown, parseLinkSpeed, readPciTopology } from './pci.ts';
 import { PciIds } from './PciIds.ts';
 
@@ -228,16 +228,19 @@ layer(NodeServices.layer)('pci', (it) => {
       const g = yield* machine().pipe(Effect.flatMap(topologyOf));
       const byId = new Map(Arr.map(g.nodes, (n) => [n.id, n] as const));
       assert.deepStrictEqual(
-        [...byId.keys()].sort(),
-        [
-          'cpu',
-          'ram',
-          'pci:0000:01:00.0',
-          'pci:0000:02:00.0',
-          'chipset:0000:04:00.0',
-          'pci:0000:08:00.0',
-          'pci:0000:0d:00.0',
-        ].sort(),
+        Arr.sort(byId.keys(), Order.String),
+        Arr.sort(
+          [
+            'cpu',
+            'ram',
+            'pci:0000:01:00.0',
+            'pci:0000:02:00.0',
+            'chipset:0000:04:00.0',
+            'pci:0000:08:00.0',
+            'pci:0000:0d:00.0',
+          ],
+          Order.String,
+        ),
       );
 
       const cpu = byId.get('cpu');

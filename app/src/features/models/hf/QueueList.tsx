@@ -17,7 +17,7 @@ export function QueueList({ endpoint, onShow }: { endpoint: string; onShow(path:
   const active = items.filter((i) => isDownloadActive(i.status));
   const finished = items
     .filter((i) => !isDownloadActive(i.status))
-    .sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0))
+    .toSorted((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0))
     .slice(0, MAX_FINISHED);
   if (items.length === 0) return null;
   return (

@@ -13,6 +13,7 @@ import {
   Logger,
   Metric,
   Option,
+  Order,
   Path,
   Queue,
   Ref,
@@ -330,7 +331,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Downloads', (it)
           const both = yield* Effect.all([Effect.exit(downloads.enqueue([m])), Effect.exit(downloads.enqueue([m]))], {
             concurrency: 'unbounded',
           });
-          assert.deepStrictEqual(Arr.map(both, Exit.isSuccess).sort(), [false, true]);
+          assert.deepStrictEqual(Arr.sort(Arr.map(both, Exit.isSuccess), Order.Boolean), [false, true]);
           const refused = Arr.findFirst(both, Exit.isFailure);
           assert.isTrue(
             Option.exists(

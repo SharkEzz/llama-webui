@@ -178,7 +178,7 @@ export function inventory(listed: Listed[]): InventoryEntry[] {
     return { project: t.projectName, file, name: t.name, milestone };
   });
   // Stable: the order of the listing within a file is kept.
-  return entries.sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+  return entries.toSorted((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
 }
 
 if (import.meta.main) {

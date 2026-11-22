@@ -28,7 +28,7 @@ export function contentRoute(file: string): ContentRoute | null {
 /** Sorted, de-duplicated routes for a list of content files (non-MDX files are ignored). */
 export function contentRoutes(files: readonly string[]): ContentRoute[] {
   const routes = files.map(contentRoute).filter((r): r is ContentRoute => r !== null);
-  return routes.sort((a, b) => a.path.localeCompare(b.path));
+  return routes.toSorted((a, b) => a.path.localeCompare(b.path));
 }
 
 /** Canonical URL form used everywhere on the site: leading and trailing slash ("/docs/x/"). */

@@ -127,7 +127,7 @@ export function suggestedSpace(e: Estimate, hw: TuningHardware, preset: PresetId
   const n = e.params.ncmoe;
   if (n !== undefined && n > 0) space.ncmoe = [...new Set([n - 8, n - 4, n, n + 4, n + 8].filter((x) => x >= 0))];
   const gpus = gpuDevices(hw.devices);
-  const biggest = [...gpus].sort((a, b) => b.totalMib - a.totalMib)[0];
+  const biggest = gpus.toSorted((a, b) => b.totalMib - a.totalMib)[0];
   const sets = [
     e.params.dev,
     gpus.map((d) => d.id),
@@ -439,7 +439,7 @@ export function startTuningSync(): void {
     const i = current.runs.findIndex((r) => r.id === run.id);
     const runs =
       i === -1
-        ? [...current.runs, run].sort((a, b) => a.id - b.id)
+        ? [...current.runs, run].toSorted((a, b) => a.id - b.id)
         : current.runs.map((r) => (r.id === run.id ? run : r));
     useTuning.setState({ current: { ...current, runs } });
   });

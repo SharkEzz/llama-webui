@@ -260,7 +260,7 @@ export async function startHub(options: HubOptions = {}): Promise<FakeHub & { re
       const rows = [...repos.values()]
         .filter(({ repo }) => repo.id.toLowerCase().includes(search))
         .filter(({ files }) => !gguf || [...files.keys()].some((path) => /\.gguf$/i.test(path)))
-        .sort((a, b) => (b.repo.downloads ?? 0) - (a.repo.downloads ?? 0))
+        .toSorted((a, b) => (b.repo.downloads ?? 0) - (a.repo.downloads ?? 0))
         .slice(0, limit)
         .map(({ repo }) => ({
           _id: sha1(`_id ${repo.id}`).slice(0, 24),

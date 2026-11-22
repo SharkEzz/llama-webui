@@ -23,6 +23,7 @@ import {
   Schema,
   Scope,
   String as Str,
+  Struct,
 } from 'effect';
 import { ChildProcessSpawner } from 'effect/process';
 import { Collectors, CollectorsNotApplied } from '../collectors/Collectors.ts';
@@ -302,14 +303,15 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
         ...collectors,
         disk: Effect.map(
           collectors.disk,
-          Option.map((disk) => ({
-            ...disk,
-            resolveModelDisk: () =>
-              Effect.andThen(
-                Ref.update(lookups, (n) => n + 1),
-                Effect.never,
-              ),
-          })),
+          Option.map(
+            Struct.assign({
+              resolveModelDisk: () =>
+                Effect.andThen(
+                  Ref.update(lookups, (n) => n + 1),
+                  Effect.never,
+                ),
+            }),
+          ),
         ),
       });
       const pid = yield* startFake;

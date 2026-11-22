@@ -241,7 +241,7 @@ export function createSimulation(seed = 7, warmup = WARMUP_SECONDS): Simulation 
         vramTotalGiB: g.vramTotalGiB,
       })),
       history: [...history],
-      requests: requests.map((r) => ({ ...r })),
+      requests: [...requests],
     };
   }
 

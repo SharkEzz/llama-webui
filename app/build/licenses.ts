@@ -37,7 +37,7 @@ function read(root: string): Package {
 }
 
 export function render(packages: Package[]): string {
-  const sorted = [...packages].sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
+  const sorted = packages.toSorted((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
   const sections = sorted.map(
     (p) => `## ${p.name} - ${p.version} (${p.license})\n\n${p.text ?? `No license file; package.json: ${p.license}.`}`,
   );

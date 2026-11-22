@@ -32,7 +32,7 @@ const RUNS = 7;
 const STARTUP_TIMEOUT_MS = 30_000;
 const SHUTDOWN_TIMEOUT_MS = 30_000;
 /** The web's client layer: the API and WebSocket clients. */
-const WEB_CLIENT_LAYER = ['app/src/lib/api.ts', 'app/src/lib/ws.ts'];
+const WEB_CLIENT_LAYER: ReadonlySet<string> = new Set(['app/src/lib/api.ts', 'app/src/lib/ws.ts']);
 
 export type Group = 'server' | 'serverTests' | 'shared' | 'sharedTests' | 'web' | 'webTests' | 'build';
 
@@ -46,8 +46,8 @@ export function classify(path: string): Group | null {
   if (!/\.tsx?$/.test(path)) return null;
   if (path === 'app/server/api.gen.ts') return null;
   if (path.startsWith('app/server/')) {
-    const dirs = segments.slice(0, -1);
-    const isTest = path.endsWith('.test.ts') || dirs.includes('testing') || dirs.includes('contract');
+    const dirs = new Set(segments.slice(0, -1));
+    const isTest = path.endsWith('.test.ts') || dirs.has('testing') || dirs.has('contract');
     return isTest ? 'serverTests' : 'server';
   }
   if (path.startsWith('packages/webui-shared/src/')) return path.endsWith('.test.ts') ? 'sharedTests' : 'shared';
@@ -66,7 +66,7 @@ export function countLines(text: string): number {
 
 export function median(values: number[]): number {
   if (values.length === 0) throw new Error('median of no values');
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = values.toSorted((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   const upper = sorted[mid] as number;
   return sorted.length % 2 === 1 ? upper : ((sorted[mid - 1] as number) + upper) / 2;
@@ -250,7 +250,7 @@ async function measure(skipDurations: boolean): Promise<Measures> {
   const workarounds: Measures['workarounds'] = [];
   for (const file of trackedFiles()) {
     const group = classify(file);
-    const isClientLayer = WEB_CLIENT_LAYER.includes(file);
+    const isClientLayer = WEB_CLIENT_LAYER.has(file);
     if (group === null && !isClientLayer) continue;
     const text = readFileSync(join(ROOT, file), 'utf8');
     const lines = countLines(text);

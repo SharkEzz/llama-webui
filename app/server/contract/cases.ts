@@ -524,7 +524,7 @@ export function normalize(v: unknown, ctx: NormalizeCtx): unknown {
       [ctx.home, '<home>'],
     ];
     let s = v;
-    for (const [path, tag] of paths.sort((a, b) => b[0].length - a[0].length)) s = s.split(path).join(tag);
+    for (const [path, tag] of paths.toSorted((a, b) => b[0].length - a[0].length)) s = s.split(path).join(tag);
     for (const p of ctx.ports) s = s.replace(new RegExp(`(?<=[:= ])${p}(?!\\d)`, 'g'), '<port>');
     return s.replace(ISO_TIME, '<time>').replace(UUID, '<uuid>').replace(ASSET_HASH, '<hash>');
   }
@@ -541,7 +541,7 @@ export function normalize(v: unknown, ctx: NormalizeCtx): unknown {
 /** The names of the fields of a value, sorted: `[]` for an array, `null` for a scalar. */
 function fieldsOf(v: unknown): string[] | null {
   if (Array.isArray(v)) return [];
-  return v && typeof v === 'object' ? Object.keys(v).sort() : null;
+  return v && typeof v === 'object' ? Object.keys(v).toSorted() : null;
 }
 
 export function record(
@@ -624,15 +624,15 @@ async function webSocketFrames(base: string): Promise<unknown[]> {
     await withTimeout(
       'the WebSocket hello and pong',
       new Promise<void>((resolve, reject) => {
-        ws.onerror = () => reject(new Error('contract: WebSocket error'));
-        ws.onmessage = (e) => {
+        ws.addEventListener('error', () => reject(new Error('contract: WebSocket error')));
+        ws.addEventListener('message', (e) => {
           const frame = JSON.parse(String(e.data)) as { type?: string };
           // A server ping may come between the two: only the hello and the pong are recorded.
           if (frame.type === 'ping') return;
           frames.push(frame);
           if (frames.length === 1) ws.send(JSON.stringify({ type: 'ping' }));
           else resolve();
-        };
+        });
       }),
     );
   } finally {

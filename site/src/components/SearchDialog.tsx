@@ -92,10 +92,10 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           data.flatMap((d) => {
             const page = d.meta.title ?? d.url;
             const subs = (d.sub_results ?? []).filter((s) => s.url !== d.url).slice(0, 3);
-            return [
-              { url: d.url, title: page, page, excerpt: d.excerpt, heading: false },
-              ...subs.map((s) => ({ url: s.url, title: s.title, page, excerpt: s.excerpt, heading: true })),
-            ];
+            const top: Hit[] = [{ url: d.url, title: page, page, excerpt: d.excerpt, heading: false }];
+            return top.concat(
+              subs.map((s) => ({ url: s.url, title: s.title, page, excerpt: s.excerpt, heading: true })),
+            );
           }),
         );
       })

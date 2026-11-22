@@ -423,7 +423,7 @@ function peerGroups(graph: TopologyGraph, placement: ModelPlacement | null): Top
   }
   return [...groups.values()]
     .filter((g) => g.length > 1)
-    .map((g) => g.sort((a, b) => (a.busId ?? '').localeCompare(b.busId ?? '')));
+    .map((g) => g.toSorted((a, b) => (a.busId ?? '').localeCompare(b.busId ?? '')));
 }
 
 /**
@@ -483,7 +483,7 @@ export function placementSeries(graph: TopologyGraph, placement: ModelPlacement 
   };
   const slices: PlacementSlice[] = placement.buffers
     .filter((b) => !hostDevice(b.device) && b.modelBytes > 0)
-    .sort((a, b) => order(a) - order(b))
+    .toSorted((a, b) => order(a) - order(b))
     .map((b) => ({ label: b.device, bytes: b.modelBytes, nodeId: gpus.find((n) => n.busId === b.busId)?.id ?? null }));
   const host = placementTotals(placement).hostModelBytes;
   if (host > 0) slices.push({ label: 'Host (RAM)', bytes: host, nodeId: 'ram' });

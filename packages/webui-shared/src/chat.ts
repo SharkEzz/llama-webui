@@ -185,10 +185,9 @@ export const statsFromTimings: {
 
 export const DEFAULT_TITLE = 'New conversation';
 /** Default titles from earlier versions, still present in existing databases. */
-const LEGACY_DEFAULT_TITLES: readonly string[] = ['Nouvelle conversation'];
+const LEGACY_DEFAULT_TITLES: ReadonlySet<string> = new Set(['Nouvelle conversation']);
 /** True when the conversation still has its default title (current or legacy) and can be auto-titled. */
-export const isDefaultTitle = (title: string): boolean =>
-  title === DEFAULT_TITLE || LEGACY_DEFAULT_TITLES.includes(title);
+export const isDefaultTitle = (title: string): boolean => title === DEFAULT_TITLE || LEGACY_DEFAULT_TITLES.has(title);
 const TITLE_WORDS = 6;
 const TITLE_MAX = 48;
 

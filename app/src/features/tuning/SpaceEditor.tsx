@@ -165,7 +165,7 @@ export function SpaceEditor() {
             />
           </div>
           <Label className="flex items-center gap-2 font-normal">
-            <Checkbox checked={includeUnfit} onCheckedChange={(v) => setIncludeUnfit(v === true)} />
+            <Checkbox checked={includeUnfit} onCheckedChange={(v) => setIncludeUnfit(v)} />
             Include configurations that do not fit (they will most likely end in “Out of memory”)
           </Label>
 

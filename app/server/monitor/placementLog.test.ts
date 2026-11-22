@@ -1,7 +1,7 @@
 import { NodeServices } from '@effect/platform-node';
 import { layer } from '@effect/vitest';
 import { type LogLine, P2P_LOG_LINE, type PlacementBuffer } from '@llama-webui/shared';
-import { Array as Arr, Effect, FileSystem, Option, Path, String as Str } from 'effect';
+import { Array as Arr, Effect, FileSystem, Option, Path, String as Str, Struct } from 'effect';
 import { expect } from 'vitest';
 import { parsePlacement } from './placementLog.ts';
 
@@ -261,7 +261,7 @@ layer(NodeServices.layer)((it) => {
       expect(by.get('CUDA0')).toBe('0000:01:00.0');
       expect(by.get('CUDA1')).toBe('0000:03:00.0');
       // The sizes are the same: only the addresses are added.
-      const withoutBusId = Arr.map((b: PlacementBuffer) => ({ ...b, busId: null }));
+      const withoutBusId = Arr.map((b: PlacementBuffer) => Struct.omit(b, ['busId']));
       expect(withoutBusId(p.buffers)).toEqual(withoutBusId(bare.buffers));
     }),
   );

@@ -198,7 +198,7 @@ export function layoutGraph(graph: TopologyGraph): Layout {
       .filter((l) => l.from === parent && l.kind !== 'memory')
       .map((l) => byId.get(l.to))
       .filter((n): n is TopologyNode => n !== undefined)
-      .sort(byKindThenBus);
+      .toSorted(byKindThenBus);
 
   for (const n of graph.nodes) {
     if (n.kind === 'cpu') nodes.set(n.id, { pos: [0, 0, 0], size: SIZE.cpu });

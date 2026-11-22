@@ -128,7 +128,7 @@ test('a spec the schema refuses is shown on its field and nothing is sent', asyn
 
   await expect(store.getState().launch()).resolves.toBe('error');
   expect(seen).toEqual([]);
-  expect(Object.keys(store.getState().errors).sort()).toEqual(['ngl', 'r']);
+  expect(Object.keys(store.getState().errors).toSorted()).toEqual(['ngl', 'r']);
 });
 
 test('a bench-run, bench-progress or bench-deleted message updates the store', () => {

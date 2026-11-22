@@ -62,26 +62,26 @@ export const useWs = create<WsState>()((set, get) => {
     const ws = new WebSocket(wsUrl());
     socket = ws;
 
-    ws.onopen = () => {
+    ws.addEventListener('open', () => {
       backoff = BACKOFF_START_MS;
       set({ status: 'open' });
-    };
-    ws.onmessage = (event) => {
+    });
+    ws.addEventListener('message', (event) => {
       const decoded = decodeFrame(String(event.data));
       if (Option.isNone(decoded)) return;
       const msg = decoded.value;
       if (msg.type === 'ping') ws.send(JSON.stringify({ type: 'pong' } satisfies WsMessage));
       set({ lastMessage: msg });
       for (const fn of listeners.get(msg.type) ?? []) fn(msg);
-    };
-    ws.onclose = () => {
+    });
+    ws.addEventListener('close', () => {
       if (socket !== ws) return;
       socket = undefined;
       set({ status: 'closed' });
       retryTimer = setTimeout(open, backoff);
       backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
-    };
-    // onerror is always followed by onclose: nothing to do here.
+    });
+    // An `error` event is always followed by `close`: nothing to do here.
   };
 
   return {
