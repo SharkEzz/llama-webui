@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router';
 import { AppLayout } from './AppLayout';
+import { RouteError } from './RouteError';
 import { MILESTONE_BY_PATH, ROUTES } from './routes';
 
 /**
@@ -26,6 +27,8 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     // First load of a deep URL (/bench reloaded): the shell right away, the page next.
     hydrateFallbackElement: <AppLayout loading />,
+    // A page that fails to load (a chunk gone after a new build) or to render: the error and a reload.
+    errorElement: <RouteError />,
     children: [
       { index: true, ...page(() => import('@/features/home/HomePage'), 'HomePage') },
       { path: 'setup', ...page(() => import('@/features/home/HomePage'), 'SetupPage') },

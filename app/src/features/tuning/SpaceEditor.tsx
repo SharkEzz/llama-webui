@@ -254,7 +254,8 @@ function ValuesRow<T>(props: {
           setError(null);
         }}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') {
+          // An Enter that ends an IME composition picks the text, it does not add the value
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
             e.preventDefault();
             submit();
           }

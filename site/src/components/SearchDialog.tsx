@@ -1,5 +1,5 @@
 import { FileText, Hash } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Command,
@@ -73,19 +73,18 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<Hit[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const latest = useRef('');
   // An empty query has no hits: cleared by the render that sees it
   if (!query.trim() && hits.length > 0) setHits([]);
 
   useEffect(() => {
-    latest.current = query;
     if (!query.trim()) return;
+    // A newer query (or the dialog's unmount) makes this search's results stale: they are dropped
+    let ignore = false;
     loadPagefind()
-      .then(async (pf) => {
-        const search = await pf.debouncedSearch(query, {}, 150);
-        if (!search || latest.current !== query) return;
-        const data = await Promise.all(search.results.slice(0, 8).map((r) => r.data()));
-        if (latest.current !== query) return;
+      .then((pf) => pf.debouncedSearch(query, {}, 150))
+      .then((search) => (search && !ignore ? Promise.all(search.results.slice(0, 8).map((r) => r.data())) : null))
+      .then((data) => {
+        if (!data || ignore) return;
         setError(null);
         setHits(
           data.flatMap((d) => {
@@ -98,13 +97,17 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           }),
         );
       })
-      .catch(() =>
+      .catch(() => {
+        if (ignore) return;
         setError(
           import.meta.env.DEV
             ? 'No search index in dev: run `pnpm site:build`, then `pnpm site:preview`.'
             : 'Search is unavailable.',
-        ),
-      );
+        );
+      });
+    return () => {
+      ignore = true;
+    };
   }, [query]);
 
   const go = (url: string) => {

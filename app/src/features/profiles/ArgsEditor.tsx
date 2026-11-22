@@ -25,8 +25,8 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [cursor, setCursor] = useState(0);
   const [active, setActive] = useState(0);
-  // Enter only completes after picking with the arrows; otherwise it keeps its role (new line).
-  const [navigated, setNavigated] = useState(false);
+  // Enter only completes after picking with the arrows; otherwise it keeps its role (new line). Never rendered: a ref.
+  const navigated = useRef(false);
   const [dismissed, setDismissed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   // cmdk assigns the list and option ids itself: read them back for aria-controls / aria-activedescendant.
@@ -55,7 +55,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
       setCursor(pos);
     });
     setActive(0);
-    setNavigated(false);
+    navigated.current = false;
   };
 
   const open = suggestions.length > 0;
@@ -97,7 +97,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
             setCursor(el.selectionStart);
             setDismissed(false);
             setActive(0);
-            setNavigated(false);
+            navigated.current = false;
           }}
           onSelect={track}
           onClick={track}
@@ -110,11 +110,13 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
             if (suggestions.length === 0) return;
             if (e.key === 'ArrowDown') {
               setActive((a) => (a + 1) % suggestions.length);
-              setNavigated(true);
+              navigated.current = true;
             } else if (e.key === 'ArrowUp') {
               setActive((a) => (a - 1 + suggestions.length) % suggestions.length);
-              setNavigated(true);
-            } else if (e.key === 'Tab' || (e.key === 'Enter' && navigated))
+              navigated.current = true;
+            } else if (e.key === 'Tab') accept(suggestions[active] ?? suggestions[0]!);
+            // An Enter that ends an IME composition picks the text, it does not complete the flag
+            else if (e.key === 'Enter' && navigated.current && !e.nativeEvent.isComposing)
               accept(suggestions[active] ?? suggestions[0]!);
             else if (e.key === 'Escape') setDismissed(true);
             else return;

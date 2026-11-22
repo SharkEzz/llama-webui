@@ -173,8 +173,11 @@ export function RepoView({
     const keys = [v.key];
     if (v.kind === 'model' && offerProjector && withProjector) keys.push(projector.key);
     setBusy(true);
-    await enqueue(repo.id, repo.sha, keys);
-    setBusy(false);
+    try {
+      await enqueue(repo.id, repo.sha, keys);
+    } finally {
+      setBusy(false);
+    }
   };
   const highlighted = (v: HfVariant) =>
     (hint.file !== null && v.files.some((f) => f.path === hint.file)) ||
