@@ -164,7 +164,7 @@ function PathInput({
   label: string;
   kind: 'model' | 'mmproj';
   value: string;
-  onCommit(p: string): void;
+  onCommit: (p: string) => void;
 }) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);

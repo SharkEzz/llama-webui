@@ -25,16 +25,16 @@ interface ChatState {
   list: ReadonlyArray<ConversationSummary>;
   current: ConversationDetail | null;
   streaming: Streaming | null;
-  loadList(): Promise<void>;
+  loadList: () => Promise<void>;
   /** Opens a conversation and reattaches to its in-progress reply, if any. */
-  open(id: number | null): Promise<void>;
-  create(): Promise<number>;
-  patch(p: ConversationPatch): Promise<void>;
-  rename(id: number, title: string): Promise<void>;
-  remove(id: number): Promise<void>;
-  send(text: string): Promise<void>;
-  regenerate(): Promise<void>;
-  stop(): Promise<void>;
+  open: (id: number | null) => Promise<void>;
+  create: () => Promise<number>;
+  patch: (p: ConversationPatch) => Promise<void>;
+  rename: (id: number, title: string) => Promise<void>;
+  remove: (id: number) => Promise<void>;
+  send: (text: string) => Promise<void>;
+  regenerate: () => Promise<void>;
+  stop: () => Promise<void>;
 }
 
 /** A reply as an endpoint streams it: the events of the reply, or the endpoint's error. */

@@ -57,27 +57,27 @@ interface TuningState {
   diskSpeed: DiskSpeed | null;
   measuring: boolean;
 
-  loadHardware(): Promise<void>;
-  setModel(path: string | null, mmproj?: string | null): void;
-  fromProfile(id: number | null): Promise<void>;
-  setPreset(id: PresetId): void;
-  pin(patch: Partial<BenchParams>): void;
-  unpin(key: keyof BenchParams): void;
-  setSpace(patch: Partial<SweepSpace>): void;
-  setBase(base: BenchParams): void;
-  setIncludeUnfit(v: boolean): void;
-  setRun(patch: Partial<TuningState['run']>): void;
-  suggestSpace(): void;
-  launch(stopServer?: boolean): Promise<'ok' | 'confirm' | 'error'>;
-  loadSweeps(): Promise<void>;
-  open(id: number | null): Promise<void>;
-  cancelSweep(id: number): Promise<void>;
-  resume(id: number, stopServer?: boolean): Promise<'ok' | 'confirm' | 'error'>;
-  validate(id: number, n: number, stopServer?: boolean): Promise<'ok' | 'confirm' | 'error'>;
-  removeSweep(id: number): Promise<void>;
-  toProfile(runId: number): Promise<Profile | null>;
-  loadChecks(modelPath: string | null): Promise<void>;
-  measureDisk(modelPath: string): Promise<void>;
+  loadHardware: () => Promise<void>;
+  setModel: (path: string | null, mmproj?: string | null) => void;
+  fromProfile: (id: number | null) => Promise<void>;
+  setPreset: (id: PresetId) => void;
+  pin: (patch: Partial<BenchParams>) => void;
+  unpin: (key: keyof BenchParams) => void;
+  setSpace: (patch: Partial<SweepSpace>) => void;
+  setBase: (base: BenchParams) => void;
+  setIncludeUnfit: (v: boolean) => void;
+  setRun: (patch: Partial<TuningState['run']>) => void;
+  suggestSpace: () => void;
+  launch: (stopServer?: boolean) => Promise<'ok' | 'confirm' | 'error'>;
+  loadSweeps: () => Promise<void>;
+  open: (id: number | null) => Promise<void>;
+  cancelSweep: (id: number) => Promise<void>;
+  resume: (id: number, stopServer?: boolean) => Promise<'ok' | 'confirm' | 'error'>;
+  validate: (id: number, n: number, stopServer?: boolean) => Promise<'ok' | 'confirm' | 'error'>;
+  removeSweep: (id: number) => Promise<void>;
+  toProfile: (runId: number) => Promise<Profile | null>;
+  loadChecks: (modelPath: string | null) => Promise<void>;
+  measureDisk: (modelPath: string) => Promise<void>;
 }
 
 const fail = (e: unknown) => void toast.error(errorMessage(e));

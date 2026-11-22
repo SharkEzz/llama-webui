@@ -19,7 +19,7 @@ function stored(): boolean {
 interface SidebarState {
   /** The user's choice, kept by the browser from one visit to the next. */
   collapsed: boolean;
-  toggle(): void;
+  toggle: () => void;
 }
 
 export const useSidebar = create<SidebarState>((set, get) => ({

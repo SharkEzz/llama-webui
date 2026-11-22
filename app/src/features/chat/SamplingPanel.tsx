@@ -104,8 +104,8 @@ function NumberField(props: {
   value: number | undefined;
   placeholder: string;
   error?: string | undefined;
-  onCommit(v: number | undefined): void;
-  onInvalid(msg: string): void;
+  onCommit: (v: number | undefined) => void;
+  onInvalid: (msg: string) => void;
 }) {
   const [draft, setDraft] = useState(props.value === undefined ? '' : String(props.value));
   useEffect(() => setDraft(props.value === undefined ? '' : String(props.value)), [props.value]);

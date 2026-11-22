@@ -259,7 +259,7 @@ function VariantRow({
   fit: VramFit | null;
   highlight: boolean;
   busy: boolean;
-  onDownload(): void;
+  onDownload: () => void;
 }) {
   return (
     <div

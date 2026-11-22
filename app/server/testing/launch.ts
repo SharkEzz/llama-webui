@@ -26,9 +26,9 @@ export interface Launched extends AsyncDisposable {
   /** The exit code (null on a signal). */
   exited: Promise<number | null>;
   /** What the server wrote to stdout so far (its log). */
-  stdout(): string;
+  stdout: () => string;
   /** What the server wrote to stderr so far. */
-  stderr(): string;
+  stderr: () => string;
 }
 
 /** The environment of the test run, as a user's: Vitest's `TEST`, a CI's `CI`, `NODE_ENV` (Vitest sets `test`) and

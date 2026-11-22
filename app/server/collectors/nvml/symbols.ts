@@ -5,31 +5,31 @@ import { dlopen } from 'node:ffi';
  * (never `Number()`: an address may not fit); out-params are Buffers; every call returns an nvmlReturn_t.
  */
 export interface NvmlSymbols {
-  nvmlInit_v2(): number;
-  nvmlShutdown(): number;
-  nvmlDeviceGetCount_v2(count: Buffer): number;
-  nvmlDeviceGetHandleByIndex_v2(i: number, out: Buffer): number;
-  nvmlDeviceGetName(h: bigint, buf: Buffer, len: number): number;
-  nvmlDeviceGetUUID(h: bigint, buf: Buffer, len: number): number;
-  nvmlDeviceGetPciInfo_v3(h: bigint, out: Buffer): number;
-  nvmlDeviceGetUtilizationRates(h: bigint, out: Buffer): number;
-  nvmlDeviceGetMemoryInfo_v2(h: bigint, out: Buffer): number;
-  nvmlDeviceGetTemperature(h: bigint, sensor: number, out: Buffer): number;
-  nvmlDeviceGetPowerUsage(h: bigint, out: Buffer): number;
-  nvmlDeviceGetPowerManagementLimit(h: bigint, out: Buffer): number;
-  nvmlDeviceGetPowerManagementDefaultLimit(h: bigint, out: Buffer): number;
-  nvmlDeviceGetPersistenceMode(h: bigint, out: Buffer): number;
-  nvmlSystemGetDriverVersion(buf: Buffer, len: number): number;
-  nvmlSystemGetCudaDriverVersion(out: Buffer): number;
-  nvmlDeviceGetClockInfo(h: bigint, type: number, out: Buffer): number;
-  nvmlDeviceGetMaxClockInfo(h: bigint, type: number, out: Buffer): number;
-  nvmlDeviceGetFanSpeed(h: bigint, out: Buffer): number;
-  nvmlDeviceGetPcieThroughput(h: bigint, counter: number, out: Buffer): number;
-  nvmlDeviceGetCurrPcieLinkGeneration(h: bigint, out: Buffer): number;
-  nvmlDeviceGetCurrPcieLinkWidth(h: bigint, out: Buffer): number;
-  nvmlDeviceGetMaxPcieLinkGeneration(h: bigint, out: Buffer): number;
-  nvmlDeviceGetMaxPcieLinkWidth(h: bigint, out: Buffer): number;
-  nvmlDeviceGetComputeRunningProcesses_v3(h: bigint, count: Buffer, infos: Buffer): number;
+  nvmlInit_v2: () => number;
+  nvmlShutdown: () => number;
+  nvmlDeviceGetCount_v2: (count: Buffer) => number;
+  nvmlDeviceGetHandleByIndex_v2: (i: number, out: Buffer) => number;
+  nvmlDeviceGetName: (h: bigint, buf: Buffer, len: number) => number;
+  nvmlDeviceGetUUID: (h: bigint, buf: Buffer, len: number) => number;
+  nvmlDeviceGetPciInfo_v3: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetUtilizationRates: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetMemoryInfo_v2: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetTemperature: (h: bigint, sensor: number, out: Buffer) => number;
+  nvmlDeviceGetPowerUsage: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetPowerManagementLimit: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetPowerManagementDefaultLimit: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetPersistenceMode: (h: bigint, out: Buffer) => number;
+  nvmlSystemGetDriverVersion: (buf: Buffer, len: number) => number;
+  nvmlSystemGetCudaDriverVersion: (out: Buffer) => number;
+  nvmlDeviceGetClockInfo: (h: bigint, type: number, out: Buffer) => number;
+  nvmlDeviceGetMaxClockInfo: (h: bigint, type: number, out: Buffer) => number;
+  nvmlDeviceGetFanSpeed: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetPcieThroughput: (h: bigint, counter: number, out: Buffer) => number;
+  nvmlDeviceGetCurrPcieLinkGeneration: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetCurrPcieLinkWidth: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetMaxPcieLinkGeneration: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetMaxPcieLinkWidth: (h: bigint, out: Buffer) => number;
+  nvmlDeviceGetComputeRunningProcesses_v3: (h: bigint, count: Buffer, infos: Buffer) => number;
 }
 
 const ret = 'int32';

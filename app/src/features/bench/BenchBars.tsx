@@ -32,7 +32,7 @@ export function BenchBars({ runs }: { runs: BenchRun[] }) {
   );
 }
 
-function Panel({ title, runs, pick }: { title: string; runs: BenchRun[]; pick(r: BenchRun): Measure | null }) {
+function Panel({ title, runs, pick }: { title: string; runs: BenchRun[]; pick: (r: BenchRun) => Measure | null }) {
   const max = Math.max(1, ...runs.map((r) => pick(r)?.tps ?? 0));
   return (
     <figure className="flex flex-col gap-2">

@@ -120,9 +120,9 @@ const round1 = (v: number) => Math.round(v * 10) / 10;
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 export interface Simulation {
-  frame(): Frame;
+  frame: () => Frame;
   /** Advances the simulated clock by one second and returns the new frame. */
-  tick(): Frame;
+  tick: () => Frame;
 }
 
 export function createSimulation(seed = 7, warmup = WARMUP_SECONDS): Simulation {

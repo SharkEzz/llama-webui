@@ -188,7 +188,7 @@ function Row({ flag, hint, children }: { flag: string; hint?: string | undefined
   );
 }
 
-function Chip({ label, onRemove, mono }: { label: string; onRemove(): void; mono?: boolean | undefined }) {
+function Chip({ label, onRemove, mono }: { label: string; onRemove: () => void; mono?: boolean | undefined }) {
   return (
     <Badge variant="secondary" className={cn('max-w-full gap-1 pr-0.5', mono && 'font-mono')}>
       <span className="truncate">{label}</span>
@@ -199,7 +199,7 @@ function Chip({ label, onRemove, mono }: { label: string; onRemove(): void; mono
   );
 }
 
-function Suggestion({ label, onClick, mono }: { label: string; onClick(): void; mono?: boolean | undefined }) {
+function Suggestion({ label, onClick, mono }: { label: string; onClick: () => void; mono?: boolean | undefined }) {
   return (
     <Button variant="ghost" size="xs" className={cn('text-muted-foreground', mono && 'font-mono')} onClick={onClick}>
       <Plus /> {label}
@@ -210,8 +210,8 @@ function Suggestion({ label, onClick, mono }: { label: string; onClick(): void; 
 function ValuesRow<T>(props: {
   flag: string;
   values: ReadonlyArray<T>;
-  onChange(v: ReadonlyArray<T>): void;
-  parse(text: string): T | string;
+  onChange: (v: ReadonlyArray<T>) => void;
+  parse: (text: string) => T | string;
   suggestions?: ReadonlyArray<T>;
   hint?: string | undefined;
   mono?: boolean | undefined;
@@ -276,7 +276,7 @@ function ToggleRow<T extends string>({
   flag: string;
   options: readonly T[];
   values: ReadonlyArray<T>;
-  onChange(v: ReadonlyArray<T>): void;
+  onChange: (v: ReadonlyArray<T>) => void;
 }) {
   return (
     <Row flag={flag}>
@@ -306,7 +306,7 @@ function DevRow({
 }: {
   gpus: ReadonlyArray<BenchDevice>;
   values: ReadonlyArray<ReadonlyArray<string>>;
-  onChange(v: ReadonlyArray<ReadonlyArray<string>>): void;
+  onChange: (v: ReadonlyArray<ReadonlyArray<string>>) => void;
 }) {
   const [draft, setDraft] = useState<string[]>([]);
   const add = (...sets: string[][]) => {
@@ -383,7 +383,7 @@ function NumField({
 }: {
   label: string;
   value: number;
-  onChange(v: number): void;
+  onChange: (v: number) => void;
   hint?: string;
 }) {
   const id = `sweep-${label.split(' ')[0]}`;

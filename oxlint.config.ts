@@ -113,12 +113,16 @@ export const base = defineConfig({
     // A stylesheet is imported for its effect; so is the server bundle by the launcher (`app/bin/llama-webui.ts`)
     'import/no-unassigned-import': ['error', { allow: ['**/*.css', '@llama-webui/theme/*', './server/index.mjs'] }],
 
+    // The general selection (spec, "The selection" › L4)
+    // A function of an interface or a type literal is a property, so its parameters are checked strictly (no method
+    // bivariance) and reading it off its object is safe (`typescript/unbound-method`)
+    'typescript/method-signature-style': 'error',
+
     // --- Debt: off until its milestone ---
     // Rules on by category or parity rules that report on today's code; the milestone turns each on and fixes
     // its reports. L4: general and type-aware rules; L5: React (the Vitest rules have theirs in oxlint.tests.ts).
     'typescript/no-unsafe-type-assertion': 'off', // L4: 145
     'typescript/no-floating-promises': 'off', // L4: 88
-    'typescript/unbound-method': 'off', // L4: 82
     'no-shadow': 'off', // L4: 40
     'typescript/no-misused-promises': 'off', // L4: 24
     'typescript/no-unnecessary-type-assertion': 'off', // L4: 19

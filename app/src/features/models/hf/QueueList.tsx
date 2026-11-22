@@ -10,7 +10,7 @@ import { useNow } from '@/lib/useNow';
 const MAX_FINISHED = 20;
 
 /** The download queue: running and queued items first, then the last finished ones. */
-export function QueueList({ endpoint, onShow }: { endpoint: string; onShow(path: string): void }) {
+export function QueueList({ endpoint, onShow }: { endpoint: string; onShow: (path: string) => void }) {
   // No `live` here: only the running row follows the progress messages (4 per second).
   const items = useDownloads((s) => s.items);
   const clearFinished = useDownloads((s) => s.clearFinished);
@@ -39,7 +39,15 @@ export function QueueList({ endpoint, onShow }: { endpoint: string; onShow(path:
   );
 }
 
-function QueueRow({ item, endpoint, onShow }: { item: DownloadItem; endpoint: string; onShow(path: string): void }) {
+function QueueRow({
+  item,
+  endpoint,
+  onShow,
+}: {
+  item: DownloadItem;
+  endpoint: string;
+  onShow: (path: string) => void;
+}) {
   const cancel = useDownloads((s) => s.cancel);
   const retry = useDownloads((s) => s.retry);
   const remove = useDownloads((s) => s.remove);

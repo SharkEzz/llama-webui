@@ -40,7 +40,7 @@ export function BenchCompareDialog({
 }: {
   runs: BenchRun[];
   open: boolean;
-  onOpenChange(o: boolean): void;
+  onOpenChange: (o: boolean) => void;
 }) {
   const mixed = new Set(runs.map((r) => r.kind)).size > 1;
   const hw = (r: BenchRun) => JSON.stringify({ cpu: r.hardware.cpu, gpus: r.hardware.gpus.map((g) => g.name) });

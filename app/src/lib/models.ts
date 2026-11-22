@@ -16,14 +16,14 @@ interface ModelsState {
   error: string | null;
   loading: boolean;
   /** Rescans the models folder (the server only rereads changed files). */
-  refresh(): Promise<void>;
+  refresh: () => Promise<void>;
   /** What deleting the model at `path` removes (files, profiles using it) and why it is refused, if it is. */
-  usage(path: string): Promise<ModelUsage>;
+  usage: (path: string) => Promise<ModelUsage>;
   /**
    * Deletes the model's files, and the profiles using it when `deleteProfiles` is set, then rescans. Rejects with the
    * endpoint's tagged error (`ModelNotFound`, `ModelInUse`, `ProfileRunning`).
    */
-  deleteModel(path: string, deleteProfiles: boolean): Promise<ModelDeleted>;
+  deleteModel: (path: string, deleteProfiles: boolean) => Promise<ModelDeleted>;
 }
 
 /** The calls the store makes: the web's, or in a test the same calls on a fake `fetch` (`makeCall(Api, fetchImpl)`). */

@@ -24,7 +24,7 @@ interface Dev {
   readonly proc: ChildProcessByStdio<null, Readable, Readable>;
   readonly exited: Promise<number | null>;
   readonly base: string;
-  output(): string;
+  output: () => string;
   /** Each chunk of its output, with the time (`performance.now()`) it arrived. */
   readonly chunks: ReadonlyArray<{ readonly at: number; readonly text: string }>;
 }

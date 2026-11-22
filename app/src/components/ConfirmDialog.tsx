@@ -16,12 +16,12 @@ interface ConfirmDialogProps {
   description: string;
   confirmLabel: string;
   destructive?: boolean;
-  onConfirm(): unknown;
+  onConfirm: () => unknown;
   /** Trigger element (a button); without one, the dialog is controlled through `open` / `onOpenChange`. */
   trigger?: ReactElement;
   cancelLabel?: string;
   open?: boolean;
-  onOpenChange?(open: boolean): void;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function ConfirmDialog({

@@ -7,7 +7,7 @@ export type WsStatus = 'connecting' | 'open' | 'closed';
 interface WsState {
   status: WsStatus;
   lastMessage?: WsMessage;
-  connect(): void;
+  connect: () => void;
 }
 
 const BACKOFF_START_MS = 500;

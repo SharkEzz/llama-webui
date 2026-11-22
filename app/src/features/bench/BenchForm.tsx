@@ -353,7 +353,7 @@ interface TextFieldProps {
   hint?: string | undefined;
   error?: string | undefined;
   value: string;
-  onChange(e: { target: { value: string } }): void;
+  onChange: (e: { target: { value: string } }) => void;
 }
 
 function TextField({ id, label, hint, error, value, onChange }: TextFieldProps) {
@@ -384,7 +384,7 @@ function PathField({
   value,
   onChange,
   onPick,
-}: TextFieldProps & { kind: 'model' | 'mmproj'; onPick(p: string): void }) {
+}: TextFieldProps & { kind: 'model' | 'mmproj'; onPick: (p: string) => void }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -411,7 +411,7 @@ function OptionField(props: {
   options: readonly string[];
   value: string;
   error?: string | undefined;
-  onChange(v: string): void;
+  onChange: (v: string) => void;
 }) {
   const items = [{ value: DEFAULT, label: 'default' }, ...props.options.map((o) => ({ value: o, label: o }))];
   return (

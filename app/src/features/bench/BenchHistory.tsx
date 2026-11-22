@@ -349,7 +349,7 @@ function FilterSelect(props: {
   label: string;
   value: string;
   items: { value: string; label: string }[];
-  onChange(v: string): void;
+  onChange: (v: string) => void;
   wide?: boolean;
 }) {
   return (

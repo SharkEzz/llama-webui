@@ -7,8 +7,8 @@ interface Comment {
 }
 
 interface Context {
-  sourceCode: { getAllComments(): Comment[] };
-  report(diagnostic: { message: string; loc: Comment['loc'] }): void;
+  sourceCode: { getAllComments: () => Comment[] };
+  report: (diagnostic: { message: string; loc: Comment['loc'] }) => void;
 }
 
 const directive = /^(?:oxlint|eslint)-disable/;

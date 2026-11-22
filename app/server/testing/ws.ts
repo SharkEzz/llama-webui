@@ -4,13 +4,13 @@ export interface WsClient {
   /** Every message received so far, parsed as JSON. */
   readonly messages: Array<unknown>;
   /** The next message not taken yet that `match` accepts (any by default); rejects after `ms`. */
-  next(match?: (message: unknown) => boolean, ms?: number): Promise<unknown>;
+  next: (match?: (message: unknown) => boolean, ms?: number) => Promise<unknown>;
   /** Calls `listener` with each message from now on, parsed as JSON. */
-  onMessage(listener: (message: unknown) => void): void;
+  onMessage: (listener: (message: unknown) => void) => void;
   /** Settles with the close code and reason once the connection closed. */
   readonly closed: Promise<{ code: number; reason: string }>;
   /** Sends `data` as text: a string as it is, anything else as JSON. */
-  send(data: unknown): void;
+  send: (data: unknown) => void;
 }
 
 /** Whether `message` is an object whose `type` is `type`. */

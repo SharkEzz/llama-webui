@@ -23,7 +23,7 @@ import { DeleteModelPopover } from './DeleteModelPopover';
 const yesNo = (b: boolean) => (b ? 'yes' : 'no');
 
 /** GGUF details: header, weight breakdown, files; creates a prefilled profile, deletes the model. */
-export function ModelDetailDialog({ path, onClose }: { path: string | null; onClose(): void }) {
+export function ModelDetailDialog({ path, onClose }: { path: string | null; onClose: () => void }) {
   const [detail, setDetail] = useState<ModelDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();

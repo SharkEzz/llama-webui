@@ -13,12 +13,12 @@ import {
 
 /** The parts of Pagefind's browser API used here (dist/pagefind/pagefind.js, written by scripts/postbuild.ts). */
 interface Pagefind {
-  options(o: { baseUrl: string }): Promise<void>;
-  debouncedSearch(
+  options: (o: { baseUrl: string }) => Promise<void>;
+  debouncedSearch: (
     query: string,
     options?: object,
     ms?: number,
-  ): Promise<{ results: { data(): Promise<Result> }[] } | null>;
+  ) => Promise<{ results: { data: () => Promise<Result> }[] } | null>;
 }
 
 interface Result {

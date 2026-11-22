@@ -30,8 +30,8 @@ import { highlightEnv } from './highlight';
 interface ProfileFormProps {
   profile: Profile | null;
   settings: Settings | null;
-  onSaved(p: Profile): void;
-  onDeleted(): void;
+  onSaved: (p: Profile) => void;
+  onDeleted: () => void;
   /** Initial values of a new profile (“Create profile” from the Models page). */
   initial?: Partial<Draft> | undefined;
 }

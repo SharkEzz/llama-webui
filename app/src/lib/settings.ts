@@ -14,7 +14,7 @@ interface SettingsState {
   /** The last settings read or saved; `null` until the first reply. */
   settings: Settings | null;
   /** Rereads the settings; a failure keeps the last ones and rejects. */
-  load(): Promise<void>;
+  load: () => Promise<void>;
 }
 
 /**
