@@ -1,6 +1,6 @@
 import { Array as Arr, String as Str, Stream } from 'effect';
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences start with ESC (\x1b).
+// oxlint-disable-next-line no-control-regex -- ANSI escape sequences start with ESC (\x1b).
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
 /** A line without its ANSI escape sequences, its trailing `\r` and its trailing whitespace. */

@@ -100,7 +100,6 @@ export function RepoView({
   /** Only the first load waits for `delayMs`: a reload after a download is not typing. */
   const firstLoad = useRef(true);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: doneHere is a trigger (reload when a download of this repo finishes); delayMs is only read for the first load
   useEffect(() => {
     const ac = new AbortController();
     const t = setTimeout(
@@ -126,6 +125,7 @@ export function RepoView({
       clearTimeout(t);
       ac.abort();
     };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- doneHere is a trigger (reload when a download of this repo finishes); delayMs is only read for the first load
   }, [id, doneHere]);
 
   const queued = new Set(items.filter((i) => ofRepo(i) && isDownloadActive(i.status)).map((i) => i.key));

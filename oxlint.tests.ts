@@ -7,7 +7,7 @@ export const tests: OxlintConfig = {
       files: ['**/*.test.ts', '**/*.test.tsx'],
       plugins: ['vitest'],
       rules: {
-        // Biome equivalents outside `correctness` (measurements, §1 "Kept")
+        // Parity rules outside `correctness` (measurements, §1 "Kept")
         'vitest/no-duplicate-hooks': 'error',
         'vitest/no-identical-title': 'error',
         // The test blocks of @effect/vitest hold expectations too

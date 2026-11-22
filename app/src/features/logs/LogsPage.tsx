@@ -152,7 +152,7 @@ export function LogsPage() {
             else if (!atBottom && follow && userScroll.current) setFollow(false);
             if (atBottom) userScroll.current = false;
           }}
-          // biome-ignore lint/a11y/noNoninteractiveTabindex: the scrolling area must be reachable from the keyboard
+          // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the scrolling area must be reachable from the keyboard
           tabIndex={0}
         >
           {lines.length === 0 ? (

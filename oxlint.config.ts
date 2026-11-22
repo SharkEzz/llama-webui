@@ -18,9 +18,9 @@ export const base = defineConfig({
     'directives/require-reason': 'error',
     'unicorn/no-abusive-eslint-disable': 'error',
 
-    // Biome equivalents outside `correctness` (measurements, §1 "Kept")
+    // Parity rules outside `correctness` (measurements, §1 "Kept")
     'array-callback-return': 'error',
-    // Biome's `noDoubleEquals` allows `== null`
+    // `== null` stays allowed, as before
     eqeqeq: ['error', 'always', { null: 'ignore' }],
     'no-array-constructor': 'error',
     'no-case-declarations': 'error',
@@ -52,7 +52,7 @@ export const base = defineConfig({
     'no-useless-constructor': 'error',
     // A type import may stand apart from the value import of the same module
     'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
-    // Biome ignores names that start with `_`
+    // A name that starts with `_` is unused on purpose
     'no-unused-vars': [
       'error',
       {
@@ -100,7 +100,7 @@ export const base = defineConfig({
     'typescript/no-invalid-void-type': 'off',
 
     // --- Debt: off until its milestone ---
-    // Rules on by category or Biome equivalents that report on today's code; the milestone turns each on and fixes
+    // Rules on by category or parity rules that report on today's code; the milestone turns each on and fixes
     // its reports. L4: general and type-aware rules; L5: React (the Vitest rules have theirs in oxlint.tests.ts).
     'typescript/no-floating-promises': 'off', // L4: 88
     'typescript/unbound-method': 'off', // L4: 82

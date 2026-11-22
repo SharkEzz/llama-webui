@@ -55,7 +55,7 @@ function Excerpt({ html }: { html: string }) {
     <>
       {nodes.map((n, i) =>
         n.nodeName === 'MARK' ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static fragments of one excerpt
+          // oxlint-disable-next-line react/no-array-index-key -- static fragments of one excerpt
           <mark key={i} className="rounded-sm bg-primary/20 px-0.5 text-foreground">
             {n.textContent}
           </mark>

@@ -15,7 +15,6 @@ export function Thread({ canSend }: { canSend: boolean }) {
     const el = box.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id is a trigger: re-pin to the bottom on every conversation change
   useLayoutEffect(() => {
     stick.current = true;
   }, [current?.id]);

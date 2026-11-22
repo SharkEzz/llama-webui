@@ -19,7 +19,6 @@ export function BenchLiveCard() {
   // Keep the latest lines visible: scroll to the bottom on every batch.
   const logRef = useRef<HTMLPreElement>(null);
   const lines = live?.lines;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: lines is a trigger: scroll to the bottom on every batch
   useEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;

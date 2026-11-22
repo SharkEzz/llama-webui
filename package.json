@@ -17,8 +17,8 @@
     "check": "pnpm -r --parallel --include-workspace-root typecheck",
     "dev": "pnpm --filter @llama-webui/app dev",
     "format": "oxfmt",
-    "lint": "oxfmt --check && biome lint",
-    "lint:fix": "biome lint --write && oxfmt",
+    "lint": "oxfmt --check && oxlint --deny-warnings --report-unused-disable-directives",
+    "lint:fix": "oxlint --fix && oxfmt",
     "prepack": "node scripts/prepack.ts",
     "prepare": "effect-tsgo patch --typescript --no-oxlint",
     "release": "node scripts/release.ts",
@@ -31,7 +31,6 @@
     "typecheck": "tsc -p scripts"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.8",
     "@effect/tsgo": "0.73.2",
     "@types/node": "catalog:",
     "oxfmt": "0.79.0",

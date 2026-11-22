@@ -7,7 +7,7 @@ export const react: OxlintConfig = {
     // The JSX transform of React 17+ needs no `React` in scope
     'react/react-in-jsx-scope': 'off',
 
-    // Biome equivalents outside `correctness` (measurements, §1 "Kept")
+    // Parity rules outside `correctness` (measurements, §1 "Kept")
     'react/button-has-type': 'error',
     'react/jsx-no-comment-textnodes': 'error',
     'react/jsx-no-script-url': 'error',
@@ -20,12 +20,14 @@ export const react: OxlintConfig = {
     // The two React rules that report today (react/jsx-no-useless-fragment, react/no-object-type-as-default-prop)
     // are in the debt block of the base.
 
-    // Accessibility is out of scope for now: only the Biome equivalents that pass today are on
-    // Biome equivalents stricter than Biome's (`useSemanticElements`, `noAutofocus`): they report where Biome passes
+    // Accessibility is out of scope for now: the jsx-a11y rules that report on today's code are off
+    // 7 reports: an element carries its role on purpose (`meter` on an <svg>, `combobox`, `status`)
     'jsx-a11y/prefer-tag-over-role': 'off',
+    // 3 reports: the field a click just opened (rename, a search, an edit) takes the focus on purpose
     'jsx-a11y/no-autofocus': 'off',
-    // Not Biome rules
+    // 3 reports: not a parity rule; a `Button` rendered as a link (`render={<a … />}`) is labelled by its text
     'jsx-a11y/control-has-associated-label': 'off',
+    // 2 reports: not a parity rule; the logs' scrolling area and the per-core list handle keys and the pointer
     'jsx-a11y/no-noninteractive-element-interactions': 'off',
   },
 };

@@ -356,7 +356,6 @@
 .shiki,
 .shiki span {
   color: var(--shiki-light);
-  /* biome-ignore lint/complexity/noImportantStyles: overrides the background set by shiki */
   background-color: transparent !important;
 }
 .dark .shiki,

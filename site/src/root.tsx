@@ -23,7 +23,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="dark light" />
-        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static theme bootstrap, must run before paint */}
+        {/* oxlint-disable-next-line react/no-danger -- static theme bootstrap, must run before paint */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <Meta />
         <Links />

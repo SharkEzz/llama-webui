@@ -59,6 +59,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   };
 
   const open = suggestions.length > 0;
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- runs after every render on purpose: it reads the ids cmdk sets in the DOM, and setAria only runs when they change
   useLayoutEffect(() => {
     const list = open ? listRef.current?.id || undefined : undefined;
     const active = open
@@ -68,7 +69,6 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   });
 
   // Every matching flag is listed: keep the highlighted one in view while the arrows move through the list.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `active` is the trigger (cmdk marks the item from it)
   useLayoutEffect(() => {
     if (open) listRef.current?.querySelector('[cmdk-item][data-selected=true]')?.scrollIntoView({ block: 'nearest' });
   }, [open, active]);

@@ -46,7 +46,7 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string | undefi
         // HTML produced by shiki from the text (escaped by shiki), not HTML from the reply.
         <div
           className="overflow-x-auto px-3 py-2 font-mono text-[0.8rem] leading-6"
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML produced by shiki from the text (escaped), not the reply's HTML
+          // oxlint-disable-next-line react/no-danger -- HTML produced by shiki from the text (escaped), not the reply's HTML
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (

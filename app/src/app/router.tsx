@@ -8,13 +8,11 @@ import { MILESTONE_BY_PATH, ROUTES } from './routes';
  * `load` must stay a literal import() so the bundler can split it.
  */
 const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) => ({
-  // biome-ignore lint/correctness/noComponentHookFactories: the router's `lazy.Component` (loaded on demand), not a React component factory
   lazy: { Component: async () => (await load())[name] },
 });
 
 const placeholder = (title: string) => ({
   lazy: {
-    // biome-ignore lint/correctness/noComponentHookFactories: the router's `lazy.Component` (loaded on demand), not a React component factory
     Component: async () => {
       const { PlaceholderPage } = await import('@/features/_placeholder/PlaceholderPage');
       return () => <PlaceholderPage title={title} />;
