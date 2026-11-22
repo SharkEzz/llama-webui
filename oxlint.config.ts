@@ -11,12 +11,17 @@ export const base = defineConfig({
   jsPlugins: [fileURLToPath(import.meta.resolve('./scripts/oxlint/directives.ts'))],
   // tsgolint finds the tsconfig.json of each file; a file outside every project (the root files, app/bin) gets an
   // inferred one: no configuration error, and the type-aware rules still report there (checked at L3)
+  // An unused suppression is also shown in the editor; `pnpm lint` fails on it (`--report-unused-disable-directives`
+  // with `--deny-warnings`)
   options: { typeAware: true, reportUnusedDisableDirectives: 'warn' },
   settings: {
+    // The React version the `react/*` rules check against: the `react` of the catalog (`pnpm-workspace.yaml`)
     react: {
       version: '19.3.1',
     },
   },
+  // The vendored repositories are reference material, not linted (`.eslintignore` keeps oxlint from loading their
+  // configs)
   ignorePatterns: ['repos/**'],
   categories: { correctness: 'error', suspicious: 'error', perf: 'error' },
   rules: {
