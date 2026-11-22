@@ -1,0 +1,165 @@
+---
+title: Profiling
+description: Measure what the app costs (server, NVML sampler, browser, llama-server's throughput) with pnpm profiling, check a fix by running the same scenario before and after it, and read a comparison of two runs.
+---
+
+`pnpm profiling` measures the app as a person uses it: it builds it, starts it on your machine, opens its pages in
+Chromium, launches a profile on your GPUs, and writes the figures to an HTML report. It measures; it does not conclude.
+The report states CPU per process, page work, load times, API latency and throughput, with the reference value and the
+difference when you compare two runs. Which figure is a problem and what to change stays your call.
+
+The tool lives in `scripts/profiling/`. No test launches it: the suites only cover its parsing, its comparison and its
+report, on small fixtures.
+
+## What it needs
+
+- **Linux**: the figures come from `/proc`, sysfs and `fincore`.
+- **Chromium**: `/usr/bin/chromium` by default, another binary with `--chrome <path>`. It runs headless with GPU
+  compositing (ANGLE on EGL).
+- **The instance's port free**: the tool starts its own server on `127.0.0.1:7860` and refuses to run when something
+  answers there. Stop your instance first, or pick another `--host`/`--port`.
+- **The GPUs**, for a scenario with a model: it launches the profile given by `--profile <id>`, else the instance's
+  default profile, and keeps it running until its last scenario.
+
+The server uses your data directory (`--data-dir` for another one): the profiles, models and settings the tool sees are
+yours.
+
+## Commands
+
+```bash title="Terminal"
+pnpm profiling --list                              # the scenarios, with what they need and their length
+pnpm profiling dashboard aurora --name before      # two scenarios, the run named "before"
+pnpm profiling all --name baseline                 # every scenario: about an hour
+pnpm profiling chat --compare baseline             # a run compared with an earlier one
+pnpm profiling:report before --compare baseline    # rewrite a report from its results.json
+```
+
+| Option             | Effect                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `--name <run>`     | The run's folder under `.cache/profiling/`; the date and time when absent. An existing name is refused.       |
+| `--compare <run>`  | Compare with an earlier run; a run whose results have another format version is refused.                      |
+| `--profile <id>`   | The profile the model scenarios launch, instead of the default one.                                           |
+| `--data-dir <dir>` | The server's data directory.                                                                                  |
+| `--host`, `--port` | The server's address, `127.0.0.1:7860` by default.                                                            |
+| `--chrome <path>`  | The Chromium binary.                                                                                          |
+| `--no-build`       | Reuse `app/.output` instead of building. The page's functions then keep their minified names in its profiles. |
+
+By default the tool runs the normal production build with hidden source maps, moves the `.map` files into the run, and
+starts the server from the result: `app/.output` ends as after `pnpm build`.
+
+## Scenarios
+
+| Scenario     | Model | Browser | Minutes | What it measures                                                                                                  |
+| ------------ | ----- | ------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `startup`    |       |         | 1       | Spawn to `/api/health` and SIGTERM to exit, five launches; one CPU profile of a launch                            |
+| `idle`       |       |         | 1       | The server and the NVML sampler with no page: CPU per process and thread, event loop                              |
+| `load`       |       | yes     | 1       | The Dashboard's load, cold and warm cache, three each: TTFB, FCP, LCP, script time, requests, bytes               |
+| `launch`     | yes   | yes     | 1       | The profile's start with the Dashboard open: time to ready, log lines, `/ws` messages, server CPU                 |
+| `dashboard`  | yes   | yes     | 3       | The Dashboard at rest: a clean window, a profiled window (server and page), a trace, a census of the page's work  |
+| `soak`       | yes   | yes     | 6       | The Dashboard open five minutes: JS heap after GC, DOM nodes, listeners, `/ws` traffic, the server's RSS and heap |
+| `aurora`     | yes   | yes     | 3       | The Dashboard under six CSS variants (aurora animation, backdrop blur, transitions)                               |
+| `generation` | yes   | yes     | 3       | The Dashboard while a reply is generated through the app's chat API                                               |
+| `chat`       | yes   | yes     | 4       | The Chat page streaming a long Markdown reply: three successive windows, a census, long tasks                     |
+| `pages`      | yes   | yes     | 5       | Every page loaded cold, its API calls, then 12 s of presence                                                      |
+| `api`        | yes   | yes     | 2       | Every GET the pages make, replayed 20 times: median, 95th percentile, size                                        |
+| `tps`        | yes   | yes     | 3       | llama-server's own throughput (fixed request and seed) with no page, the Dashboard, a static page                 |
+| `collectors` | yes   |         | 1       | Each NVML call and each `/proc` or sysfs read of a monitor tick                                                   |
+
+A few scenarios leave things as they find them only on the way out:
+
+- `launch` evicts the profile's GGUF files from the page cache before it starts the profile, so the start reads them
+  from the disk as after a reboot; the report shows the share of the model still cached at the start.
+- `generation` and `chat` create conversations titled `Profiling (temp)` and delete them at the end.
+- `collectors` is a breakdown, not a verdict. Its NVML table times only the calls, in the tool's own process: the
+  sampler process also runs Node, encodes and sends each sample and collects its garbage. The NVML sampler's whole
+  cost is its row in the windows of `idle` or `dashboard`. The list of `/proc` and sysfs reads is kept in the tool,
+  written from `app/server/collectors/`: it does not follow the code.
+
+## Check a fix
+
+Run the scenario that shows the cost, make the fix, run the same command again against the first run:
+
+<Steps>
+
+<Step title="Measure before">
+
+```bash title="Terminal"
+pnpm profiling aurora --name before
+```
+
+</Step>
+
+<Step title="Make the fix">
+
+Change the code; the next run builds it.
+
+</Step>
+
+<Step title="Measure after, compared">
+
+```bash title="Terminal"
+pnpm profiling aurora --name after --compare before
+```
+
+</Step>
+
+</Steps>
+
+Use the same command on both sides. A full pass (`all --name baseline`) gives the overall picture; it is not the
+reference to check one fix against, as the next section explains.
+
+## Read a comparison
+
+With `--compare`, the report opens on **What changed**: the figures whose difference exceeds the noise of their kind,
+largest first. Every other figure shows the reference value and the difference, and a figure under its noise is shown
+as unchanged. The noise is a fixed threshold per kind of figure: a difference is a change when it exceeds both the
+share of the reference and the floor.
+
+| Kind of figure                      | Share of the reference     | Floor  |
+| ----------------------------------- | -------------------------- | ------ |
+| CPU of a process or thread (points) | —                          | 0.5 pt |
+| Share of a thread's time (points)   | —                          | 0.5 pt |
+| Tokens per second                   | 1 %                        | —      |
+| Duration                            | 10 %                       | 1 ms   |
+| Size                                | 5 %                        | 1 KiB  |
+| Count                               | 5 %                        | 1      |
+| AMD `gpu_busy_percent`              | indicative, never a change | —      |
+
+Three things to keep in mind:
+
+- **A run alone against a full pass.** A scenario starts from the same browser state alone or inside `all`, but not
+  from the same server: inside `all` the server has run longer and the monitor's history (300 s, in memory) is full.
+  When the server's uptime or the history's length differs by more than a factor of two between the two sides, the
+  report prints a note next to the scenario. Compare two runs of the same command.
+- **Profiled windows.** A window measured under a profiler is tagged `profiled`: the profiler inflates its CPU and the
+  server's event loop, so its figures compare only with another profiled window. The overview shows only the windows
+  measured without one.
+- **Software rendering.** When Chromium composites in software, a red banner says so at the top of the report: the
+  page and GPU-process figures then overstate blur and animation costs several times over and do not stand for a
+  desktop browser.
+
+## Where a run lives
+
+<FileTree>
+
+- `.cache/profiling/<run>/`
+  - `run.json` options, scenarios, versions, machine, Chromium's GPU status, start and end
+  - `state.json` what must be undone (pids, conversation ids, the default profile to restore)
+  - `data/<scenario>/` windows, `.cpuprofile` files, traces
+  - `sourcemaps/` the client's maps of this build
+  - `results.json` the figures of the report, with a format version
+  - `report.html` the report, one file with no external resource
+
+</FileTree>
+
+`.cache/` is ignored by git, the formatter and the linter. `pnpm profiling:report` reads `results.json` only, so a
+report can be rewritten, or compared, without the raw data.
+
+## What the tool undoes
+
+Everything the tool starts or creates is written to `state.json` before use. The end of the command (failed scenarios included),
+Ctrl+C and SIGTERM run the same undo: delete the temporary conversations, stop llama-server through the API, restore
+the default profile, close Chromium, then stop the server and wait for its exit. A second Ctrl+C quits at once.
+
+A run killed before its undo (`kill -9`, a crash) leaves its `state.json`: the next `pnpm profiling` undoes it before
+it starts, and prints what it cleaned.
