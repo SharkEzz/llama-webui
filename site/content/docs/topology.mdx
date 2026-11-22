@@ -212,13 +212,14 @@ these cards after the drawing: scroll the page to read them.
 The **Phase** card shows what `llama-server` is doing, with the current **Generation** and **Prompt** speeds in
 tok/s (the same as on the [Dashboard](/docs/dashboard/)).
 
-| Phase          | Meaning                                                                     |
-| -------------- | --------------------------------------------------------------------------- |
-| **Stopped**    | No server runs, or it is stopping or has crashed.                           |
-| **Loading**    | The server is starting and loading its model.                               |
-| **Idle**       | The server is ready and no slot is busy.                                    |
-| **Prompt**     | A busy slot has not generated its first token yet: the prompt is processed. |
-| **Generating** | Tokens are being generated.                                                 |
+| Phase          | Meaning                                                                              |
+| -------------- | ------------------------------------------------------------------------------------ |
+| **Stopped**    | No server runs, or it is stopping or has crashed.                                    |
+| **Loading**    | The server is starting and loading its model (with stage and percentage when known). |
+| **Sleeping**   | The server is in idle sleep (`--sleep-idle-seconds`): VRAM is released until wake.   |
+| **Idle**       | The server is ready and no slot is busy.                                             |
+| **Prompt**     | A busy slot has not generated its first token yet: the prompt is processed.          |
+| **Generating** | Tokens are being generated.                                                          |
 
 ### Model
 
@@ -236,9 +237,9 @@ When the split is not known, the card says why:
 
 - **No managed server: split unknown.** No server runs.
 - **Loading: the split arrives with the logs.** The server is still reading the model.
-- **Split unknown: an external server, or a profile whose -lv is below 4.** The server was not launched by
-  llama-webui, or the profile sets a log verbosity under 4 (`-lv 3`, say), at which `llama-server` does not log its
-  buffer sizes.
+- **Model is sleeping: VRAM released until the next request.** The server is in idle sleep.
+- **Split unknown: an external server without /models/sse, or a profile whose -lv is below 4.** Neither buffer logs nor
+  `/models/sse` memory breakdown are available.
 
 With `-sm tensor`, the card adds **estimate (tensor parallel)**: see below. When peer-to-peer is requested or
 reported, a last line gives its state.
@@ -259,9 +260,10 @@ llama-webui reads those lines from the [logs](/docs/logs/) of the last launch:
 
 `llama-server` only writes the buffer sizes from log verbosity 4 on, so llama-webui starts it with `-lv 4` unless the
 profile sets a verbosity itself (`-lv`, `-v` or `LLAMA_ARG_LOG_VERBOSITY`). The card and the bars fill in while the
-model loads and update live. This only works for a server llama-webui launched: an external server's output never
-reaches llama-webui. If the logs do not give a device's PCI address, its slice is shown in gray and its bar keeps a
-single gray layer.
+model loads and update live. When startup buffer logs are missing (an external server or a profile with `-lv < 4`),
+llama-webui falls back to the memory breakdown sent on `/models/sse` (single-model mode, llama.cpp PR #32398), marking
+the card **from /models/sse** when layer counts are unavailable. If neither logs nor an unambiguous single-GPU match
+give a device's PCI address, its slice is shown in gray and its bar keeps a single gray layer.
 
 With `-sm tensor` (tensor parallelism), `llama-server` groups the GPUs into one `Meta()` device and logs each buffer at
 the size of its largest part. llama-webui spreads it over the GPUs listed in the logs by `-ts` (equal parts without

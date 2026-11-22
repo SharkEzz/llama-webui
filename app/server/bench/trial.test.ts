@@ -1,6 +1,6 @@
 import { assert, describe, it } from '@effect/vitest';
-import { DEFAULT_SETTINGS, type Profile } from '@llama-webui/shared';
-import { Effect, Layer, Option, type Scope } from 'effect';
+import { DEFAULT_SETTINGS, type LoadProgress, type Profile } from '@llama-webui/shared';
+import { Array as Arr, Effect, Layer, Option, Ref, type Scope } from 'effect';
 import { health } from '../llama/probes.ts';
 import { buildCommand } from '../supervisor/command.ts';
 import { FAKE, fakeOutside, freePort } from '../testing/llama.ts';
@@ -66,6 +66,40 @@ describe('trial', () => {
         const failed = yield* Effect.flip(trialOf(cmd));
         assert.strictEqual(failed.message, '/v1/chat/completions responded 400');
         // Stopped at the end.
+        const after = yield* health({ host: '127.0.0.1', port });
+        assert.deepStrictEqual(after, Option.none());
+      }),
+    ),
+  );
+
+  it.live('a trial forwards /models/sse loading progress before warmup and measurement', () =>
+    fresh(
+      Effect.gen(function* () {
+        const port = yield* freePort;
+        const cmd = yield* fakeOn(port, {
+          FAKE_SSE: '1',
+          FAKE_SSE_STAGES: 'text_model,mmproj_model',
+          FAKE_LOAD_MS: '180',
+        });
+        const seen = yield* Ref.make<ReadonlyArray<LoadProgress>>([]);
+        const result = yield* runTrial({
+          cmd,
+          p: 16,
+          n: 4,
+          r: 1,
+          onPhase: () => Effect.void,
+          onLoadProgress: (p) => Ref.update(seen, Arr.append(p)),
+          onLine: () => Effect.void,
+          onSpawn: () => Effect.void,
+          say: () => Effect.void,
+          killTimeout: '1 second',
+          healthPoll: '50 millis',
+        });
+        const progress = yield* Ref.get(seen);
+        assert.isAbove(progress.length, 0);
+        assert.isTrue(Arr.some(progress, (p) => p.current === 'text_model'));
+        assert.isAbove(result.pp.tps, 0);
+        assert.isAbove(result.tg.tps, 0);
         const after = yield* health({ host: '127.0.0.1', port });
         assert.deepStrictEqual(after, Option.none());
       }),

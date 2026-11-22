@@ -65,6 +65,7 @@ const supervisorWith = (options: Options) =>
 type Services =
   | Supervisor
   | LogRing
+  | LlamaHttp
   | Published
   | FileSystem.FileSystem
   | Path.Path
@@ -755,6 +756,78 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
       const after = yield* Clock.currentTimeMillis;
       yield* assertGone(pidOf(stubborn));
       assert.isBelow(after - before, 3000);
+    }),
+  );
+
+  it.effect('/models/sse streams loading progress, transitions to ready with memory, and handles sleep/wake', () =>
+    fresh()(
+      Effect.gen(function* () {
+        const supervisor = yield* Supervisor;
+        const client = yield* LlamaHttp;
+        const cmd = yield* startFake({
+          env: { FAKE_SSE: '1', FAKE_LOAD_MS: '180', FAKE_SLEEP_AFTER_MS: '150' },
+        });
+        const ready = yield* stateWhen(kindIs('ready'));
+        const memOnReady = yield* supervisor.memory;
+        assert.isNotNull(memOnReady);
+        assert.strictEqual(memOnReady.devices[0]?.name, 'CUDA0');
+
+        const seen = yield* publishedViews;
+        assert.isTrue(
+          Arr.some(seen, (v) => v.state.kind === 'starting' && v.state.progress !== undefined),
+          'expected at least one starting state with SSE load progress',
+        );
+
+        // Enters sleeping automatically once idle timer fires; memory cleared while sleeping.
+        const sleeping = yield* stateWhen(kindIs('sleeping'));
+        assert.strictEqual(sleeping.kind, 'sleeping');
+        const memWhileSleeping = yield* supervisor.memory;
+        assert.isNull(memWhileSleeping);
+
+        // Waking up via /slots transitions sleeping -> starting -> ready and restores memory.
+        yield* client.get(`http://127.0.0.1:${cmd.port}/slots`).pipe(Effect.scoped, Effect.ignore);
+        yield* stateWhen(kindIs('ready'));
+        const memAfterWake = yield* supervisor.memory;
+        assert.deepStrictEqual(memAfterWake, memOnReady);
+
+        // Stopping a sleeping server works cleanly too.
+        yield* stateWhen(kindIs('sleeping'));
+        yield* supervisor.stop;
+        yield* assertState({ kind: 'idle' });
+        const memAfterStop = yield* supervisor.memory;
+        assert.isNull(memAfterStop);
+        yield* assertGone(pidOf(ready));
+      }),
+    ),
+  );
+
+  it.effect('/models/sse tracks external server loading, ready, memory, and sleeping states', () =>
+    Effect.gen(function* () {
+      const port = yield* freePort;
+      const extScope = yield* Scope.make();
+      yield* fakeOutside({
+        port,
+        env: { FAKE_SSE: '1', FAKE_LOAD_MS: '0', FAKE_SLEEP_AFTER_MS: '250' },
+      }).pipe(Scope.provide(extScope));
+      try {
+        yield* fresh()(
+          Effect.gen(function* () {
+            const supervisor = yield* Supervisor;
+            const detected = yield* supervisor.detectExternal(port);
+            assert.isTrue(detected);
+            const extReady = yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
+            assert.strictEqual(extReady.kind, 'external');
+            const extMem = yield* supervisor.memory;
+            assert.isNotNull(extMem);
+
+            yield* stateWhen((s) => s.kind === 'external' && s.status === 'sleeping');
+            const extSleepMem = yield* supervisor.memory;
+            assert.isNull(extSleepMem);
+          }),
+        );
+      } finally {
+        yield* Scope.close(extScope, Exit.void);
+      }
     }),
   );
 });

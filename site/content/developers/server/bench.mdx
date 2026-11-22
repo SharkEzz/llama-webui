@@ -91,7 +91,7 @@ with `BenchRunning` `A benchmark is running`):
    stop that someone else started leaves nothing to restart.
 2. If an external server runs: `ExternalServerRunning` `An external llama-server is running on port N: stop it
 first`.
-3. If the managed server is starting or ready and `stopServer` is false: `ServerRunning`. The web app tells it by its
+3. If the managed server is starting, ready or sleeping and `stopServer` is false: `ServerRunning`. The web app tells it by its
    `_tag`, shows its confirmation dialog, then sends the same request again with `stopServer: true`.
 4. Otherwise it records the supervisor's `lastCommand`, logs `[bench] stopping llama-server for the benchmark`, and
    forks the stop in the runner's scope **without awaiting it**.
@@ -251,8 +251,9 @@ If something already answers `/health` on the port, the run fails with `port N i
   </Step>
   <Step title="Load">
 
-It spawns the server and polls `/health` every 500 ms until it answers `200`. It fails with `loading > 10 min` after
-10 minutes (`loadTimeout`), or with the failure read from its output (see
+It spawns the server and follows `GET /models/sse` for live `loadProgress` (`status_change` events) until `loaded`,
+falling back automatically to polling `/health` every 500 ms until `200` on older builds (`404`/`503`). It fails with
+`loading > 10 min` after 10 minutes (`loadTimeout`), or with the failure read from its output (see
 [Failure messages](#failure-messages)) if the process exits first.
 
   </Step>

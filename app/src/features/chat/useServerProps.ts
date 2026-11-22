@@ -4,16 +4,16 @@ import { useServer } from '@/lib/server';
 
 export type { ServerProps };
 
-/** /props of the ready server (reread on every state change), otherwise null. */
+/** /props of the ready or sleeping server (reread when the running process changes), otherwise null. */
 export function useServerProps(): ServerProps | null {
   const kind = useServer((s) => s.view?.state.kind);
   const pid = useServer((s) => (s.view && 'pid' in s.view.state ? s.view.state.pid : null));
-  const ready = kind === 'ready' || kind === 'external';
+  const liveGroup = kind === 'external' ? 'external' : kind === 'ready' || kind === 'sleeping' ? 'managed' : null;
   const [props, setProps] = useState<ServerProps | null>(null);
-  // Out of ready, no props: cleared by the render that leaves it, before the effect of the next state
-  if (!ready && props !== null) setProps(null);
+  // Out of ready/sleeping, no props: cleared by the render that leaves it, before the effect of the next state
+  if (liveGroup === null && props !== null) setProps(null);
   useEffect(() => {
-    if (kind !== 'ready' && kind !== 'external') return;
+    if (liveGroup === null) return;
     let live = true;
     getServerProps().then(
       (p) => live && setProps(serverPropsOf(p)),
@@ -23,6 +23,6 @@ export function useServerProps(): ServerProps | null {
       live = false;
     };
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- pid is a trigger: /props is reread on every server restart
-  }, [kind, pid]);
+  }, [liveGroup, pid]);
   return props;
 }

@@ -1,86 +1,137 @@
-import type { ModelPlacement, ServerState } from '@llama-webui/shared';
-import { Array as Arr, Context, Effect, Equal, Layer, Option, Ref, Stream } from 'effect';
+import { isServerSleeping, type ModelPlacement, type ServerState } from '@llama-webui/shared';
+import { Array as Arr, Context, Effect, Equal, type FileSystem, Layer, Option, type Path, Ref, Stream } from 'effect';
+import type { ModelMemory } from 'llamacpp-js/models';
 import { LogRing } from '../logs/LogRing.ts';
 import { Supervisor } from '../supervisor/Supervisor.ts';
 import { WsHub } from '../ws/WsHub.ts';
-import { parsePlacement, RELEVANT } from './placementLog.ts';
+import { parseBusIds, parsePlacement, RELEVANT } from './placementLog.ts';
+import { placementFromMemory, readSysfsGpus, type SysfsGpu } from './placementMemory.ts';
 
-/** What the placement holds: the last state seen, the placement it published, the last one read and its pid. */
+/** What the placement holds: the last state and SSE memory seen, the published placement, and the last log placement by pid. */
 interface Held {
   readonly state: ServerState;
+  readonly memory: ModelMemory | null;
   readonly current: ModelPlacement | null;
   readonly last: Option.Option<{ readonly pid: number; readonly placement: ModelPlacement }>;
 }
 
+type Event =
+  | { readonly kind: 'state'; readonly state: ServerState }
+  | { readonly kind: 'memory'; readonly memory: ModelMemory | null }
+  | { readonly kind: 'logs' };
+
 /**
- * How the managed llama-server's model is split across the devices, read from the log ring and followed as it changes.
- * The ring only keeps the latest lines: once the launch line is evicted (request logs, -lv 4), the last placement read
- * stays valid while the server of the same pid runs. An external server writes nothing to the ring: its placement is
- * unknown even when the ring still holds an old launch.
+ * How the active llama-server's model is split across devices, read from the log ring (primary, with PCI busIds,
+ * layer counts and P2P) and falling back to `/models/sse` `data.memory` when startup buffer logs are missing
+ * (external server, profile with `-lv < 4`, or evicted ring). While sleeping, the model is unloaded from VRAM so the
+ * placement is null.
  */
 export class Placement extends Context.Service<
   Placement,
   {
-    /** The placement of the managed server, null when none runs or before its launch line. */
+    /** The placement of the active server, null when none runs, while sleeping, or before any placement is known. */
     readonly current: Effect.Effect<ModelPlacement | null>;
   }
 >()('@llama-webui/app/server/monitor/Placement') {
-  /**
-   * Reads the placement from the ring and the state once (no message), then follows the supervisor's changes and the
-   * ring's batches that hold a line that can change it; each new placement is published as `placement`.
-   */
-  static readonly layer: Layer.Layer<Placement, never, Supervisor | LogRing | WsHub> = Layer.effect(
-    Placement,
-    Effect.gen(function* () {
-      const supervisor = yield* Supervisor;
-      const ring = yield* LogRing;
-      const hub = yield* WsHub;
-      // Subscribed before the first reading: no change between the two is missed.
-      const changes = yield* supervisor.changes;
-      const batches = yield* ring.batches;
+  /** Builds `Placement` with an injectable sysfs GPU list (for tests). */
+  static readonly layerWith = (options: {
+    readonly gpus: Effect.Effect<ReadonlyArray<SysfsGpu>>;
+  }): Layer.Layer<Placement, never, Supervisor | LogRing | WsHub> =>
+    Layer.effect(
+      Placement,
+      Effect.gen(function* () {
+        const supervisor = yield* Supervisor;
+        const ring = yield* LogRing;
+        const hub = yield* WsHub;
+        const gpus = yield* options.gpus;
+        // Subscribed before the first reading: no change between the two is missed.
+        const changes = yield* supervisor.changes;
+        const memoryChanges = yield* supervisor.memoryChanges;
+        const batches = yield* ring.batches;
 
-      /** What to hold once the placement is read again, with `state` as the supervisor's state. */
-      const reread = (held: Held, state: ServerState): Effect.Effect<Held> => {
-        // Only starting, ready and stopping are a managed server (idle, crashed: none; external: no logs).
-        if (state.kind !== 'starting' && state.kind !== 'ready' && state.kind !== 'stopping') {
-          return Effect.succeed({ state, current: null, last: Option.none() });
-        }
-        return Effect.map(ring.since(0), (lines): Held => {
-          const parsed = parsePlacement(lines);
-          if (parsed !== null) {
-            return { state, current: parsed, last: Option.some({ pid: state.pid, placement: parsed }) };
+        /** What to hold once the placement is recomputed from `state`, `memory` and the log ring. */
+        const reread = (held: Held, state: ServerState, memory: ModelMemory | null): Effect.Effect<Held> => {
+          if (state.kind === 'idle' || state.kind === 'crashed' || isServerSleeping(state)) {
+            return Effect.succeed({ state, memory, current: null, last: Option.none() });
           }
-          const kept = Option.filter(held.last, (last) => last.pid === state.pid);
-          return { state, current: Option.getOrNull(Option.map(kept, (last) => last.placement)), last: kept };
-        });
-      };
+          if (state.kind === 'external') {
+            const fromSse = memory === null ? null : placementFromMemory({ memory, gpus });
+            return Effect.succeed({ state, memory, current: fromSse, last: Option.none() });
+          }
+          return Effect.map(ring.since(0), (lines): Held => {
+            const parsed = parsePlacement(lines);
+            if (parsed !== null && parsed.buffers.length > 0) {
+              return { state, memory, current: parsed, last: Option.some({ pid: state.pid, placement: parsed }) };
+            }
+            const kept = Option.filter(held.last, (last) => last.pid === state.pid);
+            if (Option.isSome(kept)) {
+              return { state, memory, current: kept.value.placement, last: kept };
+            }
+            if (memory !== null) {
+              const fromSse = placementFromMemory({
+                memory,
+                busIds: parseBusIds(lines),
+                gpus,
+                ...(parsed === null
+                  ? {}
+                  : {
+                      launchSeq: parsed.launchSeq,
+                      layers: parsed.layers,
+                      ...(parsed.p2p === undefined ? {} : { p2p: parsed.p2p }),
+                    }),
+              });
+              if (fromSse !== null) return { state, memory, current: fromSse, last: Option.none() };
+            }
+            return { state, memory, current: parsed, last: Option.none() };
+          });
+        };
 
-      const now = yield* supervisor.state;
-      const initial = yield* reread({ state: now, current: null, last: Option.none() }, now);
-      const held = yield* Ref.make(initial);
-
-      /** Reads the placement again, on a new state or with the last one seen; a new placement is published. */
-      const follow = Effect.fnUntraced(function* (change: Option.Option<ServerState>) {
-        const before = yield* Ref.get(held);
-        const next = yield* reread(
-          before,
-          Option.getOrElse(change, () => before.state),
+        const nowState = yield* supervisor.state;
+        const nowMemory = yield* supervisor.memory;
+        const initial = yield* reread(
+          { state: nowState, memory: nowMemory, current: null, last: Option.none() },
+          nowState,
+          nowMemory,
         );
-        yield* Ref.set(held, next);
-        if (!Equal.equals(next.current, before.current)) {
-          yield* hub.publish({ type: 'placement', payload: next.current });
-        }
-      });
+        const held = yield* Ref.make(initial);
 
-      yield* Stream.merge(
-        Stream.map(changes, Option.some),
-        batches.pipe(
-          Stream.filter(Arr.some((line) => RELEVANT.test(line.text))),
-          Stream.map(() => Option.none<ServerState>()),
-        ),
-      ).pipe(Stream.runForEach(follow), Effect.forkScoped);
+        /** Recomputes placement on any state, memory or relevant log batch; publishes when changed. */
+        const follow = Effect.fnUntraced(function* (event: Event) {
+          const before = yield* Ref.get(held);
+          const nextState = event.kind === 'state' ? event.state : before.state;
+          const nextMemory = event.kind === 'memory' ? event.memory : before.memory;
+          const next = yield* reread(before, nextState, nextMemory);
+          yield* Ref.set(held, next);
+          if (!Equal.equals(next.current, before.current)) {
+            yield* hub.publish({ type: 'placement', payload: next.current });
+          }
+        });
 
-      return Placement.of({ current: Effect.map(Ref.get(held), (h) => h.current) });
+        yield* Stream.mergeAll(
+          [
+            Stream.map(changes, (state): Event => ({ kind: 'state', state })),
+            Stream.map(memoryChanges, (memory): Event => ({ kind: 'memory', memory })),
+            batches.pipe(
+              Stream.filter(Arr.some((line) => RELEVANT.test(line.text))),
+              Stream.map((): Event => ({ kind: 'logs' })),
+            ),
+          ],
+          { concurrency: 'unbounded' },
+        ).pipe(Stream.runForEach(follow), Effect.forkScoped);
+
+        return Placement.of({ current: Effect.map(Ref.get(held), (h) => h.current) });
+      }),
+    );
+
+  /** Reads placement from the log ring and `/models/sse`, resolving single-GPU PCI busIds from sysfs. */
+  static readonly layer: Layer.Layer<
+    Placement,
+    never,
+    Supervisor | LogRing | WsHub | FileSystem.FileSystem | Path.Path
+  > = Layer.unwrap(
+    Effect.gen(function* () {
+      const ctx = yield* Effect.context<FileSystem.FileSystem | Path.Path>();
+      return Placement.layerWith({ gpus: readSysfsGpus().pipe(Effect.provideContext(ctx)) });
     }),
   );
 }

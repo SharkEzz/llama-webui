@@ -301,4 +301,42 @@ layer(NodeServices.layer, { excludeTestServices: true })('Placement', (it) => {
       }),
     ),
   );
+
+  it.effect(
+    'Placement: falls back to /models/sse memory for external servers and managed servers without buffer logs',
+    () =>
+      fresh(50)(
+        Effect.gen(function* () {
+          const supervisor = yield* Supervisor;
+          const placement = yield* Layer.build(
+            Placement.layerWith({ gpus: Effect.succeed([{ busId: '0000:01:00.0', vendor: 'nvidia' }]) }),
+          ).pipe(Effect.map(Context.get(Placement)));
+
+          // Managed server with FAKE_SSE=1 and no buffer size logs in LogRing -> SSE fallback.
+          yield* startFake({ FAKE_SSE: '1', FAKE_LOAD_MS: '50', FAKE_SLEEP_AFTER_MS: '200' });
+          const ready = yield* stateWhen((s) => s.kind === 'ready');
+          const fromSse = yield* placement.current.pipe(when((p) => p?.source === 'sse'));
+          assert.strictEqual(fromSse?.source, 'sse');
+          assert.strictEqual(fromSse?.buffers[0]?.device, 'CUDA0');
+          assert.strictEqual(fromSse?.buffers[0]?.busId, '0000:01:00.0');
+
+          // Sleeping clears placement.
+          yield* stateWhen((s) => s.kind === 'sleeping');
+          const whileSleeping = yield* placement.current.pipe(when((p) => p === null));
+          assert.isNull(whileSleeping);
+
+          yield* supervisor.stop;
+          yield* assertGone(pidOf(ready));
+
+          // External server with FAKE_SSE=1 -> SSE fallback placement.
+          const port = yield* freePort;
+          yield* fakeOutside({ port, env: { FAKE_SSE: '1', FAKE_LOAD_MS: '0' } });
+          yield* supervisor.detectExternal(port);
+          const extPlacement = yield* placement.current.pipe(when((p) => p?.source === 'sse'));
+          assert.strictEqual(extPlacement?.source, 'sse');
+          assert.strictEqual(extPlacement?.buffers[0]?.device, 'CUDA0');
+          assert.strictEqual(extPlacement?.buffers[0]?.busId, '0000:01:00.0');
+        }),
+      ),
+  );
 });

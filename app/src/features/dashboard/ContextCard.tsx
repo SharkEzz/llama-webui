@@ -1,4 +1,10 @@
-import { type Snapshot, slotContextTokens } from '@llama-webui/shared';
+import {
+  type LoadProgress,
+  loadProgressPct,
+  loadStageLabel,
+  type Snapshot,
+  slotContextTokens,
+} from '@llama-webui/shared';
 import { Layers } from 'lucide-react';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { Badge } from '@/components/ui/badge';
@@ -6,15 +12,40 @@ import { Progress } from '@/components/ui/progress';
 import { formatInt, formatPct } from '@/lib/format';
 
 /** Slots (context used per slot) and request queue; `loading` while the model loads (no /slots yet). */
-export function ContextCard({ snapshot, loading = false }: { snapshot: Snapshot; loading?: boolean }) {
+export function ContextCard({
+  snapshot,
+  loading = false,
+  loadProgress = null,
+  sleeping = false,
+}: {
+  snapshot: Snapshot;
+  loading?: boolean;
+  loadProgress?: LoadProgress | null;
+  sleeping?: boolean;
+}) {
   const { slots, queue } = snapshot;
+  const loadPct = loadProgress ? loadProgressPct(loadProgress) : null;
   return (
     <GlassCard title="Slots and context" icon={Layers} tone="rose">
       <div className="flex flex-col gap-4">
         {!slots || slots.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {loading ? 'Loading the model…' : '/slots unavailable for this server.'}
-          </p>
+          loading && loadProgress ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-baseline justify-between gap-2 text-sm text-muted-foreground">
+                <span>Loading {loadStageLabel(loadProgress.current).toLowerCase()}…</span>
+                {loadPct !== null && <span className="num text-xs">{formatPct(loadPct)}</span>}
+              </div>
+              <Progress value={loadPct} aria-label="Model loading progress" />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {loading
+                ? 'Loading the model…'
+                : sleeping
+                  ? 'Model is sleeping (unloaded from memory); it will reload on the next request.'
+                  : '/slots unavailable for this server.'}
+            </p>
+          )
         ) : (
           slots.map((s) => {
             const used = slotContextTokens(s);

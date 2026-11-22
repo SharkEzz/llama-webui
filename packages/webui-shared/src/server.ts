@@ -1,4 +1,4 @@
-import { Schema } from 'effect';
+import { Array as Arr, Option, Schema } from 'effect';
 
 /** The fields of a server llama-webui launched: its profile, its process, and the `--host` and port it listens on. */
 const launched = {
@@ -9,14 +9,35 @@ const launched = {
   port: Schema.Int,
 };
 
+/** Live model-loading progress from llama-server's `/models/sse` (single-model mode, llama.cpp PR #32398). */
+export const LoadProgress = Schema.Struct({
+  /** Ordered stages of this load (e.g. `['text_model', 'spec_model', 'mmproj_model']`); empty when not yet reported. */
+  stages: Schema.Array(Schema.String),
+  /** Stage currently loading (`text_model`, `spec_model`, `mmproj_model`, or another name future builds add). */
+  current: Schema.String,
+  /** Fraction loaded within `current` in `[0, 1]`; null when the stage has no scalar progress yet. */
+  value: Schema.NullOr(Schema.Finite),
+});
+export type LoadProgress = typeof LoadProgress.Type;
+
+/** Live status of an external llama-server reported by `/models/sse`, when that server supports it. */
+export const ExternalStatus = Schema.Literals(['loading', 'ready', 'sleeping']);
+export type ExternalStatus = typeof ExternalStatus.Type;
+
 /**
  * State of the supervised llama-server, told by its `kind`. `host` is the `--host` it listens on: the probes go there
  * (loopback for a wildcard address). An external server is reached on loopback.
  */
 export const ServerState = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('idle') }),
-  Schema.Struct({ kind: Schema.Literal('starting'), ...launched, since: Schema.Int }),
+  Schema.Struct({
+    kind: Schema.Literal('starting'),
+    ...launched,
+    since: Schema.Int,
+    progress: Schema.optionalKey(LoadProgress),
+  }),
   Schema.Struct({ kind: Schema.Literal('ready'), ...launched, since: Schema.Int }),
+  Schema.Struct({ kind: Schema.Literal('sleeping'), ...launched, since: Schema.Int }),
   Schema.Struct({ kind: Schema.Literal('stopping'), ...launched }),
   Schema.Struct({
     kind: Schema.Literal('crashed'),
@@ -27,7 +48,13 @@ export const ServerState = Schema.Union([
     at: Schema.Int,
     message: Schema.optionalKey(Schema.String),
   }),
-  Schema.Struct({ kind: Schema.Literal('external'), pid: Schema.NullOr(Schema.Int), port: Schema.Int }),
+  Schema.Struct({
+    kind: Schema.Literal('external'),
+    pid: Schema.NullOr(Schema.Int),
+    port: Schema.Int,
+    status: Schema.optionalKey(ExternalStatus),
+    progress: Schema.optionalKey(LoadProgress),
+  }),
 ]);
 export type ServerState = typeof ServerState.Type;
 
@@ -42,9 +69,49 @@ export type ServerView = typeof ServerView.Type;
 /** The `--host` of a state's server: null for an external one (reached on loopback) or no server. */
 export const stateHost = (s: ServerState): string | null => ('host' in s ? s.host : null);
 
-/** The profile of the server llama-webui runs (starting, ready or stopping), else null. */
+/** The profile of the server llama-webui runs (starting, ready, sleeping or stopping), else null. */
 export const activeProfileId = (state: ServerState): number | null =>
-  state.kind === 'starting' || state.kind === 'ready' || state.kind === 'stopping' ? state.profileId : null;
+  state.kind === 'starting' || state.kind === 'ready' || state.kind === 'sleeping' || state.kind === 'stopping'
+    ? state.profileId
+    : null;
+
+/** Labels for the stages llama-server's `/models/sse` reports while loading. */
+export const LOAD_STAGE_LABEL: Readonly<Record<string, string>> = {
+  text_model: 'Model',
+  spec_model: 'Draft model',
+  mmproj_model: 'Projector',
+};
+
+/** Readable label for a loading stage (`text_model` → `Model`, unknown stages kept as is). */
+export const loadStageLabel = (stage: string): string => LOAD_STAGE_LABEL[stage] ?? stage;
+
+const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
+
+/** Overall loading percentage in `[0, 100]` across the reported stages, or null when no scalar progress is known. */
+export const loadProgressPct = (progress: LoadProgress): number | null => {
+  const index = Arr.findFirstIndex(progress.stages, (s) => s === progress.current);
+  if (Option.isSome(index) && Arr.isReadonlyArrayNonEmpty(progress.stages)) {
+    const within = progress.value === null ? 0 : clamp01(progress.value);
+    return ((index.value + within) / progress.stages.length) * 100;
+  }
+  return progress.value === null ? null : clamp01(progress.value) * 100;
+};
+
+/** Live loading progress attached to `state`, when starting or when an external server reports `loading`. */
+export const stateLoadProgress = (state: ServerState | undefined): LoadProgress | null => {
+  if (state === undefined) return null;
+  if (state.kind === 'starting') return state.progress ?? null;
+  if (state.kind === 'external' && state.status === 'loading') return state.progress ?? null;
+  return null;
+};
+
+/** True when the server (managed or external) is loading a model. */
+export const isServerLoading = (state: ServerState | undefined): boolean =>
+  state !== undefined && (state.kind === 'starting' || (state.kind === 'external' && state.status === 'loading'));
+
+/** True when the server (managed or external) is sleeping (`--sleep-idle-seconds`). */
+export const isServerSleeping = (state: ServerState | undefined): boolean =>
+  state !== undefined && (state.kind === 'sleeping' || (state.kind === 'external' && state.status === 'sleeping'));
 
 /** The view of a state: the last command, and the profile of the state when it has one, else of the last command. */
 export const serverView = ({

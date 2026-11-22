@@ -140,16 +140,19 @@ buffers; the projector's buffers and the fitting probes of `-fit` are skipped. N
 peer-to-peer is in use. The sizes are only logged from `-lv 4` on, which
 llama-webui adds to a profile that sets no verbosity.
 
-`placement` is null when no managed server is `starting`, `ready` or `stopping`, before the launch line appears in the
-logs, and for an external server (it writes nothing to the ring). Once the launch line is evicted from the ring, the
-last placement read stays valid as long as the server has the same PID.
+`placement` is null when no server runs, while a server is `sleeping`, or before any placement is known. For a managed
+server with `-lv 4` (the default), startup logs remain primary because they carry PCI `busId`s, layer counts and P2P
+status. When startup buffer logs are absent (an external server or a profile with `-lv < 4`), `Placement` falls back to
+the `data.memory` report from `/models/sse` (`source: 'sse'`), resolving `busId` when unambiguous. Once the launch line
+is evicted from the ring, the last placement read stays valid as long as the server has the same PID.
 
-| Field       | Type                                                     | Description                                                                                        |
-| ----------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `launchSeq` | number                                                   | Sequence number of the `[llama-webui] launch:` log line it comes from.                             |
-| `layers`    | `{ offloaded, total }` \| null                           | From `offloaded N/M layers to GPU`; null until that line has gone by.                              |
-| `buffers`   | `PlacementBuffer[]`                                      | One per device that has buffers.                                                                   |
-| `p2p`       | `'active'` \| `'unavailable'` \| `'requested'`, optional | Peer-to-peer between the GPUs of a backend, see below. Absent when neither requested nor reported. |
+| Field       | Type                                                     | Description                                                                                                  |
+| ----------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `launchSeq` | number                                                   | Sequence number of the `[llama-webui] launch:` log line it comes from (`0` for SSE fallback without logs).   |
+| `layers`    | `{ offloaded, total }` \| null                           | From `offloaded N/M layers to GPU`; null until that line has gone by (or when read from `/models/sse`).      |
+| `buffers`   | `PlacementBuffer[]`                                      | One per device that has buffers.                                                                             |
+| `p2p`       | `'active'` \| `'unavailable'` \| `'requested'`, optional | Peer-to-peer between the GPUs of a backend, see below. Absent when neither requested nor reported.           |
+| `source`    | `'logs'` \| `'sse'`, optional                            | Where the buffer breakdown came from (`'sse'` when derived from `/models/sse` `data.memory`; absent = logs). |
 
 `PlacementBuffer`:
 
@@ -177,9 +180,9 @@ Every change is pushed as the `placement` message of the [WebSocket](/developers
 
 `packages/webui-shared/src/topology.ts` holds the pure logic the UI uses with this payload:
 
-| Export              | What it does                                                                                                       |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `hostDevice()`      | True for host-side (RAM) buffers: `CPU`, `CPU_*` (`CPU_Mapped`, `CPU_REPACK`…) and `*_Host`.                       |
-| `placementTotals()` | `modelBytes`, `gpuModelBytes` and `hostModelBytes` of a placement.                                                 |
-| `phaseOf()`         | `stopped`, `loading`, `idle`, `prompt` or `generating`, from the supervisor state and the latest snapshot's slots. |
-| `pcieBps()`         | Payload capacity of a link per direction (bytes/s) from its generation and width; null if either is unknown.       |
+| Export              | What it does                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `hostDevice()`      | True for host-side (RAM) buffers: `CPU`, `CPU_*` (`CPU_Mapped`, `CPU_REPACK`…), `*_Host` and `Host` (`/models/sse`).           |
+| `placementTotals()` | `modelBytes`, `gpuModelBytes` and `hostModelBytes` of a placement.                                                             |
+| `phaseOf()`         | `stopped`, `loading`, `sleeping`, `idle`, `prompt` or `generating`, from the supervisor state and the latest snapshot's slots. |
+| `pcieBps()`         | Payload capacity of a link per direction (bytes/s) from its generation and width; null if either is unknown.                   |

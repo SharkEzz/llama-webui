@@ -15,9 +15,8 @@ export interface ChatTarget {
 }
 
 /**
- * The llama-server that answers the chat: the managed one once it is `ready` (its `--host`, its port, its profile and
- * that profile's model, null when the profile is gone), an external one on loopback at its port (no profile, no
- * model), else none.
+ * The llama-server that answers the chat: the managed one once it is `ready` or `sleeping` (sending a request wakes
+ * llama-server automatically), an external one on loopback at its port (no profile, no model), else none.
  */
 export const chatTarget: Effect.Effect<
   Option.Option<ChatTarget>,
@@ -29,7 +28,7 @@ export const chatTarget: Effect.Effect<
   if (state.kind === 'external') {
     return Option.some({ host: null, port: state.port, profileId: null, modelPath: null });
   }
-  if (state.kind !== 'ready') return Option.none();
+  if (state.kind !== 'ready' && state.kind !== 'sleeping') return Option.none();
   const profiles = yield* ProfilesRepo;
   const modelPath = yield* profiles.get(state.profileId).pipe(
     Effect.flatMap((profile) => Effect.map(resolveProfilePaths(profile), (p) => p.model)),

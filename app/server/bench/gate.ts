@@ -108,7 +108,8 @@ export const makeGate = Effect.fn('makeGate')(function* (options: {
         return yield* ExternalServerRunning.make({
           message: `An external llama-server is running on port ${now.port}: stop it first`,
         });
-      if (now.kind !== 'starting' && now.kind !== 'ready') return yield* Ref.set(state, { ...FREE, held: true });
+      if (now.kind !== 'starting' && now.kind !== 'ready' && now.kind !== 'sleeping')
+        return yield* Ref.set(state, { ...FREE, held: true });
       if (!request.stopServer)
         return yield* ServerRunning.make({
           message: `llama-server is running (profile ${now.profile}): it will be stopped during the benchmark, then restarted`,

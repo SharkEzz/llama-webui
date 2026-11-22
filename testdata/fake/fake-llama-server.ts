@@ -84,12 +84,119 @@ if (process.env.FAKE_FAIL_ARG !== undefined && args.includes(process.env.FAKE_FA
   if (process.env.FAKE_TAIL !== undefined) process.stderr.write(process.env.FAKE_TAIL);
   await exit(1);
 }
+const sseEnabled = process.env.FAKE_SSE === "1";
+const sseStages = (process.env.FAKE_SSE_STAGES ?? "text_model").split(",").filter(Boolean);
+const sseSleepAfterMs = process.env.FAKE_SLEEP_AFTER_MS !== undefined ? Number(process.env.FAKE_SLEEP_AFTER_MS) : null;
+const sseMemory = {
+  n_ctx: Number(process.env.FAKE_N_CTX ?? 40192),
+  devices: [
+    { kind: "device", name: "CUDA0", total: 24 * 1024 ** 3, free: 10 * 1024 ** 3, model: 12 * 1024 ** 3, context: 2 * 1024 ** 3, compute: 512 * 1024 ** 2 },
+    { kind: "host", name: "Host", model: 0, context: 0, compute: 128 * 1024 ** 2 },
+  ],
+};
+const sseClients = new Set<ReadableStreamDefaultController<Uint8Array>>();
+const sseEnc = new TextEncoder();
+let sseLastEvent: unknown = null;
+let isSleeping = false;
+let isLoading = loadMs > 0;
+let sleepTimer: ReturnType<typeof setTimeout> | null = null;
+
+function sseEmit(event: string, data?: Record<string, unknown>) {
+  if (!sseEnabled) return;
+  const payload = { model: "fake-model", event, ...(data === undefined ? {} : { data }) };
+  sseLastEvent = payload;
+  const bytes = sseEnc.encode(`data: ${JSON.stringify(payload)}\n\n`);
+  for (const client of sseClients) {
+    try {
+      client.enqueue(bytes);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}
+
+function scheduleSleep() {
+  if (!sseEnabled || sseSleepAfterMs === null || sleepTimer !== null) return;
+  sleepTimer = setTimeout(() => {
+    sleepTimer = null;
+    isSleeping = true;
+    sseEmit("status_change", { status: "sleeping" });
+  }, sseSleepAfterMs);
+}
+
+function runLoadCycle(firstLoad: boolean) {
+  isLoading = loadMs > 0;
+  if (!sseEnabled) {
+    if (loadMs > 0) setTimeout(() => { isLoading = false; }, loadMs);
+    return;
+  }
+  sseEmit("status_change", { status: "loading" });
+  if (loadMs <= 0) {
+    isLoading = false;
+    isSleeping = false;
+    sseEmit("status_change", firstLoad ? { status: "loaded", info: { id: "fake-model" }, memory: sseMemory } : { status: "loaded" });
+    scheduleSleep();
+    return;
+  }
+  const steps = sseStages.flatMap((stage) => [
+    { stage, value: 0 },
+    { stage, value: 0.5 },
+    { stage, value: 1 },
+  ]);
+  const stepMs = Math.max(10, Math.floor(loadMs / (steps.length + 1)));
+  steps.forEach((step, idx) => {
+    setTimeout(() => {
+      sseEmit("status_change", {
+        status: "loading",
+        progress: { stages: sseStages, current: step.stage, value: step.value },
+      });
+    }, stepMs * idx);
+  });
+  setTimeout(() => {
+    if (process.env.FAKE_SSE_FAIL === "1") {
+      sseEmit("status_change", { status: "unloaded", exit_code: 1 });
+      log("failed to load model");
+      void exit(1);
+      return;
+    }
+    isLoading = false;
+    isSleeping = false;
+    sseEmit("status_change", firstLoad ? { status: "loaded", info: { id: "fake-model" }, memory: sseMemory } : { status: "loaded" });
+    scheduleSleep();
+  }, loadMs);
+}
+
+function wakeIfSleeping() {
+  if (!isSleeping) return;
+  isSleeping = false;
+  runLoadCycle(false);
+}
+
 const server = serve(port, host, async (req) => {
   const path = new URL(req.url).pathname;
-  const loading = Date.now() - t0 < loadMs;
-  if (path === "/health") return loading ? new Response('{"error":"loading"}', { status: 503 }) : Response.json({ status: "ok" });
+  const loading = isLoading || Date.now() - t0 < loadMs;
+  if (path === "/models/sse" && sseEnabled) {
+    let ctrl: ReadableStreamDefaultController<Uint8Array> | null = null;
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        ctrl = c;
+        sseClients.add(c);
+        if (sseLastEvent !== null) c.enqueue(sseEnc.encode(`data: ${JSON.stringify(sseLastEvent)}\n\n`));
+        req.signal.addEventListener("abort", () => {
+          sseClients.delete(c);
+          try { c.close(); } catch {}
+        });
+      },
+      cancel() {
+        if (ctrl !== null) sseClients.delete(ctrl);
+      },
+    });
+    return new Response(stream, { headers: { "content-type": "text/event-stream" } });
+  }
+  if (path === "/health") return loading ? new Response('{"error":{"type":"unavailable_error"}}', { status: 503 }) : Response.json({ status: "ok" });
   if (loading) return new Response("", { status: 503 });
   if (path === "/completion" && req.method === "POST") {
+    wakeIfSleeping();
     const body = (await req.json()) as { n_predict?: number };
     if (process.env.FAKE_CRASH_ON_PREDICT !== undefined && body.n_predict === Number(process.env.FAKE_CRASH_ON_PREDICT)) {
       // Dies mid-request, as llama-server does on a CUDA out-of-memory: the socket closes, no answer.
@@ -109,12 +216,19 @@ const server = serve(port, host, async (req) => {
       },
     });
   }
-  if (path === "/v1/chat/completions" && req.method === "POST") return chat(req);
-  if (path === "/slots") return file(`${dir}/slots-busy.json`);
+  if (path === "/v1/chat/completions" && req.method === "POST") {
+    wakeIfSleeping();
+    return chat(req);
+  }
+  if (path === "/slots") {
+    wakeIfSleeping();
+    return file(`${dir}/slots-busy.json`);
+  }
   if (path === "/metrics") return file(`${dir}/metrics-after.txt`);
   if (path === "/props") return file(`${dir}/props.json`);
   return new Response("not found", { status: 404 });
 });
+runLoadCycle(true);
 const ANSWER = [
   "## Simulated reply\n\n",
   "Here is a **list**:\n\n- one\n- two\n- three\n\n",

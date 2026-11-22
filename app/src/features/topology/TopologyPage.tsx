@@ -1,4 +1,4 @@
-import { phaseOf } from '@llama-webui/shared';
+import { phaseOf, stateLoadProgress } from '@llama-webui/shared';
 import { useEffect, useMemo } from 'react';
 import type { Tone } from '@/components/glass/tones';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -102,7 +102,15 @@ export function TopologyPage() {
         </div>
 
         <div className="grid min-h-0 items-start gap-3 @2xl:grid-cols-2 @[60rem]:col-start-2 @[60rem]:row-start-2 @[60rem]:-m-1 @[60rem]:flex @[60rem]:flex-col @[60rem]:items-stretch @[60rem]:overflow-y-auto @[60rem]:p-1">
-          <Hud phase={phase} snapshot={snapshot} graph={graph} placement={placement} tones={tones} error={error} />
+          <Hud
+            phase={phase}
+            loadProgress={stateLoadProgress(state)}
+            snapshot={snapshot}
+            graph={graph}
+            placement={placement}
+            tones={tones}
+            error={error}
+          />
           <Legend snapshot={snapshot} graph={graph} tones={tones} view={view} reducedMotion={reducedMotion} />
         </div>
       </div>

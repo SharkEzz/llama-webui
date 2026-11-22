@@ -217,6 +217,8 @@ const StillStopping = Layer.succeed(
     lastCommand: Effect.succeedNone,
     view: Effect.die('not used'),
     changes: Effect.die('not used'),
+    memory: Effect.succeed(null),
+    memoryChanges: Effect.die('not used'),
     start: () => Effect.die('not used'),
     switchTo: () => Effect.die('not used'),
     stop: Effect.void,

@@ -13,6 +13,7 @@
     "./errors": "./src/errors.ts",
     "./flags": "./src/flags.ts",
     "./metrics": "./src/metrics.ts",
+    "./models": "./src/models.ts",
     "./node": "./src/node.ts",
     "./sse": "./src/sse.ts",
     "./package.json": "./package.json"

@@ -1,4 +1,4 @@
-import type { BenchPhase, Measure } from '@llama-webui/shared';
+import type { BenchPhase, LoadProgress, Measure } from '@llama-webui/shared';
 import {
   Array as Arr,
   Clock,
@@ -17,6 +17,7 @@ import { HttpClientRequest, HttpClientResponse } from 'effect/http';
 import { ChildProcess, type ChildProcessSpawner } from 'effect/process';
 import { ERROR_LINE } from 'llamacpp-js/bench';
 import { LlamaHttp } from '../llama/LlamaHttp.ts';
+import { sanitizeLoadProgress, streamModelsSse } from '../llama/modelsSse.ts';
 import { health } from '../llama/probes.ts';
 import { linesOf } from '../logs/lines.ts';
 import { type Ending, endingOf } from '../process/ending.ts';
@@ -99,6 +100,7 @@ export const runTrial = Effect.fn('trial.runTrial')(function* (options: {
     phase: BenchPhase,
     step: { readonly index: number; readonly total: number } | null,
   ) => Effect.Effect<void>;
+  readonly onLoadProgress?: (progress: LoadProgress) => Effect.Effect<void>;
   readonly onLine: (line: string) => Effect.Effect<void>;
   readonly onSpawn: (program: Followed) => Effect.Effect<void>;
   readonly say: (text: string) => Effect.Effect<void>;
@@ -182,17 +184,60 @@ export const runTrial = Effect.fn('trial.runTrial')(function* (options: {
     }),
   );
 
-  const measured = Effect.gen(function* () {
-    const loadStart = yield* Clock.currentTimeMillis;
-    const deadline = loadStart + loadTimeout;
+  const pollUntilLoaded = Effect.gen(function* () {
     for (;;) {
       if (yield* Deferred.isDone(exit)) return yield* yield* exitError;
-      if ((yield* Clock.currentTimeMillis) > deadline)
-        return yield* TrialFailed.make({ message: `loading > ${duration(loadTimeout)}` });
       const status = yield* health(target);
-      if (Option.contains(status, 200)) break;
+      if (Option.contains(status, 200)) return;
       yield* Effect.sleep(healthPoll);
     }
+  });
+
+  const sseUntilLoaded = Effect.gen(function* () {
+    const loaded = yield* Ref.make(false);
+    for (;;) {
+      if (yield* Deferred.isDone(exit)) return yield* yield* exitError;
+      const outcome = yield* streamModelsSse(target).pipe(
+        Stream.takeUntil((ev) => ev.event === 'status_change' && (ev.status === 'loaded' || ev.status === 'unloaded')),
+        Stream.runForEach((ev) =>
+          Effect.gen(function* () {
+            if (ev.event !== 'status_change') return;
+            if (ev.status === 'loading' && ev.progress !== undefined && options.onLoadProgress !== undefined) {
+              yield* options.onLoadProgress(sanitizeLoadProgress(ev.progress));
+            } else if (ev.status === 'loaded') {
+              yield* Ref.set(loaded, true);
+            }
+          }),
+        ),
+        Effect.result,
+      );
+      if (yield* Ref.get(loaded)) return;
+      if (yield* Deferred.isDone(exit)) return yield* yield* exitError;
+      if (outcome._tag === 'Failure' && outcome.failure._tag === 'ModelsSseUnsupported') {
+        return yield* pollUntilLoaded;
+      }
+      const probe = yield* health(target);
+      if (Option.contains(probe, 200)) return;
+      yield* Effect.sleep(healthPoll);
+    }
+  });
+
+  const waitLoaded = Effect.raceFirst(
+    sseUntilLoaded,
+    Deferred.await(exit).pipe(
+      Effect.andThen(exitError),
+      Effect.flatMap((err) => Effect.fail(err)),
+    ),
+  ).pipe(
+    Effect.timeoutOrElse({
+      duration: Duration.millis(loadTimeout),
+      orElse: () => Effect.fail(TrialFailed.make({ message: `loading > ${duration(loadTimeout)}` })),
+    }),
+  );
+
+  const measured = Effect.gen(function* () {
+    const loadStart = yield* Clock.currentTimeMillis;
+    yield* waitLoaded;
     const loaded = yield* Clock.currentTimeMillis;
     yield* Metric.update(BenchMetrics.trialLoad, Duration.millis(loaded - loadStart));
     yield* options.onPhase('warmup', null);

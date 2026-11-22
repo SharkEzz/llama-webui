@@ -59,7 +59,7 @@ export function ChatPage() {
   const stop = useChat((s) => s.stop);
   const kind = useServer((s) => s.view?.state.kind);
   const props = useServerProps();
-  const canSend = kind === 'ready' || kind === 'external';
+  const canSend = kind === 'ready' || kind === 'sleeping' || kind === 'external';
   const convId = id ? Number(id) : null;
 
   useEffect(() => void loadList(), [loadList]);

@@ -35,9 +35,13 @@ const healthOf = (status: number): Health => (status === 200 ? 'ok' : status ===
 /**
  * One monitoring read of llama-server: `/health` (200 `ok`, 503 `loading`, another status `error`, nothing within
  * 800 ms `down`), then, once it is `ok`, `/slots` and `/metrics` together, each within 800 ms, null on any failure.
- * `at` is the time of the read.
+ * When `sleeping` is true, `/slots` is skipped: in llama-server `GET /slots` does not bypass sleep and would wake the
+ * server, whereas `/health` and `/metrics` return cached responses without waking it. `at` is the time of the read.
  */
-export const readLlama = Effect.fn('probes.readLlama')(function* (target: Target) {
+export const readLlama = Effect.fn('probes.readLlama')(function* (
+  target: Target,
+  options?: { readonly sleeping?: boolean },
+) {
   const client = yield* LlamaHttp;
   const at = yield* Clock.currentTimeMillis;
   const status = yield* health(target);
@@ -54,7 +58,7 @@ export const readLlama = Effect.fn('probes.readLlama')(function* (target: Target
     );
   const [slots, metrics] = yield* Effect.all(
     [
-      read('/slots', (res) => Effect.map(res.json, parseSlots)),
+      options?.sleeping === true ? Effect.succeed(null) : read('/slots', (res) => Effect.map(res.json, parseSlots)),
       read('/metrics', (res) => Effect.map(res.text, parsePrometheus)),
     ],
     { concurrency: 2 },

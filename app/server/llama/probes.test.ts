@@ -128,6 +128,26 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('probes', (it) => {
     }),
   );
 
+  it.effect('readLlama skips /slots while sleeping so llama-server stays asleep', () =>
+    Effect.gen(function* () {
+      let slotsCalled = 0;
+      const server = yield* httpStub((req, res) => {
+        if (req.url === '/health') res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+        else if (req.url === '/slots') {
+          slotsCalled++;
+          res.writeHead(200, { 'content-type': 'application/json' }).end(SLOTS);
+        } else if (req.url === '/metrics') res.writeHead(200, { 'content-type': 'text/plain' }).end(METRICS);
+        else res.writeHead(404).end();
+      });
+      const raw = yield* readLlama({ port: server.port }, { sleeping: true });
+      assert.strictEqual(raw.health, 'ok');
+      assert.isNull(raw.slots);
+      assert.strictEqual(raw.metrics?.get('llamacpp:tokens_predicted_total'), 300);
+      assert.strictEqual(slotsCalled, 0);
+      assert.strictEqual(server.requests(), 2);
+    }),
+  );
+
   it.effect('readLlama stops at a loading server', () =>
     Effect.gen(function* () {
       const loading = yield* answering(503, '{"error":{"type":"unavailable_error"}}');

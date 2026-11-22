@@ -1,5 +1,6 @@
 import {
   type HistoryDump,
+  isServerSleeping,
   type NvidiaSource,
   type ServerState,
   type Settings,
@@ -57,14 +58,25 @@ export const monitorSettingsOf = (settings: MonitorSettings): MonitorSettings =>
 });
 
 /** Where the active server listens, and its pid when known; none while no server is active. */
-const activeOf = (state: ServerState): Option.Option<{ readonly target: Target; readonly pid: number | null }> => {
+const activeOf = (
+  state: ServerState,
+): Option.Option<{ readonly target: Target; readonly pid: number | null; readonly sleeping: boolean }> => {
   switch (state.kind) {
     case 'starting':
     case 'ready':
+    case 'sleeping':
     case 'stopping':
-      return Option.some({ target: { host: stateHost(state), port: state.port }, pid: state.pid });
+      return Option.some({
+        target: { host: stateHost(state), port: state.port },
+        pid: state.pid,
+        sleeping: state.kind === 'sleeping',
+      });
     case 'external':
-      return Option.some({ target: { port: state.port }, pid: state.pid });
+      return Option.some({
+        target: { port: state.port },
+        pid: state.pid,
+        sleeping: isServerSleeping(state),
+      });
     default:
       return Option.none();
   }
@@ -249,7 +261,10 @@ export class Monitor extends Context.Service<
               Option.match(active, {
                 onNone: () => none,
                 onSome: (a) =>
-                  readLlama(a.target).pipe(Effect.provideContext(context), fallbackOnDefect('llama', null)),
+                  readLlama(a.target, { sleeping: a.sleeping }).pipe(
+                    Effect.provideContext(context),
+                    fallbackOnDefect('llama', null),
+                  ),
               }),
               gpusOf(collectors, pid, begun.ticksForPid, settings.hiddenGpus).pipe(fallbackOnDefect('gpus', [])),
               pid === null

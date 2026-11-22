@@ -72,10 +72,10 @@ export const ServerHandlers = HttpApiBuilder.group(
       return yield* supervisor.view;
     }).pipe(Effect.withSpan('ServerHandlers.restart'));
 
-    /** llama-server's own `/props`, from the server that answers (ours once ready, or one started by hand). */
+    /** llama-server's own `/props`, from the server that answers (ours once ready or sleeping, or one started by hand). */
     const serverProps = Effect.gen(function* () {
       const state = yield* supervisor.state;
-      if (state.kind !== 'ready' && state.kind !== 'external') {
+      if (state.kind !== 'ready' && state.kind !== 'sleeping' && state.kind !== 'external') {
         return yield* ServerNotReady.make({ message: 'Server not ready' });
       }
       return yield* props(probeUrl(stateHost(state), state.port)).pipe(Effect.provideContext(services));

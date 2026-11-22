@@ -1,4 +1,11 @@
-import { isLoopback, stateHost } from '@llama-webui/shared';
+import {
+  isLoopback,
+  isServerSleeping,
+  loadProgressPct,
+  loadStageLabel,
+  stateHost,
+  stateLoadProgress,
+} from '@llama-webui/shared';
 import {
   CircleAlert,
   Copy,
@@ -20,11 +27,12 @@ import { GlassCard } from '@/components/glass/GlassCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LogRow } from '@/features/logs/LogRow';
 import { call, errorMessage } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
-import { formatDuration, formatInt } from '@/lib/format';
+import { formatDuration, formatInt, formatPct } from '@/lib/format';
 import { startLogsSync, useLogs } from '@/lib/logs';
 import { useProfiles } from '@/lib/profiles';
 import { getServerProps, isRecord } from '@/lib/props';
@@ -177,31 +185,52 @@ function StateDetails() {
   const now = useNow(1000);
   const s = view?.state;
   if (!s || s.kind === 'idle') return <p className="text-sm text-muted-foreground">No server running.</p>;
+  const progress = stateLoadProgress(s);
+  const pct = progress ? loadProgressPct(progress) : null;
+  const stageIdx = progress ? progress.stages.indexOf(progress.current) : -1;
+  const sleeping = isServerSleeping(s);
   return (
-    <dl className="divide-y divide-border">
-      {'profile' in s && <Row label="Profile">{s.profile}</Row>}
-      {'pid' in s && s.pid !== null && (
-        <Row label="PID">
-          <span className="num">{s.pid}</span>
-        </Row>
+    <div className="flex flex-col gap-3">
+      <dl className="divide-y divide-border">
+        {'profile' in s && <Row label="Profile">{s.profile}</Row>}
+        {'pid' in s && s.pid !== null && (
+          <Row label="PID">
+            <span className="num">{s.pid}</span>
+          </Row>
+        )}
+        {'port' in s && (
+          <Row label="Port">
+            <span className="num">{s.port}</span>
+          </Row>
+        )}
+        {(s.kind === 'starting' || s.kind === 'ready' || s.kind === 'sleeping') && (
+          <Row label={s.kind === 'ready' ? 'Ready for' : s.kind === 'sleeping' ? 'Sleeping for' : 'Starting for'}>
+            <span className="num">{formatDuration(now - s.since)}</span>
+          </Row>
+        )}
+        {s.kind === 'crashed' && (
+          <Row label="Exit">
+            {[s.message, s.exitCode !== null ? `code ${s.exitCode}` : null, s.signal].filter(Boolean).join(', ') ||
+              'unexpected'}
+          </Row>
+        )}
+      </dl>
+      {progress && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+            <span>
+              Loading {loadStageLabel(progress.current).toLowerCase()}
+              {stageIdx >= 0 && progress.stages.length > 1 ? ` (${stageIdx + 1}/${progress.stages.length})` : ''}
+            </span>
+            {pct !== null && <span className="num">{formatPct(pct)}</span>}
+          </div>
+          <Progress value={pct} aria-label="Model loading progress" />
+        </div>
       )}
-      {'port' in s && (
-        <Row label="Port">
-          <span className="num">{s.port}</span>
-        </Row>
+      {sleeping && (
+        <p className="text-xs text-muted-foreground">Model unloaded from memory; it will reload on the next request.</p>
       )}
-      {(s.kind === 'starting' || s.kind === 'ready') && (
-        <Row label={s.kind === 'ready' ? 'Ready for' : 'Starting for'}>
-          <span className="num">{formatDuration(now - s.since)}</span>
-        </Row>
-      )}
-      {s.kind === 'crashed' && (
-        <Row label="Exit">
-          {[s.message, s.exitCode !== null ? `code ${s.exitCode}` : null, s.signal].filter(Boolean).join(', ') ||
-            'unexpected'}
-        </Row>
-      )}
-    </dl>
+    </div>
   );
 }
 
@@ -211,8 +240,9 @@ const scalar = (v: unknown): string | undefined =>
 
 function PropsCard() {
   const state = useServer((s) => s.view?.state);
-  const live = state?.kind === 'ready' || state?.kind === 'external';
-  const key = live ? `${state.kind}-${state.pid}` : null;
+  const live = state?.kind === 'ready' || state?.kind === 'sleeping' || state?.kind === 'external';
+  // Keep key stable across ready <-> sleeping for the same PID so /props is not re-fetched on sleep/wake.
+  const key = live ? `${state.kind === 'external' ? 'external' : 'managed'}-${state.pid}` : null;
   const [props, setProps] = useState<Props | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Another server (or none): the previous one's /props go, in the render that sees it
