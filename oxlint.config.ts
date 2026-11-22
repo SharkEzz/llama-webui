@@ -19,6 +19,10 @@ export const base = defineConfig({
     react: {
       version: '19.3.1',
     },
+    // Typecheck mode of the Vitest rules: some skip their checks on `describe` blocks that hold type tests
+    vitest: {
+      typecheck: true,
+    },
   },
   // The vendored repositories are reference material, not linted (`.eslintignore` keeps oxlint from loading their
   // configs)
