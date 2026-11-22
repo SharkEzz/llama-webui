@@ -218,19 +218,21 @@ name, and the relative paths that walk into the same directory (`../../server/x.
 `import`, an `import type`, an `export … from` and an `import('…')` of a string literal alike, with the message below as
 its help. It does not see an `import()` of a template literal or of a computed string, nor a `require`.
 
-| Config                                    | Refused                                                                                                                           | Message                                                                    |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `oxlint.config.ts` (`vendored`, everyone) | `repos/…` and any relative path into `repos/`                                                                                     | the vendored repositories are reference material, import the package       |
-| `app/src/oxlint.config.ts`                | `app/server/` (`@llama-webui/app/server/…`, `../server/…`, `../../app/server/…`); `node:*`                                        | the web talks to the server through `@llama-webui/shared` and `lib/api.ts` |
-| `site/oxlint.config.ts`                   | Anything of `app/` (`@llama-webui/app`, `../../app/…`); `@llama-webui/shared`, which the site does not use                        | the site copies what it reuses; tokens come from `@llama-webui/theme`      |
-| `packages/llamacpp-js/oxlint.config.ts`   | `@llama-webui/*` and the relative paths into the other packages and `app/`; `effect`, `@effect/*`; `node:*` outside `src/node.ts` | the package has no dependency; Node APIs live behind `llamacpp-js/node`    |
-| `packages/webui-shared/oxlint.config.ts`  | `app/` (`@llama-webui/app`, `../../../app/…`); `node:*`                                                                           | shared code runs in the browser                                            |
-| `app/server/oxlint.config.ts`             | `better-sqlite3`, `bun:*`; `node:sqlite` outside `db/`                                                                            | SQLite goes through `SqlClient` (`app/server/db/Db.ts`)                    |
+| Config                                              | Refused                                                                                                                           | Message                                                                    |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `oxlint.config.ts` (`vendored`, everyone)           | `repos/…` and any relative path into `repos/`                                                                                     | the vendored repositories are reference material, import the package       |
+| `app/src/oxlint.config.ts`                          | `app/server/` (`@llama-webui/app/server/…`, `../server/…`, `../../app/server/…`); `node:*`                                        | the web talks to the server through `@llama-webui/shared` and `lib/api.ts` |
+| `site/oxlint.config.ts`                             | Anything of `app/` (`@llama-webui/app`, `../../app/…`); `@llama-webui/shared`, which the site does not use                        | the site copies what it reuses; tokens come from `@llama-webui/theme`      |
+| `packages/llamacpp-js/oxlint.config.ts`             | `@llama-webui/*` and the relative paths into the other packages and `app/`; `effect`, `@effect/*`; `node:*` outside `src/node.ts` | the package has no dependency; Node APIs live behind `llamacpp-js/node`    |
+| `packages/webui-shared/oxlint.config.ts`            | `app/` (`@llama-webui/app`, `../../../app/…`); `node:*`                                                                           | shared code runs in the browser                                            |
+| `llamacppNode` (`app/src`, `packages/webui-shared`) | `llamacpp-js/node` and the relative paths to `packages/llamacpp-js/src/node.ts`                                                   | browser code: llamacpp-js/node needs Node                                  |
+| `app/server/oxlint.config.ts`                       | `better-sqlite3`, `bun:*`; `node:sqlite` outside `db/`                                                                            | SQLite goes through `SqlClient` (`app/server/db/Db.ts`)                    |
 
-A config that sets the rule replaces the options of `base`, so each project lists `vendored` again. A ban of
-`node:*` is for source files: the tests (`**/*.test.ts`, `**/*.test.tsx`, `packages/llamacpp-js/tests/`) are exempt,
-and so are `app/server/testing/` and the server's tests from the `node:sqlite` ban (`lifecycle.test.ts` reads the
-database of the build it runs). The other bans apply to tests too. In `app/server`, every other `node:*` import is the
+A config that sets the rule replaces the options of `base`, so each project lists `vendored` again. `llamacppNode` is
+in `oxlint.config.ts`, for the two projects whose code runs in the browser. A ban of `node:*` or of `llamacpp-js/node`
+is for source files: the tests (`**/*.test.ts`, `**/*.test.tsx`, `packages/llamacpp-js/tests/`) are exempt, and so are
+`app/server/testing/` and the server's tests from the `node:sqlite` ban (`lifecycle.test.ts` reads the database of the
+build it runs). The other bans apply to tests too. In `app/server`, every other `node:*` import is the
 business of the Effect diagnostics (see [The platform and Effect](#the-platform-and-effect)). The build is checked as
 well, on its output: `app/server/build.test.ts`, `scripts/package.test.ts` and
 `packages/llamacpp-js/tests/package.test.ts`.

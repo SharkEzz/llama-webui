@@ -21,6 +21,13 @@ export const vendored = {
 // Node's built-in modules (`unicorn/prefer-node-protocol` leaves `node:` as their only spelling)
 export const nodeBuiltins = { regex: '^node:' };
 
+// The Node half of llamacpp-js, for the browser code (webui-shared, app/src): its `./node` export, or a relative path to
+// `packages/llamacpp-js/src/node.ts` (with or without `@/`)
+export const llamacppNode = {
+  regex: '^(llamacpp-js/node|(@/)?(\\.\\./)+(packages/)?llamacpp-js/src/node)([./]|$)',
+  message: 'browser code: llamacpp-js/node needs Node',
+};
+
 export const base = defineConfig({
   plugins: ['eslint', 'typescript', 'unicorn', 'oxc', 'import', 'promise'],
   // An absolute path: oxlint refuses a relative plugin path in a config that another one `extends`
