@@ -71,6 +71,7 @@ export function TimeSeriesChart({
   const latest = useEffectEvent(() => ({ series, data }));
 
   // Creation: per series set, theme (colors read from CSS variables) and shape.
+  // signature and resolved are triggers (series read via latest, colors via readChartTheme)
   useEffect(() => {
     const el = host.current;
     if (!el) return;

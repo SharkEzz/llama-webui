@@ -25,6 +25,7 @@ export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = '
   return (
     <figure className="inline-flex shrink-0 flex-col items-center gap-1.5" style={{ width: size }}>
       <div className="relative" style={{ width: size, height: size }}>
+        {/* SVG gauge: <meter> cannot apply to an <svg> */}
         <svg
           width={size}
           height={size}

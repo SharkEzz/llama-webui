@@ -69,6 +69,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   });
 
   // Every matching flag is listed: keep the highlighted one in view while the arrows move through the list.
+  // `active` is the trigger (cmdk marks the item from it)
   useLayoutEffect(() => {
     if (open) listRef.current?.querySelector('[cmdk-item][data-selected=true]')?.scrollIntoView({ block: 'nearest' });
   }, [open, active]);
