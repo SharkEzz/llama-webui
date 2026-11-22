@@ -38,3 +38,14 @@ test('the GPU gauge is never reported as changed', () => {
   const c = compare(fixtureResults({ gpuBusy: 8 }), fixtureResults({ gpuBusy: 56 }));
   expect(c.changed.some((f) => f.kind === 'gpuBusy')).toBe(false);
 });
+
+test('a small process saving a point of CPU is a change in a clean window, not in a profiled one', () => {
+  const sampler = (window: 'clean' | 'profiled', pct: number) =>
+    fixtureResults({ cpu: { dashboard: { [window]: { 'nvml-worker': pct } } } });
+  expect(compare(sampler('clean', 2), sampler('clean', 3.2)).byId.get('dashboard.clean.cpu.nvml-worker')?.changed).toBe(
+    true,
+  );
+  expect(
+    compare(sampler('profiled', 2), sampler('profiled', 3.2)).byId.get('dashboard.profiled.cpu.nvml-worker')?.changed,
+  ).toBe(false);
+});

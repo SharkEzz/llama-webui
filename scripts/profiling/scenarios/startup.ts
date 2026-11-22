@@ -5,7 +5,18 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseCpuProfile, summarizeProfile } from '../analyze/cpuprofile.ts';
 import { serverOrigins } from '../analyze/origins.ts';
-import { alive, baseUrlOf, LAUNCHER, now, REPO, SERVER_BUNDLE, sleep, terminate, waitHealth } from '../instance.ts';
+import {
+  alive,
+  baseUrlOf,
+  LAUNCHER,
+  now,
+  REPO,
+  SERVER_BUNDLE,
+  sleep,
+  startTime,
+  terminate,
+  waitHealth,
+} from '../instance.ts';
 import { parseJson } from '../json.ts';
 import { type Context, dataDir, type Scenario } from '../measure.ts';
 
@@ -23,7 +34,7 @@ async function launch(
   const child = spawn(process.execPath, args, { cwd: REPO, stdio: 'ignore', env });
   const pid = child.pid;
   if (pid === undefined) throw new Error('the server did not spawn');
-  run.writeState({ ...run.readState(), serverPid: pid });
+  run.writeState({ ...run.readState(), serverPid: pid, serverStart: startTime(pid) });
   if (!(await waitHealth(baseUrlOf(options.host, options.port), 20_000))) {
     await terminate(pid);
     throw new Error('the server did not answer /api/health within 20 s');
@@ -35,7 +46,7 @@ async function launch(
   while (alive(pid) && now() - t1 < 10_000) await sleep(5);
   const stopMs = now() - t1;
   if (alive(pid)) await terminate(pid, 0, 'SIGKILL');
-  run.writeState({ ...run.readState(), serverPid: null });
+  run.writeState({ ...run.readState(), serverPid: null, serverStart: null });
   return { pid, startMs, stopMs };
 }
 

@@ -164,7 +164,8 @@ export async function measure(ctx: Context, page: Page | null, options: WindowOp
   const window: Window = {
     id: options.id,
     label: options.label,
-    profiled: profile,
+    // A trace costs the page as a profiler does: its figures compare only with another profiled window.
+    profiled: profile || options.trace === true,
     serverUptimeS,
     historyPoints,
     procs: procWindow,

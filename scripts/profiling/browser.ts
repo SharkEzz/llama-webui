@@ -1,7 +1,7 @@
 // Headless Chromium on the GPU, the pages of the app it opens, and the component census of a page.
 import { type Browser, type CDPSession, type Page, launch } from 'puppeteer-core';
 import { clientOrigins } from './analyze/origins.ts';
-import { now, sleep } from './instance.ts';
+import { now, sleep, startTime } from './instance.ts';
 import { arr, isRecord, num, str } from './json.ts';
 import { type Context, sourcemaps } from './measure.ts';
 import type { Census, PageLoad, ResourceKind } from './results.ts';
@@ -39,7 +39,7 @@ export async function startBrowser(
     handleSIGHUP: false,
   });
   const pid = browser.process()?.pid ?? null;
-  run.writeState({ ...run.readState(), chromePid: pid });
+  run.writeState({ ...run.readState(), chromePid: pid, chromeStart: pid === null ? null : startTime(pid) });
   const session = await browser.target().createCDPSession();
   const info = await session.send('SystemInfo.getInfo');
   await session.detach();

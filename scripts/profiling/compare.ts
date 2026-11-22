@@ -4,13 +4,16 @@ import { RESULTS_VERSION, type Results, SCENARIO_NAMES, type ScenarioName } from
 
 /**
  * The noise of each kind of figure: a difference is a change when it exceeds both the absolute floor and the share
- * of the reference. `gpuBusy` (the AMD cards' gauge) is indicative and never a change.
+ * of the reference. A figure of a profiled window (a profiler or a trace running) has twice that threshold: the
+ * profiler's own cost varies from one run to the next. `gpuBusy` (the AMD cards' gauge) is indicative and never a
+ * change.
  */
 export const NOISE: Record<FigureKind, { relative: number; absolute: number } | null> = {
   // Calibrated on two runs of `dashboard aurora` on unchanged code (check-1, check-2, 2026-11-22), the measured spread in
-  // each comment.
-  // percentage points: up to 1.15 for a process (in a traced window; 0.8 in the others)
-  cpu: { relative: 0, absolute: 1.5 },
+  // each comment. Two runs give a spread, not a distribution: a smaller difference may still be real, repeat the runs.
+  // percentage points: up to 0.8 for a process in a clean window (chrome-gpu at 13.7 %), 0.56 at 0.76 %; up to 1.15
+  // in a traced one
+  cpu: { relative: 0.1, absolute: 0.75 },
   // percentage points: up to 0.77 (page tasks of a traced window)
   share: { relative: 0, absolute: 1 },
   tps: { relative: 0.01, absolute: 0 },
@@ -43,9 +46,13 @@ export class VersionMismatch extends Error {
   override readonly name = 'VersionMismatch';
 }
 
-function threshold(kind: FigureKind, reference: number): number | null {
+/** The profiler's share of a profiled window's noise. */
+const PROFILED_FACTOR = 2;
+
+function threshold(kind: FigureKind, reference: number, profiled: boolean): number | null {
   const noise = NOISE[kind];
-  return noise === null ? null : Math.max(noise.absolute, noise.relative * Math.abs(reference));
+  if (noise === null) return null;
+  return Math.max(noise.absolute, noise.relative * Math.abs(reference)) * (profiled ? PROFILED_FACTOR : 1);
 }
 
 const apart = (a: number, b: number) => {
@@ -67,7 +74,7 @@ export function compare(run: Results, reference: Results): Comparison {
     const r = refFigures.get(f.id);
     if (!r) continue;
     const delta = f.value - r.value;
-    const limit = threshold(f.kind, r.value);
+    const limit = threshold(f.kind, r.value, f.profiled);
     const changed = limit !== null && Math.abs(delta) > limit;
     byId.set(f.id, { reference: r.value, delta, relative: r.value === 0 ? null : delta / r.value, changed });
     if (changed) ranked.push({ figure: f, excess: limit > 0 ? Math.abs(delta) / limit : Infinity });

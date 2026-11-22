@@ -28,6 +28,21 @@ export function alive(pid: number): boolean {
   }
 }
 
+/** The start time of a process (`/proc/<pid>/stat` field 22, in clock ticks since boot); null once it is gone. */
+export function startTime(pid: number): number | null {
+  try {
+    const stat = readFileSync(`/proc/${String(pid)}/stat`, 'utf8');
+    const start = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]);
+    return Number.isFinite(start) ? start : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The process a state file recorded, still running: same pid and same start time, not a pid reused since. */
+export const ours = (pid: number | null, start: number | null): pid is number =>
+  pid !== null && start !== null && alive(pid) && startTime(pid) === start;
+
 /** Sends `signal`, waits for the exit, SIGKILL after `graceMs`. True when the process was running. */
 export async function terminate(pid: number, graceMs = 5000, signal: NodeJS.Signals = 'SIGTERM'): Promise<boolean> {
   if (!alive(pid)) return false;
@@ -197,7 +212,7 @@ export async function startInstance(run: RunDir, options: Options): Promise<Inst
   child.unref();
   const pid = child.pid;
   if (pid === undefined) throw new Error('the server did not spawn');
-  run.writeState({ ...run.readState(), serverPid: pid });
+  run.writeState({ ...run.readState(), serverPid: pid, serverStart: startTime(pid) });
   const inspector = await Cdp.connect(await inspectorUrl(log, pid, 10_000));
   if (!(await waitHealth(baseUrl, 30_000))) throw new Error(`the server did not answer /api/health: see ${log}`);
   const api = (path: string, init?: { method?: string; body?: unknown }) => request(baseUrl, path, init);
@@ -255,7 +270,7 @@ export async function startInstance(run: RunDir, options: Options): Promise<Inst
     stop: async () => {
       inspector.close();
       await terminate(pid);
-      run.writeState({ ...run.readState(), serverPid: null });
+      run.writeState({ ...run.readState(), serverPid: null, serverStart: null });
     },
   };
 }
@@ -278,58 +293,91 @@ const isEmpty = (s: State) =>
   s.restoreDefaultProfile === null &&
   !s.profileStarted;
 
-/** Undoes what a run's state.json lists, each step tolerant of what is already gone; one line per thing undone. */
-export async function undo(run: RunDir): Promise<string[]> {
-  let state = run.readState();
-  if (isEmpty(state)) return [];
-  const done: string[] = [];
-  const save = (patch: Partial<State>) => {
-    state = { ...state, ...patch };
-    run.writeState(state);
+/** What an undo did, one line per thing, and what it could not do. */
+export interface Undone {
+  done: string[];
+  failed: string[];
+}
+
+/**
+ * Undoes what a run's state.json lists. Each step stands alone: one that fails is reported and the next ones still run,
+ * Chromium and the server last. The API is called, and a process signalled, only when the process the state recorded
+ * still runs (same pid, same start time): never a pid reused since, nor an instance started after the run.
+ */
+export async function undo(run: RunDir): Promise<Undone> {
+  const out: Undone = { done: [], failed: [] };
+  if (isEmpty(run.readState())) return out;
+  // Read again at each step: a scenario still finishing may have recorded something since.
+  const patch = (p: Partial<State>) => run.writeState({ ...run.readState(), ...p });
+  const step = async (what: string, act: () => Promise<void>) => {
+    try {
+      await act();
+    } catch (error) {
+      out.failed.push(`could not ${what}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   };
   const { host, port } = runAddress(run);
   const baseUrl = baseUrlOf(host, port);
-  const serverUp = state.serverPid !== null && alive(state.serverPid);
-  if (serverUp) {
-    const deleted = [];
-    for (const id of state.conversations) {
-      try {
-        await request(baseUrl, `/api/chat/${String(id)}`, { method: 'DELETE' });
-        deleted.push(id);
-      } catch (error) {
-        if (!(error instanceof ApiError && error.status === 404)) throw error;
-      }
-    }
-    if (deleted.length > 0) done.push(`deleted the temporary conversations ${deleted.join(', ')}`);
-    save({ conversations: [] });
-    if (state.profileStarted) {
-      await request(baseUrl, '/api/server/stop', { method: 'POST' });
-      done.push('stopped llama-server');
-      save({ profileStarted: false });
-    }
-    if (state.restoreDefaultProfile !== null) {
-      const want = state.restoreDefaultProfile.id;
-      if ((await defaultProfileId(baseUrl)) !== want) {
-        await request(baseUrl, '/api/settings', { method: 'PATCH', body: { defaultProfileId: want } });
-        done.push(`restored the default profile to ${want === null ? 'none' : `#${String(want)}`}`);
-      }
-      save({ restoreDefaultProfile: null });
-    }
-  } else if (state.conversations.length > 0 || state.restoreDefaultProfile !== null) {
-    done.push(
-      `the server was gone: could not delete the conversations ${state.conversations.join(', ') || '(none)'} nor restore the default profile`,
+  const first = run.readState();
+  const serverUp = () => {
+    const s = run.readState();
+    return ours(s.serverPid, s.serverStart);
+  };
+  const deleteConversations = async () => {
+    const ids = run.readState().conversations;
+    const deleted: number[] = [];
+    for (const id of ids)
+      await step(`delete the conversation ${String(id)}`, async () => {
+        try {
+          await request(baseUrl, `/api/chat/${String(id)}`, { method: 'DELETE' });
+          deleted.push(id);
+        } catch (error) {
+          if (!(error instanceof ApiError && error.status === 404)) throw error;
+        }
+      });
+    if (deleted.length > 0) out.done.push(`deleted the temporary conversations ${deleted.join(', ')}`);
+    const left = run.readState().conversations.filter((id) => !ids.includes(id));
+    patch({ conversations: left });
+  };
+
+  if (serverUp()) {
+    await deleteConversations();
+    if (first.profileStarted)
+      await step('stop llama-server', async () => {
+        await request(baseUrl, '/api/server/stop', { method: 'POST' });
+        out.done.push('stopped llama-server');
+        patch({ profileStarted: false });
+      });
+    const restore = first.restoreDefaultProfile;
+    if (restore !== null)
+      await step('restore the default profile', async () => {
+        if ((await defaultProfileId(baseUrl)) !== restore.id) {
+          await request(baseUrl, '/api/settings', { method: 'PATCH', body: { defaultProfileId: restore.id } });
+          out.done.push(`restored the default profile to ${restore.id === null ? 'none' : `#${String(restore.id)}`}`);
+        }
+        patch({ restoreDefaultProfile: null });
+      });
+  } else if (first.conversations.length > 0 || first.restoreDefaultProfile !== null) {
+    out.failed.push(
+      `the run's server was gone: could not delete the conversations ${first.conversations.join(', ') || '(none)'} nor restore the default profile`,
     );
-    save({ conversations: [], restoreDefaultProfile: null, profileStarted: false });
+    patch({ conversations: [], restoreDefaultProfile: null, profileStarted: false });
   }
-  if (state.chromePid !== null) {
-    if (await terminate(state.chromePid)) done.push(`closed Chromium (pid ${String(state.chromePid)})`);
-    save({ chromePid: null });
-  }
-  if (state.serverPid !== null) {
+  const chrome = run.readState();
+  await step('close Chromium', async () => {
+    if (ours(chrome.chromePid, chrome.chromeStart) && (await terminate(chrome.chromePid)))
+      out.done.push(`closed Chromium (pid ${String(chrome.chromePid)})`);
+    patch({ chromePid: null, chromeStart: null });
+  });
+  // A conversation recorded by a scenario that was still finishing.
+  if (serverUp() && run.readState().conversations.length > 0) await deleteConversations();
+  const server = run.readState();
+  await step('stop the server', async () => {
     // The server stops llama-server itself on SIGTERM.
-    if (await terminate(state.serverPid, 10_000)) done.push(`stopped the server (pid ${String(state.serverPid)})`);
-    save({ serverPid: null });
-  }
+    if (ours(server.serverPid, server.serverStart) && (await terminate(server.serverPid, 10_000)))
+      out.done.push(`stopped the server (pid ${String(server.serverPid)})`);
+    patch({ serverPid: null, serverStart: null });
+  });
   run.writeState({ ...EMPTY_STATE });
-  return done;
+  return out;
 }

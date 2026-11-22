@@ -4,7 +4,17 @@ import { availableParallelism, release, totalmem } from 'node:os';
 import type { Browser } from 'puppeteer-core';
 import { startBrowser } from './browser.ts';
 import { compare } from './compare.ts';
-import { defaultProfileId, type Instance, portAnswers, prepareBuild, startInstance, undo } from './instance.ts';
+import {
+  defaultProfileId,
+  type Instance,
+  ours,
+  portAnswers,
+  prepareBuild,
+  startInstance,
+  startTime,
+  type Undone,
+  undo,
+} from './instance.ts';
 import { arr, isRecord, str } from './json.ts';
 import type { Context } from './measure.ts';
 import { type Options, SCENARIOS, UsageError } from './options.ts';
@@ -22,12 +32,26 @@ import { SCENARIO_RUNNERS } from './scenarios/index.ts';
 
 const say = (line: string) => process.stdout.write(`${line}\n`);
 
-/** Undoes every earlier run whose state.json still lists something (the tool was killed). */
+const report = (prefix: string, { done, failed }: Undone) => {
+  for (const line of done) say(`${prefix}${line}`);
+  for (const line of failed) say(`${prefix}${line}`);
+};
+
+/**
+ * Undoes every earlier run whose state.json still lists something (the tool was killed). A run whose tool still runs
+ * (another `pnpm profiling`) is not left behind: it is skipped, and its port is then refused below.
+ */
 async function cleanLeftovers(): Promise<void> {
   if (!existsSync(PROFILING_ROOT)) return;
   for (const entry of readdirSync(PROFILING_ROOT, { withFileTypes: true })) {
-    if (!entry.isDirectory() || !existsSync(runDir(entry.name).file('state.json'))) continue;
-    for (const line of await undo(runDir(entry.name))) say(`profiling: run ${entry.name} was left behind: ${line}`);
+    const left = runDir(entry.name);
+    if (!entry.isDirectory() || !existsSync(left.file('state.json'))) continue;
+    const { toolPid, toolStart } = left.readState();
+    if (ours(toolPid, toolStart)) {
+      say(`profiling: run ${entry.name} is still running (pid ${String(toolPid)}): left as is`);
+      continue;
+    }
+    report(`profiling: run ${entry.name} was left behind: `, await undo(left));
   }
 }
 
@@ -106,9 +130,9 @@ export async function runCommand(options: Options): Promise<number> {
   // run.json first: an undo after a kill reads the address there.
   const info = runInfo(options);
   writeRunInfo(run, info);
-  const profileId = needsModel ? await profileToLaunch(run, options) : null;
-  info.options.profileId = profileId;
-  writeRunInfo(run, info);
+  // Who owns the run: another `pnpm profiling` does not undo it while this one runs.
+  run.writeState({ ...run.readState(), toolPid: process.pid, toolStart: startTime(process.pid) });
+  let profileId: number | null = options.profile;
   const results: Results = { version: RESULTS_VERSION, run: info, scenarios: {}, failed: [] };
   let instance: Instance | null = null;
   let browser: Browser | null = null;
@@ -122,9 +146,9 @@ export async function runCommand(options: Options): Promise<number> {
     }
     if (browser !== null) {
       await browser.close().catch(() => undefined);
-      run.writeState({ ...run.readState(), chromePid: null });
+      run.writeState({ ...run.readState(), chromePid: null, chromeStart: null });
     }
-    for (const line of await undo(run)) say(`profiling: ${line}`);
+    report('profiling: ', await undo(run));
     info.endedAt = new Date().toISOString();
     writeRunInfo(run, info);
     run.writeResults(results);
@@ -182,6 +206,10 @@ export async function runCommand(options: Options): Promise<number> {
   };
 
   try {
+    // Inside the try, under the signal handlers: the short start that reads the default profile is undone too.
+    if (needsModel) profileId = await profileToLaunch(run, options);
+    info.options.profileId = profileId;
+    writeRunInfo(run, info);
     say(options.build ? 'profiling: building with hidden source maps' : 'profiling: reusing the existing build');
     info.symbolicated = (await prepareBuild(run, options.build)).symbolicated;
     if (options.scenarios.includes('startup')) await runScenario('startup');

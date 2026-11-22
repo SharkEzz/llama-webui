@@ -8,8 +8,14 @@ export const PROFILING_ROOT = resolve(import.meta.dirname, '../../.cache/profili
 
 /** What the undo must clean up: written before each thing is started or created. */
 export interface State {
+  /** The tool's own process, while it runs: a run whose tool is alive is not left behind. */
+  toolPid: number | null;
+  toolStart: number | null;
+  /** Each pid with its start time (`/proc/<pid>/stat` field 22): a pid reused by another process is not ours. */
   serverPid: number | null;
+  serverStart: number | null;
   chromePid: number | null;
+  chromeStart: number | null;
   conversations: number[];
   /** the default profile to put back, when the tool changed it */
   restoreDefaultProfile: { id: number | null } | null;
@@ -17,8 +23,12 @@ export interface State {
 }
 
 export const EMPTY_STATE: State = {
+  toolPid: null,
+  toolStart: null,
   serverPid: null,
+  serverStart: null,
   chromePid: null,
+  chromeStart: null,
   conversations: [],
   restoreDefaultProfile: null,
   profileStarted: false,
@@ -54,8 +64,12 @@ function toState(value: unknown): State {
   if (!isRecord(value)) return { ...EMPTY_STATE };
   const restore = value.restoreDefaultProfile;
   return {
+    toolPid: pid(value.toolPid),
+    toolStart: pid(value.toolStart),
     serverPid: pid(value.serverPid),
+    serverStart: pid(value.serverStart),
     chromePid: pid(value.chromePid),
+    chromeStart: pid(value.chromeStart),
     conversations: arr(value.conversations).filter((c): c is number => typeof c === 'number'),
     restoreDefaultProfile: isRecord(restore) ? { id: typeof restore.id === 'number' ? restore.id : null } : null,
     profileStarted: value.profileStarted === true,

@@ -7,9 +7,12 @@ import type { ProcWindow } from './results.ts';
 export interface ProcSample {
   /** ms (performance.now) */
   t: number;
-  /** cumulative CPU ticks of each group, summed over its processes */
-  groups: Record<string, { utime: number; stime: number; rssKb: number }>;
-  /** cumulative CPU ticks per `group/thread` */
+  /**
+   * Cumulative CPU ticks of each process, by pid: a window sums the difference of each process, so one that exits
+   * takes only what it spent during the window, not its lifetime, out of its group.
+   */
+  procs: Record<string, { group: string; utime: number; stime: number; rssKb: number }>;
+  /** Cumulative CPU ticks of each thread, keyed `group/name<TAB>tid`: a window sums them by `group/name`. */
   threads: Record<string, number>;
   /** gpu_busy_percent of each amdgpu card, by PCI address */
   gpuBusy: Record<string, number>;
@@ -112,7 +115,7 @@ function amdCards(): Map<string, string> {
 let cardCache: Map<string, string> | null = null;
 
 export function sampleProcs(roots: ProcRoots): ProcSample {
-  const groups: ProcSample['groups'] = {};
+  const procs: ProcSample['procs'] = {};
   const threads: ProcSample['threads'] = {};
   const pids = new Set<number>();
   for (const root of [roots.server, roots.chrome]) if (root !== null) for (const p of processTree(root)) pids.add(p);
@@ -120,10 +123,7 @@ export function sampleProcs(roots: ProcRoots): ProcSample {
     const s = readStat(`/proc/${String(pid)}/stat`);
     if (!s) continue;
     const group = classify(pid, roots);
-    const g = (groups[group] ??= { utime: 0, stime: 0, rssKb: 0 });
-    g.utime += s.utime;
-    g.stime += s.stime;
-    g.rssKb += s.rssKb;
+    procs[String(pid)] = { group, utime: s.utime, stime: s.stime, rssKb: s.rssKb };
     // llama-server's threads are its compute pool: their split says nothing about the app
     if (group === 'llama-server') continue;
     let tids: string[] = [];
@@ -137,7 +137,7 @@ export function sampleProcs(roots: ProcRoots): ProcSample {
       if (!t) continue;
       // Pool threads are numbered (ThreadPoolForeg, CompositorTileW1…): one line per kind
       const name = `${group}/${t.comm.replace(/[\d#:/-]+$/, '').trim() || t.comm}`;
-      threads[name] = (threads[name] ?? 0) + t.utime + t.stime;
+      threads[`${name}\t${tid}`] = t.utime + t.stime;
     }
   }
   cardCache ??= amdCards();
@@ -149,22 +149,30 @@ export function sampleProcs(roots: ProcRoots): ProcSample {
       // the card went away (or does not expose the gauge)
     }
   }
-  return { t: performance.now(), groups, threads, gpuBusy };
+  return { t: performance.now(), procs, threads, gpuBusy };
 }
 
 /**
- * The difference of a cumulative counter over the samples: the last value it reached minus its first, a key absent
- * from the first sample counting from zero (a process that started during the window). Never negative.
+ * The difference of a cumulative counter over the samples, per key (a process, a thread), summed by `by(key)`: the last
+ * value a key reached minus its first, a key absent from the first sample counting from zero (it started during the
+ * window), one gone before the last keeping what it spent until then. Never negative.
  */
-function spent<T>(samples: ProcSample[], read: (s: ProcSample) => Record<string, T>, value: (v: T) => number) {
+function spent<T>(
+  samples: ProcSample[],
+  read: (s: ProcSample) => Record<string, T>,
+  value: (v: T) => number,
+  by: (key: string, v: T) => string,
+) {
+  const first = new Map<string, number>();
+  const last = new Map<string, { group: string; end: number }>();
+  for (const [i, s] of samples.entries())
+    for (const [key, v] of Object.entries(read(s))) {
+      if (i === 0) first.set(key, value(v));
+      last.set(key, { group: by(key, v), end: value(v) });
+    }
   const out = new Map<string, number>();
-  const first = read(samples[0] ?? { t: 0, groups: {}, threads: {}, gpuBusy: {} });
-  const last = new Map<string, number>();
-  for (const s of samples) for (const [key, v] of Object.entries(read(s))) last.set(key, value(v));
-  for (const [key, end] of last) {
-    const start = first[key];
-    out.set(key, Math.max(0, end - (start === undefined ? 0 : value(start))));
-  }
+  for (const [key, { group, end }] of last)
+    out.set(group, (out.get(group) ?? 0) + Math.max(0, end - (first.get(key) ?? 0)));
   return out;
 }
 
@@ -173,15 +181,18 @@ export function cpuWindow(samples: ProcSample[], ticksPerSecond: number): ProcWi
   const final = samples.at(-1);
   const wallMs = first && final ? final.t - first.t : 0;
   const pct = (ticks: number) => (wallMs > 0 ? ((ticks / ticksPerSecond) * 1000 * 100) / wallMs : 0);
+  const byGroup = (_pid: string, p: { group: string }) => p.group;
   const user = spent(
     samples,
-    (s) => s.groups,
-    (g) => g.utime,
+    (s) => s.procs,
+    (p) => p.utime,
+    byGroup,
   );
   const sys = spent(
     samples,
-    (s) => s.groups,
-    (g) => g.stime,
+    (s) => s.procs,
+    (p) => p.stime,
+    byGroup,
   );
   const cpuPct: Record<string, number> = {};
   const userPct: Record<string, number> = {};
@@ -193,12 +204,17 @@ export function cpuWindow(samples: ProcSample[], ticksPerSecond: number): ProcWi
     cpuPct[group] = pct(u + st);
   }
   const rssMb: Record<string, number> = {};
-  for (const s of samples) for (const [group, g] of Object.entries(s.groups)) rssMb[group] = g.rssKb / 1024;
+  for (const s of samples) {
+    const kb = new Map<string, number>();
+    for (const p of Object.values(s.procs)) kb.set(p.group, (kb.get(p.group) ?? 0) + p.rssKb);
+    for (const [group, total] of kb) rssMb[group] = total / 1024;
+  }
   const threadPct: Record<string, number> = {};
   for (const [name, ticks] of spent(
     samples,
     (s) => s.threads,
     (v) => v,
+    (key) => key.slice(0, key.lastIndexOf('\t')),
   )) {
     const v = pct(ticks);
     if (v >= 0.05) threadPct[name] = v;
