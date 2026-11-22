@@ -211,19 +211,16 @@ const repoDir = Effect.gen(function* () {
 
 /** A variant of `o/r` whose files are `[path, size]`. */
 const input = (key: string, files: ReadonlyArray<readonly [string, number]> = [[key, 100]]) =>
-  Effect.map(
-    repoDir,
-    (dir): NewDownload => ({
-      repo: 'o/r',
-      revision: SHA,
-      key,
-      name: Str.replace(/\.gguf$/, '')(key),
-      quant: null,
-      kind: 'model',
-      dir,
-      files: Arr.map(files, ([path, size]) => ({ path, size, sha256: null })),
-    }),
-  );
+  Effect.map(repoDir, (dir): NewDownload => ({
+    repo: 'o/r',
+    revision: SHA,
+    key,
+    name: Str.replace(/\.gguf$/, '')(key),
+    quant: null,
+    kind: 'model',
+    dir,
+    files: Arr.map(files, ([path, size]) => ({ path, size, sha256: null })),
+  }));
 
 /** Fails the test unless `effect` gives `expected`. */
 const expectEqual = <A, E, R>(effect: Effect.Effect<A, E, R>, expected: A) =>

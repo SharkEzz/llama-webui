@@ -35,21 +35,18 @@ type Identity = Pick<GpuReading, 'key' | 'vendor' | 'name' | 'busId'>;
 export const identityReading: {
   (why: 'suspended' | 'hidden'): (g: Identity) => GpuReading;
   (g: Identity, why: 'suspended' | 'hidden'): GpuReading;
-} = dual(
-  2,
-  (g: Identity, why: 'suspended' | 'hidden'): GpuReading => ({
-    key: g.key,
-    vendor: g.vendor,
-    name: g.name,
-    busId: g.busId,
-    utilPct: null,
-    vramUsedBytes: 0,
-    vramTotalBytes: 0,
-    tempC: null,
-    powerW: null,
-    ...(why === 'suspended' ? { suspended: true } : { hidden: true }),
-  }),
-);
+} = dual(2, (g: Identity, why: 'suspended' | 'hidden'): GpuReading => ({
+  key: g.key,
+  vendor: g.vendor,
+  name: g.name,
+  busId: g.busId,
+  utilPct: null,
+  vramUsedBytes: 0,
+  vramTotalBytes: 0,
+  tempC: null,
+  powerW: null,
+  ...(why === 'suspended' ? { suspended: true } : { hidden: true }),
+}));
 
 /** A PCI bus id in the form of sysfs: `00000000:01:00.0` and `0000:0D:00.0` give `0000:01:00.0`, `0000:0d:00.0`. */
 export const normalizeBusId = (id: string): string => {

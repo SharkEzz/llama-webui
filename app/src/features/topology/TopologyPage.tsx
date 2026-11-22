@@ -12,8 +12,8 @@ import { gpuTones, linkFlows, nodeLive, peerLinks } from './flows';
 import { Hud } from './Hud';
 import { Labels } from './Labels';
 import { layoutGraph } from './layout';
-import { type SceneView, TopologyScene } from './TopologyScene';
 import { useSceneColors } from './themeColors';
+import { type SceneView, TopologyScene } from './TopologyScene';
 import { useReducedMotion } from './useReducedMotion';
 
 /** Full-frame 3D scene (same height as chat and logs: p-4 + status bar + gap) with the HUD cards on top. */

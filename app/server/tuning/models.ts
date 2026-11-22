@@ -1,7 +1,7 @@
 import { ModelNotFound, ModelPathInvalid, ModelUnreadable, ProjectorNotFound } from '@llama-webui/shared';
 import { Effect, FileSystem, Option, String as Str } from 'effect';
-import { GgufReader } from '../models/GgufReader.ts';
 import type { ModelInfo } from '../models/gguf.ts';
+import { GgufReader } from '../models/GgufReader.ts';
 
 /** Whether `path` is a regular file (a directory, a missing path and an unreadable one are not). */
 const isFile = Effect.fn('tuning.isFile')(function* (path: string) {

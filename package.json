@@ -2,20 +2,23 @@
   "name": "llama-webui",
   "version": "0.4.2",
   "private": true,
-  "type": "module",
   "bin": {
     "llama-webui": "app/.output/llama-webui.mjs"
   },
   "files": [
     "app/.output"
   ],
+  "os": [
+    "linux"
+  ],
+  "type": "module",
   "scripts": {
     "build": "pnpm --filter @llama-webui/app build",
     "check": "pnpm -r --parallel --include-workspace-root typecheck",
     "dev": "pnpm --filter @llama-webui/app dev",
-    "format": "biome format --write",
-    "lint": "biome check",
-    "lint:fix": "biome check --write",
+    "format": "oxfmt",
+    "lint": "oxfmt --check && biome lint",
+    "lint:fix": "biome lint --write && oxfmt",
     "prepack": "node scripts/prepack.ts",
     "prepare": "effect-tsgo patch --typescript --no-oxlint",
     "release": "node scripts/release.ts",
@@ -31,16 +34,14 @@
     "@biomejs/biome": "2.6.8",
     "@effect/tsgo": "0.73.2",
     "@types/node": "catalog:",
+    "oxfmt": "0.79.0",
     "typescript": "catalog:",
     "typescript-language-server": "^6.1.0",
     "vite": "catalog:",
     "vitest": "5.1.1"
   },
-  "packageManager": "pnpm@12.21.0",
   "engines": {
     "node": ">=26.13"
   },
-  "os": [
-    "linux"
-  ]
+  "packageManager": "pnpm@12.21.0"
 }

@@ -1,7 +1,7 @@
 import type { GpuReading } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Option, Order, Path, String as Str } from 'effect';
-import { PciIds } from '../hardware/PciIds.ts';
 import { readLinkCurrent, readLinkMax, readNum, slotLink } from '../hardware/pcieLink.ts';
+import { PciIds } from '../hardware/PciIds.ts';
 import { finiteOrNull } from '../monitor/finite.ts';
 import { identityReading } from './gpu.ts';
 import { readTrimmed } from './read.ts';

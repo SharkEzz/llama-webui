@@ -3,8 +3,8 @@ import { Array as Arr, Clock, Effect, FileSystem, HashSet, Option, Order, Path, 
 import { physicalDisks } from '../collectors/disk.ts';
 import { readTrimmed } from '../collectors/read.ts';
 import { readCpuInfo } from './cpu.ts';
-import { displayName, PciIds } from './PciIds.ts';
 import { isHostBridge, readLinkCurrent, readLinkMax, readNum, slotLink } from './pcieLink.ts';
+import { displayName, PciIds } from './PciIds.ts';
 import { chipsetLabel, cpuLabel } from './pciLabels.ts';
 
 /*

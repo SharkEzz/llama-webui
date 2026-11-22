@@ -8,13 +8,10 @@ export interface Memo<A> {
 }
 
 const makeMemo = <A>() =>
-  Effect.map(
-    Ref.make(HashMap.empty<string, A>()),
-    (ref): Memo<A> => ({
-      get: (path) => Effect.map(Ref.get(ref), HashMap.get(path)),
-      set: (path, value) => Ref.update(ref, HashMap.set(path, value)),
-    }),
-  );
+  Effect.map(Ref.make(HashMap.empty<string, A>()), (ref): Memo<A> => ({
+    get: (path) => Effect.map(Ref.get(ref), HashMap.get(path)),
+    set: (path, value) => Ref.update(ref, HashMap.set(path, value)),
+  }));
 
 /**
  * The last estimate and the last disk measure of each model, for the checks (`/api/tuning/estimate` and

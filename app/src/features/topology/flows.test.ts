@@ -309,7 +309,12 @@ test('linkFlows: a chipset link is measured against its own uplink, with the sum
 test('linkBadge: both directions in the words of each kind of link, nothing at rest under 8 MiB/s, nothing without a measurement', () => {
   const badge = (g: TopologyGraph, s: Snapshot | null, id: string, busy = false) => {
     const link = g.links.find((l) => l.id === id)!;
-    return linkBadge(link, g.nodes.find((n) => n.id === link.to)!, linkFlows(g, s).get(id)!, busy);
+    return linkBadge(
+      link,
+      g.nodes.find((n) => n.id === link.to)!,
+      linkFlows(g, s).get(id)!,
+      busy,
+    );
   };
   expect(badge(graph, snapshot, 'a')).toEqual({
     lines: [
@@ -374,7 +379,14 @@ test('linkBadge: a chipset link speaks of the devices behind it', () => {
     disk: { ...snapshot.disk!, perDisk: { nvme1n1: { readBps: 2e9, writeBps: 1e6 } } },
   } as Snapshot;
   const link = g.links.find((l) => l.id === 'c')!;
-  expect(linkBadge(link, g.nodes.find((n) => n.id === link.to)!, linkFlows(g, s).get('c')!, false)!.lines).toEqual([
+  expect(
+    linkBadge(
+      link,
+      g.nodes.find((n) => n.id === link.to)!,
+      linkFlows(g, s).get('c')!,
+      false,
+    )!.lines,
+  ).toEqual([
     { label: '→ devices', value: '976.6 KiB/s' },
     { label: '→ host', value: '1.9 GiB/s' },
   ]);

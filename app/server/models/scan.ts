@@ -3,8 +3,8 @@ import type { ModelEntry, ModelSummary } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Metric, Number as Num, Option, Order, Path, String as Str } from 'effect';
 import { dual } from 'effect/Function';
 import { cacheLoad, cacheLookup, ModelMetrics } from '../runtime/Metrics.ts';
-import { GgufReader, stampOf } from './GgufReader.ts';
 import { type ModelInfo, shardName } from './gguf.ts';
+import { GgufReader, stampOf } from './GgufReader.ts';
 import { ModelCacheRepo } from './ModelCacheRepo.ts';
 
 /** One model of the folder: its first file, the parts found, the parts missing (relative paths). */
@@ -55,31 +55,28 @@ export const groupGgufFiles = (relPaths: ReadonlyArray<string>): Array<GgufGroup
 export const toSummary: {
   (relPath: string): (info: ModelInfo) => ModelSummary;
   (info: ModelInfo, relPath: string): ModelSummary;
-} = dual(
-  2,
-  (info: ModelInfo, relPath: string): ModelSummary => ({
-    path: info.path,
-    relPath,
-    files: info.files,
-    fileBytes: info.fileBytes,
-    kind: info.kind,
-    arch: info.arch,
-    name: info.name,
-    quant: info.quant,
-    params: info.params,
-    blockCount: info.blockCount,
-    contextLength: info.contextLength,
-    embeddingLength: info.embeddingLength,
-    headCount: info.headCount,
-    headCountKv: Arr.reduce(info.headCountKv, 0, (a, b) => Math.max(a, b)),
-    expertCount: info.expertCount,
-    expertUsedCount: info.expertUsedCount,
-    nextnLayers: info.nextnLayers,
-    recurrent: info.recurrent,
-    slidingWindow: info.slidingWindow,
-    hasChatTemplate: info.hasChatTemplate,
-  }),
-);
+} = dual(2, (info: ModelInfo, relPath: string): ModelSummary => ({
+  path: info.path,
+  relPath,
+  files: info.files,
+  fileBytes: info.fileBytes,
+  kind: info.kind,
+  arch: info.arch,
+  name: info.name,
+  quant: info.quant,
+  params: info.params,
+  blockCount: info.blockCount,
+  contextLength: info.contextLength,
+  embeddingLength: info.embeddingLength,
+  headCount: info.headCount,
+  headCountKv: Arr.reduce(info.headCountKv, 0, (a, b) => Math.max(a, b)),
+  expertCount: info.expertCount,
+  expertUsedCount: info.expertUsedCount,
+  nextnLayers: info.nextnLayers,
+  recurrent: info.recurrent,
+  slidingWindow: info.slidingWindow,
+  hasChatTemplate: info.hasChatTemplate,
+}));
 
 /**
  * The `*.gguf` files under `root` (relative paths, `/`-separated): names starting with “.” are skipped, directory

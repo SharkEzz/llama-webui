@@ -89,22 +89,20 @@ const bySeq = Order.mapInput(Order.Number, (l: LogLine) => l.seq);
 export const mergeLogs: {
   (incoming: ReadonlyArray<LogLine>, max: number): (view: LogView) => LogView;
   (view: LogView, incoming: ReadonlyArray<LogLine>, max: number): LogView;
-} = dual(
-  3,
-  (view: LogView, incoming: ReadonlyArray<LogLine>, max: number): LogView =>
-    Arr.match(incoming, {
-      onEmpty: () => view,
-      onNonEmpty: (batch) => {
-        const merged =
-          Arr.headNonEmpty(batch).seq > lastSeq(view.lines)
-            ? Arr.appendAll(view.lines, batch)
-            : Arr.sort(
-                // The incoming copy of a line wins over the one held.
-                Arr.dedupeWith(Arr.appendAll(batch, view.lines), (a, b) => a.seq === b.seq),
-                bySeq,
-              );
-        const lines = merged.length > max ? Arr.takeRight(merged, max) : merged;
-        return { ...view, lines, seq: Math.max(view.seq, lastSeq(lines) + 1) };
-      },
-    }),
+} = dual(3, (view: LogView, incoming: ReadonlyArray<LogLine>, max: number): LogView =>
+  Arr.match(incoming, {
+    onEmpty: () => view,
+    onNonEmpty: (batch) => {
+      const merged =
+        Arr.headNonEmpty(batch).seq > lastSeq(view.lines)
+          ? Arr.appendAll(view.lines, batch)
+          : Arr.sort(
+              // The incoming copy of a line wins over the one held.
+              Arr.dedupeWith(Arr.appendAll(batch, view.lines), (a, b) => a.seq === b.seq),
+              bySeq,
+            );
+      const lines = merged.length > max ? Arr.takeRight(merged, max) : merged;
+      return { ...view, lines, seq: Math.max(view.seq, lastSeq(lines) + 1) };
+    },
+  }),
 );

@@ -2,8 +2,8 @@ import { isLoopback, type Settings, type SystemInfo, type ThemeMode } from '@lla
 import { ListChecks } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { GlassCard } from '@/components/glass/GlassCard';
 import { GLASS } from '@/components/glass/glass';
+import { GlassCard } from '@/components/glass/GlassCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/Select';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';

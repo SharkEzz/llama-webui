@@ -126,22 +126,20 @@ const isOk = (status: number) => status >= 200 && status < 300;
 export const streamChat: {
   (body: unknown): (baseUrl: string) => Stream.Stream<ChatChunk, ChatStreamFailure, LlamaHttp>;
   (baseUrl: string, body: unknown): Stream.Stream<ChatChunk, ChatStreamFailure, LlamaHttp>;
-} = dual(
-  2,
-  (baseUrl: string, body: unknown): Stream.Stream<ChatChunk, ChatStreamFailure, LlamaHttp> =>
-    Stream.unwrap(
-      Effect.gen(function* () {
-        const client = yield* LlamaHttp;
-        const request = yield* HttpClientRequest.post(`${baseUrl}/v1/chat/completions`).pipe(
-          HttpClientRequest.bodyJson(body),
-          Effect.orDie,
-        );
-        const res = yield* client.execute(request).pipe(Effect.mapError(unreachable));
-        if (!isOk(res.status)) {
-          const text = yield* res.text.pipe(Effect.orElseSucceed(() => ''));
-          return yield* LlamaHttpFailed.make({ status: res.status, body: text, error: errorOfBody(text) });
-        }
-        return chunksOf(res.stream);
-      }),
-    ),
+} = dual(2, (baseUrl: string, body: unknown): Stream.Stream<ChatChunk, ChatStreamFailure, LlamaHttp> =>
+  Stream.unwrap(
+    Effect.gen(function* () {
+      const client = yield* LlamaHttp;
+      const request = yield* HttpClientRequest.post(`${baseUrl}/v1/chat/completions`).pipe(
+        HttpClientRequest.bodyJson(body),
+        Effect.orDie,
+      );
+      const res = yield* client.execute(request).pipe(Effect.mapError(unreachable));
+      if (!isOk(res.status)) {
+        const text = yield* res.text.pipe(Effect.orElseSucceed(() => ''));
+        return yield* LlamaHttpFailed.make({ status: res.status, body: text, error: errorOfBody(text) });
+      }
+      return chunksOf(res.stream);
+    }),
+  ),
 );

@@ -319,16 +319,13 @@ export class HfClient extends Context.Service<
             ...Arr.map(['downloads', 'likes', 'gated', 'lastModified'], (field) => ['expand[]', field] as const),
           ],
         });
-        return Arr.map(
-          rows,
-          (row): HfSearchHit => ({
-            id: row.id,
-            downloads: row.downloads ?? 0,
-            likes: row.likes ?? 0,
-            lastModified: row.lastModified ?? null,
-            gated: isGated(Option.fromUndefinedOr(row.gated)),
-          }),
-        );
+        return Arr.map(rows, (row): HfSearchHit => ({
+          id: row.id,
+          downloads: row.downloads ?? 0,
+          likes: row.likes ?? 0,
+          lastModified: row.lastModified ?? null,
+          gated: isGated(Option.fromUndefinedOr(row.gated)),
+        }));
       }, Effect.provideContext(context));
 
       const repoFiles = Effect.fn('HfClient.repoFiles')(function* (id: string, revision: string) {
@@ -342,14 +339,11 @@ export class HfClient extends Context.Service<
           id: info.id,
           sha: info.sha,
           gated: isGated(Option.fromUndefinedOr(info.gated)),
-          files: Arr.map(
-            info.siblings ?? [],
-            (sibling): HfFile => ({
-              path: sibling.rfilename,
-              size: sibling.lfs?.size ?? sibling.size ?? 0,
-              sha256: sibling.lfs?.sha256 ?? null,
-            }),
-          ),
+          files: Arr.map(info.siblings ?? [], (sibling): HfFile => ({
+            path: sibling.rfilename,
+            size: sibling.lfs?.size ?? sibling.size ?? 0,
+            sha256: sibling.lfs?.sha256 ?? null,
+          })),
         } satisfies RepoFiles;
       }, Effect.provideContext(context));
 

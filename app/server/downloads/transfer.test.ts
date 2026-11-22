@@ -269,9 +269,8 @@ const statuses = Effect.fnUntraced(function* (id: number) {
 const lives = Effect.gen(function* () {
   const published = yield* Published;
   const all = yield* Ref.get(published);
-  return Arr.flatMap(
-    all,
-    (message): ReadonlyArray<DownloadLive | null> => (message.type === 'download-progress' ? [message.payload] : []),
+  return Arr.flatMap(all, (message): ReadonlyArray<DownloadLive | null> =>
+    message.type === 'download-progress' ? [message.payload] : [],
   );
 });
 
@@ -317,24 +316,21 @@ const fullDisk = Effect.gen(function* () {
   return FileSystem.FileSystem.of({
     ...fs,
     open: (path, options) =>
-      Effect.map(
-        fs.open(path, options),
-        (file): FileSystem.File => ({
-          [FileSystem.FileTypeId]: FileSystem.FileTypeId,
-          get stat() {
-            return file.stat;
-          },
-          get sync() {
-            return file.sync;
-          },
-          seek: (offset, from) => file.seek(offset, from),
-          read: (buffer, readOptions) => file.read(buffer, readOptions),
-          readAlloc: (size, readOptions) => file.readAlloc(size, readOptions),
-          truncate: (length) => file.truncate(length),
-          write: () => Effect.fail(enospc),
-          writeAll: () => Effect.fail(enospc),
-        }),
-      ),
+      Effect.map(fs.open(path, options), (file): FileSystem.File => ({
+        [FileSystem.FileTypeId]: FileSystem.FileTypeId,
+        get stat() {
+          return file.stat;
+        },
+        get sync() {
+          return file.sync;
+        },
+        seek: (offset, from) => file.seek(offset, from),
+        read: (buffer, readOptions) => file.read(buffer, readOptions),
+        readAlloc: (size, readOptions) => file.readAlloc(size, readOptions),
+        truncate: (length) => file.truncate(length),
+        write: () => Effect.fail(enospc),
+        writeAll: () => Effect.fail(enospc),
+      })),
   });
 });
 

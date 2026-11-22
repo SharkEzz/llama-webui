@@ -186,16 +186,14 @@ describe('execute', () => {
           // A card holding 1 GiB when the run starts, 3 GiB afterwards.
           const calls = yield* Ref.make(0);
           const gpus = Ref.getAndUpdate(calls, (n) => n + 1).pipe(
-            Effect.map(
-              (n): ReadonlyArray<GpuSample> => [
-                {
-                  key: 'g0',
-                  vendor: 'other',
-                  name: 'Fake GPU',
-                  vramUsedBytes: (n === 0 ? 1 : 3) * 1024 ** 3,
-                } as unknown as GpuSample,
-              ],
-            ),
+            Effect.map((n): ReadonlyArray<GpuSample> => [
+              {
+                key: 'g0',
+                vendor: 'other',
+                name: 'Fake GPU',
+                vramUsedBytes: (n === 0 ? 1 : 3) * 1024 ** 3,
+              } as unknown as GpuSample,
+            ]),
           );
           yield* useFake({ port: yield* freePort, env: { FAKE_LOAD_MS: '50' } });
           const spec = yield* specOf({ kind, modelPath: model, r: 1, p: 16, n: 4 });

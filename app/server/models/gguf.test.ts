@@ -2,8 +2,8 @@ import { NodeServices } from '@effect/platform-node';
 import { assert, describe, it, layer } from '@effect/vitest';
 import { Array as Arr, Effect, FileSystem, Layer, Path } from 'effect';
 import { type FakeTensor, type KvValue, writeGguf } from '../testing/gguf.ts';
-import { GgufReader } from './GgufReader.ts';
 import { type ParsedShard, parseModel } from './gguf.ts';
+import { GgufReader } from './GgufReader.ts';
 
 const u32 = (value: number): KvValue => ({ type: 'u32', value });
 const str = (value: string): KvValue => ({ type: 'string', value });
