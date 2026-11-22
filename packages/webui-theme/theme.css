@@ -71,6 +71,9 @@
   --glow-1-duration: 28s;
   --glow-2-duration: 34s;
   --glow-3-duration: 40s;
+  /* the drift advances one step per --glow-step (each duration divides by it), not every frame: the compositor and
+     the backdrop blurs above the glows only redo their work at each step, a fraction of a pixel under the blur */
+  --glow-step: 250ms;
   --spotlight-opacity: 11%;
   --spotlight-border-opacity: 34%;
   --grid-line-opacity: 7%;
@@ -292,7 +295,7 @@
   filter: blur(120px);
   will-change: transform;
   @media (prefers-reduced-motion: no-preference) {
-    animation: var(--drift) var(--d) ease-in-out infinite alternate;
+    animation: var(--drift) var(--d) steps(calc(var(--d) / var(--glow-step))) infinite alternate;
   }
 }
 
