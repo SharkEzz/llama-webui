@@ -214,9 +214,12 @@ Six families of the rules picked by name shape how the code is written:
 #### Import bans
 
 `no-restricted-imports` holds one pattern per boundary. A pattern matches the specifier as it is written: the package
-name, and the relative paths that walk into the same directory (`../../server/x.ts`, `@/../server/x.ts`). It reports an
-`import`, an `import type`, an `export … from` and an `import('…')` of a string literal alike, with the message below as
-its help. It does not see an `import()` of a template literal or of a computed string, nor a `require`.
+name and its subpaths (`@llama-webui/shared/api`), and the relative paths that walk into the same directory
+(`../../server/x.ts`, `@/../server/x.ts`). It reports an `import`, an `import type`, an `export … from`, an
+`import x = require('…')` and an `import('…')` of a string literal alike, with the message below as its help. It does
+not see an `import()` of a template literal or of a computed string, a `require`, nor a path given to `vi.mock`; nor a
+type written `import('…').T` or `typeof import('…')`, which `typescript/consistent-type-imports` refuses whatever the
+path.
 
 | Config                                              | Refused                                                                                                                           | Message                                                                    |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |

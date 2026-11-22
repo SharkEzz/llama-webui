@@ -9,7 +9,7 @@ const copies = 'the site copies what it reuses; tokens come from `@llama-webui/t
 // Anything of `app/`, by its package name or a relative path out of `site/` (`../app/…`, `../../../app/src/…`); and
 // `@llama-webui/shared`, which the site does not use
 const app = { regex: '^((@/)?(\\.\\./)+app|@llama-webui/app)(/|$)', message: copies };
-const shared = { name: '@llama-webui/shared', message: copies };
+const shared = { regex: '^@llama-webui/shared(/|$)', message: copies };
 
 export default defineConfig({
   extends: [base, react, tests, tailwind],
@@ -18,7 +18,7 @@ export default defineConfig({
   rules: {
     // The site prerenders: a browser global read during render or in a hook's initial state breaks the build
     'react-doctor/no-unguarded-browser-global-in-render-or-hook-init': 'error',
-    'no-restricted-imports': ['error', { paths: [shared], patterns: [vendored, app] }],
+    'no-restricted-imports': ['error', { patterns: [vendored, app, shared] }],
   },
   ignorePatterns: [
     // shadcn components keep their default code

@@ -6,11 +6,13 @@ import { defineConfig } from 'oxlint';
 import { tests } from './oxlint.tests.ts';
 
 // The import bans (`no-restricted-imports`), one pattern per boundary, each matched on the specifier as written: the
-// package name, and the relative forms that walk into the same directory (`../../server/x.ts`), with or without the
-// `@/` alias in front. The rule reports `import`, `import type`, `export … from` and `import('…')` alike (not an
-// `import()` of a template literal or a computed string, nor `require`). A project config that sets the rule replaces
-// the options of the base: its bans list `vendored` again. A `node:*` ban is for source files only: each project lists
-// its bans again, without it, for its tests.
+// package name and its subpaths (`(/|$)`), and the relative forms that walk into the same directory
+// (`../../server/x.ts`), with or without the `@/` alias in front. The rule reports `import`, `import type`,
+// `export … from`, `import x = require('…')` and `import('…')` of a string alike. It does not see an `import()` of a
+// template literal or of a computed string, a `require`, nor a path given to `vi.mock`; nor a type written
+// `import('…').T` or `typeof import('…')`, which `typescript/consistent-type-imports` refuses whatever the path. A
+// project config that sets the rule replaces the options of the base: its bans list `vendored` again. A `node:*` ban
+// is for source files only: each project lists its bans again, without it, for its tests.
 
 // Everyone: the vendored repositories (`repos/`)
 export const vendored = {
