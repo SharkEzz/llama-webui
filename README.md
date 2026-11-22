@@ -332,11 +332,11 @@ JSON responses.
 
 ### Tech stack
 
-[Node.js](https://nodejs.org) 26 (`node:sqlite`, `node:ffi`) · [pnpm](https://pnpm.io) · [Vite](https://vite.dev) · [Nitro](https://nitro.build) ([h3](https://h3.dev), srvx, crossws) · [Vitest](https://vitest.dev) ·
+[Node.js](https://nodejs.org) 26 (`node:sqlite`, `node:ffi`) · [pnpm](https://pnpm.io) · [Effect](https://effect.website) (`HttpApi`, `Schema`, `SqlClient`) · [Vite](https://vite.dev) · [Rolldown](https://rolldown.rs) · [Vitest](https://vitest.dev) ·
 [React 19](https://react.dev) · [React Router](https://reactrouter.com) · [Tailwind CSS 4](https://tailwindcss.com) ·
 [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com) · [uPlot](https://github.com/leeoniya/uPlot) ·
 [react-three-fiber](https://r3f.docs.pmnd.rs) · [Shiki](https://shiki.style) · [Zustand](https://zustand.docs.pmnd.rs) ·
-[Zod](https://zod.dev) · [oxfmt and oxlint](https://oxc.rs) · [react-doctor](https://github.com/millionco/react-doctor) ·
+[oxfmt and oxlint](https://oxc.rs) · [react-doctor](https://github.com/millionco/react-doctor) ·
 [oxlint-tailwindcss](https://github.com/sergioazoc/oxlint-tailwindcss)
 
 ## License

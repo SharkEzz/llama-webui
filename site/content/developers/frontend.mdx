@@ -6,7 +6,7 @@ description: How the React app in app/src is organized, how its zustand stores a
 The web app is a React 19 single-page app in `app/src/`, served by the same server as the API (see
 [Serving the UI](/developers/architecture/#serving-the-ui)): Vite with HMR in development, the output of `vite build`
 (`app/.output/public/`, read from disk by the server) in production. Its entry is `app/index.html`, which loads
-`app/src/main.tsx`. It imports the API definition, schemas and pure functions from `@llama-webui/shared`, nothing from `app/server/`, and never talks to
+`app/src/main.tsx`. It imports the API definition, schemas and pure functions from `@llama-webui/shared`, nothing from `app/server/` (the lint refuses it, see [Import bans](/developers/contributing/conventions/#import-bans)), and never talks to
 `llama-server` directly: everything goes through the llama-webui API.
 
 ## Structure
