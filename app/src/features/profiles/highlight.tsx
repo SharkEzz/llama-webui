@@ -16,7 +16,7 @@ export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactN
           ? 'text-tone-amber underline decoration-dotted decoration-tone-amber/70'
           : 'text-tone-blue';
       return (
-        // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
+        // oxlint-disable-next-line react/no-array-index-key -- positional tokens recomputed on every render
         <span key={i}>
           <span className={cls}>{name}</span>
           {rest && <span className="text-foreground/85">{rest}</span>}
@@ -25,13 +25,13 @@ export function highlightArgs(text: string, catalog: FlagCatalog | null): ReactN
     }
     if (/^["']/.test(tok))
       return (
-        // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
+        // oxlint-disable-next-line react/no-array-index-key -- positional tokens recomputed on every render
         <span key={i} className="text-success">
           {tok}
         </span>
       );
     return (
-      // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
+      // oxlint-disable-next-line react/no-array-index-key -- positional tokens recomputed on every render
       <span key={i} className="text-foreground/85">
         {tok}
       </span>
@@ -48,7 +48,7 @@ export function highlightEnv(text: string): ReactNode {
     if (!line.trim()) return line + nl;
     if (eq <= 0 || !/^\s*[A-Za-z_][A-Za-z0-9_]*\s*$/.test(key)) {
       return (
-        // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
+        // oxlint-disable-next-line react/no-array-index-key -- positional tokens recomputed on every render
         <span key={i}>
           <span className="text-tone-rose underline decoration-wavy decoration-tone-rose/70">{line}</span>
           {nl}
@@ -56,7 +56,7 @@ export function highlightEnv(text: string): ReactNode {
       );
     }
     return (
-      // biome-ignore lint/suspicious/noArrayIndexKey: positional tokens recomputed on every render
+      // oxlint-disable-next-line react/no-array-index-key -- positional tokens recomputed on every render
       <span key={i}>
         <span className="text-tone-teal">{key}</span>
         <span className="text-muted-foreground">=</span>

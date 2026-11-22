@@ -118,7 +118,7 @@ export function PlanTable() {
           </TableHeader>
           <TableBody>
             {plan.items.slice(0, SHOWN).map((it, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: labels are not unique: the index completes the key
+              // oxlint-disable-next-line react/no-array-index-key -- labels are not unique: the index completes the key
               <TableRow key={it.label + i}>
                 <TableCell className="num text-xs text-muted-foreground">{i + 1}</TableCell>
                 <TableCell className="font-mono text-xs whitespace-normal">{it.label}</TableCell>

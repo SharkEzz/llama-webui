@@ -60,10 +60,10 @@ export function TimeSeriesChart({
   const fmt = useRef(format);
   fmt.current = format;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: version triggers the history reread (read outside the closure); signature sums up `series`
   const data = useMemo((): uPlot.AlignedData => {
     const { times, series: all } = useMonitor.getState().history;
     return [times, ...series.map((s) => all.get(s.key) ?? new Array<number | null>(times.length).fill(null))];
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- version triggers the history reread (read outside the closure); signature sums up `series`
   }, [version, signature]);
 
   // Current series and data, read at creation without rerunning it: data is pushed by the next effect
@@ -71,7 +71,7 @@ export function TimeSeriesChart({
   const latest = useEffectEvent(() => ({ series, data }));
 
   // Creation: per series set, theme (colors read from CSS variables) and shape.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: signature and resolved are triggers (series read via latest, colors via readChartTheme)
+  // signature and resolved are triggers (series read via latest, colors via readChartTheme)
   useEffect(() => {
     const el = host.current;
     if (!el) return;

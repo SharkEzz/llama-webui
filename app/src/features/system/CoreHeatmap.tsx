@@ -33,7 +33,7 @@ export function CoreHeatmap({ cores }: { cores: readonly number[] }) {
       onKeyDown={onKeyDown}
     >
       {cores.map((pct, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: one cell per core, the index is the core's identity
+        // oxlint-disable-next-line react/no-array-index-key -- one cell per core, the index is the core's identity
         <li key={i}>
           <Tooltip>
             <TooltipTrigger

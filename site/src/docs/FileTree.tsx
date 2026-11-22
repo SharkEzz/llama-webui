@@ -29,7 +29,7 @@ function Items({ list }: { list: El }) {
         const dir = name?.endsWith('/') ?? false;
         const Icon = dir ? Folder : File;
         return (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static tree written in the page
+          // oxlint-disable-next-line react/no-array-index-key -- static tree written in the page
           <li key={i} className="relative">
             <div className="flex items-baseline gap-2 py-0.5">
               <Icon className="size-3.5 shrink-0 translate-y-0.5 text-muted-foreground" aria-hidden="true" />

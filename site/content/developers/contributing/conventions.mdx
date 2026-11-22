@@ -1,12 +1,13 @@
 ---
 title: Conventions
-description: Language, number formatting, tagged errors, Biome rules, React idioms, the platform and Effect idioms of the server, generated shadcn components and the development restarts every change goes through.
+description: Language, number formatting, tagged errors, format and lint rules, React idioms, the platform and Effect idioms of the server, generated shadcn components and the development restarts every change goes through.
 ---
 
 These rules apply to `app/`, `packages/` and `site/`. They come from `CLAUDE.md` at the root of the repository
-(written in French); `oxfmt.config.ts`, `biome.jsonc`, the `tsconfig*.json` files, the Effect diagnostics and CI
-enforce the mechanical ones. The server's own rules, each with its example (where each part of a domain goes, requests and replies, programs,
-long processes, SQL, caches), are in `docs/superpowers/poc-effect/conventions.md`.
+(written in French); `oxfmt.config.ts`, the `oxlint.config.ts` files, the `tsconfig*.json` files, the Effect
+diagnostics and CI enforce the mechanical ones. The server's own rules, each with its example (where each part of a
+domain goes, requests and replies, programs, long processes, SQL, caches), are in
+`docs/superpowers/poc-effect/conventions.md`.
 
 ## Language
 
@@ -71,78 +72,162 @@ wording of earlier versions (the app used to be in French, and old rows keep the
 
 ## Formatting and lint
 
-[oxfmt](https://oxc.rs) formats, sorts imports and sorts the keys of every `package.json`. It is a pinned
-devDependency (`oxfmt` 0.79.0) configured in `oxfmt.config.ts`, which holds the style.
-[Biome](https://biomejs.dev) lints. It is a pinned devDependency (`@biomejs/biome` 2.6.8) configured in `biome.jsonc`.
+[oxfmt](https://oxc.rs) formats and [oxlint](https://oxc.rs) lints. Both are pinned devDependencies (`oxfmt` 0.79.0,
+`oxlint` 1.94.0, with `oxlint-tsgolint` 7.0.2008 for the rules that read types), configured in TypeScript files.
 
-| Setting        | Value                                                                                                            |
-| -------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Indentation    | 2 spaces                                                                                                         |
-| Line width     | 120 columns                                                                                                      |
-| Quotes         | Single quotes in TypeScript, double quotes in JSX attributes, CSS and YAML                                       |
-| Semicolons     | Always                                                                                                           |
-| Imports        | Sorted by oxfmt, no blank line between groups                                                                    |
-| `package.json` | Keys sorted by oxfmt                                                                                             |
-| Lint rules     | The `recommended` preset, with `style/noNonNullAssertion` turned off (`x!` is allowed)                           |
-| Domains        | `tailwind`, `test`, `project` (module graph) and `types` (type inference), `recommended`                         |
-| React          | The `react` domain, turned on for `app/src/**` and `site/**` (not detected from `catalog:`)                      |
-| Server         | `correctness/useYield` off for `app/server/**`: a generator of `Effect.gen` or `Effect.fn` does not always yield |
-| CSS            | Parsed with Tailwind directives                                                                                  |
+### Format
+
+oxfmt formats, sorts imports and sorts the keys of every `package.json`. Its config, `oxfmt.config.ts`, holds the
+style:
+
+| Setting        | Value                                                                      |
+| -------------- | -------------------------------------------------------------------------- |
+| Indentation    | 2 spaces                                                                   |
+| Line width     | 120 columns                                                                |
+| Quotes         | Single quotes in TypeScript, double quotes in JSX attributes, CSS and YAML |
+| Semicolons     | Always                                                                     |
+| Imports        | Sorted by oxfmt, no blank line between groups                              |
+| `package.json` | Keys sorted by oxfmt                                                       |
 
 oxfmt formats TypeScript, JavaScript, JSON, CSS, YAML, HTML, every `.md` file (the root `docs/` included) and the
 site's `.mdx` pages. In Markdown and MDX, the code of fenced blocks stays as written (`embeddedLanguageFormatting`
 off). It skips what `.gitignore` lists, `repos/`, `testdata`, `pnpm-lock.yaml`, the generated
 `app/server/contract/golden.json` and the generated shadcn components.
 
-Biome lints TypeScript, JSON and CSS in every package. It skips files ignored by Git, `node_modules`, `testdata`,
-`dist`, the app's build output (`.output`), the site's build output (`site/build`, `site/dist`, `site/.react-router`),
-the generated `app/server/contract/golden.json`, the `.mdx` pages (not supported), the generated shadcn components
-(see [Generated shadcn components](#generated-shadcn-components)) and `repos/`, the reference copies of other
-repositories (`!!`: not even indexed).
+### Lint
 
-| Command         | Runs                          | Effect                                   |
-| --------------- | ----------------------------- | ---------------------------------------- |
-| `pnpm lint`     | `oxfmt --check && biome lint` | Format, imports and lint, read-only      |
-| `pnpm lint:fix` | `biome lint --write && oxfmt` | Applies Biome's safe fixes, then formats |
-| `pnpm format`   | `oxfmt`                       | Formats only                             |
+oxlint lints the TypeScript and TSX of every package; CSS, Markdown and MDX are formatted, not linted. It runs the
+rules of its `correctness` category and a selection of other rules picked by name, all in `error`. The type-aware ones
+(`options.typeAware`) read the types through the `tsconfig.json` of each file. Every rule that is off or has options
+carries a one-line comment with its reason in the config: that is where to read why.
 
-In VS Code, install the oxc extension (`oxc.oxc-vscode`) and set `"editor.defaultFormatter": "oxc.oxc-vscode"` in
-your settings: `.vscode/` is ignored by Git, so each contributor sets it.
+The root and four projects (`app/server`, `app/src`, `site`, `packages/llamacpp-js`) each have an `oxlint.config.ts`,
+and a file takes the nearest one above it. That config replaces the root one instead of adding to it, so a project
+config extends `base` and the fragments it needs:
+
+| File                                    | Lints, or holds                                                                                                                                                                                                                                                                                               |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `oxlint.config.ts`                      | Its named export `base`: the plugins (`eslint`, `typescript`, `unicorn`, `oxc`, `import`, `promise`), the `correctness` category, the rules by name, the debt block. Its default export, `base` and the Vitest rules, lints `scripts/`, `app/build/`, `app/bin/`, `packages/webui-shared/` and the root files |
+| `app/server/oxlint.config.ts`           | The server: `base` and the Vitest rules, with `require-yield` off (a generator of `Effect.gen` or `Effect.fn` does not always yield)                                                                                                                                                                          |
+| `app/src/oxlint.config.ts`              | The web app: `base`, the React rules and the Vitest rules                                                                                                                                                                                                                                                     |
+| `site/oxlint.config.ts`                 | The website: `base`, the React rules and the Vitest rules                                                                                                                                                                                                                                                     |
+| `packages/llamacpp-js/oxlint.config.ts` | `llamacpp-js`: `base` alone, since its tests run on `node:test`                                                                                                                                                                                                                                               |
+| `oxlint.react.ts`                       | The React fragment: the `react` and `jsx-a11y` plugins. Accessibility is limited to the rules that pass today; the others of `jsx-a11y` are off by name                                                                                                                                                       |
+| `oxlint.tests.ts`                       | The Vitest fragment: an override for `**/*.test.ts` and `**/*.test.tsx` with the `vitest` plugin                                                                                                                                                                                                              |
+| `scripts/oxlint/directives.ts`          | The local plugin of `directives/require-reason` (see [Never disable a rule](#never-disable-a-rule)), tested by `scripts/oxlint/directives.test.ts`                                                                                                                                                            |
+
+A project config is short:
+
+```ts title="app/src/oxlint.config.ts"
+export default defineConfig({
+  extends: [base, react, tests],
+  // shadcn components keep their default code
+  ignorePatterns: ['components/ui/**'],
+});
+```
+
+`ignorePatterns` do not travel through `extends`, and they are relative to the config that declares them: each
+project config repeats those under its directory. Besides what `.gitignore` lists, oxlint skips `repos/`, the root
+`docs/`, `testdata`, the generated `app/server/contract/golden.json`, the generated shadcn components and the build
+outputs. `.eslintignore` holds `/repos/`: oxlint reads it before it looks for nested configs, and only it keeps
+oxlint from loading `repos/effect/.oxlintrc.json`, whose plugin is not installed here. Given a path under `repos/`
+explicitly, oxlint still loads that config and fails with a configuration error; `pnpm lint`, which walks the
+repository, does not.
+
+The rules that report on today's code and are not fixed yet are off in two marked blocks, each rule with its count
+and the milestone of the oxc migration (L4 or L5) that turns it on and fixes its reports: `--- Debt: off until its
+milestone ---` in `oxlint.config.ts`, and the Vitest rules in the override of `oxlint.tests.ts` (the override's
+category would turn them back on from the base). A block only shrinks: a rule never goes into it to get the lint
+through.
+
+The Effect diagnostics are not oxlint's: `tsc` reports them in `pnpm check`
+([Effect diagnostics](/developers/contributing/testing/#effect-diagnostics)).
+
+| Command         | Runs                                                                         | Effect                                                                      |
+| --------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `pnpm lint`     | `oxfmt --check && oxlint --deny-warnings --report-unused-disable-directives` | Format, imports and lint, read-only; a warning or an unused directive fails |
+| `pnpm lint:fix` | `oxlint --fix && oxfmt`                                                      | Applies oxlint's safe fixes, then formats                                   |
+| `pnpm format`   | `oxfmt`                                                                      | Formats only                                                                |
+
+`oxlint --fix` applies safe fixes only: an unused import, for example, stays for you to remove.
+`pnpm exec oxlint --fix-suggestions` removes it too; review its diff.
+
+To see the rules that apply to a project, print its config:
+
+```bash title="Terminal"
+pnpm exec oxlint -c app/src/oxlint.config.ts --print-config
+```
+
+`--print-config` followed by a file path ignores the path and prints the root config.
+
+In VS Code, install the oxc extension (`oxc.oxc-vscode`): it formats with oxfmt and shows oxlint's reports. Make it
+the formatter and let it apply oxlint's fixes when you save:
+
+```json title=".vscode/settings.json"
+{
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "editor.codeActionsOnSave": { "source.fixAll.oxc": "explicit" }
+}
+```
+
+`.vscode/` is ignored by Git, so each contributor sets it.
 
 Before a commit, a pull request or the end of a milestone, `pnpm lint` must report zero errors and zero warnings
 (see [the quality gate](/developers/contributing/workflow/#the-quality-gate)).
 
 ### Never disable a rule
 
-Do not turn a rule off or lower it to `warn` in `biome.jsonc` to get the lint through. When a rule reports a false
-positive, silence that one line with a `biome-ignore` comment that names the rule and says why:
+Do not turn a rule off or lower it to `warn` to get the lint through. When a rule reports a false positive, suppress
+it on that one line with a directive that names the rule and gives the reason after `--`:
 
 ```tsx title="app/src/features/chat/CodeBlock.tsx"
-// biome-ignore lint/security/noDangerouslySetInnerHtml: HTML produced by shiki from the text (escaped), not the reply's HTML
+// oxlint-disable-next-line react/no-danger -- HTML produced by shiki from the text (escaped), not the reply's HTML
+dangerouslySetInnerHTML={{ __html: html }}
 ```
 
-The same works in CSS:
+Among JSX children, the directive is a JSX comment:
 
-```css title="app/src/index.css"
-/* biome-ignore lint/complexity/noImportantStyles: overrides the border set by uPlot */
+```tsx title="site/src/root.tsx"
+{/* oxlint-disable-next-line react/no-danger -- static theme bootstrap, must run before paint */}
+<script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
 ```
+
+Name the rule as oxlint's report prints it, with a `/` for its parentheses and without the `eslint` prefix of a core
+rule: `react-hooks(exhaustive-deps)` is written `react-hooks/exhaustive-deps`, `eslint(no-control-regex)` is written
+`no-control-regex`.
+`pnpm lint` fails on a directive without a reason (`directives/require-reason`, the local plugin), on one that names
+no rule (`unicorn/no-abusive-eslint-disable`), and on one that suppresses nothing
+(`--report-unused-disable-directives`).
 
 ## React
 
 The web app uses React 19. Three rules cover most effect-related lint reports:
 
-- **Trigger dependencies.** `useExhaustiveDependencies` flags a dependency the effect does not read. When the value is a
-  deliberate trigger (the effect must run again when it changes), keep it and say so in a `biome-ignore`:
+- **Trigger dependencies.** `react-hooks/exhaustive-deps` reports a value a hook reads but does not list, and a
+  dependency that a `useMemo` or a `useCallback` lists but does not read. An effect may list a value it does not read:
+  when it is a deliberate trigger (the effect must run again when it changes), keep it and say so in a comment:
 
   ```tsx title="app/src/features/chat/Thread.tsx"
-  // biome-ignore lint/correctness/useExhaustiveDependencies: current.id is a trigger: re-pin to the bottom on every conversation change
+  // current.id is a trigger: re-pin to the bottom on every conversation change
   useLayoutEffect(() => {
     stick.current = true;
   }, [current?.id]);
   ```
 
+  When the rule reports a list that is deliberate, the directive goes above the dependency array: it silences every
+  report of that hook, a missing dependency included, although the report prints the line where the value is used. A
+  hook with no array (an effect that runs after every render) takes the directive above the hook:
+
+  ```tsx title="app/src/components/charts/TimeSeriesChart.tsx"
+  const data = useMemo((): uPlot.AlignedData => {
+    const { times, series: all } = useMonitor.getState().history;
+    return [times, ...series.map((s) => all.get(s.key) ?? new Array<number | null>(times.length).fill(null))];
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- version triggers the history reread (read outside the closure); signature sums up `series`
+  }, [version, signature]);
+  ```
+
 - **Read the latest value without re-running the effect.** Use `useEffectEvent` rather than leaving the value out of
-  the dependencies with an ignore:
+  the dependencies with a suppression:
 
   ```tsx title="app/src/features/tuning/TuningPage.tsx"
   // Only a change of ?sweep opens one; openId is read fresh without re-running the effect.
@@ -218,9 +303,9 @@ sources use only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/
 ## Generated shadcn components
 
 `app/src/components/ui/**` and `site/src/components/ui/**` hold stock [shadcn/ui](https://ui.shadcn.com) components
-(configured by `components.json` in each package). Biome and oxfmt ignore them entirely (no lint, no format, no import
-sorting) so they stay comparable with shadcn updates. Biome's exclusion is a single `!` in `files.includes`, not
-`!!`: the files stay indexed, so the `project` and `types` rules still resolve the imports of `@/components/ui/…` from the rest of the code. Leave them untouched: put the project's changes in a wrapper outside `ui/`, as
+(configured by `components.json` in each package). oxfmt and oxlint ignore them entirely (no format, no lint, no
+import sorting) so they stay comparable with shadcn updates; the type-aware rules still read their types where the
+rest of the code imports them. Leave them untouched: put the project's changes in a wrapper outside `ui/`, as
 `app/src/components/Select.tsx` does for the select list.
 
 ## Development restarts

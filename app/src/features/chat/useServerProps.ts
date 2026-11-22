@@ -9,7 +9,7 @@ export function useServerProps(): ServerProps | null {
   const kind = useServer((s) => s.view?.state.kind);
   const pid = useServer((s) => (s.view && 'pid' in s.view.state ? s.view.state.pid : null));
   const [props, setProps] = useState<ServerProps | null>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pid is a trigger: /props is reread on every server restart
+  // pid is a trigger: /props is reread on every server restart
   useEffect(() => {
     if (kind !== 'ready' && kind !== 'external') {
       setProps(null);

@@ -41,12 +41,10 @@ A run is created with status `running` and executes in the background. Its progr
 | `ExternalServerRunning` | `An external llama-server is running on port <port>: stop it first`                                 | A `llama-server` that llama-webui did not start holds the port.                              |
 | `ServerStopTooSlow`     | `llama-server is taking too long to stop: try again`                                                | A stop of `llama-server` already in progress does not end in time.                           |
 
-The web app tells them apart by `_tag`: `ServerRunning` asks to confirm, then sends the request again with
-`stopServer: true`.
-
-`server-running` is a confirmation request: the web app asks the user, then sends the same request again with
-`stopServer: true`. The stop is not awaited by the route: the run shows the phase `stopping-server` meanwhile, then
-`restarting-server` at the end. If the restart fails, its error is appended to the run's `error`.
+The web app tells them apart by `_tag`. `ServerRunning` is a confirmation request: the web app asks the user, then
+sends the same request again with `stopServer: true`. The stop is not awaited by the route: the run shows the phase
+`stopping-server` meanwhile, then `restarting-server` at the end. If the restart fails, its error is appended to the
+run's `error`.
 
 ## The run spec
 

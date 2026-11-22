@@ -46,9 +46,11 @@ quickly after a change that does not touch the build.
 | `pnpm exec vitest`                                                           | Watch mode: reruns the tests a change affects               |
 
 <Callout type="warning">
-  `--changed` and watch mode follow imports only. The suites that start the production build (contract, lifecycle,
-  build output) and `vite dev` (`app/server/dev.test.ts`) do not import the server: a change to a route or a service
-  does not select them. Use them as a quick loop while working, and run the full `pnpm test` before every commit.
+
+`--changed` and watch mode follow imports only. The suites that start the production build (contract, lifecycle, build
+output) and `vite dev` (`app/server/dev.test.ts`) do not import the server: a change to a route or a service does not
+select them. Use them as a quick loop while working, and run the full `pnpm test` before every commit.
+
 </Callout>
 
 A test has 5 seconds by default. The tests that start `vite dev` pass a longer timeout as the last argument of
@@ -213,7 +215,7 @@ describe('parseSlots', () => {
 ## Captured outputs
 
 `testdata/` holds real outputs captured from `llama-server`, `llama-bench`, `nvidia-smi` and the kernel. Parsers are
-tested against them rather than against hand-written strings. Biome does not check this folder.
+tested against them rather than against hand-written strings. oxfmt and oxlint do not check this folder.
 
 | File                                                                                                                  | What it is                                                                    | Read by                                                                                              |
 | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -400,13 +402,15 @@ git diff app/server/contract/golden.json
 ```
 
 A failure lists the names of the cases whose reply changed, with the diff of those replies only. `golden.json` is
-written by the test and left out of the formatter (oxfmt) and of Biome, so a regeneration changes only the entries that moved. The suite was
+written by the test and left out of the formatter (oxfmt), so a regeneration changes only the entries that moved. The suite was
 recorded on the Nitro server and replayed on the Effect server; the replies that changed on purpose are listed in
 `docs/superpowers/poc-effect/behaviours.md` of the repository.
 
 <Callout type="note">
+
 The golden pins no Hugging Face success (the suite has no network) and no value of the machine-dependent endpoints:
 check those screens in the running app after a change of framework or runtime.
+
 </Callout>
 
 ## Migrations on old data

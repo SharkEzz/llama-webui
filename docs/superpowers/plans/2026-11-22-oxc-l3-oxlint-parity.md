@@ -19,7 +19,7 @@ change sits in one marked block, off, for L4 and L5 to empty.
 
 - Branch `chore/oxlint` from `chore/oxfmt-mdx` (stacked; the PR is based on it); one PR; green on `pnpm lint`, `pnpm check`
   (0 `effect(` line), `pnpm test`.
-- **No code change**: `git diff master --stat -- '*.ts' '*.tsx' '*.css'` outside the new config files shows only
+- **No code change**: `git diff chore/oxfmt-mdx --stat -- '*.ts' '*.tsx' '*.css'` outside the new config files shows only
   comment lines (directives converted or removed).
 - Every active rule is `error`. `pnpm lint` = `oxfmt --check && oxlint --deny-warnings --report-unused-disable-directives`.
 - A rule that is off or has options carries a one-line comment with its reason, in the config.
@@ -188,6 +188,13 @@ change sits in one marked block, off, for L4 and L5 to empty.
   74-128, 211), `getting-started.mdx` (134-136, 220, 287-300), `index.mdx` (40, 83), `frontend.mdx` (51),
   `contributing/testing.mdx` (217, 401), `contributing/workflow.mdx` (46, 230), `.github/workflows/ci.yml` (line 1)
 
+- [ ] **Step 0:** Carried over from the review of L2, each a commit of its own before the rewrite:
+      `site/content/developers/api/bench.mdx`, the paragraph below the error table that still says `server-running` and
+      repeats the sentence above it (left by #80): remove what is stale, keep what the page still needs
+      (`docs(site): drop a stale paragraph of the bench API page`); `contributing/testing.mdx`, the two `<Callout>` whose
+      text is glued to their tags get their blank lines, and `contributing/workflow.mdx`, the sentence on inline
+      components at the start of a line says what happens (oxfmt splits the paragraph there) instead of "for the same
+      reason" (`docs(site): Callouts follow the blank-line rule`).
 - [ ] **Step 1:** Rewrite each for what is now true. The examples of suppressions in `conventions.mdx` become real
       ones taken from the code after Task 4. The editor note gains `"source.fixAll.oxc": "explicit"`.
 - [ ] **Step 2:** `pnpm format`; `pnpm site:build && pnpm --dir site check-links`; `pnpm lint && pnpm check && pnpm test`;

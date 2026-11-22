@@ -31,7 +31,7 @@ export function Endpoint({
       <code className="min-w-0 break-all text-foreground">
         {parts.map((p, i) =>
           p.startsWith(':') ? (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static fragments of one path
+            // oxlint-disable-next-line react/no-array-index-key -- static fragments of one path
             <span key={i} className="text-primary-ink">
               {p}
             </span>

@@ -100,10 +100,10 @@
 :is(.ts-chart, .ts-legend) .u-legend .u-marker {
   height: 0;
   width: 0.875rem;
-  /* biome-ignore lint/complexity/noImportantStyles: overrides the border set by uPlot */
+  /* overrides the border set by uPlot */
   border-width: 2px 0 0 0 !important;
   border-radius: 1px;
-  /* biome-ignore lint/complexity/noImportantStyles: overrides the background set by uPlot */
+  /* overrides the background set by uPlot */
   background: transparent !important;
 }
 :is(.ts-chart, .ts-legend) .u-legend .u-series:first-child .u-marker {

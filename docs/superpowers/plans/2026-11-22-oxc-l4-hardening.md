@@ -31,8 +31,8 @@ the test suites and the contract golden are the proof. About 680 reports, about 
 - No sorting rule. Accessibility rules untouched. The five rules the user declined stay off: `curly`,
   `typescript/strict-boolean-expressions`, `typescript/no-non-null-assertion`, `vitest/prefer-strict-equal`,
   `no-nested-ternary`.
-- **Size:** if the branch passes about 1,500 changed lines, it is split into three PRs in this order, each from
-  `master` after the previous one is merged: Tasks 1-2, Task 3, Tasks 4-7.
+- **Size:** if the branch passes about 1,500 changed lines, it is split into three PRs in this order, stacked, each
+  branched from and based on the previous one: Tasks 1-2, Task 3, Tasks 4-7.
 
 ## Review Focus
 

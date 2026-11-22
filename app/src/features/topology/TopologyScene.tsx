@@ -65,7 +65,6 @@ export function TopologyScene(p: TopologySceneProps) {
   const smoother = useMemo(() => new Smoother(0.4), []);
   const pacer = useMemo(() => new FramePacer(), []);
   // An input changed: a frame as soon as possible, then running smoothings keep the pace (see FramePacer).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: triggers, the scene reads these values on the next frame
   useEffect(() => {
     pacer.requested = true;
   }, [pacer, p.flows, p.peers, p.live, p.tones, p.colors, p.hovered, p.layout, p.reducedMotion]);
@@ -163,7 +162,6 @@ function FrameDriver({ pacer, smoother }: { pacer: FramePacer; smoother: Smoothe
   const get = useThree((s) => s.get);
   const size = useThree((s) => s.size);
   // Resizing clears the canvas: draw a frame right away.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `size` is the trigger
   useEffect(() => {
     pacer.requested = true;
   }, [pacer, size]);
