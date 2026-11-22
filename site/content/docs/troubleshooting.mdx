@@ -228,9 +228,10 @@ usable memory: its total minus a margin of 512 MiB plus 4 %. The reason names th
 | `not enough RAM: … needed with weights in RAM, … available` | The model is too large for the GPUs, and moving experts or layers to RAM needs more RAM than is available: free RAM, or pick **100 GB model**, which accepts reading the rest from disk. |
 | `model too large: … of RAM needed, … available` | Nothing fits on the GPUs and the RAM is too small as well.                                   |
 
-**Tight in VRAM** means less than 5 % headroom on a card: it should start, but the margin is thin. A placement that runs
-over the RAM is also only tight, not a failure: what does not fit is read back from the disk, slowly. In the Hugging
-Face sheet, **Partial offload** only means the file is larger than your VRAM: part of the model will stay in RAM.
+In the recommendation's memory bars, **tight: less than 5% headroom** marks a card between 95 % and 100 % of its usable
+memory: it should start, but the margin is thin. A placement that runs over the RAM is also only tight, not a failure:
+what does not fit is read back from the disk, slowly. In the Hugging Face sheet, **Partial offload** only means the
+file is larger than your VRAM: part of the model will stay in RAM.
 
 **Fix:** on the [Tuning](/docs/tuning/) page, pick **Make the model fit**, or **100 GB model** for a large MoE model,
 and create a profile from the result. Otherwise use a smaller quantization. For `unknown device`, check the device

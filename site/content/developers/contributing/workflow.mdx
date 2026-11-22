@@ -260,8 +260,9 @@ Only the build job fetches the whole history, for the version `git describe` giv
 request cancels its run still going; the runs on `master` all go to their end.
 
 `.github/workflows/site-deploy.yml` publishes `site/dist/` to GitHub Pages: on every push to `master` that changes
-`site/` (or the workflow itself), and when started by hand from the Actions tab (`workflow_dispatch`). A pull request
-never deploys: the site changes it brings go live when it is merged.
+`site/`, the shared theme it imports (`packages/webui-theme/`) or the workflow itself, and when started by hand from
+the Actions tab (`workflow_dispatch`). A pull request never deploys: the site changes it brings go live when it is
+merged.
 
 ## Releases
 

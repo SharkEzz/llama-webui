@@ -14,6 +14,10 @@
   --section-halo-opacity: 0.18;
 }
 
+/*
+ * Where an anchor lands, below the floating header: the only offset (no scroll-mt on a target, the two would add up).
+ * The docs scroll-spy (OFFSET in src/docs/Toc.tsx) must stay above it.
+ */
 @layer base {
   html {
     scroll-padding-top: 5.5rem;
@@ -29,8 +33,9 @@
 @layer components {
   .spotlight-card {
     position: relative;
+    /* The lift is on `translate`: `transform` is held by the scroll-reveal animation once it has played. */
     transition:
-      transform 250ms cubic-bezier(0.22, 1, 0.36, 1),
+      translate 250ms cubic-bezier(0.22, 1, 0.36, 1),
       box-shadow 250ms ease,
       border-color 250ms ease;
   }
@@ -60,15 +65,21 @@
       opacity: 1;
     }
     .spotlight-card:hover {
-      --tw-ring-color: color-mix(
-        in oklch,
-        var(--card-tone, var(--tone-blue)) var(--spotlight-border-opacity),
-        var(--surface-border)
-      );
       @media (prefers-reduced-motion: no-preference) {
-        transform: translateY(-2px);
+        translate: 0 -2px;
       }
     }
+  }
+}
+
+/* Out of the layers: the ring color set by `glass` (a utility) would win over a rule of the components layer. */
+@media (hover: hover) {
+  .spotlight-card:hover {
+    --tw-ring-color: color-mix(
+      in oklch,
+      var(--card-tone, var(--tone-blue)) var(--spotlight-border-opacity),
+      var(--surface-border)
+    );
   }
 }
 
@@ -168,10 +179,10 @@
     margin-top: 0;
   }
   .docs-prose :where(h2):not(:where(.not-prose *)) {
-    @apply mt-14 mb-4 scroll-mt-24 text-2xl font-semibold tracking-tight text-foreground;
+    @apply mt-14 mb-4 text-2xl font-semibold tracking-tight text-foreground;
   }
   .docs-prose :where(h3):not(:where(.not-prose *)) {
-    @apply mt-10 mb-3 scroll-mt-24 text-lg font-semibold tracking-tight text-foreground;
+    @apply mt-10 mb-3 text-lg font-semibold tracking-tight text-foreground;
   }
   .docs-prose :where(p):not(:where(.not-prose *)) {
     @apply my-5;

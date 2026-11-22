@@ -402,7 +402,7 @@ dedicated card without one, matched to the monitored cards; every card when ther
 its last disk measurement. Both are kept in memory by the `TuningMemo` service (`app/server/tuning/TuningMemo.ts`),
 which the endpoints that write and read them share: a restart forgets them.
 
-The first-run checklist on the Home page only shows the checks for which `isSetupCheck(id)` is true: it drops those that
+The first-run checklist only shows the checks for which `isSetupCheck(id)` is true: it drops those that
 need a model or a running server (`cpu.memlock`, `cpu.swappiness`, `kernel.disk`, `kernel.disk-speed`,
 `kernel.swap`, the PCIe checks and `build.simd`).
 

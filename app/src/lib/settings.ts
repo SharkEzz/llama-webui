@@ -1,6 +1,7 @@
 import { type Settings, SettingsInvalid } from '@llama-webui/shared';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { create } from 'zustand';
 import { call, errorMessage, errorTag } from './api';
 
 export type SettingsErrors = Partial<Record<keyof Settings, string>>;
@@ -9,23 +10,44 @@ export type SettingsErrors = Partial<Record<keyof Settings, string>>;
 const invalid = (e: unknown): SettingsInvalid | undefined =>
   errorTag(e) === 'SettingsInvalid' && e instanceof SettingsInvalid ? e : undefined;
 
+interface SettingsState {
+  /** The last settings read or saved; `null` until the first reply. */
+  settings: Settings | null;
+  /** Rereads the settings; a failure keeps the last ones and rejects. */
+  load(): Promise<void>;
+}
+
+/**
+ * The settings, shared by the pages: read when the WebSocket opens (`AppLayout`), so a page opened later renders from
+ * them right away, and a read that failed while the server was away is done again when it is back.
+ */
+export const useSettings = create<SettingsState>()((set) => ({
+  settings: null,
+  async load() {
+    set({ settings: await call((api) => api.settings.get()) });
+  },
+}));
+
 /**
  * Settings saved field by field (PATCH /api/settings): validation errors are kept per field, other errors are toasts.
- * `save` resolves to whether the patch was saved.
+ * `save` resolves to whether the patch was saved. `settings` is the shared store's, reread on mount.
  */
 export function useSettingsEditor() {
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const settings = useSettings((s) => s.settings);
   const [errors, setErrors] = useState<SettingsErrors>({});
 
   useEffect(() => {
-    void call((api) => api.settings.get()).then(setSettings, (e: unknown) => toast.error(errorMessage(e)));
+    useSettings
+      .getState()
+      .load()
+      .catch((e: unknown) => toast.error(errorMessage(e)));
   }, []);
 
   const save = async (patch: Partial<Settings>, o: { quiet?: boolean } = {}): Promise<boolean> => {
     const keys = Object.keys(patch) as (keyof Settings)[];
     try {
       const { warning, ...next } = await call((api) => api.settings.patch({ payload: patch }));
-      setSettings(next);
+      useSettings.setState({ settings: next });
       if (warning !== undefined) toast.warning(warning);
       setErrors((e) => {
         const copy = { ...e };

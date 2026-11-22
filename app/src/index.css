@@ -69,13 +69,17 @@
     .app-spotlight:hover > .spotlight-layer::before {
       opacity: 1;
     }
-    .app-spotlight:hover {
-      --tw-ring-color: color-mix(
-        in oklch,
-        var(--card-tone, var(--tone-blue)) var(--spotlight-border-opacity),
-        var(--surface-border)
-      );
-    }
+  }
+}
+
+/* Out of the layers: the ring color set by `ring-surface-border` (a utility) would win over the components layer. */
+@media (hover: hover) {
+  .app-spotlight:hover {
+    --tw-ring-color: color-mix(
+      in oklch,
+      var(--card-tone, var(--tone-blue)) var(--spotlight-border-opacity),
+      var(--surface-border)
+    );
   }
 }
 

@@ -49,8 +49,8 @@ one dashboard designed for a **single machine you own**:
 
 ### 🚀 Server and profiles
 
-- **First-run setup checklist**, then a **launch pad** on Home: every profile with its model, quantization, last
-  benchmark and estimated memory fit, started (or switched to) in one click.
+- **First-run setup checklist** that finds `llama-server`, checks the models folder and reviews the machine
+  configuration, with the exact commands to run.
 - Start, stop, restart or switch `llama-server` in one click; states are tracked live (_starting → ready → stopping_,
   crash detection, externally launched servers detected through `/proc`).
 - **Profiles** store a model, an optional multimodal projector, a working directory, `llama-server` arguments and
@@ -197,11 +197,11 @@ Then open **<http://127.0.0.1:7860>**. The status bar shows the running version:
 build, `dev` in development. The [installation guide](https://sharkezz.github.io/llama-webui/docs/getting-started/installation/)
 also covers the npm prefix, a systemd service, updates and uninstalling.
 
-On first launch, Home opens a **setup checklist**: it finds your `llama-server` binary (or asks for its path), checks
-the models folder, lists what `llama-bench` and the GPU telemetry can see, and reviews the machine configuration with
-the exact commands to run. Only the binary and the models folder are required; you can reopen the checklist later from
-**Settings**. Once it is done, Home becomes a **launch pad**: one card per profile, with its model, last benchmark and
-memory fit, started in one click.
+On first launch, llama-webui opens a **setup checklist**: it finds your `llama-server` binary (or asks for its path),
+checks the models folder, lists what `llama-bench` and the GPU telemetry can see, and reviews the machine configuration
+with the exact commands to run. Only the binary and the models folder are required; you can reopen the checklist later
+from **Settings**. Once it is done (or skipped), the same address shows the **Dashboard**; profiles start from the
+**Server** page.
 
 > [!TIP]
 > Not sure which flags to use? Open **Tuning**, pick your model and a goal, and click _Create profile_ from the

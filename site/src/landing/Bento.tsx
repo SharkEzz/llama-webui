@@ -69,11 +69,7 @@ export function FeatureSection({
   children: React.ReactNode;
 }) {
   return (
-    <section
-      id={id}
-      aria-labelledby={`${id}-title`}
-      className="relative isolate mx-auto max-w-6xl scroll-mt-24 px-6 py-24 sm:py-28"
-    >
+    <section id={id} aria-labelledby={`${id}-title`} className="relative isolate mx-auto max-w-6xl px-6 py-24 sm:py-28">
       <SectionHalo tone={tone} />
       <PageChips pages={pages} tone={tone} />
       <h2

@@ -66,7 +66,7 @@ messages leave in the order of the changes:
 `HttpLive` serves, on `NodeHttpServer` (the server of `node:http`):
 
 - the API: `HttpApiBuilder.layer(Api)`, with each group's handlers (`app/server/<domain>/http.ts`, merged in
-  `ApiRoutes`): 68 endpoints in all. Any other path under `/api`, whatever its method, is a `404`
+  `ApiRoutes`): 67 endpoints in all. Any other path under `/api`, whatever its method, is a `404`
   `{ "_tag": "RouteNotFound", "message": "Unknown route" }`, a method a path lacks too (there is no `405`);
 - `/ws`: the WebSocket (see [WebSocket](#websocket)); a request without an upgrade gets `426`
   `WebSocket upgrade expected`;

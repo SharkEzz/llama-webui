@@ -104,8 +104,11 @@ export function WhySection() {
       <dl className="mt-12 grid gap-4 sm:grid-cols-3 sm:gap-5">
         {PILLARS.map(({ title, text, tone, bar }) => (
           <GlassCard key={title} tone={tone} as="div" className="p-6">
-            <div className={cn('mb-4 h-0.5 w-8 rounded-full', bar)} aria-hidden="true" />
-            <dt className="text-base font-semibold tracking-tight">{title}</dt>
+            {/* The bar is inside the dt: a group of a dl only holds dt and dd. */}
+            <dt className="text-base font-semibold tracking-tight">
+              <span className={cn('mb-4 block h-0.5 w-8 rounded-full', bar)} aria-hidden="true" />
+              {title}
+            </dt>
             <dd className="mt-2 text-sm leading-relaxed text-muted-foreground text-pretty">{text}</dd>
           </GlassCard>
         ))}

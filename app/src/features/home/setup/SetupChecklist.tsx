@@ -13,7 +13,8 @@ import { BenchStep, BinaryStep, GpuStep, MachineStep, ModelsStep, NetworkStep, P
 
 /**
  * First-run checklist, on one page: two required steps (llama-server, models folder), the rest optional.
- * “Finish” records `onboardingDone`; `/` then shows the Dashboard.
+ * “Finish” records `onboardingDone`; `/` then shows the Dashboard. Until the required steps are done, “Skip for now”
+ * records it too: the Dashboard also follows a llama-server started outside the app.
  */
 export function SetupChecklist({
   settings,
@@ -50,6 +51,7 @@ export function SetupChecklist({
   };
   const steps = { report, settings, errors, save: saveAndCheck };
   const required = report ? [report.binary.path !== null, report.models.exists].filter(Boolean).length : 0;
+  const finish = () => void save({ onboardingDone: true }, { quiet: true }).then((ok) => ok && onFinish());
 
   return (
     <div className="flex flex-col gap-4">
@@ -79,14 +81,18 @@ export function SetupChecklist({
           <p className="text-sm text-muted-foreground">
             {report?.ready
               ? 'Required steps done. You can come back to this checklist from Settings.'
-              : `${required} of 2 required steps done: llama-server and the models folder.`}
+              : `${required} of 2 required steps done: llama-server and the models folder. You can skip them and come back to this checklist from Settings.`}
           </p>
-          <Button
-            disabled={!report?.ready}
-            onClick={() => void save({ onboardingDone: true }, { quiet: true }).then((ok) => ok && onFinish())}
-          >
-            Finish <ArrowRight />
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {report && !report.ready && (
+              <Button variant="ghost" onClick={finish}>
+                Skip for now
+              </Button>
+            )}
+            <Button disabled={!report?.ready} onClick={finish}>
+              Finish <ArrowRight />
+            </Button>
+          </div>
         </div>
       </GlassCard>
     </div>

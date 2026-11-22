@@ -31,7 +31,7 @@ export function MonitoringSection() {
     <section
       id="monitoring"
       aria-labelledby="monitoring-title"
-      className="relative isolate mx-auto max-w-6xl scroll-mt-24 px-6 py-24 sm:py-28"
+      className="relative isolate mx-auto max-w-6xl px-6 py-24 sm:py-28"
     >
       <SectionHalo tone="blue" />
       <div className="grid gap-12 lg:grid-cols-[minmax(0,4.4fr)_minmax(0,7.6fr)] lg:items-start">

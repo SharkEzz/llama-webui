@@ -82,7 +82,7 @@ const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, n
   lazy: { Component: async () => (await load())[name] },
 });
 
-{ path: 'dashboard', ...page(() => import('@/features/dashboard/DashboardPage'), 'DashboardPage') },
+{ path: 'server', ...page(() => import('@/features/server/ServerPage'), 'ServerPage') },
 ```
 
 `load` must stay a literal `import()` so that `vite build` can split the page into its own chunk: the initial bundle
@@ -90,8 +90,14 @@ only holds the shell, and the Topology page's three.js scene only loads with tha
 URL, `hydrateFallbackElement` renders `<AppLayout loading />`, the shell with a `PageSkeleton`, until the page's code
 arrives. Unknown paths render the placeholder page with "Page not found".
 
+`/` is `HomePage` (`features/home/`): the setup checklist until `onboardingDone` is recorded (by **Finish** or **Skip
+for now**), then `DashboardPage`, which it imports directly, so the Dashboard has no chunk of its own. `/dashboard`,
+its former address, redirects to `/`; `/setup` always renders the checklist.
+
 `AppLayout` draws the aurora background, the sidebar, the status bar and the page `<Outlet />`, with the sonner
-`Toaster` at the bottom right. It refreshes the health store (version, uptime) every time the WebSocket opens.
+`Toaster` at the bottom right. Every time the WebSocket opens, it refreshes the health store (version, uptime) and the
+settings store (`useSettings` in `lib/settings.ts`): `HomePage` chooses between the checklist and the Dashboard from
+it without waiting for a request on each visit, and a read that failed while the server was away is done again.
 
 The sidebar lists `ROUTES` in order and draws a thin line between two groups of entries (`navGroups()` in
 `routes.ts`: `overview`, `run`, `monitor`, `tune`); **Settings** (group `settings`) is pinned at the bottom with the

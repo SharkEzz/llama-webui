@@ -262,7 +262,7 @@ export function ProfileStep() {
       <p className="text-muted-foreground">
         {profiles.length > 0
           ? `${profiles.length} ${plural(profiles.length, 'profile')}: ${profiles.map((p) => p.name).join(', ')}.`
-          : 'A profile is a model plus its llama-server arguments, started in one click from Home.'}
+          : 'A profile is a model plus its llama-server arguments, started in one click from the Server page.'}
       </p>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/profiles" />}>

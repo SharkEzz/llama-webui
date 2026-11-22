@@ -52,8 +52,9 @@ const STEPS = [
 
 const gib = (n: number) => `${n.toFixed(1)} GiB`;
 
+/** The `dark:` pair replaces the shadcn trigger's own dark active colors, which would otherwise win. */
 const TAB_TRIGGER_CLASS =
-  'h-9 flex-none rounded-xl px-3.5 text-xs font-medium sm:text-sm data-active:border-surface-border-bright data-active:bg-surface-strong data-active:text-foreground data-active:inset-shadow-highlight';
+  'h-9 flex-none rounded-xl px-3.5 text-xs font-medium sm:text-sm data-active:border-surface-border-bright data-active:bg-surface-strong data-active:text-foreground data-active:inset-shadow-highlight dark:data-active:border-surface-border-bright dark:data-active:bg-surface-strong';
 
 function Recommendation() {
   return (
@@ -209,7 +210,7 @@ export function TuningSection() {
     <section
       id="tuning"
       aria-labelledby="tuning-title"
-      className="relative isolate mx-auto max-w-6xl scroll-mt-24 px-6 py-24 sm:py-28"
+      className="relative isolate mx-auto max-w-6xl px-6 py-24 sm:py-28"
     >
       <SectionHalo tone="amber" />
       <Tabs defaultValue="rec" className="gap-7">
@@ -244,10 +245,11 @@ export function TuningSection() {
           <TabsContent value="rec">
             <Recommendation />
           </TabsContent>
-          <TabsContent value="presets">
+          {/* Kept mounted (hidden): the prerendered page holds the three panels, not only the first. */}
+          <TabsContent value="presets" keepMounted>
             <Presets />
           </TabsContent>
-          <TabsContent value="checks">
+          <TabsContent value="checks" keepMounted>
             <Checks />
           </TabsContent>
         </GlassCard>
