@@ -20,11 +20,28 @@ export function contextOverflow(e: LlamaError): { promptTokens: number | null; c
   };
 }
 
+/** `v` is llama-server's JSON error: an object whose fields, when present, have their type. */
+export function isLlamaError(v: unknown): v is LlamaError {
+  if (typeof v !== 'object' || v === null) return false;
+  const is = (key: keyof LlamaError, type: 'number' | 'string') => {
+    const field: unknown = Reflect.get(v, key);
+    return field === undefined || typeof field === type;
+  };
+  return (
+    is('code', 'number') &&
+    is('message', 'string') &&
+    is('type', 'string') &&
+    is('n_prompt_tokens', 'number') &&
+    is('n_ctx', 'number')
+  );
+}
+
 /** The `error` of an HTTP error body, if the body is llama-server JSON. */
 export function parseLlamaError(body: string): LlamaError | null {
   try {
-    const e = (JSON.parse(body) as { error?: unknown } | null)?.error;
-    return typeof e === 'object' && e !== null ? (e as LlamaError) : null;
+    const json: unknown = JSON.parse(body);
+    const e = typeof json === 'object' && json !== null && 'error' in json ? json.error : undefined;
+    return isLlamaError(e) ? e : null;
   } catch {
     return null;
   }

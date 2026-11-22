@@ -16,7 +16,9 @@ interface GlassCardProps {
  */
 export function GlassCard({ tone, reveal = true, as = 'article', className, children }: GlassCardProps) {
   const Tag = as;
-  const style = tone ? ({ '--card-tone': TONE_VAR[tone] } as CSSProperties) : undefined;
+  const style: (CSSProperties & { '--card-tone': string }) | undefined = tone
+    ? { '--card-tone': TONE_VAR[tone] }
+    : undefined;
 
   const onPointerMove = (e: PointerEvent<HTMLElement>) => {
     if (e.pointerType !== 'mouse') return;

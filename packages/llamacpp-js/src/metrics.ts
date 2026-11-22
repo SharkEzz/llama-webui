@@ -79,21 +79,23 @@ const numOrNull = (v: unknown): number | null => (typeof v === 'number' && Numbe
 
 export function parseSlots(json: unknown): SlotView[] {
   if (!Array.isArray(json)) return [];
+  const slots: unknown[] = json;
   const out: SlotView[] = [];
-  for (const s of json) {
+  for (const s of slots) {
     if (typeof s !== 'object' || s === null) continue;
-    const o = s as Record<string, unknown>;
-    const nt = Array.isArray(o.next_token) ? o.next_token[0] : o.next_token;
-    const next = (typeof nt === 'object' && nt !== null ? nt : {}) as Record<string, unknown>;
+    const o = (key: string): unknown => Reflect.get(s, key);
+    const tokens = o('next_token');
+    const nt: unknown = Array.isArray(tokens) ? tokens[0] : tokens;
+    const next = (key: string): unknown => (typeof nt === 'object' && nt !== null ? Reflect.get(nt, key) : undefined);
     out.push({
-      id: num(o.id),
-      nCtx: num(o.n_ctx),
-      processing: o.is_processing === true,
-      idTask: numOrNull(o.id_task),
-      nPromptTokens: num(o.n_prompt_tokens),
-      nPromptProcessed: num(o.n_prompt_tokens_processed),
-      nDecoded: num(next.n_decoded),
-      nRemain: numOrNull(next.n_remain),
+      id: num(o('id')),
+      nCtx: num(o('n_ctx')),
+      processing: o('is_processing') === true,
+      idTask: numOrNull(o('id_task')),
+      nPromptTokens: num(o('n_prompt_tokens')),
+      nPromptProcessed: num(o('n_prompt_tokens_processed')),
+      nDecoded: num(next('n_decoded')),
+      nRemain: numOrNull(next('n_remain')),
     });
   }
   return out;

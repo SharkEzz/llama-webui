@@ -21,7 +21,7 @@ test('withVersion: replaces it in place, or adds it after name; other keys keep 
     `${JSON.stringify({ name: 'a', version: '0.2.0', private: true, scripts: { x: 'y' } }, null, 2)}\n`,
   );
   const missing = { name: 'b', private: true };
-  expect(Object.keys(JSON.parse(withVersion(JSON.stringify(missing), '1.0.0')))).toEqual([
+  expect(Object.keys(JSON.parse(withVersion(JSON.stringify(missing), '1.0.0')) as object)).toEqual([
     'name',
     'version',
     'private',

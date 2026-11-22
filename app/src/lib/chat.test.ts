@@ -73,7 +73,7 @@ const sse = (events: ReadonlyArray<ChatEvent>, end: 'close' | 'open' | Error = '
 function server(routes: Record<string, Response | (() => Response) | ReadonlyArray<() => Response>>) {
   const seen: Array<{ route: string; signal: AbortSignal | null | undefined }> = [];
   const asked = new Map<string, number>();
-  const fetchImpl = ((input: RequestInfo | URL, init?: RequestInit) => {
+  const fetchImpl = ((input: string | URL, init?: RequestInit) => {
     const route = `${init?.method ?? 'GET'} ${new URL(String(input)).pathname}`;
     seen.push({ route, signal: init?.signal });
     const n = asked.get(route) ?? 0;

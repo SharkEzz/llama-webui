@@ -38,6 +38,9 @@ import { useServer } from '@/lib/server';
 const DEFAULT = '__default';
 const NO_PROFILE = '__none';
 
+/** A field of the form typed as text. */
+type TextKey = { [K in FormField]: Form[K] extends string ? K : never }[FormField];
+
 /** Run form: model, tool, one field per flag, other server flags; asks for confirmation if the server is running. */
 export function BenchForm() {
   const form = useBench((s) => s.form);
@@ -81,9 +84,9 @@ export function BenchForm() {
     }
   };
 
-  const field = (k: FormField) => ({
+  const field = (k: TextKey) => ({
     id: `bench-${k}`,
-    value: form[k] as string,
+    value: form[k],
     'aria-invalid': errors[k] ? true : undefined,
     onChange: (e: { target: { value: string } }) => setForm({ [k]: e.target.value } as Partial<Form>),
   });
@@ -125,7 +128,7 @@ export function BenchForm() {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Tool</Label>
-            <Tabs value={form.kind} onValueChange={(v) => setForm({ kind: v as Form['kind'] })}>
+            <Tabs value={form.kind} onValueChange={(v: Form['kind']) => setForm({ kind: v })}>
               <TabsList className="h-9 w-full p-1 *:px-3">
                 <TabsTrigger value="bench">llama-bench</TabsTrigger>
                 <TabsTrigger value="server">Server</TabsTrigger>

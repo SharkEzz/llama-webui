@@ -222,11 +222,13 @@ function ValuesRow<T>(props: {
   const add = (v: T) => {
     if (!props.values.some((x) => same(x, v))) props.onChange([...props.values, v]);
   };
+  // `parse` answers a value or an error message; a string is a message, except the "all" of -ngl
+  const isError = (v: T | string): v is string => typeof v === 'string' && !(props.flag === '-ngl' && v === 'all');
   const submit = () => {
     if (!text.trim()) return;
     const v = props.parse(text);
-    if (typeof v === 'string' && !(props.flag === '-ngl' && v === 'all')) return setError(v);
-    add(v as T);
+    if (isError(v)) return setError(v);
+    add(v);
     setText('');
   };
   return (

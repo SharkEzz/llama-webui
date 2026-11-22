@@ -173,7 +173,7 @@ const input = Effect.fnUntraced(function* (key: string, files: Files, sha256?: s
 });
 
 /** `m.gguf` of `size` bytes, served. */
-const single = Effect.fnUntraced(function* (size = 4000) {
+const single = Effect.fnUntraced(function* (size: number = 4000) {
   const body = data(size);
   const files: Files = [['m.gguf', body]];
   yield* serve(files);

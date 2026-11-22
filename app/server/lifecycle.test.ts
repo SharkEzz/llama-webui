@@ -206,6 +206,8 @@ test('SIGTERM with the UI open and a reply streaming stops in under 2 s, ends th
     while (!until()) {
       const chunk = await reader.read().catch(() => ({ done: true as const, value: undefined }));
       if (chunk.done) return;
+      // A fetch body's chunks are bytes (its stream is typed `any`)
+      if (!(chunk.value instanceof Uint8Array)) throw new Error('the reply body is not bytes');
       events.push(...parser.push(decoder.decode(chunk.value, { stream: true })));
     }
   };

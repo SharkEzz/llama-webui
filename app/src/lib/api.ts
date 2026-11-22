@@ -47,6 +47,7 @@ function request<Groups extends HttpApiGroup.Constraint, A, E>(
   api: HttpApi.HttpApi<string, Groups>,
   f: (client: HttpApiClient.Client<Groups>) => Effect.Effect<A, E>,
 ) {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a generic `Groups` hides that the web's APIs declare no client middleware (see the cast's comment)
   return HttpApiClient.make(api).pipe(
     Effect.flatMap(f),
     // The request never got an answer (refused, network down, DNS): the server is unreachable.

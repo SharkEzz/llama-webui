@@ -21,17 +21,19 @@ export function packageRoot(id: string): string | null {
   return rest.length > depth ? id.slice(0, at + '/node_modules/'.length) + rest.slice(0, depth).join('/') : null;
 }
 
+/** A field of a parsed `package.json`, read as it is written. */
+function field(pkg: unknown, key: string): unknown {
+  return typeof pkg === 'object' && pkg !== null ? Reflect.get(pkg, key) : undefined;
+}
+
 function read(root: string): Package {
-  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
-    name: string;
-    version: string;
-    license?: string;
-  };
+  const pkg: unknown = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  const license = field(pkg, 'license');
   const file = readdirSync(root).find((f) => /^(?:licen[cs]e|copying)(?:\.|$)/i.test(f));
   return {
-    name: pkg.name,
-    version: pkg.version,
-    license: pkg.license ?? 'unknown',
+    name: String(field(pkg, 'name')),
+    version: String(field(pkg, 'version')),
+    license: typeof license === 'string' ? license : 'unknown',
     text: file ? readFileSync(join(root, file), 'utf8').trim() : null,
   };
 }
@@ -49,7 +51,7 @@ export function writeLicenses(moduleIds: Iterable<string>, file: string): void {
   // One entry per package and version: two copies of the same version are one license.
   const seen = new Map<string, Package>();
   for (const id of moduleIds) {
-    const root = packageRoot(id.replace(/^\0/, '').split('?')[0] as string);
+    const root = packageRoot(id.replace(/^\0/, '').replace(/\?.*$/s, ''));
     if (!root) continue;
     const p = read(root);
     seen.set(`${p.name}@${p.version}`, p);

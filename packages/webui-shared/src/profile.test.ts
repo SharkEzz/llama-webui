@@ -15,7 +15,9 @@ const issues = (input: unknown) => {
 };
 
 test('import: a whole exported file, other keys ignored', async () => {
-  const raw = JSON.parse(await readFile(join(import.meta.dirname, '../../../testdata/llama-tui-config.json'), 'utf8'));
+  const raw: unknown = JSON.parse(
+    await readFile(join(import.meta.dirname, '../../../testdata/llama-tui-config.json'), 'utf8'),
+  );
   const r = parseProfileImport(raw);
   expect(r.profiles.map((p) => p.name)).toEqual(['qwen3.8-27b-mtp', 'qwen3.8-27b-mtp (optimisé) (optimisé)']);
   expect(r.rejected).toEqual([]);

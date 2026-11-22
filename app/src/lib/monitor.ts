@@ -47,7 +47,7 @@ function append(h: ClientHistory, s: Snapshot) {
   for (const [key, values] of h.series) values.push(s.points[key] ?? null);
   for (const [key, v] of Object.entries(s.points)) {
     if (h.series.has(key)) continue;
-    const values: (number | null)[] = new Array(h.times.length - 1).fill(null);
+    const values: (number | null)[] = Array.from({ length: h.times.length - 1 }, () => null);
     values.push(v);
     h.series.set(key, values);
   }

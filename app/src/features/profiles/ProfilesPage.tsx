@@ -27,7 +27,7 @@ export function ProfilesPage() {
   const view = useServer((s) => s.view);
 
   useEffect(() => {
-    void reload().catch((e: Error) => toast.error(e.message));
+    void reload().catch((e: unknown) => toast.error(errorMessage(e)));
     call((api) => api.settings.get()).then(setSettings, () => {});
   }, [reload]);
 

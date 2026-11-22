@@ -2,6 +2,7 @@ import { phaseOf } from '@llama-webui/shared';
 import { LocateFixed } from 'lucide-react';
 import { Component, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { GLASS } from '@/components/glass/glass';
+import type { Tone } from '@/components/glass/tones';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMonitor } from '@/lib/monitor';
@@ -41,7 +42,7 @@ export function TopologyPage() {
     () => (graph && flows ? nodeLive(graph, snapshot, placement, flows) : null),
     [graph, snapshot, placement, flows],
   );
-  const tones = useMemo(() => (graph ? gpuTones(graph) : new Map()), [graph]);
+  const tones = useMemo(() => (graph ? gpuTones(graph) : new Map<string, Tone>()), [graph]);
   const peers = useMemo(() => (graph ? peerLinks(graph, placement) : []), [graph, placement]);
   const phase = phaseOf(state, snapshot);
   const busy = phase === 'loading' || phase === 'prompt' || phase === 'generating';

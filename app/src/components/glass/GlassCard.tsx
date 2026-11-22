@@ -29,7 +29,9 @@ const ICON_TONE: Record<Tone, string> = {
  */
 export function GlassCard({ title, icon: Icon, tone, actions, className, contentClassName, children }: GlassCardProps) {
   const hasHeader = Boolean(title || actions);
-  const style = tone ? ({ '--card-tone': TONE_VAR[tone] } as CSSProperties) : undefined;
+  const style: (CSSProperties & { '--card-tone': string }) | undefined = tone
+    ? { '--card-tone': TONE_VAR[tone] }
+    : undefined;
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== 'mouse') return;

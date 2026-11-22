@@ -193,8 +193,8 @@ function Monitoring({ settings, save }: SectionProps) {
               max={1800}
               step={30}
               value={history}
-              onValueChange={(v) => setHistory(Array.isArray(v) ? v[0]! : v)}
-              onValueCommitted={(v) => save({ historySeconds: Array.isArray(v) ? v[0]! : v })}
+              onValueChange={(v) => setHistory(typeof v === 'number' ? v : v[0]!)}
+              onValueCommitted={(v) => save({ historySeconds: typeof v === 'number' ? v : v[0]! })}
               aria-label="History kept, in seconds"
             />
           </div>

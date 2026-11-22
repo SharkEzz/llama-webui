@@ -151,6 +151,12 @@ interface Listed {
   projectName: string;
 }
 
+/** `v` is a test as `vitest list --json` writes it. */
+function isListed(v: unknown): v is Listed {
+  const is = (key: keyof Listed) => typeof v === 'object' && v !== null && typeof Reflect.get(v, key) === 'string';
+  return is('name') && is('file') && is('projectName');
+}
+
 /**
  * Every test as Vitest collects it by running the files (`--staticParse=false`): a static parse would list a
  * `test.each` once with its `%s` template and drop a `test.skipIf`. No build (`LLAMA_WEBUI_TEST_BUILD=0`).
@@ -165,7 +171,9 @@ function listTests(): Listed[] {
       stdio: ['ignore', 'ignore', 'inherit'],
     });
     if (r.status !== 0) throw new Error(`vitest list failed (${r.status ?? r.signal})`);
-    return JSON.parse(readFileSync(out, 'utf8')) as Listed[];
+    const listed: unknown = JSON.parse(readFileSync(out, 'utf8'));
+    if (!Array.isArray(listed) || !listed.every(isListed)) throw new Error('vitest list wrote tests of another shape');
+    return listed;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

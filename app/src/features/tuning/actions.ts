@@ -77,7 +77,7 @@ export function benchFromEstimate(e: Estimate): void {
 }
 
 function isCacheType(str: string | undefined): str is CacheType {
-  return str != null && CACHE_TYPES.includes(str as never);
+  return CACHE_TYPES.some((c) => c === str);
 }
 
 export type PinKey = 'ngl' | 'ncmoe' | 'dev' | 'ts' | 'kv' | 't' | 'ub';

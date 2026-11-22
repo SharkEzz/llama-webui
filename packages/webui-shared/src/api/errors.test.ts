@@ -20,8 +20,9 @@ test('requestInvalid words the first issue with its path and lists them all', ()
   expect(error.message).toBe('Invalid data: cannot be empty (name)');
   expect(error.issues).toEqual([
     { path: ['name'], message: 'cannot be empty' },
-    { path: ['args', '1'], message: expect.any(String) },
+    { path: ['args', '1'], message: error.issues[1]?.message },
   ]);
+  expect(error.issues[1]?.message).toEqual(expect.any(String));
 });
 
 test('an issue of the whole value has no path in the message', () => {

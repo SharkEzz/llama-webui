@@ -1,3 +1,4 @@
+import { Predicate } from 'effect';
 import { useCallback, useState } from 'react';
 
 /** The cards laid over the scene that fold down to their title line, to give the scene more room. */
@@ -12,8 +13,8 @@ export function parseCollapsed(raw: string | null): Collapsed {
   try {
     v = raw === null ? null : JSON.parse(raw);
   } catch {}
-  const o = (typeof v === 'object' && v !== null ? v : {}) as Record<string, unknown>;
-  return { phase: o.phase === true, model: o.model === true };
+  const folded = (card: HudCard) => Predicate.hasProperty(v, card) && v[card] === true;
+  return { phase: folded('phase'), model: folded('model') };
 }
 
 function stored(): Collapsed {

@@ -1,4 +1,4 @@
-import type { BenchRun, BenchStatus, Measure } from '@llama-webui/shared';
+import { type BenchRun, BenchStatus, type Measure } from '@llama-webui/shared';
 import { Copy, GitCompare, History, MoreHorizontal, RotateCcw, Trash2, UserPlus } from 'lucide-react';
 import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
@@ -28,7 +28,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { type BenchFilters, KIND_LABEL, STATUS_LABEL, useBench } from '@/lib/bench';
+import { KIND_LABEL, STATUS_LABEL, useBench } from '@/lib/bench';
 import { copyText } from '@/lib/clipboard';
 import { formatDuration, formatRate, formatShortDate, formatStddev } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -124,7 +124,7 @@ export function BenchHistory() {
               { value: 'bench', label: 'llama-bench' },
               { value: 'server', label: 'Server' },
             ]}
-            onChange={(v) => setFilters({ kind: v as BenchFilters['kind'] })}
+            onChange={(kind) => setFilters({ kind })}
           />
           <FilterSelect
             label="Model"
@@ -138,9 +138,9 @@ export function BenchHistory() {
             value={filters.status}
             items={[
               { value: 'all', label: 'All statuses' },
-              ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label })),
+              ...BenchStatus.literals.map((value) => ({ value, label: STATUS_LABEL[value] })),
             ]}
-            onChange={(v) => setFilters({ status: v as BenchFilters['status'] })}
+            onChange={(status) => setFilters({ status })}
           />
           <FilterSelect
             label="Sweeps"
@@ -149,7 +149,7 @@ export function BenchHistory() {
               { value: 'none', label: 'Without sweeps' },
               { value: 'all', label: 'With sweeps' },
             ]}
-            onChange={(v) => setFilters({ sweeps: v as BenchFilters['sweeps'] })}
+            onChange={(sweeps) => setFilters({ sweeps })}
           />
         </div>
 
@@ -345,11 +345,12 @@ export function BenchHistory() {
   );
 }
 
-function FilterSelect(props: {
+/** A filter's select: `onChange` gets one of the items' values. */
+function FilterSelect<V extends string>(props: {
   label: string;
-  value: string;
-  items: { value: string; label: string }[];
-  onChange: (v: string) => void;
+  value: V;
+  items: { value: V; label: string }[];
+  onChange: (v: V) => void;
   wide?: boolean;
 }) {
   return (

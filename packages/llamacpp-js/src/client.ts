@@ -2,7 +2,14 @@
  * HTTP client for llama-server: health probes, the monitoring reads, `/props` and streamed chat completions. Only
  * `fetch` (injectable everywhere, for tests or another transport), so it runs in Node and in browsers.
  */
-import { type LlamaError, LlamaHttpError, LlamaReplyError, LlamaStreamCutError, LlamaStreamError } from './errors.ts';
+import {
+  isLlamaError,
+  type LlamaError,
+  LlamaHttpError,
+  LlamaReplyError,
+  LlamaStreamCutError,
+  LlamaStreamError,
+} from './errors.ts';
 import { type Health, type LlamaRaw, parsePrometheus, parseSlots } from './metrics.ts';
 import { SseParser } from './sse.ts';
 
@@ -50,9 +57,11 @@ export async function probeLlamaServer(
 ): Promise<boolean> {
   try {
     const r = await fetchImpl(`${probeUrl(host, port)}/health`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-    const body = (await r.json().catch(() => null)) as { status?: unknown; error?: { type?: unknown } } | null;
+    const body: unknown = await r.json().catch(() => null);
     if (!body || typeof body !== 'object') return false;
-    return typeof body.status === 'string' || body.error?.type === 'unavailable_error';
+    if ('status' in body && typeof body.status === 'string') return true;
+    const error = 'error' in body ? body.error : undefined;
+    return typeof error === 'object' && error !== null && 'type' in error && error.type === 'unavailable_error';
   } catch {
     return false;
   }
@@ -124,6 +133,46 @@ export interface ChatCompletionChunk {
   error?: LlamaError;
 }
 
+/** `v` is a chunk: an object whose fields, when present, have their type. */
+function isChunk(v: unknown): v is ChatCompletionChunk {
+  if (typeof v !== 'object' || v === null) return false;
+  const field = (o: object, key: string): unknown => Reflect.get(o, key);
+  const isObject = (x: unknown): x is object => typeof x === 'object' && x !== null;
+  const text = (x: unknown) => x === undefined || x === null || typeof x === 'string';
+  const choice = (c: unknown) => {
+    if (!isObject(c)) return false;
+    const delta = field(c, 'delta');
+    return (
+      delta === undefined ||
+      (isObject(delta) && text(field(delta, 'content')) && text(field(delta, 'reasoning_content')))
+    );
+  };
+  const timings = (t: unknown) => {
+    if (t === undefined) return true;
+    if (!isObject(t)) return false;
+    const n = (key: keyof LlamaTimings, optional: boolean) => {
+      const x = field(t, key);
+      return typeof x === 'number' || (optional && x === undefined);
+    };
+    return (
+      n('prompt_n', false) &&
+      n('prompt_per_second', false) &&
+      n('predicted_n', false) &&
+      n('predicted_per_second', false) &&
+      n('cache_n', true) &&
+      n('draft_n', true) &&
+      n('draft_n_accepted', true)
+    );
+  };
+  const choices = field(v, 'choices');
+  const error = field(v, 'error');
+  return (
+    (choices === undefined || (Array.isArray(choices) && choices.every(choice))) &&
+    timings(field(v, 'timings')) &&
+    (error === undefined || isLlamaError(error))
+  );
+}
+
 /**
  * Streams `/v1/chat/completions` (`body` is sent as is, with `stream: true`): yields each chunk until `[DONE]`.
  * Throws the `fetch` error when the server cannot be reached, `LlamaHttpError` when it refuses the request,
@@ -155,17 +204,21 @@ export async function* streamChatCompletion(
         throw new LlamaStreamCutError('the stream broke', { cause });
       }
       if (chunk.done) throw new LlamaStreamCutError('the stream ended before [DONE]');
+      // A fetch body's chunks are bytes (its stream is typed `any` under Node's types)
+      if (!(chunk.value instanceof Uint8Array)) throw new LlamaReplyError('the stream is not bytes');
       for (const ev of parser.push(decoder.decode(chunk.value, { stream: true }))) {
         if (ev.data === '[DONE]') {
           finished = true;
           return;
         }
-        let j: ChatCompletionChunk;
+        let j: unknown;
         try {
-          j = JSON.parse(ev.data) as ChatCompletionChunk;
+          j = JSON.parse(ev.data);
         } catch {
           continue;
         }
+        // An event that is not a chunk is skipped, like one that is not JSON
+        if (!isChunk(j)) continue;
         if (j.error) throw new LlamaStreamError(j.error);
         yield j;
       }

@@ -25,7 +25,7 @@ export const parseDiskstats = (text: string): Map<string, Counters> => {
 };
 
 /** Whole physical disks: the `/sys/block` entries backed by a device, minus loop, ram and zram. */
-export const physicalDisks = Effect.fn('disk.physicalDisks')(function* (sysBlockRoot = '/sys/block') {
+export const physicalDisks = Effect.fn('disk.physicalDisks')(function* (sysBlockRoot: string = '/sys/block') {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const entries = yield* fs.readDirectory(sysBlockRoot).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));

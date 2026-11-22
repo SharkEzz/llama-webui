@@ -6,7 +6,7 @@ import {
   Color,
   type InstancedMesh,
   type Mesh,
-  type MeshStandardMaterial,
+  MeshStandardMaterial,
   Object3D,
   QuadraticBezierCurve3,
   Vector3,
@@ -328,7 +328,8 @@ function Projector({ layout, peerPaths, layer }: ProjectorProps) {
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
       el.style.visibility = projected.z < 1 ? 'visible' : 'hidden';
       // No room above for the hovered block's tooltip: it moves below the label (see Labels).
-      const stack = el.firstElementChild as HTMLElement | null;
+      const first = el.firstElementChild;
+      const stack = first instanceof HTMLElement ? first : null;
       const tip = stack?.querySelector<HTMLElement>(':scope > dl');
       el.classList.toggle('tip-below', !!stack && !!tip && y - stack.offsetHeight - tip.offsetHeight < 16);
     }
@@ -457,7 +458,9 @@ function TankFill({ id, size, live, color, colors, smoother }: TankFillProps) {
       box.visible = height > 1e-3;
       box.scale.set(inner[0], Math.max(height, 1e-3), inner[2]);
       box.position.y = y + height / 2;
-      (box.material as MeshStandardMaterial).emissiveIntensity = slot === 3 ? 0.04 + 0.16 * load : 0.3 + 0.7 * load;
+      // Always so: the mesh holds the `meshStandardMaterial` below
+      if (box.material instanceof MeshStandardMaterial)
+        box.material.emissiveIntensity = slot === 3 ? 0.04 + 0.16 * load : 0.3 + 0.7 * load;
       y += height;
     }
     const top = surface.current;

@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LogRow } from '@/features/logs/LogRow';
-import { call } from '@/lib/api';
+import { call, errorMessage } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatDuration, formatInt } from '@/lib/format';
 import { useLogs } from '@/lib/logs';
@@ -205,6 +205,10 @@ function StateDetails() {
   );
 }
 
+/** A scalar of llama-server's untyped /props as text; undefined for what is missing or not a scalar. */
+const scalar = (v: unknown): string | undefined =>
+  typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : undefined;
+
 function PropsCard() {
   const state = useServer((s) => s.view?.state);
   const live = state?.kind === 'ready' || state?.kind === 'external';
@@ -216,7 +220,7 @@ function PropsCard() {
     setProps(null);
     setError(null);
     if (!key) return;
-    getServerProps().then(setProps, (e: Error) => setError(e.message));
+    getServerProps().then(setProps, (e: unknown) => setError(errorMessage(e)));
   }, [key]);
 
   const gen: Props = isRecord(props?.default_generation_settings) ? props.default_generation_settings : {};
@@ -243,20 +247,20 @@ function PropsCard() {
       ) : (
         <dl className="divide-y divide-border">
           <Row label="Model">
-            <span className="font-mono text-xs" title={String(props.model_path ?? '')}>
-              {String(props.model_alias ?? props.model_path ?? '—')}
+            <span className="font-mono text-xs" title={scalar(props.model_path) ?? ''}>
+              {scalar(props.model_alias ?? props.model_path) ?? '—'}
             </span>
           </Row>
-          {props.model_ftype !== undefined && <Row label="Quantization">{String(props.model_ftype)}</Row>}
+          {props.model_ftype !== undefined && <Row label="Quantization">{scalar(props.model_ftype) ?? '—'}</Row>}
           <Row label="Context">
             <span className="num">{typeof gen.n_ctx === 'number' ? formatInt(gen.n_ctx) : '—'}</span> tokens
           </Row>
           <Row label="Slots">
-            <span className="num">{String(props.total_slots ?? '—')}</span>
+            <span className="num">{scalar(props.total_slots) ?? '—'}</span>
           </Row>
           <Row label="Inputs besides text">{modalities.length > 0 ? modalities.join(', ') : 'none'}</Row>
           <Row label="Build llama.cpp">
-            <span className="num">{String(props.build_info ?? '—')}</span>
+            <span className="num">{scalar(props.build_info) ?? '—'}</span>
           </Row>
         </dl>
       )}
@@ -277,7 +281,7 @@ function CommandCard({ command, host }: { command: string | null; host: string |
             onClick={() =>
               copyText(command).then(
                 () => toast.success('Command copied'),
-                (e: Error) => toast.error(e.message),
+                (e: unknown) => toast.error(errorMessage(e)),
               )
             }
           >

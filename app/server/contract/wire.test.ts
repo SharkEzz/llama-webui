@@ -44,11 +44,8 @@ test('a body is sent with its content-length; the reply keeps its status, lower-
     body: 'hé',
     headers: { 'Content-Type': 'text/plain' },
   });
-  expect(r).toEqual({
-    status: 200,
-    headers: expect.objectContaining({ 'content-type': 'text/plain' }),
-    body: 'got:hé',
-  });
+  expect(r).toEqual({ status: 200, headers: r.headers, body: 'got:hé' });
+  expect(r.headers).toEqual(expect.objectContaining({ 'content-type': 'text/plain' }));
   expect(seen['content-length']).toBe('3');
 });
 

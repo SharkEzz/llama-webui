@@ -36,8 +36,6 @@ const WEB_CLIENT_LAYER: ReadonlySet<string> = new Set(['app/src/lib/api.ts', 'ap
 
 export type Group = 'server' | 'serverTests' | 'shared' | 'sharedTests' | 'web' | 'webTests' | 'build';
 
-const GROUPS: Group[] = ['server', 'serverTests', 'shared', 'sharedTests', 'web', 'webTests', 'build'];
-
 /** The group a repo-relative path is counted in, or null when it is not counted. */
 export function classify(path: string): Group | null {
   const segments = path.split('/');
@@ -68,8 +66,8 @@ export function median(values: number[]): number {
   if (values.length === 0) throw new Error('median of no values');
   const sorted = values.toSorted((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  const upper = sorted[mid] as number;
-  return sorted.length % 2 === 1 ? upper : ((sorted[mid - 1] as number) + upper) / 2;
+  const upper = sorted[mid]!;
+  return sorted.length % 2 === 1 ? upper : (sorted[mid - 1]! + upper) / 2;
 }
 
 /** `owner/repo#123`, not inside a longer path. */
@@ -154,7 +152,9 @@ function bundledPackages(): string[] {
 async function freePort(): Promise<number> {
   const s = createServer();
   await new Promise<void>((done) => s.listen(0, '127.0.0.1', done));
-  const port = (s.address() as { port: number }).port;
+  const address = s.address();
+  if (address === null || typeof address === 'string') throw new Error('the probe listens on no TCP port');
+  const port = address.port;
   await new Promise((done) => s.close(done));
   return port;
 }
@@ -245,7 +245,15 @@ async function measure(skipDurations: boolean): Promise<Measures> {
     durationsMs = { build, check, test };
   }
 
-  const code = Object.fromEntries(GROUPS.map((g) => [g, { files: 0, lines: 0 }])) as Measures['code'];
+  const code: Measures['code'] = {
+    server: { files: 0, lines: 0 },
+    serverTests: { files: 0, lines: 0 },
+    shared: { files: 0, lines: 0 },
+    sharedTests: { files: 0, lines: 0 },
+    web: { files: 0, lines: 0 },
+    webTests: { files: 0, lines: 0 },
+    build: { files: 0, lines: 0 },
+  };
   const webClientLayer = { files: 0, lines: 0 };
   const workarounds: Measures['workarounds'] = [];
   for (const file of trackedFiles()) {
@@ -267,15 +275,14 @@ async function measure(skipDurations: boolean): Promise<Measures> {
     }
   }
 
-  const pkg = JSON.parse(readFileSync(join(ROOT, 'app/package.json'), 'utf8')) as {
-    dependencies?: Record<string, string>;
-    devDependencies?: Record<string, string>;
+  const pkg: unknown = JSON.parse(readFileSync(join(ROOT, 'app/package.json'), 'utf8'));
+  /** The number of entries of a dependency field of `app/package.json` (0 when absent). */
+  const count = (key: string) => {
+    const deps: unknown = typeof pkg === 'object' && pkg !== null ? Reflect.get(pkg, key) : undefined;
+    return typeof deps === 'object' && deps !== null ? Object.keys(deps).length : 0;
   };
   const dependencies: Measures['dependencies'] = {
-    app: {
-      dependencies: Object.keys(pkg.dependencies ?? {}).length,
-      devDependencies: Object.keys(pkg.devDependencies ?? {}).length,
-    },
+    app: { dependencies: count('dependencies'), devDependencies: count('devDependencies') },
     bundledIntoServer: bundledPackages(),
   };
 

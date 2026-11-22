@@ -22,8 +22,9 @@ export function closeTo(actual: number, expected: number, digits = 2): void {
 /** Every property of `expected` is deeply equal in `actual`, which may have others. */
 export function matchObject(actual: unknown, expected: object): void {
   assert.ok(actual !== null && typeof actual === 'object', `${actual} is not an object`);
-  for (const [key, value] of Object.entries(expected)) {
-    const got: unknown = (actual as Record<string, unknown>)[key];
+  const entries: [string, unknown][] = Object.entries(expected);
+  for (const [key, value] of entries) {
+    const got: unknown = Reflect.get(actual, key);
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) matchObject(got, value);
     else assert.deepEqual(got, value, `property ${key}`);
   }

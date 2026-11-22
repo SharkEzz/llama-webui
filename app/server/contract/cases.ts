@@ -2,6 +2,7 @@
 // HTTP over node:net, see ./wire.ts), so a change of server framework replays it unchanged. Each milestone adds the
 // cases of the endpoints it ports; `contract.test.ts` fails while an endpoint of the API definition has none.
 import { Api } from '@llama-webui/shared';
+import { Predicate } from 'effect';
 import { HttpApi } from 'effect/http-api';
 import { readSse, request, type WireRequest, type WireResponse } from './wire.ts';
 
@@ -515,19 +516,21 @@ const ASSET_HASH = /(?<=\/assets\/[\w.-]+?-)[\w-]{8}(?=\.(?:js|css|svg)\b)/g;
  * Replaces what changes between runs (times, ports, temporary paths, ids of the boot) or between builds (asset hashes)
  * with placeholders.
  */
+function normalizeText(v: string, ctx: NormalizeCtx): string {
+  // Longest first: one of these paths may contain another.
+  const paths: [string, string][] = [
+    [ctx.tmp, '<tmp>'],
+    [ctx.repo, '<repo>'],
+    [ctx.home, '<home>'],
+  ];
+  let s = v;
+  for (const [path, tag] of paths.toSorted((a, b) => b[0].length - a[0].length)) s = s.split(path).join(tag);
+  for (const p of ctx.ports) s = s.replace(new RegExp(`(?<=[:= ])${p}(?!\\d)`, 'g'), '<port>');
+  return s.replace(ISO_TIME, '<time>').replace(UUID, '<uuid>').replace(ASSET_HASH, '<hash>');
+}
+
 export function normalize(v: unknown, ctx: NormalizeCtx): unknown {
-  if (typeof v === 'string') {
-    // Longest first: one of these paths may contain another.
-    const paths: [string, string][] = [
-      [ctx.tmp, '<tmp>'],
-      [ctx.repo, '<repo>'],
-      [ctx.home, '<home>'],
-    ];
-    let s = v;
-    for (const [path, tag] of paths.toSorted((a, b) => b[0].length - a[0].length)) s = s.split(path).join(tag);
-    for (const p of ctx.ports) s = s.replace(new RegExp(`(?<=[:= ])${p}(?!\\d)`, 'g'), '<port>');
-    return s.replace(ISO_TIME, '<time>').replace(UUID, '<uuid>').replace(ASSET_HASH, '<hash>');
-  }
+  if (typeof v === 'string') return normalizeText(v, ctx);
   if (typeof v === 'number') return EPOCH_MS(v) ? '<time>' : ctx.ports.includes(v) ? '<port>' : v;
   if (Array.isArray(v)) return v.map((x) => normalize(x, ctx));
   if (v && typeof v === 'object') {
@@ -550,7 +553,10 @@ export function record(
   flags: { headOnly?: boolean; machine?: boolean } = {},
 ): Outcome {
   const headers: Record<string, string> = {};
-  for (const h of KEPT_HEADERS) if (res.headers[h] !== undefined) headers[h] = normalize(res.headers[h], ctx) as string;
+  for (const h of KEPT_HEADERS) {
+    const value = res.headers[h];
+    if (value !== undefined) headers[h] = normalizeText(value, ctx);
+  }
   const out: Outcome = { status: res.status, headers };
   if (res.body === '' || flags.headOnly) return out;
   let body: unknown = res.body;
@@ -626,9 +632,9 @@ async function webSocketFrames(base: string): Promise<unknown[]> {
       new Promise<void>((resolve, reject) => {
         ws.addEventListener('error', () => reject(new Error('contract: WebSocket error')));
         ws.addEventListener('message', (e) => {
-          const frame = JSON.parse(String(e.data)) as { type?: string };
+          const frame: unknown = JSON.parse(String(e.data));
           // A server ping may come between the two: only the hello and the pong are recorded.
-          if (frame.type === 'ping') return;
+          if (valueAt(frame, 'type') === 'ping') return;
           frames.push(frame);
           if (frames.length === 1) ws.send(JSON.stringify({ type: 'ping' }));
           else resolve();
@@ -641,11 +647,16 @@ async function webSocketFrames(base: string): Promise<unknown[]> {
   return frames;
 }
 
+/** The value at `path` in a parsed JSON value, undefined where a step is missing. */
+function valueAt(v: unknown, ...path: string[]): unknown {
+  let out = v;
+  for (const key of path) out = Predicate.hasProperty(out, key) ? out[key] : undefined;
+  return out;
+}
+
 /** The `id` of a reply's JSON body (`path` names the object that holds it). */
 function idOf(res: WireResponse, ...path: string[]): number {
-  let v: unknown = JSON.parse(res.body);
-  for (const key of path) v = (v as Record<string, unknown>)[key];
-  const id = (v as { id?: unknown }).id;
+  const id = valueAt(JSON.parse(res.body), ...path, 'id');
   if (typeof id !== 'number') throw new Error(`contract: no id in ${res.status} ${res.body}`);
   return id;
 }
@@ -688,7 +699,7 @@ export async function runStreams(
     (async () => {
       for (;;) {
         const res = await request(base, bare('GET', '/api/server/state'));
-        const kind = (JSON.parse(res.body) as { state: { kind: string } }).state.kind;
+        const kind = valueAt(JSON.parse(res.body), 'state', 'kind');
         if (kind !== 'starting') return res;
         await new Promise((resolve) => setTimeout(resolve, 100));
       }

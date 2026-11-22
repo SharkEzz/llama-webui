@@ -1,4 +1,5 @@
 import { Api, type BenchLive, type BenchRun } from '@llama-webui/shared';
+import { Schema } from 'effect';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { makeCall } from './api';
@@ -84,7 +85,7 @@ const live = (l: Partial<BenchLive> & Pick<BenchLive, 'runId'>): BenchLive => ({
 /** The store on a fake server: `routes` answers `METHOD /path` (in order when a list), `seen` records each request. */
 function server(routes: Record<string, () => Response>) {
   const seen: Array<{ route: string; query: string; body: string }> = [];
-  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const fetchImpl = (async (input: string | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const route = `${init?.method ?? 'GET'} ${url.pathname}`;
     seen.push({ route, query: url.search, body: init?.body ? await new Response(init.body).text() : '' });
@@ -173,7 +174,8 @@ test('a ServerRunning refusal is told by its tag and offers to stop the server',
   await expect(store.getState().launch()).resolves.toBe('confirm');
   expect(error).not.toHaveBeenCalled();
   await expect(store.getState().launch(true)).resolves.toBe('ok');
-  expect(seen.map((s) => JSON.parse(s.body).stopServer)).toEqual([false, true]);
+  const sent = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ stopServer: Schema.Boolean })));
+  expect(seen.map((s) => sent(s.body).stopServer)).toEqual([false, true]);
 
   // Another refusal of the same status is an error, told by its message.
   const busy = server({

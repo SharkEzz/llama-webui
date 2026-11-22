@@ -8,6 +8,7 @@ import {
   type BenchStatus,
   defer,
   type Profile,
+  RequestInvalid,
   requestInvalid,
   STRICT,
   shellQuote,
@@ -180,20 +181,21 @@ export function specFromForm(f: BenchForm): { spec: Record<string, unknown> } | 
  * Form field targeted by an issue path of the spec (`["params", "ngl"]` → “ngl”, `["serverArgs", "2"]` →
  * “serverArgs”); a path of the request body (`["spec", …]`) is read from the spec down.
  */
-function fieldOf(path: ReadonlyArray<string | number>): FormField {
+function fieldOf(path: ReadonlyArray<string | number>): string {
   const [a, b] = path[0] === 'spec' ? path.slice(1) : path;
-  if (a === 'params' && typeof b === 'string') return b as FormField;
-  return (typeof a === 'string' ? a : 'modelPath') as FormField;
+  if (a === 'params' && typeof b === 'string') return b;
+  return typeof a === 'string' ? a : 'modelPath';
 }
+
+/** A key of the form (an issue's path may name a part of the spec the form has no field for). */
+const isFormField = (key: string): key is FormField => Object.hasOwn(EMPTY_FORM, key);
 
 /** The spec as the server decodes it (strict, every issue): the form's typed values checked before any request. */
 const decodeSpec = Schema.decodeUnknownResult(BenchSpec, STRICT);
 
 /** The issues of a `RequestInvalid` refusal, none for another error. */
 const issuesOf = (e: unknown): ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly message: string }> =>
-  errorTag(e) === 'RequestInvalid' && typeof e === 'object' && e !== null && 'issues' in e && Array.isArray(e.issues)
-    ? e.issues
-    : [];
+  errorTag(e) === 'RequestInvalid' && e instanceof RequestInvalid ? e.issues : [];
 
 export interface BenchFilters {
   kind: BenchKind | 'all';
@@ -284,7 +286,7 @@ export const makeBenchStore = ({ call }: BenchCalls) =>
 
     setForm(patch) {
       const errors = { ...get().errors };
-      for (const k of Object.keys(patch) as FormField[]) delete errors[k];
+      for (const k of Object.keys(patch).filter(isFormField)) delete errors[k];
       set({ form: { ...get().form, ...patch }, errors });
     },
 
@@ -320,7 +322,11 @@ export const makeBenchStore = ({ call }: BenchCalls) =>
         issues: ReadonlyArray<{ readonly path: ReadonlyArray<string>; readonly message: string }>,
       ) => {
         const errors: Partial<Record<FormField, string>> = {};
-        for (const i of issues) errors[fieldOf(i.path)] ??= i.message;
+        for (const i of issues) {
+          // A part without a field shows nowhere
+          const field = fieldOf(i.path);
+          if (isFormField(field)) errors[field] ??= i.message;
+        }
         set({ errors });
       };
       const decoded = decodeSpec(built.spec);

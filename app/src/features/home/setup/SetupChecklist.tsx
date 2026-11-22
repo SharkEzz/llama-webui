@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { GlassCard } from '@/components/glass/GlassCard';
 import { Button } from '@/components/ui/button';
+import { errorMessage } from '@/lib/api';
 import { useProfiles } from '@/lib/profiles';
 import type { SettingsErrors } from '@/lib/settings';
 import { getSetup } from '@/lib/setup';
@@ -33,7 +34,7 @@ export function SetupChecklist({
   const refresh = useCallback(() => {
     setLoading(true);
     return getSetup()
-      .then(setReport, (e: Error) => toast.error(e.message))
+      .then(setReport, (e: unknown) => toast.error(errorMessage(e)))
       .finally(() => setLoading(false));
   }, []);
 

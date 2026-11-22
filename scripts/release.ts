@@ -29,7 +29,8 @@ export function parseVersion(raw: string): string | null {
 
 /** The package.json text with `version` set, right after `name` when it was missing; the other keys keep their order. */
 export function withVersion(text: string, version: string): string {
-  const pkg = JSON.parse(text) as Record<string, unknown>;
+  const pkg: unknown = JSON.parse(text);
+  if (typeof pkg !== 'object' || pkg === null) throw new Error('package.json is not a JSON object');
   const out: Record<string, unknown> = {};
   if (!('name' in pkg)) out.version = version;
   for (const [key, value] of Object.entries(pkg)) {
@@ -44,8 +45,9 @@ export function withVersion(text: string, version: string): string {
 export async function readVersions(root = ROOT): Promise<Record<string, string | null>> {
   const versions: Record<string, string | null> = {};
   for (const file of PACKAGE_FILES) {
-    const pkg = JSON.parse(await readFile(`${root}/${file}`, 'utf8')) as { version?: unknown };
-    versions[file] = typeof pkg.version === 'string' ? pkg.version : null;
+    const pkg: unknown = JSON.parse(await readFile(`${root}/${file}`, 'utf8'));
+    const version = typeof pkg === 'object' && pkg !== null && 'version' in pkg ? pkg.version : undefined;
+    versions[file] = typeof version === 'string' ? version : null;
   }
   return versions;
 }
@@ -73,7 +75,7 @@ if (import.meta.main) {
     }
     console.log(`release: every package.json is at ${expected}`);
   } else {
-    const version = positionals.length === 1 ? parseVersion(positionals[0] as string) : null;
+    const version = positionals.length === 1 ? parseVersion(positionals[0]!) : null;
     if (!version) {
       console.error('usage: pnpm release <version>   (for example 0.2.0)');
       process.exit(2);

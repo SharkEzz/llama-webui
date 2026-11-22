@@ -67,10 +67,10 @@ export async function launch(opts: {
   });
   let stdout = '';
   let stderr = '';
-  proc.stdout.on('data', (chunk) => {
+  proc.stdout.on('data', (chunk: Buffer) => {
     stdout += chunk;
   });
-  proc.stderr.on('data', (chunk) => {
+  proc.stderr.on('data', (chunk: Buffer) => {
     stderr += chunk;
     process.stderr.write(chunk);
   });

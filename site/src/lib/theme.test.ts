@@ -15,11 +15,12 @@ function runInitScript(options: { stored?: string | null; prefersDark?: boolean;
   const matchMedia = (query: string) => ({
     matches: query === '(prefers-color-scheme: dark)' && (options.prefersDark ?? false),
   });
-  new Function('document', 'localStorage', 'matchMedia', THEME_INIT_SCRIPT)(
-    { documentElement: html },
-    storage,
-    matchMedia,
-  );
+  const init = new Function('document', 'localStorage', 'matchMedia', THEME_INIT_SCRIPT) as (
+    document: unknown,
+    localStorage: unknown,
+    matchMedia: unknown,
+  ) => void;
+  init({ documentElement: html }, storage, matchMedia);
   return html.className;
 }
 

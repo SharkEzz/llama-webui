@@ -1,4 +1,4 @@
-import type { Check, CheckFamily, CheckState } from '@llama-webui/shared';
+import { type Check, CheckFamily, type CheckState } from '@llama-webui/shared';
 import {
   ChevronDown,
   CircleCheck,
@@ -180,7 +180,7 @@ export function ChecksCard() {
 
 /** Checks grouped by family: issues first, passing ones folded. */
 export function CheckList({ checks }: { checks: ReadonlyArray<Check> }) {
-  const families = (Object.keys(FAMILY) as CheckFamily[])
+  const families = CheckFamily.literals
     .map((f) => ({ family: f, checks: checks.filter((c) => c.family === f) }))
     .filter((g) => g.checks.length > 0);
   return (

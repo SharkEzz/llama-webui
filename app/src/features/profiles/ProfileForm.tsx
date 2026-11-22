@@ -230,7 +230,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
                     toast.success(`Copy created: ${p.name}`);
                     onSaved(p);
                   },
-                  (e: Error) => toast.error(e.message),
+                  (e: unknown) => toast.error(errorMessage(e)),
                 )
               }
             >
@@ -256,7 +256,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
                       toast.success('Profile deleted');
                       onDeleted();
                     },
-                    (e: Error) => toast.error(e.message),
+                    (e: unknown) => toast.error(errorMessage(e)),
                   )
                 }
                 trigger={

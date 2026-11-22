@@ -53,7 +53,7 @@ const live = (l: Partial<DownloadLive> & Pick<DownloadLive, 'id'>): DownloadLive
  */
 function server(routes: Record<string, () => Response>) {
   const seen: Array<{ route: string; query: string; body: string }> = [];
-  const fetchImpl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  const fetchImpl = (async (input: string | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const route = `${init?.method ?? 'GET'} ${url.pathname}`;
     seen.push({ route, query: url.search, body: init?.body ? await new Response(init.body).text() : '' });
