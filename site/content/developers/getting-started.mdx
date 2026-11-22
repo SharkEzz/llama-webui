@@ -147,6 +147,7 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
 ## Repository layout
 
 <FileTree>
+
 - `app/` the app: the React client and the Effect server (workspace `@llama-webui/app`)
   - `index.html` HTML entry, applies the theme before the first paint
   - `vite.config.ts` the client (React, Tailwind, alias `@`), the `.env` file, and the dev server plugin
@@ -219,6 +220,7 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
 - `tsconfig.base.json` the options every project's `tsconfig.json` extends; `tsconfig.effect.json` adds Effect's language service
 - `oxfmt.config.ts` format rules (style, import and `package.json` order)
 - `biome.jsonc` lint rules
+
 </FileTree>
 
 The [Web app](/developers/frontend/) and [Shared package](/developers/shared/) pages describe `app/src/` and

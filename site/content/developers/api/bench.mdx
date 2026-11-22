@@ -43,7 +43,6 @@ A run is created with status `running` and executes in the background. Its progr
 
 The web app tells them apart by `_tag`: `ServerRunning` asks to confirm, then sends the request again with
 `stopServer: true`.
-| `llama-server is taking too long to stop: try again`                                            |                  | A stop already in progress has lasted more than 60 seconds.            |
 
 `server-running` is a confirmation request: the web app asks the user, then sends the same request again with
 `stopServer: true`. The stop is not awaited by the route: the run shows the phase `stopping-server` meanwhile, then

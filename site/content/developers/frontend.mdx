@@ -12,6 +12,7 @@ The web app is a React 19 single-page app in `app/src/`, served by the same serv
 ## Structure
 
 <FileTree>
+
 - `app/`
   - `index.html` HTML entry; an inline script applies the theme before the first paint
   - `components.json` shadcn configuration (`base-nova` style)
@@ -38,6 +39,7 @@ The web app is a React 19 single-page app in `app/src/`, served by the same serv
       - `charts/` `TimeSeriesChart` (uPlot) and its theme
       - `ui/` shadcn components, generated: do not edit
       - `CodeTextarea.tsx`, `ConfirmDialog.tsx`, `Select.tsx`
+
 </FileTree>
 
 A page's code lives in `features/<page>/`, named after its route. What several pages share goes to `lib/` (data and

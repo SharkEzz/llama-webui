@@ -349,6 +349,7 @@ small model, the fake `llama-server` as the `binary` setting), then starts the p
 `app/server/contract/golden.json`.
 
 <FileTree>
+
 - `app/server/contract/`
   - `wire.ts`: raw HTTP/1.1 client on `node:net` (`request`, `readSse`): a request carries the headers a browser
     sends, not the ones a `fetch` implementation adds
@@ -356,6 +357,7 @@ small model, the fake `llama-server` as the `binary` setting), then starts the p
     `runStreams()`
   - `contract.test.ts`: prepares the data, launches the build, runs the cases, compares with the golden
   - `golden.json`: the recorded replies, one entry per case, in run order
+
 </FileTree>
 
 The cases come in three parts:
