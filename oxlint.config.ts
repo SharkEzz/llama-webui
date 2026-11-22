@@ -1,6 +1,6 @@
 // The base of every oxlint config: plugins, categories, type-aware rules and the selection that applies to all code.
-// As the root config it covers scripts/, app/build, app/bin, packages/webui-shared, packages/webui-theme and the root
-// files; each other project has its own `oxlint.config.ts`, which extends `base` (a nested config replaces this one).
+// As the root config it covers scripts/, app/build, app/bin, packages/webui-shared and the root files;
+// each other project has its own `oxlint.config.ts`, which extends `base` (a nested config replaces this one).
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'oxlint';
 import { tests } from './oxlint.tests.ts';
