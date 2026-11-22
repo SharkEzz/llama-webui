@@ -3,8 +3,8 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { BenchDevice, BenchDraft, BenchLive, BenchRun, BenchSpec } from '../bench.ts';
 import { Profile } from '../profile.ts';
 import { ModelPathRefused } from './ModelsApi.ts';
-import { ProfileNameTaken, ProfileNotFound } from './ProfilesApi.ts';
 import { IdParam } from './params.ts';
+import { ProfileNameTaken, ProfileNotFound } from './ProfilesApi.ts';
 
 /** A run, a sweep, or a request between its acceptance and its start already holds the bench: `A benchmark is running`. */
 export class BenchRunning extends Schema.TaggedError<BenchRunning, { readonly BenchRunning: unique symbol }>()(

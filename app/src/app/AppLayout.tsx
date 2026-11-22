@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils';
 import { useWs } from '@/lib/ws';
 import { PageSkeleton } from './PageSkeleton';
 import { Sidebar } from './Sidebar';
-import { StatusBar } from './StatusBar';
 import { useSidebarLayout } from './sidebarPrefs';
+import { StatusBar } from './StatusBar';
 
 /** `loading`: first load of a page (its code is not there yet), the shell with a skeleton. */
 export function AppLayout({ loading = false }: { loading?: boolean }) {

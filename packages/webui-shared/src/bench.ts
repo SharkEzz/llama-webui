@@ -382,12 +382,10 @@ export function ctxFromArgs(args: ReadonlyArray<string>): number | undefined {
 export const withCtx: {
   (ctx: number | null | undefined): (args: ReadonlyArray<string>) => ReadonlyArray<string>;
   (args: ReadonlyArray<string>, ctx: number | null | undefined): ReadonlyArray<string>;
-} = dual(
-  2,
-  (args: ReadonlyArray<string>, ctx: number | null | undefined): ReadonlyArray<string> =>
-    Predicate.isNumber(ctx) && ctx !== 0 && !Number.isNaN(ctx) && ctxFromArgs(args) === undefined
-      ? [...args, '-c', String(ctx)]
-      : args,
+} = dual(2, (args: ReadonlyArray<string>, ctx: number | null | undefined): ReadonlyArray<string> =>
+  Predicate.isNumber(ctx) && ctx !== 0 && !Number.isNaN(ctx) && ctxFromArgs(args) === undefined
+    ? [...args, '-c', String(ctx)]
+    : args,
 );
 
 /** One field's value as the tool's flag value, none when the tool's default applies. */

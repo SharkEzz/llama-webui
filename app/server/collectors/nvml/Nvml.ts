@@ -31,19 +31,17 @@ export interface NvmlState {
 export const onSample: {
   (snapshot: NvmlSnapshot, now: number): (state: NvmlState) => NvmlState;
   (state: NvmlState, snapshot: NvmlSnapshot, now: number): NvmlState;
-} = dual(
-  3,
-  (state: NvmlState, snapshot: NvmlSnapshot, now: number): NvmlState =>
-    state.dead
-      ? state
-      : {
-          ...state,
-          gpus: snapshot.gpus,
-          procs: snapshot.procs,
-          system: snapshot.system,
-          lastSampleAt: now,
-          freshIntervalMs: state.intervalMs,
-        },
+} = dual(3, (state: NvmlState, snapshot: NvmlSnapshot, now: number): NvmlState =>
+  state.dead
+    ? state
+    : {
+        ...state,
+        gpus: snapshot.gpus,
+        procs: snapshot.procs,
+        system: snapshot.system,
+        lastSampleAt: now,
+        freshIntervalMs: state.intervalMs,
+      },
 );
 
 /**
@@ -53,14 +51,11 @@ export const onSample: {
 export const onConfigure: {
   (intervalMs: number): (state: NvmlState) => NvmlState;
   (state: NvmlState, intervalMs: number): NvmlState;
-} = dual(
-  2,
-  (state: NvmlState, intervalMs: number): NvmlState => ({
-    ...state,
-    intervalMs,
-    freshIntervalMs: Math.max(state.freshIntervalMs, intervalMs),
-  }),
-);
+} = dual(2, (state: NvmlState, intervalMs: number): NvmlState => ({
+  ...state,
+  intervalMs,
+  freshIntervalMs: Math.max(state.freshIntervalMs, intervalMs),
+}));
 
 /** The sampler is gone: no reading any more. */
 const onDeath = (state: NvmlState): NvmlState => ({ ...state, gpus: [], procs: [], dead: true });

@@ -2,8 +2,8 @@
   "name": "@llama-webui/theme",
   "version": "0.4.2",
   "private": true,
-  "sideEffects": true,
   "type": "module",
+  "sideEffects": true,
   "exports": {
     "./theme.css": "./theme.css"
   }

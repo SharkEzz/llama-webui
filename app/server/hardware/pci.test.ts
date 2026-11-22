@@ -2,8 +2,8 @@ import { NodeServices } from '@effect/platform-node';
 import { assert, describe, it, layer } from '@effect/vitest';
 import type { TopologyGraph } from '@llama-webui/shared';
 import { Array as Arr, Effect, FileSystem, Layer, Option, Path, Record } from 'effect';
-import { PciIds } from './PciIds.ts';
 import { chipsetLabel, cpuLabel, findPciIdsEntry, minKnown, parseLinkSpeed, readPciTopology } from './pci.ts';
+import { PciIds } from './PciIds.ts';
 
 interface Dev {
   readonly vendor: string;

@@ -3,8 +3,8 @@ import { Array as Arr, Effect, type FileSystem, type Path } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import { AppInfo } from '../config/AppInfo.ts';
 import { CpuInfo } from '../hardware/CpuInfo.ts';
-import type { PciIds } from '../hardware/PciIds.ts';
 import { readPciTopology } from '../hardware/pci.ts';
+import type { PciIds } from '../hardware/PciIds.ts';
 import { Monitor } from './Monitor.ts';
 import { Placement } from './Placement.ts';
 

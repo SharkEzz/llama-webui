@@ -11,13 +11,11 @@ import { withoutTrailingSlash } from '../config/paths.ts';
 export const repoDir: {
   (repo: string): (modelsDir: string) => Effect.Effect<string, never, Path.Path>;
   (modelsDir: string, repo: string): Effect.Effect<string, never, Path.Path>;
-} = dual(
-  2,
-  (modelsDir: string, repo: string): Effect.Effect<string, never, Path.Path> =>
-    Effect.gen(function* () {
-      const path = yield* Path.Path;
-      return path.join(path.resolve(modelsDir), ...Str.split(repo, '/'));
-    }),
+} = dual(2, (modelsDir: string, repo: string): Effect.Effect<string, never, Path.Path> =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    return path.join(path.resolve(modelsDir), ...Str.split(repo, '/'));
+  }),
 );
 
 /** The segments of a relative path once `.` and `..` are resolved; none when a `..` would leave its folder. */

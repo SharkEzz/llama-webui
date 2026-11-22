@@ -2,14 +2,7 @@ import type { ComponentProps } from 'react';
 import { SelectContent as BaseSelectContent, SelectItem as BaseSelectItem } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-export {
-  Select,
-  SelectGroup,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+export { Select, SelectGroup, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
  * Select list with the project's tweaks over the shadcn version (components/ui stays stock): opens below the

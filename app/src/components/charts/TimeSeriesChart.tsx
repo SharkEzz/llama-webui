@@ -117,16 +117,14 @@ export function TimeSeriesChart({
           ],
       series: [
         { label: 'Time', value: (_u, v) => (v == null ? '—' : formatTime(v * 1000)) },
-        ...series.map(
-          (s): uPlot.Series => ({
-            label: s.label,
-            stroke: theme.series[s.tone],
-            fill: withAlpha(theme.series[s.tone], 0.1),
-            width: compact ? 1.5 : 2,
-            points: { show: false },
-            value: (_u, v) => (v == null ? '—' : fmt.current(v)),
-          }),
-        ),
+        ...series.map((s): uPlot.Series => ({
+          label: s.label,
+          stroke: theme.series[s.tone],
+          fill: withAlpha(theme.series[s.tone], 0.1),
+          width: compact ? 1.5 : 2,
+          points: { show: false },
+          value: (_u, v) => (v == null ? '—' : fmt.current(v)),
+        })),
       ],
     };
     const u = new uPlot(opts, data, el);

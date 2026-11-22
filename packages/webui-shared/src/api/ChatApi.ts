@@ -1,8 +1,8 @@
 import { Schema, SchemaTransformation } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from 'effect/http-api';
 import { ChatEvent, ConversationDetail, ConversationPatch, ConversationSummary } from '../chat.ts';
-import { ProfileNotFound } from './ProfilesApi.ts';
 import { IdParam } from './params.ts';
+import { ProfileNotFound } from './ProfilesApi.ts';
 import { ServerNotReady } from './ServerApi.ts';
 
 /** No conversation has this id: `Conversation not found`. */

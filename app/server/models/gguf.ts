@@ -133,16 +133,13 @@ export const parseModel = ({
         Number(s.tensorDataOffset),
         Option.getOrElse(Arr.get(fileSizes, i), () => 0),
       );
-      return Arr.map(
-        infos,
-        (t, j): TensorInfo => ({
-          name: t.name,
-          shape: Arr.map(t.shape, Number),
-          dtype: t.dtype,
-          offset: Number(t.offset),
-          bytes: bytes[j]!,
-        }),
-      );
+      return Arr.map(infos, (t, j): TensorInfo => ({
+        name: t.name,
+        shape: Arr.map(t.shape, Number),
+        dtype: t.dtype,
+        offset: Number(t.offset),
+        bytes: bytes[j]!,
+      }));
     }),
   );
   const blockCount = num(meta, k('block_count'), 0);

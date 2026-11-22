@@ -118,9 +118,8 @@ const pushAll = Effect.fnUntraced(function* (texts: ReadonlyArray<string>) {
 const placements = Effect.gen(function* () {
   const published = yield* Published;
   const messages = yield* Ref.get(published);
-  return Arr.flatMap(
-    messages,
-    (message): ReadonlyArray<ModelPlacement | null> => (message.type === 'placement' ? [message.payload] : []),
+  return Arr.flatMap(messages, (message): ReadonlyArray<ModelPlacement | null> =>
+    message.type === 'placement' ? [message.payload] : [],
   );
 });
 

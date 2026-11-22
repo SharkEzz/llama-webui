@@ -4,8 +4,8 @@
   "private": true,
   "description": "Talk to llama.cpp: llama-server's HTTP API, its metrics, the --help of its binaries and llama-bench's output.",
   "license": "MIT",
-  "sideEffects": false,
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
     "./bench": "./src/bench.ts",

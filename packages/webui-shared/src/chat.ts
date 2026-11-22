@@ -171,20 +171,17 @@ export type LlamaTimingsSchema = typeof LlamaTimingsSchema.Type;
 export const statsFromTimings: {
   (ttftMs: number | null, durationMs: number): (t: LlamaTimings) => MessageStats;
   (t: LlamaTimings, ttftMs: number | null, durationMs: number): MessageStats;
-} = dual(
-  3,
-  (t: LlamaTimings, ttftMs: number | null, durationMs: number): MessageStats => ({
-    ttftMs,
-    promptTokens: t.prompt_n,
-    cachedTokens: t.cache_n ?? 0,
-    genTokens: t.predicted_n,
-    ppTps: t.prompt_per_second,
-    tgTps: t.predicted_per_second,
-    draftN: t.draft_n ?? null,
-    draftAccepted: t.draft_n_accepted ?? null,
-    durationMs,
-  }),
-);
+} = dual(3, (t: LlamaTimings, ttftMs: number | null, durationMs: number): MessageStats => ({
+  ttftMs,
+  promptTokens: t.prompt_n,
+  cachedTokens: t.cache_n ?? 0,
+  genTokens: t.predicted_n,
+  ppTps: t.prompt_per_second,
+  tgTps: t.predicted_per_second,
+  draftN: t.draft_n ?? null,
+  draftAccepted: t.draft_n_accepted ?? null,
+  durationMs,
+}));
 
 export const DEFAULT_TITLE = 'New conversation';
 /** Default titles from earlier versions, still present in existing databases. */

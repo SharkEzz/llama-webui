@@ -182,9 +182,8 @@ const withoutPrefix = Str.replace(/^0\.00\.000\.000 I /, '');
 const publishedViews = Effect.gen(function* () {
   const published = yield* Published;
   const messages = yield* Ref.get(published);
-  return Arr.flatMap(
-    messages,
-    (message): ReadonlyArray<ServerView> => (message.type === 'server-state' ? [message.payload] : []),
+  return Arr.flatMap(messages, (message): ReadonlyArray<ServerView> =>
+    message.type === 'server-state' ? [message.payload] : [],
   );
 });
 

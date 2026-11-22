@@ -632,25 +632,22 @@ export class BenchRunner extends Context.Service<
           if (!Arr.isReadonlyArrayNonEmpty(best))
             return yield* NothingToValidate.make({ message: 'No successful run to validate' });
           const { modelPath, mmprojPath, profileId, serverArgs, p, n, r } = sweep.spec;
-          const queued = Arr.map(
-            best,
-            ({ run }): QueuedItem => ({
-              spec: {
-                kind: 'server',
-                modelPath,
-                mmprojPath,
-                profileId,
-                params: run.spec.params,
-                // The context the sweep was planned at, not the model's full one (#24).
-                serverArgs: withCtx(serverArgs, sweepCtx(sweep.spec)),
-                p,
-                n,
-                r,
-              },
-              label: `validation · ${run.sweepLabel ?? 'base'}`,
-              fit: run.fit ?? 'fits',
-            }),
-          );
+          const queued = Arr.map(best, ({ run }): QueuedItem => ({
+            spec: {
+              kind: 'server',
+              modelPath,
+              mmprojPath,
+              profileId,
+              params: run.spec.params,
+              // The context the sweep was planned at, not the model's full one (#24).
+              serverArgs: withCtx(serverArgs, sweepCtx(sweep.spec)),
+              p,
+              n,
+              r,
+            },
+            label: `validation · ${run.sweepLabel ?? 'base'}`,
+            fit: run.fit ?? 'fits',
+          }));
           return yield* startSweep({
             files: sweep.spec,
             stopServer: request.stopServer,
