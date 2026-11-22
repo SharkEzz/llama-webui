@@ -57,6 +57,9 @@
       "tailwindDirectives": true,
     },
   },
+  "assist": {
+    "enabled": false,
+  },
   "overrides": [
     {
       "includes": ["app/src/**", "site/**"],
