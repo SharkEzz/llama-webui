@@ -119,7 +119,13 @@ export interface ScenarioResults {
   /** clean, profiled */
   idle: { windows: Window[] };
   load: { loads: PageLoad[] };
-  launch: { readyMs: number; logLines: number; windows: Window[] };
+  launch: {
+    readyMs: number;
+    logLines: number;
+    /** the share of the profile's GGUF files in the page cache at the start, after their eviction; null if unread */
+    modelCachedPct?: number | null;
+    windows: Window[];
+  };
   /** clean (60 s), profiled (60 s, census), trace (20 s) */
   dashboard: { windows: Window[] };
   soak: {

@@ -2,12 +2,15 @@
 import type { Scenario } from '../measure.ts';
 import type { ScenarioName } from '../results.ts';
 import { aurora } from './aurora.ts';
+import { chat } from './chat.ts';
 import { dashboard } from './dashboard.ts';
+import { generation } from './generation.ts';
 import { idle } from './idle.ts';
 import { launch } from './launch.ts';
 import { load } from './load.ts';
 import { soak } from './soak.ts';
 import { startup } from './startup.ts';
+import { tps } from './tps.ts';
 
 const later = <K extends ScenarioName>(name: K): Scenario<K> => ({
   name,
@@ -22,10 +25,10 @@ export const SCENARIO_RUNNERS: { [K in ScenarioName]: Scenario<K> } = {
   dashboard,
   soak,
   aurora,
-  generation: later('generation'),
-  chat: later('chat'),
+  generation,
+  chat,
   pages: later('pages'),
   api: later('api'),
-  tps: later('tps'),
+  tps,
   collectors: later('collectors'),
 };
