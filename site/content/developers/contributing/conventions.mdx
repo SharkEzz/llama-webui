@@ -102,6 +102,14 @@ name) and a selection of other rules picked by name, all in `error`. The type-aw
 (`options.typeAware`) read the types through the `tsconfig.json` of each file. Every rule that is off or has options
 carries a one-line comment with its reason in the config: that is where to read why.
 
+Three families of the rules picked by name shape how the code is written:
+
+| Family                            | Rules                                                                                                                                                | The code                                                                                                                                                                                     |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unsafe `any`                      | `typescript/no-unsafe-assignment`, `no-unsafe-member-access`, `no-unsafe-argument`, `no-unsafe-return`, `no-unsafe-call`, `no-unsafe-type-assertion` | What `JSON.parse`, a `catch` or an untyped import gives is decoded or typed before use; a cast is a decode, a guard, a `satisfies` or a narrower declaration (tests may cast their fixtures) |
+| Discarded promises                | `typescript/no-floating-promises`, `no-misused-promises`, `no-confusing-void-expression`, `require-await`                                            | A promise is awaited, returned, handled, or discarded on purpose with `void`; a function that returns one is not passed where a `void` callback is expected (an event handler)               |
+| Interface functions as properties | `typescript/method-signature-style`                                                                                                                  | `fn: (x: T) => U`, not `fn(x: T): U`: the parameters are checked strictly, and the function can be read off its object                                                                       |
+
 The root and four projects (`app/server`, `app/src`, `site`, `packages/llamacpp-js`) each have an `oxlint.config.ts`,
 and a file takes the nearest one above it. That config replaces the root one instead of adding to it, so a project
 config extends `base` and the fragments it needs:
@@ -109,8 +117,8 @@ config extends `base` and the fragments it needs:
 | File                                    | Lints, or holds                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `oxlint.config.ts`                      | Its named export `base`: the plugins (`eslint`, `typescript`, `unicorn`, `oxc`, `import`, `promise`), the `correctness`, `suspicious` and `perf` categories, the rules by name, the debt block. Its default export, `base` and the Vitest rules, lints `scripts/`, `app/build/`, `app/bin/`, `packages/webui-shared/` and the root files |
-| `app/server/oxlint.config.ts`           | The server: `base` and the Vitest rules, with `require-yield` off (a generator of `Effect.gen` or `Effect.fn` does not always yield)                                                                                                                                                                                                     |
-| `app/src/oxlint.config.ts`              | The web app: `base`, the React rules and the Vitest rules                                                                                                                                                                                                                                                                                |
+| `app/server/oxlint.config.ts`           | The server: `base` and the Vitest rules, with `require-yield` off (a generator of `Effect.gen` or `Effect.fn` does not always yield) and `no-console` on (a log goes through `Effect.log*`)                                                                                                                                              |
+| `app/src/oxlint.config.ts`              | The web app: `base`, the React rules and the Vitest rules, with `no-console` on                                                                                                                                                                                                                                                          |
 | `site/oxlint.config.ts`                 | The website: `base`, the React rules and the Vitest rules                                                                                                                                                                                                                                                                                |
 | `packages/llamacpp-js/oxlint.config.ts` | `llamacpp-js`: `base` alone, since its tests run on `node:test`                                                                                                                                                                                                                                                                          |
 | `oxlint.react.ts`                       | The React fragment: the `react` and `jsx-a11y` plugins. Accessibility is limited to the rules that pass today; the others of `jsx-a11y` are off by name                                                                                                                                                                                  |
@@ -122,6 +130,10 @@ A project config is short:
 ```ts title="app/src/oxlint.config.ts"
 export default defineConfig({
   extends: [base, react, tests],
+  rules: {
+    // The page logs nothing to the console but what it cannot show (a suppression says which)
+    'no-console': 'error',
+  },
   // shadcn components keep their default code
   ignorePatterns: ['components/ui/**'],
 });
@@ -136,7 +148,7 @@ explicitly, oxlint still loads that config and fails with a configuration error;
 repository, does not.
 
 The rules that report on today's code and are not fixed yet are off in two marked blocks, each rule with its count
-and the milestone of the oxc migration (L4 or L5) that turns it on and fixes its reports: `--- Debt: off until its
+and the milestone of the oxc migration (L5, the only one left) that turns it on and fixes its reports: `--- Debt: off until its
 milestone ---` in `oxlint.config.ts`, and the Vitest rules in the override of `oxlint.tests.ts` (the override's
 category would turn them back on from the base). A block only shrinks: a rule never goes into it to get the lint
 through.
