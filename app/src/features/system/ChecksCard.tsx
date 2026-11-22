@@ -197,7 +197,7 @@ export function CheckList({ checks }: { checks: ReadonlyArray<Check> }) {
             {ok.length > 0 && (
               <Collapsible>
                 <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                  <ChevronDown className="size-3.5 transition-transform group-data-[panel-open]:rotate-180" />
+                  <ChevronDown className="size-3.5 transition-transform group-data-panel-open:rotate-180" />
                   {ok.length} {plural(ok.length, 'check')} ok
                 </CollapsibleTrigger>
                 <CollapsibleContent>
@@ -234,7 +234,7 @@ function CheckRow({ check: c }: { check: Check }) {
         <p className="text-muted-foreground">{c.detail}</p>
         {c.state === 'warn' && <p className="text-xs text-muted-foreground">Impact: {c.impact}</p>}
         {c.command && (
-          <div className="flex items-start gap-1.5 rounded-md bg-well inset-shadow-well py-1 pr-1 pl-2.5">
+          <div className="flex items-start gap-1.5 rounded-md bg-well py-1 pr-1 pl-2.5 inset-shadow-well">
             <code className="min-w-0 flex-1 py-0.5 font-mono text-xs break-all">{c.command}</code>
             <Button variant="ghost" size="icon-xs" onClick={() => void copyText(c.command!)} aria-label="Copy command">
               <Copy />

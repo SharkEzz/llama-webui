@@ -1,11 +1,14 @@
-// The public site (React, prerendered): the base, the React rules and the Vitest rules.
+// The public site (React, prerendered): the base, the React rules, the Vitest rules and the Tailwind rules.
 import { defineConfig } from 'oxlint';
 import { base } from '../oxlint.config.ts';
 import { react } from '../oxlint.react.ts';
+import { tailwind } from '../oxlint.tailwind.ts';
 import { tests } from '../oxlint.tests.ts';
 
 export default defineConfig({
-  extends: [base, react, tests],
+  extends: [base, react, tests, tailwind],
+  // The stylesheet the Tailwind rules read (it imports Tailwind and the theme), relative to this file
+  settings: { tailwindcss: { entryPoint: 'src/styles/app.css' } },
   rules: {
     // The site prerenders: a browser global read during render or in a hook's initial state breaks the build
     'react-doctor/no-unguarded-browser-global-in-render-or-hook-init': 'error',

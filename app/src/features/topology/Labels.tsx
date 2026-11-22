@@ -41,7 +41,7 @@ export function Labels({ graph, live, flows, peers, tones, busy, hovered, layerR
           <span
             className={cn(
               CHIP,
-              'block -translate-x-1/2 -translate-y-1/2 text-[11px] font-medium leading-tight',
+              'block -translate-x-1/2 -translate-y-1/2 text-[11px] leading-tight font-medium',
               peer.confirmed ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
@@ -81,7 +81,7 @@ export function Labels({ graph, live, flows, peers, tones, busy, hovered, layerR
                   isHovered && 'ring-primary/60',
                 )}
               >
-                <span className="max-w-32 truncate text-[11px] font-medium leading-tight text-foreground">
+                <span className="max-w-32 truncate text-[11px] leading-tight font-medium text-foreground">
                   {n.label}
                 </span>
                 {l.headline !== null && (
@@ -114,14 +114,14 @@ export function Labels({ graph, live, flows, peers, tones, busy, hovered, layerR
 function Badge({ badge }: { badge: LinkBadge }) {
   const ui = LEVEL_UI[badge.level];
   return (
-    <div className={cn(CHIP, 'fade-in animate-in duration-300', ui.ring)}>
+    <div className={cn(CHIP, 'animate-in duration-300 fade-in', ui.ring)}>
       <dl className="grid grid-cols-[auto_auto] gap-x-2 text-[11px] leading-tight">
         {badge.lines.map((line) => (
           <BadgeLine key={line.label} label={line.label} value={line.value} />
         ))}
       </dl>
       {badge.pct && (
-        <p className={cn('num text-center text-[11px] font-medium leading-tight', ui.text)}>{badge.pct} of capacity</p>
+        <p className={cn('text-center num text-[11px] leading-tight font-medium', ui.text)}>{badge.pct} of capacity</p>
       )}
     </div>
   );
@@ -131,7 +131,7 @@ function BadgeLine({ label, value }: { label: string; value: string }) {
   return (
     <>
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="num text-right text-foreground">{value}</dd>
+      <dd className="text-right num text-foreground">{value}</dd>
     </>
   );
 }
@@ -142,7 +142,7 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="whitespace-nowrap text-muted-foreground">{label}</dt>
       <dd
         className={cn(
-          'num text-right text-foreground',
+          'text-right num text-foreground',
           value.length > 28 ? 'max-w-56 whitespace-normal' : 'whitespace-nowrap',
         )}
       >

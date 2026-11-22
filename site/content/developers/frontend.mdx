@@ -296,6 +296,13 @@ imported by both `app/src/index.css` and `site/src/styles/app.css`: `:root` for 
 Tailwind through `@theme inline`. Components only use these semantic classes, never raw colors. The four tones of the
 glass components and the charts are `blue`, `teal`, `amber` and `rose` (`components/glass/tones.ts`).
 
+oxfmt sorts the classes of `className`, `cn(…)` and `cva(…)` against `app/src/index.css`, and `oxlint-tailwindcss`
+lints them against the same stylesheet (`oxlint.tailwind.ts`, entry point in `app/src/oxlint.config.ts`): an
+unknown class, a conflicting pair, a non-canonical spelling or a raw color fails `pnpm lint`. The theme's plain
+classes (`aurora`, `glow`…) are allowed by name ([Tailwind classes](/developers/contributing/conventions/#tailwind-classes)).
+The plugin caches the theme by the package's version, not its content: after editing `packages/webui-theme/theme.css`, delete
+`$TMPDIR/oxlint-tailwindcss-<uid>` (or set a fresh `OXLINT_TAILWINDCSS_CACHE_DIR`) before trusting `pnpm lint`.
+
 ## Charts
 
 Time series use uPlot through `components/charts/TimeSeriesChart.tsx`, on the Dashboard and the System page. A chart

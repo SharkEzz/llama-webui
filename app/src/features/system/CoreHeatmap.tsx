@@ -39,7 +39,7 @@ export function CoreHeatmap({ cores }: { cores: readonly number[] }) {
             <TooltipTrigger
               tabIndex={i === current ? 0 : -1}
               onFocus={() => setActive(i)}
-              className="relative flex h-9 w-full items-center justify-center overflow-hidden rounded-md border border-border text-[0.65rem] text-muted-foreground outline-none num focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="relative flex h-9 w-full items-center justify-center overflow-hidden rounded-md border border-border num text-[0.65rem] text-muted-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
               aria-label={`Core ${i}: ${formatPct(pct)}`}
             >
               <span

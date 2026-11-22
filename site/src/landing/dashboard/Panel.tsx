@@ -50,7 +50,7 @@ export function StatTile({
   tone: string;
 }) {
   return (
-    <div className={cn(PANEL, 'flex min-w-0 flex-col gap-2 rounded-xl px-4 py-4')}>
+    <div className={cn(PANEL, 'flex min-w-0 flex-col gap-2 rounded-xl p-4')}>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span
           className="size-2 shrink-0 rounded-full"
@@ -59,7 +59,7 @@ export function StatTile({
         <span className="truncate">{label}</span>
       </div>
       <div className="flex items-baseline gap-1.5">
-        <span className="num truncate text-2xl font-medium leading-none tracking-tight">{value}</span>
+        <span className="truncate num text-2xl leading-none font-medium tracking-tight">{value}</span>
         {unit && <span className="text-sm text-muted-foreground">{unit}</span>}
       </div>
       {hint && <p className="truncate text-xs text-muted-foreground">{hint}</p>}

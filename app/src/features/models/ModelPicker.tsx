@@ -59,7 +59,7 @@ export function ModelPicker({ kind, onSelect }: { kind: ModelKind; onSelect: (pa
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate font-mono text-xs">{m.relPath}</span>
-                  <span className="num truncate text-xs text-muted-foreground">
+                  <span className="truncate num text-xs text-muted-foreground">
                     {[m.quant, formatBytes(m.fileBytes), m.arch].filter(Boolean).join(' · ')}
                   </span>
                 </span>

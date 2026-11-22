@@ -62,7 +62,7 @@ export function Gauge({ value, max = 100, label, unit = '%', size = 96, tone = '
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="num font-medium leading-none" style={{ fontSize: size * 0.22 }}>
+          <span className="num leading-none font-medium" style={{ fontSize: size * 0.22 }}>
             {display}
             {unit && (
               <span className="ml-0.5 font-sans text-muted-foreground" style={{ fontSize: size * 0.12 }}>

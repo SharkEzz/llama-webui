@@ -18,18 +18,18 @@ export function Hero() {
           <span className="text-foreground">Linux · Single Node.js process</span>
         </div>
 
-        <h1 className="text-gradient-fade mt-6 max-w-[15ch] text-5xl leading-[1.02] font-semibold tracking-[-0.04em] text-balance sm:text-7xl">
+        <h1 className="mt-6 max-w-[15ch] text-gradient-fade text-5xl leading-[1.02] font-semibold tracking-[-0.04em] text-balance sm:text-7xl">
           {SITE.tagline}
         </h1>
 
-        <p className="mt-6 max-w-[60ch] text-lg leading-relaxed text-muted-foreground text-pretty sm:text-xl">
+        <p className="mt-6 max-w-[60ch] text-lg leading-relaxed text-pretty text-muted-foreground sm:text-xl">
           {SITE.description}
         </p>
 
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
           <Button
             size="lg"
-            className="h-11 rounded-xl px-5 shadow-[0_10px_28px_-6px] shadow-primary/55 inset-shadow-highlight"
+            className="h-11 rounded-xl px-5 shadow-[0_10px_28px_-6px] inset-shadow-highlight shadow-primary/55"
             nativeButton={false}
             render={<Link to="/docs/getting-started/installation/" />}
           >

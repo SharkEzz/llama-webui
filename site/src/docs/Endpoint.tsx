@@ -24,7 +24,7 @@ export function Endpoint({
 }) {
   const parts = path.split(/(:[A-Za-z]+)/);
   return (
-    <div className="not-prose my-4 flex min-w-0 items-center gap-3 rounded-lg bg-well px-3 py-2 font-mono text-[0.8125rem] inset-shadow-well ring-1 ring-border">
+    <div className="not-prose my-4 flex min-w-0 items-center gap-3 rounded-lg bg-well px-3 py-2 font-mono text-[0.8125rem] ring-1 inset-shadow-well ring-border">
       <span className={cn('shrink-0 rounded-md px-1.5 py-0.5 text-[0.6875rem] font-semibold', METHOD[method])}>
         {method}
       </span>

@@ -18,6 +18,7 @@ export function Logo({ className }: { className?: string }) {
       <LogoMark />
       <span>
         llama<span className="text-muted-foreground">-</span>
+        {/* oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- the blue of the logo mark's first bar (fill above, as in the favicon) */}
         <span className="text-[#3698ff]">webui</span>
       </span>
     </span>

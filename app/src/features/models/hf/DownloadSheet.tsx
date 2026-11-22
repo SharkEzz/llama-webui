@@ -85,11 +85,11 @@ function SearchResults({ q, onPick }: { q: string; onPick: (id: string) => void 
           >
             <span className="min-w-0 flex-1 truncate text-sm">{h.id}</span>
             {h.gated && <Lock className="size-3 text-muted-foreground" aria-label="Gated" />}
-            <span className="num inline-flex items-center gap-1 text-xs text-muted-foreground" title="Downloads">
+            <span className="inline-flex items-center gap-1 num text-xs text-muted-foreground" title="Downloads">
               <Download className="size-3" />
               {compact(h.downloads)}
             </span>
-            <span className="num inline-flex items-center gap-1 text-xs text-muted-foreground" title="Likes">
+            <span className="inline-flex items-center gap-1 num text-xs text-muted-foreground" title="Likes">
               <Heart className="size-3" />
               {compact(h.likes)}
             </span>
@@ -135,7 +135,7 @@ export function DownloadSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 data-[side=right]:sm:max-w-xl">
+      <SheetContent side="right" className="w-full gap-0 sm:data-[side=right]:max-w-xl">
         <SheetHeader>
           <SheetTitle>Download from Hugging Face</SheetTitle>
           <SheetDescription>

@@ -50,7 +50,8 @@ const SESSION: Line[] = [
 function Terminal() {
   return (
     <div
-      className="scroll-reveal overflow-hidden rounded-2xl bg-[oklch(0.13_0.008_260/88%)] text-[oklch(0.88_0.01_255)] shadow-surface inset-shadow-highlight ring-1 ring-white/12 backdrop-blur-xl"
+      // oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- a terminal window's own background and text, dark in both themes
+      className="scroll-reveal overflow-hidden rounded-2xl bg-[oklch(0.13_0.008_260/88%)] text-[oklch(0.88_0.01_255)] shadow-surface ring-1 inset-shadow-highlight ring-white/12 backdrop-blur-xl"
       aria-hidden="true"
     >
       <div className="flex h-9 items-end gap-1 border-b border-white/10 px-2.5 text-xs">
@@ -71,13 +72,16 @@ function Terminal() {
         {SESSION.map((l) => (
           <p
             key={l.text}
+            // oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- the terminal's error red, not a theme tone
             className={l.kind === 'err' ? 'text-[oklch(0.72_0.17_15)]' : l.kind === 'out' ? 'text-white/55' : ''}
           >
+            {/* oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- the terminal's prompt teal, not a theme tone */}
             {l.kind === 'cmd' && <span className="text-[oklch(0.78_0.12_185)]">$ </span>}
             {l.text}
           </p>
         ))}
         <p>
+          {/* oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- the terminal's prompt teal, not a theme tone */}
           <span className="text-[oklch(0.78_0.12_185)]">$ </span>
           <span className="inline-block h-3.5 w-2 translate-y-0.5 bg-white/70" />
         </p>
@@ -97,7 +101,7 @@ export function WhySection() {
           >
             One tab instead of a pile of terminals.
           </h2>
-          <p className="mt-5 max-w-[56ch] text-lg text-muted-foreground text-pretty">
+          <p className="mt-5 max-w-[56ch] text-lg text-pretty text-muted-foreground">
             llama-server is fast and flexible, but running it day to day means juggling long command lines, nvidia-smi
             in another terminal, and a lot of trial and error to fit a big model across several GPUs.
           </p>
@@ -112,7 +116,7 @@ export function WhySection() {
               <span className={cn('mb-4 block h-0.5 w-8 rounded-full', bar)} aria-hidden="true" />
               {title}
             </dt>
-            <dd className="mt-2 text-sm leading-relaxed text-muted-foreground text-pretty">{text}</dd>
+            <dd className="mt-2 text-sm leading-relaxed text-pretty text-muted-foreground">{text}</dd>
           </GlassCard>
         ))}
       </dl>

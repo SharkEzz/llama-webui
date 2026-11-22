@@ -43,7 +43,7 @@ export function MonitoringSection() {
           >
             See what every GPU is doing.
           </h2>
-          <p className="mt-4 max-w-[44ch] text-lg text-muted-foreground text-pretty">
+          <p className="mt-4 max-w-[44ch] text-lg text-pretty text-muted-foreground">
             Throughput, VRAM, PCIe traffic, power and temperatures, read from the real hardware every second while
             llama-server works.
           </p>

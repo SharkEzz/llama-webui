@@ -50,7 +50,7 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
     <Dialog open={path !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="break-all font-mono text-sm">{detail?.relPath ?? path}</DialogTitle>
+          <DialogTitle className="font-mono text-sm break-all">{detail?.relPath ?? path}</DialogTitle>
           <DialogDescription>{detail?.name || 'GGUF header'}</DialogDescription>
         </DialogHeader>
         {error ? (
@@ -97,7 +97,7 @@ export function ModelDetailDialog({ path, onClose }: { path: string | null; onCl
                   {detail.files.length > 1 ? `${detail.files.length} files` : 'File'}
                 </p>
                 {detail.files.map((f) => (
-                  <p key={f} className="break-all font-mono text-xs">
+                  <p key={f} className="font-mono text-xs break-all">
                     {f}
                   </p>
                 ))}

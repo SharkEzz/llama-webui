@@ -65,7 +65,7 @@ export function SpaceEditor() {
               <span className="text-muted-foreground">no flags (llama-bench defaults)</span>
             ) : (
               <>
-                <code className="rounded-md bg-well inset-shadow-well px-2 py-1 font-mono text-xs">
+                <code className="rounded-md bg-well px-2 py-1 font-mono text-xs inset-shadow-well">
                   {baseArgs.join(' ')}
                 </code>
                 <Button variant="ghost" size="xs" onClick={() => setBase({})}>

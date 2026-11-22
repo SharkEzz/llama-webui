@@ -52,7 +52,7 @@ function Panel({ title, ranked, pick }: { title: string; ranked: Ranked[]; pick:
                     </>
                   )}
                 </span>
-                <span className="num text-right text-xs">{m ? fmt(m.tps, 1) : '—'}</span>
+                <span className="text-right num text-xs">{m ? fmt(m.tps, 1) : '—'}</span>
               </TooltipTrigger>
               <TooltipContent className="num">
                 {r.run.sweepLabel}: {formatMeasure(m)}

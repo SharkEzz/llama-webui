@@ -190,7 +190,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
         <p className="text-sm text-warning">Unknown to this llama-server: {problems.unknown.join(', ')}</p>
       )}
       {helpFlag ? (
-        <p className="rounded-md bg-well inset-shadow-well px-3 py-2 font-mono text-xs leading-5 text-muted-foreground">
+        <p className="rounded-md bg-well px-3 py-2 font-mono text-xs leading-5 text-muted-foreground inset-shadow-well">
           {describeFlag(helpFlag)}
         </p>
       ) : catalogError ? (

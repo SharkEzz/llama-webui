@@ -107,15 +107,15 @@ export function ModelCard() {
               {info.arch} · {info.quant} · {formatParams(info.params)}
             </dd>
             <dt className="text-muted-foreground">Size</dt>
-            <dd className="num text-right">{formatBytes(info.fileBytes)}</dd>
+            <dd className="text-right num">{formatBytes(info.fileBytes)}</dd>
             <dt className="text-muted-foreground">Layers</dt>
-            <dd className="num text-right">{info.blockCount}</dd>
+            <dd className="text-right num">{info.blockCount}</dd>
             <dt className="text-muted-foreground">Experts</dt>
-            <dd className="num text-right">
+            <dd className="text-right num">
               {info.expertCount > 0 ? `${info.expertUsedCount} active of ${info.expertCount}` : 'dense'}
             </dd>
             <dt className="text-muted-foreground">Max context</dt>
-            <dd className="num text-right">{formatInt(info.contextLength)}</dd>
+            <dd className="text-right num">{formatInt(info.contextLength)}</dd>
           </dl>
         )}
 
@@ -124,7 +124,7 @@ export function ModelCard() {
             <span className="text-xs text-muted-foreground">
               Other profile flags (carried over to the created profile and the server validation)
             </span>
-            <code className="rounded-md bg-well inset-shadow-well px-2.5 py-1.5 font-mono text-xs break-all">
+            <code className="rounded-md bg-well px-2.5 py-1.5 font-mono text-xs break-all inset-shadow-well">
               {shellQuote(serverArgs)}
             </code>
             {addedCtx && (
@@ -151,7 +151,7 @@ export function ModelCard() {
                 <Lock /> Pin
               </Button>
             </div>
-            <code className="rounded-md bg-well inset-shadow-well px-2.5 py-1.5 font-mono text-xs break-all">
+            <code className="rounded-md bg-well px-2.5 py-1.5 font-mono text-xs break-all inset-shadow-well">
               {shellQuote(replacedArgs)}
             </code>
           </div>

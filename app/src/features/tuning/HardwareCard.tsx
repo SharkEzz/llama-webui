@@ -48,7 +48,7 @@ export function HardwareCard() {
                     <span className="flex items-baseline gap-2">
                       <span className="font-mono text-xs">{d.id}</span>
                       {role && <Badge variant="outline">{role}</Badge>}
-                      <span className="num ml-auto shrink-0 text-xs">
+                      <span className="ml-auto shrink-0 num text-xs">
                         {formatBytes(d.freeMib * MiB)}{' '}
                         <span className="text-muted-foreground">/ {formatBytes(d.totalMib * MiB)}</span>
                       </span>
@@ -70,7 +70,7 @@ export function HardwareCard() {
           </ul>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 border-t pt-3">
             <dt className="text-muted-foreground">RAM</dt>
-            <dd className="num text-right">
+            <dd className="text-right num">
               {formatBytes(hw.ramAvailableBytes)}{' '}
               <span className="text-muted-foreground">available / {formatBytes(hw.ramTotalBytes)}</span>
             </dd>

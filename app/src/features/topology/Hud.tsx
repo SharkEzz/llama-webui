@@ -117,9 +117,9 @@ export function Hud({ phase, snapshot, graph, placement, tones, reducedMotion, e
         <div className="mt-1">{phaseLine}</div>
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
           <dt className="text-muted-foreground">Generation</dt>
-          <dd className="num text-right">{formatRate(snapshot?.rates.genTps)}</dd>
+          <dd className="text-right num">{formatRate(snapshot?.rates.genTps)}</dd>
           <dt className="text-muted-foreground">Prompt</dt>
-          <dd className="num text-right">{formatRate(snapshot?.rates.ppTps)}</dd>
+          <dd className="text-right num">{formatRate(snapshot?.rates.ppTps)}</dd>
         </dl>
       </Panel>
 
@@ -262,8 +262,8 @@ function SliceRow({ label, bytes, pct, color }: { label: string; bytes: number; 
         <span className="size-2 rounded-full" style={{ background: color }} aria-hidden="true" />
         {label}
       </dt>
-      <dd className="num text-right">{formatBytes(bytes)}</dd>
-      <dd className="num text-right text-muted-foreground">{fmt(pct, 1)}%</dd>
+      <dd className="text-right num">{formatBytes(bytes)}</dd>
+      <dd className="text-right num text-muted-foreground">{fmt(pct, 1)}%</dd>
     </>
   );
 }

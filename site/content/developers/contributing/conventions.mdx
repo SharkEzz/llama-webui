@@ -73,13 +73,14 @@ wording of earlier versions (the app used to be in French, and old rows keep the
 ## Formatting and lint
 
 [oxfmt](https://oxc.rs) formats and [oxlint](https://oxc.rs) lints. Both are pinned devDependencies (`oxfmt` 0.79.0,
-`oxlint` 1.94.0, with `oxlint-tsgolint` 7.0.2008 for the rules that read types, and the JS plugin
-`oxlint-plugin-react-doctor` 0.9.23 for ten React rules), configured in TypeScript files.
+`oxlint` 1.94.0, with `oxlint-tsgolint` 7.0.2008 for the rules that read types, and the JS plugins
+`oxlint-plugin-react-doctor` 0.9.23 for ten React rules and `oxlint-tailwindcss` 1.17.2 for the Tailwind classes),
+configured in TypeScript files.
 
 ### Format
 
-oxfmt formats, sorts imports and sorts the keys of every `package.json`. Its config, `oxfmt.config.ts`, holds the
-style:
+oxfmt formats, sorts imports, sorts the keys of every `package.json` and sorts Tailwind classes. Its config,
+`oxfmt.config.ts`, holds the style:
 
 | Setting        | Value                                                                      |
 | -------------- | -------------------------------------------------------------------------- |
@@ -89,11 +90,19 @@ style:
 | Semicolons     | Always                                                                     |
 | Imports        | Sorted by oxfmt, no blank line between groups                              |
 | `package.json` | Keys sorted by oxfmt                                                       |
+| Tailwind       | Classes sorted by oxfmt, in Tailwind's order                               |
 
 oxfmt formats TypeScript, JavaScript, JSON, CSS, YAML, HTML, every `.md` file (the root `docs/` included) and the
 site's `.mdx` pages. In Markdown and MDX, the code of fenced blocks stays as written (`embeddedLanguageFormatting`
 off). It skips what `.gitignore` lists, `repos/`, `testdata`, `pnpm-lock.yaml`, the generated
 `app/server/contract/golden.json` and the generated shadcn components.
+
+oxfmt sorts the Tailwind classes of `className`, `cn(…)` and `cva(…)` (`sortTailwindcss`), with one override per
+project for the stylesheet that defines its utilities: `app/**` reads `app/src/index.css`, `site/**` reads
+`site/src/styles/app.css`. A class string elsewhere, such as a constant or a map of variants, is not sorted and
+stays as written. The order of a `class` attribute never changes the cascade; it matters only to `cn`, which keeps
+the last of two conflicting classes, and two classes of the same property and variant in one list are what
+`tailwindcss/no-conflicting-classes` reports, so the sort cannot change which one wins.
 
 ### Lint
 
@@ -121,18 +130,21 @@ config extends `base` and the fragments it needs:
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `oxlint.config.ts`                      | Its named export `base`: the plugins (`eslint`, `typescript`, `unicorn`, `oxc`, `import`, `promise`), the `correctness`, `suspicious` and `perf` categories, the rules by name. Its default export, `base` and the Vitest rules, lints `scripts/`, `app/build/`, `app/bin/`, `packages/webui-shared/` and the root files |
 | `app/server/oxlint.config.ts`           | The server: `base` and the Vitest rules, with `require-yield` off (a generator of `Effect.gen` or `Effect.fn` does not always yield) and `no-console` on (a log goes through `Effect.log*`)                                                                                                                              |
-| `app/src/oxlint.config.ts`              | The web app: `base`, the React rules and the Vitest rules, with `no-console` on                                                                                                                                                                                                                                          |
-| `site/oxlint.config.ts`                 | The website: `base`, the React rules and the Vitest rules                                                                                                                                                                                                                                                                |
+| `app/src/oxlint.config.ts`              | The web app: `base`, the React, Vitest and Tailwind rules (its stylesheet: `index.css`), with `no-console` on                                                                                                                                                                                                            |
+| `site/oxlint.config.ts`                 | The website: `base`, the React, Vitest and Tailwind rules (its stylesheet: `src/styles/app.css`)                                                                                                                                                                                                                         |
 | `packages/llamacpp-js/oxlint.config.ts` | `llamacpp-js`: `base` alone, since its tests run on `node:test`                                                                                                                                                                                                                                                          |
 | `oxlint.react.ts`                       | The React fragment: the `react` and `jsx-a11y` plugins, and the `react-doctor` JS plugin with nine of its rules (the site config adds the tenth). Accessibility is limited to the rules that pass today; the others of `jsx-a11y` are off by name                                                                        |
 | `oxlint.tests.ts`                       | The Vitest fragment: an override for `**/*.test.ts` and `**/*.test.tsx` with the `vitest` plugin                                                                                                                                                                                                                         |
+| `oxlint.tailwind.ts`                    | The Tailwind fragment: the `oxlint-tailwindcss` JS plugin with its recommended rules (see [Tailwind classes](#tailwind-classes)); each project that extends it sets its stylesheet in `settings.tailwindcss.entryPoint`, relative to its config                                                                          |
 | `scripts/oxlint/directives.ts`          | The local plugin of `directives/require-reason` (see [Never disable a rule](#never-disable-a-rule)), tested by `scripts/oxlint/directives.test.ts`                                                                                                                                                                       |
 
 A project config is short:
 
 ```ts title="app/src/oxlint.config.ts"
 export default defineConfig({
-  extends: [base, react, tests],
+  extends: [base, react, tests, tailwind],
+  // The stylesheet the Tailwind rules read (it imports Tailwind and the theme), relative to this file
+  settings: { tailwindcss: { entryPoint: 'index.css' } },
   rules: {
     // The page logs nothing to the console but what it cannot show (a suppression says which)
     'no-console': 'error',
@@ -185,6 +197,35 @@ the formatter and let it apply oxlint's fixes when you save:
 
 Before a commit, a pull request or the end of a milestone, `pnpm lint` must report zero errors and zero warnings
 (see [the quality gate](/developers/contributing/workflow/#the-quality-gate)).
+
+### Tailwind classes
+
+`oxlint.tailwind.ts` lints the classes of the web app and of the site with `oxlint-tailwindcss`, which reads the
+design system of the project's stylesheet (`settings.tailwindcss.entryPoint`), so it knows the theme's tokens and the
+project's own utilities. Sixteen of its seventeen recommended rules are on, in `error`: an unknown class, two
+conflicting classes, a variant made useless by the base class, a duplicate, a class built at runtime, a deprecated or
+non-canonical spelling (`[container-type:size]` is `@container-size`), an arbitrary value a named class already
+gives, axes a shorthand covers (`px-4 py-4` is `p-4`), variants out of order, and a hard-coded color. The
+seventeenth, `enforce-sort-order`, stays off, and so does `enforce-consistent-line-wrapping` (not recommended, off as
+a guard): oxfmt is the single owner of the class order and of the wrapping.
+
+The plugin caches each stylesheet's design system in `oxlint-tailwindcss-<uid>` under the system temp directory
+(`$TMPDIR`, `/tmp` by default), keyed by the stylesheet and the versions of the packages it imports, not by the
+content of `@llama-webui/theme`: after editing `packages/webui-theme/theme.css`, delete that directory (or run with a
+fresh `OXLINT_TAILWINDCSS_CACHE_DIR`) before trusting `pnpm lint` or the editor, since CI always starts cold.
+
+| Case                                      | What to do                                                                                                                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A plain class of the theme, not a utility | Add it by name to the `allowlist` of `tailwindcss/no-unknown-classes` in `oxlint.tailwind.ts` (today `aurora` and `glow`, `glow-1` to `glow-3`, from `packages/webui-theme/theme.css`); never delete it |
+| A shorthand, a canonical spelling         | Take the form the rule proposes once it is the same CSS; a shorthand under a variant is not always one (`sm:top-2 bottom-2` is not `inset-y-2`)                                                         |
+| A hard-coded color                        | Use the theme token of exactly that value; without one, keep the value under a suppression that says what it reproduces, and add no token                                                               |
+
+The landing page reproduces screens and a terminal with their own colors, so a few colors stay:
+
+```tsx title="site/src/components/Logo.tsx"
+{/* oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- the blue of the logo mark's first bar (fill above, as in the favicon) */}
+<span className="text-[#3698ff]">webui</span>
+```
 
 ### Never disable a rule
 
