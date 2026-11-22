@@ -89,9 +89,9 @@ devDependency (`oxfmt` 0.79.0) configured in `oxfmt.config.ts`, which holds the 
 | Server        | `correctness/useYield` off for `app/server/**`: a generator of `Effect.gen` or `Effect.fn` does not always yield |
 | CSS           | Parsed with Tailwind directives                                                           |
 
-oxfmt formats TypeScript, JavaScript, JSON, CSS, YAML and HTML. It skips what `.gitignore` lists, `repos/`, `docs/`,
-`testdata`, `pnpm-lock.yaml`, the generated `app/server/contract/golden.json`, the generated shadcn components and
-every `.md` and `.mdx` file.
+oxfmt formats TypeScript, JavaScript, JSON, CSS, YAML and HTML. It skips what `.gitignore` lists, `repos/`, the root
+`docs/`, `testdata`, `pnpm-lock.yaml`, the generated `app/server/contract/golden.json`, the generated shadcn
+components and every `.md` and `.mdx` file.
 
 Biome lints TypeScript, JSON and CSS in every package. It skips files ignored by Git, `node_modules`, `testdata`,
 `dist`, the app's build output (`.output`), the site's build output (`site/build`, `site/dist`, `site/.react-router`),
