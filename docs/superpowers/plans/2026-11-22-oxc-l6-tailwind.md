@@ -39,48 +39,51 @@ JS plugin in `app/src/oxlint.config.ts` and `site/oxlint.config.ts`, each with i
 ### Task 1: Class order
 
 **Files:**
+
 - Modify: `oxfmt.config.ts`; rewritten by the formatter: about 56 files under `app/src` and `site/src`
 
 - [ ] **Step 1:** Add two overrides: `{ files: ['app/**'], options: { sortTailwindcss: { stylesheet: './app/src/index.css', functions: ['cn', 'cva'] } } }`
-  and the same for `site/**` with `./site/src/styles/app.css`.
+      and the same for `site/**` with `./site/src/styles/app.css`.
 - [ ] **Step 2:** `pnpm format`. Expected: about 56 files, about 100 lines, class order only
-  (`git diff -U0 | grep '^[+-]' | grep -v 'class\|cn(\|cva(' ` shows nothing but multi-line class lists).
+      (`git diff -U0 | grep '^[+-]' | grep -v 'class\|cn(\|cva(' ` shows nothing but multi-line class lists).
 - [ ] **Step 3:** `pnpm lint && pnpm check && pnpm test`. Commit the config (`chore: oxfmt orders the Tailwind classes`),
-  then the output alone (`style: order the Tailwind classes`).
+      then the output alone (`style: order the Tailwind classes`).
 
 ### Task 2: The lint plugin
 
 **Files:**
+
 - Modify: `package.json`, `pnpm-lock.yaml`, `app/src/oxlint.config.ts`, `site/oxlint.config.ts`
 
 - [ ] **Step 1:** `pnpm add -D -w -E oxlint-tailwindcss@1.17.2`. In both configs: `jsPlugins: ['oxlint-tailwindcss']`,
-  `settings.tailwindcss.entryPoint` (`index.css` for `app/src`, `src/styles/app.css` for `site`: relative to the
-  config file), and the plugin's recommended rules by name in `error` (the list in its README, "Setup"): every rule
-  it marks `error` or `warn`, minus the two of the constraints. Its opt-in rules stay off.
+      `settings.tailwindcss.entryPoint` (`index.css` for `app/src`, `src/styles/app.css` for `site`: relative to the
+      config file), and the plugin's recommended rules by name in `error` (the list in its README, "Setup"): every rule
+      it marks `error` or `warn`, minus the two of the constraints. Its opt-in rules stay off.
 - [ ] **Step 2:** `tailwindcss/no-unknown-classes`: allow the non-utility classes that `packages/webui-theme/theme.css`
-  and the two stylesheets define (`aurora` and the others the first run names), through the rule's own allow option;
-  the list carries a comment saying where the classes come from.
+      and the two stylesheets define (`aurora` and the others the first run names), through the rule's own allow option;
+      the list carries a comment saying where the classes come from.
 - [ ] **Step 3:** `pnpm exec oxlint -f json app/src site`, group by rule. Expected: about 34 reports minus the 14 of
-  `no-unknown-classes` once allowed and the 4 of `enforce-sort-order`.
+      `no-unknown-classes` once allowed and the 4 of `enforce-sort-order`.
 - [ ] **Step 4:** Commit: `chore: lint Tailwind classes with oxlint-tailwindcss`.
 
 ### Task 3: The reports
 
 - [ ] **Step 1:** `enforce-canonical` (5), `enforce-shorthand` (4), `consistent-variant-order` (1): apply the form the
-  rule proposes after checking it is equivalent (Review Focus).
+      rule proposes after checking it is equivalent (Review Focus).
 - [ ] **Step 2:** `no-hardcoded-colors` (6, all in the site): for each hex, look for a token of exactly that value in
-  `packages/webui-theme/theme.css`; use it if it exists, otherwise
-  `// oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- <what the colour reproduces>`.
+      `packages/webui-theme/theme.css`; use it if it exists, otherwise
+      `// oxlint-disable-next-line tailwindcss/no-hardcoded-colors -- <what the colour reproduces>`.
 - [ ] **Step 3:** Any other rule that reports: same test of equivalence; a rule whose every fix would change the
-  rendering goes off with its reason.
+      rendering goes off with its reason.
 - [ ] **Step 4:** `pnpm site:build`; with `pnpm dev` (`LLAMA_WEBUI_HOST=0.0.0.0`, `http://192.168.0.20:7860`) and
-  `pnpm site:dev`, open each page whose classes changed in this task (not the pure reorder of Task 1) and compare
-  with `master` side by side.
+      `pnpm site:dev`, open each page whose classes changed in this task (not the pure reorder of Task 1) and compare
+      with `master` side by side.
 - [ ] **Step 5:** `pnpm lint && pnpm check && pnpm test`. Commit: `style: canonical Tailwind classes`.
 
 ### Task 4: Documentation and PR
 
 **Files:**
+
 - Modify: `CLAUDE.md` ("Format et lint": Tailwind classes ordered by oxfmt, linted by the plugin, where the allowed
   theme classes are listed), `site/content/developers/contributing/conventions.mdx`,
   `site/content/developers/frontend.mdx` (styling section), `.git-blame-ignore-revs` (the L3 squash is not a
@@ -88,8 +91,8 @@ JS plugin in `app/src/oxlint.config.ts` and `site/oxlint.config.ts`, each with i
 
 - [ ] **Step 1:** Update, `pnpm format`, `pnpm site:build && pnpm --dir site check-links`.
 - [ ] **Step 2:** Time `pnpm lint` (three runs); above 60 s on the CI runner the lint gets its own job in
-  `.github/workflows/ci.yml`.
+      `.github/workflows/ci.yml`.
 - [ ] **Step 3:** `pnpm lint && pnpm check && pnpm test`; `pnpm build && node scripts/smoke.ts`. Commit, push, PR
-  `chore: Order and lint Tailwind classes`. Body: files reordered, reports fixed by rule, suppressions with their
-  reasons, the timing, "no visual change" with the pages compared. End with
-  `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+      `chore: Order and lint Tailwind classes`. Body: files reordered, reports fixed by rule, suppressions with their
+      reasons, the timing, "no visual change" with the pages compared. End with
+      `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
