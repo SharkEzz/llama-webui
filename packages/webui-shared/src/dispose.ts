@@ -3,7 +3,7 @@
  * (`Symbol.for('Symbol.dispose')`), for browsers that do not have `Symbol.dispose` yet.
  */
 const DISPOSE: typeof Symbol.dispose =
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- `Symbol.for` types its key as any `symbol`; this one is the key Vite's `using` code disposes by
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion, typescript/no-unnecessary-condition -- `Symbol.for` types its key as any `symbol`; this one is the key Vite's `using` code disposes by. `Symbol.dispose` is typed as always there; the browsers this falls back for lack it
   Symbol.dispose ?? (Symbol.for('Symbol.dispose') as typeof Symbol.dispose);
 
 /**

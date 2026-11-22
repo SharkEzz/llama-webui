@@ -116,14 +116,15 @@ export function TimeSeriesChart({
             { ...axis, values: (_u, splits) => splits.map((v) => fmt.current(v)), size: 64, space: 32 },
           ],
       series: [
-        { label: 'Time', value: (_u, v) => (v == null ? '—' : formatTime(v * 1000)) },
+        // uPlot types the value as a number; it passes null where the series has no point (the legend off the data)
+        { label: 'Time', value: (_u, v: number | null) => (v == null ? '—' : formatTime(v * 1000)) },
         ...series.map((s): uPlot.Series => ({
           label: s.label,
           stroke: theme.series[s.tone],
           fill: withAlpha(theme.series[s.tone], 0.1),
           width: compact ? 1.5 : 2,
           points: { show: false },
-          value: (_u, v) => (v == null ? '—' : fmt.current(v)),
+          value: (_u, v: number | null) => (v == null ? '—' : fmt.current(v)),
         })),
       ],
     };

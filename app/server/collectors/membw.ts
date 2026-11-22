@@ -29,7 +29,7 @@ export interface PerfLine {
 /** CSV line of `perf stat -I … -x,`: “1.005,1072663,,umc_cas_cmd.rd,2010102242,100,00,,”. */
 export const parsePerfLine = (line: string): PerfLine | null => {
   const f = Str.split(line, ',');
-  const [first = '', second = '', , fourth = ''] = f;
+  const [first, second = '', , fourth = ''] = f;
   if (f.length < 4) return null;
   const time = Number(first);
   if (!Number.isFinite(time)) return null;
@@ -265,5 +265,7 @@ export const makeMemBandwidth = Effect.fn('makeMemBandwidth')(function* (options
     );
   });
 
-  return { sample, procSample, setPid, configure } satisfies MemBandwidthSampler as MemBandwidthSampler;
+  // Declared, not inferred: callers see the interface
+  const sampler: MemBandwidthSampler = { sample, procSample, setPid, configure };
+  return sampler;
 });

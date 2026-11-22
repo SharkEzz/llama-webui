@@ -88,7 +88,7 @@ export function BenchForm() {
     id: `bench-${k}`,
     value: form[k],
     'aria-invalid': errors[k] ? true : undefined,
-    onChange: (e: { target: { value: string } }) => setForm({ [k]: e.target.value } as Partial<Form>),
+    onChange: (e: { target: { value: string } }) => setForm({ [k]: e.target.value }),
   });
 
   const profileItems = [

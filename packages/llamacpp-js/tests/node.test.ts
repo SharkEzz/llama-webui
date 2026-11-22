@@ -49,7 +49,7 @@ test('loadFlags reads the --help of a binary, null when it cannot run', async ()
     await chmod(bin, 0o755);
     const catalog = await loadFlags(bin);
     assert.equal(catalog?.flags.length, 47);
-    assert.equal(catalog?.byName.has('--ctx-size'), true);
+    assert.equal(catalog.byName.has('--ctx-size'), true);
     assert.equal(await loadFlags(join(dir, 'missing')), null);
   } finally {
     await rm(dir, { recursive: true, force: true });

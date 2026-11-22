@@ -116,9 +116,7 @@ const Queued = (options: QueueOptions = {}) => {
     freeBytes: () => Effect.succeed(null),
     marginBytes: 0,
     liveEvery: options.liveEvery ?? '0 millis',
-    ...(options.appTiming === true
-      ? {}
-      : { retryDelays: Arr.replicate('10 millis', 5), stall: '5 seconds' as Duration.Input }),
+    ...(options.appTiming === true ? {} : { retryDelays: Arr.replicate('10 millis', 5), stall: '5 seconds' }),
     ...(options.transfer === undefined ? {} : { transfer: options.transfer }),
   }).pipe(Layer.provide(RecordingHub));
   return options.fs === undefined ? queue : queue.pipe(Layer.provide(Layer.succeed(FileSystem.FileSystem, options.fs)));
@@ -274,9 +272,7 @@ const lives = Effect.gen(function* () {
   );
 });
 
-const retrying = Effect.map(lives, (all) =>
-  Arr.flatMap(all, (live) => (live !== null && live.phase === 'retrying' ? [live] : [])),
-);
+const retrying = Effect.map(lives, (all) => Arr.flatMap(all, (live) => (live?.phase === 'retrying' ? [live] : [])));
 
 /** The requests of `route` the fake Hub saw. */
 const requestsOf = (route: 'resolve' | 'cdn') =>
@@ -367,7 +363,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('transfer', (it) 
         for (const request of cdn) assert.isUndefined(request.headers.authorization);
         const all = yield* lives;
         assert.isNull(Arr.last(all).pipe(Option.getOrThrow));
-        assert.isTrue(Arr.some(all, (live) => live !== null && live.bytesDone === 5000));
+        assert.isTrue(Arr.some(all, (live) => live?.bytesDone === 5000));
       }),
     ),
   );
@@ -423,7 +419,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('transfer', (it) 
         yield* expectPlaced('m.gguf', body);
         yield* expectEqual(ranges, [undefined, 'bytes=2000-']);
         const all = yield* lives;
-        assert.isFalse(Arr.some(all, (live) => live !== null && live.phase === 'verifying'));
+        assert.isFalse(Arr.some(all, (live) => live?.phase === 'verifying'));
       }),
     ),
   );
@@ -769,7 +765,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('transfer', (it) 
       yield* expectPlaced('m.gguf', body);
       yield* expectEqual(ranges, [`bytes=${left}-`]);
       const all = yield* lives;
-      assert.isTrue(Arr.some(all, (live) => live !== null && live.phase === 'verifying' && live.bytesDone === left));
+      assert.isTrue(Arr.some(all, (live) => live?.phase === 'verifying' && live.bytesDone === left));
     }),
   );
 });

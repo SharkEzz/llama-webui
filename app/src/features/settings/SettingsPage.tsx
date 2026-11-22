@@ -229,7 +229,7 @@ function Appearance() {
     <GlassCard title="Theme">
       <div className="flex flex-col gap-1.5">
         <Label>Interface theme</Label>
-        <Select items={THEMES} value={mode} onValueChange={(v) => v && setMode(v as ThemeMode)}>
+        <Select items={THEMES} value={mode} onValueChange={(v) => v && setMode(v)}>
           <SelectTrigger className="w-40" aria-label="Theme">
             <SelectValue />
           </SelectTrigger>

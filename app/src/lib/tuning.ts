@@ -110,7 +110,7 @@ export function replacedProfileParams(profile: BenchParams, pinned: Partial<Benc
   const out: Record<string, unknown> = {};
   const pins: Readonly<Record<string, unknown>> = pinned;
   for (const [k, v] of Object.entries(profile)) if (JSON.stringify(pins[k]) !== JSON.stringify(v)) out[k] = v;
-  return out as BenchParams;
+  return out;
 }
 
 /** Static -ot patterns: they send MoE experts to RAM (llama.cpp applies the first matching rule). */
@@ -301,7 +301,7 @@ export const useTuning = create<TuningState>()((set, get) => {
       for (const k of Object.keys(space))
         if (space[k] === undefined || (Array.isArray(space[k]) && (space[k] as unknown[]).length === 0))
           delete space[k];
-      set({ space: space as SweepSpace });
+      set({ space });
       schedulePlan();
     },
 

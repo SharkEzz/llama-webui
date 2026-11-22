@@ -146,24 +146,31 @@ export const base = defineConfig({
     'typescript/require-await': 'error',
     'typescript/prefer-promise-reject-errors': 'error',
     'typescript/await-thenable': 'error',
+    // A condition the types already decide is removed; a guard on data from outside the types stays, its type
+    // fixed or its line suppressed with the reason. `while (true)` is a loop that ends by `return` or `break`
+    'typescript/no-unnecessary-condition': ['error', { allowConstantLoopConditions: 'only-allowed-literals' }],
+    'typescript/prefer-optional-chain': 'error',
+    // `||` on a string, a number or a boolean falls back on `''`, `0` and `false` on purpose (an empty name shows
+    // its placeholder, `0` is refused): the rule asks for `??` on objects only
+    'typescript/prefer-nullish-coalescing': ['error', { ignorePrimitives: true }],
+    // A `default` stands for the rest of the union on purpose
+    'typescript/switch-exhaustiveness-check': ['error', { considerDefaultExhaustiveForUnions: true }],
+    'typescript/no-unnecessary-type-assertion': 'error',
+    'typescript/no-useless-default-assignment': 'error',
+    'typescript/no-redundant-type-constituents': 'error',
+    'typescript/no-duplicate-type-constituents': 'error',
 
     // --- Debt: off until its milestone ---
     // Rules on by category or parity rules that report on today's code; the milestone turns each on and fixes
     // its reports. L4: general and type-aware rules; L5: React (the Vitest rules have theirs in oxlint.tests.ts).
     'no-shadow': 'off', // L4: 40
-    'typescript/no-unnecessary-type-assertion': 'off', // L4: 19
-    'typescript/no-useless-default-assignment': 'off', // L4: 6
-    'typescript/prefer-optional-chain': 'off', // L4: 6
     'typescript/restrict-template-expressions': 'off', // L4: 4
-    'typescript/switch-exhaustiveness-check': 'off', // L4: 4
     'unicorn/no-new-array': 'off', // L4: 4
-    'typescript/no-redundant-type-constituents': 'off', // L4: 3
     'typescript/prefer-string-starts-ends-with': 'off', // L4: 2
     'unicorn/new-for-builtins': 'off', // L4: 2
     'oxc/no-accumulating-spread': 'off', // L4: 1
     'prefer-arrow-callback': 'off', // L4: 1
     'promise/no-callback-in-promise': 'off', // L4: 1
-    'typescript/no-duplicate-type-constituents': 'off', // L4: 1
     'typescript/no-implied-eval': 'off', // L4: 1
     'typescript/require-array-sort-compare': 'off', // L4: 1
     'unicorn/no-useless-spread': 'off', // L4: 1

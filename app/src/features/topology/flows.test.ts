@@ -152,7 +152,7 @@ test('linkFlows: memory activity is a share of the whole machine (0–100), for 
   const full = { ...snapshot, proc: { cpuPct: 1200, rssBytes: 0 } } as Snapshot;
   expect(linkFlows(graph, full).get('cpu-ram')!.activity).toBe(100);
   // No managed server: the machine's own load.
-  expect(linkFlows(graph, { ...snapshot, proc: null } as Snapshot).get('cpu-ram')!.activity).toBe(18);
+  expect(linkFlows(graph, { ...snapshot, proc: null }).get('cpu-ram')!.activity).toBe(18);
 });
 
 test('linkFlows / nodeLive: with perf, the memory link carries measured DRAM traffic (writes forward, reads back)', () => {
@@ -253,10 +253,14 @@ test('placementSeries: GPUs in graph order with their tone, host last, none when
 });
 
 const GIB = 1024 ** 3;
-const withGpu = (o: Partial<GpuSample>): Snapshot =>
-  ({ ...snapshot, allGpus: [{ ...snapshot.allGpus[0]!, ...o }, ...snapshot.allGpus.slice(1)] }) as Snapshot;
-const withDisk = (readBps: number, writeBps: number): Snapshot =>
-  ({ ...snapshot, disk: { ...snapshot.disk!, perDisk: { nvme0n1: { readBps, writeBps } } } }) as Snapshot;
+const withGpu = (o: Partial<GpuSample>): Snapshot => ({
+  ...snapshot,
+  allGpus: [{ ...snapshot.allGpus[0]!, ...o }, ...snapshot.allGpus.slice(1)],
+});
+const withDisk = (readBps: number, writeBps: number): Snapshot => ({
+  ...snapshot,
+  disk: { ...snapshot.disk!, perDisk: { nvme0n1: { readBps, writeBps } } },
+});
 
 test('levelOf: ok below the warning threshold, unknown is ok', () => {
   expect(levelOf(0.69, 0.7, 0.9)).toBe('ok');

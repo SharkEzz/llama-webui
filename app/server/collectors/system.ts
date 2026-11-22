@@ -18,7 +18,8 @@ const numbers = (text: string): ReadonlyArray<number> => pipe(text, Str.trim, St
 /** `/proc/stat` cpu lines: user nice system idle iowait irq softirq steal (guest is already in user). */
 export const parseProcStat = (text: string): Times | null => {
   let total: CpuTimes | null = null;
-  const cores: Array<CpuTimes> = [];
+  // Filled by index: a core missing from the file leaves a hole, which reads as `undefined`
+  const cores: Array<CpuTimes | undefined> = [];
   for (const line of Str.split(text, '\n')) {
     const m = /^cpu(\d*)\s+(.*)$/.exec(line);
     if (m === null) continue;

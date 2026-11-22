@@ -80,7 +80,7 @@ export const largestBar = (resource: string | null): number => {
   const sizes = Arr.getSomes(
     Arr.map(Arr.take(Str.split(resource, '\n'), 6), (line) => {
       const [start, end] = Str.split(Str.trim(line), /\s+/);
-      if (start === undefined || end === undefined || start === '' || end === '') return Option.none<number>();
+      if (end === undefined || start === '' || end === '') return Option.none<number>();
       return Option.liftThrowable(() => Number(BigInt(end) - BigInt(start) + 1n))();
     }),
   );
@@ -130,7 +130,7 @@ const kfdProperties = (text: string): Readonly<Record<string, number>> =>
     Arr.getSomes(
       Arr.map(Str.split(text, '\n'), (line) => {
         const [key, value] = Str.split(Str.trim(line), /\s+/);
-        if (key === undefined || value === undefined || key === '' || value === '') return Option.none();
+        if (value === undefined || key === '' || value === '') return Option.none();
         const n = Number(value);
         return Number.isFinite(n) ? Option.some([key, n] as const) : Option.none();
       }),
@@ -253,7 +253,7 @@ export const readSys = Effect.fn('tuning.readSys')(function* (options: SysOption
   const iommuActive = Option.match(iommuEntries, { onNone: () => null, onSome: Arr.isReadonlyArrayNonEmpty });
   const moduleList = yield* textOr(path.join(proc, 'modules'), '');
   const modules = Arr.filter(
-    Arr.map(Str.split(moduleList, '\n'), (l) => Str.split(l, /\s+/)[0] ?? ''),
+    Arr.map(Str.split(moduleList, '\n'), (l) => Str.split(l, /\s+/)[0]),
     Str.isNonEmpty,
   );
 

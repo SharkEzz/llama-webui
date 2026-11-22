@@ -3,7 +3,7 @@ import { Array as Arr, Clock, Effect, type FileSystem, Option, type Path, String
 import { HttpApiBuilder } from 'effect/http-api';
 import type { ChildProcessSpawner } from 'effect/process';
 import { BenchRunner } from '../bench/BenchRunner.ts';
-import { expandHome, type homeDir } from '../config/Home.ts';
+import { expandHome } from '../config/Home.ts';
 import { LogRing } from '../logs/LogRing.ts';
 import { checkModelPath } from '../models/allowedPath.ts';
 import type { GgufReader } from '../models/GgufReader.ts';
@@ -27,8 +27,7 @@ type Taken =
   | FileSystem.FileSystem
   | Path.Path
   | GgufReader
-  | ChildProcessSpawner.ChildProcessSpawner
-  | Effect.Services<typeof homeDir>;
+  | ChildProcessSpawner.ChildProcessSpawner;
 
 /**
  * The endpoints of `/api/tuning`: the system checks against a model, the hardware the estimator plans on, the disk

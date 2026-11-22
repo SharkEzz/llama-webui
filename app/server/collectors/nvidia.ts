@@ -64,7 +64,7 @@ export interface ComputeApp {
 /** The output of `nvidia-smi --query-compute-apps=pid,gpu_uuid,used_memory --format=csv,noheader,nounits`. */
 export const parseComputeApps = (csv: string): ReadonlyArray<ComputeApp> =>
   Arr.flatMap(Str.split(csv, '\n'), (line): ReadonlyArray<ComputeApp> => {
-    const [pid = '', uuid = '', used = ''] = Arr.map(Str.split(line, ','), Str.trim);
+    const [pid, uuid = '', used = ''] = Arr.map(Str.split(line, ','), Str.trim);
     const p = Number(pid);
     const u = Number(used);
     if (uuid === '' || pid === '' || !Number.isFinite(p)) return [];
@@ -275,12 +275,14 @@ export const makeNvidiaSmi = Effect.fn('makeNvidiaSmi')(function* (options: {
     return procVramOf({ gpus: gpusOf(h), procs }, pid);
   });
 
-  return {
+  // Declared, not inferred: callers see the interface (its `configure` takes the `needs` this one ignores)
+  const smi: NvidiaSmi = {
     gpus: SynchronizedRef.get(held).pipe(Effect.map(gpusOf)),
     procVram,
     refreshApps,
     configure,
     available: SynchronizedRef.get(held).pipe(Effect.map((h) => h.available)),
     start,
-  } satisfies NvidiaSmi as NvidiaSmi;
+  };
+  return smi;
 });

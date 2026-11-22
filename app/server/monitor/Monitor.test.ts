@@ -320,7 +320,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
           const snapshots = yield* Effect.all([next(), next(), next()]);
           for (const s of snapshots) {
             assert.isNotNull(s.disk);
-            assert.isNull(s.disk?.model);
+            assert.isNull(s.disk.model);
           }
           const count = yield* Ref.get(lookups);
           assert.strictEqual(count, 1);

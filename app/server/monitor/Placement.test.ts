@@ -188,7 +188,7 @@ layer(NodeServices.layer, { excludeTestServices: true })('Placement', (it) => {
           // Started again, the load logged again: its placement again.
           yield* startFake();
           yield* pushAll(lines);
-          const again = yield* placement.current.pipe(when((p) => p !== null && p.buffers.length === 5));
+          const again = yield* placement.current.pipe(when((p) => p?.buffers.length === 5));
           assert.deepStrictEqual(again?.layers, { offloaded: 49, total: 49 });
           const all = yield* placements;
           assert.deepStrictEqual(Arr.last(all), Option.some(again));

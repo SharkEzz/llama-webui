@@ -357,7 +357,6 @@ describe('ProfilesApi', () => {
         );
         const [b] = result.imported;
         assert.isDefined(b);
-        if (b === undefined) return;
         const got = yield* client.profiles.get({ params: { id: b.id } });
         assert.strictEqual(got.model, '/models/b.gguf');
       }),

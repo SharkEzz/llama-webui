@@ -86,7 +86,7 @@ export function ServerPage() {
                 <Select
                   items={items}
                   value={selectedId !== null ? String(selectedId) : null}
-                  onValueChange={(v) => setSelected(v as string | null)}
+                  onValueChange={(v) => setSelected(v)}
                 >
                   <SelectTrigger className="w-full" aria-label="Profile">
                     <SelectValue placeholder="Choose a profile" />

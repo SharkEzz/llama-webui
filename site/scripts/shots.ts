@@ -52,7 +52,7 @@ async function scrollTo(page: Page, text: string, block: 'start' | 'center' | 'e
   await page.waitForFunction(
     (t, b) => {
       const matches = [...document.querySelectorAll<HTMLElement>('body *')].filter(
-        (e) => e.childElementCount === 0 && e.offsetParent !== null && e.textContent?.trim().startsWith(t),
+        (e) => e.childElementCount === 0 && e.offsetParent !== null && e.textContent.trim().startsWith(t),
       );
       matches[0]?.scrollIntoView({ block: b as ScrollLogicalPosition });
       return matches.length > 0;
@@ -67,7 +67,7 @@ async function scrollTo(page: Page, text: string, block: 'start' | 'center' | 'e
 async function clickButton(page: Page, label: string) {
   await page.waitForFunction(
     (text) => {
-      const button = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === text);
+      const button = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === text);
       button?.click();
       return !!button;
     },
@@ -168,7 +168,7 @@ export const SHOTS: Shot[] = [
       await page.waitForSelector(byText('CUDA0,CUDA1,ROCm0'), { timeout: 30_000 });
       await page.waitForFunction(
         () => {
-          const label = [...document.querySelectorAll('label')].find((l) => l.textContent?.includes('100 GB model'));
+          const label = [...document.querySelectorAll('label')].find((l) => l.textContent.includes('100 GB model'));
           const radio = label?.querySelector('input');
           if (radio && !radio.checked) radio.click();
           return radio?.checked;

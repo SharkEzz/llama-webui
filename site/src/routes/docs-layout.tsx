@@ -79,7 +79,7 @@ export default function DocsLayout() {
                 Edit this page on GitHub
               </a>
             )}
-            {place && (place.prev || place.next) && (
+            {place && (place.prev ?? place.next) && (
               <nav
                 aria-label="Previous and next pages"
                 className="mt-8 grid gap-4 border-t border-border pt-8 sm:grid-cols-2"

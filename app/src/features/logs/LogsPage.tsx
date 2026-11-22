@@ -78,7 +78,7 @@ export function LogsPage() {
       </header>
 
       <div className={cn(GLASS, 'flex flex-wrap items-center gap-3 p-3')}>
-        <Select items={LEVELS} value={minLevel} onValueChange={(v) => v && setMinLevel(v as LogLevel)}>
+        <Select items={LEVELS} value={minLevel} onValueChange={(v) => v && setMinLevel(v)}>
           <SelectTrigger className="w-56" aria-label="Minimum level">
             <SelectValue />
           </SelectTrigger>

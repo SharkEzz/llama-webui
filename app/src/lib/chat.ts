@@ -71,7 +71,8 @@ export const makeChatStore = ({ call, callStream }: ChatCalls) =>
         set({ streaming: { ...s, content: s.content + pending.content, reasoning: s.reasoning + pending.reasoning } });
         pending = { content: '', reasoning: '' };
       };
-      let ended = false;
+      // Typed by its assertion: set by `onEvent`, which a narrowing to `false` would not see
+      let ended = false as boolean;
       const onEvent = (e: ChatEvent) => {
         if (ctl.signal.aborted) return;
         const cur = get().current;

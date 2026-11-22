@@ -67,7 +67,8 @@ function tree(pid: number): number[] {
   return [pid, ...children.flatMap(tree)];
 }
 
-const health = async (base: string) => (await fetch(`${base}/api/health`)).json() as Promise<{ bootId: string }>;
+// Not decoded: the start's wait checks that the reply carries a `bootId` rather than assume it
+const health = async (base: string) => (await fetch(`${base}/api/health`)).json() as Promise<{ bootId?: string }>;
 const bootId = async (base: string) => (await health(base)).bootId;
 const serverKind = async (base: string) =>
   ((await (await fetch(`${base}/api/server/state`)).json()) as { state: { kind: string } }).state.kind;
@@ -178,7 +179,7 @@ test('saving a server file restarts the server', async () => {
   const dev = sharedDev();
   const pid = await startFakeThrough(dev.base);
   const before = await bootId(dev.base);
-  let booted = '';
+  let booted: string | undefined = '';
   await edited('server/health/http.ts', () =>
     until(
       'a new boot',
@@ -215,7 +216,7 @@ test('in dev, without Effect DevTools, a restart does not wait for them', async 
   expect(dev.output()).toMatch(/no Effect DevTools at ws:\/\/127\.0\.0\.1:\d+: start them, then save a server file/);
   const before = await bootId(dev.base);
   const from = dev.chunks.length;
-  let booted = '';
+  let booted: string | undefined = '';
   let bootedAt = 0;
   await edited('server/health/http.ts', () =>
     until(
