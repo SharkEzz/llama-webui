@@ -216,7 +216,7 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
 - `testdata/` captured outputs used by the tests
   - `fake/` stand-ins for `llama-server` and `llama-bench`, with their fixtures
   - `llama-bench/` `llama-bench` JSON, stderr and `--list-devices` captures
-- `repos/` reference copies of external repositories (`effect`), read-only and never imported
+- `repos/` reference copies of external repositories (`effect`), read-only and never imported (the lint refuses it)
 - `scripts/` `smoke.ts` (the build and the tarball smoke tests), `prepack.ts` (no pack without a build), `release.ts` (versions), `vendored.ts` (what `prepare` leaves out of `repos/`), `oxlint/directives.ts` (the local oxlint plugin), and the tests of the package and the repository
 - `docs/` README assets and design plans
 - `package.json` the published package (`bin`, `files`, no dependencies) and the scripts
@@ -224,7 +224,7 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
 - `vitest.config.ts` one Vitest project per code base
 - `tsconfig.base.json` the options every project's `tsconfig.json` extends; `tsconfig.effect.json` adds Effect's language service
 - `oxfmt.config.ts` format rules (style, import, `package.json` and Tailwind class order)
-- `oxlint.config.ts` lint rules: the `base` every project's `oxlint.config.ts` extends, with the fragments `oxlint.react.ts`, `oxlint.tests.ts` and `oxlint.tailwind.ts`
+- `oxlint.config.ts` lint rules: the `base` every project's `oxlint.config.ts` extends (each adds its import bans), with the fragments `oxlint.react.ts`, `oxlint.tests.ts` and `oxlint.tailwind.ts`
 - `.eslintignore` keeps oxlint out of `repos/`
 - `.git-blame-ignore-revs` the formatting commits `git blame` skips
 

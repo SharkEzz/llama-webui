@@ -1,9 +1,34 @@
 // The base of every oxlint config: plugins, categories, type-aware rules and the selection that applies to all code.
-// As the root config it covers scripts/, app/build, app/bin, packages/webui-shared and the root files;
+// As the root config it covers scripts/, app/build, app/bin and the root files;
 // each other project has its own `oxlint.config.ts`, which extends `base` (a nested config replaces this one).
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'oxlint';
 import { tests } from './oxlint.tests.ts';
+
+// The import bans (`no-restricted-imports`), one pattern per boundary, each matched on the specifier as written: the
+// package name and its subpaths (`(/|$)`), and the relative forms that walk into the same directory
+// (`../../server/x.ts`), with or without the `@/` alias in front. The rule reports `import`, `import type`,
+// `export … from`, `import x = require('…')` and `import('…')` of a string alike. It does not see an `import()` of a
+// template literal or of a computed string, a `require`, nor a path given to `vi.mock`; nor a type written
+// `import('…').T` or `typeof import('…')`, which `typescript/consistent-type-imports` refuses whatever the path. A
+// project config that sets the rule replaces the options of the base: its bans list `vendored` again. A `node:*` ban
+// is for source files only: each project lists its bans again, without it, for its tests.
+
+// Everyone: the vendored repositories (`repos/`)
+export const vendored = {
+  regex: '^(@/)?(\\.{1,2}/)*repos(/|$)',
+  message: 'the vendored repositories are reference material, import the package',
+};
+
+// Node's built-in modules (`unicorn/prefer-node-protocol` leaves `node:` as their only spelling)
+export const nodeBuiltins = { regex: '^node:' };
+
+// The Node half of llamacpp-js, for the browser code (webui-shared, app/src): its `./node` export, or a relative path to
+// `packages/llamacpp-js/src/node.ts` (with or without `@/`)
+export const llamacppNode = {
+  regex: '^(llamacpp-js/node|(@/)?(\\.\\./)+(packages/)?llamacpp-js/src/node)([./]|$)',
+  message: 'browser code: llamacpp-js/node needs Node',
+};
 
 export const base = defineConfig({
   plugins: ['eslint', 'typescript', 'unicorn', 'oxc', 'import', 'promise'],
@@ -209,6 +234,10 @@ export const base = defineConfig({
     'typescript/no-implied-eval': 'error',
     'typescript/require-array-sort-compare': 'error',
     'unicorn/no-useless-spread': 'error',
+
+    // The architecture (spec, "The selection" › L7): the import bans above, and no import cycle
+    'no-restricted-imports': ['error', { patterns: [vendored] }],
+    'import/no-cycle': 'error',
   },
   overrides: [
     {

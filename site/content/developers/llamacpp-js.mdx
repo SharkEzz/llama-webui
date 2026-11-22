@@ -92,9 +92,11 @@ builds that only put them in the message, from its text.
 
 ## Rules of the package
 
-`packages/llamacpp-js/tests/package.test.ts` and the type check enforce them:
+`packages/llamacpp-js/tests/package.test.ts`, the type check and the lint enforce them:
 
-- **No dependency.** No `dependencies` in its `package.json`, and no import of `@llama-webui/*`.
+- **No dependency.** No `dependencies` in its `package.json`, and no import of `@llama-webui/*`, `effect` or
+  `@effect/*`, nor of `node:*` outside `src/node.ts` and the tests (`packages/llamacpp-js/oxlint.config.ts`, see
+  [Import bans](/developers/contributing/conventions/#import-bans)).
 - **Node 24 or later.** `engines.node` is `>=24`. The sources use web and `node:*` APIs only: its project
   (`packages/llamacpp-js/tsconfig.json`) is checked with the Node types alone, so any other runtime's API does not
   type check. Its tests, in `tests/` (out of `src/`, which holds only what the package ships), are written with
