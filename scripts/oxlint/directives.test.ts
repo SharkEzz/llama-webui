@@ -18,6 +18,11 @@ const files: Record<string, string> = {
   'block.ts': ['/* oxlint-disable no-console */', 'console.log(1);'].join('\n'),
   'eslint.ts': ['/* eslint-disable-next-line no-console -- why */', 'console.log(1);'].join('\n'),
   'empty.ts': ['export const x = 1;', 'console.log(x); // oxlint-disable-line no-console --'].join('\n'),
+  'dashes.ts': [
+    'console.log(1); /* oxlint-disable-line no-console --- */',
+    'console.log(2); // oxlint-disable-line no-console -- -',
+    'console.log(3); // oxlint-disable-line no-console -- `log` is the point',
+  ].join('\n'),
 };
 
 const dir = mkdtempSync(join(tmpdir(), 'lw-directives-'));
@@ -59,7 +64,11 @@ test('dashes with nothing after them are not a reason', () => {
   expect(at('empty.ts')).toEqual([2]);
 });
 
+test('more dashes are not a reason either; a reason may start with a backtick', () => {
+  expect(at('dashes.ts')).toEqual([1, 2]);
+});
+
 test('the message says how to write the reason', () => {
   expect(new Set(reports.map((d) => d.message))).toEqual(new Set(['A suppression states its reason: `-- <reason>`.']));
-  expect(reports).toHaveLength(3);
+  expect(reports).toHaveLength(5);
 });

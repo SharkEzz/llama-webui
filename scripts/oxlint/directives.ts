@@ -12,7 +12,8 @@ interface Context {
 }
 
 const directive = /^(?:oxlint|eslint)-disable/;
-const reason = /--\s*\S/;
+// A word character after the `--`: dashes alone (`---`, `-- -`) are no reason
+const reason = /--.*\w/;
 
 const requireReason = {
   meta: { type: 'suggestion', docs: { description: 'A suppression states its reason after `--`.' } },

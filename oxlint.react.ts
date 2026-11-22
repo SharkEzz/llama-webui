@@ -17,7 +17,7 @@ export const react: OxlintConfig = {
     'react/no-namespace': 'error',
     'react/rules-of-hooks': 'error',
     'jsx-a11y/anchor-ambiguous-text': 'error',
-    // The two React rules that report today (react/jsx-no-useless-fragment, react/no-object-type-as-default-prop)
+    // The two parity rules that report today (react/jsx-no-useless-fragment, react/no-object-type-as-default-prop)
     // are in the debt block of the base.
 
     // Accessibility is out of scope for now: the jsx-a11y rules that report on today's code are off

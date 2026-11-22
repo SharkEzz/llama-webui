@@ -126,7 +126,7 @@ export const base = defineConfig({
     'unicorn/prefer-string-starts-ends-with': 'off', // L4: 1
     'react/immutability': 'off', // L5: 14
     'react/set-state-in-effect': 'off', // L5: 13
-    'react/refs': 'off', // L5: 2
+    'react/refs': 'off', // L5: 1
     'react/incompatible-library': 'off', // L5: 1
     'react/jsx-no-useless-fragment': 'off', // L5: 1
     'react/no-object-type-as-default-prop': 'off', // L5: 1
