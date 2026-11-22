@@ -93,7 +93,9 @@ The components of `site/src/docs/mdx-components.tsx` need no import:
 | `FileTree`            | A folder tree written as a Markdown list, names in backticks, a trailing `/` for folders |
 | `ArchitectureDiagram` | The overview diagram of the [Architecture](/developers/architecture/) page               |
 
-Leave a blank line after an opening tag and before the closing tag when the content is Markdown. A code fence always
+Leave a blank line after an opening tag and before the closing tag when the content is Markdown: oxfmt, which formats
+the pages, joins Markdown glued to a tag into one paragraph. For the same reason, do not start a line of a paragraph
+with an inline component such as `<Kbd>`: oxfmt splits the paragraph there. A code fence always
 takes a language, and a title after it for a snippet from a file or a terminal: `bash title="Terminal"`,
 `ts title="app/server/http/Guard.ts"`.
 
