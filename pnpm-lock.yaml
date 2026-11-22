@@ -195,6 +195,9 @@ catalogs:
     oxlint-plugin-react-doctor:
       specifier: 0.9.23
       version: 0.9.23
+    oxlint-tailwindcss:
+      specifier: 1.17.2
+      version: 1.17.2
     react:
       specifier: ^19.3.1
       version: 19.3.1
@@ -237,7 +240,7 @@ importers:
         specifier: 'catalog:'
         version: 0.9.23
       oxlint-tailwindcss:
-        specifier: 1.17.2
+        specifier: 'catalog:'
         version: 1.17.2
       oxlint-tsgolint:
         specifier: 7.0.2008
@@ -372,6 +375,9 @@ importers:
       oxlint-plugin-react-doctor:
         specifier: 'catalog:'
         version: 0.9.23
+      oxlint-tailwindcss:
+        specifier: 'catalog:'
+        version: 1.17.2
       rolldown:
         specifier: 1.3.3
         version: 1.3.3
@@ -496,6 +502,9 @@ importers:
       oxlint-plugin-react-doctor:
         specifier: 'catalog:'
         version: 0.9.23
+      oxlint-tailwindcss:
+        specifier: 'catalog:'
+        version: 1.17.2
       pagefind:
         specifier: ^1.6.0
         version: 1.6.0
