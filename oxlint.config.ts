@@ -110,6 +110,8 @@ export const base = defineConfig({
     'no-await-in-loop': 'off',
     // `.then` is used for its effect, its value discarded
     'promise/always-return': 'off',
+
+    // Options inside `suspicious` and `perf`
     // A stylesheet is imported for its effect; so is the server bundle by the launcher (`app/bin/llama-webui.ts`)
     'import/no-unassigned-import': ['error', { allow: ['**/*.css', '@llama-webui/theme/*', './server/index.mjs'] }],
 
