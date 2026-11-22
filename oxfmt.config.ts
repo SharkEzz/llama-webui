@@ -5,7 +5,11 @@ export default defineConfig({
   singleQuote: true,
   sortImports: { newlinesBetween: false },
   sortPackageJson: true,
-  overrides: [{ files: ['**/*.css', '**/*.yaml', '**/*.yml'], options: { singleQuote: false } }],
+  overrides: [
+    { files: ['**/*.css', '**/*.yaml', '**/*.yml'], options: { singleQuote: false } },
+    // Fenced code blocks of the site's pages and of the Markdown stay as written
+    { files: ['**/*.md', '**/*.mdx'], options: { embeddedLanguageFormatting: 'off' } },
+  ],
   // What `.gitignore` lists is skipped by oxfmt itself
   ignorePatterns: [
     // Vendored reference repositories (read-only, never imported)
@@ -16,10 +20,6 @@ export default defineConfig({
     '**/src/components/ui',
     '**/testdata',
     'pnpm-lock.yaml',
-    // The root docs/ only (plans, specs), not site/src/docs
-    '/docs/',
-    '**/*.md',
-    '**/*.mdx',
     '.claude',
     '.agents',
   ],
