@@ -46,7 +46,7 @@
     "oxlint-plugin-react-doctor": "catalog:",
     "oxlint-tailwindcss": "catalog:",
     "pagefind": "^1.6.0",
-    "puppeteer-core": "^25.18.1",
+    "puppeteer-core": "catalog:",
     "rehype-autolink-headings": "^7.1.0",
     "rehype-slug": "^6.0.0",
     "remark-frontmatter": "^5.0.0",
