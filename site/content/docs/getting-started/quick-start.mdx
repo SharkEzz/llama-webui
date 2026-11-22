@@ -1,6 +1,6 @@
 ---
 title: Quick start
-description: Go from a fresh install to a first chat by getting a GGUF model, creating a profile, starting it from the launch pad and watching the Dashboard.
+description: Go from a fresh install to a first chat by getting a GGUF model, creating a profile, starting llama-server and watching the Dashboard.
 ---
 
 This page takes you from a fresh install to a first answer from your own `llama-server`. It assumes llama-webui is [installed](/docs/getting-started/installation/) and open in your browser.
@@ -8,9 +8,9 @@ This page takes you from a fresh install to a first answer from your own `llama-
 <Steps>
   <Step title="Finish the setup checklist">
 
-If Home still shows **Welcome to llama-webui**, give it the path to `llama-server` and a models folder, then click
-**Finish**. The [First run](/docs/getting-started/first-run/) page explains each step. Home then becomes the
-**Launch pad**.
+If `/` still shows **Welcome to llama-webui**, give it the path to `llama-server` and a models folder, then click
+**Finish**. The [First run](/docs/getting-started/first-run/) page explains each step. `/` then opens the
+**Dashboard**.
 
   </Step>
   <Step title="Get a GGUF model">
@@ -54,19 +54,18 @@ Leave out `--host`, `--port`, `-m`, `-mm`, `--metrics`, `--slots` and `--props`:
 editor flags them if you type them.
 
   </Step>
-  <Step title="Start it from the launch pad">
+  <Step title="Start llama-server">
 
-Click **Home**. Each profile has a card with its model, quantization and size, its last benchmark ("No benchmark yet"
-for now) and a memory estimate such as **Fits in VRAM**. Click **Start**.
+Open **Server** in the sidebar, pick the profile you just created, and click **Start**.
 
-The button reads **Starting…** while the model loads. When `llama-server` answers, the card is marked **Ready** and
-shows **Chat**, **Dashboard** and **Stop**. If the server crashes instead, the card says how it exited: open
-[Logs](/docs/logs/) to read `llama-server`'s output.
+The state reads **Starting…** while the model loads, then switches to **Ready** once `llama-server` answers. If the
+server crashes instead, the [Server](/docs/server/) page says how it exited: open [Logs](/docs/logs/) to read
+`llama-server`'s output.
 
   </Step>
   <Step title="Chat">
 
-Click **Chat** on the card. Type in the message box and press <Kbd>Enter</Kbd> to send (<Kbd>Shift</Kbd> +
+Open **Chat** in the sidebar. Type in the message box and press <Kbd>Enter</Kbd> to send (<Kbd>Shift</Kbd> +
 <Kbd>Enter</Kbd> for a new line): the first message creates a conversation. The answer streams in, and a line under it
 gives the time to first token, the prompt and generation speeds and the number of tokens.
 
@@ -87,8 +86,7 @@ VRAM of each GPU the server uses, and the reads from the model's disk. Scroll fo
 
 ## Next steps
 
-- Measure the profile with a real run on the [Benchmark](/docs/benchmark/) page; the result then appears on its
-  launch pad card.
+- Measure the profile with a real run on the [Benchmark](/docs/benchmark/) page and compare runs side by side.
 - Let [Tuning](/docs/tuning/) recommend flags for your hardware, or [find the best flags with a
   sweep](/docs/guides/find-best-flags/).
 - Running a model larger than your VRAM? Follow

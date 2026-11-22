@@ -7,6 +7,7 @@ on:
     branches: [master]
     paths:
       - "site/**"
+      - "packages/webui-theme/**"
       - ".github/workflows/site-deploy.yml"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"

@@ -9,7 +9,7 @@ import { formatInt, formatPct } from '@/lib/format';
 export function ContextCard({ snapshot, loading = false }: { snapshot: Snapshot; loading?: boolean }) {
   const { slots, queue } = snapshot;
   return (
-    <GlassCard title="Slots and context" icon={Layers}>
+    <GlassCard title="Slots and context" icon={Layers} tone="rose">
       <div className="flex flex-col gap-4">
         {!slots || slots.length === 0 ? (
           <p className="text-sm text-muted-foreground">

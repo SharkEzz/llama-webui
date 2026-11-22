@@ -3,9 +3,10 @@ title: First run
 description: The setup checklist llama-webui opens on its first launch, step by step, with what each check needs from you and how to fix it.
 ---
 
-On its first launch, Home opens a setup checklist titled **Welcome to llama-webui**. It finds `llama-server`, checks
-the models folder, shows what `llama-bench` and the GPU telemetry can see, and reviews the machine configuration. Only
-the first two steps are required; you can come back to the others at any time.
+On its first launch, llama-webui opens a setup checklist titled **Welcome to llama-webui** at `/`, where the Dashboard
+will be. It finds
+`llama-server`, checks the models folder, shows what `llama-bench` and the GPU telemetry can see, and reviews the
+machine configuration. Only the first two steps are required; you can come back to the others at any time.
 
 <Screenshot
   name="setup"
@@ -30,7 +31,8 @@ creating a folder), click **Check again** at the top of the page: it runs every 
 profiles included.
 
 The card at the bottom counts the required steps, for example "1 of 2 required steps done: llama-server and the models
-folder.", and holds the **Finish** button, available once both pass.
+folder.", and holds the **Finish** button, available once both pass. Until then, **Skip for now** sits next to it (see
+[Finish](#finish)).
 
 ## llama-server
 
@@ -113,7 +115,7 @@ or a running server, such as the PCIe link under load, are on the [System](/docs
 
 ## First profile
 
-**Optional.** A profile is a model plus its `llama-server` arguments, started in one click from Home. The step is
+**Optional.** A profile is a model plus its `llama-server` arguments, started in one click from the [Server](/docs/server/) page. The step is
 **Done** once at least one profile exists, and lists their names. Otherwise it offers two ways to create one:
 
 - **Create a profile** opens the [Profiles](/docs/profiles/) page.
@@ -130,17 +132,15 @@ way.
 
 ## Finish
 
-Click **Finish** once the two required steps pass. llama-webui records that the setup is done, and Home becomes the
-[launch pad](/docs/home/): one card per profile, started in one click. Next, follow the
-[Quick start](/docs/getting-started/quick-start/) to download a model and run a first chat.
+Click **Finish** once the two required steps pass. llama-webui records that the setup is done, and `/` opens the
+[Dashboard](/docs/dashboard/). Next, follow the [Quick start](/docs/getting-started/quick-start/) to download a model,
+create a profile and run a first chat.
+
+While a required step fails, **Skip for now** does the same without waiting for it: the Dashboard opens, for example
+to follow a `llama-server` started outside the app. The pages that need the binary or the models folder keep asking
+for them, and the checklist stays available from Settings.
 
 ## Come back to the checklist
 
-The checklist stays available after the first run:
-
-- In [Settings](/docs/settings/), click **Run setup again**.
-- On the launch pad, click **Setup checklist**, at the top right.
-- If `llama-server` or the models folder goes missing later (a moved build, an unmounted disk), the launch pad shows a
-  **Setup incomplete** alert that says what broke, with a **Fix** button that opens the checklist.
-
-When you reopen it this way, **Finish** takes you back to Home.
+The checklist stays available after the first run: in [Settings](/docs/settings/), click **Run setup again** (or open
+`/setup`). When you reopen it this way, **Finish** takes you back to the Dashboard.

@@ -11,8 +11,8 @@ latest logs.
 
 ## Server states
 
-llama-webui runs one `llama-server` at a time. Its state appears next to the page title, on the profile's card on the
-[launch pad](/docs/home/), and in the status bar at the top of every page (click it to open the Server page).
+llama-webui runs one `llama-server` at a time. Its state appears next to the page title and in the status bar at the top
+of every page (click it to open the Server page).
 
 | State          | Meaning                                                                                                                         |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -130,5 +130,5 @@ The `llama-server` llama-webui starts is tied to it, so no model is left in memo
 - If llama-webui crashes or is killed, the kernel kills `llama-server` too. llama-webui launches it through
   `setpriv --pdeathsig KILL` (from util-linux) for that purpose; the effective command does not show this prefix.
 
-A server is not restarted on its own when llama-webui starts again: start a profile from the launch pad or this page.
+A server is not restarted on its own when llama-webui starts again: start a profile from this page.
 An external server, on the other hand, is not affected by llama-webui stopping.

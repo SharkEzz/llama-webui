@@ -1,11 +1,11 @@
 import type { LucideIcon } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
-import type { Tone } from './dashboard/tones';
+import { TONE_VAR, type Tone } from './dashboard/tones';
+import { GlassCard } from './GlassCard';
 
-export const SURFACE = 'rounded-2xl bg-card ring-1 ring-surface-border shadow-surface inset-shadow-highlight';
-
-const TONE_TEXT: Record<Tone, string> = {
+export const TONE_TEXT: Record<Tone, string> = {
   blue: 'text-tone-blue',
   teal: 'text-tone-teal',
   amber: 'text-tone-amber',
@@ -19,9 +19,39 @@ export interface AppPage {
   doc: string;
 }
 
+/** Soft radial halo placed behind a feature chapter, tinted with the section's tone. */
+export function SectionHalo({ tone }: { tone: Tone }) {
+  return (
+    <div
+      className="section-halo absolute top-10 left-1/2 -z-10 h-80 w-[min(58rem,90vw)] -translate-x-1/2 rounded-full"
+      style={{ '--halo': TONE_VAR[tone] } as CSSProperties}
+      aria-hidden="true"
+    />
+  );
+}
+
+/** Frosted pill links naming the app pages covered by a feature section. */
+export function PageChips({ pages, tone, className }: { pages: AppPage[]; tone: Tone; className?: string }) {
+  return (
+    <ul className={cn('flex flex-wrap gap-2', className)}>
+      {pages.map(({ label, icon: Icon, doc }) => (
+        <li key={label}>
+          <Link
+            to={doc}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-card/75 px-3 py-1 text-xs font-medium text-foreground/90 backdrop-blur-md transition-colors hover:border-surface-border-bright hover:bg-surface-strong"
+          >
+            <Icon className={cn('size-3.5', TONE_TEXT[tone])} aria-hidden="true" />
+            {label}
+            <span className="sr-only"> documentation</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
- * A feature section: the app pages it covers (named and drawn as in the app's sidebar, in the section's tone, each
- * linking to its documentation page), a headline, a lede, then a 6-column grid of cards.
+ * A feature section: chapter halo, app page pills, headline, lede, and a custom layout for its cards.
  */
 export function FeatureSection({
   id,
@@ -39,39 +69,28 @@ export function FeatureSection({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="mx-auto max-w-6xl scroll-mt-20 px-6 py-24 sm:py-32">
-      <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-muted-foreground">
-        {pages.map(({ label, icon: Icon, doc }) => (
-          <li key={label}>
-            <Link
-              to={doc}
-              className="flex items-center gap-2 underline-offset-4 transition-colors hover:text-foreground hover:underline"
-            >
-              <Icon className={cn('size-4', TONE_TEXT[tone])} aria-hidden="true" />
-              {label}
-              <span className="sr-only"> documentation</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <section id={id} aria-labelledby={`${id}-title`} className="relative isolate mx-auto max-w-6xl px-6 py-24 sm:py-28">
+      <SectionHalo tone={tone} />
+      <PageChips pages={pages} tone={tone} />
       <h2
         id={`${id}-title`}
-        className="mt-5 max-w-[22ch] text-4xl font-semibold tracking-[-0.03em] text-balance sm:text-5xl"
+        className="mt-5 max-w-[22ch] text-4xl font-semibold tracking-[-0.035em] text-balance sm:text-5xl"
       >
         {title}
       </h2>
-      <p className="mt-5 max-w-[60ch] text-lg text-muted-foreground text-pretty">{lede}</p>
-      <div className="mt-14 grid grid-cols-1 gap-4 lg:grid-cols-6">{children}</div>
+      <p className="mt-4 max-w-[60ch] text-lg text-muted-foreground text-pretty">{lede}</p>
+      <div className="mt-12">{children}</div>
     </section>
   );
 }
 
 /**
- * A card of a feature grid: a title and one or two sentences (plus optional details), then its visual (a capture or
- * a replica). `side` puts the visual on the right from the lg breakpoint, for full-width cards.
+ * A frosted glass card of a feature section: title, description (plus optional details), and its visual (capture or
+ * replica). `side` places the visual on the right from the lg breakpoint for wide cards.
  */
 export function BentoCard({
   title,
+  tone,
   children,
   details,
   visual,
@@ -79,6 +98,7 @@ export function BentoCard({
   className,
 }: {
   title: string;
+  tone?: Tone | undefined;
   children: React.ReactNode;
   details?: React.ReactNode;
   visual: React.ReactNode;
@@ -86,23 +106,19 @@ export function BentoCard({
   className?: string;
 }) {
   return (
-    <article
-      className={cn(
-        SURFACE,
-        'flex min-w-0 flex-col overflow-hidden',
-        side && 'lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]',
-        className,
-      )}
+    <GlassCard
+      tone={tone}
+      className={cn('flex min-w-0 flex-col', side && 'lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]', className)}
     >
       <div className={cn('px-6 pt-6 pb-5', side && 'lg:pb-6')}>
-        <h3 className="font-semibold tracking-tight">{title}</h3>
+        <h3 className="text-[1.0625rem] font-semibold tracking-tight">{title}</h3>
         <p className="mt-1.5 max-w-[56ch] text-sm leading-relaxed text-muted-foreground text-pretty">{children}</p>
         {details}
       </div>
       <div className={cn('relative flex min-h-0 flex-1 flex-col', side && 'lg:pt-6')}>{visual}</div>
-    </article>
+    </GlassCard>
   );
 }
 
 /** Frame for a capture inside a card: inset from the top-left, flush with the right and bottom edges. */
-export const SHOT_FRAME = 'ml-6 rounded-tl-xl ring-1 ring-surface-border';
+export const SHOT_FRAME = 'ml-6 rounded-tl-xl ring-1 ring-surface-border-bright/80';

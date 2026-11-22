@@ -9,7 +9,7 @@ import { formatBps, formatBytes, formatPct, formatTemp, num } from '@/lib/format
 import { cn } from '@/lib/utils';
 
 const GPU_TONES: Tone[] = ['amber', 'rose', 'blue', 'teal'];
-const WELL = 'rounded-md bg-well inset-shadow-well';
+const WELL = 'rounded-xl bg-well inset-shadow-well ring-1 ring-border/70';
 const short = (name: string) => name.replace(/^NVIDIA GeForce /, '').replace(/^Radeon /, '');
 const pct = (used: number, total: number) => (total > 0 ? Math.round((100 * used) / total) : 0);
 const round = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? 0 : Math.round(v));
@@ -33,6 +33,7 @@ export function SystemCard({ snapshot, className }: { snapshot: Snapshot | null;
     <GlassCard
       title="System"
       icon={Cpu}
+      tone="blue"
       actions={
         <Link
           to="/system"

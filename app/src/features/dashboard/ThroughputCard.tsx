@@ -37,6 +37,7 @@ export function ThroughputCard({ metric }: { metric: keyof typeof METRICS }) {
     <GlassCard
       title={title}
       icon={icon}
+      tone={series.tone}
       actions={<div ref={setLegend} className="ts-legend" />}
       contentClassName="flex min-h-0 flex-1 flex-col"
     >

@@ -18,8 +18,7 @@ export const checkPathForm = (path: string): Effect.Effect<void, ModelPathInvali
 
 /**
  * The GGUF the tuning plans on: an absolute path to a `.gguf` file (400 otherwise), an existing file (404), a readable
- * header (422 with the reader's message). Where the path may be is the caller's (`checkModelPath`): the launchpad reads
- * the profiles' models.
+ * header (422 with the reader's message). Where the path may be is the caller's (`checkModelPath`).
  */
 export const loadModel = Effect.fn('tuning.loadModel')(function* (
   path: string,

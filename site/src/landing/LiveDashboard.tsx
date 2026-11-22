@@ -15,15 +15,18 @@ export function LiveDashboard() {
   return (
     <figure ref={ref} className="relative">
       <div
-        className="halo absolute -top-24 left-[8%] -z-10 h-80 w-1/2 opacity-50 [--halo:var(--tone-blue)] dark:opacity-100"
+        className="halo absolute -top-24 left-[8%] -z-10 h-80 w-1/2 opacity-60 [--halo:var(--tone-blue)] dark:opacity-100"
         aria-hidden="true"
       />
       <div
-        className="halo absolute top-1/3 right-0 -z-10 h-96 w-2/5 opacity-50 [--halo:var(--tone-teal)] dark:opacity-100"
+        className="halo absolute top-1/3 right-[4%] -z-10 h-96 w-2/5 opacity-55 [--halo:var(--tone-teal)] dark:opacity-100"
         aria-hidden="true"
       />
       <div className="scroll-tilt-scope">
-        <div className="scroll-tilt rounded-xl shadow-[0_40px_120px_-30px] shadow-black/50" aria-hidden="true">
+        <div
+          className="scroll-tilt rounded-2xl bg-linear-to-b from-surface-border-bright via-surface-border to-transparent p-2 shadow-[0_40px_120px_-24px] shadow-black/55"
+          aria-hidden="true"
+        >
           <AppWindow>
             <DashboardReplica frame={frame} />
           </AppWindow>

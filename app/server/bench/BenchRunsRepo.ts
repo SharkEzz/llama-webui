@@ -195,11 +195,6 @@ export class BenchRunsRepo extends Context.Service<
     /** The runs `filters` keeps: newest first, a sweep's items in queue order. */
     readonly list: (filters: RunFilters) => Effect.Effect<ReadonlyArray<BenchRun>>;
     readonly get: (id: number) => Effect.Effect<Option.Option<BenchRun>>;
-    /**
-     * The latest successful one-off run of each profile, by profile id (sweep items test other settings than the
-     * profile's own, and a run whose profile was deleted has none).
-     */
-    readonly lastOkByProfile: Effect.Effect<ReadonlyMap<number, BenchRun>>;
     /** Whether a row went. */
     readonly delete: (id: number) => Effect.Effect<boolean>;
     /** Deletes the failed, cancelled and interrupted one-off runs (sweep items stay); their ids. */
@@ -223,14 +218,6 @@ export class BenchRunsRepo extends Context.Service<
         Result: Row,
         execute: (sweepId) =>
           sql`SELECT * FROM bench_runs WHERE sweep_id = ${sweepId} AND status = 'queued' ORDER BY id LIMIT 1`,
-      });
-      const findLastOk = SqlSchema.findAll({
-        Request: Schema.Void,
-        Result: Row,
-        execute: () =>
-          sql`SELECT * FROM bench_runs b WHERE b.id = (
-                SELECT id FROM bench_runs WHERE profile_id = b.profile_id AND status = 'ok' AND sweep_id IS NULL
-                ORDER BY created_at DESC, id DESC LIMIT 1)`,
       });
 
       /** The run of `id`: a row the caller holds the id of (one missing is a defect). */
@@ -395,15 +382,6 @@ export class BenchRunsRepo extends Context.Service<
         Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
       );
 
-      const lastOkByProfile = Effect.gen(function* () {
-        const rows = yield* findLastOk();
-        const runs = yield* Effect.forEach(rows, runOf);
-        return new Map(Arr.flatMap(runs, (run) => (run.spec.profileId === null ? [] : [[run.spec.profileId, run]])));
-      }).pipe(
-        Effect.catchTags({ SqlError: Effect.die, SchemaError: Effect.die }),
-        Effect.withSpan('BenchRunsRepo.lastOkByProfile'),
-      );
-
       const remove = Effect.fn('BenchRunsRepo.delete')(function* (id: number) {
         const rows = yield* Effect.orDie(sql`DELETE FROM bench_runs WHERE id = ${id} RETURNING id`);
         return Arr.isReadonlyArrayNonEmpty(rows);
@@ -434,7 +412,6 @@ export class BenchRunsRepo extends Context.Service<
         finish,
         list,
         get,
-        lastOkByProfile,
         delete: remove,
         deleteFailed,
         stopOrphans,

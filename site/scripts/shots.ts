@@ -11,7 +11,7 @@ import type { Page } from 'puppeteer-core';
 export interface Shot {
   /** Output base name: public/screenshots/<name>-<theme>.webp */
   name: string;
-  /** App route, e.g. "/dashboard". */
+  /** App route, e.g. "/". */
   path: string;
   /** Text that must be visible before capturing. */
   readyText?: string;
@@ -103,8 +103,7 @@ async function scrollMainToBottom(page: Page) {
 export const SHOTS: Shot[] = [
   // Captured on the empty demo instance, before `demo-seed.ts setup`.
   { name: 'setup', path: '/setup', readyText: 'Welcome to llama-webui', goneText: 'Checking…', manual: true },
-  { name: 'launchpad', path: '/', readyText: 'Launch pad', goneText: 'Loading' },
-  { name: 'dashboard', path: '/dashboard', readyText: 'Generation (tok/s)', live: true, delayMs: 4000 },
+  { name: 'dashboard', path: '/', readyText: 'Generation (tok/s)', live: true, delayMs: 4000 },
   { name: 'system', path: '/system', readyText: 'NVIDIA GeForce RTX 5070 Ti', live: true, delayMs: 4000 },
   { name: 'topology', path: '/topology', readyText: 'Generating', live: true, delayMs: 6000 },
   { name: 'server', path: '/server', readyText: 'Effective command' },
@@ -164,7 +163,7 @@ export const SHOTS: Shot[] = [
     prepare: async (page) => {
       await selectOption(page, '[aria-label="Starting profile"]', 'Qwen3.8 Flash-Next · 70 GB MoE');
       // Loading the profile resets the preset: wait for its recommendation before picking one.
-      await page.waitForSelector(byText('experts of the first'), { timeout: 30_000 });
+      await page.waitForSelector(byText('CUDA0,CUDA1,ROCm0'), { timeout: 30_000 });
       await page.waitForFunction(
         () => {
           const label = [...document.querySelectorAll('label')].find((l) => l.textContent?.includes('100 GB model'));

@@ -3,7 +3,6 @@ import {
   Boxes,
   Cpu,
   Gauge,
-  Home,
   MessageSquare,
   Network,
   ScrollText,
@@ -18,8 +17,7 @@ import {
  * other; `settings` is pinned at the bottom.
  */
 export const ROUTES = [
-  { path: '/', label: 'Home', icon: Home, group: 'overview' },
-  { path: '/dashboard', label: 'Dashboard', icon: Activity, group: 'overview' },
+  { path: '/', label: 'Dashboard', icon: Activity, group: 'overview' },
   { path: '/models', label: 'Models', icon: Boxes, group: 'run' },
   { path: '/profiles', label: 'Profiles', icon: SlidersHorizontal, group: 'run' },
   { path: '/server', label: 'Server', icon: Server, group: 'run' },

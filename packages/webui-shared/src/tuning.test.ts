@@ -66,6 +66,5 @@ test('the tuning and setup endpoints', () => {
     'POST /api/tuning/estimate',
     'POST /api/tuning/plan',
     'GET /api/setup',
-    'GET /api/launchpad',
   ]);
 });

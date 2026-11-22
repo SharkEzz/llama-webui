@@ -1,3 +1,5 @@
+import { GlassCard } from './GlassCard';
+
 /** README "Requirements" and the collectors (server/collectors/). */
 const GROUPS = [
   ['NVIDIA GPUs', 'Telemetry through NVML, with nvidia-smi as a fallback.'],
@@ -8,20 +10,25 @@ const GROUPS = [
 
 export function HardwareBand() {
   return (
-    <section aria-labelledby="hardware-title" className="border-y border-border bg-card/40">
-      <div className="mx-auto grid max-w-6xl gap-10 px-6 py-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] lg:gap-16">
-        <h2 id="hardware-title" className="max-w-[16ch] text-2xl font-semibold tracking-tight text-balance">
-          Runs on the hardware you already have.
-        </h2>
-        <dl className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
-          {GROUPS.map(([title, text]) => (
-            <div key={title}>
-              <dt className="font-medium">{title}</dt>
-              <dd className="mt-1 text-sm text-muted-foreground text-pretty">{text}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
+    <section aria-labelledby="hardware-title" className="mx-auto max-w-6xl px-6 py-12">
+      <GlassCard as="div" className="rounded-3xl p-7 sm:p-10">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.5fr)] lg:gap-12">
+          <h2
+            id="hardware-title"
+            className="max-w-[16ch] text-2xl font-semibold tracking-tight text-balance sm:text-3xl"
+          >
+            Runs on the hardware you already have.
+          </h2>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            {GROUPS.map(([title, text]) => (
+              <div key={title} className="rounded-xl bg-well p-4 ring-1 ring-border">
+                <dt className="text-sm font-medium">{title}</dt>
+                <dd className="mt-1 text-sm text-muted-foreground text-pretty">{text}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </GlassCard>
     </section>
   );
 }

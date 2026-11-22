@@ -360,7 +360,7 @@ the cached list is that of its first read: the estimator takes the live one from
 [Live memory](/developers/server/tuning/#live-memory)).
 
 The list feeds `GET /api/bench/devices` (the device picker of the form), and through `TuningHardware` the
-[Tuning](/developers/server/tuning/) estimator, sweep planning, and the launch pad's fit badges.
+[Tuning](/developers/server/tuning/) estimator and sweep planning.
 
 ## Sweeps
 
@@ -446,8 +446,7 @@ never handed out again: `best_run_id` relies on it.
 
 `SweepsRepo` computes `counts` (total and per status) from `bench_runs` on every read, and `best` (label, kind, prompt
 and generation speed) from the best run. `BenchRunsRepo.list` only returns one-off runs by default (`sweepId:
-"none"`), and `lastOkByProfile`, used by the launch pad, ignores sweep items: they test other settings than the
-profile's own. The schema itself is on the [Database](/developers/server/database/) page.
+"none"`). The schema itself is on the [Database](/developers/server/database/) page.
 
 A sweep's status (`SweepStatus`) is `running`, `done`, `cancelled` or `interrupted`.
 

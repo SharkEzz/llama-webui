@@ -31,7 +31,6 @@ export const NAV: NavSection[] = [
       {
         title: 'Run models',
         pages: [
-          { path: 'docs/home', title: 'Home and launch pad' },
           { path: 'docs/models', title: 'Models' },
           { path: 'docs/hugging-face', title: 'Hugging Face downloads' },
           { path: 'docs/profiles', title: 'Profiles' },
@@ -114,7 +113,7 @@ export const NAV: NavSection[] = [
           { path: 'developers/api/overview', title: 'Overview' },
           { path: 'developers/api/websocket', title: 'WebSocket' },
           { path: 'developers/api/app', title: 'Health and settings' },
-          { path: 'developers/api/setup', title: 'Setup and launch pad' },
+          { path: 'developers/api/setup', title: 'Setup' },
           { path: 'developers/api/profiles', title: 'Profiles' },
           { path: 'developers/api/server', title: 'Server, state and logs' },
           { path: 'developers/api/models', title: 'Models' },

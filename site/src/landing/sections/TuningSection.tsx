@@ -1,7 +1,11 @@
 import { CircleCheck, TriangleAlert, Wand2 } from 'lucide-react';
 import { Shot } from '@/components/Shot';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { BentoCard, FeatureSection, SHOT_FRAME } from '../Bento';
+import { type AppPage, BentoCard, PageChips, SectionHalo, SHOT_FRAME } from '../Bento';
+import { GlassCard } from '../GlassCard';
+
+const PAGES: AppPage[] = [{ label: 'Tuning', icon: Wand2, doc: '/docs/tuning/' }];
 
 /**
  * Output of the app's estimator (server/tuning/estimate.ts) for the "Responsive chat" preset, run on the real GGUF of
@@ -37,66 +41,93 @@ const PRESETS = [
   ['100 GB model', 'MoE experts in RAM, attention and norms on all cards'],
 ] as const;
 
+const STEPS = [
+  [
+    'Explore',
+    'Every combination of the values you list (devices, splits, cache types, -ot patterns) that the estimator says fits, run one after the other with llama-bench. A restart resumes where it stopped.',
+  ],
+  ['Validate', 'The best candidates run again on a real llama-server.'],
+  ['Keep', 'The winner becomes a profile, ready to start from the Server page.'],
+] as const;
+
 const gib = (n: number) => `${n.toFixed(1)} GiB`;
+
+/** The `dark:` pair replaces the shadcn trigger's own dark active colors, which would otherwise win. */
+const TAB_TRIGGER_CLASS =
+  'h-9 flex-none rounded-xl px-3.5 text-xs font-medium sm:text-sm data-active:border-surface-border-bright data-active:bg-surface-strong data-active:text-foreground data-active:inset-shadow-highlight dark:data-active:border-surface-border-bright dark:data-active:bg-surface-strong';
 
 function Recommendation() {
   return (
-    <div className="mx-6 mb-6 grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <table className="w-full text-xs max-sm:block">
-        <thead className="max-sm:hidden">
-          <tr className="border-b border-border text-left">
-            <th className="h-9 pr-3 font-medium">Flag</th>
-            <th className="h-9 pr-3 font-medium">Value</th>
-            <th className="h-9 font-medium">Why</th>
-          </tr>
-        </thead>
-        <tbody className="max-sm:block">
-          {ROWS.map(([flag, value, why]) => (
-            <tr
-              key={flag}
-              className="border-b border-border last:border-0 max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:py-1.5"
-            >
-              <td className="py-2 pr-3 align-top font-mono whitespace-nowrap">{flag}</td>
-              <td className="py-2 pr-3 align-top font-mono whitespace-nowrap">{value}</td>
-              <td className="py-2 align-top text-muted-foreground max-sm:col-span-2 max-sm:pt-0">{why}</td>
+    <div>
+      <div className="mb-6">
+        <h3 className="text-[1.0625rem] font-semibold tracking-tight">Every flag comes with a reason</h3>
+        <p className="mt-1.5 max-w-[66ch] text-sm leading-relaxed text-muted-foreground text-pretty">
+          Responsive chat for a 70.6 GiB model on an RTX 5070 Ti, an RTX 5060 Ti and a Radeon RX 9070 XT. The estimator
+          keeps 5 of 48 layers in RAM and flags the cards with a thin margin.
+        </p>
+      </div>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start">
+        <table className="w-full text-xs max-sm:block">
+          <thead className="max-sm:hidden">
+            <tr className="border-b border-border text-left">
+              <th className="h-9 pr-3 font-medium text-muted-foreground">Flag</th>
+              <th className="h-9 pr-3 font-medium text-muted-foreground">Value</th>
+              <th className="h-9 font-medium text-muted-foreground">Why</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="flex flex-col gap-3">
-        {BARS.map((b) => {
-          const tight = b.used > 0.95 * b.budget;
-          const ram = b.device === 'RAM';
-          return (
-            <div key={b.device} className="flex flex-col gap-1.5">
-              <div className="flex items-baseline gap-2 text-sm">
-                <span className="font-mono font-medium">{b.device}</span>
-                <span className="num ml-auto text-xs whitespace-nowrap">
-                  {gib(b.used)}{' '}
-                  <span className="text-muted-foreground">
-                    / {gib(b.budget)} {ram ? 'available' : 'usable'}
+          </thead>
+          <tbody className="max-sm:block">
+            {ROWS.map(([flag, value, why]) => (
+              <tr
+                key={flag}
+                className="border-b border-border last:border-0 max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:py-1.5"
+              >
+                <td className="py-2 pr-3 align-top font-mono whitespace-nowrap">{flag}</td>
+                <td className="py-2 pr-3 align-top font-mono whitespace-nowrap text-tone-amber">{value}</td>
+                <td className="py-2 align-top text-muted-foreground max-sm:col-span-2 max-sm:pt-0">{why}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="flex flex-col gap-4 rounded-xl bg-well p-5 ring-1 ring-border">
+          {BARS.map((b) => {
+            const tight = b.used > 0.95 * b.budget;
+            const ram = b.device === 'RAM';
+            return (
+              <div key={b.device} className="flex flex-col gap-1.5">
+                <div className="flex items-baseline gap-2 text-sm">
+                  <span className="font-mono font-medium">{b.device}</span>
+                  <span className="num ml-auto text-xs whitespace-nowrap">
+                    {gib(b.used)}{' '}
+                    <span className="text-muted-foreground">
+                      / {gib(b.budget)} {ram ? 'available' : 'usable'}
+                    </span>
                   </span>
-                </span>
+                </div>
+                <div className="relative h-2 rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      'absolute inset-y-0 left-0 rounded-full',
+                      tight
+                        ? 'bg-linear-to-r from-tone-amber to-tone-rose'
+                        : 'bg-linear-to-r from-primary to-tone-teal',
+                    )}
+                    style={{ width: `${(100 * b.used) / b.total}%` }}
+                  />
+                  <div
+                    className="absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground/65"
+                    style={{ left: `${(100 * b.budget) / b.total}%` }}
+                  />
+                </div>
+                {tight && (
+                  <p className="flex items-center gap-1 text-xs text-warning">
+                    <TriangleAlert className="size-3.5" aria-hidden="true" />
+                    tight: less than 5% headroom
+                  </p>
+                )}
               </div>
-              <div className="relative h-2 rounded-full bg-muted">
-                <div
-                  className={cn('absolute inset-y-0 left-0 rounded-full', tight ? 'bg-warning' : 'bg-chart-1')}
-                  style={{ width: `${(100 * b.used) / b.total}%` }}
-                />
-                <div
-                  className="absolute -inset-y-0.5 w-0.5 rounded-full bg-foreground/60"
-                  style={{ left: `${(100 * b.budget) / b.total}%` }}
-                />
-              </div>
-              {tight && (
-                <p className="flex items-center gap-1 text-xs text-warning">
-                  <TriangleAlert className="size-3.5" aria-hidden="true" />
-                  tight: less than 5% headroom
-                </p>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -104,89 +135,130 @@ function Recommendation() {
 
 function Presets() {
   return (
-    <ul className="mx-6 mb-6 flex flex-col gap-1.5">
-      {PRESETS.map(([label, hint], i) => (
-        <li
-          key={label}
-          className={cn(
-            'rounded-lg border px-3 py-2',
-            i === 0 ? 'border-primary/60 bg-primary/8' : 'border-border text-muted-foreground',
-          )}
-        >
-          <span className={cn('block text-sm font-medium', i === 0 && 'text-foreground')}>{label}</span>
-          <span className="block text-xs text-muted-foreground">{hint}</span>
-        </li>
-      ))}
-    </ul>
+    <div>
+      <div className="mb-6">
+        <h3 className="text-[1.0625rem] font-semibold tracking-tight">Pick a goal</h3>
+        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-muted-foreground text-pretty">
+          Each preset sets the target context, the KV cache type and what the ranking favors.
+        </p>
+      </div>
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {PRESETS.map(([label, hint], i) => (
+          <li
+            key={label}
+            className={cn(
+              'rounded-xl border p-4 transition-colors',
+              i === 0 ? 'border-primary/60 bg-primary/10' : 'border-border bg-well text-muted-foreground',
+            )}
+          >
+            <span className={cn('block text-sm font-medium', i === 0 && 'text-foreground')}>{label}</span>
+            <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{hint}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
 function Checks() {
   return (
-    <div className="mx-6 mb-6 flex flex-col gap-3 text-sm">
-      <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
-        <div className="flex items-center gap-2">
-          <TriangleAlert className="size-4 shrink-0 text-warning" aria-label="Warning" />
-          <span className="font-medium">CPU governor</span>
-          <span className="ml-auto font-mono text-xs text-muted-foreground">powersave</span>
-        </div>
-        <p className="text-xs text-muted-foreground">slower prompt processing and CPU offload</p>
-        <code className="rounded-md bg-muted px-2.5 py-2 font-mono text-[11px] leading-relaxed break-all">
-          echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-        </code>
+    <div>
+      <div className="mb-6">
+        <h3 className="text-[1.0625rem] font-semibold tracking-tight">Check the system</h3>
+        <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-muted-foreground text-pretty">
+          A read-only list of what slows llama.cpp down on this machine, each with the command that fixes it.
+        </p>
       </div>
-      {[
-        ['Persistence NVIDIA GeForce RTX 5070 Ti', 'enabled'],
-        ['Module nvidia_uvm', 'loaded'],
-        ['Transparent hugepages', 'madvise'],
-      ].map(([label, detail]) => (
-        <div key={label} className="flex items-center gap-2 px-3">
-          <CircleCheck className="size-4 shrink-0 text-success" aria-label="OK" />
-          <span className="truncate">{label}</span>
-          <span className="ml-auto font-mono text-xs text-muted-foreground">{detail}</span>
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <div className="flex flex-col gap-2.5 rounded-xl border border-warning/35 bg-well p-4 text-sm">
+          <div className="flex items-center gap-2">
+            <TriangleAlert className="size-4 shrink-0 text-warning" aria-label="Warning" />
+            <span className="font-medium">CPU governor</span>
+            <span className="ml-auto font-mono text-xs text-muted-foreground">powersave</span>
+          </div>
+          <p className="text-xs text-muted-foreground">slower prompt processing and CPU offload</p>
+          <code className="rounded-lg bg-muted px-3 py-2 font-mono text-[11px] leading-relaxed break-all">
+            echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+          </code>
         </div>
-      ))}
-      <p className="px-3 text-xs text-muted-foreground">
-        Also: power limit, PCIe link, Resizable BAR, AMD DPM, swappiness, memlock, IOMMU, model disk speed.
-      </p>
+        <div className="flex flex-col gap-2.5 text-sm">
+          {[
+            ['Persistence NVIDIA GeForce RTX 5070 Ti', 'enabled'],
+            ['Module nvidia_uvm', 'loaded'],
+            ['Transparent hugepages', 'madvise'],
+          ].map(([label, detail]) => (
+            <div
+              key={label}
+              className="flex items-center gap-2.5 rounded-xl border border-border bg-well px-3.5 py-2.5"
+            >
+              <CircleCheck className="size-4 shrink-0 text-success" aria-label="OK" />
+              <span className="truncate">{label}</span>
+              <span className="ml-auto font-mono text-xs text-muted-foreground">{detail}</span>
+            </div>
+          ))}
+          <p className="px-1 pt-1 text-xs text-muted-foreground">
+            Also: power limit, PCIe link, Resizable BAR, AMD DPM, swappiness, memlock, IOMMU, model disk speed.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
 
-const STEPS = [
-  [
-    'Explore',
-    'Every combination of the values you list (devices, splits, cache types, -ot patterns) that the estimator says fits, run one after the other with llama-bench. A restart resumes where it stopped.',
-  ],
-  ['Validate', 'The best candidates run again on a real llama-server.'],
-  ['Keep', 'The winner becomes a profile, ready to start from the launch pad.'],
-] as const;
-
 export function TuningSection() {
   return (
-    <FeatureSection
+    <section
       id="tuning"
-      tone="amber"
-      pages={[{ label: 'Tuning', icon: Wand2, doc: '/docs/tuning/' }]}
-      title="Get flags that fit your hardware."
-      lede="Choose a goal. llama-webui reads your GPUs, RAM and CPU, recommends every flag with the reason behind it, then backs it up with benchmarks."
+      aria-labelledby="tuning-title"
+      className="relative isolate mx-auto max-w-6xl px-6 py-24 sm:py-28"
     >
-      <BentoCard className="lg:col-span-6" title="Every flag comes with a reason" visual={<Recommendation />}>
-        Responsive chat for a 70.6 GiB model on an RTX 5070 Ti, an RTX 5060 Ti and a Radeon RX 9070 XT. The estimator
-        keeps 5 of 48 layers in RAM and flags the cards with a thin margin.
-      </BentoCard>
+      <SectionHalo tone="amber" />
+      <Tabs defaultValue="rec" className="gap-7">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <PageChips pages={PAGES} tone="amber" />
+            <h2
+              id="tuning-title"
+              className="mt-5 max-w-[20ch] text-4xl font-semibold tracking-[-0.035em] text-balance sm:text-5xl"
+            >
+              Get flags that fit your hardware.
+            </h2>
+            <p className="mt-4 max-w-[58ch] text-lg text-muted-foreground text-pretty">
+              Choose a goal. llama-webui reads your GPUs, RAM and CPU, recommends every flag with the reason behind it,
+              then backs it up with benchmarks.
+            </p>
+          </div>
+          <TabsList className="w-fit flex-wrap gap-1 rounded-2xl border border-border bg-card/75 p-1.5 backdrop-blur-xl group-data-horizontal/tabs:h-auto">
+            <TabsTrigger value="rec" className={TAB_TRIGGER_CLASS}>
+              Flags &amp; VRAM
+            </TabsTrigger>
+            <TabsTrigger value="presets" className={TAB_TRIGGER_CLASS}>
+              Pick a goal
+            </TabsTrigger>
+            <TabsTrigger value="checks" className={TAB_TRIGGER_CLASS}>
+              System checks
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-      <BentoCard className="lg:col-span-3" title="Pick a goal" visual={<Presets />}>
-        Each preset sets the target context, the KV cache type and what the ranking favors.
-      </BentoCard>
-
-      <BentoCard className="lg:col-span-3" title="Check the system" visual={<Checks />}>
-        A read-only list of what slows llama.cpp down on this machine, each with the command that fixes it.
-      </BentoCard>
+        <GlassCard tone="amber" className="p-6 sm:p-7">
+          <TabsContent value="rec">
+            <Recommendation />
+          </TabsContent>
+          {/* Kept mounted (hidden): the prerendered page holds the three panels, not only the first. */}
+          <TabsContent value="presets" keepMounted>
+            <Presets />
+          </TabsContent>
+          <TabsContent value="checks" keepMounted>
+            <Checks />
+          </TabsContent>
+        </GlassCard>
+      </Tabs>
 
       <BentoCard
         side
-        className="lg:col-span-6"
+        tone="amber"
+        className="mt-5"
         title="Sweeps settle it with measurements"
         details={
           <ol className="mt-6 flex flex-col gap-5">
@@ -216,6 +288,6 @@ export function TuningSection() {
       >
         When the estimate leaves a choice open, a sweep measures it.
       </BentoCard>
-    </FeatureSection>
+    </section>
   );
 }

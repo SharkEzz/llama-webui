@@ -5,6 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useHealth } from '@/lib/health';
+import { useSettings } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 import { useWs } from '@/lib/ws';
 import { PageSkeleton } from './PageSkeleton';
@@ -18,9 +19,14 @@ export function AppLayout({ loading = false }: { loading?: boolean }) {
   const refreshHealth = useHealth((s) => s.refresh);
   const { collapsed } = useSidebarLayout();
 
-  // On every (re)connect, reread the server state.
+  // On every (re)connect, reread the server state. A failed read of the settings is the page's to report.
   useEffect(() => {
-    if (status === 'open') void refreshHealth();
+    if (status !== 'open') return;
+    void refreshHealth();
+    useSettings
+      .getState()
+      .load()
+      .catch(() => {});
   }, [status, refreshHealth]);
 
   return (

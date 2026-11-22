@@ -169,7 +169,7 @@ take a `modelPath` or an `mmprojPath` (`estimate`, `plan`, `inputs`, `disk-speed
   editing a profile is not limited, and that is where a file outside the folder is chosen.
 - **A missing file** is judged as written, before the endpoint's own `404`: the answer tells nothing of a file outside.
 - Not checked: a resume or a validate of a sweep replays a spec stored when it was created, and the server's own
-  reads (the launch pad, a profile's start) open what a profile names.
+  reads (a profile's start) open what a profile names.
 
 - **Models folder**: the `modelsDir` setting, `~`-expanded, can be any directory. `GET /api/models` walks it for
   `*.gguf` files, skipping names that start with `.` and not following directory symlinks (a symlinked `.gguf` file is
@@ -180,7 +180,7 @@ take a `modelPath` or an `mmprojPath` (`estimate`, `plan`, `inputs`, `disk-speed
   not exist, `422` `ModelUnreadable` when the file does not parse.
 - **Profile paths**: a profile's model, projector and working directory can be anywhere (they open the rule above). `profilePaths()` resolves
   them the way `llama-server` will (`~` expanded, relative to the profile's `cwd`) wherever llama-webui reads the
-  model itself, for example for the launch pad and benchmarks.
+  model itself, for example for benchmarks.
 - **Hugging Face downloads** are the only writes into a user-chosen folder, and they are confined. `repoDir()` accepts
   only an `org/name` repository ID matching `HF_REPO_RE` (checked by the request's schema: `400` `RequestInvalid`
 `Invalid data: Invalid repository id: …`) and maps it to

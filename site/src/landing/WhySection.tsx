@@ -1,20 +1,28 @@
 import { cn } from '@/lib/utils';
+import type { Tone } from './dashboard/tones';
+import { GlassCard } from './GlassCard';
 
 /** README "Why llama-webui?" */
-const PILLARS = [
-  [
-    'One process, one port.',
-    'API, WebSocket and UI are served by one Node.js process on port 7860. No database server: everything lives in a SQLite file.',
-  ],
-  [
-    'Mixed hardware.',
-    'NVIDIA (NVML), AMD (sysfs) and CPU are first-class, including multi-GPU setups mixing CUDA and Vulkan or ROCm devices.',
-  ],
-  [
-    'Measured, not guessed.',
-    'Throughput, VRAM, PCIe traffic, disk reads and DRAM bandwidth come from the real server and the real hardware, and tuning recommendations are validated by actual benchmark runs.',
-  ],
-] as const;
+const PILLARS: readonly { title: string; text: string; tone: Tone; bar: string }[] = [
+  {
+    title: 'One process, one port.',
+    text: 'API, WebSocket and UI are served by one Node.js process on port 7860. No database server: everything lives in a SQLite file.',
+    tone: 'blue',
+    bar: 'bg-tone-blue',
+  },
+  {
+    title: 'Mixed hardware.',
+    text: 'NVIDIA (NVML), AMD (sysfs) and CPU are first-class, including multi-GPU setups mixing CUDA and Vulkan or ROCm devices.',
+    tone: 'teal',
+    bar: 'bg-tone-teal',
+  },
+  {
+    title: 'Measured, not guessed.',
+    text: 'Throughput, VRAM, PCIe traffic, disk reads and DRAM bandwidth come from the real server and the real hardware, and tuning recommendations are validated by actual benchmark runs.',
+    tone: 'amber',
+    bar: 'bg-tone-amber',
+  },
+];
 
 type Line = { kind: 'cmd' | 'out' | 'err'; text: string };
 
@@ -39,10 +47,10 @@ const SESSION: Line[] = [
 function Terminal() {
   return (
     <div
-      className="overflow-hidden rounded-xl bg-[oklch(0.16_0.006_255)] text-[oklch(0.86_0.01_255)] shadow-surface ring-1 ring-white/10"
+      className="scroll-reveal overflow-hidden rounded-2xl bg-[oklch(0.13_0.008_260/88%)] text-[oklch(0.88_0.01_255)] shadow-surface inset-shadow-highlight ring-1 ring-white/12 backdrop-blur-xl"
       aria-hidden="true"
     >
-      <div className="flex h-9 items-end gap-1 border-b border-white/10 px-2 text-xs">
+      <div className="flex h-9 items-end gap-1 border-b border-white/10 px-2.5 text-xs">
         {['llama-server', 'watch nvidia-smi', 'amd-smi monitor'].map((tab, i) => (
           <span
             key={tab}
@@ -77,12 +85,12 @@ function Terminal() {
 
 export function WhySection() {
   return (
-    <section aria-labelledby="why-title" className="mx-auto max-w-6xl px-6 py-24 sm:py-32">
-      <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16">
-        <div>
+    <section aria-labelledby="why-title" className="mx-auto max-w-6xl px-6 py-24 sm:py-28">
+      <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-14">
+        <div className="scroll-reveal">
           <h2
             id="why-title"
-            className="max-w-[20ch] text-4xl font-semibold tracking-[-0.03em] text-balance sm:text-5xl"
+            className="max-w-[20ch] text-4xl font-semibold tracking-[-0.035em] text-balance sm:text-5xl"
           >
             One tab instead of a pile of terminals.
           </h2>
@@ -93,12 +101,16 @@ export function WhySection() {
         </div>
         <Terminal />
       </div>
-      <dl className="mt-16 grid gap-8 sm:grid-cols-3 sm:gap-10">
-        {PILLARS.map(([title, text]) => (
-          <div key={title} className="border-t border-border pt-5">
-            <dt className="font-semibold tracking-tight">{title}</dt>
+      <dl className="mt-12 grid gap-4 sm:grid-cols-3 sm:gap-5">
+        {PILLARS.map(({ title, text, tone, bar }) => (
+          <GlassCard key={title} tone={tone} as="div" className="p-6">
+            {/* The bar is inside the dt: a group of a dl only holds dt and dd. */}
+            <dt className="text-base font-semibold tracking-tight">
+              <span className={cn('mb-4 block h-0.5 w-8 rounded-full', bar)} aria-hidden="true" />
+              {title}
+            </dt>
             <dd className="mt-2 text-sm leading-relaxed text-muted-foreground text-pretty">{text}</dd>
-          </div>
+          </GlassCard>
         ))}
       </dl>
     </section>

@@ -14,6 +14,7 @@ export const PACKAGE_FILES = [
   'package.json',
   'app/package.json',
   'packages/webui-shared/package.json',
+  'packages/webui-theme/package.json',
   'packages/llamacpp-js/package.json',
   'site/package.json',
 ];

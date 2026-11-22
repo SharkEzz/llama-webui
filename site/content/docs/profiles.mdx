@@ -5,7 +5,7 @@ description: Create and edit profiles, the named llama-server launch configurati
 
 A profile is a named way to launch `llama-server`: the model to load, an optional multimodal projector, the
 `llama-server` arguments and environment variables, and where to listen. You start profiles from the
-[launch pad](/docs/home/) or the [Server](/docs/server/) page; the Profiles page is where you write them.
+[Server](/docs/server/) page; the Profiles page is where you write them.
 
 <Screenshot name="profiles" alt="The Profiles page: a list of three profiles on the left, the first marked with a green dot, and the editor on the right with Name, Working directory, Model (GGUF), Multimodal projector, Host and Port fields, and the llama-server arguments box with one flag per line and an autocomplete list open under --f." />
 
@@ -29,7 +29,7 @@ Other pages create profiles for you, already filled in: **Create profile** in a 
 
 | Field                    | What it holds                                                                                                                                  |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Name**                 | Required, and unique among your profiles. It is what the launch pad, the Server page and the status bar show.                                 |
+| **Name**                 | Required, and unique among your profiles. It is what the Server page and the status bar show.                                                  |
 | **Working directory**    | The folder `llama-server` runs in. Relative paths in the model and projector fields start from here.                                           |
 | **Model (GGUF)**         | Required. The model file; for a split model, its first part.                                                                                   |
 | **Multimodal projector** | Optional. The `mmproj` file that lets the model read images (and audio or video for some models).                                               |
@@ -129,7 +129,7 @@ The buttons under the editor:
 - **Save** (**Create profile** for a new one) is enabled once something changed. A name already used by another
   profile is refused.
 - **Start this profile** launches it. It is disabled while there are unsaved changes, or while a server is already
-  running: use **Switch** on the launch pad or the Server page to change profiles.
+  running: use **Switch** on the Server page to change profiles.
 - **Duplicate** creates a copy named `<name> (copy)` (then `(copy 2)`…) and opens it.
 - **Export** downloads this profile alone as a JSON file.
 - **Delete** asks for confirmation, then deletes the profile. It is disabled while `llama-server` runs this profile:

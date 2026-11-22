@@ -30,7 +30,7 @@ pnpm install
 ```
 
 `pnpm install` installs the whole pnpm workspace, declared in `pnpm-workspace.yaml`: `packages/*` (`webui-shared`,
-`llamacpp-js`), the app, `app/`, and the website, `site/`, all from one `pnpm-lock.yaml`. The same file holds the
+`webui-theme`, `llamacpp-js`), the app, `app/`, and the website, `site/`, all from one `pnpm-lock.yaml`. The same file holds the
 `catalog:` of the versions that move together (React, Vite, TypeScript, Effect…): change a version there, not in a
 `package.json`. A dependency change commits its `pnpm-lock.yaml`; CI installs with
 `--frozen-lockfile`.
@@ -174,7 +174,7 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
     - `collectors/` NVML (`nvml/`, a child program on `node:ffi`), `nvidia-smi`, AMD sysfs, `/proc`, disks, `perf`
     - `chat/` server-owned chat replies and their SSE stream, conversations
     - `bench/` the bench runner, gate, executor, sweeps
-    - `tuning/` memory estimator, sweep space, system checks, first run and launch pad
+    - `tuning/` memory estimator, sweep space, system checks and first-run setup
     - `hf/` the Hugging Face client (`HfHttp`, `HfClient`)
     - `downloads/` the download queue and its transfers
     - `models/` the models folder scan, GGUF reading, deletion
@@ -197,6 +197,8 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
   - `webui-shared/` schemas (Effect `Schema`), pure functions and the API definition (workspace `@llama-webui/shared`)
     - `src/` one module per domain, re-exported by `index.ts`
     - `src/api/` `Api` and one group per domain, with the errors of each endpoint
+  - `webui-theme/` shared Obsidian Aurora CSS theme tokens, aurora backdrop and base primitives (workspace `@llama-webui/theme`)
+    - `theme.css` imported by `app/src/index.css` and `site/src/styles/app.css`
   - `llamacpp-js/` the llama.cpp client: HTTP API, metrics, `--help`, `llama-bench` output (workspace `llamacpp-js`)
     - `src/` one module per subpath export, `node.ts` for the process and filesystem helpers
     - `tests/` its tests (`node:test`), run by `node --test`

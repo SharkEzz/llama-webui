@@ -15,7 +15,7 @@ const settings = ROUTES.find((r) => r.group === 'settings')!;
  * rather than removed. It stays the row's accessible name and is revealed as the sidebar widens.
  */
 const ROW =
-  'group relative flex h-9 w-full items-center gap-3 overflow-hidden rounded-md px-3 text-sm transition-colors text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground';
+  'group relative flex h-9 w-full items-center gap-3 overflow-hidden rounded-lg px-3 text-sm transition-colors text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground';
 const LABEL = 'overflow-hidden whitespace-nowrap';
 
 /** The row's name beside the sidebar, only while its label is clipped. */
@@ -46,7 +46,11 @@ function Item({ route, collapsed }: { route: AppRoute; collapsed: boolean }) {
         to={route.path}
         end={route.path === '/'}
         className={({ isActive }) =>
-          cn(ROW, isActive && 'bg-sidebar-primary/12 text-sidebar-accent-foreground hover:bg-sidebar-primary/15')
+          cn(
+            ROW,
+            isActive &&
+              'bg-sidebar-primary/14 text-sidebar-accent-foreground inset-shadow-highlight shadow-[0_0_20px_-8px] shadow-sidebar-primary/50 hover:bg-sidebar-primary/18',
+          )
         }
       >
         {({ isActive }) => (
@@ -54,7 +58,7 @@ function Item({ route, collapsed }: { route: AppRoute; collapsed: boolean }) {
             <span
               aria-hidden="true"
               className={cn(
-                'absolute top-2 bottom-2 left-0 w-0.5 rounded-full bg-sidebar-primary transition-opacity',
+                'absolute top-2.5 bottom-2.5 left-1 w-0.5 rounded-full bg-sidebar-primary shadow-[0_0_8px] shadow-sidebar-primary/80 transition-opacity',
                 isActive ? 'opacity-100' : 'opacity-0',
               )}
             />
@@ -74,23 +78,23 @@ export function Sidebar() {
   const toggleLabel = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
 
   return (
-    <aside className="sticky top-4 m-4 mr-0 flex h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-lg border border-sidebar-border bg-sidebar p-3 text-sidebar-foreground shadow-surface inset-shadow-highlight backdrop-blur-(--surface-blur)">
+    <aside className="sticky top-4 m-4 mr-0 flex h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-xl border border-surface-border-bright/70 bg-sidebar p-3 text-sidebar-foreground shadow-surface inset-shadow-highlight backdrop-blur-(--surface-blur) backdrop-saturate-150">
       <div className="flex h-10 items-center gap-2.5 overflow-hidden px-2.5">
         <LlamaMark />
         <span className={cn(LABEL, 'text-[0.9375rem] font-semibold tracking-tight')}>llama-webui</span>
       </div>
-      <nav id="main-navigation" aria-label="Main navigation" className="mt-4 flex flex-1 flex-col gap-0.5">
+      <nav id="main-navigation" aria-label="Main navigation" className="mt-4 flex flex-1 flex-col gap-1.5">
         {main.map((group, i) => (
           <Fragment key={group[0]!.group}>
             {/* Centered under the icons, so it reads the same collapsed and expanded. */}
-            {i > 0 && <div aria-hidden="true" className="mx-2 my-2 h-px shrink-0 bg-sidebar-border" />}
+            {i > 0 && <div aria-hidden="true" className="mx-2 my-1.5 h-px shrink-0 bg-sidebar-border" />}
             {group.map((r) => (
               <Item key={r.path} route={r} collapsed={collapsed} />
             ))}
           </Fragment>
         ))}
       </nav>
-      <div className="flex flex-col gap-0.5 border-t border-sidebar-border pt-3">
+      <div className="flex flex-col gap-1.5 border-t border-sidebar-border pt-3">
         {/* A narrow window has no room for the labels: nothing to expand to. */}
         {!narrow && (
           <RowTooltip label={toggleLabel} show={collapsed}>
