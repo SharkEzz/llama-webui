@@ -251,6 +251,17 @@ const grown = (before: number, after: number) => (after >= before ? after - befo
 
 /** One load of a page: a new browser context when cold; warm is a reload once the cache is filled. */
 export async function loadPage(ctx: Context, path: string, cache: 'cold' | 'warm'): Promise<PageLoad> {
+  const { load, page } = await loadAndKeep(ctx, path, cache);
+  await closePage(page);
+  return load;
+}
+
+/** `loadPage`, the page left open, with the API calls of the load and their duration (request to its last byte). */
+export async function loadAndKeep(
+  ctx: Context,
+  path: string,
+  cache: 'cold' | 'warm',
+): Promise<{ load: PageLoad; page: Page; apiCalls: { url: string; ms: number }[] }> {
   await closePages(ctx);
   const page = await newPage(ctx, cache === 'cold');
   const url = `${ctx.instance.baseUrl}${path}`;
@@ -258,14 +269,20 @@ export async function loadPage(ctx: Context, path: string, cache: 'cold' | 'warm
   await session.send('Network.enable');
   await session.send('Performance.enable');
   if (cache === 'warm') await page.goto(url, { waitUntil: 'networkidle2' });
-  const requests = new Map<string, { kind: ResourceKind; wire: number; decoded: number }>();
+  const requests = new Map<
+    string,
+    { kind: ResourceKind; url: string; start: number; end: number; wire: number; decoded: number }
+  >();
   let t0 = 0;
   // Set by the frame handler: an object, so that the wait below sees it change.
   const ws = { snapshotAt: 0 };
   session.on('Network.requestWillBeSent', (ev) => {
     if (t0 === 0) t0 = ev.timestamp;
     const kind = ev.request.url.includes('/api/') ? 'api' : (KIND_OF_TYPE[ev.type ?? ''] ?? 'other');
-    requests.set(ev.requestId, { kind, wire: 0, decoded: 0 });
+    const short = ev.request.url.startsWith(ctx.instance.baseUrl)
+      ? ev.request.url.slice(ctx.instance.baseUrl.length)
+      : ev.request.url;
+    requests.set(ev.requestId, { kind, url: short, start: ev.timestamp, end: 0, wire: 0, decoded: 0 });
   });
   session.on('Network.dataReceived', (ev) => {
     const r = requests.get(ev.requestId);
@@ -273,7 +290,10 @@ export async function loadPage(ctx: Context, path: string, cache: 'cold' | 'warm
   });
   session.on('Network.loadingFinished', (ev) => {
     const r = requests.get(ev.requestId);
-    if (r) r.wire = ev.encodedDataLength;
+    if (r) {
+      r.wire = ev.encodedDataLength;
+      r.end = ev.timestamp;
+    }
   });
   session.on('Network.webSocketFrameReceived', (ev) => {
     if (ws.snapshotAt === 0 && t0 !== 0 && ev.response.payloadData.includes('"type":"snapshot"'))
@@ -292,7 +312,6 @@ export async function loadPage(ctx: Context, path: string, cache: 'cold' | 'warm
   })()`);
   const after = new Map((await session.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
   await session.detach();
-  await closePage(page);
   const t = isRecord(timing) ? timing : {};
   const byKind: PageLoad['byKind'] = {
     html: { count: 0, bytes: 0 },
@@ -307,7 +326,7 @@ export async function loadPage(ctx: Context, path: string, cache: 'cold' | 'warm
     byKind[r.kind].bytes += r.wire;
   }
   const list = [...requests.values()];
-  return {
+  const load: PageLoad = {
     cache,
     ttfbMs: num(t.ttfb),
     fcpMs: num(t.fcp),
@@ -320,4 +339,8 @@ export async function loadPage(ctx: Context, path: string, cache: 'cold' | 'warm
     decodedBytes: list.reduce((a, r) => a + r.decoded, 0),
     byKind,
   };
+  const apiCalls = list
+    .filter((r) => r.kind === 'api' && r.url.startsWith('/api/') && r.end > 0)
+    .map((r) => ({ url: r.url, ms: (r.end - r.start) * 1000 }));
+  return { load, page, apiCalls };
 }
