@@ -419,11 +419,11 @@ The language service of Effect enforces it: `pnpm check` refuses a `node:*` impo
 `process.env` in the server ([Effect diagnostics](/developers/contributing/testing/#effect-diagnostics)). Four `node:*`
 imports remain, each with a directive and its reason: `node:http` (the server factory `NodeHttpServer` takes),
 `node:crypto` (a model's hash as it streams), and `node:fs/promises` twice (`statfs` and `rmdir`, which `FileSystem`
-lacks). There is no Express, Hono, `better-sqlite3` (refused by the lint, see [Import bans](#import-bans)), `execa`, `dotenv` or zod, and no Jest. The build bundles every
-package the server imports: it needs no `node_modules` at run time. Two exceptions: `site/` is built with Vite and
-React Router (its scripts, run by Node, use `node:*`); `packages/llamacpp-js/` targets Node 24 or later, so its
-sources use only web and `node:*` APIs (`fetch`, `node:child_process`, `node:fs/promises`), and its tests use
-`node:test` with no dependency ([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
+lacks). There is no Express, Hono, `better-sqlite3` (refused by the lint, see [Import bans](#import-bans)), `execa`,
+`dotenv` or zod, and no Jest. The build bundles every package the server imports: it needs no `node_modules` at run
+time. Two exceptions: `site/` is built with Vite and React Router (its scripts, run by Node, use `node:*`);
+`packages/llamacpp-js/` targets Node 24 or later, so its sources use only web and `node:*` APIs (`fetch`,
+`node:child_process`, `node:fs/promises`), and its tests use `node:test` with no dependency ([llamacpp-js](/developers/llamacpp-js/#rules-of-the-package)).
 
 ### Code idioms
 
