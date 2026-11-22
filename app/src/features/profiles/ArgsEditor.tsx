@@ -6,12 +6,27 @@ import {
   reservedFlagMessage,
   unknownFlags,
 } from '@llama-webui/shared';
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CodeTextarea } from '@/components/CodeTextarea';
 import { Command, CommandItem, CommandList } from '@/components/ui/command';
 import { useFlags } from '@/lib/flags';
 import { parseArgs, wordAt } from './argsText';
 import { highlightArgs } from './highlight';
+
+/**
+ * Copies onto the field the ids cmdk assigns itself (it writes `id` after the props it is given): the list's in
+ * `aria-controls`, the selected option's in `aria-activedescendant`; without a list, neither.
+ */
+function copyListIds(field: HTMLElement, list: HTMLElement | null) {
+  const ids = {
+    'aria-controls': list?.id,
+    'aria-activedescendant': list?.querySelector<HTMLElement>('[cmdk-item][data-selected=true]')?.id,
+  };
+  for (const [name, id] of Object.entries(ids)) {
+    if (id) field.setAttribute(name, id);
+    else field.removeAttribute(name);
+  }
+}
 
 interface ArgsEditorProps {
   id?: string;
@@ -29,8 +44,6 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   const navigated = useRef(false);
   const [dismissed, setDismissed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  // cmdk assigns the list and option ids itself: read them back for aria-controls / aria-activedescendant.
-  const [aria, setAria] = useState<{ list?: string | undefined; active?: string | undefined }>({});
 
   const parsed = useMemo(() => parseArgs(value), [value]);
   const at = wordAt(value, cursor);
@@ -59,31 +72,27 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   };
 
   const open = suggestions.length > 0;
-  // While the list is mounted, follow the ids cmdk sets in the DOM: the list's, and the selected option's as cmdk
-  // moves its `data-selected`. Stable, so React attaches it once per list.
-  const followList = useCallback((el: HTMLDivElement | null) => {
-    listRef.current = el;
-    if (!el) return;
-    const read = () => {
-      const list = el.id || undefined;
-      const selected = el.querySelector<HTMLElement>('[cmdk-item][data-selected=true]')?.id || undefined;
-      setAria((a) => (a.list === list && a.active === selected ? a : { list, active: selected }));
-    };
-    read();
-    const observer = new MutationObserver(read);
-    observer.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-selected'] });
-    return () => {
-      observer.disconnect();
-      listRef.current = null;
-      setAria({});
-    };
-  }, []);
+  // aria-controls and aria-activedescendant are written on the textarea here, not rendered: they are ids cmdk sets in
+  // the DOM, and the selected one moves when cmdk re-marks `data-selected`, without a render of this component. No
+  // state, so nothing here can render again. cmdk gives its list a new composed ref on every render: an object ref,
+  // never a callback with effects.
+  useLayoutEffect(() => {
+    const field = ref.current;
+    const list = open ? listRef.current : null;
+    if (!field) return;
+    copyListIds(field, list);
+    if (!list) return;
+    const observer = new MutationObserver(() => copyListIds(field, list));
+    observer.observe(list, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-selected'] });
+    return () => observer.disconnect();
+    // The refs are listed although stable: they are handed to other components (CodeTextarea, cmdk's list)
+  }, [open, ref, listRef]);
 
   // Every matching flag is listed: keep the highlighted one in view while the arrows move through the list.
   useLayoutEffect(() => {
     if (open) listRef.current?.querySelector('[cmdk-item][data-selected=true]')?.scrollIntoView({ block: 'nearest' });
     // oxlint-disable-next-line react/exhaustive-effect-dependencies -- active is a trigger: cmdk marks the item from it
-  }, [open, active]);
+  }, [open, active, listRef]);
 
   const track = () => setCursor(ref.current?.selectionStart ?? 0);
 
@@ -98,11 +107,10 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
           rows={6}
           placeholder={'-c 32768\n-ngl 99\n-fa on'}
           aria-invalid={!Array.isArray(parsed) || problems.reserved.length > 0}
+          // oxlint-disable-next-line jsx-a11y/role-has-required-aria-props -- aria-controls is written by the layout effect above, from the id cmdk gives its list
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={open}
-          aria-controls={aria.list}
-          aria-activedescendant={aria.active}
           onChange={(text, el) => {
             onChange(text);
             setCursor(el.selectionStart);
@@ -147,7 +155,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
             onMouseDown={(e) => e.preventDefault()}
             className="absolute inset-x-0 top-full z-20 mt-1 h-auto rounded-lg! border border-border shadow-surface inset-shadow-highlight backdrop-blur-(--surface-blur)"
           >
-            <CommandList ref={followList} aria-label="Suggested flags">
+            <CommandList ref={listRef} aria-label="Suggested flags">
               {suggestions.map((name) => {
                 const flag = catalog ? flagOf(catalog, name) : undefined;
                 return (
