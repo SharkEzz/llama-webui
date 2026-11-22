@@ -41,6 +41,12 @@ export interface WindowOptions {
   during?: () => Promise<unknown>;
 }
 
+/** The run's source maps of the client, null with --no-build (page functions keep minified names). */
+export function sourcemaps(ctx: Context): string | null {
+  const maps = ctx.run.file('sourcemaps');
+  return existsSync(maps) ? maps : null;
+}
+
 /** The folder of a scenario's raw data. */
 export function dataDir(ctx: Context): string {
   const dir = ctx.run.file('data', ctx.scenario);
@@ -136,10 +142,25 @@ export async function measure(ctx: Context, page: Page | null, options: WindowOp
   const procs = watchProcs({ server: instance.serverPid, chrome: ctx.browser?.process()?.pid ?? null });
   const t0 = now();
 
-  await Promise.all([sleep(options.ms), options.during?.()]);
+  try {
+    await Promise.all([sleep(options.ms), options.during?.()]);
+  } catch (error) {
+    // Leave nothing running for the next window: profilers, trace, the page session.
+    procs.stop();
+    const quiet = (p: Promise<unknown> | undefined) => p?.catch(() => undefined);
+    await quiet(session && profile ? session.send('Profiler.stop') : undefined);
+    await quiet(profile ? inspector.send('Profiler.stop') : undefined);
+    await quiet(page && options.trace === true ? page.tracing.stop() : undefined);
+    await quiet(session?.detach());
+    throw error;
+  }
 
   const wallMs = now() - t0;
   const procWindow = procs.stop();
+  // Every profiler is stopped before anything is summarized, so that a summary that throws leaves none running.
+  const pageRaw: unknown = session && profile ? (await session.send('Profiler.stop')).profile : null;
+  const serverStopped = profile ? await inspector.send('Profiler.stop') : null;
+  const serverRaw = isRecord(serverStopped) ? serverStopped.profile : null;
   const window: Window = {
     id: options.id,
     label: options.label,
@@ -149,27 +170,19 @@ export async function measure(ctx: Context, page: Page | null, options: WindowOp
     procs: procWindow,
     eventLoopUtilization: null,
   };
-  if (session && profile) {
-    const { profile: raw } = await session.send('Profiler.stop');
-    writeFileSync(join(dir, `${options.id}.page.cpuprofile`), JSON.stringify(raw));
-    const maps = ctx.run.file('sourcemaps');
-    window.pageProfile = summarizeProfile(parseCpuProfile(raw), clientOrigins(existsSync(maps) ? maps : null));
-  }
-  if (profile) {
-    const stopped = await inspector.send('Profiler.stop');
-    const raw = isRecord(stopped) ? stopped.profile : null;
-    writeFileSync(join(dir, `${options.id}.server.cpuprofile`), JSON.stringify(raw));
-    window.serverProfile = summarizeProfile(parseCpuProfile(raw), serverOrigins(SERVER_BUNDLE));
-  }
+  if (pageRaw !== null) writeFileSync(join(dir, `${options.id}.page.cpuprofile`), JSON.stringify(pageRaw));
+  if (serverRaw !== null) writeFileSync(join(dir, `${options.id}.server.cpuprofile`), JSON.stringify(serverRaw));
   const elu = num(await inspector.evaluate(SERVER_END));
   // A profiler inflates the event loop's busy time: only a clean window reports it.
   if (!profile) window.eventLoopUtilization = elu;
   const after = await metrics();
   const countersAfter = page ? await pageCounters(page) : null;
-  if (page && options.trace === true) {
-    await page.tracing.stop();
-    window.trace = summarizeTrace(tracePath);
-  }
+  if (page && options.trace === true) await page.tracing.stop();
+  if (session) await session.detach();
+  if (pageRaw !== null) window.pageProfile = summarizeProfile(parseCpuProfile(pageRaw), clientOrigins(sourcemaps(ctx)));
+  if (serverRaw !== null)
+    window.serverProfile = summarizeProfile(parseCpuProfile(serverRaw), serverOrigins(SERVER_BUNDLE));
+  if (page && options.trace === true) window.trace = summarizeTrace(tracePath);
   if (before && after && countersBefore && countersAfter) {
     const d = (k: string) => (after.get(k) ?? 0) - (before.get(k) ?? 0);
     const sec = wallMs / 1000;
@@ -195,7 +208,6 @@ export async function measure(ctx: Context, page: Page | null, options: WindowOp
     }
     window.ws = ws;
   }
-  if (session) await session.detach();
   writeFileSync(join(dir, `${options.id}.window.json`), `${JSON.stringify(window, null, 2)}\n`);
   return window;
 }

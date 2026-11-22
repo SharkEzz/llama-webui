@@ -192,10 +192,13 @@ export function clientOrigins(sourcemapsDir: string | null): ClientResolver {
     const mapped = mapOf(chunk);
     if (!mapped) return null;
     const e = mapped.map.findEntry(line, column);
+    // A generated position with no original one gives an entry whose originalSource is undefined.
     if (!('originalSource' in e)) return null;
-    const i = mapped.sources.indexOf(e.originalSource);
+    const source: unknown = e.originalSource;
+    if (typeof source !== 'string') return null;
+    const i = mapped.sources.indexOf(source);
     const text = (i >= 0 ? mapped.contents[i] : null)?.split('\n')[e.originalLine] ?? '';
-    const g = clientGroup(e.originalSource);
+    const g = clientGroup(source);
     return {
       fn: nameIn(text, fallbackName || '(anonymous)'),
       module: g.module,

@@ -1,7 +1,12 @@
 // The scenarios, by name: each one returns its part of results.json.
 import type { Scenario } from '../measure.ts';
 import type { ScenarioName } from '../results.ts';
+import { aurora } from './aurora.ts';
+import { dashboard } from './dashboard.ts';
 import { idle } from './idle.ts';
+import { launch } from './launch.ts';
+import { load } from './load.ts';
+import { soak } from './soak.ts';
 import { startup } from './startup.ts';
 
 const later = <K extends ScenarioName>(name: K): Scenario<K> => ({
@@ -12,11 +17,11 @@ const later = <K extends ScenarioName>(name: K): Scenario<K> => ({
 export const SCENARIO_RUNNERS: { [K in ScenarioName]: Scenario<K> } = {
   startup,
   idle,
-  load: later('load'),
-  launch: later('launch'),
-  dashboard: later('dashboard'),
-  soak: later('soak'),
-  aurora: later('aurora'),
+  load,
+  launch,
+  dashboard,
+  soak,
+  aurora,
   generation: later('generation'),
   chat: later('chat'),
   pages: later('pages'),

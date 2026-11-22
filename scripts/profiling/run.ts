@@ -1,6 +1,8 @@
 // `pnpm profiling <scenario…>`: build, start what the scenarios need, run them in order, undo, write the report.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { availableParallelism, release, totalmem } from 'node:os';
+import type { Browser } from 'puppeteer-core';
+import { startBrowser } from './browser.ts';
 import { compare } from './compare.ts';
 import { defaultProfileId, type Instance, portAnswers, prepareBuild, startInstance, undo } from './instance.ts';
 import { arr, isRecord, str } from './json.ts';
@@ -109,6 +111,7 @@ export async function runCommand(options: Options): Promise<number> {
   writeRunInfo(run, info);
   const results: Results = { version: RESULTS_VERSION, run: info, scenarios: {}, failed: [] };
   let instance: Instance | null = null;
+  let browser: Browser | null = null;
 
   const finish = async (): Promise<string> => {
     // The GPUs are listed once the monitor has sampled them, so at the end rather than at the start.
@@ -116,6 +119,10 @@ export async function runCommand(options: Options): Promise<number> {
       const system = await instance.api('/api/system/info').catch(() => null);
       if (isRecord(system))
         info.machine.gpus = arr(system.gpus).flatMap((g) => (isRecord(g) ? [str(g.name, 'GPU')] : []));
+    }
+    if (browser !== null) {
+      await browser.close().catch(() => undefined);
+      run.writeState({ ...run.readState(), chromePid: null });
     }
     for (const line of await undo(run)) say(`profiling: ${line}`);
     info.endedAt = new Date().toISOString();
@@ -154,7 +161,7 @@ export async function runCommand(options: Options): Promise<number> {
       if (instance === null) throw new Error('the server is not started');
       return instance;
     },
-    browser: null,
+    browser,
     scenario,
     log: (line) => say(`[${scenario}] ${line}`),
   });
@@ -183,6 +190,12 @@ export async function runCommand(options: Options): Promise<number> {
       instance = await startInstance(run, options);
       const health = await instance.api('/api/health');
       info.versions.app = isRecord(health) ? str(health.version, 'unknown') : 'unknown';
+      if (rest.some((s) => SCENARIOS[s].needsBrowser)) {
+        const chromium = await startBrowser(run, options.chrome);
+        browser = chromium.browser;
+        info.versions.chromium = chromium.version;
+        info.gpuCompositing = chromium.gpuCompositing;
+      }
       writeRunInfo(run, info);
       for (const name of rest.filter((s) => !SCENARIOS[s].needsModel)) await runScenario(name);
       const withModel = rest.filter((s) => SCENARIOS[s].needsModel);
