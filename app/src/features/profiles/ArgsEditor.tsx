@@ -41,7 +41,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
 
   const problems = useMemo(() => {
     if (!Array.isArray(parsed)) return { reserved: [], unknown: [] };
-    const reserved = [...new Set(parsed.map(reservedFlag).filter((f): f is string => !!f))];
+    const reserved = [...new Set(parsed.map(reservedFlag).filter((f): f is string => Boolean(f)))];
     const unknown = catalog ? [...new Set(unknownFlags(catalog, parsed))].filter((f) => !reserved.includes(f)) : [];
     return { reserved, unknown };
   }, [parsed, catalog]);
@@ -62,10 +62,10 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- runs after every render on purpose: it reads the ids cmdk sets in the DOM, and setAria only runs when they change
   useLayoutEffect(() => {
     const list = open ? listRef.current?.id || undefined : undefined;
-    const active = open
+    const selected = open
       ? listRef.current?.querySelector<HTMLElement>('[cmdk-item][data-selected=true]')?.id || undefined
       : undefined;
-    if (list !== aria.list || active !== aria.active) setAria({ list, active });
+    if (list !== aria.list || selected !== aria.active) setAria({ list, active: selected });
   });
 
   // Every matching flag is listed: keep the highlighted one in view while the arrows move through the list.
@@ -149,7 +149,7 @@ export function ArgsEditor({ id, value, onChange }: ArgsEditorProps) {
                       {flag?.value && <span className="text-muted-foreground"> {flag.value}</span>}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {flag?.help.replace(/\s*\(env: [A-Z0-9_]+\)/g, '')}
+                      {flag?.help.replaceAll(/\s*\(env: [A-Z0-9_]+\)/g, '')}
                     </span>
                   </CommandItem>
                 );

@@ -62,7 +62,10 @@ export function TimeSeriesChart({
 
   const data = useMemo((): uPlot.AlignedData => {
     const { times, series: all } = useMonitor.getState().history;
-    return [times, ...series.map((s) => all.get(s.key) ?? new Array<number | null>(times.length).fill(null))];
+    return [
+      times,
+      ...series.map((s) => all.get(s.key) ?? Array.from({ length: times.length }, (): number | null => null)),
+    ];
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- version triggers the history reread (read outside the closure); signature sums up `series`
   }, [version, signature]);
 
@@ -75,7 +78,7 @@ export function TimeSeriesChart({
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const { series, data } = latest();
+    const now = latest();
     const theme = readChartTheme();
     const axis: uPlot.Axis = {
       stroke: theme.axis,
@@ -118,7 +121,7 @@ export function TimeSeriesChart({
       series: [
         // uPlot types the value as a number; it passes null where the series has no point (the legend off the data)
         { label: 'Time', value: (_u, v: number | null) => (v == null ? '—' : formatTime(v * 1000)) },
-        ...series.map((s): uPlot.Series => ({
+        ...now.series.map((s): uPlot.Series => ({
           label: s.label,
           stroke: theme.series[s.tone],
           fill: withAlpha(theme.series[s.tone], 0.1),
@@ -128,7 +131,7 @@ export function TimeSeriesChart({
         })),
       ],
     };
-    const u = new uPlot(opts, data, el);
+    const u = new uPlot(opts, now.data, el);
     plot.current = u;
     const size = () => {
       const width = Math.max(1, el.clientWidth);

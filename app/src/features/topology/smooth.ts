@@ -8,7 +8,7 @@ export const MAX_DT = 0.1;
 
 /** Per-key exponential smoothing, so tick values (1 s) do not advance in jumps in the render loop. */
 export class Smoother {
-  private v = new Map<string, number>();
+  private readonly v = new Map<string, number>();
   private moving = false;
   private readonly tau: number;
 

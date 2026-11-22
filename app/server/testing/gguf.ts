@@ -20,8 +20,8 @@ const T = { u32: 4, f32: 6, string: 8, array: 9, u64: 10 } as const;
 const ALIGN = 32;
 
 class Out {
-  private parts: Uint8Array[] = [];
-  private enc = new TextEncoder();
+  private readonly parts: Uint8Array[] = [];
+  private readonly enc = new TextEncoder();
   u32(n: number) {
     const b = new Uint8Array(4);
     new DataView(b.buffer).setUint32(0, n, true);
@@ -105,8 +105,8 @@ export async function writeGguf(path: string, kv: Record<string, KvValue>, tenso
   });
   const pad = (ALIGN - (o.length % ALIGN)) % ALIGN;
   o.raw(new Uint8Array(pad));
-  const last = tensors[tensors.length - 1];
-  const dataBytes = last ? offsets[offsets.length - 1]! + last.bytes : 0;
+  const last = tensors.at(-1);
+  const dataBytes = last ? offsets.at(-1)! + last.bytes : 0;
   o.raw(new Uint8Array(dataBytes));
   await writeFile(path, o.bytes());
 }

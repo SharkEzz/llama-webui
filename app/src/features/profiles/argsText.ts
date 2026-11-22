@@ -14,7 +14,7 @@ export function formatArgs(args: readonly string[]): string {
 
 /** Arguments of the typed text (line breaks separate like spaces). */
 export function parseArgs(text: string): string[] | { error: string } {
-  return shellSplit(text.replace(/\r?\n/g, ' '));
+  return shellSplit(text.replaceAll(/\r?\n/g, ' '));
 }
 
 /** The word under the cursor and its bounds; the previous word is used to find a value's flag. */

@@ -525,8 +525,8 @@ function normalizeText(v: string, ctx: NormalizeCtx): string {
   ];
   let s = v;
   for (const [path, tag] of paths.toSorted((a, b) => b[0].length - a[0].length)) s = s.split(path).join(tag);
-  for (const p of ctx.ports) s = s.replace(new RegExp(`(?<=[:= ])${p}(?!\\d)`, 'g'), '<port>');
-  return s.replace(ISO_TIME, '<time>').replace(UUID, '<uuid>').replace(ASSET_HASH, '<hash>');
+  for (const p of ctx.ports) s = s.replaceAll(new RegExp(`(?<=[:= ])${p}(?!\\d)`, 'g'), '<port>');
+  return s.replaceAll(ISO_TIME, '<time>').replaceAll(UUID, '<uuid>').replaceAll(ASSET_HASH, '<hash>');
 }
 
 export function normalize(v: unknown, ctx: NormalizeCtx): unknown {
@@ -560,7 +560,7 @@ export function record(
   const out: Outcome = { status: res.status, headers };
   if (res.body === '' || flags.headOnly) return out;
   let body: unknown = res.body;
-  if (/json/.test(res.headers['content-type'] ?? '')) {
+  if ((res.headers['content-type'] ?? '').includes('json')) {
     try {
       body = JSON.parse(res.body);
     } catch {

@@ -128,8 +128,8 @@ async function setup() {
     else await api(`/api/profiles/${id}`, { method: 'PUT', body: profile });
     console.log(`profile: ${profile.name}`);
   }
-  const chat = await profileByName(PROFILES[0]!.name);
-  await api('/api/settings', { method: 'PATCH', body: { defaultProfileId: chat.id } });
+  const chatProfile = await profileByName(PROFILES[0]!.name);
+  await api('/api/settings', { method: 'PATCH', body: { defaultProfileId: chatProfile.id } });
 }
 
 async function waitBench(id: number): Promise<BenchRun> {
@@ -142,7 +142,7 @@ async function waitBench(id: number): Promise<BenchRun> {
 }
 
 async function bench() {
-  const chat = await profileByName(PROFILES[0]!.name);
+  const chatProfile = await profileByName(PROFILES[0]!.name);
   const modelPath = `${MODELS}/${M27B}`;
   const dual = { ngl: 'all', dev: ['CUDA0', 'CUDA1'], ts: [51, 58], fa: 'on' } as const;
   const specs = [
@@ -150,7 +150,7 @@ async function bench() {
     { kind: 'bench', modelPath, params: { ...dual, sm: 'layer' } },
     { kind: 'bench', modelPath, params: { ...dual, sm: 'tensor' } },
     { kind: 'bench', modelPath, params: { ...dual, sm: 'tensor', ctk: 'q8_0', ctv: 'q8_0' } },
-    { ...(await api<object>(`/api/bench/from-profile/${chat.id}`)), kind: 'server', profileId: chat.id },
+    { ...(await api<object>(`/api/bench/from-profile/${chatProfile.id}`)), kind: 'server', profileId: chatProfile.id },
   ];
   for (const spec of specs) {
     const run = await api<BenchRun>('/api/bench/run', { body: { spec, stopServer: true } });
@@ -161,8 +161,8 @@ async function bench() {
 
 async function waitSweep(id: number) {
   for (;;) {
-    const { sweep } = await api<{ sweep: Sweep }>(`/api/sweeps/${id}`);
-    if (sweep.status !== 'running') return sweep;
+    const { sweep: run } = await api<{ sweep: Sweep }>(`/api/sweeps/${id}`);
+    if (run.status !== 'running') return run;
     await sleep(3000);
   }
 }
@@ -176,23 +176,23 @@ async function sweep() {
     space: { dev: [['CUDA0'], ['CUDA0', 'CUDA1']], sm: ['layer', 'tensor'], ctk: ['f16', 'q8_0'] },
     r: 2,
   };
-  const { sweep } = await api<{ sweep: Sweep }>('/api/sweeps', { body: { spec, stopServer: true } });
-  const explored = await waitSweep(sweep.id);
-  console.log(`sweep #${sweep.id} explored: ${explored.counts.ok}/${explored.counts.total} ok`);
-  await api(`/api/sweeps/${sweep.id}/validate`, { body: { n: 2, stopServer: true } });
-  const validated = await waitSweep(sweep.id);
-  console.log(`sweep #${sweep.id} ${validated.status}`);
+  const { sweep: created } = await api<{ sweep: Sweep }>('/api/sweeps', { body: { spec, stopServer: true } });
+  const explored = await waitSweep(created.id);
+  console.log(`sweep #${created.id} explored: ${explored.counts.ok}/${explored.counts.total} ok`);
+  await api(`/api/sweeps/${created.id}/validate`, { body: { n: 2, stopServer: true } });
+  const validated = await waitSweep(created.id);
+  console.log(`sweep #${created.id} ${validated.status}`);
 }
 
 async function start() {
-  const chat = await profileByName(PROFILES[0]!.name);
+  const chatProfile = await profileByName(PROFILES[0]!.name);
   const current = await api<{ state: { kind: string }; profileId: number | null }>('/api/server/state');
-  if (current.state.kind === 'ready' && current.profileId === chat.id) {
+  if (current.state.kind === 'ready' && current.profileId === chatProfile.id) {
     console.log('llama-server already ready');
     return;
   }
   await api(current.state.kind === 'idle' ? '/api/server/start' : '/api/server/switch', {
-    body: { profileId: chat.id },
+    body: { profileId: chatProfile.id },
   });
   for (;;) {
     const { state } = await api<{ state: { kind: string } }>('/api/server/state');

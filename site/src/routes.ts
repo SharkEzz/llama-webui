@@ -9,6 +9,9 @@ const pages = contentRoutes(readdirSync(contentDir, { recursive: true, encoding:
 
 export default [
   index('routes/home.tsx'),
-  layout('routes/docs-layout.tsx', [...pages.map((p) => route(p.path, `../content/${p.file}`))]),
+  layout(
+    'routes/docs-layout.tsx',
+    pages.map((p) => route(p.path, `../content/${p.file}`)),
+  ),
   route('*', 'routes/not-found.tsx'),
 ] satisfies RouteConfig;

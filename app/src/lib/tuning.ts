@@ -137,7 +137,7 @@ export function suggestedSpace(e: Estimate, hw: TuningHardware, preset: PresetId
   const seen = new Set<string>();
   const dev = sets.filter(
     (s): s is ReadonlyArray<string> =>
-      !!s && s.length > 0 && s[0] !== 'none' && !seen.has(s.join()) && !!seen.add(s.join()),
+      s !== undefined && s.length > 0 && s[0] !== 'none' && !seen.has(s.join()) && Boolean(seen.add(s.join())),
   );
   if (dev.length > 1) space.dev = dev;
   if (preset === 'agent') space.ub = [512, 2048];

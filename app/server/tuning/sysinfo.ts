@@ -265,10 +265,7 @@ export const readSys = Effect.fn('tuning.readSys')(function* (options: SysOption
     Order.String,
   );
   const hipLib = Option.flatMap(binaryDir, (dir) =>
-    Option.map(
-      Arr.findFirst(backendLibs, (n) => /^libggml-hip\.so/.test(n)),
-      (n) => path.join(dir, n),
-    ),
+    Option.map(Arr.findFirst(backendLibs, Str.startsWith('libggml-hip.so')), (n) => path.join(dir, n)),
   );
   const hipTargets = Option.isNone(hipLib) ? null : yield* hipTargetsOf(hipLib.value, options.hipTargets);
   const amdGfx = yield* readKfd(sys);

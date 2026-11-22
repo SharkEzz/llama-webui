@@ -17,12 +17,12 @@ export function chipsetLabel(name: string | null): string {
 export function cpuLabel(model: string): string {
   const label = pipe(
     model,
-    Str.replace(/\((R|TM)\)/gi, ''),
+    Str.replaceAll(/\((R|TM)\)/gi, ''),
     Str.replace(/\s+\d+-Core Processor$/i, ''),
     Str.replace(/\s+Processor$/i, ''),
     Str.replace(/\s+CPU\s*@.*$/i, ''),
     Str.replace(/\s+with Radeon Graphics$/i, ''),
-    Str.replace(/\s{2,}/g, ' '),
+    Str.replaceAll(/\s{2,}/g, ' '),
     Str.trim,
   );
   return label === '' ? 'CPU' : label;

@@ -67,8 +67,8 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('probes', (it) => {
         );
         const page = yield* answering(200, '<!doctype html><title>Hi</title>', 'text/html');
         const array = yield* answering(200, '[{"status":"ok"}]');
-        const port = yield* freePort;
-        const answers = yield* Effect.forEach([ready.port, loading.port, page.port, array.port, port], (port) =>
+        const closed = yield* freePort;
+        const answers = yield* Effect.forEach([ready.port, loading.port, page.port, array.port, closed], (port) =>
           isLlamaServer({ port }),
         );
         assert.deepStrictEqual(answers, [true, true, false, false, false]);

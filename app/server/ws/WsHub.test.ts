@@ -304,12 +304,12 @@ it.effect('a client that does not read does not hold the stop past the timeout',
     yield* Deferred.await(greeted);
     yield* shutdown.before(hub.publish({ type: 'ping' }));
 
-    const start = yield* Clock.currentTimeMillis;
+    const startedAt = yield* Clock.currentTimeMillis;
     const stopping = yield* shutdown.run.pipe(Effect.forkChild);
     // The test clock moves 10 ms at a time until the stop ends: it cannot end before the 500 ms of the timeout.
     for (let i = 0; i < 100 && stopping.pollUnsafe() === undefined; i++) yield* TestClock.adjust('10 millis');
     assert.isDefined(stopping.pollUnsafe(), 'the stop still waits after 1 s');
-    const elapsed = (yield* Clock.currentTimeMillis) - start;
+    const elapsed = (yield* Clock.currentTimeMillis) - startedAt;
     assert.isAtLeast(elapsed, 500);
     assert.isBelow(elapsed, 600);
   }),

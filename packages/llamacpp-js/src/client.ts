@@ -21,7 +21,7 @@ const PROBE_TIMEOUT_MS = 800;
  * connections (#28). IPv6 addresses get their brackets.
  */
 export function probeUrl(host: string | null | undefined, port: number): string {
-  const h = (host ?? '').trim().replace(/^\[|\]$/g, '');
+  const h = (host ?? '').trim().replaceAll(/^\[|\]$/g, '');
   const target = h === '' || h === '0.0.0.0' ? '127.0.0.1' : h === '::' ? '::1' : h;
   return `http://${target.includes(':') ? `[${target}]` : target}:${port}`;
 }

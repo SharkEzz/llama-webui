@@ -36,7 +36,7 @@ export const fakeModel = (o: FakeModel = {}): ModelInfo => {
       add(`blk.${i}.ffn_down_exps.weight`, e / 3);
     }
   }
-  add('output_norm.weight', 1 * MiB);
+  add('output_norm.weight', MiB);
   add('output.weight', o.outputBytes ?? 300 * MiB);
   return {
     path: '/m/fake.gguf',
@@ -51,7 +51,7 @@ export const fakeModel = (o: FakeModel = {}): ModelInfo => {
     blockCount: layers,
     embeddingLength: 4096,
     headCount: 32,
-    headCountKv: Array(layers).fill(4),
+    headCountKv: Array.from({ length: layers }, () => 4),
     keyLength: 128,
     valueLength: 128,
     contextLength: o.contextLength ?? 131072,

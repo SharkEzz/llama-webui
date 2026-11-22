@@ -170,10 +170,10 @@ export async function startHub(options: HubOptions = {}): Promise<FakeHub & { re
   const answer = (
     res: ServerResponse,
     fault: HubFault | undefined,
-    answer: { status: number; headers: Record<string, string>; body: Buffer | string | undefined },
+    reply: { status: number; headers: Record<string, string>; body: Buffer | string | undefined },
   ) => {
     if (fault === undefined || 'pass' in fault) {
-      res.writeHead(answer.status, answer.headers).end(answer.body);
+      res.writeHead(reply.status, reply.headers).end(reply.body);
       return;
     }
     if ('status' in fault) {
@@ -186,8 +186,8 @@ export async function startHub(options: HubOptions = {}): Promise<FakeHub & { re
       return;
     }
     const after = 'cut' in fault ? fault.cut : fault.stall;
-    res.writeHead(answer.status, answer.headers);
-    res.write(Buffer.from(answer.body ?? '').subarray(0, after));
+    res.writeHead(reply.status, reply.headers);
+    res.write(Buffer.from(reply.body ?? '').subarray(0, after));
     // Unref'd: a cut still pending when the Hub closes does not hold the process.
     if ('cut' in fault) setTimeout(() => res.destroy(), 20).unref();
   };
@@ -402,11 +402,11 @@ async function reposOf(dir: string): Promise<Array<HubRepo>> {
 if (import.meta.main) {
   const { values } = parseArgs({ options: { port: { type: 'string' }, dir: { type: 'string' } } });
   if (values.port === undefined || values.dir === undefined) {
-    console.error('usage: node app/server/testing/hub.ts --port <n> --dir <folder>');
+    Effect.runSync(Effect.logError('usage: node app/server/testing/hub.ts --port <n> --dir <folder>'));
     process.exit(2);
   }
   const hub = await startHub({ port: Number(values.port), repos: await reposOf(values.dir) });
-  console.log(`fake Hub on ${hub.url} (CDN ${hub.cdnUrl}): HF_ENDPOINT=${hub.url}`);
+  Effect.runSync(Effect.log(`fake Hub on ${hub.url} (CDN ${hub.cdnUrl}): HF_ENDPOINT=${hub.url}`));
   const stop = () => {
     void hub.close().then(() => process.exit(0));
   };

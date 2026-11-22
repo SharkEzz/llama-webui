@@ -69,7 +69,7 @@ async function clickButton(page: Page, label: string) {
     (text) => {
       const button = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === text);
       button?.click();
-      return !!button;
+      return Boolean(button);
     },
     { timeout: 15_000 },
     label,
@@ -95,7 +95,7 @@ async function selectOption(page: Page, trigger: string, option: string) {
 async function scrollMainToBottom(page: Page) {
   await page.evaluate(() => {
     for (const el of document.querySelectorAll('*')) {
-      if (el.scrollHeight > el.clientHeight + 20 && getComputedStyle(el).overflowY.match(/auto|scroll/)) {
+      if (el.scrollHeight > el.clientHeight + 20 && /auto|scroll/.exec(getComputedStyle(el).overflowY)) {
         el.scrollTop = el.scrollHeight;
       }
     }
@@ -119,7 +119,7 @@ export const SHOTS: Shot[] = [
         const area = [...document.querySelectorAll('textarea')].find((t) => t.value.includes('--spec-type'));
         area?.focus();
         area?.setSelectionRange(area.value.length, area.value.length);
-        return !!area;
+        return Boolean(area);
       });
       await page.keyboard.type('\n--f', { delay: 60 });
       await page.waitForSelector('[cmdk-item]');

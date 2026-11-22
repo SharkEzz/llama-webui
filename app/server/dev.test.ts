@@ -103,7 +103,7 @@ async function startDev(env: Record<string, string | undefined> = {}, port?: num
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const collect = (c: Buffer) => {
-    output += c;
+    output += String(c);
     chunks.push({ at: performance.now(), text: String(c) });
   };
   proc.stdout.on('data', collect);

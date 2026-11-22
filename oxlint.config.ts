@@ -11,7 +11,13 @@ export const base = defineConfig({
   jsPlugins: [fileURLToPath(import.meta.resolve('./scripts/oxlint/directives.ts'))],
   // tsgolint finds the tsconfig.json of each file; a file outside every project (the root files, app/bin) gets an
   // inferred one: no configuration error, and the type-aware rules still report there (checked at L3)
-  options: { typeAware: true },
+  options: { typeAware: true, reportUnusedDisableDirectives: 'warn' },
+  settings: {
+    react: {
+      version: '19.3.1',
+    },
+  },
+  ignorePatterns: ['repos/**'],
   categories: { correctness: 'error', suspicious: 'error', perf: 'error' },
   rules: {
     // A suppression names its rule and states its reason
@@ -159,22 +165,45 @@ export const base = defineConfig({
     'typescript/no-useless-default-assignment': 'error',
     'typescript/no-redundant-type-constituents': 'error',
     'typescript/no-duplicate-type-constituents': 'error',
+    // A name declared in an inner scope does not hide one of an outer scope: the inner one is renamed. The `it` of
+    // `layer(L)('…', (it) => …)` (@effect/vitest) hides the module's `it` on purpose: the Vitest rules know a test
+    // block by that name (`vitest/no-standalone-expect` reads `it.effect`, `vitest/no-identical-title` an `it` call)
+    'no-shadow': ['error', { allow: ['it'] }],
+    // `Boolean(x)`, `Number(x)` and `String(x)` say the conversion that `!!x`, `+x` and `'' + x` hide
+    'no-implicit-coercion': 'error',
+    'unicorn/prefer-string-replace-all': 'error',
+    'typescript/prefer-includes': 'error',
+    'unicorn/prefer-at': 'error',
+    'unicorn/no-new-array': 'error',
+    'unicorn/new-for-builtins': 'error',
+    // A template or a `+` joins strings and numbers only: anything else is converted by name (`String(x)`)
+    'typescript/restrict-template-expressions': 'error',
+    'typescript/restrict-plus-operands': 'error',
+    'typescript/consistent-type-definitions': 'error',
+    'typescript/prefer-readonly': 'error',
+    'typescript/prefer-regexp-exec': 'error',
+    // `document.execCommand('copy')` is the copy of a page outside a secure context (opened by a LAN IP), which has
+    // no `navigator.clipboard` (`app/src/lib/clipboard.ts`)
+    'typescript/no-deprecated': ['error', { allow: [{ from: 'lib', name: 'execCommand' }] }],
+    'typescript/prefer-string-starts-ends-with': 'error',
+    'unicorn/prefer-string-starts-ends-with': 'error',
+    // A named function passed to `memo` names its component (React's DevTools, error stacks)
+    'prefer-arrow-callback': ['error', { allowNamedFunctions: true }],
+    // A parameter of a generator passed to `Effect.fn` is typed by `Effect.fn`'s `any` arguments, not by its default:
+    // `function* (size: number = 4000)` (`downloads/transfer.test.ts`) or `(sysBlockRoot: string = '/sys/block')`
+    // (`collectors/disk.ts`) would be `any` without their annotation
+    'typescript/no-inferrable-types': ['error', { ignoreParameters: true }],
+    'oxc/no-accumulating-spread': 'error',
+    // The dev server's middleware calls connect's `next` once the server answers: it waits for it on purpose
+    // (`app/build/devServer.ts`)
+    'promise/no-callback-in-promise': ['error', { exceptions: ['next'] }],
+    'typescript/no-implied-eval': 'error',
+    'typescript/require-array-sort-compare': 'error',
+    'unicorn/no-useless-spread': 'error',
 
     // --- Debt: off until its milestone ---
     // Rules on by category or parity rules that report on today's code; the milestone turns each on and fixes
-    // its reports. L4: general and type-aware rules; L5: React (the Vitest rules have theirs in oxlint.tests.ts).
-    'no-shadow': 'off', // L4: 40
-    'typescript/restrict-template-expressions': 'off', // L4: 4
-    'unicorn/no-new-array': 'off', // L4: 4
-    'typescript/prefer-string-starts-ends-with': 'off', // L4: 2
-    'unicorn/new-for-builtins': 'off', // L4: 2
-    'oxc/no-accumulating-spread': 'off', // L4: 1
-    'prefer-arrow-callback': 'off', // L4: 1
-    'promise/no-callback-in-promise': 'off', // L4: 1
-    'typescript/no-implied-eval': 'off', // L4: 1
-    'typescript/require-array-sort-compare': 'off', // L4: 1
-    'unicorn/no-useless-spread': 'off', // L4: 1
-    'unicorn/prefer-string-starts-ends-with': 'off', // L4: 1
+    // its reports. L5: React (the Vitest rules have theirs in oxlint.tests.ts).
     'react/immutability': 'off', // L5: 14
     'react/set-state-in-effect': 'off', // L5: 13
     'react/exhaustive-effect-dependencies': 'off', // L5: 6

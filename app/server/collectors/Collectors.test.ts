@@ -480,8 +480,8 @@ layer(Platform, { excludeTestServices: true })('Collectors', (it) => {
         );
         yield* ws.assertAllDead;
         // The real sampler, tried with the missing library, is gone too.
-        const samplers = yield* realSamplers;
-        assert.deepStrictEqual(samplers, []);
+        const left = yield* realSamplers;
+        assert.deepStrictEqual(left, []);
       }),
     ),
   );

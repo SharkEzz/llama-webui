@@ -22,6 +22,7 @@ const decode = Schema.decodeUnknownResult(Schema.fromJsonString(WsMessage));
 export const decodeFrame = (frame: string): Option.Option<WsMessage> => {
   const decoded = decode(frame);
   if (Result.isSuccess(decoded)) return Option.some(decoded.success);
+  // oxlint-disable-next-line no-console -- a message of the server that does not decode: the page has no other place to say why it stopped updating
   console.error('llama-webui: a message of the server does not decode', decoded.failure);
   return Option.none();
 };

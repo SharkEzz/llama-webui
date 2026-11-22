@@ -184,7 +184,7 @@ describe('mergeRequestStats (prompt and generation counters land on different ti
 });
 
 describe('context usage and recent requests', () => {
-  const slot = (p: number, d: number, ctx: number): SlotView => ({
+  const busy = (p: number, d: number, ctx: number): SlotView => ({
     id: 0,
     nCtx: ctx,
     processing: true,
@@ -197,10 +197,10 @@ describe('context usage and recent requests', () => {
 
   test('kvUsage sums slots; generated tokens are already in n_prompt_tokens', () => {
     // Real slot mid-generation: a 29-token prompt, 1110 generated, n_prompt_tokens 1142.
-    assert.deepEqual(kvUsage([slot(1142, 1110, 64512), slot(0, 0, 64512)]), { usedTokens: 1142, totalTokens: 129024 });
+    assert.deepEqual(kvUsage([busy(1142, 1110, 64512), busy(0, 0, 64512)]), { usedTokens: 1142, totalTokens: 129024 });
     assert.equal(kvUsage([]), null);
     assert.equal(kvUsage(null), null);
-    assert.equal(kvUsage([slot(0, 0, 0)]), null);
+    assert.equal(kvUsage([busy(0, 0, 0)]), null);
   });
 
   const metricsMap = (o: Record<string, number>) => new Map(Object.entries(o).map(([k, v]) => [`llamacpp:${k}`, v]));

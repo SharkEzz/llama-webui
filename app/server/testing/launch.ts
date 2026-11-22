@@ -68,10 +68,10 @@ export async function launch(opts: {
   let stdout = '';
   let stderr = '';
   proc.stdout.on('data', (chunk: Buffer) => {
-    stdout += chunk;
+    stdout += String(chunk);
   });
   proc.stderr.on('data', (chunk: Buffer) => {
-    stderr += chunk;
+    stderr += String(chunk);
     process.stderr.write(chunk);
   });
   const exited = new Promise<number | null>((done) => proc.once('exit', (code) => done(code)));

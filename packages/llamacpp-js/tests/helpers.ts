@@ -21,7 +21,7 @@ export function closeTo(actual: number, expected: number, digits = 2): void {
 
 /** Every property of `expected` is deeply equal in `actual`, which may have others. */
 export function matchObject(actual: unknown, expected: object): void {
-  assert.ok(actual !== null && typeof actual === 'object', `${actual} is not an object`);
+  assert.ok(actual !== null && typeof actual === 'object', `${String(actual)} is not an object`);
   const entries: [string, unknown][] = Object.entries(expected);
   for (const [key, value] of entries) {
     const got: unknown = Reflect.get(actual, key);

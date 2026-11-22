@@ -33,7 +33,7 @@ export function EnvField(props: {
         }}
         highlight={highlightEnv}
         placeholder={'CUDA_VISIBLE_DEVICES=0,1\nGGML_CUDA_P2P=1'}
-        aria-invalid={!!error}
+        aria-invalid={Boolean(error)}
       />
       {error ? (
         <p className="text-xs text-destructive">{error}</p>
@@ -69,7 +69,7 @@ export function TextField(props: {
         inputMode={props.inputMode}
         placeholder={props.placeholder}
         className="font-mono"
-        aria-invalid={!!props.error}
+        aria-invalid={Boolean(props.error)}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === 'Enter' && commit()}

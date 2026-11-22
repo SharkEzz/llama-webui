@@ -18,7 +18,7 @@ const sources = (await readdir(SRC)).filter((f) => f.endsWith('.ts'));
 test('the sources import nothing from the monorepo', async () => {
   for (const f of sources) {
     const text = await readFile(join(SRC, f), 'utf8');
-    assert.deepEqual({ f, app: /@llama-webui\//.test(text) }, { f, app: false });
+    assert.deepEqual({ f, app: text.includes('@llama-webui/') }, { f, app: false });
     // Node runs the sources as they are: a relative import names its .ts file.
     assert.deepEqual({ f, bare: /from '\.\/[^']*(?<!\.ts)'/.test(text) }, { f, bare: false });
   }

@@ -54,8 +54,8 @@ function stub(reply: (seen: Seen) => Promise<Response>) {
   return { call: makeCall(TestApi, fetchImpl), callStream: makeCallStream(TestApi, fetchImpl), seen };
 }
 
-const json = (status: number, body: unknown) => () =>
-  Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }));
+const json = (status: number, value: unknown) => () =>
+  Promise.resolve(new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } }));
 
 test('call() resolves with the decoded reply of the endpoint', async () => {
   const { call } = stub(json(200, { id: 7, name: 'seven' }));
@@ -131,8 +131,8 @@ test('call() passes its signal: an abort reaches fetch and rejects the call', as
   expect(seen[0]?.init?.signal?.aborted).toBe(true);
 });
 
-const sse = (body: ReadableStream<Uint8Array>) => () =>
-  Promise.resolve(new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }));
+const sse = (stream: ReadableStream<Uint8Array>) => () =>
+  Promise.resolve(new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } }));
 
 /** A body that sends `chunks` one per read, then ends, fails with `end`, or stays open (`'open'`). */
 function body(chunks: string[], end: 'close' | 'open' | Error = 'close') {

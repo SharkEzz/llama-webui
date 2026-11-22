@@ -227,13 +227,13 @@ export class ChatRuns extends Context.Service<
          * Saves the reply as it ends (`stats` undefined keeps the stored ones) and publishes its `done`, unless it was
          * saved already; `leave` takes the run out of the runs first.
          */
-        const save = (options: {
+        const save = (ending: {
           readonly run: Run;
           readonly outcome: Outcome;
           readonly stats: Effect.Effect<MessageStats | null | undefined>;
           readonly leave: boolean;
         }) => {
-          const { run, outcome, stats } = options;
+          const { run, outcome, stats } = ending;
           return SynchronizedRef.updateEffect(run.written, (written) =>
             Option.isSome(written.final)
               ? Effect.succeed(written)
@@ -259,7 +259,7 @@ export class ChatRuns extends Context.Service<
                       ),
                     );
                   // Out of the runs before its `done`: a client that sends on `done` finds no reply in progress.
-                  if (options.leave) yield* withoutRun(run);
+                  if (ending.leave) yield* withoutRun(run);
                   yield* PubSub.publish(run.events, { type: 'done', message: saved });
                   return { ...written, final: Option.some(saved) };
                 }),

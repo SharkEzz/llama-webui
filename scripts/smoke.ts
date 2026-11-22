@@ -98,7 +98,7 @@ const [cmd, ...cmdArgs] = values.tarball
 const main = cmdArgs[0] ?? cmd;
 
 const help = spawnSync(cmd, [...cmdArgs, '--help']);
-if (help.status !== 0) fail(`--help exited with ${help.status ?? help.signal}: ${help.error ?? help.stderr}`);
+if (help.status !== 0) fail(`--help exited with ${help.status ?? help.signal}: ${String(help.error ?? help.stderr)}`);
 if (!help.stdout.toString().includes('llama-webui [options]')) fail('--help does not show the usage');
 
 /** A free port: the OS picks one, released right away. */
@@ -170,7 +170,8 @@ try {
     if (!res.ok) fail(`${r}: ${res.status}`);
     for (const m of (await res.text()).matchAll(/bundleType:(\d)/g)) bundleTypes.add(m[1]!);
   }
-  if (bundleTypes.size !== 1 || !bundleTypes.has('0')) fail(`React is not the production build (${[...bundleTypes]})`);
+  if (bundleTypes.size !== 1 || !bundleTypes.has('0'))
+    fail(`React is not the production build (${[...bundleTypes].join(',')})`);
 
   const hello = await firstMessage();
   if (hello.type !== 'hello') fail(`/ws: first message is ${JSON.stringify(hello)}`);

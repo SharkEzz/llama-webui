@@ -154,8 +154,8 @@ const repoDir = Effect.gen(function* () {
   return path.join(home, 'models', 'o', 'r');
 });
 
-/** A variant of `o/r` (at the Hub's commit) whose files are `files`, with their sha256 unless `sha256` is given. */
-const input = Effect.fnUntraced(function* (key: string, files: Files, sha256?: string) {
+/** A variant of `o/r` (at the Hub's commit) whose files are `files`, with their sha256 unless `digest` is given. */
+const input = Effect.fnUntraced(function* (key: string, files: Files, digest?: string) {
   const hub = yield* Hub;
   const dir = yield* repoDir;
   return {
@@ -166,7 +166,7 @@ const input = Effect.fnUntraced(function* (key: string, files: Files, sha256?: s
     quant: null,
     kind: 'model',
     dir,
-    files: Arr.map(files, ([path, body]) => ({ path, size: body.length, sha256: sha256 ?? hexOf(body) })),
+    files: Arr.map(files, ([path, body]) => ({ path, size: body.length, sha256: digest ?? hexOf(body) })),
   } satisfies NewDownload;
 });
 

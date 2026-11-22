@@ -133,7 +133,7 @@ function NumberField(props: {
         inputMode="decimal"
         step={props.step}
         placeholder={props.placeholder}
-        aria-invalid={!!props.error}
+        aria-invalid={Boolean(props.error)}
         className="num h-8"
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}

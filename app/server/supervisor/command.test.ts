@@ -19,8 +19,15 @@ const CWD = '/srv/llama-webui';
 /** `commandOf` with the home and working directory of these tests, and no `GGML_CUDA_P2P` in the environment. */
 const commandWith = (profile: Profile, overrides: Partial<typeof settings> & { p2pInEnvironment?: boolean } = {}) =>
   Effect.map(Path.Path, (path) => {
-    const { p2pInEnvironment = false, ...own } = overrides;
-    return commandOf({ profile, settings: { ...settings, ...own }, home: HOME, cwd: CWD, p2pInEnvironment, path });
+    const { p2pInEnvironment: p2p = false, ...own } = overrides;
+    return commandOf({
+      profile,
+      settings: { ...settings, ...own },
+      home: HOME,
+      cwd: CWD,
+      p2pInEnvironment: p2p,
+      path,
+    });
   });
 
 layer(Path.layer)('command', (it) => {

@@ -146,7 +146,10 @@ test('linkFlows: memory activity is a share of the whole machine (0–100), for 
   // llama-server at 140% (1.4 cores) on the 12 threads of the CPU node.
   expect(linkFlows(graph, snapshot).get('cpu-ram')!.activity).toBeCloseTo(140 / 12, 5);
   // Thread count from the live per-core sample when there is one.
-  const sampled = { ...snapshot, system: { ...snapshot.system, corePct: Array(16).fill(0) } } as Snapshot;
+  const sampled = {
+    ...snapshot,
+    system: { ...snapshot.system, corePct: Array.from({ length: 16 }, () => 0) },
+  } as Snapshot;
   expect(linkFlows(graph, sampled).get('cpu-ram')!.activity).toBeCloseTo(140 / 16, 5);
   // Every thread busy: 100, not 1200.
   const full = { ...snapshot, proc: { cpuPct: 1200, rssBytes: 0 } } as Snapshot;
@@ -551,7 +554,7 @@ test('nodeLive: a GPU says what is known of its peer-to-peer, and with which car
 
 test('linkShown: at rest only from 8 MiB/s in the busier direction, from 100 kB/s while llama-server works', () => {
   const mib = 1024 ** 2;
-  expect(linkShown({ fwdBps: 4 * mib, backBps: 1 * mib }, false)).toBe(false);
+  expect(linkShown({ fwdBps: 4 * mib, backBps: mib }, false)).toBe(false);
   expect(linkShown({ fwdBps: 0, backBps: 8 * mib }, false)).toBe(true);
   expect(linkShown({ fwdBps: 4 * mib, backBps: null }, true)).toBe(true);
   expect(linkShown({ fwdBps: 50e3, backBps: 50e3 }, true)).toBe(false);

@@ -102,7 +102,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
           value={draft[k]}
           onChange={set(k)}
           placeholder={placeholder}
-          aria-invalid={!!errors[k]}
+          aria-invalid={Boolean(errors[k])}
           className="font-mono text-xs"
           spellCheck={false}
         />
@@ -122,7 +122,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
         value={draft[k]}
         onChange={set(k)}
         placeholder={opts.placeholder}
-        aria-invalid={!!errors[k]}
+        aria-invalid={Boolean(errors[k])}
         className={opts.mono ? 'font-mono text-xs' : undefined}
         spellCheck={false}
       />
@@ -165,7 +165,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="pf-args">llama-server arguments</Label>
-        <ArgsEditor id="pf-args" value={draft.args} onChange={(args) => setDraft((d) => ({ ...d, args }))} />
+        <ArgsEditor id="pf-args" value={draft.args} onChange={(text) => setDraft((d) => ({ ...d, args: text }))} />
         {errors.args && <p className="text-sm text-destructive">{errors.args}</p>}
       </div>
 
@@ -174,7 +174,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
         <CodeTextarea
           id="pf-env"
           value={draft.env}
-          onChange={(env) => setDraft((d) => ({ ...d, env }))}
+          onChange={(text) => setDraft((d) => ({ ...d, env: text }))}
           highlight={highlightEnv}
           placeholder="CUDA_VISIBLE_DEVICES=0,1"
           aria-invalid={'error' in env}
