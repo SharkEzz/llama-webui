@@ -16,7 +16,7 @@ appendix §2 and §6 (each react-doctor report with its file and line).
 
 ## Global Constraints
 
-- Starts once the last L4 PR is merged. Branch `refactor/lint-react` from `master`; one PR; green on `pnpm lint`,
+- Branch `refactor/lint-react` from `refactor/lint-hardening` (stacked; the PR is based on it); one PR; green on `pnpm lint`,
   `pnpm check`, `pnpm test`.
 - **Screens behave as before**, except where the rule found a bug (a busy flag stuck after a failure, a write to
   `localStorage` inside an updater, a state mirrored one render late): those fixes are listed in the PR body with how

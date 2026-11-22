@@ -29,9 +29,8 @@ imports, of Tailwind classes and of `package.json` keys) and **oxlint** (lint, w
 - **The Effect diagnostics (user).** They stay in `tsc` (`tsconfig.effect.json` and the `prepare` script unchanged,
   `effect-tsgo patch --typescript --no-oxlint`); oxlint is installed unpatched.
 - **CSS lint (user).** The three `.css` files are formatted and no longer linted.
-- `docs/` and the Markdown files other than `README.md` are neither formatted nor linted **(user)**. Biome formats
-  every `.md` today (found while writing the plans): that check is lost for the 47 files outside `README.md`. Bringing
-  them back is one line of `oxfmt.config.ts` and a reformat of 15 of them.
+- Markdown is formatted (L2) and not linted. The first decision left `docs/` and every `.md` but `README.md` out;
+  Biome formats every `.md` today, so the user brought them all back **(user, after L1)**.
 - Refactoring beyond what a retained rule asks for.
 
 ## Anti-goals
@@ -114,8 +113,8 @@ where the reason lives, not in `CLAUDE.md`.
 `.yaml`/`.yml`), `sortImports: { newlinesBetween: false }`, `sortPackageJson: true`, and from L6
 `sortTailwindcss: { functions: ['cn', 'cva'] }` with one override per project for its stylesheet (`app/**` →
 `app/src/index.css`, `site/**` → `site/src/styles/app.css`). Scope: TS, TSX, JSON, CSS, YAML, then (L2) the MDX of
-`site/content` and `README.md`. Ignored: what `biome.jsonc` ignores (its `files.includes` exclusions and, through `vcs.useIgnoreFile`, everything in
-`.gitignore`), plus `pnpm-lock.yaml`, `docs/`, every other `.md`. The same holds for oxlint.
+`site/content` and every `.md`, `docs/` included. Ignored: what `biome.jsonc` ignores (its `files.includes` exclusions and, through `vcs.useIgnoreFile`, everything in
+`.gitignore`), plus `pnpm-lock.yaml`. The same holds for oxlint.
 
 The import and `package.json` orders are kept because Biome already applies both **(user)**. Fenced code blocks in
 MDX are left as written (`embeddedLanguageFormatting: 'off'` for `*.mdx`) **(user)**: the hand-written API reference keeps its JSON examples as their author laid them out, and the
@@ -283,8 +282,6 @@ Five strict rules were offered to the user and **declined (user)**, each a large
 
 Accepted with this design, all from appendix §1:
 
-- **Markdown format outside `README.md`**: `docs/`, `CLAUDE.md` and the other `.md` are no longer format-checked
-  (see "Non-goals").
 - **CSS lint**: 26 rules on three files (and the three `noImportantStyles` suppressions).
 - **No oxlint rule**: `noThisInStatic`, `noUselessContinue`, `noUselessStringRaw`, `noFlatMapIdentity`,
   `noUselessUndefinedInitialization`, `useSimpleNumberKeys`, `noStringCaseMismatch`,
@@ -297,14 +294,15 @@ Accepted with this design, all from appendix §1:
 ## Milestones
 
 Each is one PR; "docs" names what it rewrites. A milestone too large to review is split by project when its plan is
-written. They run in order **(call)**: a milestone branches from `master` once the PR of the previous one is merged, no
-stacked branches; the user reviews and merges each PR (`master` is protected).
+written. They run in order, on stacked branches **(user, after L1)**: a milestone branches from the previous one and its PR is
+based on that branch; the user merges the PRs one by one at the end (`master` is protected, squash). The squash
+commits of the formatting PRs exist only then: `.git-blame-ignore-revs` is one small PR after the last merge.
 
 |        | What                                                                                                                                                                                                                                                                                                                                                                                                                                               | Done when                                                                                                                                                                      |
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **L0** | This document, the appendix, and the plan of each milestone (`docs/superpowers/plans/`).                                                                                                                                                                                                                                                                                                                                                           | The user approves the selection and the losses.                                                                                                                                |
 | **L1** | oxfmt formats TS, TSX, JSON, CSS and YAML; Biome's formatter and import sorting are off and Biome only lints (`lint` = `oxfmt --check && biome lint`). Three commits: the config, the raw output, the hand edits (a `biome-ignore` moved by the reformat). PRs are squashed: the squash commit of a formatting PR goes into `.git-blame-ignore-revs` in the PR of the next milestone. Editor formatter. Docs: the format half of "Format et lint". | `oxfmt --check` clean; the diff is the 27 + 17 + 4 files of the spike, or the difference is explained.                                                                         |
-| **L2** | A blank line inside the three `<FileTree>`, the table row of `api/bench.mdx:46`, then oxfmt on `site/content/**/*.mdx` and `README.md` (raw output in its own commit). Docs: "Biome ignore les `.mdx`".                                                                                                                                                                                                                                            | The prerendered HTML of the 61 pages is the same before and after, whitespace aside; `check-links` passes.                                                                     |
+| **L2** | A blank line inside the three `<FileTree>`, the table row of `api/bench.mdx:46`, then oxfmt on `site/content/**/*.mdx` and every `.md` (raw output in its own commit). Docs: "Biome ignore les `.mdx`".                                                                                                                                                                                                                                            | The prerendered HTML of the 61 pages is the same before and after, whitespace aside; `check-links` passes.                                                                     |
 | **L3** | oxlint at parity (above); the configs of "Files" except the Tailwind and architecture parts; `scripts/oxlint/directives.ts`; the `biome-ignore` converted; `@biomejs/biome` and `biome.jsonc` removed; final scripts; editor; the comment of `ci.yml`. Docs: "Format et lint" of `CLAUDE.md`, `conventions.mdx`, `README.md` and the five other developer pages that name Biome.                                                                   | No source line changes except directives. `oxlint --print-config` on one file per project shows that project's rules, and one planted violation per project fails `pnpm lint`. |
 | **L4** | The L4 table, one commit per rule or family (the rule on, then its fixes).                                                                                                                                                                                                                                                                                                                                                                         | The L4 part of the marked block is empty.                                                                                                                                      |
 | **L5** | The L5 table, react-doctor included.                                                                                                                                                                                                                                                                                                                                                                                                               | The marked block is gone.                                                                                                                                                      |
@@ -354,6 +352,12 @@ The user accepted the calls of this document and settled the five decisions it l
 4. **Code blocks in MDX**: left as written.
 5. **The five strict rules** of "Declined" (`curly`, `strict-boolean-expressions`, `no-non-null-assertion`,
    `vitest/prefer-strict-equal`, `no-nested-ternary`): out.
+
+After L1 (same day) the user settled three more:
+
+6. **Markdown**: every `.md` is formatted by oxfmt from L2 on, `docs/` and `CLAUDE.md` included, as Biome did.
+7. **Sequencing**: stacked branches, each PR based on the previous branch, merged one by one at the end.
+8. **Editor**: the local `.vscode/settings.json` formats with `oxc.oxc-vscode` from L1 on, lints with it from L3 on.
 
 Plans: `docs/superpowers/plans/2026-11-22-oxc-l1-oxfmt.md` to `…-oxc-l7-architecture.md`, one per milestone.
 

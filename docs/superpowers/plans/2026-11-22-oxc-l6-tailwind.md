@@ -15,7 +15,7 @@ JS plugin in `app/src/oxlint.config.ts` and `site/oxlint.config.ts`, each with i
 
 ## Global Constraints
 
-- Starts once the L5 PR is merged. Branch `chore/lint-tailwind` from `master`; one PR; green on `pnpm lint`,
+- Branch `chore/lint-tailwind` from `refactor/lint-react` (stacked; the PR is based on it); one PR; green on `pnpm lint`,
   `pnpm check`, `pnpm test`.
 - **No visual change**: a report is fixed only by an equivalent form (a shorthand, a canonical spelling, a hex colour
   replaced by the theme token of exactly that value). A colour without such a token keeps its value under a

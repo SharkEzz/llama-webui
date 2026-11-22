@@ -16,7 +16,7 @@ the test suites and the contract golden are the proof. About 680 reports, about 
 
 ## Global Constraints
 
-- Starts once the L3 PR is merged. Branch `refactor/lint-hardening` from `master`. Green on `pnpm lint`, `pnpm check`
+- Branch `refactor/lint-hardening` from `chore/oxlint` (stacked; the PR is based on it). Green on `pnpm lint`, `pnpm check`
   (0 `effect(` line), `pnpm test`.
 - **Behaviour does not change.** `app/server/contract/golden.json` is not regenerated; no test is weakened, skipped
   or deleted to pass a rule. A fix that would change behaviour is a finding: write it in the PR and suppress the line

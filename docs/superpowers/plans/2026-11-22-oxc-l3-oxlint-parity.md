@@ -17,7 +17,7 @@ change sits in one marked block, off, for L4 and L5 to empty.
 
 ## Global Constraints
 
-- Starts once the L2 PR is merged. Branch `chore/oxlint` from `master`; one PR; green on `pnpm lint`, `pnpm check`
+- Branch `chore/oxlint` from `chore/oxfmt-mdx` (stacked; the PR is based on it); one PR; green on `pnpm lint`, `pnpm check`
   (0 `effect(` line), `pnpm test`.
 - **No code change**: `git diff master --stat -- '*.ts' '*.tsx' '*.css'` outside the new config files shows only
   comment lines (directives converted or removed).
@@ -191,7 +191,7 @@ change sits in one marked block, off, for L4 and L5 to empty.
       ones taken from the code after Task 4. The editor note gains `"source.fixAll.oxc": "explicit"`.
 - [ ] **Step 2:** `pnpm format`; `pnpm site:build && pnpm --dir site check-links`; `pnpm lint && pnpm check && pnpm test`;
       `pnpm build && node scripts/smoke.ts`.
-- [ ] **Step 3:** Add the L2 squash commit to `.git-blame-ignore-revs`. Commit: `docs: oxlint and oxfmt replace Biome`.
+- [ ] **Step 3:** Commit: `docs: oxlint and oxfmt replace Biome`.
 - [ ] **Step 4:** Push, PR `chore: Replace Biome with oxlint`. Body: the parity table's totals (185 kept, the losses of
       the spec), the debt block as a checklist for L4 and L5, the timing. End with
       `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
