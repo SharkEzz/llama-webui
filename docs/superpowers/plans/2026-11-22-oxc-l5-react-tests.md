@@ -4,7 +4,7 @@
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The React rules (native and ten of react-doctor) and the Vitest rules of the spec are on in `error`, and
-the debt block of `oxlint.config.ts` is gone.
+the debt blocks of `oxlint.config.ts` and `oxlint.tests.ts` are gone.
 
 **Architecture:** `oxlint.react.ts` and `oxlint.tests.ts` grow; the web (`app/src`) and the site are fixed component
 by component. A fix here can change what a screen does, so each touched component is exercised in the running app.
@@ -60,9 +60,10 @@ appendix §2 and §6 (each react-doctor report with its file and line).
 - [ ] **Step 3:** `react/immutability` (14, all in `features/topology/TopologyScene.tsx`): read how `pacer` is created.
       If it is a plain object made during render, hold it in a ref (`useRef`) so its mutation from callbacks is legal; do
       not turn it into state.
-- [ ] **Step 4:** `react/refs` (2: `components/charts/TimeSeriesChart.tsx:61` writes `fmt.current` during render,
-      `site/src/landing/useSimulation.ts:11`), `react/no-object-type-as-default-prop` (1), `react/incompatible-library`
-      (1: `useVirtualizer` in `logs/LogsPage.tsx`; a suppression with the reason, the library is the choice),
+- [ ] **Step 4:** `react/refs` (1: `site/src/landing/useSimulation.ts:11`; the `fmt.current` write during render of
+      `components/charts/TimeSeriesChart.tsx` is not reported), `react/no-object-type-as-default-prop` (1),
+      `react/incompatible-library` (1: `useVirtualizer` in `logs/LogsPage.tsx`; a suppression with the reason, the
+      library is the choice),
       `react/memo-dependencies` (1), `react/no-unescaped-entities` (6).
 - [ ] **Step 5:** `pnpm lint && pnpm check && pnpm test`. Commit: `refactor(web): fix what the React rules report`.
 
@@ -98,11 +99,13 @@ appendix §2 and §6 (each react-doctor report with its file and line).
 
 - Modify: `oxlint.tests.ts`, `oxlint.config.ts`, the reported test files
 
-- [ ] **Step 1:** Remove the `// L5` Vitest lines from the debt block. On: `vitest/no-conditional-expect` (2,
+- [ ] **Step 1:** Remove the `// L5` Vitest lines from the debt block inside the Vitest override of `oxlint.tests.ts`
+      (not the base's: the override's category would turn them back on there). On: `vitest/no-conditional-expect` (2,
       `site/src/landing/telemetry.test.ts`), `vitest/require-mock-type-parameters` (2), `vitest/require-to-throw-message`
       (1), `vitest/prefer-to-have-length` (2), `vitest/prefer-called-times` (2). Fix the 9 reports without weakening an
       assertion.
-- [ ] **Step 2:** The debt block is empty: delete its two delimiter comments.
+- [ ] **Step 2:** Both debt blocks are empty: delete their delimiter comments, in `oxlint.config.ts` and in
+      `oxlint.tests.ts`.
 - [ ] **Step 3:** `pnpm lint && pnpm check && pnpm test`. Commit: `test: fix what the Vitest rules report`.
 
 ### Task 4: The screens

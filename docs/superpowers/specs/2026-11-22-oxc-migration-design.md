@@ -288,8 +288,14 @@ Accepted with this design, all from appendix §1:
   `noDynamicNamespaceImportAccess`, `noSuspiciousSemicolonInJsx`, `noImplicitAnyLet` (in part `tsc`),
   `noSvgWithoutTitle`, `noComponentHookFactories` (two suppressions today, in `app/src/app/router.tsx`),
   `noPrivateImports` (no `@private` in the repository).
-- **Off for good**: `no-redeclare`, `no-use-before-define`, `no-invalid-void-type` (above), and five `jsx-a11y` rules
-  whose oxlint version is stricter than Biome's.
+- **Off for good**: `no-redeclare`, `no-use-before-define`, `no-invalid-void-type` (above), and four `jsx-a11y` rules
+  that report today: two Biome equivalents whose oxlint version is stricter (`prefer-tag-over-role`, `no-autofocus`)
+  and two rules Biome does not have. `no-noninteractive-tabindex` stays on, its one report under a converted
+  directive.
+- **Needs another plugin**: `noExportsInTest` (`jest/no-export` runs only under the `jest` plugin, which is not
+  enabled).
+- **`packages/llamacpp-js` tests**: they run on `node:test`, so no Vitest rule applies there and they lose Biome's
+  three test checks (focused tests, duplicate hooks, identical titles).
 
 ## Milestones
 

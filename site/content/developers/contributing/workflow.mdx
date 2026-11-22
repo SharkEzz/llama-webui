@@ -43,7 +43,7 @@ soon as a change forgets it.
 | `app/server/testing/**`, `app/server/contract/**`, `testdata/**`, the black-box suites (fakes, fixtures, the contract suite)             | [Testing](/developers/contributing/testing/) (and `/developers/api/*` when the golden changes)                                                                                                                                                                            |
 | A new domain, service, shutdown step, `/ws` message or page (`docs/superpowers/poc-effect/conventions.md`)                               | [How-to guides](/developers/contributing/how-to/)                                                                                                                                                                                                                         |
 | Requirements, installation (README)                                                                                                      | [Requirements](/docs/getting-started/requirements/), [Installation](/docs/getting-started/installation/)                                                                                                                                                                  |
-| Project conventions (Biome, language, tests, docs)                                                                                       | These Contributing pages                                                                                                                                                                                                                                                  |
+| Project conventions (oxfmt, oxlint, language, tests, docs)                                                                               | These Contributing pages                                                                                                                                                                                                                                                  |
 
 This table is the only copy: `CLAUDE.md` points to it. The other rules on these pages come from `CLAUDE.md` at the root
 of the repository: when a convention changes, update both.
@@ -208,7 +208,7 @@ feat: First-run setup checklist and profile launch pad on Home (#10)
 
 ## Pull requests
 
-- **Branch** from `master`, named after the type and the topic: `feat/hf-downloads`, `docs/readme`, `chore/biome`.
+- **Branch** from `master`, named after the type and the topic: `feat/hf-downloads`, `docs/readme`, `chore/oxlint`.
 - **Title**: the subject of the future squashed commit, `feat: Download GGUF models from Hugging Face on the Models page`.
 - **Body**:
   - `## Summary`: what the change does and why, as the user sees it, then the notable choices.
@@ -229,8 +229,8 @@ pnpm check
 pnpm test
 ```
 
-- `pnpm lint`: oxfmt finds nothing to format (format, sorted imports), then Biome lints with zero errors and zero
-  warnings.
+- `pnpm lint`: oxfmt finds nothing to format (format, sorted imports), then oxlint lints with zero errors, zero
+  warnings and no unused suppression.
 - `pnpm check`: the type checks of every project (`tsc`: `packages/*`, `scripts/`, `app/` and `app/server/`), and
   `site/`.
 - `pnpm test`: every Vitest project, `app/src/` and `site/` included (the `server` project builds the app first),

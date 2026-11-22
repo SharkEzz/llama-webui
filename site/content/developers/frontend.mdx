@@ -50,7 +50,7 @@ logic) or `components/` (UI). Pure logic that the server also needs goes to the
 
 `app/src/components/ui/` holds the shadcn components, built on Base UI (`@base-ui/react`), with `cmdk` for the command
 menu and `sonner` for toasts. They stay as shadcn generates them, so a later shadcn update can be compared file by
-file, and Biome and oxfmt ignore the folder (no lint, no format, no import sorting). To change a component's behavior, wrap it
+file, and oxlint and oxfmt ignore the folder (no lint, no format, no import sorting). To change a component's behavior, wrap it
 outside `ui/`: `components/Select.tsx` re-exports the shadcn select with the project's tweaks (it opens below its
 trigger, at least as wide as it), and `GlassCard` puts the glass look on the shadcn `Card`.
 
