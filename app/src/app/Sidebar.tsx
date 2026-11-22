@@ -58,7 +58,7 @@ function Item({ route, collapsed }: { route: AppRoute; collapsed: boolean }) {
             <span
               aria-hidden="true"
               className={cn(
-                'absolute top-2.5 bottom-2.5 left-1 w-0.5 rounded-full bg-sidebar-primary shadow-[0_0_8px] shadow-sidebar-primary/80 transition-opacity',
+                'absolute inset-y-2.5 left-1 w-0.5 rounded-full bg-sidebar-primary shadow-[0_0_8px] shadow-sidebar-primary/80 transition-opacity',
                 isActive ? 'opacity-100' : 'opacity-0',
               )}
             />

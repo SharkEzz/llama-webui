@@ -57,7 +57,7 @@ function NavItem({ label, icon: Icon, active, className }: NavItemProps) {
       )}
     >
       {active && (
-        <span className="absolute top-2.5 bottom-2.5 left-1 w-0.5 rounded-full bg-sidebar-primary shadow-[0_0_8px] shadow-sidebar-primary/80" />
+        <span className="absolute inset-y-2.5 left-1 w-0.5 rounded-full bg-sidebar-primary shadow-[0_0_8px] shadow-sidebar-primary/80" />
       )}
       <Icon className={cn('size-4 shrink-0', active && 'text-sidebar-primary')} />
       <span className="hidden truncate @5xl:inline">{label}</span>

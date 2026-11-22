@@ -50,7 +50,7 @@ export function StatTile({
   tone: string;
 }) {
   return (
-    <div className={cn(PANEL, 'flex min-w-0 flex-col gap-2 rounded-xl px-4 py-4')}>
+    <div className={cn(PANEL, 'flex min-w-0 flex-col gap-2 rounded-xl p-4')}>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span
           className="size-2 shrink-0 rounded-full"

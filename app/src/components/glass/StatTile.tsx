@@ -32,7 +32,7 @@ export function StatTile({ label, value, unit, hint, tone = 'blue', mono = true,
       size="sm"
       onPointerMove={onPointerMove}
       style={style}
-      className={cn(GLASS, 'app-spotlight min-w-0 gap-2 rounded-xl px-4 py-4', className)}
+      className={cn(GLASS, 'app-spotlight min-w-0 gap-2 rounded-xl p-4', className)}
     >
       <div className="spotlight-layer" aria-hidden="true" />
       <div className="flex items-center gap-2 text-sm text-muted-foreground">

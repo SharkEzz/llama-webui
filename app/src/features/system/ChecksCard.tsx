@@ -197,7 +197,7 @@ export function CheckList({ checks }: { checks: ReadonlyArray<Check> }) {
             {ok.length > 0 && (
               <Collapsible>
                 <CollapsibleTrigger className="group flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                  <ChevronDown className="size-3.5 transition-transform group-data-[panel-open]:rotate-180" />
+                  <ChevronDown className="size-3.5 transition-transform group-data-panel-open:rotate-180" />
                   {ok.length} {plural(ok.length, 'check')} ok
                 </CollapsibleTrigger>
                 <CollapsibleContent>

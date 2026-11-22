@@ -58,7 +58,7 @@ function Boxes({ nodes, className }: { nodes: Node[]; className: string }) {
       {nodes.map((m) => (
         <li key={m.name} className={BOX}>
           <p className="font-medium">{m.name}</p>
-          <p className="mt-0.5 text-xs [overflow-wrap:anywhere] text-muted-foreground">{m.detail}</p>
+          <p className="mt-0.5 text-xs wrap-anywhere text-muted-foreground">{m.detail}</p>
         </li>
       ))}
     </ul>

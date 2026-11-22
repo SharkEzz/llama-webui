@@ -126,7 +126,7 @@ function Meter({ label, value, tone, series, lines }: MeterProps) {
         </div>
       </div>
       {/* A size container: it takes the spare height without asking for any, and hides a history too flat to read. */}
-      <div className="[container-type:size] min-h-0 flex-1">
+      <div className="@container-size min-h-0 flex-1">
         <div className="invisible flex h-full flex-col pt-2 [@container(min-height:2.5rem)]:visible">
           <TimeSeriesChart
             aria-label={`${label} over the history`}

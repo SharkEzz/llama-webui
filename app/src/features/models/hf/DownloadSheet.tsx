@@ -135,7 +135,7 @@ export function DownloadSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 data-[side=right]:sm:max-w-xl">
+      <SheetContent side="right" className="w-full gap-0 sm:data-[side=right]:max-w-xl">
         <SheetHeader>
           <SheetTitle>Download from Hugging Face</SheetTitle>
           <SheetDescription>
