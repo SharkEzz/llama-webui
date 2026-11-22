@@ -86,8 +86,8 @@ JS plugin in `app/src/oxlint.config.ts` and `site/oxlint.config.ts`, each with i
 
 - Modify: `CLAUDE.md` ("Format et lint": Tailwind classes ordered by oxfmt, linted by the plugin, where the allowed
   theme classes are listed), `site/content/developers/contributing/conventions.mdx`,
-  `site/content/developers/frontend.mdx` (styling section), `.git-blame-ignore-revs` (the L3 squash is not a
-  formatting commit: nothing to add; this PR's own squash is added at L7)
+  `site/content/developers/frontend.mdx` (styling section). `.git-blame-ignore-revs` is one small PR after the
+  last merge (spec, "Sequencing"): nothing here
 
 - [ ] **Step 1:** Update, `pnpm format`, `pnpm site:build && pnpm --dir site check-links`.
 - [ ] **Step 2:** Time `pnpm lint` (three runs); above 60 s on the CI runner the lint gets its own job in
