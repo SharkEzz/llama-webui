@@ -27,6 +27,8 @@ const requireReason = {
       }
     },
   }),
-};
+} as const;
 
-export default { meta: { name: 'directives' }, rules: { 'require-reason': requireReason } };
+const directivesPlugin = { meta: { name: 'directives' }, rules: { 'require-reason': requireReason } } as const;
+
+export default directivesPlugin;
