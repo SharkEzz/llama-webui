@@ -131,9 +131,9 @@ The root `package.json` defines the app's scripts; the website has its own, in `
 | `pnpm test:unit` | `vitest run` | The Vitest projects only. |
 | `pnpm check` | `pnpm -r --parallel --include-workspace-root typecheck` | Runs the `typecheck` script of every workspace package at once (`packages/*`, `app/` with its client and server projects, `site/`, and the root for `scripts/`), each with its own `tsconfig.json`: [Type checking](/developers/contributing/testing/#type-checking). |
 | `pnpm typecheck` | `tsc -p scripts` | The root package's share of `pnpm check`: type checks `scripts/`. |
-| `pnpm lint` | `biome check` | Format, lint and import order, read-only. |
-| `pnpm lint:fix` | `biome check --write` | Applies Biome's safe fixes. |
-| `pnpm format` | `biome format --write` | Formats only. |
+| `pnpm lint` | `oxfmt --check && biome lint` | Format, import order and lint, read-only. |
+| `pnpm lint:fix` | `biome lint --write && oxfmt` | Applies Biome's safe fixes, then formats with oxfmt. |
+| `pnpm format` | `oxfmt` | Formats only. |
 | `pnpm release` | `node scripts/release.ts` | Sets the version of every `package.json` before a release tag ([Releases](/developers/contributing/workflow/#releases)). |
 | `pnpm site:dev` | `pnpm --filter llama-webui-site dev` | Website dev server (Vite, HMR) on `0.0.0.0:5173`. |
 | `pnpm site:build` | `pnpm --filter llama-webui-site build` | Prerenders the website into `site/dist/`. |
@@ -217,7 +217,8 @@ more scripts of its own (`check-links`, `demo-seed`, `screenshots`, `og`, `typec
 - `pnpm-workspace.yaml` the workspace, its `catalog:` and pnpm's settings
 - `vitest.config.ts` one Vitest project per code base
 - `tsconfig.base.json` the options every project's `tsconfig.json` extends; `tsconfig.effect.json` adds Effect's language service
-- `biome.jsonc` format and lint rules
+- `oxfmt.config.ts` format rules (style, import and `package.json` order)
+- `biome.jsonc` lint rules
 </FileTree>
 
 The [Web app](/developers/frontend/) and [Shared package](/developers/shared/) pages describe `app/src/` and
