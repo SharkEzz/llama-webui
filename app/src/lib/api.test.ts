@@ -120,7 +120,8 @@ test('a payload the client refuses to send rejects as the RequestInvalid the ser
 test('call() passes its signal: an abort reaches fetch and rejects the call', async () => {
   const { call, seen } = stub(
     ({ init }) =>
-      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))),
+      // fetch rejects with the signal's reason, an `AbortError` (a `DOMException`, an `Error`)
+      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error))),
   );
   const controller = new AbortController();
   const pending = call((api) => api.t.get({ params: { id: 7 }, query: {} }), { signal: controller.signal });
@@ -223,7 +224,8 @@ test('an event that does not decode rejects callStream() as an invalid reply, no
 test('an abort before the response headers ends callStream() without an error and aborts its request', async () => {
   const { callStream, seen } = stub(
     ({ init }) =>
-      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))),
+      // fetch rejects with the signal's reason, an `AbortError` (a `DOMException`, an `Error`)
+      new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error))),
   );
   const controller = new AbortController();
   const onEvent = vi.fn();

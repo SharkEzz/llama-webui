@@ -225,7 +225,7 @@ export function ProfileForm({ profile, settings, onSaved, onDeleted, initial }: 
               type="button"
               variant="ghost"
               onClick={() =>
-                duplicateProfile(profile.id).then(
+                void duplicateProfile(profile.id).then(
                   (p) => {
                     toast.success(`Copy created: ${p.name}`);
                     onSaved(p);

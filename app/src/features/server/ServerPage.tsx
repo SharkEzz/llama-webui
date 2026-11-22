@@ -279,7 +279,7 @@ function CommandCard({ command, host }: { command: string | null; host: string |
             variant="ghost"
             size="sm"
             onClick={() =>
-              copyText(command).then(
+              void copyText(command).then(
                 () => toast.success('Command copied'),
                 (e: unknown) => toast.error(errorMessage(e)),
               )

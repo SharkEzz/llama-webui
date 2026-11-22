@@ -32,7 +32,7 @@ export function CodeBlock({ children, className, 'data-title': title, 'data-lang
       </pre>
       <button
         type="button"
-        onClick={copy}
+        onClick={() => void copy()}
         aria-label={copied ? 'Copied' : 'Copy code'}
         className={cn(
           'absolute right-2 flex size-8 items-center justify-center rounded-md text-muted-foreground transition',

@@ -52,7 +52,10 @@ export function loadFlags(binary: string, timeoutMs = 5000): Promise<FlagCatalog
       ['--help'],
       { timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024, encoding: 'utf8' },
       (err, stdout) => {
-        if (err) return resolve(null);
+        if (err) {
+          resolve(null);
+          return;
+        }
         const catalog = parseHelp(stdout);
         resolve(catalog.flags.length > 0 ? catalog : null);
       },

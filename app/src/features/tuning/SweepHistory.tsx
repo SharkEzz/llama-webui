@@ -17,7 +17,7 @@ export function SweepHistory() {
   const loaded = useTuning((s) => s.sweepsLoaded);
   const openId = useTuning((s) => s.current?.sweep.id ?? null);
   const navigate = useNavigate();
-  const go = (id: number) => navigate(`/tuning?sweep=${id}`);
+  const go = (id: number) => void navigate(`/tuning?sweep=${id}`);
 
   return (
     <GlassCard title="Sweeps" icon={History}>

@@ -116,7 +116,10 @@ function NumberField(props: {
       return;
     }
     const n = Number(t);
-    if (!Number.isFinite(n)) return props.onInvalid('Number expected');
+    if (!Number.isFinite(n)) {
+      props.onInvalid('Number expected');
+      return;
+    }
     if (n !== props.value) props.onCommit(n);
   };
   return (

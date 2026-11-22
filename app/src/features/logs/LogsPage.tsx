@@ -119,7 +119,7 @@ export function LogsPage() {
           size="sm"
           disabled={lines.length === 0}
           onClick={() =>
-            copyText(lines.map((l) => l.text).join('\n')).then(
+            void copyText(lines.map((l) => l.text).join('\n')).then(
               () => toast.success(`${lines.length} ${plural(lines.length, 'line')} copied`),
               (e: unknown) => toast.error(errorMessage(e)),
             )

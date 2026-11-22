@@ -151,7 +151,10 @@ export const useTuning = create<TuningState>()((set, get) => {
   };
   const runEstimate = async () => {
     const { modelPath, mmprojPath, preset, pinned } = get();
-    if (!modelPath) return set({ estimate: null, estimating: false, estimateError: null });
+    if (!modelPath) {
+      set({ estimate: null, estimating: false, estimateError: null });
+      return;
+    }
     const seq = ++estimateSeq;
     set({ estimating: true });
     using _estimating = defer(() => {
@@ -189,7 +192,10 @@ export const useTuning = create<TuningState>()((set, get) => {
   };
   const runPlan = async () => {
     const { modelPath } = get();
-    if (!modelPath) return set({ plan: null, planError: null });
+    if (!modelPath) {
+      set({ plan: null, planError: null });
+      return;
+    }
     const seq = ++planSeq;
     set({ planning: true });
     using _planning = defer(() => {
@@ -252,7 +258,10 @@ export const useTuning = create<TuningState>()((set, get) => {
     },
 
     async fromProfile(id) {
-      if (id === null) return set({ profileId: null, serverArgs: [], profileParams: {} });
+      if (id === null) {
+        set({ profileId: null, serverArgs: [], profileParams: {} });
+        return;
+      }
       try {
         const d = await call((api) => api.bench.fromProfile({ params: { id } }));
         set({
@@ -342,7 +351,10 @@ export const useTuning = create<TuningState>()((set, get) => {
     },
 
     async open(id) {
-      if (id === null) return set({ current: null });
+      if (id === null) {
+        set({ current: null });
+        return;
+      }
       try {
         set({ current: await call((api) => api.sweeps.get({ params: { id } })) });
       } catch (e) {

@@ -125,7 +125,7 @@ test('specStats', () => {
 
 describe('fetchLlama', () => {
   test('503 → loading, no slots', async () => {
-    const f = (async () => new Response('', { status: 503 })) as unknown as typeof fetch;
+    const f = (() => Promise.resolve(new Response('', { status: 503 }))) as unknown as typeof fetch;
     const r = await fetchLlama('http://x', f);
     assert.equal(r.health, 'loading');
     assert.equal(r.slots, null);
@@ -136,8 +136,8 @@ describe('fetchLlama', () => {
       '/slots': await fixture('slots-busy.json'),
       '/metrics': await fixture('metrics-after.txt'),
     };
-    const f = (async (u: string) =>
-      new Response(body[new URL(u).pathname as keyof typeof body])) as unknown as typeof fetch;
+    const f = ((u: string) =>
+      Promise.resolve(new Response(body[new URL(u).pathname as keyof typeof body]))) as unknown as typeof fetch;
     const r = await fetchLlama('http://x', f);
     assert.equal(r.health, 'ok');
     assert.equal(r.slots?.[0]?.nDecoded, 21);
@@ -154,9 +154,7 @@ describe('fetchLlama', () => {
     assert.ok(Date.now() - t0 < 200);
   });
   test('network error → down', async () => {
-    const f = (async () => {
-      throw new Error('ECONNREFUSED');
-    }) as unknown as typeof fetch;
+    const f = (() => Promise.reject(new Error('ECONNREFUSED'))) as unknown as typeof fetch;
     assert.equal((await fetchLlama('http://x', f)).health, 'down');
   });
 });

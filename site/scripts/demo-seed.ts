@@ -187,7 +187,10 @@ async function sweep() {
 async function start() {
   const chat = await profileByName(PROFILES[0]!.name);
   const current = await api<{ state: { kind: string }; profileId: number | null }>('/api/server/state');
-  if (current.state.kind === 'ready' && current.profileId === chat.id) return console.log('llama-server already ready');
+  if (current.state.kind === 'ready' && current.profileId === chat.id) {
+    console.log('llama-server already ready');
+    return;
+  }
   await api(current.state.kind === 'idle' ? '/api/server/start' : '/api/server/switch', {
     body: { profileId: chat.id },
   });

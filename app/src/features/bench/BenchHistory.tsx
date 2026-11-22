@@ -71,7 +71,10 @@ export function BenchHistory() {
   });
   useEffect(() => {
     if (focus === null) return;
-    if (filters.sweeps !== 'all') return setFilters({ sweeps: 'all' });
+    if (filters.sweeps !== 'all') {
+      setFilters({ sweeps: 'all' });
+      return;
+    }
     if (!runs.some((r) => r.id === focus)) return;
     focusRun(focus);
   }, [focus, filters.sweeps, runs, setFilters]);
@@ -87,7 +90,7 @@ export function BenchHistory() {
 
   const toProfile = async (id: number) => {
     const p = await useBench.getState().toProfile(id);
-    if (p) navigate(`/profiles?id=${p.id}`);
+    if (p) void navigate(`/profiles?id=${p.id}`);
   };
 
   return (

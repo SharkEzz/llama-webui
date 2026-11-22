@@ -63,7 +63,7 @@ test('the link is not up, after the wait, when nothing listens', async () => {
 test('the link waits for a server that starts, then answers at once on the one connection it keeps', async () => {
   const port = await freePort();
   const server = link(port);
-  const waiting = [server.up(5000), server.up(5000)];
+  const waiting = [Promise.resolve(server.up(5000)), Promise.resolve(server.up(5000))];
   await sleep(150);
   const listener = await listen(port);
   expect(await Promise.all(waiting)).toEqual([true, true]);
@@ -80,7 +80,8 @@ test('the link drops when the server goes away, and waits for the next one', asy
   expect(await server.up(5000)).toBe(true);
   await first.stop();
   // The close of the kept connection reaches the link: it waits again, here for nothing.
-  let asked: true | Promise<boolean> = true;
+  // Typed by its assertion: a declared type would be narrowed to `true`, the closure's assignments unseen
+  let asked = true as true | Promise<boolean>;
   await expect
     .poll(
       () => {

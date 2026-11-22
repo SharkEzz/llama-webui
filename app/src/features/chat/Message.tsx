@@ -59,7 +59,7 @@ export function Message({ message, live, canRegenerate, onRegenerate }: MessageP
                 size="icon-xs"
                 aria-label="Copy the reply"
                 onClick={() =>
-                  copyText(content).then(() => {
+                  void copyText(content).then(() => {
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1500);
                   })

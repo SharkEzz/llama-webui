@@ -129,13 +129,28 @@ export const base = defineConfig({
     'typescript/no-unsafe-type-assertion': 'error',
     'typescript/use-unknown-in-catch-callback-variable': 'error',
     'typescript/no-base-to-string': 'error',
+    // A promise is awaited, returned, handled or discarded on purpose (`void`); the test functions of `node:test`
+    // (llamacpp-js) return a promise the runner handles
+    'typescript/no-floating-promises': [
+      'error',
+      {
+        allowForKnownSafeCalls: [{ from: 'package', name: ['test', 'it', 'describe', 'suite'], package: 'node:test' }],
+      },
+    ],
+    // A function that returns a promise is not passed where a `void` callback is expected (an event handler)
+    'typescript/no-misused-promises': 'error',
+    // A `void` value is not used as a value; `() => f()` and `void f()` say the result is discarded
+    'typescript/no-confusing-void-expression': ['error', { ignoreArrowShorthand: true, ignoreVoidOperator: true }],
+    // An `async` function awaits something (the check without types, `require-await`, is replaced by this one)
+    'require-await': 'off',
+    'typescript/require-await': 'error',
+    'typescript/prefer-promise-reject-errors': 'error',
+    'typescript/await-thenable': 'error',
 
     // --- Debt: off until its milestone ---
     // Rules on by category or parity rules that report on today's code; the milestone turns each on and fixes
     // its reports. L4: general and type-aware rules; L5: React (the Vitest rules have theirs in oxlint.tests.ts).
-    'typescript/no-floating-promises': 'off', // L4: 88
     'no-shadow': 'off', // L4: 40
-    'typescript/no-misused-promises': 'off', // L4: 24
     'typescript/no-unnecessary-type-assertion': 'off', // L4: 19
     'typescript/no-useless-default-assignment': 'off', // L4: 6
     'typescript/prefer-optional-chain': 'off', // L4: 6
@@ -143,7 +158,6 @@ export const base = defineConfig({
     'typescript/switch-exhaustiveness-check': 'off', // L4: 4
     'unicorn/no-new-array': 'off', // L4: 4
     'typescript/no-redundant-type-constituents': 'off', // L4: 3
-    'typescript/await-thenable': 'off', // L4: 2
     'typescript/prefer-string-starts-ends-with': 'off', // L4: 2
     'unicorn/new-for-builtins': 'off', // L4: 2
     'oxc/no-accumulating-spread': 'off', // L4: 1

@@ -54,17 +54,18 @@ export function RecommendationCard() {
               size="sm"
               onClick={() => {
                 benchFromEstimate(estimate);
-                navigate('/bench');
+                void navigate('/bench');
               }}
             >
               <Gauge /> Run a benchmark
             </Button>
             <Button
               size="sm"
-              onClick={async () => {
-                const p = await profileFromEstimate(estimate);
-                if (p) navigate(`/profiles?id=${p.id}`);
-              }}
+              onClick={() =>
+                void profileFromEstimate(estimate).then((p) => {
+                  if (p) void navigate(`/profiles?id=${p.id}`);
+                })
+              }
             >
               <UserPlus /> Create profile
             </Button>
@@ -197,7 +198,10 @@ function PinEditor({ pin, flag, initial }: { pin: PinKey; flag: string; initial:
   const [error, setError] = useState<string | null>(null);
   const submit = () => {
     const patch = parsePin(pin, text);
-    if (typeof patch === 'string') return setError(patch);
+    if (typeof patch === 'string') {
+      setError(patch);
+      return;
+    }
     useTuning.getState().pin(patch);
     setOpen(false);
   };

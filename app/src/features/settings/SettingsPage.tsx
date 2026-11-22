@@ -75,7 +75,7 @@ function General({ settings, errors, save }: SectionProps & { errors: SettingsEr
           hint="One variable per line, KEY=value. Applied to every profile started, and to benchmarks and Tuning sweeps; a profile variable with the same name wins. Takes effect at the next start."
           value={settings.env}
           error={errors.env}
-          onCommit={(env) => save({ env })}
+          onCommit={(env) => void save({ env })}
         />
       </GlassCard>
     </div>
@@ -92,7 +92,7 @@ function Server({ settings, errors, save }: SectionProps & { errors: SettingsErr
           hint="Path, or name in the PATH."
           value={settings.binary}
           error={errors.binary}
-          onCommit={(v) => save({ binary: v })}
+          onCommit={(v) => void save({ binary: v })}
         />
         <TextField
           id="modelsDir"
@@ -100,7 +100,7 @@ function Server({ settings, errors, save }: SectionProps & { errors: SettingsErr
           hint="Default working directory of profiles."
           value={settings.modelsDir}
           error={errors.modelsDir}
-          onCommit={(v) => save({ modelsDir: v })}
+          onCommit={(v) => void save({ modelsDir: v })}
         />
         <TextField
           id="host"
@@ -117,7 +117,7 @@ function Server({ settings, errors, save }: SectionProps & { errors: SettingsErr
           }
           value={settings.host}
           error={errors.host}
-          onCommit={(v) => save({ host: v })}
+          onCommit={(v) => void save({ host: v })}
         />
         <TextField
           id="port"
@@ -125,7 +125,7 @@ function Server({ settings, errors, save }: SectionProps & { errors: SettingsErr
           value={String(settings.port)}
           error={errors.port}
           inputMode="numeric"
-          onCommit={(v) => save({ port: Number(v) })}
+          onCommit={(v) => void save({ port: Number(v) })}
         />
       </div>
     </GlassCard>
@@ -150,26 +150,28 @@ function Monitoring({ settings, save }: SectionProps) {
             label="NVML for NVIDIA GPUs"
             hint="Otherwise nvidia-smi (no PCIe bandwidth). Applied on the next llama-webui start."
             checked={c.nvml}
-            onChange={(on) => save({ collectors: { ...c, nvml: on } })}
+            onChange={(on) => void save({ collectors: { ...c, nvml: on } })}
           />
           <SwitchRow
             id="sys"
             label="CPU and memory"
             checked={c.system}
-            onChange={(on) => save({ collectors: { ...c, system: on } })}
+            onChange={(on) => void save({ collectors: { ...c, system: on } })}
           />
           <SwitchRow
             id="disk"
             label="Disks"
             checked={c.disk}
-            onChange={(on) => save({ collectors: { ...c, disk: on } })}
+            onChange={(on) => void save({ collectors: { ...c, disk: on } })}
           />
           <div className="flex flex-col gap-1.5">
             <Label>Polling interval</Label>
             <Select
               items={INTERVALS}
               value={String(settings.pollIntervalMs)}
-              onValueChange={(v) => v && save({ pollIntervalMs: Number(v) })}
+              onValueChange={(v) => {
+                if (v) void save({ pollIntervalMs: Number(v) });
+              }}
             >
               <SelectTrigger className="w-40" aria-label="Polling interval">
                 <SelectValue />
@@ -194,7 +196,7 @@ function Monitoring({ settings, save }: SectionProps) {
               step={30}
               value={history}
               onValueChange={(v) => setHistory(typeof v === 'number' ? v : v[0]!)}
-              onValueCommitted={(v) => save({ historySeconds: typeof v === 'number' ? v : v[0]! })}
+              onValueCommitted={(v) => void save({ historySeconds: typeof v === 'number' ? v : v[0]! })}
               aria-label="History kept, in seconds"
             />
           </div>
@@ -211,7 +213,7 @@ function Monitoring({ settings, save }: SectionProps) {
             <GpuSwitches
               gpus={info.gpus}
               hidden={settings.hiddenGpus}
-              onChange={(hiddenGpus) => save({ hiddenGpus })}
+              onChange={(hiddenGpus) => void save({ hiddenGpus })}
             />
           )}
         </div>

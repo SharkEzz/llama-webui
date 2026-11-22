@@ -56,31 +56,46 @@ const isFile = (path: string) =>
 
 /** The preview server for `dist` (not listening yet). */
 export function serveDist(dist: string): Server {
-  return createServer(async (req, res) => {
-    try {
-      // Parsed as a URL: `..` and `%2e%2e` segments are resolved before the base is checked.
-      const url = new URL(req.url ?? '/', 'http://localhost');
-      if (url.pathname === '/' || url.pathname === BASE) return redirect(res, `${BASE}/`);
-      if (!url.pathname.startsWith(`${BASE}/`)) {
-        res.writeHead(404, { 'content-type': 'text/plain;charset=utf-8', 'content-length': '9' });
-        return res.end(req.method === 'HEAD' ? undefined : 'Not found');
-      }
+  // Every failure is answered by the `catch`: the promise is discarded on purpose
+  return createServer((req, res) => void answer(dist, req, res));
+}
 
-      const rel = normalize(decodeURIComponent(url.pathname.slice(BASE.length))).replace(/^(\.\.(\/|$))+/, '');
-      const path = join(dist, rel);
-      if (!url.pathname.endsWith('/')) {
-        if (await isFile(path)) return await send(req, res, path);
-        if (await isFile(join(path, 'index.html'))) return redirect(res, `${url.pathname}/${url.search}`);
-      } else if (await isFile(join(path, 'index.html'))) {
-        return await send(req, res, join(path, 'index.html'));
-      }
-      await send(req, res, join(dist, '404.html'), 404);
-    } catch (err) {
-      console.error(`serve: ${req.url}: ${err instanceof Error ? err.message : String(err)}`);
-      if (!res.headersSent) res.writeHead(500);
-      res.end();
+/** The answer to one request; a failure is logged and answered with a 500. */
+async function answer(dist: string, req: IncomingMessage, res: ServerResponse) {
+  try {
+    // Parsed as a URL: `..` and `%2e%2e` segments are resolved before the base is checked.
+    const url = new URL(req.url ?? '/', 'http://localhost');
+    if (url.pathname === '/' || url.pathname === BASE) {
+      redirect(res, `${BASE}/`);
+      return;
     }
-  });
+    if (!url.pathname.startsWith(`${BASE}/`)) {
+      res.writeHead(404, { 'content-type': 'text/plain;charset=utf-8', 'content-length': '9' });
+      res.end(req.method === 'HEAD' ? undefined : 'Not found');
+      return;
+    }
+
+    const rel = normalize(decodeURIComponent(url.pathname.slice(BASE.length))).replace(/^(\.\.(\/|$))+/, '');
+    const path = join(dist, rel);
+    if (!url.pathname.endsWith('/')) {
+      if (await isFile(path)) {
+        await send(req, res, path);
+        return;
+      }
+      if (await isFile(join(path, 'index.html'))) {
+        redirect(res, `${url.pathname}/${url.search}`);
+        return;
+      }
+    } else if (await isFile(join(path, 'index.html'))) {
+      await send(req, res, join(path, 'index.html'));
+      return;
+    }
+    await send(req, res, join(dist, '404.html'), 404);
+  } catch (err) {
+    console.error(`serve: ${req.url}: ${err instanceof Error ? err.message : String(err)}`);
+    if (!res.headersSent) res.writeHead(500);
+    res.end();
+  }
 }
 
 if (import.meta.main) {
