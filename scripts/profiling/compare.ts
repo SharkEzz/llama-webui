@@ -7,14 +7,18 @@ import { RESULTS_VERSION, type Results, SCENARIO_NAMES, type ScenarioName } from
  * of the reference. `gpuBusy` (the AMD cards' gauge) is indicative and never a change.
  */
 export const NOISE: Record<FigureKind, { relative: number; absolute: number } | null> = {
-  // percentage points
-  cpu: { relative: 0, absolute: 0.5 },
-  share: { relative: 0, absolute: 0.5 },
+  // Calibrated on two runs of `dashboard aurora` on unchanged code (check-1, check-2, 2026-11-22), the measured spread in
+  // each comment.
+  // percentage points: up to 1.15 for a process (in a traced window; 0.8 in the others)
+  cpu: { relative: 0, absolute: 1.5 },
+  // percentage points: up to 0.77 (page tasks of a traced window)
+  share: { relative: 0, absolute: 1 },
   tps: { relative: 0.01, absolute: 0 },
-  // ms
-  duration: { relative: 0.1, absolute: 1 },
-  // bytes
-  size: { relative: 0.05, absolute: 1024 },
+  // ms: up to 11.8 % (the page profile's active time)
+  duration: { relative: 0.15, absolute: 1 },
+  // bytes: up to 8.6 % (the JS heap, read without a GC; transferred bytes under 2 %)
+  size: { relative: 0.1, absolute: 1024 },
+  // up to 4.9 %
   count: { relative: 0.05, absolute: 1 },
   gpuBusy: null,
 };

@@ -113,15 +113,15 @@ reference to check one fix against, as the next section explains.
 With `--compare`, the report opens on **What changed**: the figures whose difference exceeds the noise of their kind,
 largest first. Every other figure shows the reference value and the difference, and a figure under its noise is shown
 as unchanged. The noise is a fixed threshold per kind of figure: a difference is a change when it exceeds both the
-share of the reference and the floor.
+share of the reference and the floor. They were set from two runs of the same scenarios on unchanged code.
 
 | Kind of figure                      | Share of the reference     | Floor  |
 | ----------------------------------- | -------------------------- | ------ |
-| CPU of a process or thread (points) | —                          | 0.5 pt |
-| Share of a thread's time (points)   | —                          | 0.5 pt |
+| CPU of a process or thread (points) | —                          | 1.5 pt |
+| Share of a thread's time (points)   | —                          | 1 pt   |
 | Tokens per second                   | 1 %                        | —      |
-| Duration                            | 10 %                       | 1 ms   |
-| Size                                | 5 %                        | 1 KiB  |
+| Duration                            | 15 %                       | 1 ms   |
+| Size                                | 10 %                       | 1 KiB  |
 | Count                               | 5 %                        | 1      |
 | AMD `gpu_busy_percent`              | indicative, never a change | —      |
 
