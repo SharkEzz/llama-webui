@@ -17,12 +17,12 @@ takes in them. Use it to see at a glance where a model lives, which component wo
 The control at the top of the page, **Cards** or **Board**, switches between two drawings of the same machine, with
 the same blocks, the same figures and the same links. The browser remembers the one you chose.
 
-- **Cards** is a diagram: the **CPU** on top with the **Memory** at its left, a row below with the devices on the
-  CPU's own PCIe lanes (GPUs, then NVMe drives, then chipsets), and one row further the devices connected through
-  each **chipset**. Curves link a device to what it hangs off.
-- **Board** is the plan of a motherboard seen from above: the socket with the memory modules at its right and the
-  CPU's drives at its left, one slot per GPU below (those of the CPU first, then those of a chipset), the chipsets at
-  the lower right with their drives. Tracks run at right angles and never cross.
+- **Cards** is a diagram: the **CPU** on top with the **Memory** at its left and an integrated GPU at its right, a row
+  below with the devices on the CPU's own PCIe lanes (GPUs, then NVMe drives, then chipsets), and one row further the
+  devices connected through each **chipset**. Curves link a device to what it hangs off.
+- **Board** is the plan of a motherboard seen from above: the socket with the memory modules at its right, the CPU's
+  drives and an integrated GPU at its left, one slot per GPU below (those of the CPU first, then those of a chipset),
+  the chipsets at the lower right with their drives. Tracks run at right angles and never cross.
 
 <Screenshot
   name="topology-board"
@@ -45,9 +45,16 @@ drives and other PCIe devices are not.
 Each GPU gets its own color, used again in the legend and the model split. The CPU uses the accent color and the
 memory its own; drives and chipsets are neutral.
 
-The drawing takes the room it has and always shows whole: it grows on a large screen (up to twice its size) and
-shrinks with the window, without scrolling. Only a window too small to read it at half its size makes it scroll.
-There is nothing to rotate or zoom.
+The drawing starts whole in the room it has, at the left of the side column: it grows on a large screen (up to twice its size) and
+shrinks with the window. From there you look closer with the mouse:
+
+- The **wheel** zooms in and out around the pointer, up to four times the drawing's size and back to the whole
+  drawing.
+- A **drag** moves the drawing in its frame. A press that does not move stays a click, on a block for example.
+- Three buttons at the lower right of the frame do the same without a wheel: **Zoom in**, **Reset zoom**, which shows
+  the whole drawing again, and **Zoom out**.
+
+Switching between **Cards** and **Board** shows the whole drawing again.
 
 ## The blocks
 
@@ -116,7 +123,8 @@ Links join the blocks: curves between the cards, tracks on the board.
 - A link's thickness shows the PCIe capacity of the link at its maximum generation and width, so a Gen5 x16 slot looks
   thicker than a Gen4 x4 one.
 - The **CPU ↔ memory** link has a fixed thickness.
-- A thin, faint link is an internal connection without a PCIe link to report. It carries nothing and has no label.
+- A thin, faint link is an internal connection without a PCIe link to report: the one of a GPU inside the processor,
+  which is in no slot. It carries nothing and has no label.
 
 Each PCIe link has a label with its current state, such as `Gen4 x8`: a card that trained below what its slot can do
 shows there. In the Cards view the label sits on the link, above the card it reaches; on the board, in the margin
@@ -192,10 +200,9 @@ card's own PCIe link.
 
 ## The side column
 
-A column holds the title and the view control, then the **Phase** and **Model** cards and the legend. It stands at
-the right of the drawing when that leaves the drawing its full size, or when the drawing is limited by the height of
-the window anyway. Otherwise the drawing takes the whole width of the page and the cards come after it: scroll the
-page to read them. The two views do not have the same shape, so the column can move when you switch.
+A column at the right of the drawing holds the title and the view control, then the **Phase** and **Model** cards and
+the **Legend** button. It stays there in both views. Only a window too narrow for it, a phone or a small tablet, shows
+these cards after the drawing: scroll the page to read them.
 
 ### Phase
 
@@ -270,7 +277,9 @@ instead, and the legend says **Reduced motion: no streaks, a busy link is dashed
 ## Keyboard
 
 Every block is a button: <Kbd>Tab</Kbd> goes from one to the next, <Kbd>Enter</Kbd> or <Kbd>Space</Kbd> opens its
-details and moves the focus into them, and <Kbd>Esc</Kbd> closes them and gives the focus back to the block.
+details and moves the focus into them, and <Kbd>Esc</Kbd> closes them and gives the focus back to the block. In a
+zoomed drawing, a block that takes the focus comes into view. The three zoom buttons follow the blocks in the tab
+order.
 
 ## If the hardware cannot be read
 

@@ -1,17 +1,30 @@
 import { pcieBps, type TopologyGraph, type TopologyLink, type TopologyNode } from '@llama-webui/shared';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { Maximize, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { GLASS } from '@/components/glass/glass';
 import { TONE_VAR, type Tone } from '@/components/glass/tones';
+import { Button } from '@/components/ui/button';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { type Camera, fitCamera, panBy, resolveCamera, reveal, ZOOM_MAX, ZOOM_STEP, zoomAt } from './camera';
+import { detailPopover } from './detailPopover';
 import { type Level, type LinkFlow, linkBadge, type NodeLive, type PeerLink } from './flows';
-import { fitScale } from './geometry';
 import { createStreakLoop, laneStates, type StreakLoop, trackLook } from './streaks';
 import { resolveColor } from './themeColors';
 import type { ViewLayout } from './tree';
 
 /*
- * The frame both views draw in: the drawing at its natural size, scaled to the room it has, with the tracks of the
- * links (SVG), their labels (text) and their streaks (one canvas). The blocks are the view's own.
+ * The frame both views draw in: the drawing at its natural size, whole in the room it has until someone zooms or
+ * moves it (the wheel, a drag, the three buttons), with the tracks of the links (SVG), their labels (text) and their
+ * streaks (one canvas). The blocks are the view's own.
  */
 
 /** What the page hands a view. */
@@ -40,6 +53,13 @@ export interface StageProps extends Pick<ViewProps, 'graph' | 'flows' | 'specs' 
 const WIDEST_BPS = pcieBps(5, 16) ?? 1;
 /** Canvas pixels per px of the drawing, at most: a large drawing on a dense screen stays a reasonable canvas. */
 const MAX_RATIO = 2;
+/** How far the pointer goes, in px, before a press on the drawing is a drag and no longer a click. */
+const DRAG_START = 4;
+/** Scale change per px of wheel: a notch of a mouse wheel (100 px) is about 16%; a pinch of a touchpad counts more. */
+const WHEEL_RATE = 0.0015;
+const PINCH_RATE = 0.01;
+/** Height of a line, in px, for a wheel that counts in lines. */
+const WHEEL_LINE = 16;
 
 const LEVEL_COLOR: Record<Exclude<Level, 'ok'>, string> = { warn: 'var(--warning)', crit: 'var(--destructive)' };
 const LEVEL_TEXT: Record<Level, string> = {
@@ -82,12 +102,84 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
     return () => observer.disconnect();
   }, []);
 
-  const scale = fitScale(room ?? { w: 0, h: 0 }, { w: layout.width, h: layout.height });
-  // The drawing takes its frame: only a window too small for half its size makes it scroll
-  const width = Math.floor(layout.width * scale);
-  const height = Math.floor(layout.height * scale);
-  const scrolls = room !== null && (width > room.w || height > room.h);
-  const ratio = Math.min(MAX_RATIO, scale * (typeof devicePixelRatio === 'number' ? devicePixelRatio : 1));
+  // What someone zoomed or moved to; null shows the whole drawing, whatever the size of the frame
+  const [chosen, setChosen] = useState<Camera | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
+  const dragged = useRef(false);
+
+  const natural = useMemo(() => ({ w: layout.width, h: layout.height }), [layout.width, layout.height]);
+  const camera = resolveCamera(chosen, room ?? { w: 0, h: 0 }, natural);
+  const fit = fitCamera(room ?? { w: 0, h: 0 }, natural);
+  const { scale } = camera;
+  // A step of a quarter: the canvas is not allocated again at each notch of the wheel
+  const ratio = Math.min(
+    MAX_RATIO,
+    Math.ceil(scale * (typeof devicePixelRatio === 'number' ? devicePixelRatio : 1) * 4) / 4,
+  );
+
+  /** Zooms around a point of the frame, its center by default. */
+  const zoom = (factor: number, at?: { x: number; y: number }) => {
+    if (!room) return;
+    // The details stand beside a block that is about to move
+    detailPopover.close();
+    const next = zoomAt(camera, factor, at ?? { x: room.w / 2, y: room.h / 2 }, room, natural);
+    setChosen(next.scale <= fit.scale ? null : next);
+  };
+  const onWheel = useEffectEvent((event: WheelEvent) => {
+    const el = frame.current;
+    if (!el) return;
+    // The wheel zooms here: it does not scroll the page under the drawing
+    event.preventDefault();
+    const box = el.getBoundingClientRect();
+    const delta = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? WHEEL_LINE : 1);
+    zoom(Math.exp(-delta * (event.ctrlKey ? PINCH_RATE : WHEEL_RATE)), {
+      x: event.clientX - box.left,
+      y: event.clientY - box.top,
+    });
+  });
+  // React's wheel listener is passive: it cannot keep the page from scrolling
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const listener = (event: WheelEvent) => onWheel(event);
+    el.addEventListener('wheel', listener, { passive: false });
+    return () => el.removeEventListener('wheel', listener);
+  }, []);
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    drag.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+  };
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== event.pointerId || !room) return;
+    const dx = event.clientX - d.x;
+    const dy = event.clientY - d.y;
+    if (!d.moved) {
+      if (Math.hypot(dx, dy) < DRAG_START) return;
+      d.moved = true;
+      // From here the press is a drag: the frame keeps the pointer, and the block under it gets no click
+      event.currentTarget.setPointerCapture(event.pointerId);
+      detailPopover.close();
+      setDragging(true);
+    }
+    d.x = event.clientX;
+    d.y = event.clientY;
+    setChosen(panBy(camera, dx, dy, room, natural));
+  };
+  const onPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== event.pointerId) return;
+    drag.current = null;
+    if (!d.moved) return;
+    setDragging(false);
+    // The click that follows a drag is not one: it is dropped, and so is the mark if no click comes
+    dragged.current = true;
+    setTimeout(() => {
+      dragged.current = false;
+    }, 0);
+  };
 
   const links = useMemo(() => {
     const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
@@ -128,11 +220,41 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
   }, [states, links, theme]);
 
   return (
-    <div ref={frame} className={cn('flex size-full', scrolls ? 'overflow-auto' : 'overflow-hidden')}>
-      <div className={cn('m-auto shrink-0', room === null && 'invisible')} style={{ width, height }}>
+    <div className="relative size-full">
+      <div
+        ref={frame}
+        className={cn(
+          'relative size-full touch-none overflow-clip select-none',
+          dragging ? 'cursor-grabbing' : 'cursor-grab',
+        )}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
+        onClickCapture={(event) => {
+          if (!dragged.current) return;
+          dragged.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onFocus={(event) => {
+          // A block reached with the keyboard comes into view; one clicked is already under the pointer
+          const el = frame.current;
+          if (!el || !room || !event.target.matches(':focus-visible')) return;
+          const box = el.getBoundingClientRect();
+          const block = event.target.getBoundingClientRect();
+          const rect = { x: block.left - box.left, y: block.top - box.top, w: block.width, h: block.height };
+          const next = reveal(camera, rect, room, natural);
+          if (next !== camera) setChosen(next);
+        }}
+      >
         <div
-          className="relative origin-top-left"
-          style={{ width: layout.width, height: layout.height, transform: `scale(${scale})` }}
+          className={cn('absolute top-0 left-0 origin-top-left', room === null && 'invisible')}
+          style={{
+            width: layout.width,
+            height: layout.height,
+            transform: `translate(${Math.round(camera.x)}px, ${Math.round(camera.y)}px) scale(${scale})`,
+          }}
         >
           {backdrop}
           <svg
@@ -220,6 +342,44 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
             </span>
           ))}
         </div>
+      </div>
+      <div role="group" aria-label="Zoom" className="absolute right-3 bottom-3 flex flex-col gap-1">
+        <Button
+          variant="secondary"
+          size="icon-sm"
+          className={GLASS}
+          aria-label="Zoom in"
+          title="Zoom in"
+          disabled={scale >= ZOOM_MAX}
+          onClick={() => zoom(ZOOM_STEP)}
+        >
+          <ZoomIn aria-hidden="true" />
+        </Button>
+        <Button
+          variant="secondary"
+          size="icon-sm"
+          className={GLASS}
+          aria-label="Reset zoom"
+          title="Reset zoom"
+          disabled={chosen === null}
+          onClick={() => {
+            detailPopover.close();
+            setChosen(null);
+          }}
+        >
+          <Maximize aria-hidden="true" />
+        </Button>
+        <Button
+          variant="secondary"
+          size="icon-sm"
+          className={GLASS}
+          aria-label="Zoom out"
+          title="Zoom out"
+          disabled={scale <= fit.scale}
+          onClick={() => zoom(1 / ZOOM_STEP)}
+        >
+          <ZoomOut aria-hidden="true" />
+        </Button>
       </div>
     </div>
   );

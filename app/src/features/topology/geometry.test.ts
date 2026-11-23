@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import {
-  columnAtRight,
   crosses,
   curve,
   elbow,
@@ -145,29 +144,5 @@ describe('fitScale', () => {
   test('a frame not measured yet, or an empty drawing, gives a usable scale', () => {
     expect(fitScale({ w: 0, h: 0 }, natural)).toBe(SCALE_MIN);
     expect(fitScale({ w: 800, h: 600 }, { w: 0, h: 0 })).toBe(1);
-  });
-});
-
-describe('columnAtRight', () => {
-  const cards = { w: 1252, h: 730 };
-  const board = { w: 1058, h: 830 };
-
-  test('the column stands at the right when the drawing keeps its natural size beside it', () => {
-    expect(columnAtRight({ w: 1648, h: 992 }, cards)).toBe(true);
-    expect(columnAtRight({ w: 1648, h: 992 }, board)).toBe(true);
-  });
-
-  test('it goes under the drawing when it would shrink it, and the whole width would not', () => {
-    expect(columnAtRight({ w: 1328, h: 912 }, cards)).toBe(false);
-    expect(columnAtRight({ w: 1328, h: 912 }, board)).toBe(false);
-    expect(columnAtRight({ w: 1264, h: 776 }, cards)).toBe(false);
-  });
-
-  test('it stays at the right of a drawing its height already limits: the width it takes costs nothing', () => {
-    expect(columnAtRight({ w: 1264, h: 776 }, board)).toBe(true);
-  });
-
-  test('a page not measured yet has no column at the right', () => {
-    expect(columnAtRight({ w: 0, h: 0 }, cards)).toBe(false);
   });
 });

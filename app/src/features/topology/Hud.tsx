@@ -28,9 +28,15 @@ export interface HudProps {
   graph: TopologyGraph | null;
   placement: ModelPlacement | null;
   tones: Map<string, Tone>;
+  error: boolean;
+}
+
+export interface LegendProps {
+  snapshot: Snapshot | null;
+  graph: TopologyGraph | null;
+  tones: Map<string, Tone>;
   view: TopologyView;
   reducedMotion: boolean;
-  error: boolean;
 }
 
 const PHASE_UI: Record<Phase, { dot: string; text: string }> = {
@@ -44,15 +50,16 @@ const PHASE_UI: Record<Phase, { dot: string; text: string }> = {
 const PANEL = cn(GLASS, 'rounded-md px-3.5 py-3 text-sm');
 const TITLE = 'text-[0.9375rem] font-semibold tracking-tight';
 
-export function Hud({ phase, snapshot, graph, placement, tones, view, reducedMotion, error }: HudProps) {
+/** Color of a device of the model split, or of a GPU of the legend: the tone of its block. */
+function colorOf(tones: Map<string, Tone>, nodeId: string | null): string {
+  const tone = nodeId ? tones.get(nodeId) : undefined;
+  return tone ? TONE_VAR[tone] : 'var(--muted-foreground)';
+}
+
+export function Hud({ phase, snapshot, graph, placement, tones, error }: HudProps) {
   const ui = PHASE_UI[phase];
   const series = graph ? placementSeries(graph, placement) : [];
   const total = series.reduce((s, x) => s + x.bytes, 0);
-  const colorOf = (nodeId: string | null) => {
-    const tone = nodeId ? tones.get(nodeId) : undefined;
-    return tone ? TONE_VAR[tone] : 'var(--muted-foreground)';
-  };
-  const gpuNodes: TopologyNode[] = graph?.nodes.filter((n) => n.kind === 'gpu') ?? [];
   const p2p = p2pSummary(placement);
 
   return (
@@ -92,7 +99,7 @@ export function Hud({ phase, snapshot, graph, placement, tones, view, reducedMot
               {series.map((s) => (
                 <span
                   key={s.label}
-                  style={{ width: `${(100 * s.bytes) / total}%`, background: colorOf(s.nodeId) }}
+                  style={{ width: `${(100 * s.bytes) / total}%`, background: colorOf(tones, s.nodeId) }}
                   title={`${s.label}: ${formatBytes(s.bytes)}`}
                 />
               ))}
@@ -104,7 +111,7 @@ export function Hud({ phase, snapshot, graph, placement, tones, view, reducedMot
                   label={s.label}
                   bytes={s.bytes}
                   pct={(100 * s.bytes) / total}
-                  color={colorOf(s.nodeId)}
+                  color={colorOf(tones, s.nodeId)}
                 />
               ))}
             </dl>
@@ -124,65 +131,71 @@ export function Hud({ phase, snapshot, graph, placement, tones, view, reducedMot
           </>
         )}
       </section>
-
-      <Popover>
-        <PopoverTrigger
-          render={<Button variant="secondary" size="sm" className={cn(GLASS, 'self-start justify-self-start')} />}
-        >
-          <CircleHelp aria-hidden="true" />
-          Legend
-        </PopoverTrigger>
-        <PopoverContent side="top" align="start" className="w-80 gap-2 px-3.5 py-3">
-          <h2 className={TITLE}>Legend</h2>
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            <li>Wide bar of a GPU or of the memory: the memory in use.</li>
-            <li className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
-              In a GPU, in this order:
-              <Swatch color="var(--tone-blue)" label="model" />
-              <Swatch color={tint('var(--tone-blue)', LAYER_TINT.kv)} label="KV cache" />
-              <Swatch color={tint('var(--tone-blue)', LAYER_TINT.compute)} label="compute" />
-              <Swatch color="var(--muted-foreground)" label="other" />
-            </li>
-            <li>
-              The bar is outlined and its figure turns amber from {FILL_WARN_PCT}% full, red from {FILL_CRIT_PCT}%.
-            </li>
-            <li>Thin bar: load. CPU tiles: one per thread, lit with its load.</li>
-            <li>Link thickness: PCIe capacity.</li>
-            <li>
-              Streaks: measured throughput (log scale), one direction per lane. The label of a link gives its current
-              state and its exact figures. At rest, a link shows its traffic only from 8 MiB/s.
-            </li>
-            <li>
-              Percentage on a label: share of the link&apos;s current capacity, amber from {fmt(LINK_WARN * 100, 0)}%,
-              red from {fmt(LINK_CRIT * 100, 0)}%.
-            </li>
-            <li>
-              {snapshot?.system?.memBw
-                ? 'CPU ↔ memory: measured DRAM traffic (perf).'
-                : 'CPU ↔ memory: the link follows the CPU activity, without streaks, for lack of a DRAM measurement (perf).'}
-            </li>
-            <li>
-              Dotted link between GPUs: peer-to-peer (direct transfers), fainter when only requested. Not measured
-              apart: its traffic is part of each card&apos;s figures.
-            </li>
-            <li>Select a block for its details.</li>
-            {view === 'board' && <li>The board is a convention, not a picture of this motherboard.</li>}
-          </ul>
-          {gpuNodes.length > 0 && (
-            <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              {gpuNodes.map((n) => (
-                <li key={n.id}>
-                  <Swatch color={colorOf(n.id)} label={n.label} />
-                </li>
-              ))}
-            </ul>
-          )}
-          {reducedMotion && (
-            <p className="text-xs text-muted-foreground">Reduced motion: no streaks, a busy link is dashed.</p>
-          )}
-        </PopoverContent>
-      </Popover>
     </>
+  );
+}
+
+export function Legend({ snapshot, graph, tones, view, reducedMotion }: LegendProps) {
+  const gpuNodes: TopologyNode[] = graph?.nodes.filter((n) => n.kind === 'gpu') ?? [];
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={<Button variant="secondary" size="sm" className={cn(GLASS, 'self-start justify-self-start')} />}
+      >
+        <CircleHelp aria-hidden="true" />
+        Legend
+      </PopoverTrigger>
+      <PopoverContent side="top" align="start" className="w-80 gap-2 px-3.5 py-3">
+        <h2 className={TITLE}>Legend</h2>
+        <ul className="space-y-1 text-xs text-muted-foreground">
+          <li>Wide bar of a GPU or of the memory: the memory in use.</li>
+          <li className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+            In a GPU, in this order:
+            <Swatch color="var(--tone-blue)" label="model" />
+            <Swatch color={tint('var(--tone-blue)', LAYER_TINT.kv)} label="KV cache" />
+            <Swatch color={tint('var(--tone-blue)', LAYER_TINT.compute)} label="compute" />
+            <Swatch color="var(--muted-foreground)" label="other" />
+          </li>
+          <li>
+            The bar is outlined and its figure turns amber from {FILL_WARN_PCT}% full, red from {FILL_CRIT_PCT}%.
+          </li>
+          <li>Thin bar: load. CPU tiles: one per thread, lit with its load.</li>
+          <li>Link thickness: PCIe capacity.</li>
+          <li>
+            Streaks: measured throughput (log scale), one direction per lane. The label of a link gives its current
+            state and its exact figures. At rest, a link shows its traffic only from 8 MiB/s.
+          </li>
+          <li>
+            Percentage on a label: share of the link&apos;s current capacity, amber from {fmt(LINK_WARN * 100, 0)}%, red
+            from {fmt(LINK_CRIT * 100, 0)}%.
+          </li>
+          <li>
+            {snapshot?.system?.memBw
+              ? 'CPU ↔ memory: measured DRAM traffic (perf).'
+              : 'CPU ↔ memory: the link follows the CPU activity, without streaks, for lack of a DRAM measurement (perf).'}
+          </li>
+          <li>
+            Dotted link between GPUs: peer-to-peer (direct transfers), fainter when only requested. Not measured apart:
+            its traffic is part of each card&apos;s figures.
+          </li>
+          <li>Select a block for its details.</li>
+          <li>The wheel zooms, a drag moves the drawing; the buttons at its lower right zoom and reset.</li>
+          {view === 'board' && <li>The board is a convention, not a picture of this motherboard.</li>}
+        </ul>
+        {gpuNodes.length > 0 && (
+          <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {gpuNodes.map((n) => (
+              <li key={n.id}>
+                <Swatch color={colorOf(tones, n.id)} label={n.label} />
+              </li>
+            ))}
+          </ul>
+        )}
+        {reducedMotion && (
+          <p className="text-xs text-muted-foreground">Reduced motion: no streaks, a busy link is dashed.</p>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
