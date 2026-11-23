@@ -59,7 +59,8 @@ const writeDevice = (
 
 /**
  * A fake sysfs/procfs mirroring the reference machine: two root-port GPUs and an NVMe on the CPU, a Radeon behind a
- * chipset switch (with its own on-card switch), an "internal" bridge device with no link attributes.
+ * chipset switch (with its own on-card switch), and the processor's own GPU behind its internal bridge, which reports
+ * a link like a slot does, next to the processor's other functions.
  */
 const machine = Effect.fn('machine')(function* (extra: Readonly<Record<string, Dev>> = {}) {
   const fs = yield* FileSystem.FileSystem;
@@ -84,6 +85,8 @@ const machine = Effect.fn('machine')(function* (extra: Readonly<Record<string, D
           cls: '0x030000',
           link: ['32.0 GT/s PCIe', 16, '2.5 GT/s PCIe', 8],
         },
+        // The card's own audio function.
+        '0000:01:00.1': { vendor: '0x10de', device: '0x22e9', cls: '0x040300' },
       },
     },
     '0000:00:01.2': {
@@ -150,8 +153,17 @@ const machine = Effect.fn('machine')(function* (extra: Readonly<Record<string, D
       vendor: '0x1022',
       device: '0x14dd',
       cls: '0x060400',
+      link: ['16.0 GT/s PCIe', 16, '16.0 GT/s PCIe', 16],
       children: {
-        '0000:0d:00.0': { vendor: '0x1002', device: '0x13c0', cls: '0x030000' },
+        '0000:0d:00.0': {
+          vendor: '0x1002',
+          device: '0x13c0',
+          cls: '0x030000',
+          link: ['16.0 GT/s PCIe', 16, '16.0 GT/s PCIe', 16],
+        },
+        // The processor's security processor and one of its USB controllers.
+        '0000:0d:00.2': { vendor: '0x1022', device: '0x1649', cls: '0x108000' },
+        '0000:0d:00.3': { vendor: '0x1022', device: '0x15b6', cls: '0x0c0330' },
       },
     },
   };
@@ -339,7 +351,7 @@ layer(NodeServices.layer)('pci', (it) => {
         genCur: 4,
         widthCur: 4,
       });
-      // No link attributes: an on-die device.
+      // The processor's own GPU: the link its internal bridge reports (Gen4 x16) is no slot.
       assert.deepStrictEqual(linkTo(g, 'pci:0000:0d:00.0'), {
         id: 'cpu-pci:0000:0d:00.0',
         from: 'cpu',
@@ -351,6 +363,35 @@ layer(NodeServices.layer)('pci', (it) => {
         widthCur: null,
       });
       assert.strictEqual(g.links.length, 6);
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect('readPciTopology: a card in a slot is not integrated, whatever the vendors around it', () =>
+    Effect.gen(function* () {
+      const link = ['16.0 GT/s PCIe', 16, '16.0 GT/s PCIe', 16] as const;
+      const m = yield* machine({
+        // A card of the platform's own vendor, with its audio function: every function is the card's.
+        '0000:00:06.0': {
+          vendor: '0x8086',
+          device: '0x464d',
+          cls: '0x060400',
+          link,
+          children: {
+            '0000:10:00.0': { vendor: '0x8086', device: '0x56a0', cls: '0x030000', link },
+            '0000:10:00.1': { vendor: '0x8086', device: '0x4f90', cls: '0x040300' },
+          },
+        },
+        // A GPU on the root bus, without a link: inside the processor.
+        '0000:00:02.0': { vendor: '0x8086', device: '0xa780', cls: '0x030000' },
+      });
+      const g = yield* topologyOf(m);
+      assert.deepStrictEqual([linkTo(g, 'pci:0000:10:00.0')?.kind, linkTo(g, 'pci:0000:10:00.0')?.genCur], ['pcie', 4]);
+      assert.deepStrictEqual(
+        [linkTo(g, 'pci:0000:00:02.0')?.from, linkTo(g, 'pci:0000:00:02.0')?.kind],
+        ['cpu', 'internal'],
+      );
+      // The reference machine's card keeps its link next to its audio function.
+      assert.strictEqual(linkTo(g, 'pci:0000:01:00.0')?.kind, 'pcie');
     }).pipe(Effect.scoped),
   );
 

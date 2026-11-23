@@ -306,7 +306,10 @@ export function nodeLive(
       }
       if (g?.clockGrMhz != null) add('Graphics clock', `${fmt(g.clockGrMhz, 0)} MHz`);
       if (g?.clockMemMhz != null) add('Memory clock', `${fmt(g.clockMemMhz, 0)} MHz`);
-      add('PCIe link', linkLabel(g?.pcieGen ?? link?.genCur, g?.pcieWidth ?? link?.widthCur));
+      // A GPU inside the processor is in no slot: what its sample reads is the processor's internal bridge
+      if (link?.kind !== 'internal') {
+        add('PCIe link', linkLabel(g?.pcieGen ?? link?.genCur, g?.pcieWidth ?? link?.widthCur));
+      }
       if (flow?.fwdBps != null) add('Host → GPU', formatBps(flow.fwdBps));
       if (flow?.backBps != null) add('GPU → host', formatBps(flow.backBps));
       const others = peers.find((group) => group.includes(n))?.filter((x) => x !== n);

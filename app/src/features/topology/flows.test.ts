@@ -667,6 +667,21 @@ test('nodeLive: the CPU gives its load average and the memory its page cache', (
   expect(factsOf(s, 'ram').Cached).toBe('6.0 GiB');
 });
 
+test('nodeLive: a GPU inside the processor has no PCIe link among its facts, whatever its sample says', () => {
+  const s = {
+    ...snapshot,
+    allGpus: [
+      ...snapshot.allGpus.filter((g) => g.busId !== '0000:0d:00.0'),
+      gpu({ busId: '0000:0d:00.0', vendor: 'amd', pcieGen: 4, pcieWidth: 16, tempC: 34 }),
+    ],
+  } as Snapshot;
+  const labels = nodeLive(graph, s, placement)
+    .get('pci:0000:0d:00.0')!
+    .facts.map((f) => f.label);
+  expect(labels).toContain('Temperature');
+  expect(labels).not.toContain('PCIe link');
+});
+
 test('linkSpecs: the current state of each PCIe link, a GPU sample winning over the graph', () => {
   // Link `a` is Gen1 x8 in the graph (read at rest), Gen5 x8 in the sample
   expect(linkSpecs(graph, null)).toEqual(
