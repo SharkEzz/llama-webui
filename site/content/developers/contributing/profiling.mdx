@@ -71,7 +71,9 @@ A few scenarios leave things as they find them only on the way out:
   from the disk as after a reboot; the report shows the share of the model still cached at the start.
 - `generation` and `chat` create conversations titled `Profiling (temp)` and delete them at the end.
 - `collectors` is a breakdown, not a verdict. Its NVML table times only the calls, in the tool's own process: the
-  sampler process also runs Node, encodes and sends each sample and collects its garbage. The NVML sampler's whole
+  sampler process also runs Node, encodes and sends each sample and collects its garbage. The first of its rounds is
+  dropped, and with it the values the sampler reads once and keeps (identity, maxima, driver versions): the table is
+  what each later sample costs. The NVML sampler's whole
   cost is its row in the windows of `idle` or `dashboard`. The list of `/proc` and sysfs reads is kept in the tool,
   written from `app/server/collectors/`: it does not follow the code.
 

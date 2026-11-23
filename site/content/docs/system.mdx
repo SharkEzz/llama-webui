@@ -73,7 +73,7 @@ Without PCIe traffic, the [Topology](/docs/topology/) page draws no streaks and 
 ### NVIDIA: NVML or nvidia-smi
 
 NVML is the library installed with the NVIDIA driver (`libnvidia-ml.so.1`). llama-webui loads it when it starts and
-reads every card from a background thread. If NVML cannot be loaded or does not
+reads every card from a process of its own. If NVML cannot be loaded or does not
 answer within 3 seconds, llama-webui falls back to `nvidia-smi`, which reports fewer values (see the table above).
 
 To use `nvidia-smi` on purpose, turn off **NVML for NVIDIA GPUs** on the **Monitoring** tab of Settings. The change

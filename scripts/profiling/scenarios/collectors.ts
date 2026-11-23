@@ -1,6 +1,7 @@
 // collectors: a breakdown, not a verdict. Each NVML call the sampler makes, timed through the app's own reading code
-// (`deviceHandles`, `readNvml`) over a library wrapped in a timing Proxy; then each /proc or sysfs file a monitor tick
-// reads, re-read once per second. 11 rounds each, the first dropped.
+// (`deviceHandles`, `nvmlReader`) over a library wrapped in a timing Proxy; then each /proc or sysfs file a monitor tick
+// reads, re-read once per second. 11 rounds each, the first dropped: for NVML, the first round is also where the reader
+// reads what it keeps (identity, maxima, driver versions), so the table is what every later sample costs.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { now, sleep } from '../instance.ts';
@@ -24,7 +25,7 @@ async function loadNvml() {
     import('../../../app/server/collectors/nvml/symbols.ts'),
     import('../../../app/server/collectors/nvml/read.ts'),
   ]);
-  return { lib: symbols.openNvml(), deviceHandles: read.deviceHandles, readNvml: read.readNvml };
+  return { lib: symbols.openNvml(), deviceHandles: read.deviceHandles, nvmlReader: read.nvmlReader };
 }
 
 async function nvml(skipped: string[]): Promise<Collectors['nvml']> {
@@ -35,7 +36,7 @@ async function nvml(skipped: string[]): Promise<Collectors['nvml']> {
     skipped.push(`NVML: the library does not load (${error instanceof Error ? error.message : String(error)})`);
     return null;
   }
-  const { lib, deviceHandles, readNvml } = loaded;
+  const { lib, deviceHandles, nvmlReader } = loaded;
   if (lib.nvmlInit_v2() !== 0) {
     skipped.push('NVML: nvmlInit_v2 failed');
     return null;
@@ -65,13 +66,14 @@ async function nvml(skipped: string[]): Promise<Collectors['nvml']> {
   });
   try {
     const handles = deviceHandles(timed);
+    const read = nvmlReader(timed, handles);
     let sampleCpuMs = 0;
     let sampleWallMs = 0;
     for (let round = 0; round < ROUNDS; round++) {
       const r0 = now();
       const c0 = process.cpuUsage();
       timing.on = round > 0;
-      readNvml(timed, handles, { skipGpus: [] });
+      read({ skipGpus: [] });
       if (round > 0) {
         sampleCpuMs += cpuMs(process.cpuUsage(c0));
         sampleWallMs += now() - r0;

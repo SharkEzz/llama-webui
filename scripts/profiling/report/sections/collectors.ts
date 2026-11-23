@@ -27,7 +27,7 @@ ${figure(
       })),
     { title: 'CPU of each NVML call in one sample', labelWidth: 340, color: SERIES[1] },
   ),
-  "The calls the app's <code>readNvml</code> makes for one sample of every GPU, timed through a proxy on its symbols, in the tool's own process. They are only part of the NVML sampler's CPU: its process also runs Node, encodes and sends each sample, and collects its garbage. Its whole cost is the NVML sampler row of the windows.",
+  "The calls the app's <code>nvmlReader</code> makes for one sample of every GPU, after the first one, which also reads what the sampler keeps (identity, maxima, driver versions), timed through a proxy on its symbols, in the tool's own process. They are only part of the NVML sampler's CPU: its process also runs Node, encodes and sends each sample, and collects its garbage. Its whole cost is the NVML sampler row of the windows.",
 )}`
     : '';
   const reads = s.reads.toSorted((a, b) => b.cpuMs - a.cpuMs);
