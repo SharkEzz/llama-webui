@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMonitor } from '@/lib/monitor';
 import { useServer } from '@/lib/server';
-import { refreshTopology, useTopology } from '@/lib/topology';
+import { useTopology, watchTopology } from '@/lib/topology';
 import { cn } from '@/lib/utils';
 import { gpuTones, linkFlows, nodeLive, peerLinks } from './flows';
 import { Hud } from './Hud';
@@ -31,10 +31,9 @@ export function TopologyPage() {
   const view = useRef<SceneView | null>(null);
   const [viewMoved, setViewMoved] = useState(false);
 
-  // The graph is reloaded on open: the links' current state (Gen/width) changes with power states.
-  useEffect(() => {
-    void refreshTopology();
-  }, []);
+  // The graph is read while the page is shown, and again on each reconnect: the links' current state (Gen/width)
+  // changes with power states. No other page asks for it.
+  useEffect(() => watchTopology(), []);
 
   const layout = useMemo(() => (graph ? layoutGraph(graph) : null), [graph]);
   const flows = useMemo(() => (graph ? linkFlows(graph, snapshot) : null), [graph, snapshot]);

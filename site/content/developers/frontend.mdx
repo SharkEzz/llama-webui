@@ -149,7 +149,7 @@ effects and the sync functions.
 | `server.ts`    | `useServer`                              | `server-state`; `GET /api/state` on connection. Also the start, switch, restart and stop actions.                              |
 | `monitor.ts`   | `useMonitor`                             | `snapshot`, appended to a client-side history; `GET /api/monitor/history` on connection and when the history shape changes.    |
 | `logs.ts`      | `useLogs`                                | `hello` and `log`; `GET /api/logs?since=<seq>` on connection.                                                                  |
-| `topology.ts`  | `useTopology`                            | `placement`; `GET /api/topology` on connection.                                                                                |
+| `topology.ts`  | `useTopology`                            | `placement`; `GET /api/topology` while the Topology page is shown (`watchTopology`), again on each connection.                 |
 | `downloads.ts` | `useDownloads`                           | `download`, `download-progress`, `download-deleted`; the queue reloaded on connection. A finished download rescans the models. |
 | `bench.ts`     | `useBench`                               | `bench-progress`, `bench-run`, `bench-deleted`; the history reloaded on connection.                                            |
 | `tuning.ts`    | `useTuning`                              | `sweep`, `sweep-progress`, `sweep-deleted`, and the `bench-*` messages of the open sweep; the sweeps reloaded on connection.   |
