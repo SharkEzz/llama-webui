@@ -55,10 +55,15 @@ one night with no code change, #137), so a baseline measured earlier is not a re
   launch is read once, then the base is measured, then the head. Base first is also the order a migration needs: the
   head's migrations run after the base has used the data directory.
 - **What stays the same on both sides.** The server's working directory is the repository (its `.env` is the one read
-  on both sides), the data directory, the address, the profile, Chromium.
+  on both sides), the address, the profile, Chromium.
+- **The data directory.** Each side runs on its own copy of the data directory (`<run>/datadir`), taken before the
+  first measure from the one `--data-dir` names, else the one the server would use (`scripts/profiling/datadir.ts`
+  follows the server's rules: `LLAMA_WEBUI_DATA_DIR`, `.env`, `XDG_DATA_HOME`, the home). A copy is written to the
+  run's `state.json` before it is made and removed by the undo. Both sides start from the same data, and a migration
+  never reaches the source. The copy is taken as the directory is: one the branch already migrated may not open with
+  the base's code.
 - **`collectors`** imports the app's NVML reader from the sources of the side it measures. When the base's reader does
-  not have the shape the head's scenario expects, the scenario fails on the base and the head shows it uncompared, as
-  any scenario missing from a reference.
+  not export what the scenario calls, its NVML table is skipped on that side (a note of the scenario, not a failure).
 - **Refusals.** `--base` with `--compare` (one reference at a time) or with `--no-build` (the base has no build to
   reuse).
 - **`summary.md`.** A run compared with another also writes `summary.md`: the two versions, the figures outside the
@@ -83,20 +88,24 @@ only under `--base`; with the default port the tool already refused next to a ru
   accepts scenario names, `all` and `--profile <integer>`, and nothing else; no scenario means `all`. Anything else is
   answered with the usage.
 - **One pass at a time.** `concurrency: profiling`, not cancelled by a newer comment.
-- **Data.** The job copies a seed data directory (repository variable `PROFILING_DATA_DIR`, a path on the runner) to a
-  temporary one and passes it as `--data-dir`: a PR's migration never reaches the seed. The port is the repository
-  variable `PROFILING_PORT` (7870 when unset).
+- **Data.** The job passes the repository variable `PROFILING_DATA_DIR` (a path on the runner) as `--data-dir` when it
+  is set; the tool copies it for each side, as for any `--base` run. The port is the repository variable
+  `PROFILING_PORT` (7870 when unset).
 - **The answer.** `summary.md` as a comment on the PR, with the measured commit and a link to the workflow run. A pass
-  that fails or is refused answers with its reason: the last lines of the output, the runner's home and workspace
-  paths replaced.
+  that fails or is refused answers with its reason: the last lines of the output, the runner's home, workspace,
+  temporary and data paths replaced.
 - **The report.** Copied to `PROFILING_REPORTS_DIR` on the runner when that variable is set. **(my call)**: it is not
-  uploaded as an artifact unless `PROFILING_UPLOAD_REPORT` is `true`. The repository is public, and the report names
-  the machine (CPU, GPUs, kernel, the profile, the data directory's path).
+  attached to the pull request nor uploaded as an artifact. The repository is public, and the report names the machine
+  (CPU, GPUs, kernel, the profile, the data directory's path). The design first shown to the user said the report
+  would be attached: this is a deviation, to be reopened if they want it (an artifact is the way, for a private
+  repository or once the report can leave the machine's description out).
 
 A workflow started by a comment runs from the default branch: the command cannot be tried before it is merged. What it
 calls (`--base`, `comment.ts`, `summary.md`) is tested before.
 
 ## Build order
+
+No separate plan document was written: this list was the plan.
 
 1. The side a pass measures (`Target`: sources, build output), through the instance, the scenarios and the build.
 2. `--base`: options, the worktree and its undo, the two passes, `summary.md`.
@@ -106,7 +115,8 @@ calls (`--base`, `comment.ts`, `summary.md`) is tested before.
 
 ## Tests
 
-- Unit: the options, the worktree's undo, the llama-server check on a fake `/proc`, `summary.md`, the comment parser.
-- By hand, without a model: `pnpm profiling startup idle load --base master` on a free port and a temporary data
-  directory. A scenario with a model needs the GPUs: asked of the user.
+- Unit: the options, the worktree's and the data copy's undo, the data directory's rules, the llama-server check on a
+  fake `/proc`, `summary.md`, the comment parser and the answer.
+- By hand, without a model: `pnpm profiling startup idle load --base master` on a free port; SIGTERM during the base's
+  build, and SIGKILL then the next command's cleanup. A scenario with a model needs the GPUs: asked of the user.
 - The workflow itself: after the merge, by a comment on a PR.

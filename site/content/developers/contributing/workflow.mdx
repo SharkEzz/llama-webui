@@ -42,7 +42,7 @@ soon as a change forgets it.
 | `package.json` scripts, repository layout                                                                                                | [Development setup](/developers/getting-started/)                                                                                                                                                                                                                         |
 | `app/server/testing/**`, `app/server/contract/**`, `testdata/**`, the black-box suites (fakes, fixtures, the contract suite)             | [Testing](/developers/contributing/testing/) (and `/developers/api/*` when the golden changes)                                                                                                                                                                            |
 | A new domain, service, shutdown step, `/ws` message or page (`docs/superpowers/poc-effect/conventions.md`)                               | [How-to guides](/developers/contributing/how-to/)                                                                                                                                                                                                                         |
-| `scripts/profiling/` (a scenario, an option, the noise table, the report)                                                                | [Profiling](/developers/contributing/profiling/)                                                                                                                                                                                                                          |
+| `scripts/profiling/`, `.github/workflows/profiling.yml` (a scenario, an option, the noise table, the report, the comment command)        | [Profiling](/developers/contributing/profiling/)                                                                                                                                                                                                                          |
 | Requirements, installation (README)                                                                                                      | [Requirements](/docs/getting-started/requirements/), [Installation](/docs/getting-started/installation/)                                                                                                                                                                  |
 | The lint configuration: `oxlint*.ts` (the root fragments and every project's `oxlint.config.ts`), `oxfmt.config.ts`, `scripts/oxlint/`   | [Conventions](/developers/contributing/conventions/) (format, lint and [What the linter enforces](/developers/contributing/conventions/#what-the-linter-enforces))                                                                                                        |
 | Project conventions (language, tests, docs)                                                                                              | These Contributing pages                                                                                                                                                                                                                                                  |
@@ -268,6 +268,11 @@ request cancels its run still going; the runs on `master` all go to their end.
 `site/`, the shared theme it imports (`packages/webui-theme/`) or the workflow itself, and when started by hand from
 the Actions tab (`workflow_dispatch`). A pull request never deploys: the site changes it brings go live when it is
 merged.
+
+`.github/workflows/profiling.yml` answers a `/profiling` comment on a pull request: it measures the pull request
+against its base on a self-hosted runner with GPUs and posts the comparison.
+[Profiling](/developers/contributing/profiling/#measure-a-pull-request-from-a-comment) has the command, its rules and
+the runner's setup. No other workflow runs on that runner.
 
 ## Releases
 

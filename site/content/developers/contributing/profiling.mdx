@@ -1,6 +1,6 @@
 ---
 title: Profiling
-description: Measure what the app costs (server, NVML sampler, browser, llama-server's throughput) with pnpm profiling, check a fix by running the same scenario before and after it, and read a comparison of two runs.
+description: Measure what the app costs (server, NVML sampler, browser, llama-server's throughput) with pnpm profiling, check a fix by running the same scenario before and after it, measure a branch against its base in one run or from a pull request comment, and read a comparison of two runs.
 ---
 
 `pnpm profiling` measures the app as a person uses it: it builds it, starts it on your machine, opens its pages in
@@ -8,8 +8,8 @@ Chromium, launches a profile on your GPUs, and writes the figures to an HTML rep
 The report states CPU per process, page work, load times, API latency and throughput, with the reference value and the
 difference when you compare two runs. Which figure is a problem and what to change stays your call.
 
-The tool lives in `scripts/profiling/`. No test launches it: the suites only cover its parsing, its comparison and its
-report, on small fixtures.
+The tool lives in `scripts/profiling/`. No test launches it: the suites only cover its options, its undo, its
+comparison, its report and the comment command's parser, on small fixtures.
 
 ## What it needs
 
@@ -19,10 +19,11 @@ report, on small fixtures.
 - **The instance's port free**: the tool starts its own server on `127.0.0.1:7860` and refuses to run when something
   answers there. Stop your instance first, or pick another `--host`/`--port`.
 - **The GPUs**, for a scenario with a model: it launches the profile given by `--profile <id>`, else the instance's
-  default profile, and keeps it running until its last scenario.
+  default profile, and keeps it running until its last scenario. The tool refuses to start one while a process named
+  `llama-server` runs on the machine, whoever started it: stop it first.
 
 The server uses your data directory (`--data-dir` for another one): the profiles, models and settings the tool sees are
-yours.
+yours. With `--base`, each side works on its own copy of it.
 
 ## Commands
 
@@ -31,6 +32,7 @@ pnpm profiling --list                              # the scenarios, with what th
 pnpm profiling dashboard aurora --name before      # two scenarios, the run named "before"
 pnpm profiling all --name baseline                 # every scenario: about an hour
 pnpm profiling chat --compare baseline             # a run compared with an earlier one
+pnpm profiling chat --base master                  # master, then the working tree compared with it
 pnpm profiling:report before --compare baseline    # rewrite a report from its results.json
 ```
 
@@ -38,6 +40,7 @@ pnpm profiling:report before --compare baseline    # rewrite a report from its r
 | ------------------ | ------------------------------------------------------------------------------------------------------------- |
 | `--name <run>`     | The run's folder under `.cache/profiling/`; the date and time when absent. An existing name is refused.       |
 | `--compare <run>`  | Compare with an earlier run; a run whose results have another format version is refused.                      |
+| `--base <ref>`     | Measure a git ref first, then the working tree compared with it. Not with `--compare` nor `--no-build`.       |
 | `--profile <id>`   | The profile the model scenarios launch, instead of the default one.                                           |
 | `--data-dir <dir>` | The server's data directory.                                                                                  |
 | `--host`, `--port` | The server's address, `127.0.0.1:7860` by default.                                                            |
@@ -117,6 +120,55 @@ pnpm profiling aurora --name after --compare before
 Use the same command on both sides. A full pass (`all --name baseline`) gives the overall picture; it is not the
 reference to check one fix against, as the next section explains.
 
+## Measure a branch against its base
+
+`--base <ref>` takes both measures in one run: the ref first (a branch, a tag, a commit), then the working tree, with
+the same scenarios, profile, address and Chromium. It answers what a branch changes without a baseline measured
+earlier, which the machine's state makes unreliable from one hour to the next.
+
+```bash title="Terminal"
+pnpm profiling chat dashboard --base master --name my-branch
+```
+
+<Steps>
+
+<Step title="The base is checked out and installed">
+
+The ref is checked out in a git worktree under the base run's folder (`.cache/profiling/my-branch.base/src`), then
+installed there with `pnpm install --frozen-lockfile --ignore-scripts --prefer-offline`.
+
+</Step>
+
+<Step title="Both sides are built">
+
+The base in its worktree, then the working tree: a build that fails stops the command before any measure. The profile
+to launch is then read once, for both sides.
+
+</Step>
+
+<Step title="The base is measured, then the working tree">
+
+The base is an ordinary run named `<name>.base`; the working tree is the run `<name>`, compared with it. The copy of
+the tool in the working tree measures both, so a difference comes from the app, not from the tool.
+
+</Step>
+
+</Steps>
+
+Three things differ from a run without `--base`:
+
+- **The data directory is copied.** Each side starts its server on its own copy of the data directory (the one
+  `--data-dir` names, else the one the server would use), made before the first measure and removed with the run. Both
+  sides start from the same data, and a migration the branch brings never reaches your data. The copy is taken as the
+  directory is: one a branch has already migrated may not open with the base's older code, so give `--data-dir` a
+  directory from before.
+- **The server's working directory stays the repository** on both sides: its `.env` is the one both read.
+- **`collectors` loads the NVML reader of the side it measures.** When the base's reader does not export what the
+  scenario calls, its NVML table is skipped on the base and shown without comparison on the working tree.
+
+Stopping the command (Ctrl+C, SIGTERM) removes the worktree and the copies; so does the next `pnpm profiling` after a
+kill.
+
 ## Read a comparison
 
 With `--compare`, the report opens on **What changed**: the figures whose difference exceeds the noise of their kind,
@@ -127,6 +179,10 @@ as unchanged. The noise is a fixed threshold per kind of figure: a difference is
 share of the reference and the floor; a figure of a profiled window has twice that threshold. They were set from two
 runs of the same scenarios on unchanged code: two runs give a spread, not a distribution. A smaller difference may
 still be real, such as a small process's CPU: read the raw difference, or repeat both runs.
+
+A compared run also writes `summary.md` next to its report: the two versions, the figures outside the noise (the 40
+with the largest excess), the scenarios that failed on either side and the comparison's notes, in Markdown. It names no
+path and nothing of the machine but what a failed scenario's message holds.
 
 | Kind of figure                      | Share of the reference     | Floor   |
 | ----------------------------------- | -------------------------- | ------- |
@@ -162,6 +218,10 @@ Three things to keep in mind:
   - `sourcemaps/` the client's maps of this build
   - `results.json` the figures of the report, with a format version
   - `report.html` the report, one file with no external resource
+  - `summary.md` the comparison in Markdown, for a compared run
+  - `datadir/` with `--base`, this side's copy of the data directory, while the run lasts
+- `.cache/profiling/<run>.base/` with `--base`, the base's run: the same files, and
+  - `src/` the base's worktree, while the run lasts
 
 </FileTree>
 
@@ -174,9 +234,76 @@ switch (**Auto**, **Light**, **Dark**) picks one, which the browser keeps.
 Everything the tool starts or creates is written to `state.json` when it starts or creates it, each process with its
 start time. The end of the command (failed scenarios included), Ctrl+C and SIGTERM run the same undo: delete the
 temporary conversations, stop llama-server through the API, restore the default profile, close Chromium, then stop the
-server and wait for its exit. A step that fails is printed and the next ones still run. The API is called, and a
+server and wait for its exit; with `--base`, the base's worktree and each side's copy of the data directory are removed
+last. A step that fails is printed and the next ones still run. The API is called, and a
 process stopped, only while the process recorded in `state.json` still runs: a pid reused since, or an instance started
 on the port after the run, is left alone, and what could not be undone is printed. A second Ctrl+C quits at once.
 
 A run killed before its undo (`kill -9`, a crash) leaves its `state.json`: the next `pnpm profiling` undoes it before
 it starts, and prints what it cleaned. A run whose `pnpm profiling` still runs is left as it is.
+
+## Measure a pull request from a comment
+
+A comment on a pull request starts a pass on the maintainer's machine and gets the comparison as an answer:
+
+```text title="Comment"
+/profiling chat dashboard --profile 6
+```
+
+The first line holds the command: scenario names or `all` (the default when none is named), and `--profile <id>`.
+Anything else is answered with the usage. `.github/workflows/profiling.yml` then runs
+`pnpm profiling <scenarios> --base origin/<base branch>` on the pull request's last commit, and posts the run's
+`summary.md` with the commit it measured and a link to the workflow run. A pass that is refused or fails answers with
+the end of its output, the runner's paths replaced by placeholders.
+
+| Rule                 | Detail                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Who can start a pass | The repository's owner and its collaborators; a comment from anyone else starts nothing.                        |
+| Forks                | A pull request from a fork is refused with an answer: push the branch to the repository to measure it.          |
+| One pass at a time   | A new comment waits for the pass in progress; a third one replaces the second while the first still runs.       |
+| The report           | Not uploaded: it names the machine. It is copied to `PROFILING_REPORTS_DIR` on the runner when that is set.     |
+| Changes to the job   | A workflow started by a comment runs from `master`: a change to `profiling.yml` takes effect once it is merged. |
+
+### Set up the runner
+
+The pass needs the GPUs, so it runs on a [self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners)
+with the label `profiling`, installed on the machine that has them:
+
+<Steps>
+
+<Step title="Require approval for outside contributors' workflows">
+
+In the repository's **Settings › Actions › General**, under the approval of fork pull request workflows, require
+approval for all external contributors. A workflow started by a pull request runs the pull request's own copy of the
+workflow files: without that approval, a fork could name the `profiling` label in a workflow of its own and run code on
+the machine. Read the workflow changes of a fork's pull request before you approve its runs.
+
+</Step>
+
+<Step title="Register the runner">
+
+**Settings › Actions › Runners › New self-hosted runner** gives the commands. Add the label `profiling` when
+`config.sh` asks for labels, and run the runner as your own user, not as root: it needs `git`, `gh`, Chromium, the
+GPUs, and the model files the profile names.
+
+</Step>
+
+<Step title="Give it a data directory">
+
+Set the repository variable `PROFILING_DATA_DIR` (**Settings › Secrets and variables › Actions › Variables**) to a data
+directory on the machine that holds the profile to launch as its default one. Each pass copies it, so it is never
+changed. Without the variable, the pass copies the data directory of the runner's user.
+
+</Step>
+
+</Steps>
+
+| Repository variable     | Effect                                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `PROFILING_DATA_DIR`    | The data directory each pass copies; the runner's user's own when unset.                                       |
+| `PROFILING_PORT`        | The port of the pass's server, 7870 when unset: it must be free.                                               |
+| `PROFILING_REPORTS_DIR` | A folder on the machine where each pass leaves its `report.html`, `results.json`, `run.json` and `summary.md`. |
+
+A pass uses the GPUs for as long as its scenarios last (`all` is about twenty minutes a side) and is refused while a
+llama-server runs. Check the first report for the software rendering banner: a runner started as a service must still
+reach the GPU for Chromium's compositing.
