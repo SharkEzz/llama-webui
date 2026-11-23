@@ -7,6 +7,7 @@ import { useServer } from '@/lib/server';
 import { useTopology, watchTopology } from '@/lib/topology';
 import { cn } from '@/lib/utils';
 import { toneOfNode } from './blocks';
+import { BoardView } from './BoardView';
 import { CardsView } from './CardsView';
 import { Detail } from './Detail';
 import { detailOf, gpuTones, linkFlows, linkSpecs, nodeLive, peerLinks } from './flows';
@@ -55,6 +56,7 @@ export function TopologyPage() {
   // A block that left the graph has no details any more: the panel closes with it
   const detail = graph && live ? detailOf(graph, live, selected) : null;
   const openId = detail?.node.id ?? null;
+  const View = view === 'board' ? BoardView : CardsView;
 
   useEffect(() => {
     if (openId === null) return;
@@ -107,7 +109,7 @@ export function TopologyPage() {
 
         <div ref={drawing} className="h-[72dvh] min-h-0 @7xl:col-start-1 @7xl:row-span-2 @7xl:row-start-1 @7xl:h-auto">
           {graph && live && flows ? (
-            <CardsView
+            <View
               graph={graph}
               live={live}
               flows={flows}

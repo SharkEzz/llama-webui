@@ -59,12 +59,14 @@ interface BlockProps {
   tone: BlockTone;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** No glass surface of its own: the block is made of parts that have theirs (the memory modules of the board). */
+  bare?: boolean;
   className?: string;
   children: ReactNode;
 }
 
 /** A block at its rectangle. Its content is phrasing content (spans): it sits in a button. */
-export function Block({ node, live, rect, tone, selected, onSelect, className, children }: BlockProps) {
+export function Block({ node, live, rect, tone, selected, onSelect, bare = false, className, children }: BlockProps) {
   const style: CSSProperties & { '--tone': string } = {
     left: rect.x,
     top: rect.y,
@@ -80,9 +82,14 @@ export function Block({ node, live, rect, tone, selected, onSelect, className, c
       onClick={() => onSelect(node.id)}
       style={style}
       className={cn(
-        GLASS,
-        'absolute cursor-pointer text-left text-foreground transition-shadow outline-none hover:ring-surface-border-bright focus-visible:ring-2 focus-visible:ring-ring',
-        selected && 'ring-2 ring-primary-ink hover:ring-primary-ink',
+        'absolute cursor-pointer text-left text-foreground',
+        bare
+          ? ['rounded-lg outline-offset-4 outline-primary-ink focus-visible:outline-2', selected && 'outline-2']
+          : [
+              GLASS,
+              'transition-shadow outline-none hover:ring-surface-border-bright focus-visible:ring-2 focus-visible:ring-ring',
+              selected && 'ring-2 ring-primary-ink hover:ring-primary-ink',
+            ],
         live.dim && 'opacity-60',
         className,
       )}

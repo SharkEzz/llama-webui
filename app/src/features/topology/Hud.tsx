@@ -126,7 +126,9 @@ export function Hud({ phase, snapshot, graph, placement, tones, view, reducedMot
       </section>
 
       <Popover>
-        <PopoverTrigger render={<Button variant="secondary" size="sm" className={cn(GLASS, 'self-start')} />}>
+        <PopoverTrigger
+          render={<Button variant="secondary" size="sm" className={cn(GLASS, 'self-start justify-self-start')} />}
+        >
           <CircleHelp aria-hidden="true" />
           Legend
         </PopoverTrigger>
