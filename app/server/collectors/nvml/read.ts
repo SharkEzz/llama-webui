@@ -1,5 +1,5 @@
 import type { GpuReading } from '@llama-webui/shared';
-import { Array as Arr } from 'effect';
+import { Array as Arr, Record } from 'effect';
 import { dual } from 'effect/Function';
 import { type GpuNeeds, gpuSkipped, identityReading, normalizeBusId } from '../gpu.ts';
 import type { NvmlProc, NvmlSnapshot, NvmlSystem } from './protocol.ts';
@@ -28,6 +28,20 @@ const CLOCK_MEM = 2;
 const PCIE_TX = 0;
 const PCIE_RX = 1;
 
+/**
+ * How long the PCIe throughput read is kept. Each counter blocks about 20 ms per card in the driver (rx and tx: about
+ * 40 ms of wall and 2 to 5 ms of CPU per card), and what shows it does not need it every second: the System page's GPU
+ * card, the Topology page's link streaks and the monitor's `pcieRx`/`pcieTx` history hold it for up to this long.
+ */
+export const PCIE_THROUGHPUT_PERIOD_MS = 5_000;
+
+/**
+ * How long the power limit and the persistence mode are kept. A person changes them (`nvidia-smi -pl`, `-pm`), not
+ * the load: the System page's GPU card shows the limit, and the tuning checks read both, which the page reloads every
+ * 10 s; each read is up to 2 ms of CPU in the driver.
+ */
+export const LIMITS_PERIOD_MS = 10_000;
+
 /** The NUL-terminated string at `from` of `buf`, `to` at most. */
 const cString = (buf: Buffer, from = 0, to = buf.length): string => {
   const end = buf.indexOf(0, from);
@@ -45,6 +59,9 @@ export const deviceHandles = (lib: NvmlSymbols): ReadonlyArray<bigint> => {
   }
   return handles;
 };
+
+/** One sample of the cards at `nowMs`, the time in ms of the sampler's clock. */
+export type NvmlSample = (needs: GpuNeeds, nowMs: number) => NvmlSnapshot;
 
 /** What a call answered: its return code, and the value it gave (the fallback when it gave none). */
 interface Answer<A> {
@@ -67,15 +84,49 @@ const once = <A>(ask: () => Answer<A>): (() => A) => {
   };
 };
 
+/** A value read again once its period has passed (`every`). */
+interface Periodic<A> {
+  /** The value at `nowMs`: the one last read while its period runs, else read again. */
+  readonly at: (nowMs: number) => A;
+  /** Drops the value: the next `at` reads it. */
+  readonly forget: () => void;
+}
+
 /**
- * The reader of the cards of `handles`. Each call is one sample: one reading per card, and the processes on it; cards
- * `needs` skips are only identified (UUID, name, bus id). What does not change is read on the first sample that needs
- * it, then kept (`once`); the buffers NVML fills are the reader's, reused by every sample.
+ * A value read again only once `periodMs` has passed since its last read (or when the clock went back); in between,
+ * the value last read. It is kept once NVML gives it, or says the card has none (`NVML_ERROR_NOT_SUPPORTED`); any
+ * other failure answers the fallback, keeps nothing, and is asked again on the next sample: a value is never carried
+ * over a failure.
+ */
+const every = <A>(periodMs: number, ask: () => Answer<A>): Periodic<A> => {
+  let kept: { readonly readAt: number; readonly value: A } | undefined;
+  return {
+    at: (nowMs) => {
+      if (kept !== undefined) {
+        const elapsed = nowMs - kept.readAt;
+        if (elapsed >= 0 && elapsed < periodMs) return kept.value;
+      }
+      const answer = ask();
+      kept = answer.rc === SUCCESS || answer.rc === NOT_SUPPORTED ? { readAt: nowMs, value: answer.value } : undefined;
+      return answer.value;
+    },
+    forget: () => {
+      kept = undefined;
+    },
+  };
+};
+
+/**
+ * The reader of the cards of `handles`. Each call is one sample at `nowMs` (the sampler's clock): one reading per
+ * card, and the processes on it; cards `needs` skips are only identified (UUID, name, bus id). What does not change is
+ * read on the first sample that needs it, then kept (`once`); the PCIe throughput, the power limit and the persistence
+ * mode are read again once their period has passed (`every`), and a card's first sample after it was hidden reads them
+ * all. The buffers NVML fills are the reader's, reused by every sample.
  */
 export const nvmlReader: {
-  (handles: ReadonlyArray<bigint>): (lib: NvmlSymbols) => (needs: GpuNeeds) => NvmlSnapshot;
-  (lib: NvmlSymbols, handles: ReadonlyArray<bigint>): (needs: GpuNeeds) => NvmlSnapshot;
-} = dual(2, (lib: NvmlSymbols, handles: ReadonlyArray<bigint>): ((needs: GpuNeeds) => NvmlSnapshot) => {
+  (handles: ReadonlyArray<bigint>): (lib: NvmlSymbols) => NvmlSample;
+  (lib: NvmlSymbols, handles: ReadonlyArray<bigint>): NvmlSample;
+} = dual(2, (lib: NvmlSymbols, handles: ReadonlyArray<bigint>): NvmlSample => {
   const str = Buffer.alloc(STR_LEN);
   const u32 = Buffer.alloc(4);
   const pci = Buffer.alloc(PCI_INFO_SIZE);
@@ -112,6 +163,16 @@ export const nvmlReader: {
     pcieGenMax: once(() => answerU32(lib.nvmlDeviceGetMaxPcieLinkGeneration(h, u32))),
     pcieWidthMax: once(() => answerU32(lib.nvmlDeviceGetMaxPcieLinkWidth(h, u32))),
     powerDefaultLimitW: once(() => answerU32(lib.nvmlDeviceGetPowerManagementDefaultLimit(h, u32), 1, 1000)),
+    slow: {
+      pcieRxBps: every(PCIE_THROUGHPUT_PERIOD_MS, () =>
+        answerU32(lib.nvmlDeviceGetPcieThroughput(h, PCIE_RX, u32), 1024),
+      ),
+      pcieTxBps: every(PCIE_THROUGHPUT_PERIOD_MS, () =>
+        answerU32(lib.nvmlDeviceGetPcieThroughput(h, PCIE_TX, u32), 1024),
+      ),
+      powerLimitW: every(LIMITS_PERIOD_MS, () => answerU32(lib.nvmlDeviceGetPowerManagementLimit(h, u32), 1, 1000)),
+      persistence: every(LIMITS_PERIOD_MS, () => answerU32(lib.nvmlDeviceGetPersistenceMode(h, u32))),
+    },
   }));
 
   /** The compute processes on a card; none when NVML refuses. */
@@ -138,7 +199,7 @@ export const nvmlReader: {
     }
   };
 
-  return (needs: GpuNeeds): NvmlSnapshot => {
+  return (needs, nowMs) => {
     const gpus: Array<GpuReading> = [];
     const procs: Array<NvmlProc> = [];
     for (const card of cards) {
@@ -148,7 +209,10 @@ export const nvmlReader: {
       const key = `nvidia:${uuid}`;
       const name = card.name();
       const busId = card.busId();
+      const { slow } = card;
       if (gpuSkipped(needs, busId)) {
+        // Shown again, the card is read in full, not with values from before it was hidden.
+        for (const value of Record.values(slow)) value.forget();
         gpus.push(identityReading({ key, vendor: 'nvidia', name, busId }, 'hidden'));
         continue;
       }
@@ -156,7 +220,7 @@ export const nvmlReader: {
       mem.writeUInt32LE(MEMORY_V2_VERSION, 0);
       const memOk = lib.nvmlDeviceGetMemoryInfo_v2(h, mem) === SUCCESS; // unknown VRAM reads as 0, the GPU stays listed
       const utilOk = lib.nvmlDeviceGetUtilizationRates(h, util) === SUCCESS;
-      const persistence = readU32(lib.nvmlDeviceGetPersistenceMode(h, u32));
+      const persistence = slow.persistence.at(nowMs);
 
       gpus.push({
         key,
@@ -169,7 +233,7 @@ export const nvmlReader: {
         vramTotalBytes: memOk ? Number(mem.readBigUInt64LE(8)) : 0,
         tempC: readU32(lib.nvmlDeviceGetTemperature(h, 0, u32)),
         powerW: readU32(lib.nvmlDeviceGetPowerUsage(h, u32), 1, 1000),
-        powerLimitW: readU32(lib.nvmlDeviceGetPowerManagementLimit(h, u32), 1, 1000),
+        powerLimitW: slow.powerLimitW.at(nowMs),
         powerDefaultLimitW: card.powerDefaultLimitW(),
         persistence: persistence === null ? null : persistence === 1,
         clockGrMhz: readU32(lib.nvmlDeviceGetClockInfo(h, CLOCK_GRAPHICS, u32)),
@@ -180,8 +244,8 @@ export const nvmlReader: {
         pcieWidth: readU32(lib.nvmlDeviceGetCurrPcieLinkWidth(h, u32)),
         pcieGenMax: card.pcieGenMax(),
         pcieWidthMax: card.pcieWidthMax(),
-        pcieRxBps: readU32(lib.nvmlDeviceGetPcieThroughput(h, PCIE_RX, u32), 1024),
-        pcieTxBps: readU32(lib.nvmlDeviceGetPcieThroughput(h, PCIE_TX, u32), 1024),
+        pcieRxBps: slow.pcieRxBps.at(nowMs),
+        pcieTxBps: slow.pcieTxBps.at(nowMs),
       });
       readProcs(h, key, procs);
     }

@@ -192,10 +192,22 @@ its stdin and stdout, and both sides decode the lines with the schemas of `nvml/
 | server to sampler (`ToSampler`)   | `{ type: 'start', intervalMs, needs, lib? }`, then `{ type: 'configure', intervalMs, needs }` |
 | sampler to server (`FromSampler`) | `{ type: 'ready' }`, `{ type: 'error', message }`, `{ type: 'sample', snapshot }`             |
 
-`nvmlReader()` (`nvml/read.ts`) makes one sample per call. On every sample it reads, per card: utilization, memory
-utilization, VRAM, temperature, power, power limit, persistence mode, graphics and memory clocks, fan, current PCIe
-link, PCIe throughput (received and sent, the two calls that block) and the compute processes. What does not change is
-read on the first sample that needs it, then kept: per card its UUID, name, bus ID, maximum graphics clock, maximum
+`nvmlReader()` (`nvml/read.ts`) makes one sample per call, at the time the sampler gives it (`Clock`). On every sample
+it reads, per card: utilization, memory utilization, VRAM, temperature, power, graphics and memory clocks, fan, current
+PCIe link and the compute processes. Three values cost a call into the driver each that nothing needs every second, so
+they are read again only once their period has passed since their last read, and each sample in between reports the
+value last read:
+
+| Value                                                     | Period                            | Read by                                                                                          |
+| --------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
+| PCIe throughput, received and sent (the calls that block) | 5 s (`PCIE_THROUGHPUT_PERIOD_MS`) | The System page's GPU card, the Topology page's streaks, the `gpu.<key>.pcieRx`/`pcieTx` history |
+| Power limit, persistence mode                             | 10 s (`LIMITS_PERIOD_MS`)         | The GPU card (the limit) and the tuning checks, which the System page reloads every 10 s         |
+
+The periods are times, not counts of samples: with an interval longer than a period, the value is read on every
+sample. The first sample reads them all, and so does the first sample of a card after it was hidden. A slow value
+NVML refuses is reported unknown (`null`) and asked again on the next sample, never replaced by the one before; an
+answer that the card does not support it is kept for the period. A clock that goes back reads them again. What does
+not change is read on the first sample that needs it, then kept: per card its UUID, name, bus ID, maximum graphics clock, maximum
 PCIe link and default power limit, and the driver and CUDA driver versions. Such a value is kept once NVML gives it, or
 says the card does not support it; any other failure is asked again on the next sample, and a card whose UUID fails is
 left out of that sample. A hidden card is only identified, so after its first sample it costs no call. Device handles

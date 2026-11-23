@@ -236,9 +236,9 @@ vendor or the card does not provide them.
 | `procVramBytes`      | number                | VRAM held by the `llama-server` process on this card (0 without a server).                 |
 | `memUtilPct`         | number \| null        | Memory controller utilization, %.                                                          |
 | `fanPct`             | number \| null        | Fan speed, %.                                                                              |
-| `powerLimitW`        | number \| null        | Current power limit, W.                                                                    |
+| `powerLimitW`        | number \| null        | Current power limit, W. Through NVML, read every 10 s.                                     |
 | `powerDefaultLimitW` | number \| null        | Factory power limit (NVIDIA); differs from `powerLimitW` if it was lowered.                |
-| `persistence`        | boolean \| null       | NVIDIA persistence mode.                                                                   |
+| `persistence`        | boolean \| null       | NVIDIA persistence mode, read every 10 s.                                                  |
 | `clockGrMhz`         | number \| null        | Graphics clock, MHz.                                                                       |
 | `clockGrMaxMhz`      | number \| null        | Maximum graphics clock, MHz.                                                               |
 | `clockMemMhz`        | number \| null        | Memory clock, MHz.                                                                         |
@@ -246,8 +246,8 @@ vendor or the card does not provide them.
 | `pcieWidth`          | number \| null        | Current PCIe width.                                                                        |
 | `pcieGenMax`         | number \| null        | Maximum PCIe generation.                                                                   |
 | `pcieWidthMax`       | number \| null        | Maximum PCIe width.                                                                        |
-| `pcieRxBps`          | number \| null        | PCIe receive throughput, bytes/s.                                                          |
-| `pcieTxBps`          | number \| null        | PCIe transmit throughput, bytes/s.                                                         |
+| `pcieRxBps`          | number \| null        | PCIe receive throughput, bytes/s, read every 5 s (the value holds in between).             |
+| `pcieTxBps`          | number \| null        | PCIe transmit throughput, bytes/s, read every 5 s (the value holds in between).            |
 | `suspended`          | boolean               | Sleeping card (runtime-suspended): deliberately not read, since any read would wake it up. |
 | `hidden`             | boolean               | Card listed in the `hiddenGpus` setting: listed but not read.                              |
 

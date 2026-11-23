@@ -1,8 +1,9 @@
 import { assert, describe, it } from '@effect/vitest';
 import type { GpuReading } from '@llama-webui/shared';
 import { Array as Arr, Record } from 'effect';
-import { identityReading } from '../gpu.ts';
-import { nvmlReader } from './read.ts';
+import { type GpuNeeds, identityReading } from '../gpu.ts';
+import type { NvmlSnapshot } from './protocol.ts';
+import { type NvmlSample, nvmlReader } from './read.ts';
 import type { NvmlSymbols } from './symbols.ts';
 
 const GiB = 1024 ** 3;
@@ -50,11 +51,25 @@ const fullReading = (key: string, busId: string): GpuReading => ({
   pcieTxBps: 50 * 1024,
 });
 
+/** What the cards answer to the calls that are not read on every sample, and to the fan; a test changes them. */
+interface LiveValues {
+  /** KiB/s */
+  pcieRx: number;
+  /** KiB/s */
+  pcieTx: number;
+  /** mW */
+  powerLimit: number;
+  persistence: number;
+  fan: number;
+}
+
 /**
- * A fake libnvidia-ml over `cards`. Every call is counted by name and card (`<symbol>@<handle>`, the system's calls
- * by name alone); `rcs` scripts the return codes of a call, one per call in order, then success.
+ * A fake libnvidia-ml over `cards`. Every call is counted by name and card (`<symbol>@<uuid>`, the system's calls by
+ * name alone, the PCIe throughput as `PcieRx` and `PcieTx`); `rcs` scripts the return codes of a call, one per call
+ * in order, then success. `live` holds what the slow calls and the fan answer, the same for every card.
  */
 const fakeNvml = (cards: ReadonlyArray<FakeCard>, rcs: Record<string, Array<number>> = {}) => {
+  const live: LiveValues = { pcieRx: 100, pcieTx: 50, powerLimit: 300_000, persistence: 1, fan: 30 };
   const calls = new Map<string, number>();
   const byHandle = new Map(Arr.map(cards, (c) => [c.handle, c] as const));
   const count = (key: string): number => {
@@ -73,9 +88,9 @@ const fakeNvml = (cards: ReadonlyArray<FakeCard>, rcs: Record<string, Array<numb
       return rc;
     };
   const u32 =
-    (value: number) =>
+    (value: number | (() => number)) =>
     (_: FakeCard, out: Buffer): void => {
-      out.writeUInt32LE(value, 0);
+      out.writeUInt32LE(typeof value === 'number' ? value : value(), 0);
     };
   const typed =
     (values: Record<number, number>) =>
@@ -115,9 +130,15 @@ const fakeNvml = (cards: ReadonlyArray<FakeCard>, rcs: Record<string, Array<numb
     }),
     nvmlDeviceGetTemperature: on('Temperature', typed({ 0: 45 })),
     nvmlDeviceGetPowerUsage: on('PowerUsage', u32(120_000)),
-    nvmlDeviceGetPowerManagementLimit: on('PowerManagementLimit', u32(300_000)),
+    nvmlDeviceGetPowerManagementLimit: on(
+      'PowerManagementLimit',
+      u32(() => live.powerLimit),
+    ),
     nvmlDeviceGetPowerManagementDefaultLimit: on('PowerManagementDefaultLimit', u32(285_000)),
-    nvmlDeviceGetPersistenceMode: on('PersistenceMode', u32(1)),
+    nvmlDeviceGetPersistenceMode: on(
+      'PersistenceMode',
+      u32(() => live.persistence),
+    ),
     nvmlSystemGetDriverVersion: (buf, len) => {
       const rc = count('DriverVersion');
       if (rc === SUCCESS) str(buf, len, '580.95.05');
@@ -130,8 +151,15 @@ const fakeNvml = (cards: ReadonlyArray<FakeCard>, rcs: Record<string, Array<numb
     },
     nvmlDeviceGetClockInfo: on('ClockInfo', typed({ 0: 2800, 2: 14001 })),
     nvmlDeviceGetMaxClockInfo: on('MaxClockInfo', typed({ 0: 3100 })),
-    nvmlDeviceGetFanSpeed: on('FanSpeed', u32(30)),
-    nvmlDeviceGetPcieThroughput: on('PcieThroughput', typed({ 0: 50, 1: 100 })),
+    nvmlDeviceGetFanSpeed: on(
+      'FanSpeed',
+      u32(() => live.fan),
+    ),
+    nvmlDeviceGetPcieThroughput: (h, counter, out) =>
+      on(
+        counter === 1 ? 'PcieRx' : 'PcieTx',
+        u32(() => (counter === 1 ? live.pcieRx : live.pcieTx)),
+      )(h, out),
     nvmlDeviceGetCurrPcieLinkGeneration: on('CurrPcieLinkGeneration', u32(4)),
     nvmlDeviceGetCurrPcieLinkWidth: on('CurrPcieLinkWidth', u32(16)),
     nvmlDeviceGetMaxPcieLinkGeneration: on('MaxPcieLinkGeneration', u32(5)),
@@ -156,7 +184,7 @@ const fakeNvml = (cards: ReadonlyArray<FakeCard>, rcs: Record<string, Array<numb
   };
   const of = (call: string, card?: FakeCard): number =>
     calls.get(card === undefined ? call : `${call}@${card.uuid}`) ?? 0;
-  return { lib, of };
+  return { lib, of, live };
 };
 
 const handlesOf = (cards: ReadonlyArray<FakeCard>) => Arr.map(cards, (c) => c.handle);
@@ -171,31 +199,51 @@ const STATIC_CALLS = [
   'MaxPcieLinkWidth',
   'PowerManagementDefaultLimit',
 ];
-/** The calls of a card made on every sample (the PCIe throughput twice: rx and tx; the clocks twice). */
+/** The calls of a card made on every sample (the clocks twice: graphics and memory). */
 const SAMPLE_CALLS: Record<string, number> = {
   MemoryInfo: 1,
   UtilizationRates: 1,
-  PersistenceMode: 1,
   Temperature: 1,
   PowerUsage: 1,
-  PowerManagementLimit: 1,
   ClockInfo: 2,
   FanSpeed: 1,
   CurrPcieLinkGeneration: 1,
   CurrPcieLinkWidth: 1,
-  PcieThroughput: 2,
   ComputeRunningProcesses: 1,
+};
+/** The calls of a card made again once 5 s have passed since their last read. */
+const PCIE_CALLS = ['PcieRx', 'PcieTx'];
+/** The calls of a card made again once 10 s have passed since their last read. */
+const LIMIT_CALLS = ['PowerManagementLimit', 'PersistenceMode'];
+
+const ALL: GpuNeeds = { skipGpus: [] };
+
+/** One sample at each time of `at` (ms), in order. */
+const sampleAt = (read: NvmlSample, at: ReadonlyArray<number>, needs: GpuNeeds = ALL): Array<NvmlSnapshot> =>
+  Arr.map(at, (t) => read(needs, t));
+
+/** How many times each of `calls` was made on `card`. */
+const countsOf = (nvml: ReturnType<typeof fakeNvml>, calls: ReadonlyArray<string>, card: FakeCard) =>
+  Arr.map(calls, (call) => nvml.of(call, card));
+
+/** The one card of a sample. */
+const only = (snapshot: NvmlSnapshot | undefined): GpuReading => {
+  const g = snapshot?.gpus[0];
+  assert.isDefined(g);
+  return g;
 };
 
 describe('the NVML reader', () => {
-  it('reads what does not change once, and the rest on every sample', () => {
+  it('reads what does not change once, the slow values once per period, and the rest on every sample', () => {
     const nvml = fakeNvml([CARD_A, CARD_B]);
     const read = nvmlReader(nvml.lib, handlesOf([CARD_A, CARD_B]));
-    const samples = [read({ skipGpus: [] }), read({ skipGpus: [] }), read({ skipGpus: [] })];
+    const samples = sampleAt(read, [0, 1000, 2000]);
     for (const card of [CARD_A, CARD_B]) {
       for (const call of STATIC_CALLS) assert.strictEqual(nvml.of(call, card), 1, `${call} of ${card.uuid}`);
       for (const [call, n] of Record.toEntries(SAMPLE_CALLS))
         assert.strictEqual(nvml.of(call, card), 3 * n, `${call} of ${card.uuid}`);
+      for (const call of [...PCIE_CALLS, ...LIMIT_CALLS])
+        assert.strictEqual(nvml.of(call, card), 1, `${call} of ${card.uuid}`);
     }
     assert.strictEqual(nvml.of('DriverVersion'), 1);
     assert.strictEqual(nvml.of('CudaDriverVersion'), 1);
@@ -207,25 +255,150 @@ describe('the NVML reader', () => {
       });
   });
 
+  it('reads the PCIe throughput on the first sample, then again once 5 s have passed', () => {
+    const nvml = fakeNvml([CARD_A]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
+    read(ALL, 0);
+    assert.deepStrictEqual(countsOf(nvml, PCIE_CALLS, CARD_A), [1, 1]);
+    sampleAt(read, [1000, 2000, 3000, 4000, 4999]);
+    assert.deepStrictEqual(countsOf(nvml, PCIE_CALLS, CARD_A), [1, 1], 'not before 5 s');
+    read(ALL, 5000);
+    assert.deepStrictEqual(countsOf(nvml, PCIE_CALLS, CARD_A), [2, 2], 'at 5 s');
+    sampleAt(read, [6000, 9999]);
+    assert.deepStrictEqual(countsOf(nvml, PCIE_CALLS, CARD_A), [2, 2]);
+    read(ALL, 10_000);
+    assert.deepStrictEqual(countsOf(nvml, PCIE_CALLS, CARD_A), [3, 3], '5 s after the last read');
+  });
+
+  it('reads the power limit and the persistence mode on the first sample, then again once 10 s have passed', () => {
+    const nvml = fakeNvml([CARD_A]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
+    read(ALL, 0);
+    assert.deepStrictEqual(countsOf(nvml, LIMIT_CALLS, CARD_A), [1, 1]);
+    sampleAt(read, [1000, 5000, 9000, 9999]);
+    assert.deepStrictEqual(countsOf(nvml, LIMIT_CALLS, CARD_A), [1, 1], 'not before 10 s');
+    read(ALL, 10_000);
+    assert.deepStrictEqual(countsOf(nvml, LIMIT_CALLS, CARD_A), [2, 2], 'at 10 s');
+    sampleAt(read, [15_000, 19_999]);
+    assert.deepStrictEqual(countsOf(nvml, LIMIT_CALLS, CARD_A), [2, 2]);
+    read(ALL, 20_000);
+    assert.deepStrictEqual(countsOf(nvml, LIMIT_CALLS, CARD_A), [3, 3], '10 s after the last read');
+  });
+
+  it('reads the fan speed on every sample', () => {
+    const nvml = fakeNvml([CARD_A]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
+    const fans = Arr.map([0, 100, 200, 300], (t, i) => {
+      nvml.live.fan = 30 + i;
+      return only(read(ALL, t)).fanPct;
+    });
+    assert.deepStrictEqual(fans, [30, 31, 32, 33]);
+    assert.strictEqual(nvml.of('FanSpeed', CARD_A), 4);
+  });
+
+  it('reports the value it last read between two reads, every field of the reading kept', () => {
+    const nvml = fakeNvml([CARD_A]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
+    read(ALL, 0);
+    Object.assign(nvml.live, { pcieRx: 700, pcieTx: 400, powerLimit: 250_000, persistence: 0 });
+    assert.deepStrictEqual(read(ALL, 4000).gpus, [fullReading('nvidia:GPU-a', '0000:01:00.0')]);
+    const pcieDue = only(read(ALL, 5000));
+    assert.deepStrictEqual(
+      [pcieDue.pcieRxBps, pcieDue.pcieTxBps, pcieDue.powerLimitW, pcieDue.persistence],
+      [700 * 1024, 400 * 1024, 300, true],
+    );
+    const limitsDue = only(read(ALL, 10_000));
+    assert.deepStrictEqual(
+      [limitsDue.pcieRxBps, limitsDue.pcieTxBps, limitsDue.powerLimitW, limitsDue.persistence],
+      [700 * 1024, 400 * 1024, 250, false],
+    );
+  });
+
+  it('reads every value on every sample when the interval is longer than the periods', () => {
+    const nvml = fakeNvml([CARD_A]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
+    sampleAt(read, [0, 12_000, 24_000, 36_000]);
+    assert.deepStrictEqual(countsOf(nvml, [...PCIE_CALLS, ...LIMIT_CALLS, 'FanSpeed'], CARD_A), [4, 4, 4, 4, 4]);
+  });
+
+  it('reads the slow values again when the clock goes back', () => {
+    const nvml = fakeNvml([CARD_A]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
+    sampleAt(read, [60_000, 61_000, 2000, 3000]);
+    assert.deepStrictEqual(countsOf(nvml, [...PCIE_CALLS, ...LIMIT_CALLS], CARD_A), [2, 2, 2, 2]);
+  });
+
   it('identifies a hidden card without reading it, and reads it in full once it is shown', () => {
     const nvml = fakeNvml([CARD_A, CARD_B]);
     const read = nvmlReader(nvml.lib, handlesOf([CARD_A, CARD_B]));
     const hidden = { skipGpus: ['0000:0d:00.0'] };
-    const first = read(hidden);
-    read(hidden);
+    const [first] = sampleAt(read, [0, 1000], hidden);
     assert.deepStrictEqual(
-      first.gpus[1],
+      first?.gpus[1],
       identityReading(
         { key: 'nvidia:GPU-b', vendor: 'nvidia', name: 'NVIDIA GeForce RTX 5070 Ti', busId: '0000:0d:00.0' },
         'hidden',
       ),
     );
     for (const call of ['UUID', 'Name', 'PciInfo']) assert.strictEqual(nvml.of(call, CARD_B), 1, call);
-    for (const call of ['MaxClockInfo', 'PowerManagementDefaultLimit', ...Record.keys(SAMPLE_CALLS)])
+    for (const call of [
+      'MaxClockInfo',
+      'PowerManagementDefaultLimit',
+      ...Record.keys(SAMPLE_CALLS),
+      ...PCIE_CALLS,
+      ...LIMIT_CALLS,
+    ])
       assert.strictEqual(nvml.of(call, CARD_B), 0, call);
-    const shown = read({ skipGpus: [] });
+    const shown = read(ALL, 2000);
     assert.deepStrictEqual(shown.gpus[1], fullReading('nvidia:GPU-b', '0000:0d:00.0'));
     assert.strictEqual(nvml.of('MaxClockInfo', CARD_B), 1);
+  });
+
+  it('reads a card in full on the first sample it is shown again, within the periods', () => {
+    const nvml = fakeNvml([CARD_A, CARD_B]);
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A, CARD_B]));
+    read(ALL, 0);
+    read({ skipGpus: ['0000:0d:00.0'] }, 1000);
+    Object.assign(nvml.live, { pcieRx: 700, pcieTx: 400, powerLimit: 250_000, persistence: 0 });
+    const [a, b] = read(ALL, 2000).gpus;
+    assert.deepStrictEqual(countsOf(nvml, [...PCIE_CALLS, ...LIMIT_CALLS], CARD_B), [2, 2, 2, 2]);
+    assert.deepStrictEqual(
+      [b?.pcieRxBps, b?.pcieTxBps, b?.powerLimitW, b?.persistence],
+      [700 * 1024, 400 * 1024, 250, false],
+    );
+    assert.deepStrictEqual(countsOf(nvml, [...PCIE_CALLS, ...LIMIT_CALLS], CARD_A), [1, 1, 1, 1]);
+    assert.deepStrictEqual(
+      [a?.pcieRxBps, a?.powerLimitW],
+      [100 * 1024, 300],
+      'a card that stayed shown keeps its values',
+    );
+  });
+
+  it('reports a slow value that fails as unknown, and asks it again on the next sample', () => {
+    const nvml = fakeNvml([CARD_A], {
+      'PcieRx@GPU-a': [UNKNOWN],
+      'PowerManagementLimit@GPU-a': [SUCCESS, UNKNOWN],
+    });
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
+    const first = only(read(ALL, 0));
+    assert.deepStrictEqual([first.pcieRxBps, first.pcieTxBps], [null, 50 * 1024]);
+    const second = only(read(ALL, 1000));
+    assert.strictEqual(second.pcieRxBps, 100 * 1024, 'asked again on the next sample');
+    assert.deepStrictEqual(countsOf(nvml, PCIE_CALLS, CARD_A), [2, 1]);
+    read(ALL, 2000);
+    assert.deepStrictEqual(countsOf(nvml, PCIE_CALLS, CARD_A), [2, 1], 'kept once read');
+    assert.strictEqual(only(read(ALL, 10_000)).powerLimitW, null, 'a failure does not report the value before it');
+    assert.strictEqual(only(read(ALL, 11_000)).powerLimitW, 300);
+    read(ALL, 12_000);
+    assert.strictEqual(nvml.of('PowerManagementLimit', CARD_A), 3);
+  });
+
+  it('keeps for its period the answer that the card does not support a slow value', () => {
+    const nvml = fakeNvml([CARD_A], { 'PcieTx@GPU-a': [NOT_SUPPORTED] });
+    const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
+    for (const s of sampleAt(read, [0, 1000, 4999])) assert.strictEqual(only(s).pcieTxBps, null);
+    assert.strictEqual(nvml.of('PcieTx', CARD_A), 1);
+    assert.strictEqual(only(read(ALL, 5000)).pcieTxBps, 50 * 1024);
   });
 
   it('asks a value that does not change again after a failure, and keeps it once read', () => {
@@ -236,16 +409,13 @@ describe('the NVML reader', () => {
       DriverVersion: [UNKNOWN],
     });
     const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
-    const first = read({ skipGpus: [] });
-    assert.deepStrictEqual(first.gpus, [], 'a card without its UUID is left out of the sample');
-    assert.strictEqual(first.system.driver, null);
-    const second = read({ skipGpus: [] });
-    assert.strictEqual(second.gpus[0]?.name, 'NVIDIA GPU', 'the name of a card that refuses it');
-    assert.strictEqual(second.gpus[0]?.clockGrMaxMhz, null);
-    assert.strictEqual(second.system.driver, '580.95.05');
-    const third = read({ skipGpus: [] });
-    assert.deepStrictEqual(third.gpus, [fullReading('nvidia:GPU-a', '0000:01:00.0')]);
-    read({ skipGpus: [] });
+    const [first, second, third] = sampleAt(read, [0, 1000, 2000, 3000]);
+    assert.deepStrictEqual(first?.gpus, [], 'a card without its UUID is left out of the sample');
+    assert.strictEqual(first?.system.driver, null);
+    assert.strictEqual(second?.gpus[0]?.name, 'NVIDIA GPU', 'the name of a card that refuses it');
+    assert.strictEqual(second?.gpus[0]?.clockGrMaxMhz, null);
+    assert.strictEqual(second?.system.driver, '580.95.05');
+    assert.deepStrictEqual(third?.gpus, [fullReading('nvidia:GPU-a', '0000:01:00.0')]);
     assert.deepStrictEqual(
       [nvml.of('UUID', CARD_A), nvml.of('Name', CARD_A), nvml.of('MaxClockInfo', CARD_A), nvml.of('DriverVersion')],
       [2, 2, 2, 2],
@@ -255,8 +425,7 @@ describe('the NVML reader', () => {
   it('does not ask again for a value the card does not support', () => {
     const nvml = fakeNvml([CARD_A], { 'PowerManagementDefaultLimit@GPU-a': [NOT_SUPPORTED] });
     const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
-    const samples = [read({ skipGpus: [] }), read({ skipGpus: [] }), read({ skipGpus: [] })];
-    for (const s of samples) assert.strictEqual(s.gpus[0]?.powerDefaultLimitW, null);
+    for (const s of sampleAt(read, [0, 1000, 2000])) assert.strictEqual(s.gpus[0]?.powerDefaultLimitW, null);
     assert.strictEqual(nvml.of('PowerManagementDefaultLimit', CARD_A), 1);
   });
 
@@ -264,9 +433,9 @@ describe('the NVML reader', () => {
     const pids = Array.from({ length: 70 }, (_, i) => 1000 + i);
     const nvml = fakeNvml([{ ...CARD_A, pids }]);
     const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
-    for (let i = 0; i < 2; i++)
+    for (const s of sampleAt(read, [0, 1000]))
       assert.deepStrictEqual(
-        Arr.map(read({ skipGpus: [] }).procs, (p) => p.pid),
+        Arr.map(s.procs, (p) => p.pid),
         pids,
       );
   });
@@ -274,7 +443,7 @@ describe('the NVML reader', () => {
   it('leaves out the processes of a card that refuses them, and reads them at the next sample', () => {
     const nvml = fakeNvml([CARD_A], { 'ComputeRunningProcesses@GPU-a': [UNKNOWN] });
     const read = nvmlReader(nvml.lib, handlesOf([CARD_A]));
-    assert.deepStrictEqual(read({ skipGpus: [] }).procs, []);
-    assert.deepStrictEqual(read({ skipGpus: [] }).procs, [{ pid: 4242, key: 'nvidia:GPU-a', usedBytes: GiB }]);
+    assert.deepStrictEqual(read(ALL, 0).procs, []);
+    assert.deepStrictEqual(read(ALL, 1000).procs, [{ pid: 4242, key: 'nvidia:GPU-a', usedBytes: GiB }]);
   });
 });

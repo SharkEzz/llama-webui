@@ -32,3 +32,39 @@ test('an interrupted run renders, and says what failed', () => {
 test('software compositing is flagged at the top', () => {
   expect(renderReport(fixtureResults({ gpuCompositing: 'disabled_software' }), null)).toContain('software rendering');
 });
+
+test("the collectors section shows a full and a light NVML sample and each call's cadence, and still reads a run without them", () => {
+  const rx = { call: 'nvmlDeviceGetPcieThroughput(rx)', cpuMs: 2, wallMs: 42 };
+  const before = fixtureResults();
+  before.scenarios.collectors = {
+    nvml: { gpus: 2, sampleCpuMs: 12, sampleWallMs: 90, calls: [rx] },
+    reads: [],
+    skipped: [],
+  };
+  const after = fixtureResults();
+  after.scenarios.collectors = {
+    nvml: {
+      gpus: 2,
+      sampleCpuMs: 12,
+      sampleWallMs: 90,
+      lightCpuMs: 6,
+      lightWallMs: 8,
+      avgCpuMs: 7.1,
+      calls: [
+        { ...rx, runsPerMinute: 12 },
+        { call: 'nvmlDeviceGetPowerManagementLimit', cpuMs: 1.2, wallMs: 1.3, runsPerMinute: 6 },
+        { call: 'nvmlDeviceGetFanSpeed', cpuMs: 1, wallMs: 1.1, runsPerMinute: 60 },
+      ],
+    },
+    reads: [],
+    skipped: [],
+  };
+  const old = renderReport(before, null);
+  expect(old).toContain('full sample, CPU');
+  expect(old).not.toContain('light sample, CPU');
+  expect(old).not.toMatch(/NaN|undefined|Infinity/);
+  const html = renderReport(after, compare(after, before));
+  for (const text of ['light sample, CPU', 'on average at 1 Hz', 'every 5 s', 'every 10 s', 'every sample'])
+    expect(html).toContain(text);
+  expect(html).not.toMatch(/NaN|undefined|Infinity/);
+});

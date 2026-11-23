@@ -151,9 +151,16 @@ export interface ScenarioResults {
   collectors: {
     nvml: {
       gpus: number;
+      /** a full sample: every value the reader reads again once its period passed is due */
       sampleCpuMs: number;
       sampleWallMs: number;
-      calls: { call: string; cpuMs: number; wallMs: number }[];
+      /** a light sample: no period passed (absent from runs before the periods) */
+      lightCpuMs?: number;
+      lightWallMs?: number;
+      /** a light sample plus the calls it leaves out, as often as they run at 1 Hz */
+      avgCpuMs?: number;
+      /** per full sample, summed over the cards; `runsPerMinute`: of 60 samples at 1 Hz, how many make the call on a card */
+      calls: { call: string; cpuMs: number; wallMs: number; runsPerMinute?: number }[];
     } | null;
     reads: { label: string; cpuMs: number; wallMs: number }[];
     skipped: string[];

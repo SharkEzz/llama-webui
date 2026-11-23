@@ -1,7 +1,12 @@
 // collectors: a breakdown, not a verdict. Each NVML call the sampler makes, timed through the app's own reading code
 // (`deviceHandles`, `nvmlReader`) over a library wrapped in a timing Proxy; then each /proc or sysfs file a monitor tick
-// reads, re-read once per second. 11 rounds each, the first dropped: for NVML, the first round is also where the reader
-// reads what it keeps (identity, maxima, driver versions), so the table is what every later sample costs.
+// reads, re-read once per second (11 rounds, the first dropped).
+//
+// The reader reads some values only once their period has passed (the PCIe throughput, the power limit, the
+// persistence mode) and keeps the static ones for good. Its clock is the time it is given, so the tool drives it: a
+// first round that reads everything (dropped), then full samples (every period passed) and light samples (none passed)
+// in turn, one per second. The table is the cost of each call in a full sample; how often a call runs comes from a
+// count over one minute of samples at 1 Hz, the default interval, on a reader of its own.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { now, sleep } from '../instance.ts';
@@ -9,6 +14,12 @@ import type { Scenario } from '../measure.ts';
 import type { ScenarioResults } from '../results.ts';
 
 const ROUNDS = 11;
+/** Full and light NVML samples, each, after the dropped first round. */
+const NVML_ROUNDS = 10;
+/** A step of the reader's clock past every period: each slow value is due. */
+const PAST_EVERY_PERIOD_MS = 3_600_000;
+/** The samples of the count of how often each call runs: one minute at 1 Hz. */
+const MINUTE_SAMPLES = 60;
 /** The calls that take a type or counter argument after the handle, named by it as the first pass did. */
 const ARG_NAMES: Record<string, Record<number, string>> = {
   nvmlDeviceGetClockInfo: { 0: 'graphics', 2: 'mem' },
@@ -42,7 +53,8 @@ async function nvml(skipped: string[]): Promise<Collectors['nvml']> {
     return null;
   }
   const calls = new Map<string, { cpuMs: number; wallMs: number }>();
-  const timing = { on: false };
+  const counts = new Map<string, number>();
+  const timing = { on: false, counting: false };
   const timed = new Proxy(lib, {
     get(target, prop, receiver): unknown {
       const value: unknown = Reflect.get(target, prop, receiver);
@@ -51,10 +63,14 @@ async function nvml(skipped: string[]): Promise<Collectors['nvml']> {
         const c0 = process.cpuUsage();
         const t0 = now();
         const result: unknown = Reflect.apply(value, target, args);
-        if (timing.on) {
+        if (timing.on || timing.counting) {
           const arg = args[1];
           const named = typeof arg === 'number' ? ARG_NAMES[prop]?.[arg] : undefined;
           const call = named === undefined ? prop : `${prop}(${named})`;
+          if (timing.counting) {
+            counts.set(call, (counts.get(call) ?? 0) + 1);
+            return result;
+          }
           const a = calls.get(call) ?? { cpuMs: 0, wallMs: 0 };
           a.cpuMs += cpuMs(process.cpuUsage(c0));
           a.wallMs += now() - t0;
@@ -67,28 +83,54 @@ async function nvml(skipped: string[]): Promise<Collectors['nvml']> {
   try {
     const handles = deviceHandles(timed);
     const read = nvmlReader(timed, handles);
-    let sampleCpuMs = 0;
-    let sampleWallMs = 0;
-    for (let round = 0; round < ROUNDS; round++) {
+    const full = { cpuMs: 0, wallMs: 0 };
+    const light = { cpuMs: 0, wallMs: 0 };
+    let clock = 0;
+    for (let round = 0; round <= 2 * NVML_ROUNDS; round++) {
+      // Round 0 reads everything and is dropped; then odd rounds are full samples, even rounds light ones.
+      const isFull = round % 2 === 1;
+      if (isFull) clock += PAST_EVERY_PERIOD_MS;
       const r0 = now();
       const c0 = process.cpuUsage();
-      timing.on = round > 0;
-      read({ skipGpus: [] });
+      timing.on = isFull;
+      read({ skipGpus: [] }, clock);
       if (round > 0) {
-        sampleCpuMs += cpuMs(process.cpuUsage(c0));
-        sampleWallMs += now() - r0;
+        const into = isFull ? full : light;
+        into.cpuMs += cpuMs(process.cpuUsage(c0));
+        into.wallMs += now() - r0;
       }
       await sleep(Math.max(0, 1000 - (now() - r0)));
     }
-    const n = ROUNDS - 1;
+    timing.on = false;
+    timing.counting = true;
+    const counted = nvmlReader(timed, handles);
+    for (let i = 0; i < MINUTE_SAMPLES; i++) counted({ skipGpus: [] }, i * 1000);
+    timing.counting = false;
+    const n = NVML_ROUNDS;
+    // Per full sample, summed over the cards; how many of the minute's samples make each call (on one card: the count
+    // is over every card).
+    const perCall = [...calls]
+      .map(([call, a]) => ({
+        call,
+        cpuMs: a.cpuMs / n,
+        wallMs: a.wallMs / n,
+        runsPerMinute: (counts.get(call) ?? 0) / Math.max(1, handles.length),
+      }))
+      .toSorted((x, y) => y.cpuMs - x.cpuMs);
+    const lightCpuMs = light.cpuMs / n;
     return {
       gpus: handles.length,
-      sampleCpuMs: sampleCpuMs / n,
-      sampleWallMs: sampleWallMs / n,
-      // Per sample, summed over the cards.
-      calls: [...calls]
-        .map(([call, a]) => ({ call, cpuMs: a.cpuMs / n, wallMs: a.wallMs / n }))
-        .toSorted((x, y) => y.cpuMs - x.cpuMs),
+      sampleCpuMs: full.cpuMs / n,
+      sampleWallMs: full.wallMs / n,
+      lightCpuMs,
+      lightWallMs: light.wallMs / n,
+      // A light sample, plus the calls it leaves out as often as they run at 1 Hz.
+      avgCpuMs:
+        lightCpuMs +
+        perCall
+          .filter((c) => c.runsPerMinute < MINUTE_SAMPLES)
+          .reduce((sum, c) => sum + (c.cpuMs * c.runsPerMinute) / MINUTE_SAMPLES, 0),
+      calls: perCall,
     };
   } finally {
     lib.nvmlShutdown();
@@ -193,7 +235,7 @@ export const collectors: Scenario<'collectors'> = {
     if (n) {
       const top = n.calls.slice(0, 5).map((c) => c.call.replace('nvmlDeviceGet', ''));
       ctx.log(
-        `NVML, ${String(n.gpus)} GPUs: ${n.sampleCpuMs.toFixed(2)} ms CPU per sample; costliest: ${top.join(', ')}`,
+        `NVML, ${String(n.gpus)} GPUs: ${n.sampleCpuMs.toFixed(2)} ms CPU per full sample, ${(n.lightCpuMs ?? 0).toFixed(2)} ms per light one, ${(n.avgCpuMs ?? 0).toFixed(2)} ms on average at 1 Hz; costliest: ${top.join(', ')}`,
       );
     }
     const r = await reads(ctx.instance.serverPid, skipped);

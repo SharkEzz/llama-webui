@@ -4,7 +4,8 @@
  *
  * It reads `ToSampler` commands on its stdin and writes `FromSampler` messages on its stdout, one JSON value per line
  * (`protocol.ts`). On `start` it opens and inits NVML: `error` when it cannot (it then stays idle), else `ready`, then
- * one `sample` every `intervalMs` (100 ms at least, the round's own time included). `configure` changes the interval
+ * one `sample` every `intervalMs` (100 ms at least, the round's own time included), read at the time of its start, by
+ * which the reader keeps its slow values for their period (`read.ts`). `configure` changes the interval
  * and what to read from the next round. The end of its stdin (the server gone, even killed) ends it, with exit 0.
  *
  * Run as is by Node in development (relative imports with `.ts`, erasable syntax only), bundled to
@@ -62,7 +63,7 @@ const program = Effect.gen(function* () {
     function* (read: Effect.Success<ReturnType<typeof open>>) {
       const t0 = yield* Clock.currentTimeMillis;
       const { needs } = yield* Ref.get(config);
-      const snapshot = yield* Effect.try({ try: () => read(needs), catch: failed });
+      const snapshot = yield* Effect.try({ try: () => read(needs, t0), catch: failed });
       yield* send({ type: 'sample', snapshot });
       const { intervalMs } = yield* Ref.get(config);
       const t1 = yield* Clock.currentTimeMillis;
