@@ -69,7 +69,11 @@ curl http://127.0.0.1:7860/api/topology
 memory nodes and their `cpu-ram` link, then walks `/sys/bus/pci/devices` for display controllers (class `0x03`, GPUs)
 and NVMe controllers (class `0x0108`). Each device is linked to the CPU directly (root port), or through a chipset node
 when the first bridge below the root port has the root port's vendor, is not marked removable, and is not a
-Thunderbolt or USB4 bridge (a PCIe switch from another vendor, on an NVMe card or a riser, is not a chipset). Any failed
+Thunderbolt or USB4 bridge (a PCIe switch from another vendor, on an NVMe card or a riser, is not a chipset). A GPU
+inside the processor gets an `internal` link without figures: one whose link reports no speed (on the root bus), or
+one right under a root port that shares its PCI device with functions of the root port's vendor and is not of that
+vendor itself (a Ryzen's Radeon, vendor `0x1002`, sits beside the processor's security processor and USB controllers,
+vendor `0x1022`, behind an internal bridge that reports Gen4 x16 like a slot). Any failed
 read degrades to unknown: at worst the graph holds the CPU and memory only. The CPU node comes from the CPU info the
 server keeps (`CpuInfo`, the one [System](/docs/system/) shows), not from a new read of `/proc/cpuinfo`. The devices
 are read one after the other in bus id order, which is the order of the nodes and links.
@@ -94,7 +98,7 @@ are read one after the other in bus id order, which is the order of the nodes an
 | `busId`  | string                                                   | PCI address (`0000:01:00.0`), the same format as `GpuSample.busId` and the `hiddenGpus` setting. Missing for `cpu` and `ram`.                         |
 | `vendor` | `"nvidia"` \| `"amd"` \| `"intel"` \| `"other"`          | GPUs and NVMe drives only.                                                                                                                            |
 | `block`  | string                                                   | NVMe only: its block device (`nvme0n1`), the key of `DiskSample.perDisk` and `model.disk` in the [Snapshot](/developers/api/monitor/#disk).           |
-| `detail` | `Record<string, string \| number \| null>`               | Static facts for the tooltip; null is unknown.                                                                                                        |
+| `detail` | `Record<string, string \| number \| null>`               | Static facts for the block and its details; null is unknown.                                                                                          |
 
 What `detail` holds per kind:
 
@@ -110,16 +114,16 @@ What `detail` holds per kind:
 
 `TopologyLink`:
 
-| Field      | Type                                   | Description                                                                    |
-| ---------- | -------------------------------------- | ------------------------------------------------------------------------------ |
-| `id`       | string                                 | `cpu-ram`, `cpu-chipset:<busId>`, or `<from>-pci:<busId>`.                     |
-| `from`     | string                                 | Node id on the CPU side (upstream).                                            |
-| `to`       | string                                 | Node id downstream.                                                            |
-| `kind`     | `"pcie"` \| `"memory"` \| `"internal"` | `memory` for `cpu-ram`; `internal` when the link reports no PCIe speed at all. |
-| `genMax`   | number \| null                         | Link capability: the lower of both ends' maximum generation.                   |
-| `widthMax` | number \| null                         | Link capability: the lower of both ends' maximum width.                        |
-| `genCur`   | number \| null                         | Current generation.                                                            |
-| `widthCur` | number \| null                         | Current width.                                                                 |
+| Field      | Type                                   | Description                                                                                                                                |
+| ---------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`       | string                                 | `cpu-ram`, `cpu-chipset:<busId>`, or `<from>-pci:<busId>`.                                                                                 |
+| `from`     | string                                 | Node id on the CPU side (upstream).                                                                                                        |
+| `to`       | string                                 | Node id downstream.                                                                                                                        |
+| `kind`     | `"pcie"` \| `"memory"` \| `"internal"` | `memory` for `cpu-ram`; `internal` for a GPU inside the processor, or a link that reports no PCIe speed at all: its four figures are null. |
+| `genMax`   | number \| null                         | Link capability: the lower of both ends' maximum generation.                                                                               |
+| `widthMax` | number \| null                         | Link capability: the lower of both ends' maximum width.                                                                                    |
+| `genCur`   | number \| null                         | Current generation.                                                                                                                        |
+| `widthCur` | number \| null                         | Current width.                                                                                                                             |
 
 For recent Radeon cards, which sit behind a PCIe switch on the card itself, the link is read at the card's upstream
 port (`slotLink()`): the GPU's own link to that switch always reads its full width. A width outside 1 to 32 (a

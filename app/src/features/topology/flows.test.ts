@@ -1,6 +1,16 @@
 import type { GpuSample, ModelPlacement, Snapshot, TopologyGraph } from '@llama-webui/shared';
 import { expect, test } from 'vitest';
-import { levelOf, linkBadge, linkFlows, linkShown, nodeLive, peerLinks, placementSeries } from './flows';
+import {
+  detailOf,
+  levelOf,
+  linkBadge,
+  linkFlows,
+  linkShown,
+  linkSpecs,
+  nodeLive,
+  peerLinks,
+  placementSeries,
+} from './flows';
 
 const graph: TopologyGraph = {
   at: 0,
@@ -517,7 +527,7 @@ test('peerLinks: a single GPU per backend or a device without a PCI address: not
   ).toEqual([]);
 });
 
-test('peerLinks: three cards of one backend are joined as a chain, in the order of the scene', () => {
+test('peerLinks: three cards of one backend are joined as a chain, by bus address', () => {
   const g: TopologyGraph = {
     ...threeGpus,
     nodes: [
@@ -559,4 +569,171 @@ test('linkShown: at rest only from 8 MiB/s in the busier direction, from 100 kB/
   expect(linkShown({ fwdBps: 4 * mib, backBps: null }, true)).toBe(true);
   expect(linkShown({ fwdBps: 50e3, backBps: 50e3 }, true)).toBe(false);
   expect(linkShown({ fwdBps: null, backBps: null }, true)).toBe(false);
+});
+
+const withRtx = (o: Partial<GpuSample>): Snapshot => ({
+  ...snapshot,
+  allGpus: snapshot.allGpus.map((g) => (g.busId === '0000:01:00.0' ? { ...g, ...o } : g)),
+});
+const factsOf = (s: Snapshot, id: string) =>
+  Object.fromEntries(
+    nodeLive(graph, s, placement)
+      .get(id)!
+      .facts.map((f) => [f.label, f.value]),
+  );
+
+test('nodeLive: the detail of a GPU adds what the sample carries beyond the essentials', () => {
+  const s = withRtx({
+    procVramBytes: 11 * 1024 ** 3,
+    memUtilPct: 42,
+    fanPct: 55,
+    powerLimitW: 250,
+    powerDefaultLimitW: 300,
+    clockGrMhz: 2520,
+    clockMemMhz: 15001,
+  });
+  const live = nodeLive(graph, s, placement).get('pci:0000:01:00.0')!;
+  expect(live.facts.map((f) => f.label)).toEqual([
+    'Utilization',
+    'VRAM',
+    'Model',
+    'KV cache',
+    'Compute buffers',
+    'Other VRAM',
+    'llama-server (VRAM)',
+    'Temperature',
+    'Power',
+    'Memory controller',
+    'Fan',
+    'Power limit',
+    'Graphics clock',
+    'Memory clock',
+    'PCIe link',
+    'Host → GPU',
+    'GPU → host',
+  ]);
+  expect(factsOf(s, 'pci:0000:01:00.0')).toMatchObject({
+    'llama-server (VRAM)': '11.0 GiB',
+    'Memory controller': '42%',
+    Fan: '55%',
+    'Power limit': '250 W (factory 300 W)',
+    'Graphics clock': '2,520 MHz',
+    'Memory clock': '15,001 MHz',
+  });
+});
+
+test('nodeLive: a power limit left at the factory value is written once', () => {
+  const s = withRtx({ powerLimitW: 300, powerDefaultLimitW: 300 });
+  expect(factsOf(s, 'pci:0000:01:00.0')['Power limit']).toBe('300 W');
+  expect(factsOf(withRtx({ powerLimitW: 300 }), 'pci:0000:01:00.0')['Power limit']).toBe('300 W');
+});
+
+test('nodeLive: a detail row is absent when the sample does not have its value', () => {
+  const labels = Object.keys(factsOf(snapshot, 'pci:0000:01:00.0'));
+  for (const label of [
+    'llama-server (VRAM)',
+    'Memory controller',
+    'Fan',
+    'Power limit',
+    'Graphics clock',
+    'Memory clock',
+  ])
+    expect(labels).not.toContain(label);
+  expect(Object.keys(factsOf(snapshot, 'cpu'))).not.toContain('Load average');
+  expect(Object.keys(factsOf(snapshot, 'ram'))).not.toContain('Cached');
+});
+
+test('nodeLive: the CPU gives its load average and the memory its page cache', () => {
+  const s = {
+    ...snapshot,
+    system: {
+      ...snapshot.system,
+      load: [1.5, 0.75, 0.25],
+      mem: { ...snapshot.system!.mem, cachedBytes: 6 * 1024 ** 3 },
+    },
+  } as Snapshot;
+  const cpu = nodeLive(graph, s, placement)
+    .get('cpu')!
+    .facts.map((f) => f.label);
+  expect(cpu.slice(cpu.indexOf('Temperature'), cpu.indexOf('Temperature') + 2)).toEqual([
+    'Temperature',
+    'Load average',
+  ]);
+  expect(factsOf(s, 'cpu')['Load average']).toBe('1.50  0.75  0.25');
+  const ram = nodeLive(graph, s, placement)
+    .get('ram')!
+    .facts.map((f) => f.label);
+  expect(ram.slice(0, 2)).toEqual(['Used', 'Cached']);
+  expect(factsOf(s, 'ram').Cached).toBe('6.0 GiB');
+});
+
+test('nodeLive: a GPU inside the processor has no PCIe link among its facts, whatever its sample says', () => {
+  const s = {
+    ...snapshot,
+    allGpus: [
+      ...snapshot.allGpus.filter((g) => g.busId !== '0000:0d:00.0'),
+      gpu({ busId: '0000:0d:00.0', vendor: 'amd', pcieGen: 4, pcieWidth: 16, tempC: 34 }),
+    ],
+  } as Snapshot;
+  const labels = nodeLive(graph, s, placement)
+    .get('pci:0000:0d:00.0')!
+    .facts.map((f) => f.label);
+  expect(labels).toContain('Temperature');
+  expect(labels).not.toContain('PCIe link');
+});
+
+test('nodeLive: a card in a slot gives the lanes its link trained at, a GPU sample winning over the graph', () => {
+  const live = nodeLive(graph, snapshot, placement);
+  expect(live.get('pci:0000:01:00.0')!.lanes).toBe(8);
+  expect(live.get('pci:0000:08:00.0')!.lanes).toBe(4);
+  // Without a sample, what the graph read; without a current state, what the link can do
+  const wide = {
+    ...graph,
+    links: graph.links.map((l) => (l.id === 'a' ? { ...l, widthMax: 16, widthCur: null } : l)),
+  };
+  expect(nodeLive(graph, null, null).get('pci:0000:01:00.0')!.lanes).toBe(8);
+  expect(nodeLive(wide, null, null).get('pci:0000:01:00.0')!.lanes).toBe(16);
+  expect(nodeLive(wide, snapshot, null).get('pci:0000:01:00.0')!.lanes).toBe(8);
+});
+
+test('nodeLive: a GPU inside the processor, and a block that is not a card, have no lanes', () => {
+  const live = nodeLive(graph, snapshot, placement);
+  expect(live.get('pci:0000:0d:00.0')!.lanes).toBeNull();
+  expect(live.get('cpu')!.lanes).toBeNull();
+  expect(live.get('pci:0000:02:00.0')!.lanes).toBeNull();
+});
+
+test('nodeLive: a hidden card keeps the lanes of its slot', () => {
+  const s = {
+    ...snapshot,
+    allGpus: snapshot.allGpus.map((g) => (g.busId === '0000:08:00.0' ? { ...g, hidden: true } : g)),
+  } as Snapshot;
+  expect(nodeLive(graph, s, placement).get('pci:0000:08:00.0')).toMatchObject({ dim: true, lanes: 4 });
+});
+
+test('linkSpecs: the current state of each PCIe link, a GPU sample winning over the graph', () => {
+  // Link `a` is Gen1 x8 in the graph (read at rest), Gen5 x8 in the sample
+  expect(linkSpecs(graph, null)).toEqual(
+    new Map([
+      ['a', 'Gen1 x8'],
+      ['b', 'Gen4 x4'],
+      ['c', 'Gen4 x4'],
+      ['d', 'Gen1 x4'],
+    ]),
+  );
+  const specs = linkSpecs(graph, snapshot);
+  expect(specs.get('a')).toBe('Gen5 x8');
+  expect(specs.get('d')).toBe('Gen4 x4');
+  expect(specs.has('cpu-ram')).toBe(false);
+  expect(specs.has('e')).toBe(false);
+});
+
+test('detailOf: the selected block with its figures, nothing once it is not in the graph', () => {
+  const live = nodeLive(graph, snapshot, placement);
+  const detail = detailOf(graph, live, 'pci:0000:01:00.0');
+  expect(detail?.node.label).toBe('RTX 5070 Ti');
+  expect(detail?.live).toBe(live.get('pci:0000:01:00.0'));
+  expect(detailOf(graph, live, 'pci:0000:99:00.0')).toBeNull();
+  expect(detailOf(graph, live, null)).toBeNull();
+  expect(detailOf(graph, new Map(), 'cpu')).toBeNull();
 });

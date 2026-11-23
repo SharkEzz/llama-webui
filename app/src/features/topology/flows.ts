@@ -11,13 +11,16 @@ import {
   type TopologyNode,
 } from '@llama-webui/shared';
 import type { Tone } from '@/components/glass/tones';
-import { fmt, formatBps, formatBytes, formatPct, plural } from '@/lib/format';
-import { FLOOR_BPS } from './smooth';
+import { fmt, formatBps, formatBytes, formatPct, num, plural } from '@/lib/format';
 
 /*
  * Projects the snapshot (existing measurements) onto the hardware graph: what flows over each link and what to say
- * about each node. Pure functions, tested without DOM or Three.
+ * about each node. Pure functions, tested without a DOM.
  */
+
+/** Throughput under which a link counts as idle, and the top of the log scale its streaks are drawn on. */
+export const FLOOR_BPS = 1e5;
+export const CEIL_BPS = 20e9;
 
 /** How close to its limit a link or a tank is; always shown next to its figure, never by color alone. */
 export type Level = 'ok' | 'warn' | 'crit';
@@ -25,7 +28,7 @@ export type Level = 'ok' | 'warn' | 'crit';
 /** Share of a link's current capacity from which it turns amber, then red. */
 export const LINK_WARN = 0.7;
 export const LINK_CRIT = 0.9;
-/** Fill (%) from which a tank's surface turns amber, then red. */
+/** Fill (%) from which a tank's bar and figure turn amber, then red. */
 export const FILL_WARN_PCT = 85;
 export const FILL_CRIT_PCT = 95;
 /** Share of the capacity from which a badge spells it out: below, the figure is noise. */
@@ -33,12 +36,13 @@ const BADGE_PCT_MIN = 0.25;
 /**
  * Throughput from which a link shows its traffic (streaks and badge) while llama-server is at rest (8 MiB/s): an idle
  * GPU exchanges a few MiB/s with the host, which would otherwise keep streaks running and badges on screen, and the
- * scene redrawing. While the server loads or generates, everything from 100 kB/s shows. The tooltips keep every figure.
+ * drawing repainting. While the server loads or generates, everything from 100 kB/s shows. A block's details keep
+ * every figure.
  */
 export const REST_FLOOR_BPS = 8 * 1024 ** 2;
 
 /**
- * The link's traffic is worth showing (streaks, glow, badge): its busier direction reaches the floor. `busy`:
+ * The link's traffic is worth showing (streaks, track, badge): its busier direction reaches the floor. `busy`:
  * llama-server is loading, processing a prompt or generating.
  */
 export function linkShown(flow: Pick<LinkFlow, 'fwdBps' | 'backBps'>, busy: boolean): boolean {
@@ -86,7 +90,7 @@ export interface TankLayer {
 }
 
 export interface NodeLive {
-  /** 0..100: load (GPU, CPU utilization…) driving the glow; null = unknown. */
+  /** 0..100: load (GPU, CPU utilization, a drive's share of its link); null = unknown. */
   loadPct: number | null;
   /** 0..100: fill (VRAM, RAM); null = not applicable. */
   fillPct: number | null;
@@ -103,17 +107,20 @@ export interface NodeLive {
   barPct: number | null;
   /** Second line under the name (memory in use); null = none. */
   sub: string | null;
-  /** Tooltip lines. */
+  /** Lanes the link of a card in a slot trained at; null = not a card in a slot, or unknown. */
+  lanes: number | null;
+  /** Every figure of the block, for its detail panel. */
   facts: Fact[];
 }
 
 /** Values of a block that is not a tank and has nothing to add to its name and headline. */
-const PLAIN: Pick<NodeLive, 'fillLevel' | 'layers' | 'cores' | 'barPct' | 'sub'> = {
+const PLAIN: Pick<NodeLive, 'fillLevel' | 'layers' | 'cores' | 'barPct' | 'sub' | 'lanes'> = {
   fillLevel: 'ok',
   layers: [],
   cores: [],
   barPct: null,
   sub: null,
+  lanes: null,
 };
 
 const linkLabel = (gen: number | null | undefined, width: number | null | undefined) =>
@@ -269,9 +276,12 @@ export function nodeLive(
 
     if (n.kind === 'gpu') {
       const g = gpuOf(snapshot, n);
+      // A GPU inside the processor is in no slot. The sample is read more often than the graph
+      const lanes = link?.kind === 'pcie' ? (g?.pcieWidth ?? link.widthCur ?? link.widthMax) : null;
       if (g?.hidden || g?.suspended) {
         out.set(n.id, {
           ...PLAIN,
+          lanes,
           loadPct: null,
           fillPct: null,
           dim: true,
@@ -290,9 +300,22 @@ export function nodeLive(
       if (buf && buf.kvBytes > 0) add('KV cache', formatBytes(buf.kvBytes));
       if (buf && buf.computeBytes > 0) add('Compute buffers', formatBytes(buf.computeBytes));
       if (tank.otherBytes) add('Other VRAM', formatBytes(tank.otherBytes));
+      if (g && g.procVramBytes > 0) add('llama-server (VRAM)', formatBytes(g.procVramBytes));
       if (g?.tempC != null) add('Temperature', `${fmt(g.tempC, 1)} °C`);
       if (g?.powerW != null) add('Power', `${fmt(g.powerW, 1)} W`);
-      add('PCIe link', linkLabel(g?.pcieGen ?? link?.genCur, g?.pcieWidth ?? link?.widthCur));
+      if (g?.memUtilPct != null) add('Memory controller', formatPct(g.memUtilPct));
+      if (g?.fanPct != null) add('Fan', formatPct(g.fanPct));
+      if (g?.powerLimitW != null) {
+        const factory = g.powerDefaultLimitW;
+        const lowered = factory != null && factory !== g.powerLimitW;
+        add('Power limit', `${fmt(g.powerLimitW, 0)} W${lowered ? ` (factory ${fmt(factory, 0)} W)` : ''}`);
+      }
+      if (g?.clockGrMhz != null) add('Graphics clock', `${fmt(g.clockGrMhz, 0)} MHz`);
+      if (g?.clockMemMhz != null) add('Memory clock', `${fmt(g.clockMemMhz, 0)} MHz`);
+      // A GPU inside the processor is in no slot: what its sample reads is the processor's internal bridge
+      if (link?.kind !== 'internal') {
+        add('PCIe link', linkLabel(g?.pcieGen ?? link?.genCur, g?.pcieWidth ?? link?.widthCur));
+      }
       if (flow?.fwdBps != null) add('Host → GPU', formatBps(flow.fwdBps));
       if (flow?.backBps != null) add('GPU → host', formatBps(flow.backBps));
       const others = peers.find((group) => group.includes(n))?.filter((x) => x !== n);
@@ -311,6 +334,7 @@ export function nodeLive(
         headline: g?.utilPct != null ? formatPct(g.utilPct) : '—',
         barPct: g?.utilPct ?? null,
         sub: vram,
+        lanes,
         facts,
       });
     } else if (n.kind === 'cpu') {
@@ -319,6 +343,7 @@ export function nodeLive(
       if (snapshot?.proc) add('llama-server', formatPct(snapshot.proc.cpuPct));
       if (sys?.freqMhz != null) add('Frequency', `${sys.freqMhz} MHz`);
       if (sys?.tempC != null) add('Temperature', `${fmt(sys.tempC, 1)} °C`);
+      if (sys?.load) add('Load average', sys.load.map((x) => num(2).format(x)).join('  '));
       const cores = n.detail.physicalCores;
       const threads = n.detail.logicalThreads;
       if (cores != null && threads != null) add('Cores', `${cores} cores · ${threads} threads`);
@@ -341,6 +366,7 @@ export function nodeLive(
       const bw = snapshot?.system?.memBw ?? null;
       const usage = mem && used !== null ? `${formatBytes(used)} / ${formatBytes(mem.totalBytes)}` : null;
       add('Used', usage);
+      if (mem && mem.cachedBytes > 0) add('Cached', formatBytes(mem.cachedBytes));
       if (bw) add('Read', formatBps(bw.readBps));
       if (bw) add('Write', formatBps(bw.writeBps));
       if (snapshot?.proc?.dramBps != null) add('llama-server (DRAM)', formatBps(snapshot.proc.dramBps));
@@ -393,6 +419,36 @@ export function nodeLive(
   return out;
 }
 
+/**
+ * The current state of each PCIe link, by link id (“Gen4 x8”): what tells a link that trained below what it can do. A
+ * GPU's sample wins over the graph, read less often; a link whose state is unknown has no entry.
+ */
+export function linkSpecs(graph: TopologyGraph, snapshot: Snapshot | null): Map<string, string> {
+  const out = new Map<string, string>();
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  for (const l of graph.links) {
+    if (l.kind !== 'pcie') continue;
+    const to = byId.get(l.to);
+    const g = to?.kind === 'gpu' ? gpuOf(snapshot, to) : undefined;
+    const label = linkLabel(g?.pcieGen ?? l.genCur, g?.pcieWidth ?? l.widthCur);
+    if (label) out.set(l.id, label);
+  }
+  return out;
+}
+
+/** What the detail panel shows. */
+export interface NodeDetail {
+  node: TopologyNode;
+  live: NodeLive;
+}
+
+/** The selected block and its figures; null without a selection, or once the block is no longer in the graph. */
+export function detailOf(graph: TopologyGraph, live: Map<string, NodeLive>, id: string | null): NodeDetail | null {
+  const node = id === null ? undefined : graph.nodes.find((n) => n.id === id);
+  const figures = node ? live.get(node.id) : undefined;
+  return node && figures ? { node, live: figures } : null;
+}
+
 /** A direct GPU-to-GPU connection (peer-to-peer): not a PCIe link of the graph, and not measured apart. */
 export interface PeerLink {
   id: string;
@@ -407,7 +463,7 @@ const P2P_BACKEND = /^(CUDA|ROCm)\d+$/;
 
 /**
  * GPUs concerned by peer-to-peer, per backend: those holding the model when the launch requested it or NCCL reports
- * it, in the order of the scene. A backend with a single card has no one to talk to.
+ * it, by bus address. A backend with a single card has no one to talk to.
  */
 function peerGroups(graph: TopologyGraph, placement: ModelPlacement | null): TopologyNode[][] {
   if (!placement?.p2p) return [];
@@ -441,7 +497,7 @@ export function peerLinks(graph: TopologyGraph, placement: ModelPlacement | null
   );
 }
 
-/** Peer-to-peer of a GPU in its tooltip, when it is not in use (one short line: the Model card says more). */
+/** Peer-to-peer of a GPU in its details, when it is not in use (one short line: the Model card says more). */
 const P2P_SHORT = {
   active: 'active',
   requested: 'requested, not confirmed',

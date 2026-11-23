@@ -22,6 +22,13 @@ export interface Shot {
   delayMs?: number;
   /** Needs a generation in progress. */
   live?: boolean;
+  /** Captured with motion on, for a page whose reduced-motion drawing is a fallback (Topology: streaks, not dashes). */
+  motion?: boolean;
+  /**
+   * Captured in a larger window, of the same shape as the others (the image has their size): a page laid out by the
+   * room it has (Topology: its side column at the right).
+   */
+  viewport?: { width: number; height: number };
   /** Only captured when named on the command line. */
   manual?: boolean;
 }
@@ -102,12 +109,35 @@ async function scrollMainToBottom(page: Page) {
   });
 }
 
+/** Wide enough for the Topology page to keep its column at the right of both views. */
+const TOPOLOGY_VIEWPORT = { width: 1920, height: 1200 };
+
 export const SHOTS: Shot[] = [
   // Captured on the empty demo instance, before `demo-seed.ts setup`.
   { name: 'setup', path: '/setup', readyText: 'Welcome to llama-webui', goneText: 'Checking…', manual: true },
   { name: 'dashboard', path: '/', readyText: 'Generation (tok/s)', live: true, delayMs: 4000 },
   { name: 'system', path: '/system', readyText: 'NVIDIA GeForce RTX 5070 Ti', live: true, delayMs: 4000 },
-  { name: 'topology', path: '/topology', readyText: 'Generating', live: true, delayMs: 6000 },
+  // The browser keeps the chosen view from one shot to the next: each one picks its own.
+  {
+    name: 'topology',
+    path: '/topology',
+    readyText: 'Generating',
+    prepare: (page) => clickButton(page, 'Cards'),
+    live: true,
+    motion: true,
+    viewport: TOPOLOGY_VIEWPORT,
+    delayMs: 6000,
+  },
+  {
+    name: 'topology-board',
+    path: '/topology',
+    readyText: 'Generating',
+    prepare: (page) => clickButton(page, 'Board'),
+    live: true,
+    motion: true,
+    viewport: TOPOLOGY_VIEWPORT,
+    delayMs: 6000,
+  },
   { name: 'server', path: '/server', readyText: 'Effective command' },
   {
     name: 'profiles',

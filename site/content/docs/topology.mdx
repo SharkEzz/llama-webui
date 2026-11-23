@@ -1,39 +1,70 @@
 ---
 title: Topology
-description: A live 3D view of the machine, with CPU, memory, GPUs, NVMe drives and chipsets, the memory each one holds, the measured traffic on each link, and how the model is split across devices.
+description: A live drawing of the machine, as cards or as a board, with CPU, memory, GPUs, NVMe drives and chipsets, the memory each one holds, the measured traffic on each link, and how the model is split across devices.
 ---
 
-The Topology page draws your machine as a 3D scene: the CPU, the memory, the GPUs and NVMe drives on their PCIe links,
-with the measured traffic flowing along each link. GPUs and memory are tanks filled to the memory they hold, split by
-what the loaded model takes in them. Use it to see at a glance where a model lives, which component works and which
-link is busy.
+The Topology page draws your machine: the CPU, the memory, the GPUs and NVMe drives on their PCIe links, with the
+measured traffic flowing along each link. GPUs and memory show the memory they hold, split by what the loaded model
+takes in them. Use it to see at a glance where a model lives, which component works and which link is busy.
 
 <Screenshot
   name="topology"
-  alt="Topology during a generation: a CPU block showing one tile per thread, memory behind it and, in front, two GeForce GPUs drawn as glass tanks partly filled in layers, a Radeon integrated GPU, an NVMe drive and a chipset with a Radeon card behind it. Streaks run along the links and each active link has its throughput above the block it reaches. Two cards frame the scene: the phase Generating with tok/s, and the model split between the devices."
+  alt="Topology during a generation, in the Cards view: a card for the CPU with one tile per thread, the memory at its left and, below, cards for two GeForce GPUs with their VRAM bar filled in layers, an integrated GPU hidden in Settings, an NVMe drive and a chipset with a Radeon card under it. Curves link the cards, each with its PCIe state and, where traffic flows, its streaks and its throughput. A column at the right holds the view control, the phase Generating with its speed in tok/s, and the model split between CUDA0, CUDA1 and the host."
 />
 
-## The scene
+## Two views
+
+The control at the top of the page, **Cards** or **Board**, switches between two drawings of the same machine, with
+the same blocks, the same figures and the same links. The browser remembers the one you chose.
+
+- **Cards** is a diagram: the **CPU** on top with the **Memory** at its left and an integrated GPU at its right, a row
+  below with the devices on the CPU's own PCIe lanes (GPUs, then NVMe drives, then chipsets), and one row further the
+  devices connected through each **chipset**. Curves link a device to what it hangs off.
+- **Board** is the plan of a motherboard seen from above: the socket with the memory modules at its right, the CPU's
+  drives and an integrated GPU at its left, one slot per GPU below (those of the CPU first, then those of a chipset),
+  the chipsets at the lower right with their drives. Tracks run at right angles and never cross.
+
+<Screenshot
+  name="topology-board"
+  alt="The same machine in the Board view: the socket with its thread tiles, four memory modules at its right filled to the memory in use, the NVMe drive at its left, four GPU slots one under the other with their figures and VRAM bar, and the chipset at the lower right. Tracks at right angles join the socket to each slot, two of them carrying streaks; the state of each link is written in the margin."
+  caption="The Board view, during the same generation."
+/>
+
+<Callout type="note">
+
+The board is a convention, not a picture of your motherboard: llama-webui knows what each device hangs off, not where
+its slot is. The number of memory modules is the real one when the kernel reads it (see **DIMMs** below); otherwise
+the board fills two of its four slots.
+
+</Callout>
 
 The hardware is read from the kernel each time you open the page, so the link states are current (links slow down
-when idle to save power). The layout is always the same:
+when idle to save power). Every display controller is drawn, integrated GPUs included, and every NVMe drive. SATA
+drives and other PCIe devices are not.
 
-- the **CPU** in the middle and the **Memory** behind it;
-- in front of the CPU, a row with the devices on its own PCIe lanes: GPUs, then NVMe drives, then chipsets;
-- behind each **chipset**, one row further, the devices connected through it.
+Each GPU gets its own color, used again in the legend and the model split. The CPU uses the accent color and the
+memory its own; drives and chipsets are neutral.
 
-Every display controller is drawn, integrated GPUs included, and every NVMe drive. SATA drives and other PCIe devices
-are not.
+The drawing starts whole in the room it has, at the left of the side column: it grows on a large screen (up to twice its size) and
+shrinks with the window. From there you look closer with the mouse:
 
-Each GPU gets its own color, used again in the legend and the model split. The CPU uses the accent color; memory,
-drives and chipsets are neutral.
+- The **wheel** zooms in and out around the pointer, up to four times the drawing's size and back to the whole
+  drawing.
+- A **drag** moves the drawing in its frame. A press that does not move stays a click, on a block for example.
+- Three buttons at the lower right of the frame do the same without a wheel: **Zoom in**, **Reset zoom**, which shows
+  the whole drawing again, and **Zoom out**.
 
-### Tanks: GPUs and memory
+Switching between **Cards** and **Board** shows the whole drawing again.
 
-A GPU and the memory are glass tanks. The level is the memory in use, on a linear scale: a tank half full is a card
-with half its VRAM taken. The figure is the measured one, the same as on the [System](/docs/system/) page.
+## The blocks
 
-In a GPU, the contents are stacked in layers, from the bottom:
+### GPUs and memory
+
+A GPU and the memory have a wide bar: the memory in use, on a linear scale, so a bar half full is a card with half
+its VRAM taken. The figure is the measured one, the same as on the [System](/docs/system/) page. On the board, each
+memory module is an upright bar, and all of them show the level of the whole memory.
+
+In a GPU, the bar is split in layers, in this order:
 
 | Layer               | What it is                                                                        | Color                 |
 | ------------------- | --------------------------------------------------------------------------------- | --------------------- |
@@ -44,72 +75,77 @@ In a GPU, the contents are stacked in layers, from the bottom:
 
 The three first sizes come from `llama-server`'s logs (see [How the model split is found](#how-the-model-split-is-found)).
 When they add up to more than the VRAM in use, while the model is still loading or with the estimate of `-sm tensor`,
-they shrink together: the level never exceeds the measurement. Without a known split, the tank has a single gray
-layer.
+they shrink together: the bar never exceeds the measurement. Without a known split, the bar has a single gray layer.
 
-The memory tank has a single layer, the RAM in use. Weights mapped from the disk (`mmap`) sit in the page cache, which
-is not counted as used, so the model has no layer of its own there: its size is in the tank's details, as **Model in
+The memory has a single layer, the RAM in use. Weights mapped from the disk (`mmap`) sit in the page cache, which is
+not counted as used, so the model has no layer of its own there: its size is in the block's details, as **Model in
 RAM**.
 
-The liquid glows brighter with the load of the component. Its surface turns amber from 85% full and red from 95%.
-Hidden and sleeping GPUs are empty, dimmed tanks labeled **hidden** or **suspended**, with **Hidden in Settings** in
-their details (see [Sleeping and hidden GPUs](/docs/system/#sleeping-and-hidden-gpus)).
+From 85% full, the bar is outlined and its percentage turns amber; from 95%, red. Hidden and sleeping GPUs are dimmed
+and say **Hidden in Settings** or **Suspended, not read** instead of their figures (see
+[Sleeping and hidden GPUs](/docs/system/#sleeping-and-hidden-gpus)).
 
-### The CPU and the other blocks
+### What a block shows
 
-The top of the **CPU** is a grid with one tile per thread, each lit with the load of its thread: you see how many
-threads work, not only the average. The block itself glows with the load of the machine.
+| Block      | On the block                                                                                                                |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| GPU        | Utilization (with a thin bar in the Cards view), temperature, power, the VRAM in use, its total and share                   |
+| CPU        | CPU load of the machine, one tile per thread lit with the load of that thread, temperature, and frequency in the Cards view |
+| Memory     | Share of the RAM in use, the RAM in use and its total                                                                       |
+| NVMe drive | **Read** and **Write** in the Cards view; on the board, a light that brightens with its activity                            |
+| Chipset    | Number of devices behind it, and its current link to the CPU in the Cards view                                              |
 
-NVMe drives and chipsets are plain blocks. A drive glows with its throughput against the capacity of its link.
+The tiles of the CPU show how many threads work, not only the average.
 
-### Labels and details
+### Details
 
-Above each block, a label gives its name and what matters most:
+Select a block, with a click or with <Kbd>Enter</Kbd> once it has the focus, to open all its figures beside it.
+The block stays outlined while its details are open, and they keep following the measurements. Select another
+block to move them there. Select the block again, press <Kbd>Esc</Kbd>, click elsewhere or use **Close the
+details** to close them.
 
-| Block      | Under the name                                             |
-| ---------- | ---------------------------------------------------------- |
-| GPU        | Utilization with a bar, then the VRAM in use and its total |
-| CPU        | CPU load of the machine, with a bar                        |
-| Memory     | RAM in use and its total                                   |
-| NVMe drive | Nothing: its throughput is on its link's badge             |
-| Chipset    | Current link to the CPU, such as `Gen4 x4`                 |
+| Block      | Details                                                                                                                                                                                                                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GPU        | **Utilization**, **VRAM**, the **Model**, **KV cache** and **Compute buffers** sizes it holds, **Other VRAM**, **llama-server (VRAM)**, **Temperature**, **Power**, **Memory controller**, **Fan**, **Power limit**, **Graphics clock**, **Memory clock**, **PCIe link**, **Host → GPU** and **GPU → host** traffic, **Peer-to-peer** |
+| CPU        | **Load**, **llama-server** CPU use (one full core is 100%: it can exceed 100%), **Frequency**, **Temperature**, **Load average** (1, 5 and 15 minutes), **Cores**, **NUMA**                                                                                                                                                           |
+| Memory     | **Used**, **Cached**, DRAM **Read** and **Write** (or **Bandwidth** not measured), **llama-server (DRAM)**, **llama-server (RSS)**, **Model in RAM**, **Swap**, **DIMMs** with their temperature                                                                                                                                      |
+| NVMe drive | **Read**, **Write**, **Capacity**, **PCIe link**, and **Role** when it holds the running model                                                                                                                                                                                                                                        |
+| Chipset    | **CPU link** (current and maximum), number of **Devices** behind it                                                                                                                                                                                                                                                                   |
 
-Hover a block for its details:
-
-| Block      | Details                                                                                                                                                                                                               |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GPU        | **Utilization**, **VRAM**, the **Model**, **KV cache** and **Compute buffers** sizes it holds, **Other VRAM**, **Temperature**, **Power**, **PCIe link**, **Host → GPU** and **GPU → host** traffic, **Peer-to-peer** |
-| CPU        | **Load**, **llama-server** CPU use (one full core is 100%: it can exceed 100%), **Frequency**, **Temperature**, **Cores**, **NUMA**                                                                                   |
-| Memory     | **Used**, DRAM **Read** and **Write** (or **Bandwidth** not measured), **llama-server (DRAM)**, **llama-server (RSS)**, **Model in RAM**, **Swap**, **DIMMs** with their temperature                                  |
-| NVMe drive | **Read**, **Write**, **Capacity**, **PCIe link**, and **Role** when it holds the running model                                                                                                                        |
-| Chipset    | **CPU link** (current and maximum), number of **Devices** behind it                                                                                                                                                   |
-
-A detail appears only when it is known. **DIMMs** needs memory modules with a temperature sensor the kernel reads
-(the `spd5118` driver, for DDR5 modules).
+A detail appears only when it is known: what a GPU reports depends on its driver (see
+[What each source reports](/docs/system/#what-each-source-reports)). **Power limit** adds the factory value when the limit was lowered.
+**DIMMs** needs memory modules with a temperature sensor the kernel reads (the `spd5118` driver, for DDR5 modules).
 
 ## Traffic on the links
 
-Tubes join the blocks:
+Links join the blocks: curves between the cards, tracks on the board.
 
-- A tube's thickness shows the PCIe capacity of the link at its maximum generation and width, so a Gen5 x16 slot looks
+- A link's thickness shows the PCIe capacity of the link at its maximum generation and width, so a Gen5 x16 slot looks
   thicker than a Gen4 x4 one.
-- The **CPU ↔ memory** tube has a fixed thickness.
-- A thin, faint tube is an internal connection without a PCIe link to report. It carries nothing.
+- The **CPU ↔ memory** link has a fixed thickness.
+- A thin, faint link is an internal connection without a PCIe link to report: the one of a GPU inside the processor,
+  which is in no slot. It carries nothing and has no label.
+
+Each PCIe link has a label with its current state, such as `Gen4 x8`: a card that trained below what its slot can do
+shows there. In the Cards view the label sits on the link, above the card it reaches; on the board, in the margin
+beside the slot or the drive.
+
+In the **Board** view, each card in a slot has the contacts of its connector drawn under it, as long as an x16 one.
+The contacts its link uses are gold and the others gray: all of them at x16, half at x8, a quarter at x4.
 
 ### Streaks
 
-Streaks travel along a tube when traffic is measured on that link, toward the device on one lane and back on the
-other. More traffic means more streaks, longer and faster, on a logarithmic scale, so 50 MiB/s stays visible next to
-20 GiB/s. The tube also glows brighter with more traffic. Streaks show that something flows and roughly how much; the
-exact figure is on the badge. At rest, the same 8 MiB/s floor as for badges applies (see below): the background traffic
-of an idle GPU leaves its link still.
+Streaks travel along a link when traffic is measured on it, toward the device on one lane and back on the other.
+More traffic means more streaks, and faster ones, on a logarithmic scale, so 50 MiB/s stays visible next to 20 GiB/s.
+The link itself takes its color, stronger with more traffic. Streaks show that something flows and roughly how much;
+the exact figure is on the link's label. At rest, the same 8 MiB/s floor as for the figures applies (see below): the
+background traffic of an idle GPU leaves its link still.
 
-### Badges
+### Throughput
 
-A link that carries traffic gets a badge, stacked on the label of the block it reaches, with the exact throughput in
-each direction:
+A link that carries traffic adds the exact throughput in each direction to its label:
 
-| Link             | Lines of the badge        |
+| Link             | Lines of the label        |
 | ---------------- | ------------------------- |
 | CPU ↔ GPU        | **→ GPU**, **→ host**     |
 | CPU ↔ NVMe drive | **read**, **write**       |
@@ -117,14 +153,14 @@ each direction:
 | CPU ↔ chipset    | **→ devices**, **→ host** |
 
 While `llama-server` loads a model, processes a prompt or generates, every link with measured traffic shows its
-badge. At rest, a link shows its traffic, streaks and badge, only from 8 MiB/s: an idle GPU exchanges a few MiB/s with
-the host, which would otherwise leave streaks running and badges on screen all the time. The details on hover always give the figures.
+figures. At rest, a link shows its traffic, streaks and figures, only from 8 MiB/s: an idle GPU exchanges a few MiB/s
+with the host, which would otherwise leave streaks running all the time. The details of a block always give them.
 
 ### A link near its limit
 
 Each direction of a PCIe link has the full capacity of the link in its current state (a link that slowed down to Gen1
-saturates much sooner than at its maximum). When the busier direction reaches 25% of that capacity, the badge adds
-the percentage, such as **87% of capacity**. The tube and the badge turn amber from 70% and red from 90%.
+saturates much sooner than at its maximum). When the busier direction reaches 25% of that capacity, the label adds
+the percentage, such as **87% of capacity**. The link, its streaks and that line turn amber from 70% and red from 90%.
 
 This mostly shows while a model loads: reading it from an NVMe drive and sending it to the GPUs can fill a link.
 During a generation, a GPU link usually stays under 1% of its capacity. A chipset link is measured against its own
@@ -132,17 +168,17 @@ link to the CPU, with the sum of the devices behind it: two busy devices on one 
 
 ### What is measured
 
-| Link             | Measured from                                                                             | Without a measurement                              |
-| ---------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| CPU ↔ NVIDIA GPU | The card's PCIe counters, through NVML, read every 5 seconds                              | No streaks, no badge (NVIDIA through `nvidia-smi`) |
-| CPU ↔ AMD GPU    | Not measured: the `amdgpu` driver does not report PCIe traffic                            | No streaks, no badge                               |
-| CPU ↔ NVMe drive | The drive's read and write counters (**Disks** collector)                                 | No streaks, no badge                               |
-| CPU ↔ chipset    | The sum of the devices behind it                                                          | No streaks, no badge                               |
-| CPU ↔ memory     | DRAM traffic through `perf` (AMD Zen 4 and Zen 5), writes on one lane, reads on the other | A pulse whose rate follows CPU activity            |
+| Link             | Measured from                                                                             | Without a measurement                                |
+| ---------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| CPU ↔ NVIDIA GPU | The card's PCIe counters, through NVML, read every 5 seconds                              | No streaks, no figures (NVIDIA through `nvidia-smi`) |
+| CPU ↔ AMD GPU    | Not measured: the `amdgpu` driver does not report PCIe traffic                            | No streaks, no figures                               |
+| CPU ↔ NVMe drive | The drive's read and write counters (**Disks** collector)                                 | No streaks, no figures                               |
+| CPU ↔ chipset    | The sum of the devices behind it                                                          | No streaks, no figures                               |
+| CPU ↔ memory     | DRAM traffic through `perf` (AMD Zen 4 and Zen 5), writes on one lane, reads on the other | A link whose color follows CPU activity, no streaks  |
 
-Without a DRAM measurement, the memory link pulses with `llama-server`'s CPU use when a server runs, and with the
-machine's CPU load otherwise. [Monitor DRAM bandwidth](/docs/guides/dram-bandwidth/) explains how to get the real
-figure.
+Without a DRAM measurement, the memory link is colored by `llama-server`'s CPU use when a server runs, and by the
+machine's CPU load otherwise: it has no streaks, since nothing says which way the bytes go.
+[Monitor DRAM bandwidth](/docs/guides/dram-bandwidth/) explains how to get the real figure.
 
 ### Peer-to-peer between GPUs
 
@@ -165,15 +201,16 @@ with NCCL: add that variable to a profile to know whether your cards really use 
 The link is dotted and carries no streaks: nothing measures that traffic apart. It is part of the figures of each
 card's own PCIe link.
 
-## Cards around the scene
+## The side column
 
-Both cards fold down to their title line with the arrow in their corner, to leave more room to the scene. The browser
-remembers which ones are folded.
+A column at the right of the drawing holds the title and the view control, then the **Phase** and **Model** cards and
+the **Legend** button. It stays there in both views. Only a window too narrow for it, a phone or a small tablet, shows
+these cards after the drawing: scroll the page to read them.
 
 ### Phase
 
-The card at the top left shows what `llama-server` is doing, with the current **Generation** and **Prompt** speeds in
-tok/s (the same as on the [Dashboard](/docs/dashboard/)). Folded, it keeps the phase.
+The **Phase** card shows what `llama-server` is doing, with the current **Generation** and **Prompt** speeds in
+tok/s (the same as on the [Dashboard](/docs/dashboard/)).
 
 | Phase          | Meaning                                                                     |
 | -------------- | --------------------------------------------------------------------------- |
@@ -185,15 +222,15 @@ tok/s (the same as on the [Dashboard](/docs/dashboard/)). Folded, it keeps the p
 
 ### Model
 
-The card at the top right shows how the model's weights are split. A bar and a list give each device's share, with
-its size and percentage. Folded, it keeps the total size.
+The **Model** card shows how the model's weights are split. A bar and a list give each device's share, with its size
+and percentage.
 
 - GPUs appear under `llama-server`'s device names: `CUDA0`, `ROCm0`, `Vulkan1`…
 - **Host (RAM)** sums everything kept in system memory, including weights mapped from the disk (`mmap`).
 
 The line below gives the total size and the **offloaded layers** count, such as `66/66`. Only the main model is
 counted: a draft model and a multimodal projector are left out. The KV cache is not in the bar; each GPU's share
-shows as a layer of its tank, with its size in the details on hover.
+shows as a layer of its bar, with its size in its details.
 
 When the split is not known, the card says why:
 
@@ -208,58 +245,53 @@ reported, a last line gives its state.
 
 ### Legend
 
-The **?** button at the bottom left opens the legend: what the tanks, their layers, the bars, the streaks, the badges
-and the alert colors mean, whether the memory link shows measured DRAM traffic or CPU activity, and the color of each
-GPU.
+The **Legend** button opens the legend: what the bars, their layers, the streaks, the labels of the links and the
+alert colors mean, whether the memory link shows measured DRAM traffic or CPU activity, and the color of each GPU.
 
 ## How the model split is found
 
 `llama-server` does not report where it put the model through its API, but it writes it to its output while loading.
 llama-webui reads those lines from the [logs](/docs/logs/) of the last launch:
 
-- which device each backend uses, with its PCI address, which ties `CUDA0` to a block of the scene;
+- which device each backend uses, with its PCI address, which ties `CUDA0` to a block of the drawing;
 - the size of the model, KV cache and compute buffers on each device;
 - the number of layers offloaded to the GPUs.
 
 `llama-server` only writes the buffer sizes from log verbosity 4 on, so llama-webui starts it with `-lv 4` unless the
-profile sets a verbosity itself (`-lv`, `-v` or `LLAMA_ARG_LOG_VERBOSITY`). The card and the tanks fill in while the
+profile sets a verbosity itself (`-lv`, `-v` or `LLAMA_ARG_LOG_VERBOSITY`). The card and the bars fill in while the
 model loads and update live. This only works for a server llama-webui launched: an external server's output never
-reaches llama-webui. If the logs do not give a device's PCI address, its slice is shown in gray and its tank keeps a
+reaches llama-webui. If the logs do not give a device's PCI address, its slice is shown in gray and its bar keeps a
 single gray layer.
 
 With `-sm tensor` (tensor parallelism), `llama-server` groups the GPUs into one `Meta()` device and logs each buffer at
 the size of its largest part. llama-webui spreads it over the GPUs listed in the logs by `-ts` (equal parts without
 it), and the card says **estimate (tensor parallel)**. `llama-server` gives no PCI address for these GPUs: their
-slices are gray and their tanks keep a single layer, unless the profile sets `NCCL_DEBUG=INFO`, with which NCCL logs
+slices are gray and their bars keep a single layer, unless the profile sets `NCCL_DEBUG=INFO`, with which NCCL logs
 the address of each CUDA device.
 
-## Move the camera
+## Motion and reduced motion
 
-The hint under the scene sums up the controls: **Drag: rotate · Right-click: pan · Wheel: zoom**.
+The streaks are the only thing that moves between two measurements: they are drawn 20 times a second, and only while
+a link carries traffic worth showing. Everything else changes once a second, when a new measurement arrives.
 
-- Drag with the left button to turn around the scene, drag with the right button to move it, and use the wheel to zoom
-  in and out. The camera cannot go below the floor.
-- Left alone, the camera drifts slowly. Once you move it, it stays where you leave it, even if you resize the window.
-- **Recenter view**, under the scene, brings the camera back to its starting point. It is active once you have moved
-  it.
+With the system's reduced motion setting on, there are no streaks: a busy link is dashed and more strongly colored
+instead, and the legend says **Reduced motion: no streaks, a busy link is dashed.** The figures and the bars stay.
 
-The scene only draws a new frame when something moves, and not at all while the browser tab is in the background.
+## Keyboard
 
-With the system's reduced motion setting on, the camera does not drift and the links glow steadily without streaks;
-the legend says **Reduced motion: steady glow, no streaks.** The badges, the tanks and the bars stay.
+Every block is a button: <Kbd>Tab</Kbd> goes from one to the next, <Kbd>Enter</Kbd> or <Kbd>Space</Kbd> opens its
+details and moves the focus into them, and <Kbd>Esc</Kbd> closes them and gives the focus back to the block. In a
+zoomed drawing, a block that takes the focus comes into view. The three zoom buttons follow the blocks in the tab
+order.
 
-## Requirements
-
-The scene needs WebGL. If the browser cannot start it, for example on a remote desktop without graphics
-acceleration, the page shows **3D scene unavailable: WebGL could not start in this browser.** The cards around the
-scene still work.
+## If the hardware cannot be read
 
 If the page cannot load the hardware graph from llama-webui, the phase card shows **Topology unreadable (API
-unavailable).**, folded or not.
+unavailable).**
 
 ## Without a running model
 
-The page works without a server: the scene shows the hardware with its live traffic and load, each tank filled to
-the memory in use in a single gray layer, the phase is **Stopped**, and the model card says **No managed server:
-split unknown.** Start a profile from the [Server](/docs/server/) page to see the tanks fill
-layer by layer as the model loads.
+The page works without a server: it shows the hardware with its live traffic and load, each GPU's bar filled to the
+VRAM in use in a single gray layer, the phase is **Stopped**, and the model card says **No managed server: split
+unknown.** Start a profile from the [Server](/docs/server/) page to see the bars fill layer by layer as the model
+loads.

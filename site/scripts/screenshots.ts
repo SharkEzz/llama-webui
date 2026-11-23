@@ -51,8 +51,7 @@ const browser = await launch({
   executablePath: '/usr/bin/chromium',
   headless: true,
   defaultViewport: VIEWPORT,
-  // SwiftShader gives the Topology page (WebGL) a GPU-less renderer in headless mode.
-  args: ['--hide-scrollbars', '--force-color-profile=srgb', '--enable-unsafe-swiftshader'],
+  args: ['--hide-scrollbars', '--force-color-profile=srgb'],
 });
 
 try {
@@ -61,7 +60,8 @@ try {
     for (const shot of shots) {
       const page = await browser.newPage();
       try {
-        await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+        if (shot.viewport) await page.setViewport({ ...VIEWPORT, ...shot.viewport });
+        if (!shot.motion) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
         await page.goto(`${base}${shot.path}`, { waitUntil: 'networkidle2' });
         if (shot.readyText) await page.waitForSelector(`::-p-text(${shot.readyText})`, { timeout: 15_000 });
         if (shot.goneText) {

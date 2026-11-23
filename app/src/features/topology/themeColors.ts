@@ -1,72 +1,33 @@
-import { useMemo } from 'react';
-import { Color } from 'three';
-import type { Tone } from '@/components/glass/tones';
-import { useTheme } from '@/lib/theme';
-
-export interface SceneColors {
-  dark: boolean;
-  tone: Record<Tone, Color>;
-  primary: Color;
-  /** Neutral glow of components without a tone (RAM, NVMe, chipset). */
-  neutral: Color;
-  /** Body of the blocks and tubes. */
-  slab: Color;
-  tube: Color;
-  /** A link or a tank near its limit, then at it (see Level). */
-  warning: Color;
-  critical: Color;
-}
+/*
+ * Colors of the drawing. They are the theme's tokens, used as CSS wherever CSS reads them; only the canvas of the
+ * streaks needs them resolved.
+ */
 
 /**
- * Share of white mixed into a GPU's tone for each of its tank layers: the model keeps the full tone, its KV cache and
- * compute buffers are lighter shades of it (mixed in linear space, where a little white goes a long way). Shared with
- * the legend's swatches.
+ * Share of white mixed into a GPU's tone for each layer of its memory: the model keeps the full tone, its KV cache and
+ * its compute buffers are lighter shades of it. Shared by the blocks and the legend's swatches.
  */
 export const LAYER_TINT = { model: 0, kv: 0.18, compute: 0.42 } as const;
 
-/** Any CSS color (including `oklch()`, which Three cannot read) → `#rrggbb`, via the browser's 2D canvas. */
-export function cssToHex(value: string): string | null {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1;
-  canvas.height = 1;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.fillStyle = '#000000';
-  ctx.fillStyle = value;
-  ctx.fillRect(0, 0, 1, 1);
-  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-  return `#${[r, g, b].map((v) => (v ?? 0).toString(16).padStart(2, '0')).join('')}`;
-}
+/** A lighter shade of a color (mixed in linear space, where a little white goes a long way). */
+export const tint = (color: string, k: number) =>
+  k > 0 ? `color-mix(in srgb-linear, ${color}, white ${Math.round(k * 100)}%)` : color;
 
-/** Value of a theme color token, resolved by the browser on the root element. */
-export function cssVarColor(name: string, fallback: string): Color {
+const resolved = new Map<string, string>();
+
+/**
+ * A CSS color (a token, a `color-mix()`) as the browser computes it, for a canvas, which does not read custom
+ * properties. `theme` is the theme the value is asked for: the same token is another color in the other one.
+ */
+export function resolveColor(css: string, theme: string): string {
+  const key = `${theme}\n${css}`;
+  const known = resolved.get(key);
+  if (known !== undefined) return known;
   const probe = document.createElement('span');
-  probe.style.color = `var(${name})`;
-  document.body.appendChild(probe);
-  const resolved = getComputedStyle(probe).color;
+  probe.style.color = css;
+  document.body.append(probe);
+  const value = getComputedStyle(probe).color;
   probe.remove();
-  return new Color(cssToHex(resolved) ?? fallback);
-}
-
-/** Scene colors, recomputed when the theme changes. */
-export function useSceneColors(): SceneColors {
-  const resolved = useTheme((s) => s.resolved);
-  return useMemo(() => {
-    const dark = resolved === 'dark';
-    return {
-      dark,
-      tone: {
-        blue: cssVarColor('--tone-blue', '#4f8cff'),
-        teal: cssVarColor('--tone-teal', '#3fc1b0'),
-        amber: cssVarColor('--tone-amber', '#e0a53a'),
-        rose: cssVarColor('--tone-rose', '#e8617a'),
-      },
-      primary: cssVarColor('--primary', '#4f8cff'),
-      neutral: cssVarColor('--foreground', dark ? '#f2f3f5' : '#2a2d33'),
-      slab: new Color(dark ? '#23262d' : '#dfe3ea'),
-      tube: new Color(dark ? '#3a3f4a' : '#b8bfca'),
-      warning: cssVarColor('--warning', '#e0a53a'),
-      critical: cssVarColor('--destructive', '#e5484d'),
-    };
-  }, [resolved]);
+  resolved.set(key, value);
+  return value;
 }

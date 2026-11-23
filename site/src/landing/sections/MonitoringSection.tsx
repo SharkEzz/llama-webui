@@ -13,7 +13,7 @@ const PAGES: AppPage[] = [
 const HUD = [
   ['Phase', 'loading, prompt or generation, with the current speeds'],
   ['Model split', 'memory per device and offloaded layers, from the startup logs'],
-  ['Tanks', 'each GPU filled to its VRAM: model, KV cache, compute buffers'],
+  ['Memory bars', 'each GPU filled to its VRAM: model, KV cache, compute buffers'],
   ['Links', 'exact throughput per direction, and an alert near the PCIe capacity'],
 ] as const;
 
@@ -52,7 +52,7 @@ export function MonitoringSection() {
         <div className="flex flex-col gap-5">
           <BentoCard
             tone="blue"
-            title="Your machine, in 3D"
+            title="Your machine, as cards or as a board"
             details={
               <dl className="mt-5 grid gap-x-5 gap-y-3 text-sm sm:grid-cols-2">
                 {HUD.map(([what, text]) => (
@@ -66,8 +66,8 @@ export function MonitoringSection() {
             visual={
               <Shot
                 name="topology"
-                alt="Topology page: the CPU, memory, GPUs and NVMe drive as 3D blocks, the GPUs filled to the memory they hold, with the model split per device"
-                crop={{ x: 0.155, y: 0.055, w: 0.84, h: 0.935 }}
+                alt="Topology page: the CPU, memory, GPUs and NVMe drive as cards joined by their links, the GPUs filled to the memory they hold, with the model split per device"
+                crop={{ x: 0.13, y: 0.045, w: 0.865, h: 0.8 }}
                 width="min(46rem, 90vw)"
                 className={SHOT_FRAME}
               />

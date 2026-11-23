@@ -89,6 +89,31 @@ const pcieLink = Effect.fnUntraced(function* (
   } satisfies TopologyLink;
 });
 
+/**
+ * Whether the GPU `busId`, right under the root port `root`, is inside the processor. Its bridge is no slot, yet on
+ * a Ryzen it reports a link as one does (Gen4 x16): the link attributes do not tell. What does is the company the
+ * GPU keeps: it shares its PCI device with functions of the root port's vendor (the processor's security processor,
+ * its USB controllers), which is not its own (`0x1002` for the Radeon, `0x1022` for the rest). Every function of a
+ * card in a slot is the card vendor's.
+ */
+const isIntegrated = Effect.fnUntraced(function* (options: {
+  readonly devicesDir: string;
+  readonly busIds: ReadonlyArray<string>;
+  readonly busId: string;
+  readonly vendor: string | null;
+  readonly root: string;
+}) {
+  const path = yield* Path.Path;
+  const rootVendor = yield* readTrimmed(path.join(options.root, 'vendor'));
+  if (rootVendor === null || rootVendor === options.vendor) return false;
+  // `0000:0d:00.` of `0000:0d:00.0`: what the functions of one device share
+  const device = /^.+\./.exec(options.busId)?.[0];
+  if (device === undefined) return false;
+  const others = Arr.filter(options.busIds, (id) => id !== options.busId && Str.startsWith(device)(id));
+  const vendors = yield* Effect.forEach(others, (id) => readTrimmed(path.join(options.devicesDir, id, 'vendor')));
+  return Arr.contains(vendors, rootVendor);
+});
+
 interface BlockDev {
   readonly block: string;
   /** Real directory of the controller (`…/0000:02:00.0/nvme/nvme0`). */
@@ -148,7 +173,8 @@ const ramNode = Effect.fnUntraced(function* (sysRoot: string, procRoot: string) 
 /**
  * Hardware graph: CPU, memory, then each GPU (class 0x03) and NVMe controller (0x0108) with its link to the CPU,
  * directly (root port) or through a chipset node (bridges between the root port and the card that aren't the card's
- * own). Any failed read degrades to unknown: at worst the graph holds only the CPU and memory.
+ * own). A GPU inside the processor has an `internal` link, without figures. Any failed read degrades to unknown: at
+ * worst the graph holds only the CPU and memory.
  *
  * `cpu` gives the CPU (the server's cached `CpuInfo`, read once); without it, `cpuinfo` is read under `procRoot`.
  */
@@ -256,8 +282,15 @@ export const readPciTopology = Effect.fn('pci.readPciTopology')(function* (
         detail: { sizeBytes: Option.isSome(blk) ? blk.value.sizeBytes : null },
       });
     }
+    const integrated =
+      kind === 'gpu' &&
+      root !== undefined &&
+      chain.length === 1 &&
+      (yield* isIntegrated({ devicesDir, busIds, busId, vendor: vendorId, root }));
     const link = yield* pcieLink(`${from}-${id}`, from, id, linkPath, portPath ?? null);
-    links.push(link);
+    links.push(
+      integrated ? { ...link, kind: 'internal', genMax: null, widthMax: null, genCur: null, widthCur: null } : link,
+    );
   }
   const at = yield* Clock.currentTimeMillis;
   return { nodes, links, at };

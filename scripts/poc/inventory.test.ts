@@ -13,7 +13,7 @@ test('milestoneOf places a test file in the milestone that ports it', () => {
   expect(milestoneOf('app/server/lib/db/sweeps.test.ts')).toBe('E7');
   expect(milestoneOf('app/server/lib/tuning/estimate.test.ts')).toBe('E8');
   expect(milestoneOf('packages/webui-shared/src/format.test.ts')).toBe('keep');
-  expect(milestoneOf('app/src/features/topology/layout.test.ts')).toBe('keep');
+  expect(milestoneOf('app/src/features/topology/layouts.test.ts')).toBe('keep');
   expect(milestoneOf('scripts/release.test.ts')).toBe('keep');
 });
 

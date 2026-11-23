@@ -81,17 +81,18 @@ one dashboard designed for a **single machine you own**:
   <img src="docs/assets/screenshots/system.jpg" alt="System page with per-GPU utilization, VRAM, PCIe, power, clocks and temperature" width="100%">
 </p>
 
-### 🧭 3D hardware topology
+### 🧭 Live hardware topology
 
-The **Topology** page draws your machine as an interactive 3D scene (react-three-fiber): CPU, memory,
+The **Topology** page draws your machine, as a diagram of cards or as the plan of a motherboard: CPU, memory,
 NVMe drives, GPUs and chipset, discovered automatically from sysfs. Streaks flow along each link according to
 **measured** PCIe, NVMe and DRAM traffic (DRAM through `perf` on AMD Zen 4/5), with the exact throughput next to it
-and an alert when a link nears its capacity. GPUs and memory are tanks filled to the memory in use, and cards show the
-current phase (loading, prompt, generation) and **how the model is split across devices**, parsed from
-`llama-server`'s startup logs.
+and an alert when a link nears its capacity. GPUs and memory have a bar filled to the memory in use, and selecting a
+block opens all its figures. The wheel zooms and a drag moves the drawing, to look closer at a part of the machine.
+Two panels show the current phase (loading, prompt, generation) and **how the model is split
+across devices**, parsed from `llama-server`'s startup logs.
 
 <p align="center">
-  <img src="docs/assets/screenshots/topology.jpg" alt="3D hardware topology with live PCIe, NVMe and DRAM traffic and model placement per device" width="100%">
+  <img src="docs/assets/screenshots/topology.jpg" alt="Hardware topology with live PCIe, NVMe and DRAM traffic and model placement per device" width="100%">
 </p>
 
 ### 💬 Chat
@@ -336,7 +337,7 @@ apart by their `_tag`; an unknown route, or a method a route does not have, is a
 [Node.js](https://nodejs.org) 26 (`node:sqlite`, `node:ffi`) · [pnpm](https://pnpm.io) · [Effect](https://effect.website) (`HttpApi`, `Schema`, `SqlClient`) · [Vite](https://vite.dev) · [Rolldown](https://rolldown.rs) · [Vitest](https://vitest.dev) ·
 [React 19](https://react.dev) · [React Router](https://reactrouter.com) · [Tailwind CSS 4](https://tailwindcss.com) ·
 [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com) · [uPlot](https://github.com/leeoniya/uPlot) ·
-[react-three-fiber](https://r3f.docs.pmnd.rs) · [Shiki](https://shiki.style) · [Zustand](https://zustand.docs.pmnd.rs) ·
+[Shiki](https://shiki.style) · [Zustand](https://zustand.docs.pmnd.rs) ·
 [oxfmt and oxlint](https://oxc.rs) · [react-doctor](https://github.com/millionco/react-doctor) ·
 [oxlint-tailwindcss](https://github.com/sergioazoc/oxlint-tailwindcss)
 
