@@ -1,9 +1,9 @@
 // The report of a run: one HTML document with no external resource, alone or against a reference run.
 import type { Comparison } from '../compare.ts';
+import type { Figure } from '../figures.ts';
 import { SCENARIOS } from '../options.ts';
 import { type Results, SCENARIO_NAMES } from '../results.ts';
 import { type Cell, makeCell, type Section } from './cell.ts';
-import { table } from './charts.ts';
 import { code, delta, esc, value } from './format.ts';
 import { api } from './sections/api.ts';
 import { aurora } from './sections/aurora.ts';
@@ -20,7 +20,7 @@ import { pages } from './sections/pages.ts';
 import { soak } from './sections/soak.ts';
 import { startup } from './sections/startup.ts';
 import { tps } from './sections/tps.ts';
-import { CSS, SCRIPT } from './style.ts';
+import { CSS, SCRIPT, THEME_SCRIPT } from './style.ts';
 
 const BY_SCENARIO = {
   startup,
@@ -59,7 +59,7 @@ const TITLES: Record<string, string> = {
 
 const date = (iso: string | null) => (iso === null ? 'not finished' : iso.replace('T', ' ').replace(/\.\d+Z$/, ' UTC'));
 
-function header(results: Results): string {
+function header(results: Results, comparison: Comparison | null): string {
   const { run } = results;
   const m = run.machine;
   const browser = run.scenarios.some((s) => SCENARIOS[s].needsBrowser);
@@ -91,26 +91,52 @@ function header(results: Results): string {
     ],
   ];
   return `<header class="top">
-<h1>llama-webui profiling: ${esc(run.name)}</h1>
+<h1>${esc(run.name)}</h1>
+<p class="sub">Profiling run of llama-webui${comparison ? `, compared with the run ${code(comparison.reference)}` : ''}.</p>
 <dl class="meta">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
 ${banners.join('\n')}
 </header>`;
 }
 
-function changedSection(results: Results, comparison: Comparison): string {
+/**
+ * Where a figure was measured, and what it is: a window's figures are labelled “<window>: <figure>”, and the others
+ * belong to their scenario.
+ */
+function windowOf(f: Figure): { group: string; rest: string } {
+  const at = f.label.indexOf(': ');
+  return at < 0
+    ? { group: TITLES[f.scenario] ?? f.scenario, rest: f.label }
+    : { group: f.label.slice(0, at), rest: f.label.slice(at + 2) };
+}
+
+/** The figures that changed, largest first; the page's script filters them by text and groups them by window. */
+function changedTable(comparison: Comparison): string {
+  if (comparison.changed.length === 0) return '<p>No figure moved beyond its noise threshold.</p>';
   const rows = comparison.changed.map((f) => {
     const d = comparison.byId.get(f.id);
-    return [
-      `${esc(f.label)}${f.profiled ? '<span class="tag">profiled</span>' : ''}`,
+    const { group, rest } = windowOf(f);
+    // The window is hidden, not removed, once the rows sit under its heading: the filter still reads it.
+    const label = rest === f.label ? esc(rest) : `<span class="win">${esc(group)}: </span>${esc(rest)}`;
+    const cells = [
+      `${label}${f.profiled ? '<span class="tag">profiled</span>' : ''}`,
       d ? esc(value(d.reference, f.kind)) : '—',
       esc(value(f.value, f.kind)),
       d ? `<span class="d changed">${esc(delta(d.delta, f.kind))}</span>` : '—',
     ];
+    return `<tr data-group="${esc(group)}">${cells.map((c, i) => `<td${i === 0 ? '' : ' class="num"'}>${c}</td>`).join('')}</tr>`;
   });
+  const head = ['Figure', 'Reference', 'This run', 'Difference'];
+  return `<div class="tools"><input id="changed-filter" type="search" placeholder="Filter figures, for example chrome-gpu" aria-label="Filter the figures that changed"><label><input id="changed-group" type="checkbox">Group by measured window</label><span class="count" id="changed-count" role="status"></span></div>
+<div class="tablewrap"><table><thead><tr>${head.map((h, i) => `<th${i === 0 ? '' : ' class="num"'}>${h}</th>`).join('')}</tr></thead><tbody>
+${rows.join('\n')}
+</tbody></table></div>`;
+}
+
+function changedSection(results: Results, comparison: Comparison): string {
   const notes = comparison.notes.map((n) => `<li>${code(n.scenario)}: ${esc(n.note)}</li>`).join('');
   return `<section id="changed"><h2>What changed</h2>
 <p class="muted">Against the run ${code(comparison.reference)}: the figures whose difference exceeds the noise threshold of their kind (see Method), largest first.</p>
-${rows.length > 0 ? table(['Figure', 'Reference', 'This run', 'Difference'], rows, [1, 2, 3]) : '<p>No figure moved beyond its noise threshold.</p>'}
+${changedTable(comparison)}
 ${notes === '' ? '' : `<h3>Notes</h3><ul>${notes}</ul>`}
 ${results.failed.length > 0 ? '<p>Failed scenarios of this run have no figures to compare.</p>' : ''}</section>`;
 }
@@ -134,13 +160,20 @@ export function renderReport(results: Results, comparison: Comparison | null): s
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Profiling ${esc(results.run.name)}</title>
 <style>${CSS}</style>
+<script>${THEME_SCRIPT}</script>
 </head>
 <body>
-<main>
-${header(results)}
+<div class="shell">
+<aside class="side">
+<div class="sidetop"><div class="brand">llama-webui<span>Profiling report</span></div>
+<div class="theme" role="group" aria-label="Theme"><button type="button" data-theme="auto">Auto</button><button type="button" data-theme="light">Light</button><button type="button" data-theme="dark">Dark</button></div></div>
 <nav aria-label="Sections">${nav}</nav>
+</aside>
+<main>
+${header(results, comparison)}
 ${parts.map((p) => p.html).join('\n')}
 </main>
+</div>
 <div id="tip" role="status"></div>
 <script>${SCRIPT}</script>
 </body>

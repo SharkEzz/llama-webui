@@ -1,4 +1,4 @@
-// Inline SVG charts and the HTML blocks of the report (the look of the first, hand-written report).
+// Inline SVG charts and the HTML blocks of the report.
 import { esc, num } from './format.ts';
 
 export const SERIES = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'] as const;
@@ -29,7 +29,7 @@ export function bars(rows: Bar[], opts: { title: string; color?: string; labelWi
       return `<g class="mark" tabindex="0" data-tip="${esc(tip)}">
   <rect x="0" y="${String(y - 4)}" width="${String(width)}" height="${String(rowH)}" fill="transparent"/>
   <text x="${String(lw - 10)}" y="${String(y + 13)}" text-anchor="end" class="lab">${esc(r.label)}</text>
-  <rect x="${String(lw)}" y="${String(y)}" width="${w.toFixed(1)}" height="18" rx="3" fill="${opts.color ?? SERIES[0]}"/>
+  <rect x="${String(lw)}" y="${String(y + 2)}" width="${w.toFixed(1)}" height="14" rx="4" fill="${opts.color ?? SERIES[0]}"/>
   <text x="${(lw + w + 8).toFixed(1)}" y="${String(y + 13)}" class="val">${esc(r.text)}</text>
 </g>`;
     })
@@ -80,7 +80,7 @@ export function stacked(
           const w = Math.max(0, x(acc) - x0 - 2);
           if (w <= 0.5) return '';
           const tip = `${r.label}, ${series[k] ?? ''}: ${opts.format(v)}`;
-          return `<rect class="mark" tabindex="0" x="${x0.toFixed(1)}" y="${String(y)}" width="${w.toFixed(1)}" height="18" rx="2" fill="${SERIES[k] ?? ''}" data-tip="${esc(tip)}"/>`;
+          return `<rect class="mark" tabindex="0" x="${x0.toFixed(1)}" y="${String(y + 2)}" width="${w.toFixed(1)}" height="14" rx="4" fill="${SERIES[k] ?? ''}" data-tip="${esc(tip)}"/>`;
         })
         .join('');
       return `<text x="${String(lw - 10)}" y="${String(y + 13)}" text-anchor="end" class="lab">${esc(r.label)}</text>${segs}<text x="${(x(acc) + 8).toFixed(1)}" y="${String(y + 13)}" class="val">${esc(r.total)}</text>`;

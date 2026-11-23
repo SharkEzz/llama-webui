@@ -20,6 +20,28 @@ test('a comparison lists what changed and prints the reference next to a figure'
   expect(html).toMatch(/14\.4%[\s\S]{0,200}−13\.0/); // en-US percent, U+2212 minus, one decimal
 });
 
+test('the run names the page, and the rail links every section it has', () => {
+  const html = renderReport(fixtureResults(), null);
+  expect(html).toMatch(/<h1>[^<]+<\/h1>\n<p class="sub">Profiling run of llama-webui\.<\/p>/);
+  const sections = [...html.matchAll(/<section id="([^"]+)"/g)].map((m) => m[1]);
+  const links = [...(/<nav aria-label="Sections">(.*?)<\/nav>/.exec(html)?.[1] ?? '').matchAll(/href="#([^"]+)"/g)];
+  expect(sections.length).toBeGreaterThan(2);
+  expect(links.map((m) => m[1])).toEqual(sections);
+  // Without a comparison there is nothing to filter
+  expect(html).not.toContain('id="changed-filter"');
+});
+
+test('a changed figure carries the window it was measured in, for the filter and the grouping', () => {
+  const run = fixtureResults({ cpu: { dashboard: { clean: { 'chrome-gpu': 1.4 } } } });
+  const reference = fixtureResults({ cpu: { dashboard: { clean: { 'chrome-gpu': 14.4 } } } });
+  const html = renderReport(run, compare(run, reference));
+  expect(html).toContain('compared with the run <code>');
+  expect(html).toContain('id="changed-filter"');
+  const row = /<tr data-group="([^"]+)"><td><span class="win">([^<]+): <\/span>CPU chrome-gpu/.exec(html);
+  expect(row?.[1]).toBe(row?.[2]);
+  expect(row?.[1]).toBeTruthy();
+});
+
 test('an interrupted run renders, and says what failed', () => {
   const html = renderReport(
     fixtureResults({ without: ['tps'], failed: [{ scenario: 'chat', error: 'reply timed out' }] }),
