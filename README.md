@@ -87,7 +87,8 @@ The **Topology** page draws your machine, as a diagram of cards or as the plan o
 NVMe drives, GPUs and chipset, discovered automatically from sysfs. Streaks flow along each link according to
 **measured** PCIe, NVMe and DRAM traffic (DRAM through `perf` on AMD Zen 4/5), with the exact throughput next to it
 and an alert when a link nears its capacity. GPUs and memory have a bar filled to the memory in use, and selecting a
-block opens all its figures. Two panels show the current phase (loading, prompt, generation) and **how the model is split
+block opens all its figures. The wheel zooms and a drag moves the drawing, to look closer at a part of the machine.
+Two panels show the current phase (loading, prompt, generation) and **how the model is split
 across devices**, parsed from `llama-server`'s startup logs.
 
 <p align="center">
