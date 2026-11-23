@@ -9,6 +9,7 @@ import {
   loadStageLabel,
   ServerState,
   serverView,
+  servesRequests,
   stateLoadProgress,
 } from './server.ts';
 
@@ -95,4 +96,18 @@ test('loading and sleeping helpers handle managed and external states', () => {
   expect(stateLoadProgress(extSleeping)).toBeNull();
   expect(Schema.encodeResult(ServerState)(sleeping)).toEqual(Result.succeed(sleeping));
   expect(Schema.encodeResult(ServerState)(extLoading)).toEqual(Result.succeed(extLoading));
+});
+
+test('servesRequests: ready, sleeping, waking up and external take requests, a launch still loading does not', () => {
+  const launching: ServerState = { kind: 'starting', ...running, since: 1 };
+  const waking: ServerState = { kind: 'starting', ...running, since: 1, waking: true };
+  expect(servesRequests(launching)).toBe(false);
+  expect(servesRequests(waking)).toBe(true);
+  expect(servesRequests({ kind: 'ready', ...running, since: 1 })).toBe(true);
+  expect(servesRequests({ kind: 'sleeping', ...running, since: 1 })).toBe(true);
+  expect(servesRequests({ kind: 'external', pid: null, port: 8080 })).toBe(true);
+  expect(servesRequests({ kind: 'stopping', ...running })).toBe(false);
+  expect(servesRequests({ kind: 'idle' })).toBe(false);
+  expect(servesRequests(undefined)).toBe(false);
+  expect(Schema.encodeResult(ServerState)(waking)).toEqual(Result.succeed(waking));
 });

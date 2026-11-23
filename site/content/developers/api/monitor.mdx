@@ -120,7 +120,8 @@ curl http://127.0.0.1:7860/api/system/info
 
 A `Snapshot` (`packages/webui-shared/src/monitor.ts`) is the state of one tick. When no server is active (supervisor `idle` or
 `crashed`), the `llama-server` fields are null or empty and only the machine is sampled; `starting`, `ready`,
-`stopping` and `external` count as active.
+`sleeping`, `stopping` and `external` count as active. While the server sleeps or wakes up, `slots` stays empty:
+`/slots` is not read, as it would wake `llama-server` or wait for its reload.
 
 | Field            | Type                             | Description                                                                                                                          |
 | ---------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |

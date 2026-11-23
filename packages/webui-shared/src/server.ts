@@ -35,6 +35,11 @@ export const ServerState = Schema.Union([
     ...launched,
     since: Schema.Int,
     progress: Schema.optionalKey(LoadProgress),
+    /**
+     * Reloading the model after an idle sleep, not a launch: llama-server already answers and queues the requests it
+     * receives until the model is back.
+     */
+    waking: Schema.optionalKey(Schema.Literal(true)),
   }),
   Schema.Struct({ kind: Schema.Literal('ready'), ...launched, since: Schema.Int }),
   Schema.Struct({ kind: Schema.Literal('sleeping'), ...launched, since: Schema.Int }),
@@ -113,6 +118,20 @@ export const isServerLoading = (state: ServerState | undefined): boolean =>
 /** True when the server (managed or external) is sleeping (`--sleep-idle-seconds`). */
 export const isServerSleeping = (state: ServerState | undefined): boolean =>
   state !== undefined && (state.kind === 'sleeping' || (state.kind === 'external' && state.status === 'sleeping'));
+
+/** A state whose server takes requests: `ready`, `sleeping` (a request wakes it), waking up, or external. */
+export type ServingState = Extract<ServerState, { readonly kind: 'ready' | 'sleeping' | 'starting' | 'external' }>;
+
+/**
+ * True when llama-server takes requests: ready, sleeping or waking up (it queues them until its model is back), or
+ * external. A launch that is still `starting` does not (llama-server answers 503 until it has loaded).
+ */
+export const servesRequests = (state: ServerState | undefined): state is ServingState =>
+  state !== undefined &&
+  (state.kind === 'ready' ||
+    state.kind === 'sleeping' ||
+    state.kind === 'external' ||
+    (state.kind === 'starting' && state.waking === true));
 
 /** The view of a state: the last command, and the profile of the state when it has one, else of the last command. */
 export const serverView = ({

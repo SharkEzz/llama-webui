@@ -69,7 +69,8 @@ const activeOf = (
       return Option.some({
         target: { host: stateHost(state), port: state.port },
         pid: state.pid,
-        sleeping: state.kind === 'sleeping',
+        // Waking up too: llama-server would hold `/slots` until its model is back.
+        sleeping: state.kind === 'sleeping' || (state.kind === 'starting' && state.waking === true),
       });
     case 'external':
       return Option.some({

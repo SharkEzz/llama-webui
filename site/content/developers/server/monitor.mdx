@@ -48,6 +48,8 @@ Each tick (`Monitor.tick`):
 1. Reads `supervisor.state`. A server is active in `starting`, `ready`, `sleeping`, `stopping` and `external`; its PID comes from
    the state (it can be `null` for an external server). When the server is sleeping (managed or external), `readLlama()`
    skips `/slots` so the tick does not wake `llama-server` up (`/health` and `/metrics` still run, as both bypass sleep).
+   It skips it too while a managed server wakes up (`starting` with `waking`): `llama-server` would hold the request
+   until its model is back.
 2. `beginTick()`: when the PID differs from the previous tick (restart, other profile, stop), resets everything
    derived from the previous process: the last `/slots` and `/metrics` readings, `lastRequest`, `spec`,
    `recentRequests`. Counters are never diffed across two processes.

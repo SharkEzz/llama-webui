@@ -27,7 +27,9 @@ export function ServerStateBadge({ state, className }: { state: ServerState; cla
       ? { label: 'External · Loading', dot: 'bg-tone-amber animate-pulse', text: 'text-tone-amber' }
       : extStatus === 'sleeping'
         ? { label: 'External · Sleeping', dot: 'bg-tone-blue/70', text: 'text-tone-blue' }
-        : base;
+        : state.kind === 'starting' && state.waking === true
+          ? { ...base, label: 'Waking…' }
+          : base;
   const progress = stateLoadProgress(state);
   const pct = progress ? loadProgressPct(progress) : null;
   const extraParts: string[] = [];

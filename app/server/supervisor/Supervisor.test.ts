@@ -21,6 +21,7 @@ import {
   Metric,
   Option,
   type Path,
+  Predicate,
   Ref,
   Schedule,
   Scope,
@@ -852,6 +853,9 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
         const memAfterWake = yield* supervisor.memory;
         assert.deepStrictEqual(memAfterWake, memOnReady);
         const afterWake = yield* publishedViews;
+        const isWaking = (view: ServerView) => view.state.kind === 'starting' && view.state.waking === true;
+        assert.isFalse(Arr.some(seen, isWaking), 'a launch is not a wake-up');
+        assert.isTrue(Arr.some(Arr.drop(afterWake, seen.length), isWaking), 'the reload after a sleep is a wake-up');
         const wakeProgress = Arr.map(Arr.drop(afterWake, seen.length), (view) => stateLoadProgress(view.state));
         assert.deepInclude(wakeProgress, {
           stages: ['text_model', 'mmproj_model'],
@@ -920,5 +924,57 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
       }
       yield* assertGone(outside.pid);
     }),
+  );
+
+  it.effect('a managed server wakes up to ready when /models/sse refuses a reconnect during its sleep', () =>
+    fresh()(
+      Effect.gen(function* () {
+        const supervisor = yield* Supervisor;
+        const client = yield* LlamaHttp;
+        const cmd = yield* startFake({ env: { FAKE_SSE: '1', FAKE_SSE_REFUSE_AFTER_SLEEP: '1', FAKE_LOAD_MS: '100' } });
+        const baseUrl = `http://127.0.0.1:${cmd.port}`;
+        const ready = yield* stateWhen(kindIs('ready'));
+        yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
+        yield* stateWhen(kindIs('sleeping'));
+        // The stream was cut and the watcher's reconnect answered 503: it keeps following the server.
+        yield* client.get(`${baseUrl}/test/sse-refused`).pipe(
+          Effect.flatMap((res) => res.json),
+          Effect.scoped,
+          Effect.repeat({
+            schedule: Schedule.spaced('10 millis'),
+            until: (body) => Predicate.hasProperty(body, 'refused') && body.refused === 1,
+          }),
+          Effect.timeout('2 seconds'),
+        );
+        yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
+        yield* stateWhen(kindIs('ready'));
+        yield* supervisor.stop;
+        yield* assertGone(pidOf(ready));
+      }),
+    ),
+  );
+
+  it.effect('an external watcher asks /props again after a failed answer', () =>
+    fresh()(
+      Effect.gen(function* () {
+        let propsCalls = 0;
+        const server = yield* httpStub((req, res) => {
+          if (req.url === '/props') {
+            propsCalls++;
+            res.writeHead(propsCalls === 1 ? 500 : 200, { 'content-type': 'application/json' }).end('{}');
+          } else if (req.url === '/models/sse') {
+            res.writeHead(200, { 'content-type': 'text/event-stream' });
+            res.write('data: {"model":"m","event":"status_change","data":{"status":"loaded"}}\n\n');
+          } else {
+            res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+          }
+        });
+        const supervisor = yield* Supervisor;
+        const detected = yield* supervisor.detectExternal(server.port);
+        assert.isTrue(detected);
+        yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
+        assert.isAbove(propsCalls, 1);
+      }),
+    ),
   );
 });

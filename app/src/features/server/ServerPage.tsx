@@ -3,6 +3,7 @@ import {
   isServerSleeping,
   loadProgressPct,
   loadStageLabel,
+  servesRequests,
   stateHost,
   stateLoadProgress,
 } from '@llama-webui/shared';
@@ -204,7 +205,17 @@ function StateDetails() {
           </Row>
         )}
         {(s.kind === 'starting' || s.kind === 'ready' || s.kind === 'sleeping') && (
-          <Row label={s.kind === 'ready' ? 'Ready for' : s.kind === 'sleeping' ? 'Sleeping for' : 'Starting for'}>
+          <Row
+            label={
+              s.kind === 'ready'
+                ? 'Ready for'
+                : s.kind === 'sleeping'
+                  ? 'Sleeping for'
+                  : s.waking === true
+                    ? 'Waking for'
+                    : 'Starting for'
+            }
+          >
             <span className="num">{formatDuration(now - s.since)}</span>
           </Row>
         )}
@@ -240,9 +251,8 @@ const scalar = (v: unknown): string | undefined =>
 
 function PropsCard() {
   const state = useServer((s) => s.view?.state);
-  const live = state?.kind === 'ready' || state?.kind === 'sleeping' || state?.kind === 'external';
-  // Keep key stable across ready <-> sleeping for the same PID so /props is not re-fetched on sleep/wake.
-  const key = live ? `${state.kind === 'external' ? 'external' : 'managed'}-${state.pid}` : null;
+  // One key for ready, sleeping and waking up with the same PID: /props is not reread on a sleep or a wake-up
+  const key = servesRequests(state) ? `${state.kind === 'external' ? 'external' : 'managed'}-${state.pid}` : null;
   const [props, setProps] = useState<Props | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Another server (or none): the previous one's /props go, in the render that sees it
@@ -265,7 +275,7 @@ function PropsCard() {
 
   return (
     <GlassCard title="Server info" icon={Info}>
-      {!live ? (
+      {key === null ? (
         <p className="text-sm text-muted-foreground">Available once the server is ready.</p>
       ) : error ? (
         <Alert variant="destructive">

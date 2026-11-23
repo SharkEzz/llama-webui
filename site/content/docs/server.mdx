@@ -20,6 +20,7 @@ of every page (click it to open the Server page).
 | **Starting…** | The process is running and loading the model. Live progress and stages come from `/models/sse` when supported, otherwise `/health` polling. |
 | **Ready**     | The model is loaded and the server accepts requests.                                                                                        |
 | **Sleeping**  | The server entered idle sleep (`--sleep-idle-seconds`): the model is unloaded from memory and reloads automatically on the next request.    |
+| **Waking…**   | A request woke the sleeping server and the model reloads, with its progress. Requests sent meanwhile wait for the model instead of failing. |
 | **Stopping…** | llama-webui asked the server to exit and waits for it.                                                                                      |
 | **Crashed**   | The process exited without being asked to, or could not be launched. The exit code, the signal or the error appears with it.                |
 | **External**  | A `llama-server` that llama-webui did not start is using the port (see [An external server](#an-external-server)).                          |
@@ -32,7 +33,7 @@ A normal run goes **Stopped** → **Starting…** → **Ready** → **Stopping�
 ## Control the server
 
 The **llama-server** card shows the details of the current state: **Profile**, **PID**, **Port**, and how long the
-server has been starting or ready (**Starting for**, **Ready for**). After a crash, **Exit** gives the message, exit
+server has been starting, ready, sleeping or waking up (**Starting for**, **Ready for**, **Sleeping for**, **Waking for**). After a crash, **Exit** gives the message, exit
 code or signal.
 
 Below the details, pick a profile in the list. It preselects the profile of the running server, otherwise the last

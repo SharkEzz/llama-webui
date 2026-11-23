@@ -155,23 +155,26 @@ publishing fiber (`LogRing`, `app/server/logs/LogRing.ts`).
 ### `server-state`
 
 The `ServerView` (`packages/webui-shared/src/server.ts`), the same body as `GET /api/server/state`: `state` (a `ServerState`, by
-`kind`: `idle`, `starting`, `ready`, `stopping`, `crashed`, `external`; `starting`, `ready` and `stopping` carry the
-`host` the server listens on), `command` (the last launched command) and
-`profileId`. The fields are described on [Server, state and logs](/developers/api/server/#serverview).
+`kind`: `idle`, `starting`, `ready`, `sleeping`, `stopping`, `crashed`, `external`; `starting`, `ready`, `sleeping`
+and `stopping` carry the `host` the server listens on; `starting` can carry the loading `progress` and `waking: true`
+for a reload after an idle sleep; `external` can carry the `status` and `progress` that `/models/sse` reports),
+`command` (the last launched command) and `profileId`. A message is sent on every change, a new loading `progress`
+included. The fields are described on [Server, state and logs](/developers/api/server/#serverview).
 
 ### `bench-progress`
 
 The `BenchLive` of the running benchmark run (`packages/webui-shared/src/bench.ts`), `null` when a run ends (between the items of a
 sweep too).
 
-| Field       | Type                       | Description                                                                                       |
-| ----------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
-| `runId`     | number                     | The run in progress.                                                                              |
-| `kind`      | `'bench' \| 'server'`      | A `llama-bench` run, or a run through `llama-server`.                                             |
-| `phase`     | `BenchPhase`               | `stopping-server`, `loading`, `warmup`, `prompt`, `generation`, `measure` or `restarting-server`. |
-| `step`      | `{ index, total } \| null` | Position within the run's steps, when it has some.                                                |
-| `startedAt` | number                     | When the run started (epoch ms).                                                                  |
-| `lines`     | string[]                   | The tool's last 20 lines.                                                                         |
+| Field          | Type                       | Description                                                                                        |
+| -------------- | -------------------------- | -------------------------------------------------------------------------------------------------- |
+| `runId`        | number                     | The run in progress.                                                                               |
+| `kind`         | `'bench' \| 'server'`      | A `llama-bench` run, or a run through `llama-server`.                                              |
+| `phase`        | `BenchPhase`               | `stopping-server`, `loading`, `warmup`, `prompt`, `generation`, `measure` or `restarting-server`.  |
+| `step`         | `{ index, total } \| null` | Position within the run's steps, when it has some.                                                 |
+| `startedAt`    | number                     | When the run started (epoch ms).                                                                   |
+| `lines`        | string[]                   | The tool's last 20 lines.                                                                          |
+| `loadProgress` | `LoadProgress`, optional   | Live loading progress from `llama-server`'s `/models/sse` during a `server` run's `loading` phase. |
 
 ### `bench-run`
 

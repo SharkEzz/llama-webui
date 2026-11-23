@@ -99,6 +99,10 @@ const sseEnc = new TextEncoder();
 let sseLastEvent: unknown = null;
 let isSleeping = false;
 let isLoading = loadMs > 0;
+// FAKE_SSE_REFUSE_AFTER_SLEEP=1: entering sleep cuts the /models/sse streams, and the next request of it answers 503.
+const sseRefuseAfterSleep = process.env.FAKE_SSE_REFUSE_AFTER_SLEEP === "1";
+let sseRefusePending = false;
+let sseRefused = 0;
 
 function sseEmit(event: string, data?: Record<string, unknown>) {
   if (!sseEnabled) return;
@@ -117,6 +121,13 @@ function sseEmit(event: string, data?: Record<string, unknown>) {
 function enterSleep() {
   isSleeping = true;
   sseEmit("status_change", { status: "sleeping" });
+  if (sseRefuseAfterSleep) {
+    sseRefusePending = true;
+    for (const client of sseClients) {
+      try { client.close(); } catch {}
+    }
+    sseClients.clear();
+  }
 }
 
 function runLoadCycle(firstLoad: boolean) {
@@ -170,7 +181,13 @@ function wakeIfSleeping() {
 const server = serve(port, host, async (req) => {
   const path = new URL(req.url).pathname;
   const loading = isLoading || Date.now() - t0 < loadMs;
+  if (path === "/test/sse-refused") return Response.json({ refused: sseRefused });
   if (path === "/models/sse" && sseEnabled) {
+    if (sseRefusePending) {
+      sseRefusePending = false;
+      sseRefused++;
+      return new Response("", { status: 503 });
+    }
     if (process.env.FAKE_SSE_STALL === "headers") {
       await new Promise<void>((done) => req.signal.addEventListener("abort", () => done(), { once: true }));
       return new Response(null, { status: 204 });

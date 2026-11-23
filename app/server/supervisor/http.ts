@@ -1,4 +1,4 @@
-import { Api, BenchRunning, NoProfileToRestart, ServerNotReady, stateHost } from '@llama-webui/shared';
+import { Api, BenchRunning, NoProfileToRestart, ServerNotReady, servesRequests, stateHost } from '@llama-webui/shared';
 import { Effect, type Path } from 'effect';
 import { HttpApiBuilder } from 'effect/http-api';
 import { probeUrl } from 'llamacpp-js/client';
@@ -72,10 +72,10 @@ export const ServerHandlers = HttpApiBuilder.group(
       return yield* supervisor.view;
     }).pipe(Effect.withSpan('ServerHandlers.restart'));
 
-    /** llama-server's own `/props`, from the server that answers (ours once ready or sleeping, or one started by hand). */
+    /** llama-server's own `/props`, from the server that answers (ours once ready, sleeping or waking up, or one started by hand). */
     const serverProps = Effect.gen(function* () {
       const state = yield* supervisor.state;
-      if (state.kind !== 'ready' && state.kind !== 'sleeping' && state.kind !== 'external') {
+      if (!servesRequests(state)) {
         return yield* ServerNotReady.make({ message: 'Server not ready' });
       }
       return yield* props(probeUrl(stateHost(state), state.port)).pipe(Effect.provideContext(services));

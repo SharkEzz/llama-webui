@@ -1,16 +1,19 @@
+import { servesRequests } from '@llama-webui/shared';
 import { useEffect, useState } from 'react';
 import { getServerProps, type ServerProps, serverPropsOf } from '@/lib/props';
 import { useServer } from '@/lib/server';
 
 export type { ServerProps };
 
-/** /props of the ready or sleeping server (reread when the running process changes), otherwise null. */
+/** /props of the server that takes requests (reread when the running process changes), otherwise null. */
 export function useServerProps(): ServerProps | null {
   const kind = useServer((s) => s.view?.state.kind);
+  const serving = useServer((s) => servesRequests(s.view?.state));
   const pid = useServer((s) => (s.view && 'pid' in s.view.state ? s.view.state.pid : null));
-  const liveGroup = kind === 'external' ? 'external' : kind === 'ready' || kind === 'sleeping' ? 'managed' : null;
+  // One group for ready, sleeping and waking up: the same process, its /props are not reread on a sleep or a wake-up
+  const liveGroup = !serving ? null : kind === 'external' ? 'external' : 'managed';
   const [props, setProps] = useState<ServerProps | null>(null);
-  // Out of ready/sleeping, no props: cleared by the render that leaves it, before the effect of the next state
+  // Out of those states, no props: cleared by the render that leaves it, before the effect of the next state
   if (liveGroup === null && props !== null) setProps(null);
   useEffect(() => {
     if (liveGroup === null) return;

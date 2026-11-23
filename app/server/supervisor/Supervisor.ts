@@ -199,13 +199,14 @@ export class Supervisor extends Context.Service<
             }),
           );
 
-        /** The metrics of a change of state: the state entered, whether it is ready, and how long a start took. */
+        /** The metrics of a change of state: the state entered, whether it is ready, and how long a launch took. */
         const measured = Effect.fnUntraced(function* (before: ServerState, after: ServerState) {
           if (before.kind !== after.kind) {
             yield* Metric.update(LlamaMetrics.transitions, after.kind);
             yield* Metric.update(LlamaMetrics.ready, after.kind === 'ready' ? 1 : 0);
           }
-          if (before.kind === 'starting' && after.kind === 'ready') {
+          // A wake-up from sleep reloads the model of a running server: not a launch.
+          if (before.kind === 'starting' && before.waking !== true && after.kind === 'ready') {
             yield* Metric.update(LlamaMetrics.startup, Duration.millis(after.since - before.since));
           }
         });
@@ -316,6 +317,7 @@ export class Supervisor extends Context.Service<
                 return Option.some({ ...now, state: { ...now.state, progress } });
               }
               if (now.state.kind === 'sleeping') {
+                // llama-server queues the requests it receives while it reloads: the state still serves them.
                 return Option.some({
                   ...now,
                   memory: null,
@@ -324,6 +326,7 @@ export class Supervisor extends Context.Service<
                     ...launchedOf(running.cmd, running.program.handle.pid),
                     since: nowMs,
                     ...(progress === undefined ? {} : { progress }),
+                    waking: true,
                   },
                 });
               }
@@ -361,18 +364,30 @@ export class Supervisor extends Context.Service<
 
         /**
          * Follows `/models/sse` for the lifetime of `running` if the binary supports it. Runs in `running.program.scope`.
+         * A non-2xx answer means an older build only until the stream has answered once for this process: after that,
+         * it is transient and the watcher reconnects, since only the stream sees a wake-up end (`/health` answers 200
+         * during a sleep).
          */
         const watchManaged = (running: Running): Effect.Effect<void> =>
           Effect.gen(function* () {
             const target = { host: running.cmd.host, port: running.cmd.port };
+            let supported = false;
             for (;;) {
               const current = yield* SynchronizedRef.get(held);
               if (!isThis(running)(current) || current.state.kind === 'stopping') return;
               const outcome = yield* streamModelsSse(target).pipe(
-                Stream.runForEach((event) => applyManagedEvent(running, event)),
+                Stream.runForEach((event) =>
+                  Effect.andThen(
+                    Effect.sync(() => {
+                      supported = true;
+                    }),
+                    applyManagedEvent(running, event),
+                  ),
+                ),
                 Effect.result,
               );
-              if (outcome._tag === 'Failure' && outcome.failure._tag === 'ModelsSseUnsupported') return;
+              if (outcome._tag === 'Success' || outcome.failure._tag === 'ModelsSseCut') supported = true;
+              else if (outcome.failure._tag === 'ModelsSseUnsupported' && !supported) return;
               yield* Effect.sleep(options.healthPoll);
             }
           }).pipe(Effect.provideContext(context));
@@ -430,9 +445,10 @@ export class Supervisor extends Context.Service<
               if (!isSameExternal(current.state, port, pid)) return;
               const details = yield* props(probeUrl(null, port)).pipe(Effect.option);
               if (Option.isNone(details)) {
-                // Single-model builds can return 503 from /props during the first load.
+                // A 503 during the first load, a slow or failed answer: tried again while this server is the one
+                // watched. A server gone leaves `external` (the loop ends at its next round).
                 const status = yield* health({ port });
-                if (!Option.contains(status, 503)) return;
+                if (Option.isNone(status)) yield* recheckExternal;
                 yield* Effect.sleep(options.healthPoll);
                 continue;
               }
