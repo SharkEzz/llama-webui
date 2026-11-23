@@ -9,7 +9,7 @@ takes in them. Use it to see at a glance where a model lives, which component wo
 
 <Screenshot
   name="topology"
-  alt="Topology during a generation, in the Cards view: a card for the CPU with one tile per thread, the memory at its left and, below, cards for two GeForce GPUs with their VRAM bar filled in layers, a Radeon integrated GPU, an NVMe drive and a chipset with a Radeon card under it. Curves link the cards, each with its PCIe state and, where traffic flows, its throughput. A column at the right holds the view control, the phase Generating with tok/s, and the model split between the devices."
+  alt="Topology during a generation, in the Cards view: a card for the CPU with one tile per thread, the memory at its left and, below, cards for two GeForce GPUs with their VRAM bar filled in layers, an integrated GPU hidden in Settings, an NVMe drive and a chipset with a Radeon card under it. Curves link the cards, each with its PCIe state and, where traffic flows, its streaks and its throughput. A column at the right holds the view control, the phase Generating with its speed in tok/s, and the model split between CUDA0, CUDA1 and the host."
 />
 
 ## Two views
@@ -23,6 +23,12 @@ the same blocks, the same figures and the same links. The browser remembers the 
 - **Board** is the plan of a motherboard seen from above: the socket with the memory modules at its right and the
   CPU's drives at its left, one slot per GPU below (those of the CPU first, then those of a chipset), the chipsets at
   the lower right with their drives. Tracks run at right angles and never cross.
+
+<Screenshot
+  name="topology-board"
+  alt="The same machine in the Board view: the socket with its thread tiles, four memory modules at its right filled to the memory in use, the NVMe drive at its left, four GPU slots one under the other with their figures and VRAM bar, and the chipset at the lower right. Tracks at right angles join the socket to each slot, two of them carrying streaks; the state of each link is written in the margin."
+  caption="The Board view, during the same generation."
+/>
 
 <Callout type="note">
 

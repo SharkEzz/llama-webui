@@ -67,7 +67,7 @@ export function MonitoringSection() {
               <Shot
                 name="topology"
                 alt="Topology page: the CPU, memory, GPUs and NVMe drive as cards joined by their links, the GPUs filled to the memory they hold, with the model split per device"
-                crop={{ x: 0.155, y: 0.055, w: 0.84, h: 0.935 }}
+                crop={{ x: 0.16, y: 0.055, w: 0.835, h: 0.77 }}
                 width="min(46rem, 90vw)"
                 className={SHOT_FRAME}
               />
