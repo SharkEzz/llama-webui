@@ -21,7 +21,8 @@ non-browser clients send none. A refused upgrade gets the guard's `403` (`Reques
 `WebSocket upgrade expected` (plain text), after the guard. `/ws/` is a `308` to `/ws`.
 
 Every frame is a JSON text message `{ "type": "…", "payload": … }` (`ping` and `pong` have no payload). There is no
-subscription: every connected client receives every broadcast message. The server reads only `ping` and `pong` from
+subscription: every connected client receives every broadcast message, the same text: the hub encodes a message
+once for all of them, and not at all while no client is connected. The server reads only `ping` and `pong` from
 clients and ignores anything else: frames that are not JSON, and JSON that is not a `ping` or a `pong`.
 
 ```ts title="watch.ts"

@@ -79,7 +79,10 @@ A few scenarios leave things as they find them only on the way out:
   samples on a reader of its own); the tiles give a full sample, a light one and the average at 1 Hz (a light sample
   plus the calls it leaves out, as often as they run). The NVML sampler's whole cost is its row in the windows of
   `idle` or `dashboard`. The list of `/proc` and sysfs reads is kept in the tool,
-  written from `app/server/collectors/`: it does not follow the code.
+  written from `app/server/collectors/`: it does not follow the code. It holds what a tick reads again each time:
+  not what the app keeps once read (an AMD card's link maximum), nor the cards the instance hides, and
+  for llama-server's descriptors their `/proc/<pid>/fd` links (a `readlink` each) then the fdinfo of those open on a
+  DRM node, only when an AMD card is read.
 
 ## Check a fix
 

@@ -10,7 +10,8 @@ const byBusId = Order.mapInput(Order.String, (g: GpuSample) => g.busId);
 /**
  * Every card, sorted by bus id, with llama-server's VRAM on it when `pid` is one. A hidden card (`hiddenGpus`) is listed
  * by its identity only, whatever its reader gave; a sleeping AMD card is not read (a read would wake it up). The DRM
- * nodes of either are skipped when `/proc/<pid>/fdinfo` is read. A card whose read dies is left out.
+ * nodes of either are skipped when `/proc/<pid>/fdinfo` is read, which is not read at all when no AMD card is (none, all
+ * hidden or asleep). A card whose read dies is left out.
  */
 export const collectGpus = Effect.fn('Monitor.collectGpus')(function* (options: {
   readonly collectors: Collectors['Service'];
@@ -41,8 +42,9 @@ export const collectGpus = Effect.fn('Monitor.collectGpus')(function* (options: 
     ],
     { concurrency: 'unbounded' },
   );
-  // After the AMD reads: they named the nodes to skip.
-  const amdProc = pid === null ? new Map<string, number>() : yield* amd.procVram(pid, skipNodes);
+  // After the AMD reads: they named the nodes to skip. Without an AMD card read, no VRAM of the process is shown on one.
+  const amdRead = Arr.some(amdReadings, (g) => g.hidden !== true && g.suspended !== true);
+  const amdProc = pid === null || !amdRead ? new Map<string, number>() : yield* amd.procVram(pid, skipNodes);
   const sample =
     (proc: ReadonlyMap<string, number>) =>
     (g: GpuReading): GpuSample => {

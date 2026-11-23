@@ -249,12 +249,19 @@ background every 5 ticks (`appsEvery` of `Monitor.layerWith`). The binary is `nv
 `discoverAmdCards()` lists `/sys/class/drm/card<N>` entries whose `device/vendor` is `0x1002`, with their hwmon
 folder, their DRM nodes (`card<N>`, `renderD<N>`), the PCIe link that leads to the slot, and a name from `pci.ids`.
 `readAmdCard()` reads `gpu_busy_percent`, `mem_info_vram_used` and `mem_info_vram_total`, `mem_busy_percent`, the
-link speed and width, `pp_dpm_sclk` and `pp_dpm_mclk`, and from hwmon the temperature, power, power cap and fan.
+link speed and width, `pp_dpm_sclk` and `pp_dpm_mclk`, and from hwmon the temperature, power, power cap and fan. The
+link's maximum is kept once both ends are known; the other files cost a few microseconds each and are read on every
+tick.
 
-- A card whose `power/runtime_status` is `suspended` is not read: reading its attributes would wake it up.
-- The process VRAM comes from `/proc/<pid>/fdinfo`: entries with `drm-driver: amdgpu` give `drm-pdev` and
-  `drm-memory-vram`, counted once per `drm-pdev` and `drm-client-id`. Descriptors open on a hidden or suspended card's
-  DRM node are recognized by their `/proc/<pid>/fd` link and their fdinfo is not read.
+- A card whose `power/runtime_status` is `suspended` is not read: reading its attributes would wake it up. A hidden
+  card is not read at all.
+- The process VRAM comes from the fdinfo of its DRM descriptors: each tick reads the target of every
+  `/proc/<pid>/fd/<N>` link, then `/proc/<pid>/fdinfo/<N>` only for a descriptor open on a DRM node (`card<N>`,
+  `renderD<N>`) that is not a hidden or suspended card's. A `llama-server` holds a hundred descriptors or more
+  (sockets, pipes, the NVIDIA driver's), and a few on a card. The links are read again on every tick, never kept: a
+  number closed and opened again between two ticks may point elsewhere. Entries with `drm-driver: amdgpu` give
+  `drm-pdev` and `drm-memory-vram`, counted once per `drm-pdev` and `drm-client-id`. With no AMD card read (none, or all
+  hidden or suspended), no descriptor is looked at.
 
 ### `/proc`: process, CPU and memory
 

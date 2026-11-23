@@ -154,6 +154,25 @@ it.live('a message that does not encode is logged with its type, not sent, and t
   }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
 });
 
+it.live('a published message is encoded once for every client: one that does not encode is logged once', () => {
+  const errors: Array<ReadonlyArray<unknown>> = [];
+  const logger = Logger.make<unknown, void>(({ logLevel, message }) => {
+    if (logLevel === 'Error') errors.push(Arr.ensure(message));
+  });
+  return Effect.gen(function* () {
+    const app = yield* start();
+    const clients = yield* Effect.forEach(Arr.range(1, 3), () => app.open());
+    yield* sizeIs(app.hub, 3);
+    yield* app.hub.publish({ type: 'download-deleted', payload: { ids: [Number.NaN] } });
+    yield* app.hub.publish({ type: 'download-deleted', payload: { ids: [7] } });
+    for (const client of clients) {
+      const got = yield* next(client, 'download-deleted');
+      assert.deepStrictEqual(got, { type: 'download-deleted', payload: { ids: [7] } });
+    }
+    assert.strictEqual(errors.length, 1);
+  }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set([logger])));
+});
+
 it.live('a client ping is answered with pong', () =>
   Effect.gen(function* () {
     const { open } = yield* start();
@@ -316,11 +335,11 @@ it.effect('a client that does not read does not hold the stop past the timeout',
   }),
 );
 
-/** A `snapshot` message of tick `tick`, every other field empty. */
-const snapshot = (tick: number): WsMessage => ({
+/** A `snapshot` message of tick `tick` (taken `at`), every other field empty. */
+const snapshot = (tick: number, at: number = 1_700_000_000_000 + tick * 1000): WsMessage => ({
   type: 'snapshot',
   payload: {
-    at: 1_700_000_000_000 + tick * 1000,
+    at,
     tick,
     health: null,
     rates: { genTps: 0, ppTps: 0 },
@@ -363,6 +382,40 @@ it.live('a client that connects after a snapshot gets hello, then that snapshot'
     assert.deepStrictEqual(got, ['hello', 'snapshot 1']);
     assert.deepStrictEqual(client.messages[1], snapshot(1));
   }),
+);
+
+it.live('a snapshot published while a client is connected is sent as is to one that connects later', () =>
+  Effect.gen(function* () {
+    const { open, hub } = yield* start();
+    const first = yield* open();
+    yield* sizeIs(hub, 1);
+    yield* hub.publish(snapshot(1));
+    const sent = yield* next(first, 'snapshot');
+    assert.deepStrictEqual(sent, snapshot(1));
+    first.socket.close();
+    yield* sizeIs(hub, 0);
+    const client = yield* open();
+    const got = yield* greeting(hub, client);
+    assert.deepStrictEqual(got, ['hello', 'snapshot 1']);
+    assert.deepStrictEqual(client.messages[1], snapshot(1));
+  }),
+);
+
+it.live('a snapshot that does not encode is not kept: a client that connects gets the one before it', () =>
+  Effect.gen(function* () {
+    const { open, hub } = yield* start();
+    const first = yield* open();
+    yield* sizeIs(hub, 1);
+    yield* hub.publish(snapshot(1));
+    // A time that is no integer: the type allows it, the schema does not.
+    yield* hub.publish(snapshot(2, Number.NaN));
+    yield* next(first, 'snapshot');
+    first.socket.close();
+    yield* sizeIs(hub, 0);
+    const client = yield* open();
+    const got = yield* greeting(hub, client);
+    assert.deepStrictEqual(got, ['hello', 'snapshot 1']);
+  }).pipe(Effect.provideService(Logger.CurrentLoggers, new Set())),
 );
 
 it.live('a client that connects before any snapshot gets only hello', () =>

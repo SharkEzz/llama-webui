@@ -33,6 +33,24 @@ const Flush: unique symbol = Symbol('WsHub.Flush');
 
 const encode = Schema.encodeEffect(Schema.fromJsonString(WsMessage));
 
+/**
+ * A published message, encoded once by `publish` for every client when one is connected: the text, or null when no
+ * client was counted then (each client that still gets it encodes it itself: one subscribed meanwhile, the greeting).
+ */
+interface Outgoing {
+  readonly message: WsMessage;
+  readonly text: string | null;
+}
+
+/** A message that does not encode (a number that is not finite…) is a bug of what published it: logged, not sent. */
+const encodeOrLog = (message: WsMessage): Effect.Effect<Option.Option<string>> =>
+  encode(message).pipe(
+    Effect.asSome,
+    Effect.catch((error) =>
+      Effect.as(Effect.logError(`a ${message.type} message does not encode: not sent`, error), Option.none<string>()),
+    ),
+  );
+
 /** What a client may send: anything else, JSON or not, is ignored. */
 const decodeClient = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Union([WsPing, WsPong])));
 
@@ -62,7 +80,7 @@ export class WsHub extends Context.Service<
       Effect.gen(function* () {
         const info = yield* AppInfo;
         const shutdown = yield* Shutdown;
-        const pubsub = yield* PubSub.unbounded<WsMessage | typeof Flush>();
+        const pubsub = yield* PubSub.unbounded<Outgoing | typeof Flush>();
         // One Deferred per connected client, completed once it took `Flush` (or left). A native set: Effect's
         // `HashSet` compares structurally, and two pending Deferreds are equal there.
         const clients = yield* Ref.make<ReadonlySet<Deferred.Deferred<void>>>(new Set());
@@ -70,7 +88,7 @@ export class WsHub extends Context.Service<
         // more, and a page would wait that long for its first values. Published and kept in one step under its lock,
         // and read in the step that subscribes a client: the client gets it then every message published after it,
         // none twice and none missed.
-        const lastSnapshot = yield* SynchronizedRef.make<Option.Option<WsMessage>>(Option.none());
+        const lastSnapshot = yield* SynchronizedRef.make<Option.Option<Outgoing>>(Option.none());
 
         yield* shutdown.before(
           Effect.gen(function* () {
@@ -90,19 +108,16 @@ export class WsHub extends Context.Service<
             // The handshake answer leaves when the reader is acquired: before the first write.
             const pull = yield* Socket.readerString(socket);
             const { write } = yield* socket.writer;
-            // A message that does not encode (a number that is not finite…) is a bug of what published it: logged,
-            // and not sent. A write to a socket that just closed fails: the reader sees the close and ends the client.
-            const send = (message: WsMessage) =>
-              encode(message).pipe(
-                Effect.matchEffect({
-                  onFailure: (error) => Effect.logError(`a ${message.type} message does not encode: not sent`, error),
-                  onSuccess: (text) =>
-                    Effect.ignore(write(text)).pipe(
-                      Effect.andThen(Metric.update(WsMetrics.sent, 1)),
-                      Effect.andThen(Metric.update(WsMetrics.sentBytes, text.length)),
-                    ),
-                }),
+            // A write to a socket that just closed fails: the reader sees the close and ends the client.
+            const sendText = (text: string) =>
+              Effect.ignore(write(text)).pipe(
+                Effect.andThen(Metric.update(WsMetrics.sent, 1)),
+                Effect.andThen(Metric.update(WsMetrics.sentBytes, text.length)),
               );
+            const send = (message: WsMessage) =>
+              Effect.flatMap(encodeOrLog(message), Option.match({ onNone: () => Effect.void, onSome: sendText }));
+            /** A published message: its text when `publish` encoded it, else encoded here. */
+            const sendOut = (out: Outgoing) => (out.text === null ? send(out.message) : sendText(out.text));
             // Subscribed before it is counted: a flush that waits for this client finds `Flush` in its queue.
             const [messages, greeting] = yield* SynchronizedRef.modifyEffect(lastSnapshot, (last) =>
               PubSub.subscribe(pubsub).pipe(
@@ -127,10 +142,10 @@ export class WsHub extends Context.Service<
 
             const serverTime = yield* Clock.currentTimeMillis;
             yield* send({ type: 'hello', payload: { serverTime, bootId: info.bootId } });
-            if (Option.isSome(greeting)) yield* send(greeting.value);
+            if (Option.isSome(greeting)) yield* sendOut(greeting.value);
 
             yield* PubSub.take(messages).pipe(
-              Effect.flatMap((item) => (item === Flush ? Deferred.succeed(flushed, undefined) : send(item))),
+              Effect.flatMap((item) => (item === Flush ? Deferred.succeed(flushed, undefined) : sendOut(item))),
               Effect.forever,
               Effect.forkScoped,
             );
@@ -164,17 +179,18 @@ export class WsHub extends Context.Service<
         );
 
         return {
-          publish: Effect.fn((message) =>
-            Metric.update(WsMetrics.published, message.type).pipe(
-              Effect.andThen(
-                SynchronizedRef.updateEffect(lastSnapshot, (last) =>
-                  PubSub.publish(pubsub, message).pipe(
-                    Effect.as(message.type === 'snapshot' ? Option.some(message) : last),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          // Encoded once for every client, and only when one is connected: a message that does not encode is logged
+          // once and neither sent nor kept.
+          publish: Effect.fn(function* (message) {
+            yield* Metric.update(WsMetrics.published, message.type);
+            const connected = (yield* Ref.get(clients)).size > 0;
+            const text = connected ? yield* encodeOrLog(message) : Option.none<string>();
+            if (connected && Option.isNone(text)) return;
+            const out: Outgoing = { message, text: Option.getOrNull(text) };
+            yield* SynchronizedRef.updateEffect(lastSnapshot, (last) =>
+              PubSub.publish(pubsub, out).pipe(Effect.as(message.type === 'snapshot' ? Option.some(out) : last)),
+            );
+          }),
           size: Ref.get(clients).pipe(Effect.map((set) => set.size)),
           attach,
         };
