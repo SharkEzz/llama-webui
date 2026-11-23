@@ -87,7 +87,7 @@ export function MarkdownBlocks({ blocks }: { blocks: Blocks }) {
  * grows (`blocks.ts`): the blocks before the last one are neither parsed nor rendered again.
  */
 export const Markdown = memo(function Markdown({ text }: { text: string }) {
-  const [blocks, setBlocks] = useState<Blocks>(() => ({ text, starts: [0] }));
+  const [blocks, setBlocks] = useState<Blocks>(() => ({ text, starts: [0], finished: [] }));
   let shown = blocks;
   if (blocks.text !== text) {
     shown = nextBlocks(blocks, text, parsedStarts);

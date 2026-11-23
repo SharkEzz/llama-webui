@@ -1,9 +1,11 @@
+import { getHeapStatistics, setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { describe, expect, test } from 'vitest';
-import { type Blocks, nextBlocks, pieces } from './blocks';
+import { type Blocks, detached, nextBlocks, pieces, type StartsOf } from './blocks';
 import { components, MarkdownBlocks, parsedStarts } from './Markdown';
 
 /** The reply as one text: the rendering before it was cut into blocks. */
@@ -13,7 +15,7 @@ const whole = (text: string) =>
 /** The reply as it streams: each text extends the previous one, the blocks follow it. */
 const byBlocks = (blocks: Blocks) => renderToStaticMarkup(createElement(MarkdownBlocks, { blocks }));
 
-const start = (text: string): Blocks => ({ text, starts: [0] });
+const start = (text: string): Blocks => ({ text, starts: [0], finished: [] });
 
 const corpus: Record<string, string> = {
   paragraphs: 'First paragraph with *emphasis*\nand a second line.\n\nSecond one, `code` and **bold**.\n\nThird.\n',
@@ -296,5 +298,56 @@ describe('the blocks of a growing reply', () => {
       }
       expect(blocks.starts).toEqual([0]);
     }
+  });
+});
+
+describe('the memory of a streamed reply', () => {
+  setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc') as () => void;
+  /** The heap that what `make` returns still holds after a garbage collection. */
+  const kept = (make: () => unknown) => {
+    gc();
+    const before = getHeapStatistics().used_heap_size;
+    const held = make();
+    gc();
+    const after = getHeapStatistics().used_heap_size;
+    expect(held).toBeDefined();
+    return after - before;
+  };
+
+  test('a detached slice keeps none of the text it was cut from', () => {
+    /** 16 slices of 100 characters, each cut from its own text of 1.1 MiB. */
+    const slices = (own: (slice: string) => string) => () =>
+      Array.from({ length: 16 }, (_, i) => own(`${String(i)}. A reply’s line\n`.repeat(2 ** 15).slice(0, 100)));
+    // A slice alone keeps its text (18 MiB in all): the measure sees the retention it checks
+    expect(kept(slices((slice) => slice))).toBeGreaterThan(8 * 2 ** 20);
+    expect(kept(slices(detached))).toBeLessThan(2 ** 20);
+    expect(detached('a slice of a text, longer than 13 characters')).toBe(
+      'a slice of a text, longer than 13 characters',
+    );
+    expect(detached('')).toBe('');
+  });
+
+  test('the finished pieces of a reply keep none of its earlier texts', () => {
+    /** A paragraph starts the text and follows each blank line. */
+    const paragraphs: StartsOf = (text) => [
+      { start: 0, open: false },
+      ...[...text.matchAll(/\n\n(?=.)/g)].map((m) => ({ start: m.index + 2, open: false })),
+    ];
+    const line = (i: number) => `Paragraph ${String(i)} of a reply’s text, as long as a short paragraph is.\n\n`;
+    // 600 flushes of one paragraph each: 46 000 characters in the end, 23 MiB if each piece kept the text it was cut from
+    const blocks = () => {
+      let text = '';
+      let state = start('');
+      for (let i = 0; i < 600; i++) {
+        text += line(i);
+        state = nextBlocks(state, text, paragraphs);
+      }
+      // 0, then a cut before each paragraph but the last (made at the next flush)
+      expect(state.starts).toHaveLength(599);
+      expect(pieces(state).join('')).toBe(text);
+      return state;
+    };
+    expect(kept(blocks)).toBeLessThan(2 ** 20);
   });
 });

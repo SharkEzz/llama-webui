@@ -6,10 +6,15 @@
  * top-level blocks, cut only where the cut is final (`isFinal`). The cuts come from the parse of the last piece, which
  * rendering it makes anyway (`StartsOf`): finding them costs no parse of its own, and the pieces before the last one are
  * never parsed again.
+ *
+ * `finished` holds the text of each piece before the last one, copied once when it is cut (`detached`), and the last
+ * piece is copied at each flush (`pieces`): what React, the parse and the DOM keep of a piece (its last two renders)
+ * does not keep the reply as it was then.
  */
 export interface Blocks {
   readonly text: string;
   readonly starts: readonly number[];
+  readonly finished: readonly string[];
 }
 
 /** A top-level block of a parsed text. */
@@ -105,24 +110,38 @@ function isFinal(text: string, at: number): boolean {
 }
 
 /**
+ * `text` as a string of its own. In V8 a slice of a long string is a view that keeps the whole string alive, and so is
+ * every slice of the slice (the values of its parse, the text of its DOM, the props React keeps of its last two
+ * renders): a finished piece would keep the whole reply as it was when the piece was last rendered, a copy per piece.
+ * Slicing a concatenation makes V8 copy the concatenation first, and the result is a view of that copy only.
+ */
+export const detached = (text: string): string => ` ${text}`.slice(1);
+
+/**
  * The blocks of `text`, the next text of the reply after `prev`. A text that extends the previous one keeps its cuts
  * and adds those its last piece's parse made final; any other text (another reply, a regenerated one) starts again
  * from one piece, cut at the next flush. A finished reply rendered at once stays one piece: it is parsed once anyway.
  */
 export function nextBlocks(prev: Blocks, text: string, startsOf: StartsOf): Blocks {
   if (text === prev.text) return prev;
-  if (!text.startsWith(prev.text) || GLOBAL.test(text)) return { text, starts: [0] };
+  if (!text.startsWith(prev.text) || GLOBAL.test(text)) return { text, starts: [0], finished: [] };
   const tail = prev.starts.at(-1) ?? 0;
   const found = startsOf(prev.text.slice(tail)) ?? [];
   const starts = [...prev.starts];
+  const finished = [...prev.finished];
   // The first block of the last piece starts it (after its blank lines, if any): the cuts are before the others
   for (let i = 1; i < found.length; i++) {
     const at = tail + found[i]!.start;
-    if (!found[i - 1]!.open && isFinal(prev.text, at)) starts.push(at);
+    if (!found[i - 1]!.open && isFinal(prev.text, at)) {
+      finished.push(detached(prev.text.slice(starts.at(-1), at)));
+      starts.push(at);
+    }
   }
-  return { text, starts };
+  return { text, starts, finished };
 }
 
-/** The text of each piece. */
-export const pieces = ({ text, starts }: Blocks): string[] =>
-  starts.map((s, i) => text.slice(s, starts[i + 1] ?? text.length));
+/** The text of each piece, each a string of its own (`detached`): the last one is copied at each flush. */
+export const pieces = ({ text, starts, finished }: Blocks): string[] => [
+  ...finished,
+  detached(text.slice(starts.at(-1))),
+];

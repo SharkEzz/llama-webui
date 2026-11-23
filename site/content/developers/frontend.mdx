@@ -202,6 +202,12 @@ would:
 A finished reply opened as such is one piece, parsed once. `Markdown.test.ts` renders a corpus and random documents at
 every cut of a stream with `react-dom/server`, by pieces and whole, and compares the HTML.
 
+Each piece renders from a string of its own (`detached`): a finished piece's text is copied once, when it is cut, and
+the last piece's at each flush. In V8 a slice of a string is a view that keeps the whole string alive, and React keeps
+the props of a component's last two renders: without the copy, each finished piece, through its parse, its props and
+its DOM, kept the whole reply as it was when it was cut (about 5 MB for a reply of 29 000 characters, until the page
+was reloaded). `Markdown.test.ts` checks the retention after a garbage collection.
+
 ## WebSocket client
 
 `app/src/lib/ws.ts` holds the app's single WebSocket, opened by `connect()` (once) on `ws://` or `wss://` +
