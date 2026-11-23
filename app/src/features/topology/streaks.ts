@@ -147,7 +147,7 @@ export function trackIntensity(link: TopologyLink, flow: LinkFlow | undefined, b
 }
 
 export interface StreakLoop {
-  /** The links of the drawing: their lanes replace the previous ones. */
+  /** The links of the drawing: their lanes replace the previous ones, and carry on with what flowed. */
   setLinks: (links: readonly LinkGeo[]) => void;
   /** What flows now; `colorOf` gives a link's stroke, as a color a canvas reads. Starts the timer when needed. */
   setStates: (states: Map<string, LaneState>, colorOf: (id: string, level: Level) => string) => void;
@@ -211,32 +211,41 @@ export function createStreakLoop(canvas: HTMLCanvasElement): StreakLoop {
     ctx.lineCap = 'round';
   };
 
+  let states = new Map<string, LaneState>();
+  let colorOf: (id: string, level: Level) => string = () => '';
+  /** The lanes that have streaks now, from the last states and the current links; starts the timer when needed. */
+  const apply = () => {
+    active = [];
+    for (const [id, state] of states) {
+      const pair = lanes.get(id);
+      if (!pair) continue;
+      const color = colorOf(id, state.level);
+      for (const dir of ['fwd', 'back'] as const) {
+        const x = state[dir];
+        if (x === null) continue;
+        const key = `${id}:${dir}`;
+        // A lane that starts takes a place of its own, so the lanes of a drawing do not pulse together
+        const t = progress.get(key) ?? (active.length * 0.37) % 1;
+        active.push({ key, lane: pair[dir], x, color, t });
+      }
+    }
+    if (ctx && timer === null && (active.length > 0 || dirty)) {
+      last = performance.now();
+      timer = setInterval(frame, 1000 / STREAK_FPS);
+    }
+  };
+
   return {
     setLinks(links) {
       lanes = new Map(
         links.map((l) => [l.id, { fwd: makeLane(l.route, LANE_SIDE), back: makeLane(reversed(l.route), LANE_SIDE) }]),
       );
-      active = [];
+      apply();
     },
-    setStates(states, colorOf) {
-      active = [];
-      for (const [id, state] of states) {
-        const pair = lanes.get(id);
-        if (!pair) continue;
-        const color = colorOf(id, state.level);
-        for (const dir of ['fwd', 'back'] as const) {
-          const x = state[dir];
-          if (x === null) continue;
-          const key = `${id}:${dir}`;
-          // A lane that starts takes a place of its own, so the lanes of a drawing do not pulse together
-          const t = progress.get(key) ?? (active.length * 0.37) % 1;
-          active.push({ key, lane: pair[dir], x, color, t });
-        }
-      }
-      if (ctx && timer === null && (active.length > 0 || dirty)) {
-        last = performance.now();
-        timer = setInterval(frame, 1000 / STREAK_FPS);
-      }
+    setStates(next, color) {
+      states = next;
+      colorOf = color;
+      apply();
     },
     resize(width, height, ratio) {
       size = { width, height, ratio };
@@ -248,6 +257,7 @@ export function createStreakLoop(canvas: HTMLCanvasElement): StreakLoop {
     stop() {
       halt();
       active = [];
+      states = new Map();
     },
     get running() {
       return timer !== null;

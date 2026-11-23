@@ -223,6 +223,25 @@ describe('the streak loop', () => {
     loop.stop();
   });
 
+  test('new links keep the traffic running: the same states are drawn on the new lanes', () => {
+    const loop = createStreakLoop(canvas);
+    loop.setLinks(geo);
+    loop.setStates(on, () => 'red');
+    vi.advanceTimersByTime(frame * 2);
+    calls.length = 0;
+    loop.setLinks([{ id: 'gpu', route: straight(p(0, 0), p(60, 0)), badge: null }]);
+    vi.advanceTimersByTime(frame);
+    expect(calls.filter((c) => c === 'stroke')).toHaveLength(2);
+    // A link that came with the new drawing starts as soon as it is there
+    const late = createStreakLoop(canvas);
+    late.setStates(on, () => 'red');
+    expect(late.running).toBe(false);
+    late.setLinks(geo);
+    expect(late.running).toBe(true);
+    loop.stop();
+    late.stop();
+  });
+
   test('never starts for a link the drawing does not have', () => {
     const loop = createStreakLoop(canvas);
     loop.setLinks(geo);
