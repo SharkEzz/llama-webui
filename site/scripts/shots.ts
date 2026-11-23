@@ -22,6 +22,8 @@ export interface Shot {
   delayMs?: number;
   /** Needs a generation in progress. */
   live?: boolean;
+  /** Captured with motion on, for a page whose reduced-motion drawing is a fallback (Topology: streaks, not dashes). */
+  motion?: boolean;
   /** Only captured when named on the command line. */
   manual?: boolean;
 }
@@ -114,6 +116,7 @@ export const SHOTS: Shot[] = [
     readyText: 'Generating',
     prepare: (page) => clickButton(page, 'Cards'),
     live: true,
+    motion: true,
     delayMs: 6000,
   },
   {
@@ -122,6 +125,7 @@ export const SHOTS: Shot[] = [
     readyText: 'Generating',
     prepare: (page) => clickButton(page, 'Board'),
     live: true,
+    motion: true,
     delayMs: 6000,
   },
   { name: 'server', path: '/server', readyText: 'Effective command' },

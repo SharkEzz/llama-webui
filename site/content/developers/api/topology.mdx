@@ -94,7 +94,7 @@ are read one after the other in bus id order, which is the order of the nodes an
 | `busId`  | string                                                   | PCI address (`0000:01:00.0`), the same format as `GpuSample.busId` and the `hiddenGpus` setting. Missing for `cpu` and `ram`.                         |
 | `vendor` | `"nvidia"` \| `"amd"` \| `"intel"` \| `"other"`          | GPUs and NVMe drives only.                                                                                                                            |
 | `block`  | string                                                   | NVMe only: its block device (`nvme0n1`), the key of `DiskSample.perDisk` and `model.disk` in the [Snapshot](/developers/api/monitor/#disk).           |
-| `detail` | `Record<string, string \| number \| null>`               | Static facts for the tooltip; null is unknown.                                                                                                        |
+| `detail` | `Record<string, string \| number \| null>`               | Static facts for the block and its details; null is unknown.                                                                                          |
 
 What `detail` holds per kind:
 

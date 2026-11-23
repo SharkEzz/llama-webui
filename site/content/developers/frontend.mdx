@@ -373,15 +373,15 @@ Three rules hold the page together:
 
 - **A bar's level is always the measured memory**: the sizes from the logs only split it. An alert color always has
   its figure written next to it. Thresholds are named constants in `flows.ts` (`LINK_WARN`, `LINK_CRIT`,
-  `FILL_WARN_PCT`, `FILL_CRIT_PCT`, `REST_FLOOR_BPS`), which the legend reads too.
+  `FILL_WARN_PCT`, `FILL_CRIT_PCT`, `REST_FLOOR_BPS`); the legend reads the alert thresholds from them.
 - **Nothing runs per frame but the streaks.** A monitor tick (1 Hz) renders the blocks, whose bars move by CSS
   transitions in `steps()`: five paints for a change, not half a second of frames. The streaks are drawn on
   one canvas at `STREAK_FPS` (20) by `createStreakLoop()`, which React hands the routes and, on each tick, the state of
   each lane: the loop stops by itself when no lane carries anything, and with reduced motion it never starts (a busy
   link is dashed instead). The canvas sits above the blocks, so a streak never makes the glass under it blur again.
 - **A placement is pure and tested as such** (`layouts.test.ts`, over the graphs of `fixtures.ts`): no two blocks
-  overlap, every link runs from one block to the other through no third, a label covers neither a block nor another
-  label, and on the board no two tracks cross.
+  overlap, every link runs from one block to the other through no third, the anchor of a label is clear of the blocks
+  and of the other labels, and on the board no two tracks cross.
 
 A block is a `<button>` with `aria-pressed`, the links and the canvas are `aria-hidden` and their figures are text:
 the drawing reads and works without the pointer.
