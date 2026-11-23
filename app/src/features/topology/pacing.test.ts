@@ -1,16 +1,18 @@
 import { expect, test } from 'vitest';
-import { FramePacer } from './pacing';
+import { FramePacer, type Motion } from './pacing';
 
-/** Rendered frames per second over `secs` of rAF ticks at `hz`, `during` setting the flags of each frame. */
-function fps(p: FramePacer, hz: number, secs: number, during: (p: FramePacer, now: number) => void): number {
+/**
+ * Rendered frames per second over `secs` of rAF ticks at `hz`, `during` setting the flags of each frame and returning
+ * what the smoother reports for it (nothing easing by default).
+ */
+function fps(p: FramePacer, hz: number, secs: number, during: (p: FramePacer, now: number) => Motion | void): number {
   let frames = 0;
   const start = 10_000;
   for (let i = 0; i < hz * secs; i++) {
     const now = start + (i * 1000) / hz;
     if (!p.shouldRender(now)) continue;
     frames++;
-    during(p, now);
-    p.rendered(now, false);
+    p.rendered(now, during(p, now) ?? false);
   }
   return frames / secs;
 }
@@ -89,7 +91,7 @@ test('FramePacer: a request or a gesture brings frames back, and damping keeps t
   expect(p.shouldRender(1000)).toBe(true);
   p.rendered(1000, false);
   // A value still easing towards its target (smoother) keeps the full rate.
-  p.rendered(1016.7, true);
+  p.rendered(1016.7, 'active');
   expect(p.shouldRender(1033.4)).toBe(true);
   p.rendered(1033.4, false);
   expect(p.shouldRender(1050)).toBe(false);
@@ -102,4 +104,46 @@ test('FramePacer: a request or a gesture brings frames back, and damping keeps t
   expect(p.shouldRender(1070)).toBe(true);
   p.rendered(1070, false);
   expect(p.shouldRender(2100)).toBe(false);
+});
+
+test('FramePacer: a streak parameter still easing alone renders at 30 fps, an easing glow at 60', () => {
+  for (const hz of [60, 120]) {
+    expect(fps(new FramePacer(), hz, 2, () => 'ambient')).toBe(30);
+    expect(fps(new FramePacer(), hz, 2, () => 'active')).toBe(60);
+  }
+  // Next to the drift, the easing of a streak parameter keeps 30 fps.
+  expect(
+    fps(new FramePacer(), 120, 2, (p) => {
+      p.drift = true;
+      return 'ambient';
+    }),
+  ).toBe(30);
+  // A transition or an easing glow outranks it.
+  expect(
+    fps(new FramePacer(), 120, 2, (p) => {
+      p.active = true;
+      return 'ambient';
+    }),
+  ).toBe(60);
+  expect(
+    fps(new FramePacer(), 120, 2, (p) => {
+      p.ambient = true;
+      return 'active';
+    }),
+  ).toBe(60);
+});
+
+test('FramePacer: once the streak parameters settle, the scene falls back to the ambient flag or the drift', () => {
+  const p = new FramePacer();
+  p.drift = true;
+  p.rendered(1000, 'ambient');
+  expect(p.shouldRender(1033.4)).toBe(true);
+  // Settled, streaks still running: 30 fps.
+  p.ambient = true;
+  p.rendered(1033.4, false);
+  expect(p.shouldRender(1066.8)).toBe(true);
+  // Settled, nothing ambient: the drift's 20 fps.
+  p.rendered(1066.8, false);
+  expect(p.shouldRender(1100.2)).toBe(false);
+  expect(p.shouldRender(1116.8)).toBe(true);
 });
