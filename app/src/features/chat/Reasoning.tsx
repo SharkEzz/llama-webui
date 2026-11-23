@@ -1,11 +1,11 @@
 import { Brain, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 
 /** Model reasoning: collapsed, open by default while it is being written without a reply. */
-export function Reasoning({ text, writing }: { text: string; writing: boolean }) {
+export const Reasoning = memo(function Reasoning({ text, writing }: { text: string; writing: boolean }) {
   const [open, setOpen] = useState<boolean | null>(null);
   const isOpen = open ?? writing;
   return (
@@ -22,4 +22,4 @@ export function Reasoning({ text, writing }: { text: string; writing: boolean })
       </CollapsibleContent>
     </Collapsible>
   );
-}
+});

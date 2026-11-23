@@ -180,6 +180,10 @@ conversation whose reply is still running (`live: true`) attaches to it with `GE
 another conversation aborts the stream, which only unsubscribes: the generation goes on on the server (see
 [Chat runs](/developers/server/chat/)).
 
+A flush renders only the end of the reply. The page and the thread read the store through selectors, and `Message`,
+`Reasoning` and `CodeBlock` are memoized: the conversation list, the composer and the finished messages do not render
+again during a reply.
+
 `Markdown` (`features/chat/Markdown.tsx`) cuts a growing reply into pieces of top-level blocks (`features/chat/blocks.ts`)
 and renders each piece with its own react-markdown, memoized and keyed by its offset: the pieces before the last one are
 neither parsed nor rendered again, and a piece keeps its components (a code block its highlighting). The cuts come from

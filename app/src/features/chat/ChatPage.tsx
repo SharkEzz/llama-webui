@@ -47,7 +47,16 @@ function ContextGauge({ props }: { props: ServerProps | null }) {
 export function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { current, streaming, loadList, open, create, send, stop } = useChat();
+  // Selectors, not the whole store: the page renders again on a new conversation, not on each flush of a reply
+  const currentId = useChat((s) => s.current?.id);
+  const title = useChat((s) => s.current?.title);
+  const modelPath = useChat((s) => s.current?.modelPath);
+  const streaming = useChat((s) => s.streaming !== null && s.streaming.conversationId === s.current?.id);
+  const loadList = useChat((s) => s.loadList);
+  const open = useChat((s) => s.open);
+  const create = useChat((s) => s.create);
+  const send = useChat((s) => s.send);
+  const stop = useChat((s) => s.stop);
   const kind = useServer((s) => s.view?.state.kind);
   const props = useServerProps();
   const canSend = kind === 'ready' || kind === 'external';
@@ -57,7 +66,7 @@ export function ChatPage() {
   useEffect(() => void open(convId !== null && Number.isInteger(convId) ? convId : null), [convId, open]);
 
   const onSend = async (text: string) => {
-    let target = current?.id;
+    let target = currentId;
     if (target === undefined) {
       target = await create();
       void navigate(`/chat/${target}`, { replace: true });
@@ -66,7 +75,7 @@ export function ChatPage() {
   };
 
   const serving = props?.model_path ? stem(props.model_path) : null;
-  const started = current?.modelPath ? stem(current.modelPath) : null;
+  const started = modelPath ? stem(modelPath) : null;
   return (
     <div className="grid h-[calc(100dvh-5.5rem)] grid-cols-[13rem_minmax(0,1fr)] gap-4">
       <aside className={cn(GLASS, 'flex min-h-0 flex-col p-2')}>
@@ -81,7 +90,7 @@ export function ChatPage() {
       <section className={cn(GLASS, 'flex min-h-0 flex-col gap-2 p-4')}>
         <header className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h1 className="truncate text-2xl font-semibold tracking-tight">{current?.title ?? 'Chat'}</h1>
+            <h1 className="truncate text-2xl font-semibold tracking-tight">{title ?? 'Chat'}</h1>
             <p className="truncate font-mono text-xs text-muted-foreground">
               {started ?? serving ?? 'No model loaded'}
               {started && serving && started !== serving && (
@@ -91,7 +100,7 @@ export function ChatPage() {
           </div>
           <div className="flex items-start gap-3">
             <ContextGauge props={props} />
-            {current && (
+            {currentId !== undefined && (
               <Sheet>
                 <SheetTrigger render={<Button variant="secondary" size="sm" />}>
                   <SlidersHorizontal /> Settings
@@ -110,12 +119,7 @@ export function ChatPage() {
           </div>
         </header>
         <Thread canSend={canSend} />
-        <Composer
-          canSend={canSend}
-          streaming={streaming !== null && streaming.conversationId === current?.id}
-          onSend={(t) => void onSend(t)}
-          onStop={() => void stop()}
-        />
+        <Composer canSend={canSend} streaming={streaming} onSend={(t) => void onSend(t)} onStop={() => void stop()} />
       </section>
     </div>
   );
