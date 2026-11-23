@@ -1,5 +1,7 @@
-/** Frame rate while something animates (streaks, pulse, transitions, camera being handled). */
+/** Frame rate while something moves on its own or under the hand (transitions, easing values, camera being handled). */
 export const ACTIVE_FPS = 60;
+/** Frame rate of the ambient animations that loop at rest (streaks, memory pulse): 30 fps keeps them fluid. */
+export const AMBIENT_FPS = 30;
 /** Frame rate when only the camera drift moves (under 0.1 unit/s: 20 fps is enough). */
 export const DRIFT_FPS = 20;
 /** Slack (ms): a slightly early rAF still counts, so at 120 Hz 60 fps really is every other frame. */
@@ -8,11 +10,14 @@ const SLACK_MS = 4;
 /**
  * Scene render pacing (frameloop “never”): redrawing at the display's refresh rate (120 Hz and up) costs without adding
  * anything, and redrawing a still scene is pointless. Whatever animates flags it during the frame; the next one comes at
- * `ACTIVE_FPS`, at `DRIFT_FPS` for drift alone, or never as long as nothing asks for it.
+ * `ACTIVE_FPS`, at `AMBIENT_FPS` for an ambient animation, at `DRIFT_FPS` for drift alone, or never as long as nothing
+ * asks for it. The ambient animations advance with the time between frames, not per frame: they keep their speed.
  */
 export class FramePacer {
   /** An animation needs the next frame (flagged during the frame, reset afterwards). */
   active = false;
+  /** An ambient animation (streaks, pulse) needs the next frame, at `AMBIENT_FPS` (flagged and reset like `active`). */
+  ambient = false;
   /** The camera is drifting (kept up to date every frame). */
   drift = false;
   /** A frame as soon as possible: an input changed (snapshot, hover, theme, size). */
@@ -38,7 +43,8 @@ export class FramePacer {
   rendered(now: number, moving: boolean): void {
     this.last = now;
     this.requested = false;
-    this.fps = this.active || moving ? ACTIVE_FPS : this.drift ? DRIFT_FPS : 0;
+    this.fps = this.active || moving ? ACTIVE_FPS : this.ambient ? AMBIENT_FPS : this.drift ? DRIFT_FPS : 0;
     this.active = false;
+    this.ambient = false;
   }
 }

@@ -25,6 +25,53 @@ test('FramePacer: something animating renders at 60 fps whatever the display rat
   }
 });
 
+test('FramePacer: the ambient animations (streaks, pulse) render at 30 fps whatever the display rate', () => {
+  for (const hz of [60, 120, 144]) {
+    const rate = fps(new FramePacer(), hz, 2, (p) => {
+      p.ambient = true;
+    });
+    expect(rate).toBeGreaterThanOrEqual(hz === 144 ? 28.5 : 29.5);
+    expect(rate).toBeLessThanOrEqual(30.5); // 144 Hz: every fifth frame
+  }
+});
+
+test('FramePacer: an ambient animation outranks the drift, a transition or a gesture outranks it', () => {
+  // Ambient and drift together: 30 fps.
+  expect(
+    fps(new FramePacer(), 120, 2, (p) => {
+      p.ambient = true;
+      p.drift = true;
+    }),
+  ).toBe(30);
+  // A transition during an ambient animation: 60 fps.
+  expect(
+    fps(new FramePacer(), 120, 2, (p) => {
+      p.ambient = true;
+      p.active = true;
+    }),
+  ).toBe(60);
+  // A gesture during an ambient animation: every rAF it is allowed, as before.
+  const p = new FramePacer();
+  p.rendered(1000, false);
+  p.ambient = true;
+  p.rendered(1016.7, false);
+  expect(p.shouldRender(1025)).toBe(false);
+  p.interacting = true;
+  expect(p.shouldRender(1033.4)).toBe(true);
+});
+
+test('FramePacer: the ambient flag lasts one frame, then the scene falls back to the drift', () => {
+  const p = new FramePacer();
+  p.drift = true;
+  p.ambient = true;
+  p.rendered(1000, false);
+  expect(p.shouldRender(1033.4)).toBe(true);
+  p.rendered(1033.4, false);
+  // Nothing flagged ambient during that frame: 20 fps again.
+  expect(p.shouldRender(1066.8)).toBe(false);
+  expect(p.shouldRender(1083.4)).toBe(true);
+});
+
 test('FramePacer: camera drift alone renders at 20 fps; a still scene stops after its first frame', () => {
   expect(
     fps(new FramePacer(), 120, 2, (p) => {
