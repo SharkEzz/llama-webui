@@ -71,16 +71,22 @@ layer(LlamaHttp.layer, { excludeTestServices: true })('llama/modelsSse', (it) =>
 
   it.effect('sanitizeLoadProgress clamps values and turns non-finite values into null', () =>
     Effect.sync(() => {
-      assert.deepStrictEqual(sanitizeLoadProgress({ stages: ['text_model'], current: 'text_model', value: 1.4 }), {
-        stages: ['text_model'],
-        current: 'text_model',
-        value: 1,
-      });
-      assert.deepStrictEqual(sanitizeLoadProgress({ stages: [], current: 'mmproj_model', value: Number.NaN }), {
-        stages: [],
-        current: 'mmproj_model',
-        value: null,
-      });
+      assert.deepStrictEqual(
+        sanitizeLoadProgress({ progress: { stages: ['text_model'], current: 'text_model', value: 1.4 } }),
+        {
+          stages: ['text_model'],
+          current: 'text_model',
+          value: 1,
+        },
+      );
+      assert.deepStrictEqual(
+        sanitizeLoadProgress({ progress: { stages: [], current: 'mmproj_model', value: Number.NaN } }),
+        {
+          stages: [],
+          current: 'mmproj_model',
+          value: null,
+        },
+      );
     }),
   );
 });

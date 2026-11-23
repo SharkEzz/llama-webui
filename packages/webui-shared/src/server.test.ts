@@ -73,6 +73,12 @@ test('loadProgressPct combines stages and clamps values, loadStageLabel maps kno
   expect(loadStageLabel('custom_stage')).toBe('custom_stage');
 });
 
+test('loadStageLabel displays stages that match inherited object keys verbatim', () => {
+  expect(loadStageLabel('constructor')).toBe('constructor');
+  expect(loadStageLabel('toString')).toBe('toString');
+  expect(loadStageLabel('__proto__')).toBe('__proto__');
+});
+
 test('loading and sleeping helpers handle managed and external states', () => {
   const progress = { stages: ['text_model'], current: 'text_model', value: 0.3 };
   const starting: ServerState = { kind: 'starting', ...running, since: 1, progress };

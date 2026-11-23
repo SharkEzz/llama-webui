@@ -252,7 +252,8 @@ If something already answers `/health` on the port, the run fails with `port N i
   <Step title="Load">
 
 It spawns the server, follows `GET /models/sse` for live `loadProgress` (`status_change` events), and independently
-polls `/health` every 500 ms. Warmup starts when SSE reports `loaded` or `/health` returns `200`. It fails with
+polls `/health` every 500 ms. Stage-only SSE announcements reuse the current load's last stage order.
+Warmup starts when SSE reports `loaded` or `/health` returns `200`. It fails with
 `loading > 10 min` after 10 minutes (`loadTimeout`), or with the failure read from its output (see
 [Failure messages](#failure-messages)) if the process exits first.
 

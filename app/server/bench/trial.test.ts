@@ -73,14 +73,15 @@ describe('trial', () => {
     ),
   );
 
-  it.live('a trial forwards /models/sse loading progress before warmup and measurement', () =>
+  it.live('a trial forwards /models/sse loading progress and keeps the stage order for the projector', () =>
     fresh(
       Effect.gen(function* () {
         const port = yield* freePort;
         const cmd = yield* fakeOn(port, {
           FAKE_SSE: '1',
           FAKE_SSE_STAGES: 'text_model,mmproj_model',
-          FAKE_LOAD_MS: '180',
+          FAKE_SSE_STAGE_ONLY: '1',
+          FAKE_LOAD_MS: '400',
         });
         const seen = yield* Ref.make<ReadonlyArray<LoadProgress>>([]);
         const result = yield* runTrial({
@@ -99,6 +100,7 @@ describe('trial', () => {
         const progress = yield* Ref.get(seen);
         assert.isAbove(progress.length, 0);
         assert.isTrue(Arr.some(progress, (p) => p.current === 'text_model'));
+        assert.deepInclude(progress, { stages: ['text_model', 'mmproj_model'], current: 'mmproj_model', value: null });
         assert.isAbove(result.pp.tps, 0);
         assert.isAbove(result.tg.tps, 0);
         const after = yield* health({ host: '127.0.0.1', port });

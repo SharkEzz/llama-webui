@@ -1,4 +1,4 @@
-import { Array as Arr, Option, Schema } from 'effect';
+import { Array as Arr, Option, Record as Rec, Schema } from 'effect';
 
 /** The fields of a server llama-webui launched: its profile, its process, and the `--host` and port it listens on. */
 const launched = {
@@ -83,7 +83,8 @@ export const LOAD_STAGE_LABEL: Readonly<Record<string, string>> = {
 };
 
 /** Readable label for a loading stage (`text_model` → `Model`, unknown stages kept as is). */
-export const loadStageLabel = (stage: string): string => LOAD_STAGE_LABEL[stage] ?? stage;
+export const loadStageLabel = (stage: string): string =>
+  Option.getOrElse(Rec.get(LOAD_STAGE_LABEL, stage), () => stage);
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 

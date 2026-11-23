@@ -195,14 +195,16 @@ inherited variable. Nothing else is added.
    and for the second line to know that peer-to-peer was requested.
 6. Both output streams are split into lines (`linesOf()`, `app/server/logs/lines.ts`), the idle noise
    (`update_slots: all slots are idle`) left out, and pushed to the `LogRing` (10,000 lines kept in memory).
-7. The state becomes `starting`. Two fibers in the program's scope watch for readiness: one polls `/health` every
-   `healthPoll` (500 ms), and the other connects to `GET /models/sse`, retrying while the socket is binding. Either
+7. The state becomes `starting`. One fiber in the program's scope polls `/health` every `healthPoll` (500 ms).
+   A second fiber connects to `GET /models/sse` and retries while the socket is binding. Either
    `/health` returning `200` or SSE reporting `loaded` makes the server ready during cold startup. The SSE watcher
    supplies live `starting.progress`, records `data.memory` in `supervisor.memory`, and tracks sleep and wakeup for
    the life of the process. Builds that return `404` or `503` from `/models/sse` use the health poll for startup.
    For external servers, `watchExternal()` checks `/props` before subscribing to SSE. A router stays in the generic
    `external` state because its events describe individual models. A single-model server can report `status`,
    `progress`, and `supervisor.memory` once its properties are available.
+
+Stage-only SSE announcements, such as the start of projector loading, reuse the last stage order from the current load.
 
 `start` returns once the process is spawned, not once it is ready: the endpoints answer `202` and the client follows
 the state over the WebSocket.

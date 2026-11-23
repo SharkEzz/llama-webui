@@ -86,7 +86,7 @@ if (process.env.FAKE_FAIL_ARG !== undefined && args.includes(process.env.FAKE_FA
 }
 const sseEnabled = process.env.FAKE_SSE === "1";
 const sseStages = (process.env.FAKE_SSE_STAGES ?? "text_model").split(",").filter(Boolean);
-const sseSleepAfterMs = process.env.FAKE_SLEEP_AFTER_MS !== undefined ? Number(process.env.FAKE_SLEEP_AFTER_MS) : null;
+const sseStageOnly = process.env.FAKE_SSE_STAGE_ONLY === "1";
 const sseMemory = {
   n_ctx: Number(process.env.FAKE_N_CTX ?? 40192),
   devices: [
@@ -99,7 +99,6 @@ const sseEnc = new TextEncoder();
 let sseLastEvent: unknown = null;
 let isSleeping = false;
 let isLoading = loadMs > 0;
-let sleepTimer: ReturnType<typeof setTimeout> | null = null;
 
 function sseEmit(event: string, data?: Record<string, unknown>) {
   if (!sseEnabled) return;
@@ -113,14 +112,6 @@ function sseEmit(event: string, data?: Record<string, unknown>) {
       sseClients.delete(client);
     }
   }
-}
-
-function scheduleSleep() {
-  if (!sseEnabled || sseSleepAfterMs === null || sleepTimer !== null) return;
-  sleepTimer = setTimeout(() => {
-    sleepTimer = null;
-    enterSleep();
-  }, sseSleepAfterMs);
 }
 
 function enterSleep() {
@@ -139,7 +130,6 @@ function runLoadCycle(firstLoad: boolean) {
     isLoading = false;
     isSleeping = false;
     sseEmit("status_change", firstLoad ? { status: "loaded", info: { id: "fake-model" }, memory: sseMemory } : { status: "loaded" });
-    scheduleSleep();
     return;
   }
   const steps = sseStages.flatMap((stage) => [
@@ -152,7 +142,9 @@ function runLoadCycle(firstLoad: boolean) {
     setTimeout(() => {
       sseEmit("status_change", {
         status: "loading",
-        progress: { stages: sseStages, current: step.stage, value: step.value },
+        progress: sseStageOnly && step.stage === "mmproj_model" && step.value === 0
+          ? { stage: step.stage }
+          : { stages: sseStages, current: step.stage, value: step.value },
       });
     }, stepMs * idx);
   });
@@ -166,7 +158,6 @@ function runLoadCycle(firstLoad: boolean) {
     isLoading = false;
     isSleeping = false;
     sseEmit("status_change", firstLoad ? { status: "loaded", info: { id: "fake-model" }, memory: sseMemory } : { status: "loaded" });
-    scheduleSleep();
   }, loadMs);
 }
 

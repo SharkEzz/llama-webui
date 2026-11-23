@@ -1,6 +1,13 @@
 import { NodeServices } from '@effect/platform-node';
 import { assert, layer } from '@effect/vitest';
-import { DEFAULT_SETTINGS, type Profile, type ServerState, type ServerView, type WsMessage } from '@llama-webui/shared';
+import {
+  DEFAULT_SETTINGS,
+  type Profile,
+  type ServerState,
+  type ServerView,
+  type WsMessage,
+  stateLoadProgress,
+} from '@llama-webui/shared';
 import {
   Array as Arr,
   Clock,
@@ -810,7 +817,12 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
         const supervisor = yield* Supervisor;
         const client = yield* LlamaHttp;
         const cmd = yield* startFake({
-          env: { FAKE_SSE: '1', FAKE_LOAD_MS: '180' },
+          env: {
+            FAKE_SSE: '1',
+            FAKE_SSE_STAGES: 'text_model,mmproj_model',
+            FAKE_SSE_STAGE_ONLY: '1',
+            FAKE_LOAD_MS: '180',
+          },
         });
         const baseUrl = `http://127.0.0.1:${cmd.port}`;
         const ready = yield* stateWhen(kindIs('ready'));
@@ -839,6 +851,13 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
         yield* stateWhen(kindIs('ready'));
         const memAfterWake = yield* supervisor.memory;
         assert.deepStrictEqual(memAfterWake, memOnReady);
+        const afterWake = yield* publishedViews;
+        const wakeProgress = Arr.map(Arr.drop(afterWake, seen.length), (view) => stateLoadProgress(view.state));
+        assert.deepInclude(wakeProgress, {
+          stages: ['text_model', 'mmproj_model'],
+          current: 'mmproj_model',
+          value: null,
+        });
 
         // Stopping a sleeping server works cleanly too.
         yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
@@ -856,14 +875,21 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
     Effect.gen(function* () {
       const port = yield* freePort;
       const extScope = yield* Scope.make();
-      yield* fakeOutside({
+      const outside = yield* fakeOutside({
         port,
-        env: { FAKE_SSE: '1', FAKE_LOAD_MS: '0', FAKE_SLEEP_AFTER_MS: '250' },
+        env: {
+          FAKE_SSE: '1',
+          FAKE_SSE_STAGES: 'text_model,mmproj_model',
+          FAKE_SSE_STAGE_ONLY: '1',
+          FAKE_LOAD_MS: '180',
+        },
       }).pipe(Scope.provide(extScope));
       try {
         yield* fresh()(
           Effect.gen(function* () {
             const supervisor = yield* Supervisor;
+            const client = yield* LlamaHttp;
+            const baseUrl = `http://127.0.0.1:${port}`;
             const detected = yield* supervisor.detectExternal(port);
             assert.isTrue(detected);
             const extReady = yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
@@ -871,14 +897,28 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
             const extMem = yield* supervisor.memory;
             assert.isNotNull(extMem);
 
+            yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
             yield* stateWhen((s) => s.kind === 'external' && s.status === 'sleeping');
             const extSleepMem = yield* supervisor.memory;
             assert.isNull(extSleepMem);
+
+            yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
+            yield* stateWhen((s) => s.kind === 'external' && s.status === 'ready');
+            const wakeMem = yield* supervisor.memory;
+            assert.deepStrictEqual(wakeMem, extMem);
+            const seen = yield* publishedViews;
+            const progress = Arr.map(seen, (view) => stateLoadProgress(view.state));
+            assert.deepInclude(progress, {
+              stages: ['text_model', 'mmproj_model'],
+              current: 'mmproj_model',
+              value: null,
+            });
           }),
         );
       } finally {
         yield* Scope.close(extScope, Exit.void);
       }
+      yield* assertGone(outside.pid);
     }),
   );
 });

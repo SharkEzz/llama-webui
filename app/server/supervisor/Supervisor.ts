@@ -5,6 +5,7 @@ import {
   type ServerState,
   type ServerView,
   serverView,
+  stateLoadProgress,
 } from '@llama-webui/shared';
 import {
   Clock,
@@ -303,10 +304,13 @@ export class Supervisor extends Context.Service<
         const applyManagedEvent = Effect.fnUntraced(function* (running: Running, event: ModelsSseEvent) {
           if (event.event !== 'status_change') return;
           const nowMs = yield* Clock.currentTimeMillis;
-          const progress = event.progress === undefined ? undefined : sanitizeLoadProgress(event.progress);
           yield* change((now) => {
             if (!isThis(running)(now) || now.state.kind === 'stopping') return Option.none();
             if (event.status === 'loading') {
+              const progress =
+                event.progress === undefined
+                  ? undefined
+                  : sanitizeLoadProgress({ progress: event.progress, previous: stateLoadProgress(now.state) });
               if (now.state.kind === 'starting') {
                 if (progress === undefined || Equal.equals(now.state.progress, progress)) return Option.none();
                 return Option.some({ ...now, state: { ...now.state, progress } });
@@ -384,16 +388,18 @@ export class Supervisor extends Context.Service<
             yield* recheckExternal;
             return;
           }
-          const progress = event.progress === undefined ? undefined : sanitizeLoadProgress(event.progress);
           yield* change((now) => {
             if (!isSameExternal(now.state, port, pid)) return Option.none();
             if (event.status === 'loading') {
+              const previous = stateLoadProgress(now.state);
+              const progress =
+                event.progress === undefined ? previous : sanitizeLoadProgress({ progress: event.progress, previous });
               const nextState: ServerState = {
                 kind: 'external',
                 pid,
                 port,
                 status: 'loading',
-                ...(progress === undefined ? {} : { progress }),
+                ...(progress === null ? {} : { progress }),
               };
               if (Equal.equals(now.state, nextState) && now.memory === null) return Option.none();
               return Option.some({ ...now, memory: null, state: nextState });

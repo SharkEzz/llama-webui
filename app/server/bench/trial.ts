@@ -193,19 +193,20 @@ export const runTrial = Effect.fn('trial.runTrial')(function* (options: {
   });
 
   const sseUntilLoaded = Effect.gen(function* () {
+    let progress: LoadProgress | null = null;
     for (;;) {
       const outcome = yield* streamModelsSse(target).pipe(
         Stream.takeUntil((ev) => ev.event === 'status_change' && (ev.status === 'loaded' || ev.status === 'unloaded')),
         Stream.tap((ev) =>
           Effect.gen(function* () {
-            if (
-              ev.event === 'status_change' &&
-              ev.status === 'loading' &&
-              ev.progress !== undefined &&
-              options.onLoadProgress !== undefined
-            ) {
-              yield* options.onLoadProgress(sanitizeLoadProgress(ev.progress));
+            if (ev.event !== 'status_change') return;
+            if (ev.status !== 'loading') {
+              progress = null;
+              return;
             }
+            if (ev.progress === undefined || options.onLoadProgress === undefined) return;
+            progress = sanitizeLoadProgress({ progress: ev.progress, previous: progress });
+            yield* options.onLoadProgress(progress);
           }),
         ),
         Stream.filter((ev) => ev.event === 'status_change' && ev.status === 'loaded'),

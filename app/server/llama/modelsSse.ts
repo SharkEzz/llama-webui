@@ -43,11 +43,17 @@ const unreachable = (error: HttpClientError.HttpClientError): ModelsSseUnreachab
 
 const isOk = (status: number) => status >= 200 && status < 300;
 
-/** Makes a parsed `ModelLoadProgress` safe for Effect `Schema` encoding (finite clamped value). */
-export const sanitizeLoadProgress = (p: ModelLoadProgress): LoadProgress => ({
-  stages: [...p.stages],
-  current: p.current,
-  value: p.value !== null && Number.isFinite(p.value) ? Math.min(1, Math.max(0, p.value)) : null,
+/** Clamps the value for schema encoding and preserves the current load's stage order on stage-only events. */
+export const sanitizeLoadProgress = ({
+  progress,
+  previous,
+}: {
+  readonly progress: ModelLoadProgress;
+  readonly previous?: LoadProgress | null;
+}): LoadProgress => ({
+  stages: progress.stages.length === 0 ? (previous?.stages ?? []) : [...progress.stages],
+  current: progress.current,
+  value: progress.value !== null && Number.isFinite(progress.value) ? Math.min(1, Math.max(0, progress.value)) : null,
 });
 
 const parseData = (data: string): Option.Option<ModelsSseEvent> =>
