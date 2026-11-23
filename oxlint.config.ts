@@ -3,7 +3,7 @@
 // each other project has its own `oxlint.config.ts`, which extends `base` (a nested config replaces this one).
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'oxlint';
-import { tests } from './oxlint.tests.ts';
+import { tests } from './configs/oxlint.tests.ts';
 
 // The import bans (`no-restricted-imports`), one pattern per boundary, each matched on the specifier as written: the
 // package name and its subpaths (`(/|$)`), and the relative forms that walk into the same directory
@@ -41,13 +41,9 @@ export const base = defineConfig({
   options: { typeAware: true, reportUnusedDisableDirectives: 'warn' },
   settings: {
     // The React version the `react/*` rules check against: the `react` of the catalog (`pnpm-workspace.yaml`)
-    react: {
-      version: '19.3.1',
-    },
+    react: { version: '19.3.1' },
     // Typecheck mode of the Vitest rules: some skip their checks on `describe` blocks that hold type tests
-    vitest: {
-      typecheck: true,
-    },
+    vitest: { typecheck: true },
   },
   // The vendored repositories are reference material, not linted (`.eslintignore` keeps oxlint from loading their
   // configs)

@@ -17,7 +17,7 @@ const app = (log: Ref.Ref<ReadonlyArray<string>>) =>
 const withApp = (
   log: Ref.Ref<ReadonlyArray<string>>,
   register: (shutdown: Shutdown['Service']) => Effect.Effect<void>,
-) => Layer.build(app(log)).pipe(Effect.map(Context.get(Shutdown)), Effect.flatMap(register), Effect.scoped);
+) => log.pipe(app, Layer.build, Effect.map(Context.get(Shutdown)), Effect.flatMap(register), Effect.scoped);
 
 const push = (log: Ref.Ref<ReadonlyArray<string>>, entry: string) => Ref.update(log, (l) => [...l, entry]);
 

@@ -32,6 +32,7 @@ describe('SweepsRepo', () => {
         const [first, second, third] = queued;
         assert(first !== undefined && second !== undefined && third !== undefined);
         const counted = yield* sweeps.get(s.id);
+        // @effect-diagnostics-next-line missedPipeableOpportunity:off
         assert(Option.isSome(counted));
         assert.strictEqual(counted.value.counts.total, 3);
         assert.strictEqual(counted.value.counts.queued, 3);
@@ -53,6 +54,7 @@ describe('SweepsRepo', () => {
         assert.deepStrictEqual(oneOff, []);
         yield* runs.delete(first.id);
         const forgot = yield* sweeps.get(s.id);
+        // @effect-diagnostics-next-line missedPipeableOpportunity:off
         assert(Option.isSome(forgot));
         assert.strictEqual(forgot.value.bestRunId, null);
         assert.strictEqual(forgot.value.best, null);

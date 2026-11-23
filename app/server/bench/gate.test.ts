@@ -238,7 +238,7 @@ describe('gate on a stop that never ends', () => {
         Effect.provideContext(
           Effect.gen(function* () {
             const gate = yield* makeGate({ stoppingTimeout: '60 seconds', poll: '100 millis' });
-            const acquiring = yield* Effect.forkChild(Effect.flip(gate.acquire({ stopServer: true })));
+            const acquiring = yield* gate.acquire({ stopServer: true }).pipe(Effect.flip, Effect.forkChild);
             yield* TestClock.adjust('59 seconds');
             const early = yield* Effect.sync(() => acquiring.pollUnsafe());
             assert.isUndefined(early);

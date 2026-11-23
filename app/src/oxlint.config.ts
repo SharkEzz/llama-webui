@@ -1,9 +1,9 @@
 // The web client (React): the base, the React rules, the Vitest rules and the Tailwind rules.
 import { defineConfig } from 'oxlint';
+import { react } from '../../configs/oxlint.react.ts';
+import { tailwind } from '../../configs/oxlint.tailwind.ts';
+import { tests } from '../../configs/oxlint.tests.ts';
 import { base, llamacppNode, nodeBuiltins, vendored } from '../../oxlint.config.ts';
-import { react } from '../../oxlint.react.ts';
-import { tailwind } from '../../oxlint.tailwind.ts';
-import { tests } from '../../oxlint.tests.ts';
 
 const web = 'the web talks to the server through `@llama-webui/shared` and `lib/api.ts`';
 // `app/server/`, by its package path or a relative path out of `src/` (`../server/…`, `../../app/server/…`). A

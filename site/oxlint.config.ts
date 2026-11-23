@@ -1,9 +1,9 @@
 // The public site (React, prerendered): the base, the React rules, the Vitest rules and the Tailwind rules.
 import { defineConfig } from 'oxlint';
+import { react } from '../configs/oxlint.react.ts';
+import { tailwind } from '../configs/oxlint.tailwind.ts';
+import { tests } from '../configs/oxlint.tests.ts';
 import { base, vendored } from '../oxlint.config.ts';
-import { react } from '../oxlint.react.ts';
-import { tailwind } from '../oxlint.tailwind.ts';
-import { tests } from '../oxlint.tests.ts';
 
 const copies = 'the site copies what it reuses; tokens come from `@llama-webui/theme`';
 // Anything of `app/`, by its package name or a relative path out of `site/` (`../app/…`, `../../../app/src/…`); and

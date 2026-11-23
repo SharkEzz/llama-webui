@@ -38,7 +38,11 @@ const Errors = Logger.layer([
   }),
 ]);
 
-const TestApp = serve(HttpApiBuilder.layer(TestApi).pipe(Layer.provide(Things), Layer.provide(RequestErrorsLive))).pipe(
+const TestApp = TestApi.pipe(
+  HttpApiBuilder.layer,
+  Layer.provide(Things),
+  Layer.provide(RequestErrorsLive),
+  serve,
   Layer.provideMerge(ServerTest),
   Layer.provide(Errors),
 );

@@ -229,6 +229,7 @@ describe('BenchRunsRepo', () => {
         const requeued = yield* runs.requeueInterrupted(s.id);
         assert.strictEqual(requeued, 1);
         const next = yield* runs.nextQueued(s.id);
+        // @effect-diagnostics-next-line missedPipeableOpportunity:off
         assert(Option.isSome(next));
         assert.deepStrictEqual(
           [

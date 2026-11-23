@@ -36,7 +36,7 @@ export const SweepSpace = Schema.Struct({
 }).annotate({ messageUnexpectedKey: 'unknown key' });
 export type SweepSpace = typeof SweepSpace.Type;
 
-const stored = <S extends Schema.Top>(field: S) => Schema.optionalKey(Schema.Array(field));
+const stored = <S extends Schema.Top>(field: S) => field.pipe(Schema.Array, Schema.optionalKey);
 const storedFields = StoredBenchParams.fields;
 
 /** A sweep's space as it is stored, without the rules of `SweepSpace`. */

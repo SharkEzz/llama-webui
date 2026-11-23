@@ -16,13 +16,13 @@ export const RequestErrorsLive: Layer.Layer<RequestErrors> = HttpApiMiddleware.l
       Effect.andThen(Metric.update(HttpMetrics.invalid, error.kind), answer);
     switch (error.kind) {
       case 'Params':
-        return counted(Effect.fail(RouteNotFound.make({ message: 'Unknown route' })));
+        return RouteNotFound.make({ message: 'Unknown route' }).pipe(Effect.fail, counted);
       case 'Payload':
       case 'Query':
       case 'Headers':
-        return counted(Effect.fail(requestInvalid(error.cause.issue)));
+        return requestInvalid(error.cause.issue).pipe(Effect.fail, counted);
       default:
-        return counted(Effect.fail(error));
+        return error.pipe(Effect.fail, counted);
     }
   },
 );

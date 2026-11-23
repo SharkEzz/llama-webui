@@ -423,7 +423,7 @@ layer(Base, { excludeTestServices: true, buildPerTest: true })('Monitor', (it) =
       Effect.gen(function* () {
         const repo = yield* SettingsRepo;
         yield* repo.patch({ historySeconds: 60 });
-        const [elapsed, refused] = yield* Effect.timed(Effect.flip(monitor.configure));
+        const [elapsed, refused] = yield* monitor.configure.pipe(Effect.flip, Effect.timed);
         assert.strictEqual(refused.message, 'the collectors are not up yet');
         assert.isBelow(Duration.toMillis(elapsed), 600);
         const source = yield* monitor.nvidiaSource;

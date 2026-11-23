@@ -11,7 +11,7 @@ const Row = Schema.Struct({
   cwd: Schema.NullOr(Schema.String),
   host: Schema.NullOr(Schema.String),
   port: Schema.NullOr(Schema.Int),
-  args_json: Schema.fromJsonString(Schema.Array(Schema.String)),
+  args_json: Schema.String.pipe(Schema.Array, Schema.fromJsonString),
   env_json: Schema.fromJsonString(Schema.Record(Schema.String, Schema.String)),
   source: ProfileSource,
   created_at: Schema.Int,

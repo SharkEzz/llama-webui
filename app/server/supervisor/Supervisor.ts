@@ -415,7 +415,7 @@ export class Supervisor extends Context.Service<
           );
         });
 
-        const stop = detached(Semaphore.withPermits(lock, 1)(doStop)).pipe(Effect.withSpan('Supervisor.stop'));
+        const stop = doStop.pipe(Semaphore.withPermits(lock, 1), detached, Effect.withSpan('Supervisor.stop'));
 
         const detectExternal = Effect.fn('Supervisor.detectExternal')(function* (port: number) {
           const before = yield* SynchronizedRef.get(held);

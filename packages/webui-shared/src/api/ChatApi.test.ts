@@ -47,6 +47,7 @@ test('a ChatEvent round-trips through its SSE event', () => {
   ];
   for (const event of events) {
     const encoded = encode(event);
+    // @effect-diagnostics-next-line missedPipeableOpportunity:off
     assert(Result.isSuccess(encoded));
     // The SSE event is named after the type, its data the JSON of the whole event (as the Nitro server sent it).
     expect(encoded.success.event).toBe(event.type);

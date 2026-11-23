@@ -140,15 +140,11 @@ const RepoInfo = Schema.Struct({
   // The commit pins the downloads (it goes into every resolve URL): anything but 40 hex is an invalid response.
   sha: Schema.String.check(Schema.isPattern(HF_COMMIT_RE)),
   gated: Schema.optionalKey(Gated),
-  siblings: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({
-        rfilename: Schema.String,
-        size: Schema.optionalKey(Schema.Int),
-        lfs: Schema.optionalKey(Schema.Struct({ sha256: Schema.String, size: Schema.Int })),
-      }),
-    ),
-  ),
+  siblings: Schema.Struct({
+    rfilename: Schema.String,
+    size: Schema.optionalKey(Schema.Int),
+    lfs: Schema.optionalKey(Schema.Struct({ sha256: Schema.String, size: Schema.Int })),
+  }).pipe(Schema.Array, Schema.optionalKey),
 });
 
 const WhoAmI = Schema.Struct({ name: Schema.optionalKey(Schema.String) });

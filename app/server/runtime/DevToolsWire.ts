@@ -10,7 +10,7 @@ import { Socket } from 'effect/socket';
  * the spans and the pings pass as they are. To remove once the extension decodes Effect 4's metrics.
  */
 
-const Wire = Schema.fromJsonString(Schema.toCodecJson(DevToolsSchema.Request));
+const Wire = DevToolsSchema.Request.pipe(Schema.toCodecJson, Schema.fromJsonString);
 const decodeWire = Schema.decodeUnknownEffect(Wire);
 const encodeWire = Schema.encodeEffect(Wire);
 

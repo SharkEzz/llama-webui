@@ -176,7 +176,9 @@ export const runTrial = Effect.fn('trial.runTrial')(function* (options: {
     Effect.timeoutOrElse({
       duration: requestTimeout,
       orElse: () =>
-        Effect.fail(TrialFailed.make({ message: `no response after ${duration(Duration.toMillis(requestTimeout))}` })),
+        Effect.fail(
+          TrialFailed.make({ message: `no response after ${requestTimeout.pipe(Duration.toMillis, duration)}` }),
+        ),
     }),
   );
 
