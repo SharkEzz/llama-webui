@@ -3,7 +3,7 @@ import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { Tone } from '@/components/glass/tones';
 import { formatTime, num } from '@/lib/format';
-import { useMonitor } from '@/lib/monitor';
+import { useMonitor, wantHistory } from '@/lib/monitor';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { readChartTheme, withAlpha } from './chartTheme';
@@ -63,6 +63,10 @@ export function TimeSeriesChart({
 }: TimeSeriesChartProps) {
   const host = useRef<HTMLDivElement>(null);
   const plot = useRef<uPlot | null>(null);
+  // The history is read when the first chart is shown, not at the app's start.
+  useEffect(() => {
+    wantHistory();
+  }, []);
   const resolved = useTheme((s) => s.resolved);
   const version = useMonitor((s) => s.version);
   const signature = series.map((s) => `${s.key}:${s.tone}:${s.label}`).join('|');

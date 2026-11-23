@@ -216,7 +216,8 @@ with:
 
 - `status`, `pp`, `tg` (each a `Measure`: `tps`, `stddev`, `tokens`) and, for server runs, `draftAcceptPct`;
 - `vramPeak`: one entry per card, in MiB, cards at 0 left out (see [Peak VRAM and disk](#peak-vram-and-disk));
-- `logExcerpt`: the tool's last `TAIL = 50` lines;
+- `logExcerpt`: the tool's last `TAIL = 50` lines, stored in the run's `log_excerpt` column (cleared by a requeue) and
+  never read back: no reply carries it, and the repository does not select it;
 - `durationMs` and `diskReadPeakBps`.
 
 Every line of the tool also goes to the log ring with a `[bench]` prefix. The live state (`BenchLive`) carries the

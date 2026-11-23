@@ -177,7 +177,7 @@ sweep too).
 A whole `BenchRun` (`packages/webui-shared/src/bench.ts`): sent when the run starts (a one-off run when it is created, a sweep item
 when its turn comes), when it ends, and again if the server restart that follows it fails (the error is appended to
 the run's). Its fields: `id`, `kind`, `status`, `spec`, `command`, `hardware`, `pp`, `tg`, `draftAcceptPct`,
-`vramPeak`, `error`, `logExcerpt`, `durationMs`, `diskReadPeakBps`, `sweepId`, `sweepLabel`, `fit` and `createdAt`.
+`vramPeak`, `error`, `durationMs`, `diskReadPeakBps`, `sweepId`, `sweepLabel`, `fit` and `createdAt`.
 See [Benchmarks](/developers/api/bench/).
 
 ### `bench-deleted`
@@ -254,15 +254,15 @@ A whole `DownloadItem` (`packages/webui-shared/src/hf.ts`) on every status chang
 The socket only carries changes, so a client that connects, or reconnects after a drop, first reads the current state
 over REST. The web app does it in each store: when `useWs` goes to `open`, it reloads.
 
-| Store (`app/src/lib/`) | Reloads                                   | Then applies                                                                               |
-| ---------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `server.ts`            | `GET /api/state`                          | `server-state`                                                                             |
-| `logs.ts`              | `GET /api/logs?since=<next seq>`          | `log`                                                                                      |
-| `monitor.ts`           | `GET /api/monitor/history`                | `snapshot`                                                                                 |
-| `topology.ts`          | `GET /api/topology` (Topology page shown) | `placement`                                                                                |
-| `bench.ts`             | `GET /api/bench/runs`                     | `bench-progress`, `bench-run`, `bench-deleted`                                             |
-| `tuning.ts`            | `GET /api/sweeps`                         | `sweep-progress`, `sweep`, `bench-progress`, `bench-run`, `bench-deleted`, `sweep-deleted` |
-| `downloads.ts`         | `GET /api/downloads`                      | `download-progress`, `download`, `download-deleted`                                        |
+| Store (`app/src/lib/`) | Reloads                                                                   | Then applies                                                                               |
+| ---------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `server.ts`            | `GET /api/state`                                                          | `server-state`                                                                             |
+| `logs.ts`              | `GET /api/logs?since=<next seq>` (once the Logs or Server page was shown) | `log`                                                                                      |
+| `monitor.ts`           | `GET /api/monitor/history` (once a chart was shown)                       | `snapshot`                                                                                 |
+| `topology.ts`          | `GET /api/topology` (Topology page shown)                                 | `placement`                                                                                |
+| `bench.ts`             | `GET /api/bench/runs`                                                     | `bench-progress`, `bench-run`, `bench-deleted`                                             |
+| `tuning.ts`            | `GET /api/sweeps`                                                         | `sweep-progress`, `sweep`, `bench-progress`, `bench-run`, `bench-deleted`, `sweep-deleted` |
+| `downloads.ts`         | `GET /api/downloads`                                                      | `download-progress`, `download`, `download-deleted`                                        |
 
 The list routes return the current progress with the list (`{ runs, live }`, `{ sweeps, live }`, `{ items, live }`), so
 a progress bar comes back without waiting for the next `*-progress` message.

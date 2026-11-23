@@ -225,7 +225,6 @@ export const BenchRun = Schema.Struct({
   draftAcceptPct: Schema.NullOr(Schema.Finite),
   vramPeak: Schema.Array(Schema.Struct({ key: Schema.String, name: Schema.String, mib: Schema.Finite })),
   error: Schema.NullOr(Schema.String),
-  logExcerpt: Schema.String,
   durationMs: Schema.NullOr(Schema.Finite),
   /** Peak read bandwidth of the model's disk during the run (bytes/s), if measured. */
   diskReadPeakBps: Schema.NullOr(Schema.Finite),

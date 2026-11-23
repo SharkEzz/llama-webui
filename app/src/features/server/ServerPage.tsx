@@ -25,7 +25,7 @@ import { LogRow } from '@/features/logs/LogRow';
 import { call, errorMessage } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatDuration, formatInt } from '@/lib/format';
-import { useLogs } from '@/lib/logs';
+import { startLogsSync, useLogs } from '@/lib/logs';
 import { useProfiles } from '@/lib/profiles';
 import { getServerProps, isRecord } from '@/lib/props';
 import { isRunning, restartServer, startProfile, stopServer, switchProfile, useServer } from '@/lib/server';
@@ -315,6 +315,9 @@ function CommandCard({ command, host }: { command: string | null; host: string |
 }
 
 function RecentLogs() {
+  useEffect(() => {
+    startLogsSync();
+  }, []);
   const lines = useLogs((s) => s.lines);
   const last = lines.slice(-20);
   return (

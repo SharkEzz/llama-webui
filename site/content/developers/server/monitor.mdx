@@ -114,21 +114,20 @@ bounds `historySeconds` to 30 to 1,800 and `pollIntervalMs` to at least 250, so 
 The history is only in memory: it is lost when llama-webui stops, and in development when a save of a file the
 server imports restarts it.
 
-The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`):
+The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`), one per value a chart of the app draws over
+time; a value no chart draws (a GPU's power or temperature, the request queue) stays in the snapshot only:
 
-| Keys                                                                         | Measure                                       |
-| ---------------------------------------------------------------------------- | --------------------------------------------- |
-| `llama.genTps`, `llama.ppTps`, `llama.specAccept`                            | Generation and prompt speed, draft acceptance |
-| `llama.kvPct`, `llama.reqProcessing`, `llama.reqDeferred`, `llama.busySlots` | Context use and request queue                 |
-| `proc.cpuPct`, `proc.dram`                                                   | The `llama-server` process                    |
-| `gpu.<key>.util`, `.vramPct`, `.pcieRx`, `.pcieTx`, `.power`, `.temp`        | Per GPU, `<key>` being `GpuSample.key`        |
-| `sys.cpu`, `sys.memPct`, `sys.tempC`, `mem.read`, `mem.write`                | Machine CPU, memory, DRAM bandwidth           |
-| `disk.read`, `disk.write`, `disk.modelRead`                                  | Disks, and the disk holding the model         |
+| Keys                                             | Measure                                |
+| ------------------------------------------------ | -------------------------------------- |
+| `llama.genTps`, `llama.ppTps`                    | Generation and prompt speed            |
+| `gpu.<key>.util`, `.vramPct`                     | Per GPU, `<key>` being `GpuSample.key` |
+| `sys.cpu`, `sys.memPct`, `mem.read`, `mem.write` | Machine CPU, memory, DRAM bandwidth    |
+| `disk.read`, `disk.write`, `disk.modelRead`      | Disks, and the disk holding the model  |
 
 Two rules keep the series aligned on the timestamps:
 
 - Some series start at their first known value: they are pushed only when the value is a finite number or the
-  series already exists. A machine without a CPU sensor never gets a `sys.tempC` series. The others exist from the
+  series already exists. A machine whose DRAM bandwidth is not measurable never gets a `mem.read` series. The others exist from the
   first tick.
 - Once it exists, a series moves one point per tick. An unknown value is stored as `NaN`, and `endTick()` pushes `NaN`
   to any series not fed on the tick. `NaN` becomes `null` in `points` and in the dump.
@@ -142,11 +141,13 @@ The monitor publishes each snapshot on the hub (`WsHub`, `app/server/ws/WsHub.ts
 message ([WebSocket](/developers/api/websocket/)). The hub keeps the latest one and sends it to a client right after
 its `hello`, so a page has values as soon as it connects. The web app (`app/src/lib/monitor.ts`):
 
-- reads `GET /api/monitor/history` when the WebSocket opens, and replays the snapshots that arrived during that
-  request;
-- appends each snapshot's `points` to its copy of the history, and trims it to `capacity`;
-- reads the history again when `snapshot.history` (interval or capacity) no longer matches its copy, after a settings
-  change;
+- keeps the latest snapshot from the start, for every page;
+- reads `GET /api/monitor/history` only when the first chart is shown (`wantHistory()`, called by `TimeSeriesChart`;
+  when the WebSocket opens if it is not open yet), and replays the snapshots that arrived during that request; before
+  that, a snapshot leaves the history empty, so a page without a chart never reads it;
+- from then on, appends each snapshot's `points` to its copy of the history, and trims it to `capacity`;
+- reads the history again on each reconnect of the WebSocket, and when `snapshot.history` (interval or capacity) no
+  longer matches its copy, after a settings change;
 - empties its copy when the `hello` message carries a different `bootId`, since the server restarted.
 
 `GET /api/monitor/snapshot` returns the latest snapshot, or `null` before the first tick.
@@ -198,10 +199,10 @@ PCIe link and the compute processes. Three values cost a call into the driver ea
 they are read again only once their period has passed since their last read, and each sample in between reports the
 value last read:
 
-| Value                                                     | Period                            | Read by                                                                                          |
-| --------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| PCIe throughput, received and sent (the calls that block) | 5 s (`PCIE_THROUGHPUT_PERIOD_MS`) | The System page's GPU card, the Topology page's streaks, the `gpu.<key>.pcieRx`/`pcieTx` history |
-| Power limit, persistence mode                             | 10 s (`LIMITS_PERIOD_MS`)         | The GPU card (the limit) and the tuning checks, which the System page reloads every 10 s         |
+| Value                                                     | Period                            | Read by                                                                                  |
+| --------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------- |
+| PCIe throughput, received and sent (the calls that block) | 5 s (`PCIE_THROUGHPUT_PERIOD_MS`) | The System page's GPU card, the Topology page's streaks                                  |
+| Power limit, persistence mode                             | 10 s (`LIMITS_PERIOD_MS`)         | The GPU card (the limit) and the tuning checks, which the System page reloads every 10 s |
 
 The periods are times, not counts of samples: with an interval longer than a period, the value is read on every
 sample. The first sample reads them all, and so does the first sample of a card after it was hidden. A slow value

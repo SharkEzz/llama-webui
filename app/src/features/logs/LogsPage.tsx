@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { errorMessage } from '@/lib/api';
 import { copyText } from '@/lib/clipboard';
 import { formatInt, plural } from '@/lib/format';
-import { hideCurrentLogs, useLogs } from '@/lib/logs';
+import { hideCurrentLogs, startLogsSync, useLogs } from '@/lib/logs';
 import { cn } from '@/lib/utils';
 import { LogRow } from './LogRow';
 
@@ -33,6 +33,9 @@ const EMPTY = {
 } as const;
 
 export function LogsPage() {
+  useEffect(() => {
+    startLogsSync();
+  }, []);
   const all = useLogs((s) => s.lines);
   const hiddenBefore = useLogs((s) => s.hiddenBefore);
   const [minLevel, setMinLevel] = useState<LogLevel>('debug');

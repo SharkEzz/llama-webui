@@ -1,6 +1,6 @@
 import { assert, describe, it } from '@effect/vitest';
 import { type GpuSample, SERIES, Snapshot, type SystemSample } from '@llama-webui/shared';
-import { Array as Arr, Effect, Option, Record as Rec, Schema } from 'effect';
+import { Array as Arr, Effect, Option, Order, Record as Rec, Schema } from 'effect';
 import type { LlamaRaw, SlotView } from 'llamacpp-js/metrics';
 import { History } from './History.ts';
 import { beginTick, endTick, initialMemory, type TickMemory, type TickReading } from './tick.ts';
@@ -79,29 +79,20 @@ const run = (memory: TickMemory, history: History, reading: TickReading) =>
 const seriesOf = (history: History, key: string) => Effect.map(history.dump(), (dump) => dump.series[key] ?? []);
 
 describe('tick', () => {
-  it.effect('an idle tick pushes 0 for the llama series and repeats the last acceptance', () =>
+  it.effect('an idle tick pushes 0 for the rates and only the series a screen draws', () =>
     Effect.gen(function* () {
       const history = new History(10, 1000);
       history.tick(500);
-      history.series(SERIES.specAccept).push(0.75);
+      history.series(SERIES.genTps).push(12);
       const { snapshot, memory } = run(initialMemory, history, idle(1000));
       assert.strictEqual(snapshot.tick, 1);
       assert.strictEqual(memory.tickNo, 1);
       assert.strictEqual(snapshot.health, null);
       assert.deepStrictEqual(snapshot.rates, { genTps: 0, ppTps: 0 });
       assert.deepStrictEqual([snapshot.slots, snapshot.kv, snapshot.queue, snapshot.proc], [null, null, null, null]);
-      assert.deepStrictEqual(snapshot.points, {
-        [SERIES.genTps]: 0,
-        [SERIES.ppTps]: 0,
-        [SERIES.specAccept]: 0.75,
-        [SERIES.cpuPct]: 0,
-        [SERIES.kvPct]: 0,
-        [SERIES.reqProcessing]: 0,
-        [SERIES.reqDeferred]: 0,
-        [SERIES.busySlots]: 0,
-      });
-      const accept = yield* seriesOf(history, SERIES.specAccept);
-      assert.deepStrictEqual(accept, [0.75, 0.75]);
+      assert.deepStrictEqual(snapshot.points, { [SERIES.genTps]: 0, [SERIES.ppTps]: 0 });
+      const gen = yield* seriesOf(history, SERIES.genTps);
+      assert.deepStrictEqual(gen, [12, 0]);
       assert.deepStrictEqual(snapshot.history, { intervalMs: 1000, capacity: 10 });
     }),
   );
@@ -133,19 +124,20 @@ describe('tick', () => {
   it.effect('a series starts at its first known value and an existing one not fed gets a gap', () =>
     Effect.gen(function* () {
       const history = new History(10, 1000);
-      const on = (at: number, tempC: number | null) => idle(at, { system: Option.some(system({ tempC })) });
+      const on = (at: number, readBps: number | null) =>
+        idle(at, { system: Option.some(system()), memBw: readBps === null ? null : { readBps, writeBps: 1 } });
       let memory = initialMemory;
       memory = run(memory, history, on(1000, null)).memory;
-      assert.isFalse(history.has(SERIES.sysTemp));
+      assert.isFalse(history.has(SERIES.memRead));
       memory = run(memory, history, on(2000, 50)).memory;
       const third = run(memory, history, on(3000, null));
-      assert.strictEqual(third.snapshot.points[SERIES.sysTemp], null);
+      assert.strictEqual(third.snapshot.points[SERIES.memRead], null);
       // The first tick of a series no tick feeds any more (the GPU went away) also gets a gap.
       history.series('gpu.gone.util').push(5);
       const fourth = run(third.memory, history, on(4000, 52));
       assert.strictEqual(fourth.snapshot.points['gpu.gone.util'], null);
-      const temp = yield* seriesOf(history, SERIES.sysTemp);
-      assert.deepStrictEqual(temp, [null, 50, null, 52]);
+      const read = yield* seriesOf(history, SERIES.memRead);
+      assert.deepStrictEqual(read, [null, 50, null, 52]);
     }),
   );
 
@@ -207,9 +199,21 @@ describe('tick', () => {
       active(1000, 7, { raw: busy, allGpus: [used, gpu({ key: 'nvidia:idle', procVramBytes: 0 })], dramBps: 3e9 }),
     );
     assert.strictEqual(snapshot.health, 'ok');
-    assert.strictEqual(snapshot.points[SERIES.kvPct], 25);
-    assert.strictEqual(snapshot.points[SERIES.cpuPct], 150);
-    assert.strictEqual(snapshot.points[SERIES.procDram], 3e9);
+    // The values no screen draws over time stay in the snapshot, out of the history.
+    assert.deepStrictEqual(
+      Arr.sort(Rec.keys(snapshot.points), Order.String),
+      Arr.sort(
+        [
+          SERIES.genTps,
+          SERIES.ppTps,
+          SERIES.gpuUtil('nvidia:GPU-1'),
+          SERIES.gpuUtil('nvidia:idle'),
+          SERIES.gpuVramPct('nvidia:GPU-1'),
+          SERIES.gpuVramPct('nvidia:idle'),
+        ],
+        Order.String,
+      ),
+    );
     assert.deepStrictEqual(snapshot.queue, { processing: 1, deferred: 2, busySlots: 0.5 });
     assert.deepStrictEqual(snapshot.kv, { usedTokens: 250, totalTokens: 1000 });
     assert.strictEqual(snapshot.points[SERIES.gpuUtil('nvidia:GPU-1')], null);

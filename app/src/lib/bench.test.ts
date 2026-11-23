@@ -63,7 +63,6 @@ const run = (r: Partial<BenchRun> & Pick<BenchRun, 'id'>): BenchRun => ({
   draftAcceptPct: null,
   vramPeak: [],
   error: null,
-  logExcerpt: '',
   durationMs: null,
   diskReadPeakBps: null,
   sweepId: null,

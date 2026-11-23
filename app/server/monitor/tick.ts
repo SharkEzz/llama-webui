@@ -97,10 +97,6 @@ const pushGpus = (r: HistoryRecorder, gpus: ReadonlyArray<GpuSample>) => {
   for (const g of gpus) {
     r.push(SERIES.gpuUtil(g.key), g.suspended === true || g.hidden === true ? Number.NaN : (g.utilPct ?? 0));
     r.known(SERIES.gpuVramPct(g.key), g.vramTotalBytes > 0 ? (100 * g.vramUsedBytes) / g.vramTotalBytes : null);
-    r.known(SERIES.gpuPcieRx(g.key), g.pcieRxBps);
-    r.known(SERIES.gpuPcieTx(g.key), g.pcieTxBps);
-    r.known(SERIES.gpuPower(g.key), g.powerW);
-    r.known(SERIES.gpuTemp(g.key), g.tempC);
   }
 };
 
@@ -117,7 +113,6 @@ const pushMachine = (r: HistoryRecorder, reading: TickReading) => {
       SERIES.sysMemPct,
       mem !== null && mem.totalBytes > 0 ? (100 * (mem.totalBytes - mem.availableBytes)) / mem.totalBytes : 0,
     );
-    r.known(SERIES.sysTemp, s?.tempC);
   }
   if (Option.isSome(reading.disk)) {
     const d = reading.disk.value;
@@ -130,9 +125,6 @@ const pushMachine = (r: HistoryRecorder, reading: TickReading) => {
     disk: Option.getOrNull(reading.disk),
   };
 };
-
-const lastAcceptance = (history: History): number =>
-  Option.getOrElse(history.series(SERIES.specAccept).last(), () => 0);
 
 /** Pushes one point per series into `history` and builds the snapshot. */
 export const endTick: {
@@ -147,12 +139,6 @@ export const endTick: {
   if (!reading.active) {
     r.push(SERIES.genTps, 0);
     r.push(SERIES.ppTps, 0);
-    r.push(SERIES.specAccept, lastAcceptance(history));
-    r.push(SERIES.cpuPct, 0);
-    r.push(SERIES.kvPct, 0);
-    r.push(SERIES.reqProcessing, 0);
-    r.push(SERIES.reqDeferred, 0);
-    r.push(SERIES.busySlots, 0);
     return {
       memory,
       snapshot: snapshotOf(history, r.finish(), memory, reading, {
@@ -169,7 +155,6 @@ export const endTick: {
   }
 
   const raw = reading.raw;
-  r.known(SERIES.procDram, reading.dramBps);
   const rates = raw === null ? { genTps: 0, ppTps: 0 } : liveRates(memory.prevRaw, raw);
   let next: TickMemory = raw === null ? memory : { ...memory, prevRaw: raw };
   const metrics = raw?.metrics ?? null;
@@ -190,8 +175,6 @@ export const endTick: {
 
   r.push(SERIES.genTps, rates.genTps);
   r.push(SERIES.ppTps, rates.ppTps);
-  r.push(SERIES.specAccept, next.lastRequest?.specAccept ?? lastAcceptance(history));
-  r.push(SERIES.cpuPct, reading.proc?.cpuPct ?? 0);
   const kv = kvUsage(raw?.slots ?? null);
   const metric = (key: string) => metrics?.get(`llamacpp:${key}`) ?? 0;
   const queue =
@@ -202,10 +185,6 @@ export const endTick: {
           deferred: metric('requests_deferred'),
           busySlots: metric('n_busy_slots_per_decode'),
         };
-  r.push(SERIES.kvPct, kv === null ? 0 : (100 * kv.usedTokens) / kv.totalTokens);
-  r.push(SERIES.reqProcessing, queue?.processing ?? 0);
-  r.push(SERIES.reqDeferred, queue?.deferred ?? 0);
-  r.push(SERIES.busySlots, queue?.busySlots ?? 0);
 
   return {
     memory: next,

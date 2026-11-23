@@ -4,7 +4,6 @@ import { RouterProvider } from 'react-router/dom';
 import './index.css';
 import { router } from './app/router';
 import { startDownloadsSync } from './lib/downloads';
-import { startLogsSync } from './lib/logs';
 import { startMonitorSync } from './lib/monitor';
 import { startServerSync } from './lib/server';
 import { startThemeSync } from './lib/theme';
@@ -13,7 +12,6 @@ import { useWs } from './lib/ws';
 
 startThemeSync();
 startServerSync();
-startLogsSync();
 startMonitorSync();
 startTopologySync();
 startDownloadsSync({ navigate: (to) => void router.navigate(to) });

@@ -147,31 +147,19 @@ export const CpuInfo = Schema.Struct({
 });
 export type CpuInfo = typeof CpuInfo.Type;
 
-/** Keys of the history series. */
+/** Keys of the history series: only what a chart draws (the other values are read live from the snapshot). */
 export const SERIES = {
   genTps: 'llama.genTps',
   ppTps: 'llama.ppTps',
-  specAccept: 'llama.specAccept',
-  cpuPct: 'proc.cpuPct',
   gpuUtil: (gpuKey: string) => `gpu.${gpuKey}.util`,
   gpuVramPct: (gpuKey: string) => `gpu.${gpuKey}.vramPct`,
-  gpuPcieRx: (gpuKey: string) => `gpu.${gpuKey}.pcieRx`,
-  gpuPcieTx: (gpuKey: string) => `gpu.${gpuKey}.pcieTx`,
-  gpuPower: (gpuKey: string) => `gpu.${gpuKey}.power`,
-  gpuTemp: (gpuKey: string) => `gpu.${gpuKey}.temp`,
   sysCpu: 'sys.cpu',
   sysMemPct: 'sys.memPct',
-  sysTemp: 'sys.tempC',
   memRead: 'mem.read',
   memWrite: 'mem.write',
-  procDram: 'proc.dram',
   diskRead: 'disk.read',
   diskWrite: 'disk.write',
   modelDiskRead: 'disk.modelRead',
-  kvPct: 'llama.kvPct',
-  reqProcessing: 'llama.reqProcessing',
-  reqDeferred: 'llama.reqDeferred',
-  busySlots: 'llama.busySlots',
 } as const;
 
 /** Monitoring state pushed on every tick over the WebSocket. */

@@ -20,7 +20,8 @@ the latest snapshot right after `hello`, without waiting for the next tick.
 
 A client keeps a live copy of the history this way (`app/src/lib/monitor.ts`):
 
-1. On every WebSocket connection, `GET /api/monitor/history` loads the whole history.
+1. When the first chart is shown, then on every WebSocket connection, `GET /api/monitor/history` loads the whole
+   history. A page without a chart keeps only the latest snapshot and never reads it.
 2. Each `snapshot` message carries the values added on that tick in `points`: append them to the copy, unless its
    `at` is not after the copy's last time (the snapshot sent after `hello` is already in the history just loaded).
 3. When `snapshot.history` (`intervalMs`, `capacity`) differs from the copy's, the settings changed the history's
@@ -289,32 +290,22 @@ The `llama-server` process; null without a PID or when it could not be read.
 ## History series
 
 The keys of `series` and `points`, from `SERIES` in `packages/webui-shared/src/monitor.ts`. `<key>` is a `GpuSample.key`.
+The history holds only what a chart of the app draws; the other values of a snapshot (the GPUs' power, temperature
+and PCIe throughput, the context use, the request queue, the draft acceptance, `llama-server`'s CPU and DRAM traffic)
+are read live from it, with no history.
 
-| Key                   | Value                                                  |
-| --------------------- | ------------------------------------------------------ |
-| `llama.genTps`        | `rates.genTps`                                         |
-| `llama.ppTps`         | `rates.ppTps`                                          |
-| `llama.specAccept`    | `lastRequest.specAccept`, the previous value otherwise |
-| `llama.kvPct`         | Context used, % of `kv.totalTokens`                    |
-| `llama.reqProcessing` | `queue.processing`                                     |
-| `llama.reqDeferred`   | `queue.deferred`                                       |
-| `llama.busySlots`     | `queue.busySlots`                                      |
-| `proc.cpuPct`         | `proc.cpuPct`                                          |
-| `proc.dram`           | `proc.dramBps`                                         |
-| `gpu.<key>.util`      | `utilPct` (gap for a sleeping or hidden card)          |
-| `gpu.<key>.vramPct`   | `vramUsedBytes`, % of `vramTotalBytes`                 |
-| `gpu.<key>.pcieRx`    | `pcieRxBps`                                            |
-| `gpu.<key>.pcieTx`    | `pcieTxBps`                                            |
-| `gpu.<key>.power`     | `powerW`                                               |
-| `gpu.<key>.temp`      | `tempC`                                                |
-| `sys.cpu`             | `system.cpuPct`                                        |
-| `sys.memPct`          | RAM used (`totalBytes - availableBytes`), %            |
-| `sys.tempC`           | `system.tempC`                                         |
-| `mem.read`            | `system.memBw.readBps`                                 |
-| `mem.write`           | `system.memBw.writeBps`                                |
-| `disk.read`           | `disk.readBps`                                         |
-| `disk.write`          | `disk.writeBps`                                        |
-| `disk.modelRead`      | `disk.model.readBps`                                   |
+| Key                 | Value                                         |
+| ------------------- | --------------------------------------------- |
+| `llama.genTps`      | `rates.genTps`                                |
+| `llama.ppTps`       | `rates.ppTps`                                 |
+| `gpu.<key>.util`    | `utilPct` (gap for a sleeping or hidden card) |
+| `gpu.<key>.vramPct` | `vramUsedBytes`, % of `vramTotalBytes`        |
+| `sys.cpu`           | `system.cpuPct`                               |
+| `sys.memPct`        | RAM used (`totalBytes - availableBytes`), %   |
+| `mem.read`          | `system.memBw.readBps`                        |
+| `mem.write`         | `system.memBw.writeBps`                       |
+| `disk.read`         | `disk.readBps`                                |
+| `disk.write`        | `disk.writeBps`                               |
+| `disk.modelRead`    | `disk.model.readBps`                          |
 
-With no active server, the `llama.*` series and `proc.cpuPct` get 0 (`llama.specAccept` keeps its last value). A
-series whose collector is off gets gaps.
+With no active server, the `llama.*` series get 0. A series whose collector is off gets gaps.

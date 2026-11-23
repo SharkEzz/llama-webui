@@ -2,7 +2,19 @@ import { NodeServices } from '@effect/platform-node';
 import { SqliteClient } from '@effect/sql-sqlite-node';
 import { assert, describe, it, layer } from '@effect/vitest';
 import { BenchHardware, StoredBenchSpec } from '@llama-webui/shared';
-import { Array as Arr, Context, Effect, FileSystem, Layer, Option, Order, Path, Record, Schema } from 'effect';
+import {
+  Array as Arr,
+  Context,
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  Order,
+  Path,
+  Predicate,
+  Record,
+  Schema,
+} from 'effect';
 import { SqlClient } from 'effect/sql';
 import { TestClock } from 'effect/testing';
 import * as Db from '../db/Db.ts';
@@ -53,6 +65,36 @@ describe('BenchRunsRepo', () => {
         assert.isFalse(gone);
         const c = yield* make('c');
         assert.isTrue(c.id > b.id);
+      }),
+    ),
+  );
+
+  it.effect('a run carries no log excerpt: finish stores it, a later finish keeps it, a requeue clears it', () =>
+    fresh(
+      Effect.gen(function* () {
+        const runs = yield* BenchRunsRepo;
+        const sweeps = yield* SweepsRepo;
+        const sql = yield* SqlClient.SqlClient;
+        const excerpt = (id: number) =>
+          sql<{ readonly log_excerpt: string }>`SELECT log_excerpt FROM bench_runs WHERE id = ${id}`.pipe(
+            Effect.map((rows) => rows[0]?.log_excerpt),
+          );
+        const s = yield* sweeps.create(sweepSpec());
+        const [item] = yield* runs.enqueue(s.id, [{ spec: benchSpec(), label: '-ncmoe 0', fit: 'fits' }]);
+        assert(item !== undefined);
+        yield* runs.begin(item.id, { command: 'llama-bench', hardware: NO_HARDWARE });
+        const done = yield* runs.finish(item.id, { status: 'interrupted', logExcerpt: 'line 1\nline 2' });
+        assert.isFalse(Predicate.hasProperty(done, 'logExcerpt'));
+        const stored = yield* excerpt(item.id);
+        assert.strictEqual(stored, 'line 1\nline 2');
+        const listed = yield* runs.list(runFilters({ sweep: String(s.id) }));
+        assert.isFalse(Arr.some(listed, (run) => Predicate.hasProperty(run, 'logExcerpt')));
+        yield* runs.finish(item.id, { error: 'interrupted (llama-webui stopped)' });
+        const kept = yield* excerpt(item.id);
+        assert.strictEqual(kept, 'line 1\nline 2');
+        yield* runs.requeueInterrupted(s.id);
+        const cleared = yield* excerpt(item.id);
+        assert.strictEqual(cleared, '');
       }),
     ),
   );

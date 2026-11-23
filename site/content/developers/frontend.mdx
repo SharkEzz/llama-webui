@@ -62,7 +62,6 @@ trigger, at least as wide as it), and `GlassCard` puts the glass look on the sha
 ```tsx title="app/src/main.tsx"
 startThemeSync();
 startServerSync();
-startLogsSync();
 startMonitorSync();
 startTopologySync();
 startDownloadsSync({ navigate: (to) => void router.navigate(to) });
@@ -73,7 +72,10 @@ useWs.getState().connect();
 open the model on the Models page: the store does not import the router (which imports the pages).
 
 The benchmark and tuning stores start their own sync the first time their page mounts (`startBenchSync()` in
-`BenchPage`, `startTuningSync()` in `TuningPage`).
+`BenchPage`, `startTuningSync()` in `TuningPage`). So do the logs, which only the Logs and Server pages show:
+`startLogsSync()` in `LogsPage` and in the Server page's latest logs, the whole ring read then, and the store kept
+running afterwards. The monitor's sync follows the snapshots from the start, but reads the history only when the first
+chart mounts (`wantHistory()` in `TimeSeriesChart`).
 
 ## Routing
 
@@ -143,23 +145,23 @@ A component reads a store through one selector per field or action (`useBench((s
 `useMemo`; the lint reports both ([React](/developers/contributing/conventions/#react)). `getState()` is for handlers,
 effects and the sync functions.
 
-| Module         | Store                                    | Fed by                                                                                                                         |
-| -------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `ws.ts`        | `useWs`                                  | The socket: connection status and last message.                                                                                |
-| `server.ts`    | `useServer`                              | `server-state`; `GET /api/state` on connection. Also the start, switch, restart and stop actions.                              |
-| `monitor.ts`   | `useMonitor`                             | `snapshot`, appended to a client-side history; `GET /api/monitor/history` on connection and when the history shape changes.    |
-| `logs.ts`      | `useLogs`                                | `hello` and `log`; `GET /api/logs?since=<seq>` on connection.                                                                  |
-| `topology.ts`  | `useTopology`                            | `placement`; `GET /api/topology` while the Topology page is shown (`watchTopology`), again on each connection.                 |
-| `downloads.ts` | `useDownloads`                           | `download`, `download-progress`, `download-deleted`; the queue reloaded on connection. A finished download rescans the models. |
-| `bench.ts`     | `useBench`                               | `bench-progress`, `bench-run`, `bench-deleted`; the history reloaded on connection.                                            |
-| `tuning.ts`    | `useTuning`                              | `sweep`, `sweep-progress`, `sweep-deleted`, and the `bench-*` messages of the open sweep; the sweeps reloaded on connection.   |
-| `chat.ts`      | `useChat`                                | REST and the SSE stream of the open conversation.                                                                              |
-| `health.ts`    | `useHealth`                              | `GET /api/health`, refreshed by `AppLayout` on every connection.                                                               |
-| `theme.ts`     | `useTheme`                               | `localStorage` and the `theme` setting.                                                                                        |
-| `models.ts`    | `useModels`                              | `GET /api/models`, on demand.                                                                                                  |
-| `profiles.ts`  | `useProfiles`                            | `GET /api/profiles`, on demand.                                                                                                |
-| `flags.ts`     | `useFlags()` (hook over a private store) | `GET /api/flags`, read once: the flag catalogue of the configured `llama-server`.                                              |
-| `settings.ts`  | `useSettingsEditor()` (hook, no store)   | `GET` and `PATCH /api/settings`, with per-field validation errors.                                                             |
+| Module         | Store                                    | Fed by                                                                                                                                                                          |
+| -------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ws.ts`        | `useWs`                                  | The socket: connection status and last message.                                                                                                                                 |
+| `server.ts`    | `useServer`                              | `server-state`; `GET /api/state` on connection. Also the start, switch, restart and stop actions.                                                                               |
+| `monitor.ts`   | `useMonitor`                             | `snapshot`, appended to a client-side history once a chart has asked for it (`wantHistory`); `GET /api/monitor/history` then, on connection and when the history shape changes. |
+| `logs.ts`      | `useLogs`                                | Once the Logs or Server page has been shown (`startLogsSync`): `hello` and `log`; `GET /api/logs?since=<seq>` then and on connection.                                           |
+| `topology.ts`  | `useTopology`                            | `placement`; `GET /api/topology` while the Topology page is shown (`watchTopology`), again on each connection.                                                                  |
+| `downloads.ts` | `useDownloads`                           | `download`, `download-progress`, `download-deleted`; the queue reloaded on connection. A finished download rescans the models.                                                  |
+| `bench.ts`     | `useBench`                               | `bench-progress`, `bench-run`, `bench-deleted`; the history reloaded on connection.                                                                                             |
+| `tuning.ts`    | `useTuning`                              | `sweep`, `sweep-progress`, `sweep-deleted`, and the `bench-*` messages of the open sweep; the sweeps reloaded on connection.                                                    |
+| `chat.ts`      | `useChat`                                | REST and the SSE stream of the open conversation.                                                                                                                               |
+| `health.ts`    | `useHealth`                              | `GET /api/health`, refreshed by `AppLayout` on every connection.                                                                                                                |
+| `theme.ts`     | `useTheme`                               | `localStorage` and the `theme` setting.                                                                                                                                         |
+| `models.ts`    | `useModels`                              | `GET /api/models`, on demand.                                                                                                                                                   |
+| `profiles.ts`  | `useProfiles`                            | `GET /api/profiles`, on demand.                                                                                                                                                 |
+| `flags.ts`     | `useFlags()` (hook over a private store) | `GET /api/flags`, read once: the flag catalogue of the configured `llama-server`.                                                                                               |
+| `settings.ts`  | `useSettingsEditor()` (hook, no store)   | `GET` and `PATCH /api/settings`, with per-field validation errors.                                                                                                              |
 
 ### Monitoring history
 
