@@ -99,14 +99,14 @@ export function Block({ node, live, rect, tone, selected, onSelect, bare = false
   );
 }
 
-const layerColor = (kind: LayerKind) =>
-  kind === 'other'
-    ? 'var(--muted-foreground)'
-    : kind === 'kv'
-      ? tint('var(--tone)', LAYER_TINT.kv)
-      : kind === 'compute'
-        ? tint('var(--tone)', LAYER_TINT.compute)
-        : 'var(--tone)';
+const NEUTRAL = 'var(--muted-foreground)';
+const LAYER_COLOR: Record<LayerKind, string> = {
+  model: 'var(--tone)',
+  kv: tint('var(--tone)', LAYER_TINT.kv),
+  compute: tint('var(--tone)', LAYER_TINT.compute),
+  other: NEUTRAL,
+  used: 'var(--tone)',
+};
 
 /** The four layers a GPU can hold, always in the DOM so that one appearing eases in like the others. */
 const GPU_LAYERS: readonly LayerKind[] = ['model', 'kv', 'compute', 'other'];
@@ -118,10 +118,13 @@ const GPU_LAYERS: readonly LayerKind[] = ['model', 'kv', 'compute', 'other'];
 export function Layers({
   live,
   vertical = false,
+  neutral = false,
   className,
 }: {
   live: NodeLive;
   vertical?: boolean;
+  /** A GPU whose split is not known: its memory in use is gray, since its tone stands for the model. */
+  neutral?: boolean;
   className?: string;
 }) {
   const single = live.layers.length <= 1;
@@ -142,7 +145,7 @@ export function Layers({
           <span
             key={kind}
             className={cn('absolute inset-0', vertical ? 'origin-bottom' : 'origin-left', STEPPED)}
-            style={{ transform, background: layerColor(kind) }}
+            style={{ transform, background: neutral && kind === 'used' ? NEUTRAL : LAYER_COLOR[kind] }}
           />
         );
       })}

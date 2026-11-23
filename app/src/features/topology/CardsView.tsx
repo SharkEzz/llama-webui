@@ -57,7 +57,7 @@ function Body({ node, live, compact }: { node: TopologyNode; live: NodeLive; com
       <>
         <Row label="Utilization" value={live.headline} />
         <Row label="VRAM" value={live.sub} />
-        <Layers live={live} className="h-2.5 rounded-full" />
+        <Layers live={live} neutral className="h-2.5 rounded-full" />
       </>
     ) : (
       <>
@@ -71,7 +71,7 @@ function Body({ node, live, compact }: { node: TopologyNode; live: NodeLive; com
         </span>
         <LoadBar pct={live.barPct} />
         <Row label="VRAM" value={<FillPct live={live} />} />
-        <Layers live={live} className="h-2.5 rounded-full" />
+        <Layers live={live} neutral className="h-2.5 rounded-full" />
         <span className="mt-auto truncate num text-xs text-foreground">{live.sub ?? '—'}</span>
       </>
     );
