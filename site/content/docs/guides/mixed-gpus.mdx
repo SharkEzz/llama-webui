@@ -173,7 +173,7 @@ plan says how many combinations it ignored. The **-sm** row tries split modes. S
 
 <Screenshot
   name="topology"
-  alt="Topology page during a generation: the Model card lists CUDA0 with 4.3 GiB (38.5%), CUDA1 with 6.6 GiB (58.1%) and Host (RAM) with 388.4 MiB, offloaded layers 66/66. The GPU blocks in the scene use the same colors."
+  alt="Topology page during a generation: the Model card lists CUDA0 with 4.3 GiB (38.5%), CUDA1 with 6.6 GiB (58.1%) and Host (RAM) with 388.4 MiB, offloaded layers 66/66. The GPU blocks of the drawing use the same colors."
   caption="The Model card on Topology: the share of the weights on each device."
 />
 
@@ -181,7 +181,7 @@ Once the profile runs, several pages show where the model landed:
 
 - **Topology**: the **Model** card lists each device by its llama.cpp name (`CUDA0`, `ROCm0`, `Vulkan1`…) with the
   size and share of the weights it holds, then **Host (RAM)** for what stayed in memory, the total and the offloaded
-  layers. Each device has the color of its GPU block in the scene; hover a block for its **Model** and **KV cache**.
+  layers. Each device has the color of its GPU block in the drawing; select a block for its **Model** and **KV cache**.
   The split is read from the loading logs of a server llama-webui started. See [Topology](/docs/topology/).
 - **Logs**: `llama-server` writes one `using device` line per device it loads onto, with its PCI address, then
   `offloaded N/M layers to GPU` and a `model buffer size` line per device. Search the [Logs](/docs/logs/) page for

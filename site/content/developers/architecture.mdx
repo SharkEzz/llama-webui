@@ -177,8 +177,8 @@ In development, the server sends its spans and its metrics to the
 `pnpm start` runs `pnpm build`, then `node app/.output/llama-webui.mjs`. `pnpm build` runs `vite build`, then
 `node build/server.ts`, in `app/`, and writes `app/.output/`:
 
-- `public/`: the client, split per page: each page loads only its own chunks, so the Topology page's three.js (about
-  1 MB) stays out of the others. The files of `public/assets/` are content-hashed;
+- `public/`: the client, split per page: each page loads only its own chunks. The files of `public/assets/` are
+  content-hashed;
 - `server/index.mjs`: the server, one file with every dependency bundled (it imports only `node:*`);
 - `server/nvml-worker.mjs`: the NVML sampler, built from `app/server/collectors/nvml/worker.ts`, and started as a
   child process. Development runs its sources as they are;

@@ -107,7 +107,23 @@ export const SHOTS: Shot[] = [
   { name: 'setup', path: '/setup', readyText: 'Welcome to llama-webui', goneText: 'Checking…', manual: true },
   { name: 'dashboard', path: '/', readyText: 'Generation (tok/s)', live: true, delayMs: 4000 },
   { name: 'system', path: '/system', readyText: 'NVIDIA GeForce RTX 5070 Ti', live: true, delayMs: 4000 },
-  { name: 'topology', path: '/topology', readyText: 'Generating', live: true, delayMs: 6000 },
+  // The browser keeps the chosen view from one shot to the next: each one picks its own.
+  {
+    name: 'topology',
+    path: '/topology',
+    readyText: 'Generating',
+    prepare: (page) => clickButton(page, 'Cards'),
+    live: true,
+    delayMs: 6000,
+  },
+  {
+    name: 'topology-board',
+    path: '/topology',
+    readyText: 'Generating',
+    prepare: (page) => clickButton(page, 'Board'),
+    live: true,
+    delayMs: 6000,
+  },
   { name: 'server', path: '/server', readyText: 'Effective command' },
   {
     name: 'profiles',

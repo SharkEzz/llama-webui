@@ -91,7 +91,7 @@ const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, n
 ```
 
 `load` must stay a literal `import()` so that `vite build` can split the page into its own chunk: the initial bundle
-only holds the shell, and the Topology page's three.js scene only loads with that page. On the first load of a deep
+only holds the shell, and the code of a page only loads with that page. On the first load of a deep
 URL, `hydrateFallbackElement` renders `<AppLayout loading />`, the shell with a `PageSkeleton`, until the page's code
 arrives. Unknown paths render the placeholder page with "Page not found". A page that fails to load (its chunk gone
 after a new build) or to render shows the root route's `errorElement`, `RouteError`: the app's destructive alert, "This
@@ -345,27 +345,46 @@ sparkline without axes or legend. Three props serve the Dashboard's throughput c
 its parent (a flex column) instead of `height`, so a chart can take what is left of the viewport; `syncKey` shares
 the cursor between the charts that pass the same key; `legendTarget` mounts the legend in another element (one with
 the `ts-legend` class, here the card header). The circular gauges are SVG (`components/glass/Gauge.tsx`), and the Topology page
-draws its scene with react-three-fiber (`features/topology/`).
+is drawn in HTML and SVG, with one canvas for its streaks and no drawing library (`features/topology/`, below).
 
-## The Topology scene
+## The Topology page
 
-`features/topology/` keeps what is drawn apart from how it is computed:
+`features/topology/` keeps what is drawn apart from how it is computed. The page has two views of the same graph,
+**Cards** and **Board**: each is a pure placement (rectangles and routes in the drawing's own pixels) and a component
+that fills the blocks. Everything else is shared.
 
-| File                | Role                                                                                                                                                                                                     |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `flows.ts`          | Pure: projects the snapshot and the placement onto the graph. `linkFlows()` (throughput, share of the capacity, alert level), `linkBadge()`, `nodeLive()` (tank layers, labels, tooltip), `peerLinks()`. |
-| `layout.ts`         | Pure: where each block sits, the curve of each link (`linkPath()`, `peerPath()`) and the camera fit.                                                                                                     |
-| `smooth.ts`         | `Smoother` (per-key easing between two ticks, on the time between frames) and `flowVisual()`, the log scale of the streaks.                                                                              |
-| `pacing.ts`         | `FramePacer`: a frame only when something moves, at 60 fps for transitions, gestures and easing values, 30 for the streaks (their easing included) and the memory pulse, 20 for the drift alone.         |
-| `TopologyScene.tsx` | The three.js scene: tanks, CPU thread grid, tubes, streaks, peer-to-peer dots, and the `Projector` that anchors the DOM labels.                                                                          |
-| `Labels.tsx`        | DOM labels, link badges and the tooltip, positioned by the scene.                                                                                                                                        |
-| `Hud.tsx`           | The Phase and Model cards and the legend popover; `hudPrefs.ts` keeps the folded cards in `localStorage` (`llama-webui:topology-hud`).                                                                   |
+| File                             | Role                                                                                                                                                                                                                                       |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `flows.ts`                       | Pure: projects the snapshot and the placement onto the graph. `linkFlows()` (throughput, share of the capacity, alert level), `linkBadge()`, `linkSpecs()`, `nodeLive()` (layers of a bar, figures, details), `detailOf()`, `peerLinks()`. |
+| `geometry.ts`                    | Pure: `Rect`, `Route` (an SVG path, its length and evenly spaced points), `straight()`, `curve()`, `elbow()`, `join()`, the overlap and crossing checks the tests use, and `fitScale()` (75% to 150%).                                     |
+| `tree.ts`                        | Pure: the graph as a tree (`treeOf()`), and what a placement returns (`ViewLayout`: a rectangle per block, a route per link and per peer-to-peer link, the place of each label).                                                           |
+| `layoutCards.ts`                 | Pure: the Cards placement, rows of cards and curves.                                                                                                                                                                                       |
+| `layoutBoard.ts`                 | Pure: the Board placement, a socket, memory slots, GPU slots, drives and tracks at right angles that never cross.                                                                                                                          |
+| `streaks.ts`                     | The streaks. Pure: `intensity()` (the log scale), `makeLane()`, `streaksAt()`, `laneStates()`, `trackIntensity()`; and `createStreakLoop()`, the only animation loop of the page.                                                          |
+| `Stage.tsx`                      | The frame both views share: measures itself, scales the drawing, draws the links, their labels and the peer-to-peer links in SVG, and owns the canvas of the streaks.                                                                      |
+| `blocks.tsx`                     | What a block is made of: `Block` (a button), `Layers` (the memory bar), `FillPct`, `LoadBar`, `Threads`.                                                                                                                                   |
+| `CardsView.tsx`, `BoardView.tsx` | The two views: their placement handed to `Stage`, and the content of each block. `BoardView` also draws the board behind them.                                                                                                             |
+| `Detail.tsx`                     | The details of the selected block.                                                                                                                                                                                                         |
+| `Hud.tsx`                        | The Phase and Model cards and the legend popover.                                                                                                                                                                                          |
+| `viewPrefs.ts`                   | `useView()`: the chosen view, kept in `localStorage` (`llama-webui:topology-view`).                                                                                                                                                        |
+| `themeColors.ts`                 | `LAYER_TINT` and `tint()` (the shades of a GPU's layers, shared with the legend), `resolveColor()` (a CSS color as the browser computes it, for the canvas).                                                                               |
 
-Thresholds are named constants in `flows.ts` (`LINK_WARN`, `LINK_CRIT`, `FILL_WARN_PCT`, `FILL_CRIT_PCT`,
-`REST_BADGE_FLOOR_BPS`), which the legend reads too. Two rules hold the scene together: a tank's level is always the
-measured memory (the sizes from the logs only split it), and an alert color always has its figure written next to it.
-Colors are mixed by Three in linear space, where a little of a bright tone goes a long way: `LAYER_TINT`
-(`themeColors.ts`) is shared with the legend, which mixes its swatches in `srgb-linear` for the same result.
+Three rules hold the page together:
+
+- **A bar's level is always the measured memory**: the sizes from the logs only split it. An alert color always has
+  its figure written next to it. Thresholds are named constants in `flows.ts` (`LINK_WARN`, `LINK_CRIT`,
+  `FILL_WARN_PCT`, `FILL_CRIT_PCT`, `REST_FLOOR_BPS`), which the legend reads too.
+- **Nothing runs per frame but the streaks.** A monitor tick (1 Hz) renders the blocks, whose bars move by CSS
+  transitions in `steps()`: five paints for a change, not half a second of frames. The streaks are drawn on
+  one canvas at `STREAK_FPS` (20) by `createStreakLoop()`, which React hands the routes and, on each tick, the state of
+  each lane: the loop stops by itself when no lane carries anything, and with reduced motion it never starts (a busy
+  link is dashed instead). The canvas sits above the blocks, so a streak never makes the glass under it blur again.
+- **A placement is pure and tested as such** (`layouts.test.ts`, over the graphs of `fixtures.ts`): no two blocks
+  overlap, every link runs from one block to the other through no third, a label covers neither a block nor another
+  label, and on the board no two tracks cross.
+
+A block is a `<button>` with `aria-pressed`, the links and the canvas are `aria-hidden` and their figures are text:
+the drawing reads and works without the pointer.
 
 ## Code highlighting
 

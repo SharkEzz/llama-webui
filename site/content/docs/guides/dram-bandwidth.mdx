@@ -159,12 +159,12 @@ Topology page (see below), restart the server.
 
 ## Where the bandwidth appears
 
-| Place                                                                           | What you see                                                                                                                                         |
-| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [System](/docs/system/), **Memory** card                                        | The **DRAM bandwidth** row and a **Read** and **Write** chart over the history.                                                                      |
-| [Topology](/docs/topology/), scene                                              | Streaks on the link between the CPU and **Memory**: writes on one lane, reads on the other. The badge above **Memory** gives **read** and **write**. |
-| [Topology](/docs/topology/), **Memory** details                                 | **Read**, **Write** and **llama-server (DRAM)**, the traffic of `llama-server` alone.                                                                |
-| [First run](/docs/getting-started/first-run/) checklist, **GPUs and telemetry** | Under **DRAM bandwidth**: **Measured with perf.**                                                                                                    |
+| Place                                                                           | What you see                                                                                                                                    |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| [System](/docs/system/), **Memory** card                                        | The **DRAM bandwidth** row and a **Read** and **Write** chart over the history.                                                                 |
+| [Topology](/docs/topology/), drawing                                            | Streaks on the link between the CPU and **Memory**: writes on one lane, reads on the other. The label of the link gives **read** and **write**. |
+| [Topology](/docs/topology/), **Memory** details                                 | **Read**, **Write** and **llama-server (DRAM)**, the traffic of `llama-server` alone.                                                           |
+| [First run](/docs/getting-started/first-run/) checklist, **GPUs and telemetry** | Under **DRAM bandwidth**: **Measured with perf.**                                                                                               |
 
 ## Without perf
 
@@ -172,9 +172,10 @@ When the measurement is not available, because `perf` is missing, lacks permissi
 llama-webui keeps working and says so:
 
 - The **DRAM bandwidth** row of the System page reads **not measured (perf)**, and the bandwidth chart is not shown.
-- On the Topology page, the link between the CPU and memory pulses with CPU activity instead: the legend says **CPU ↔
-  memory pulse: CPU activity, for lack of a DRAM measurement (perf).** The **Memory** details read **Bandwidth: not
-  measured (perf): the link shows CPU activity**, and **DRAM read** and **DRAM write** show `—`.
+- On the Topology page, the link between the CPU and memory follows the CPU activity instead, without streaks: the
+  legend says **CPU ↔ memory: the link follows the CPU activity, without streaks, for lack of a DRAM measurement
+  (perf).** The **Memory** details read **Bandwidth: not measured (perf): the link shows CPU activity**, without
+  **Read** and **Write**.
 - The first-run checklist explains why. When `kernel.perf_event_paranoid` is above 0, it shows the two commands of the
   first option; otherwise it says the measurement needs `perf` and an AMD Zen 4/5 CPU.
 

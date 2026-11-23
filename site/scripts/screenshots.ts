@@ -51,8 +51,7 @@ const browser = await launch({
   executablePath: '/usr/bin/chromium',
   headless: true,
   defaultViewport: VIEWPORT,
-  // SwiftShader gives the Topology page (WebGL) a GPU-less renderer in headless mode.
-  args: ['--hide-scrollbars', '--force-color-profile=srgb', '--enable-unsafe-swiftshader'],
+  args: ['--hide-scrollbars', '--force-color-profile=srgb'],
 });
 
 try {

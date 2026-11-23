@@ -366,8 +366,7 @@ The web app and the site use React 19. The lint enforces the idioms below: the R
 
 - **What is never rendered is a ref.** `react/immutability` reports a value made during render and mutated afterwards,
   and react-doctor's `rerender-state-only-in-handlers` a state that only handlers read: hold either in a `useRef`. A ref
-  passed down as a prop is named `…Ref` (the rule recognises it by its name: `pacerRef` in
-  `features/topology/TopologyScene.tsx`).
+  passed down as a prop is named `…Ref` (the rule recognises it by its name).
 
 - **Zustand is read through selectors.** Two rules apply:
   - `react/hooks` reports `useStore.getState()` called where the component renders: its body, or a `useMemo` callback.
