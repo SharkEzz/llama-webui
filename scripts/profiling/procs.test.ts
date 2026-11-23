@@ -1,5 +1,8 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { cpuWindow, type ProcSample } from './procs.ts';
+import { cpuWindow, llamaServers, type ProcSample } from './procs.ts';
 
 /** A sample of one process per group (its pid is the group's name), unless a group's ticks are given per pid. */
 const sample = (
@@ -65,4 +68,24 @@ test('the GPU gauge is the mean of its readings', () => {
   const a = { ...sample(0, {}), gpuBusy: { '0000:0d:00.0': 40 } };
   const b = { ...sample(1000, {}), gpuBusy: { '0000:0d:00.0': 60 } };
   expect(cpuWindow([a, b], 100).gpuBusyPct['0000:0d:00.0']).toBe(50);
+});
+
+test('the llama-server processes are found by name, whoever started them', () => {
+  const proc = mkdtempSync(join(tmpdir(), 'profiling-proc-'));
+  try {
+    const add = (entry: string, comm: string | null) => {
+      mkdirSync(join(proc, entry));
+      if (comm !== null) writeFileSync(join(proc, entry, 'comm'), `${comm}\n`);
+    };
+    add('4200', 'llama-server');
+    add('17', 'llama-server');
+    add('18', 'llama-bench');
+    add('19', 'node');
+    // A process gone since the listing, and an entry that is not a process.
+    add('20', null);
+    add('self', 'llama-server');
+    expect(llamaServers(proc)).toEqual([17, 4200]);
+  } finally {
+    rmSync(proc, { recursive: true, force: true });
+  }
 });

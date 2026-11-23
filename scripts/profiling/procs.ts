@@ -18,6 +18,20 @@ export interface ProcSample {
   gpuBusy: Record<string, number>;
 }
 
+/** The pids of the processes named `llama-server`, whoever started them: a model scenario needs the GPUs to itself. */
+export function llamaServers(procRoot = '/proc'): number[] {
+  const pids: number[] = [];
+  for (const entry of readdirSync(procRoot)) {
+    if (!/^\d+$/.test(entry)) continue;
+    try {
+      if (readFileSync(`${procRoot}/${entry}/comm`, 'utf8').trim() === 'llama-server') pids.push(Number(entry));
+    } catch {
+      // gone in between
+    }
+  }
+  return pids.toSorted((a, b) => a - b);
+}
+
 export interface ProcRoots {
   server: number | null;
   chrome: number | null;

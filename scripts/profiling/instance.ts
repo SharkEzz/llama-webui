@@ -1,19 +1,15 @@
 // The app under measure: the production build (with hidden source maps), the server under the inspector, its API,
 // the profile, and the undo that leaves the instance as it was found.
-import { spawn } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync } from 'node:fs';
+import { type ChildProcess, spawn } from 'node:child_process';
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, statSync } from 'node:fs';
 import { connect } from 'node:net';
-import { basename, join, resolve } from 'node:path';
+import { basename, join } from 'node:path';
 import { Cdp } from './cdp.ts';
+import { removeDataCopy } from './datadir.ts';
 import { arr, isRecord, num, parseJson, str } from './json.ts';
 import { type Options, UsageError } from './options.ts';
 import { EMPTY_STATE, type RunDir, type State } from './run-dir.ts';
-
-export const REPO = resolve(import.meta.dirname, '../..');
-const APP = join(REPO, 'app');
-const OUTPUT = join(APP, '.output');
-export const LAUNCHER = join(OUTPUT, 'llama-webui.mjs');
-export const SERVER_BUNDLE = join(OUTPUT, 'server/index.mjs');
+import { INSTALL_ARGS, removeWorktree, REPO, type Target, worktreeAddArgs } from './target.ts';
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 export const now = (): number => performance.now();
@@ -131,12 +127,25 @@ export async function waitHealth(baseUrl: string, timeoutMs: number): Promise<bo
 export const baseUrlOf = (host: string, port: number): string =>
   `http://${host.includes(':') ? `[${host}]` : host}:${String(port)}`;
 
+/** The commands of a checkout, an install or a build still running. */
+const commands = new Set<ChildProcess>();
+
+/** Stops the command of a checkout, an install or a build still running: a signal to the tool alone does not reach it. */
+export function stopCommands(): void {
+  for (const child of commands) child.kill('SIGTERM');
+}
+
 function exec(cmd: string, args: string[], cwd: string, log: string): Promise<void> {
   const fd = openSync(log, 'a');
   return new Promise<void>((done, fail) => {
     const child = spawn(cmd, args, { cwd, stdio: ['ignore', fd, fd] });
-    child.once('error', fail);
+    commands.add(child);
+    child.once('error', (error) => {
+      commands.delete(child);
+      fail(error);
+    });
     child.once('exit', (code, signal) => {
+      commands.delete(child);
       closeSync(fd);
       if (code === 0) done();
       else fail(new Error(`${cmd} ${args.join(' ')} failed (${signal ?? `exit ${String(code)}`}): see ${log}`));
@@ -151,22 +160,35 @@ function mapsUnder(dir: string): string[] {
 }
 
 /**
- * The normal production build with hidden source maps, whose maps are then moved into the run: `app/.output` ends with
- * the same files as after `pnpm build`. Without `build`, the existing build is used and page functions stay minified.
+ * Checks `commit` out in a worktree at the target's root and installs it. The path is written to the run's state
+ * first: the undo removes the worktree, whatever was done in it.
  */
-export async function prepareBuild(run: RunDir, build: boolean): Promise<{ symbolicated: boolean }> {
+export async function checkoutBase(run: RunDir, target: Target, commit: string): Promise<void> {
+  mkdirSync(run.path, { recursive: true });
+  const log = run.file('build.log');
+  run.writeState({ ...run.readState(), worktree: target.root });
+  await exec('git', worktreeAddArgs(target.root, commit), REPO, log);
+  await exec('pnpm', INSTALL_ARGS, target.root, log);
+}
+
+/**
+ * The normal production build of a target with hidden source maps, whose maps are then moved into the run: its
+ * `app/.output` ends with the same files as after `pnpm build`. Without `build`, the existing build is used and page
+ * functions stay minified.
+ */
+export async function prepareBuild(run: RunDir, build: boolean, target: Target): Promise<{ symbolicated: boolean }> {
   if (!build) {
-    if (!existsSync(LAUNCHER))
-      throw new UsageError(`--no-build: there is no build to reuse (${LAUNCHER}): run pnpm build`);
+    if (!existsSync(target.launcher))
+      throw new UsageError(`--no-build: there is no build to reuse (${target.launcher}): run pnpm build`);
     return { symbolicated: false };
   }
   mkdirSync(run.path, { recursive: true });
   const log = run.file('build.log');
-  await exec('pnpm', ['exec', 'vite', 'build', '--sourcemap', 'hidden'], APP, log);
-  await exec(process.execPath, ['build/server.ts'], APP, log);
-  const target = run.file('sourcemaps');
-  mkdirSync(target, { recursive: true });
-  for (const map of mapsUnder(OUTPUT)) renameSync(map, join(target, basename(map)));
+  await exec('pnpm', ['exec', 'vite', 'build', '--sourcemap', 'hidden'], target.app, log);
+  await exec(process.execPath, ['build/server.ts'], target.app, log);
+  const maps = run.file('sourcemaps');
+  mkdirSync(maps, { recursive: true });
+  for (const map of mapsUnder(target.output)) renameSync(map, join(maps, basename(map)));
   return { symbolicated: true };
 }
 
@@ -182,10 +204,15 @@ export interface Instance {
   stop: () => Promise<void>;
 }
 
-async function inspectorUrl(log: string, pid: number, timeoutMs: number): Promise<string> {
+/**
+ * The inspector's address a server wrote to its log, read from `from` on: a run's log holds every start of its server
+ * (the short one that reads the default profile, then the measured one), each with its own address.
+ */
+export async function inspectorUrl(log: string, from: number, pid: number, timeoutMs: number): Promise<string> {
   const end = now() + timeoutMs;
   while (now() < end) {
-    const url = /Debugger listening on (ws:\/\/\S+)/.exec(existsSync(log) ? readFileSync(log, 'utf8') : '')?.[1];
+    const written = existsSync(log) ? readFileSync(log).subarray(from).toString('utf8') : '';
+    const url = /Debugger listening on (ws:\/\/\S+)/.exec(written)?.[1];
     if (url !== undefined) return url;
     if (!alive(pid)) break;
     await sleep(20);
@@ -199,13 +226,18 @@ export async function defaultProfileId(baseUrl: string): Promise<number | null> 
   return isRecord(settings) && typeof settings.defaultProfileId === 'number' ? settings.defaultProfileId : null;
 }
 
-export async function startInstance(run: RunDir, options: Options): Promise<Instance> {
+/**
+ * Starts the server of a target's build. Its working directory is the repository whatever the target, so both sides
+ * of a `--base` run read the same `.env`.
+ */
+export async function startInstance(run: RunDir, options: Options, target: Target): Promise<Instance> {
   if (await portAnswers(options.host, options.port))
     throw new UsageError(`port ${String(options.port)} is in use: stop the instance that runs there first`);
   const baseUrl = baseUrlOf(options.host, options.port);
   const log = run.file('server.log');
-  const args = ['--inspect=127.0.0.1:0', LAUNCHER, '--host', options.host, '--port', String(options.port)];
+  const args = ['--inspect=127.0.0.1:0', target.launcher, '--host', options.host, '--port', String(options.port)];
   if (options.dataDir !== null) args.push('--data-dir', options.dataDir);
+  const logged = existsSync(log) ? statSync(log).size : 0;
   const fd = openSync(log, 'a');
   const child = spawn(process.execPath, args, { cwd: REPO, detached: true, stdio: ['ignore', fd, fd] });
   closeSync(fd);
@@ -213,7 +245,7 @@ export async function startInstance(run: RunDir, options: Options): Promise<Inst
   const pid = child.pid;
   if (pid === undefined) throw new Error('the server did not spawn');
   run.writeState({ ...run.readState(), serverPid: pid, serverStart: startTime(pid) });
-  const inspector = await Cdp.connect(await inspectorUrl(log, pid, 10_000));
+  const inspector = await Cdp.connect(await inspectorUrl(log, logged, pid, 10_000));
   if (!(await waitHealth(baseUrl, 30_000))) throw new Error(`the server did not answer /api/health: see ${log}`);
   const api = (path: string, init?: { method?: string; body?: unknown }) => request(baseUrl, path, init);
 
@@ -291,7 +323,9 @@ const isEmpty = (s: State) =>
   s.chromePid === null &&
   s.conversations.length === 0 &&
   s.restoreDefaultProfile === null &&
-  !s.profileStarted;
+  !s.profileStarted &&
+  s.worktree === null &&
+  !s.dataCopy;
 
 /** What an undo did, one line per thing, and what it could not do. */
 export interface Undone {
@@ -301,7 +335,7 @@ export interface Undone {
 
 /**
  * Undoes what a run's state.json lists. Each step stands alone: one that fails is reported and the next ones still run,
- * Chromium and the server last. The API is called, and a process signalled, only when the process the state recorded
+ * Chromium and the server, then the worktree of a base and the copy of the data directory, last. The API is called, and a process signalled, only when the process the state recorded
  * still runs (same pid, same start time): never a pid reused since, nor an instance started after the run.
  */
 export async function undo(run: RunDir): Promise<Undone> {
@@ -378,6 +412,19 @@ export async function undo(run: RunDir): Promise<Undone> {
       out.done.push(`stopped the server (pid ${String(server.serverPid)})`);
     patch({ serverPid: null, serverStart: null });
   });
+  const { worktree } = run.readState();
+  if (worktree !== null)
+    await step('remove the base worktree', () => {
+      removeWorktree(worktree);
+      out.done.push(`removed the base worktree (${worktree})`);
+      return Promise.resolve();
+    });
+  if (run.readState().dataCopy)
+    await step('remove the copy of the data directory', () => {
+      removeDataCopy(run);
+      out.done.push('removed the copy of the data directory');
+      return Promise.resolve();
+    });
   run.writeState({ ...EMPTY_STATE });
   return out;
 }

@@ -1,8 +1,9 @@
 // launch: the profile started with the Dashboard open, until llama-server is ready, plus its first snapshots.
 import { openPage } from '../browser.ts';
-import { REPO, sleep } from '../instance.ts';
+import { sleep } from '../instance.ts';
 import { measure, type Scenario } from '../measure.ts';
 import { evict, profileFiles, residentPct } from '../pagecache.ts';
+import { REPO } from '../target.ts';
 
 export const launch: Scenario<'launch'> = {
   name: 'launch',

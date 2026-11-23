@@ -1,0 +1,151 @@
+# The `/profiling` comment command: measures a pull request against its base on the maintainer's machine, and answers on
+# the pull request with the comparison (docs: site/content/developers/contributing/profiling.mdx). A workflow started by
+# a comment runs from the default branch: a change to this file takes effect once it is merged.
+#
+# The job builds and runs the pull request's code on a self-hosted runner. It runs only for a comment written by the
+# owner or a collaborator, refuses a pull request from a fork, and no other workflow uses the `profiling` label.
+name: Profiling
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+# One pass at a time on the machine. A newer comment never cancels a pass in progress; GitHub keeps one waiting run per
+# group, so a third comment replaces the second while the first still runs.
+concurrency:
+  group: profiling
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  profiling:
+    name: /profiling
+    if: >-
+      github.event.issue.pull_request
+      && startsWith(github.event.comment.body, '/profiling')
+      && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: [self-hosted, profiling]
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      PR: ${{ github.event.issue.number }}
+      PROFILING_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Read the pull request
+        id: pr
+        env:
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          gh api "repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions" -f content=eyes --silent || true
+          gh pr view "$PR" --json headRefOid,baseRefName,isCrossRepository \
+            --jq '"sha=\(.headRefOid)", "base=\(.baseRefName)", "fork=\(.isCrossRepository)"' >> "$GITHUB_OUTPUT"
+
+      - name: Refuse a pull request from a fork
+        if: steps.pr.outputs.fork != 'false'
+        run: |
+          gh pr comment "$PR" --body '`/profiling` does not measure a pull request from a fork: the job would build and run its code on the maintainer'"'"'s machine. Push the branch to this repository to measure it.'
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+          fetch-depth: 0 # the base's commit, and the tags the build's version comes from
+          # .cache/profiling holds the state of a pass that was killed: the next one undoes it before it starts.
+          clean: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.13
+      - run: pnpm install --frozen-lockfile
+
+      # The comment's words never reach a shell as they are: comment.ts lets through scenario names, `--profile` and
+      # digits, and answers anything else with the usage.
+      - name: Read the comment
+        id: comment
+        env:
+          PROFILING_COMMENT: ${{ github.event.comment.body }}
+        run: |
+          if ! args=$(node scripts/profiling/comment.ts args 2> "$RUNNER_TEMP/usage.md"); then
+            gh pr comment "$PR" --body-file "$RUNNER_TEMP/usage.md"
+            exit 1
+          fi
+          echo "args=$args" >> "$GITHUB_OUTPUT"
+
+      - name: Measure the base, then the pull request
+        id: measure
+        env:
+          ARGS: ${{ steps.comment.outputs.args }}
+          BASE: ${{ steps.pr.outputs.base }}
+          PORT: ${{ vars.PROFILING_PORT || '7870' }}
+          DATA_DIR: ${{ vars.PROFILING_DATA_DIR }}
+        run: |
+          set +e
+          name="pr-$PR-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          # $ARGS is split into words on purpose (see "Read the comment").
+          node scripts/profiling/cli.ts $ARGS --base "origin/$BASE" --name "$name" --port "$PORT" \
+            ${DATA_DIR:+--data-dir "$DATA_DIR"} 2>&1 | tee "$RUNNER_TEMP/profiling.log"
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      # The head's report holds the comparison. One file, not zipped: the download opens in a browser as it is. It names
+      # the machine (CPU, GPUs, memory, kernel) and the profile, and no path but one a failed scenario's message may hold; whoever can read the repository can download it.
+      - name: Upload the report
+        id: report
+        if: always() && steps.measure.outputs.exit != ''
+        uses: actions/upload-artifact@v7
+        with:
+          path: .cache/profiling/${{ steps.measure.outputs.name }}/report.html
+          archive: false
+          if-no-files-found: ignore
+          overwrite: true # a job run again uploads under the same name
+
+      - name: Answer on the pull request
+        if: always() && steps.pr.outputs.fork == 'false' && steps.comment.outcome != 'failure'
+        env:
+          PROFILING_RUN: ${{ steps.measure.outputs.name }}
+          PROFILING_EXIT: ${{ steps.measure.outputs.exit }}
+          PROFILING_LOG: ${{ runner.temp }}/profiling.log
+          PROFILING_SHA: ${{ steps.pr.outputs.sha }}
+          PROFILING_BASE: ${{ steps.pr.outputs.base }}
+          PROFILING_DATA_DIR: ${{ vars.PROFILING_DATA_DIR }}
+          PROFILING_REPORT_URL: ${{ steps.report.outputs.artifact-url }}
+        run: |
+          if ! node scripts/profiling/comment.ts reply > "$RUNNER_TEMP/reply.md"; then
+            echo '`/profiling` failed before it could answer: see the [workflow run]('"$PROFILING_RUN_URL"').' > "$RUNNER_TEMP/reply.md"
+          fi
+          gh pr comment "$PR" --body-file "$RUNNER_TEMP/reply.md"
+
+      # The raw results are not uploaded: with the reports, they are kept in the folder a repository variable names.
+      - name: Keep the reports on the machine
+        if: always() && steps.measure.outputs.exit != '' && vars.PROFILING_REPORTS_DIR != ''
+        env:
+          NAME: ${{ steps.measure.outputs.name }}
+          REPORTS_DIR: ${{ vars.PROFILING_REPORTS_DIR }}
+        run: |
+          for run in "$NAME" "$NAME.base"; do
+            [ -f ".cache/profiling/$run/results.json" ] || continue
+            mkdir -p "$REPORTS_DIR/$run"
+            for file in report.html results.json run.json summary.md; do
+              if [ -f ".cache/profiling/$run/$file" ]; then cp ".cache/profiling/$run/$file" "$REPORTS_DIR/$run/"; fi
+            done
+          done
+
+      # Once the command has ended, it has undone what it started: its folders hold only raw data.
+      - name: Remove the runs' folders
+        if: always() && steps.measure.outputs.exit != ''
+        env:
+          NAME: ${{ steps.measure.outputs.name }}
+        run: rm -rf ".cache/profiling/$NAME" ".cache/profiling/$NAME.base"
+
+      - name: Fail when the pass did
+        if: steps.measure.outputs.exit != '0'
+        run: exit 1

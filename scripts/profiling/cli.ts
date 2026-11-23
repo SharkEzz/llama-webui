@@ -5,8 +5,9 @@ import { listScenarios, type Options, parseOptions, UsageError, USAGE } from './
 import { renderReport } from './report/render.ts';
 import { runDir } from './run-dir.ts';
 import { runCommand } from './run.ts';
+import { summary } from './summary.ts';
 
-/** Rewrites a run's report from its results.json, against a reference run when asked. */
+/** Rewrites a run's report from its results.json, and its summary.md against a reference run when asked. */
 function report(options: Options): number {
   const dir = runDir(options.name);
   if (!dir.exists()) {
@@ -24,7 +25,9 @@ function report(options: Options): number {
       return 1;
     }
     try {
-      comparison = compare(results, ref.readResults());
+      const reference = ref.readResults();
+      comparison = compare(results, reference);
+      writeFileSync(dir.file('summary.md'), summary(results, reference, comparison));
     } catch (error) {
       if (error instanceof VersionMismatch) {
         process.stderr.write(`profiling: ${error.message}\n`);

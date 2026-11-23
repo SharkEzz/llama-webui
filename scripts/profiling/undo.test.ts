@@ -1,10 +1,14 @@
-import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { alive, startTime, terminate, undo } from './instance.ts';
+import { copyDataDir, dataCopyOf } from './datadir.ts';
+import { alive, inspectorUrl, startTime, terminate, undo } from './instance.ts';
 import { EMPTY_STATE, runDir } from './run-dir.ts';
+import { worktreeAddArgs } from './target.ts';
 
 const cleanups: (() => Promise<void> | void)[] = [];
 afterEach(async () => {
@@ -76,4 +80,58 @@ test('a pid reused by another process is neither signalled nor its port called',
   await undo(run);
   expect(api.requests()).toBe(0);
   expect(alive(other.pid)).toBe(true);
+});
+
+test('the worktree of a base and the copy of the data directory are removed, with no server left to call', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'profiling-undo-'));
+  cleanups.push(() => rmSync(root, { recursive: true, force: true }));
+  const repo = join(root, 'repo');
+  mkdirSync(repo);
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  git('init', '-q', '-b', 'main');
+  writeFileSync(join(repo, 'file.txt'), 'one\n');
+  git('add', '.');
+  git('-c', 'user.name=test', '-c', 'user.email=test@example.invalid', 'commit', '-q', '-m', 'one');
+  const worktree = join(root, 'base');
+  execFileSync('git', worktreeAddArgs(worktree, git('rev-parse', 'HEAD'), repo), { stdio: 'ignore' });
+
+  const api = await failingApi();
+  const run = tempRun(api.port);
+  copyDataDir(run, repo);
+  run.writeState({ ...run.readState(), worktree });
+  const out = await undo(run);
+  expect(out.failed).toEqual([]);
+  expect(out.done).toEqual([`removed the base worktree (${worktree})`, 'removed the copy of the data directory']);
+  expect(existsSync(worktree)).toBe(false);
+  expect(existsSync(dataCopyOf(run))).toBe(false);
+  expect(git('worktree', 'list').split('\n')).toHaveLength(1);
+  expect(api.requests()).toBe(0);
+  expect(run.readState()).toEqual(EMPTY_STATE);
+});
+
+test('a worktree that cannot be removed is reported, and the rest is still undone', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'profiling-undo-'));
+  cleanups.push(() => rmSync(folder, { recursive: true, force: true }));
+  const api = await failingApi();
+  const run = tempRun(api.port);
+  copyDataDir(run, folder);
+  run.writeState({ ...run.readState(), worktree: folder });
+  const out = await undo(run);
+  expect(out.failed).toHaveLength(1);
+  expect(out.failed[0]).toContain('could not remove the base worktree');
+  expect(existsSync(folder)).toBe(true);
+  expect(existsSync(dataCopyOf(run))).toBe(false);
+});
+
+test("the inspector of a second start in the same log is the one read, not the first start's", async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'profiling-log-'));
+  cleanups.push(() => rmSync(folder, { recursive: true, force: true }));
+  const log = join(folder, 'server.log');
+  writeFileSync(log, 'Debugger listening on ws://127.0.0.1:1111/first\nDebugger ending on ws://127.0.0.1:1111/first\n');
+  const from = statSync(log).size;
+  appendFileSync(log, 'Debugger listening on ws://127.0.0.1:2222/second\nFor help, see: https://nodejs.org\n');
+  await expect(inspectorUrl(log, from, process.pid, 1000)).resolves.toBe('ws://127.0.0.1:2222/second');
+  await expect(inspectorUrl(log, 0, process.pid, 1000)).resolves.toBe('ws://127.0.0.1:1111/first');
+  await expect(inspectorUrl(log, statSync(log).size, process.pid, 50)).rejects.toThrow('did not open its inspector');
 });
