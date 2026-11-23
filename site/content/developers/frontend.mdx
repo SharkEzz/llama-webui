@@ -353,21 +353,21 @@ is drawn in HTML and SVG, with one canvas for its streaks and no drawing library
 **Cards** and **Board**: each is a pure placement (rectangles and routes in the drawing's own pixels) and a component
 that fills the blocks. Everything else is shared.
 
-| File                             | Role                                                                                                                                                                                                                                       |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `flows.ts`                       | Pure: projects the snapshot and the placement onto the graph. `linkFlows()` (throughput, share of the capacity, alert level), `linkBadge()`, `linkSpecs()`, `nodeLive()` (layers of a bar, figures, details), `detailOf()`, `peerLinks()`. |
-| `geometry.ts`                    | Pure: `Rect`, `Route` (an SVG path, its length and evenly spaced points), `straight()`, `curve()`, `elbow()`, `join()`, the overlap and crossing checks the tests use, and `fitScale()` (75% to 150%).                                     |
-| `tree.ts`                        | Pure: the graph as a tree (`treeOf()`), and what a placement returns (`ViewLayout`: a rectangle per block, a route per link and per peer-to-peer link, the place of each label).                                                           |
-| `layoutCards.ts`                 | Pure: the Cards placement, rows of cards and curves.                                                                                                                                                                                       |
-| `layoutBoard.ts`                 | Pure: the Board placement, a socket, memory slots, GPU slots, drives and tracks at right angles that never cross.                                                                                                                          |
-| `streaks.ts`                     | The streaks. Pure: `intensity()` (the log scale), `makeLane()`, `streaksAt()`, `laneStates()`, `trackIntensity()`; and `createStreakLoop()`, the only animation loop of the page.                                                          |
-| `Stage.tsx`                      | The frame both views share: measures itself, scales the drawing, draws the links, their labels and the peer-to-peer links in SVG, and owns the canvas of the streaks.                                                                      |
-| `blocks.tsx`                     | What a block is made of: `Block` (a button), `Layers` (the memory bar), `FillPct`, `LoadBar`, `Threads`.                                                                                                                                   |
-| `CardsView.tsx`, `BoardView.tsx` | The two views: their placement handed to `Stage`, and the content of each block. `BoardView` also draws the board behind them.                                                                                                             |
-| `Detail.tsx`                     | The details of the selected block.                                                                                                                                                                                                         |
-| `Hud.tsx`                        | The Phase and Model cards and the legend popover.                                                                                                                                                                                          |
-| `viewPrefs.ts`                   | `useView()`: the chosen view, kept in `localStorage` (`llama-webui:topology-view`).                                                                                                                                                        |
-| `themeColors.ts`                 | `LAYER_TINT` and `tint()` (the shades of a GPU's layers, shared with the legend), `resolveColor()` (a CSS color as the browser computes it, for the canvas).                                                                               |
+| File                             | Role                                                                                                                                                                                                                                                                                               |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flows.ts`                       | Pure: projects the snapshot and the placement onto the graph. `linkFlows()` (throughput, share of the capacity, alert level), `linkBadge()`, `linkSpecs()`, `nodeLive()` (layers of a bar, figures, details), `detailOf()`, `peerLinks()`.                                                         |
+| `geometry.ts`                    | Pure: `Rect`, `Route` (an SVG path, its length and evenly spaced points), `straight()`, `curve()`, `elbow()`, `join()`, the overlap and crossing checks the tests use, `fitScale()` (the drawing takes its frame, from half to twice its size) and `columnAtRight()` (where the side column goes). |
+| `tree.ts`                        | Pure: the graph as a tree (`treeOf()`), and what a placement returns (`ViewLayout`: a rectangle per block, a route per link and per peer-to-peer link, the place of each label).                                                                                                                   |
+| `layoutCards.ts`                 | Pure: the Cards placement, rows of cards and curves.                                                                                                                                                                                                                                               |
+| `layoutBoard.ts`                 | Pure: the Board placement, a socket, memory slots, GPU slots, drives and tracks at right angles that never cross.                                                                                                                                                                                  |
+| `streaks.ts`                     | The streaks. Pure: `intensity()` (the log scale), `makeLane()`, `streaksAt()`, `laneStates()`, `trackIntensity()`; and `createStreakLoop()`, the only animation loop of the page.                                                                                                                  |
+| `Stage.tsx`                      | The frame both views share: measures itself, scales the drawing, draws the links, their labels and the peer-to-peer links in SVG, and owns the canvas of the streaks.                                                                                                                              |
+| `blocks.tsx`                     | What a block is made of: `Block` (a button), `Layers` (the memory bar), `FillPct`, `LoadBar`, `Threads`.                                                                                                                                                                                           |
+| `CardsView.tsx`, `BoardView.tsx` | The two views: their placement handed to `Stage`, and the content of each block. `BoardView` also draws the board behind them.                                                                                                                                                                     |
+| `Detail.tsx`, `detailPopover.ts` | The details of a block, in one popover: every block is a trigger of its handle (Base UI's detached triggers), with its id as payload.                                                                                                                                                              |
+| `Hud.tsx`                        | The Phase and Model cards and the legend popover.                                                                                                                                                                                                                                                  |
+| `viewPrefs.ts`                   | `useView()`: the chosen view, kept in `localStorage` (`llama-webui:topology-view`).                                                                                                                                                                                                                |
+| `themeColors.ts`                 | `LAYER_TINT` and `tint()` (the shades of a GPU's layers, shared with the legend), `resolveColor()` (a CSS color as the browser computes it, for the canvas).                                                                                                                                       |
 
 Three rules hold the page together:
 
@@ -383,8 +383,12 @@ Three rules hold the page together:
   overlap, every link runs from one block to the other through no third, the anchor of a label is clear of the blocks
   and of the other labels, and on the board no two tracks cross.
 
-A block is a `<button>` with `aria-pressed`, the links and the canvas are `aria-hidden` and their figures are text:
-the drawing reads and works without the pointer.
+A block is a `<button>` that opens the popover of its details (`aria-expanded`), the links and the canvas are
+`aria-hidden` and their figures are text: the drawing reads and works without the pointer.
+
+The drawing never scrolls in a window large enough to read it: `Stage` scales it to its frame. `TopologyPage` gives
+that frame the first screen of the page, and puts the side column at its right only when `columnAtRight()` says the
+drawing loses nothing to it; otherwise the column comes after the drawing, and the page scrolls to it.
 
 ## Code highlighting
 

@@ -60,6 +60,7 @@ try {
     for (const shot of shots) {
       const page = await browser.newPage();
       try {
+        if (shot.viewport) await page.setViewport({ ...VIEWPORT, ...shot.viewport });
         if (!shot.motion) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
         await page.goto(`${base}${shot.path}`, { waitUntil: 'networkidle2' });
         if (shot.readyText) await page.waitForSelector(`::-p-text(${shot.readyText})`, { timeout: 15_000 });

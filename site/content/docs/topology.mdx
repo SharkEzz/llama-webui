@@ -45,8 +45,9 @@ drives and other PCIe devices are not.
 Each GPU gets its own color, used again in the legend and the model split. The CPU uses the accent color and the
 memory its own; drives and chipsets are neutral.
 
-The drawing takes the room it has: it grows on a large screen (up to 150%) and shrinks on a small one (down to 75%),
-then scrolls inside its frame. There is nothing to rotate or zoom.
+The drawing takes the room it has and always shows whole: it grows on a large screen (up to twice its size) and
+shrinks with the window, without scrolling. Only a window too small to read it at half its size makes it scroll.
+There is nothing to rotate or zoom.
 
 ## The blocks
 
@@ -91,9 +92,10 @@ The tiles of the CPU show how many threads work, not only the average.
 
 ### Details
 
-Select a block, with a click or with <Kbd>Enter</Kbd> once it has the focus, to open all its figures in the column
-beside the drawing. The block stays outlined while its details are open, and they follow you from one view to the
-other. Select it again, press <Kbd>Esc</Kbd> or use **Close the details** to close them.
+Select a block, with a click or with <Kbd>Enter</Kbd> once it has the focus, to open all its figures beside it.
+The block stays outlined while its details are open, and they keep following the measurements. Select another
+block to move them there. Select the block again, press <Kbd>Esc</Kbd>, click elsewhere or use **Close the
+details** to close them.
 
 | Block      | Details                                                                                                                                                                                                                                                                                                                               |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -190,9 +192,10 @@ card's own PCIe link.
 
 ## The side column
 
-A column holds the title and the view control, the details of the selected block, then the **Phase** and **Model**
-cards and the legend. It stands at the right of the drawing on a wide window, and under it on a narrower one, where selecting a
-block scrolls the page to its details.
+A column holds the title and the view control, then the **Phase** and **Model** cards and the legend. It stands at
+the right of the drawing when that leaves the drawing its full size, or when the drawing is limited by the height of
+the window anyway. Otherwise the drawing takes the whole width of the page and the cards come after it: scroll the
+page to read them. The two views do not have the same shape, so the column can move when you switch.
 
 ### Phase
 
@@ -267,7 +270,7 @@ instead, and the legend says **Reduced motion: no streaks, a busy link is dashed
 ## Keyboard
 
 Every block is a button: <Kbd>Tab</Kbd> goes from one to the next, <Kbd>Enter</Kbd> or <Kbd>Space</Kbd> opens its
-details and <Kbd>Esc</Kbd> closes them. **Close the details** gives the focus back to the block.
+details and moves the focus into them, and <Kbd>Esc</Kbd> closes them and gives the focus back to the block.
 
 ## If the hardware cannot be read
 
