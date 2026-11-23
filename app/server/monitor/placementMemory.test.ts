@@ -1,3 +1,4 @@
+import { Array as Arr } from 'effect';
 import type { ModelMemory } from 'llamacpp-js/models';
 import { describe, expect, test } from 'vitest';
 import { placementFromMemory } from './placementMemory.ts';
@@ -12,6 +13,23 @@ const sampleMemory: ModelMemory = {
 };
 
 describe('placementFromMemory', () => {
+  test('keeps remote RPC buffers unmapped while still resolving a local Vulkan GPU', () => {
+    const placement = placementFromMemory({
+      memory: {
+        n_ctx: 8192,
+        devices: [
+          { kind: 'device', name: 'RPC0', model: 12_000, context: 1500, compute: 500 },
+          { kind: 'device', name: 'Vulkan0', model: 4000, context: 500, compute: 250 },
+        ],
+      },
+      gpus: [{ busId: '0000:01:00.0', vendor: 'amd' }],
+    });
+    expect(Arr.map(placement?.buffers ?? [], ({ device, busId }) => ({ device, busId }))).toEqual([
+      { device: 'RPC0', busId: null },
+      { device: 'Vulkan0', busId: '0000:01:00.0' },
+    ]);
+  });
+
   test('converts non-zero devices to PlacementBuffers and matches an unambiguous single GPU', () => {
     const p = placementFromMemory({
       memory: sampleMemory,

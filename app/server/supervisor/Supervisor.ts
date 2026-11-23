@@ -20,16 +20,18 @@ import {
   Option,
   type Path,
   PubSub,
+  Schema,
   Scope,
   Semaphore,
   Stream,
   SynchronizedRef,
 } from 'effect';
 import { ChildProcess, type ChildProcessSpawner } from 'effect/process';
+import { probeUrl } from 'llamacpp-js/client';
 import type { ModelMemory, ModelsSseEvent } from 'llamacpp-js/models';
 import type { LlamaHttp } from '../llama/LlamaHttp.ts';
 import { sanitizeLoadProgress, streamModelsSse } from '../llama/modelsSse.ts';
-import { health, isLlamaServer } from '../llama/probes.ts';
+import { health, isLlamaServer, props } from '../llama/probes.ts';
 import { findLlamaServerPid, isAlive } from '../llama/procScan.ts';
 import { isIdleNoise, linesOf } from '../logs/lines.ts';
 import { LogRing } from '../logs/LogRing.ts';
@@ -74,6 +76,8 @@ const launchedOf = (cmd: BuiltCommand, pid: number) => ({
 const isSameExternal = (state: ServerState, port: number, pid: number | null): boolean =>
   state.kind === 'external' && state.port === port && state.pid === pid;
 
+const isServerProps = Schema.is(Schema.Struct({ role: Schema.optionalKey(Schema.String) }));
+
 /** The llama-server llama-webui runs: its state, one lifecycle operation at a time, the process in a scope of its own. */
 export class Supervisor extends Context.Service<
   Supervisor,
@@ -101,7 +105,7 @@ export class Supervisor extends Context.Service<
 >()('@llama-webui/app/server/supervisor/Supervisor') {
   /**
    * The supervisor: a stop sends SIGTERM, then SIGKILL after `killTimeout`; a starting server follows `/models/sse`
-   * (single-model mode, llama.cpp PR #32398) and falls back to polling `/health` every `healthPoll` on older builds;
+   * (single-model mode, llama.cpp PR #32398) while polling `/health` every `healthPoll` during cold startup;
    * the pid of a server started by hand is read from `procRoot`. The end of the layer stops the managed server; an
    * exit of llama-webui without its finalizers kills it (SIGKILL).
    */
@@ -271,33 +275,29 @@ export class Supervisor extends Context.Service<
             Effect.ignore,
           );
 
-        /** `/health` of `running` once: transitions `starting` → `ready` on 200; answers whether it is ready. */
-        const probeReady = Effect.fnUntraced(function* (running: Running) {
-          const status = yield* health({ host: running.cmd.host, port: running.cmd.port });
-          if (Option.getOrNull(status) !== 200) return false;
-          const since = yield* Clock.currentTimeMillis;
-          yield* change((now) =>
-            isThis(running)(now) && now.state.kind === 'starting'
-              ? Option.some({
-                  ...now,
-                  state: { kind: 'ready', ...launchedOf(running.cmd, running.program.handle.pid), since },
-                })
-              : Option.none(),
-          );
-          return true;
-        });
-
-        /** Fallback for older llama-server builds without single-model `/models/sse`: polls `/health` until 200. */
-        const pollHealth = (running: Running) =>
-          probeReady(running).pipe(
-            Effect.delay(options.healthPoll),
-            Effect.repeat({
-              until: (ready) => ready,
-              while: () =>
-                Effect.map(SynchronizedRef.get(held), (now) => isThis(running)(now) && now.state.kind === 'starting'),
-            }),
-            Effect.provideContext(context),
-          );
+        /** Polls independently of SSE during cold startup. A wakeup relies on SSE because /health also answers in sleep. */
+        const pollStartup = Effect.fnUntraced(function* (running: Running, startedAt: number) {
+          const target = { host: running.cmd.host, port: running.cmd.port };
+          const isColdStart = (now: Held) =>
+            isThis(running)(now) && now.state.kind === 'starting' && now.state.since === startedAt;
+          for (;;) {
+            yield* Effect.sleep(options.healthPoll);
+            const current = yield* SynchronizedRef.get(held);
+            if (!isColdStart(current)) return;
+            const status = yield* health(target);
+            if (!Option.contains(status, 200)) continue;
+            const since = yield* Clock.currentTimeMillis;
+            yield* change((now) =>
+              isColdStart(now)
+                ? Option.some({
+                    ...now,
+                    state: { kind: 'ready', ...launchedOf(running.cmd, running.program.handle.pid), since },
+                  })
+                : Option.none(),
+            );
+            return;
+          }
+        }, Effect.provideContext(context));
 
         /** Applies one `/models/sse` event to a managed server's state and memory. */
         const applyManagedEvent = Effect.fnUntraced(function* (running: Running, event: ModelsSseEvent) {
@@ -356,8 +356,7 @@ export class Supervisor extends Context.Service<
         });
 
         /**
-         * Follows `/models/sse` for the lifetime of `running`, falling back to `pollHealth` if the binary does not
-         * support single-model `/models/sse` (404/503). Runs in `running.program.scope`.
+         * Follows `/models/sse` for the lifetime of `running` if the binary supports it. Runs in `running.program.scope`.
          */
         const watchManaged = (running: Running): Effect.Effect<void> =>
           Effect.gen(function* () {
@@ -369,19 +368,7 @@ export class Supervisor extends Context.Service<
                 Stream.runForEach((event) => applyManagedEvent(running, event)),
                 Effect.result,
               );
-              if (outcome._tag === 'Failure') {
-                if (outcome.failure._tag === 'ModelsSseUnsupported') {
-                  yield* pollHealth(running);
-                  return;
-                }
-                if (outcome.failure._tag === 'ModelsSseCut') {
-                  const after = yield* SynchronizedRef.get(held);
-                  if (isThis(running)(after) && after.state.kind === 'starting') yield* probeReady(running);
-                }
-              } else {
-                const after = yield* SynchronizedRef.get(held);
-                if (isThis(running)(after) && after.state.kind === 'starting') yield* probeReady(running);
-              }
+              if (outcome._tag === 'Failure' && outcome.failure._tag === 'ModelsSseUnsupported') return;
               yield* Effect.sleep(options.healthPoll);
             }
           }).pipe(Effect.provideContext(context));
@@ -428,14 +415,22 @@ export class Supervisor extends Context.Service<
         });
 
         /**
-         * Follows `/models/sse` for an external llama-server; exits quietly when the server does not support it
-         * (404/503) or once the supervisor leaves that external state.
+         * Follows `/models/sse` for an external single-model server. A router's events describe individual models.
          */
         const watchExternal = (port: number, pid: number | null): Effect.Effect<void> =>
           Effect.gen(function* () {
             for (;;) {
               const current = yield* SynchronizedRef.get(held);
               if (!isSameExternal(current.state, port, pid)) return;
+              const details = yield* props(probeUrl(null, port)).pipe(Effect.option);
+              if (Option.isNone(details)) {
+                // Single-model builds can return 503 from /props during the first load.
+                const status = yield* health({ port });
+                if (!Option.contains(status, 503)) return;
+                yield* Effect.sleep(options.healthPoll);
+                continue;
+              }
+              if (!isServerProps(details.value) || details.value.role === 'router') return;
               const outcome = yield* streamModelsSse({ port }).pipe(
                 Stream.runForEach((event) => applyExternalEvent(port, pid, event)),
                 Effect.result,
@@ -559,6 +554,7 @@ export class Supervisor extends Context.Service<
                 }),
               );
               yield* watchManaged(running).pipe(Effect.forkIn(program.scope));
+              yield* pollStartup(running, since).pipe(Effect.forkIn(program.scope));
             }),
             read: ({ handle }) =>
               Effect.all([read(handle.stdout), read(handle.stderr)], { concurrency: 2, discard: true }),
@@ -699,6 +695,6 @@ export class Supervisor extends Context.Service<
       }),
     );
 
-  /** SIGKILL 5 s after SIGTERM, `/health` polled every 500 ms on fallback, pids read from `/proc`. */
+  /** SIGKILL 5 s after SIGTERM, `/health` polled every 500 ms during startup, pids read from `/proc`. */
   static readonly layer = Supervisor.layerWith({ killTimeout: '5 seconds', healthPoll: '500 millis' });
 }

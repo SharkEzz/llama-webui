@@ -62,6 +62,7 @@ const supervisorOn = (capacity: number) =>
 type Services =
   | Supervisor
   | LogRing
+  | LlamaHttp
   | WsHub
   | Published
   | FileSystem.FileSystem
@@ -313,14 +314,17 @@ layer(NodeServices.layer, { excludeTestServices: true })('Placement', (it) => {
           ).pipe(Effect.map(Context.get(Placement)));
 
           // Managed server with FAKE_SSE=1 and no buffer size logs in LogRing -> SSE fallback.
-          yield* startFake({ FAKE_SSE: '1', FAKE_LOAD_MS: '50', FAKE_SLEEP_AFTER_MS: '200' });
+          yield* startFake({ FAKE_SSE: '1', FAKE_LOAD_MS: '50' });
           const ready = yield* stateWhen((s) => s.kind === 'ready');
+          assert(ready.kind === 'ready');
           const fromSse = yield* placement.current.pipe(when((p) => p?.source === 'sse'));
           assert.strictEqual(fromSse?.source, 'sse');
           assert.strictEqual(fromSse?.buffers[0]?.device, 'CUDA0');
           assert.strictEqual(fromSse?.buffers[0]?.busId, '0000:01:00.0');
 
           // Sleeping clears placement.
+          const client = yield* LlamaHttp;
+          yield* client.post(`http://127.0.0.1:${ready.port}/test/sleep`).pipe(Effect.scoped);
           yield* stateWhen((s) => s.kind === 'sleeping');
           const whileSleeping = yield* placement.current.pipe(when((p) => p === null));
           assert.isNull(whileSleeping);
@@ -338,5 +342,41 @@ layer(NodeServices.layer, { excludeTestServices: true })('Placement', (it) => {
           assert.strictEqual(extPlacement?.buffers[0]?.busId, '0000:01:00.0');
         }),
       ),
+  );
+
+  it.effect('Placement: restores the cached same-PID log placement after sleep and wake', () =>
+    fresh(5)(
+      Effect.gen(function* () {
+        const supervisor = yield* Supervisor;
+        const ring = yield* LogRing;
+        const client = yield* LlamaHttp;
+        yield* startFake({ FAKE_SSE: '1', FAKE_LOAD_MS: '150' });
+        const ready = yield* stateWhen((state) => state.kind === 'ready');
+        assert(ready.kind === 'ready');
+        const baseUrl = `http://127.0.0.1:${ready.port}`;
+        yield* ring.since(0).pipe(when(Arr.some((line) => Str.includes('srv  main: cwd ')(line.text))));
+        yield* pushAll([
+          '[llama-webui] launch: llama-server -m other.gguf',
+          'llama_prepare_model_devices: using device CUDA0 (NVIDIA GeForce RTX 5070 Ti) (0000:01:00.0) - 15683 MiB free',
+          'load_tensors: offloaded 10/33 layers to GPU',
+          'load_tensors:        CUDA0 model buffer size =  1000.00 MiB',
+        ]);
+        const placement = yield* buildPlacement;
+        const fromLogs = yield* placement.current;
+        assert.deepStrictEqual(fromLogs?.layers, { offloaded: 10, total: 33 });
+        yield* pushAll(Arr.makeBy(5, (i) => `srv  log_server_r: request ${i}`));
+
+        yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
+        yield* stateWhen((state) => state.kind === 'sleeping');
+        yield* placement.current.pipe(when((value) => value === null));
+        yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
+        yield* stateWhen((state) => state.kind === 'ready');
+        const restored = yield* placement.current.pipe(when((value) => value !== null));
+        assert.deepStrictEqual(restored, fromLogs);
+
+        yield* supervisor.stop;
+        yield* assertGone(ready.pid);
+      }),
+    ),
   );
 });

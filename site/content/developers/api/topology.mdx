@@ -140,11 +140,11 @@ buffers; the projector's buffers and the fitting probes of `-fit` are skipped. N
 peer-to-peer is in use. The sizes are only logged from `-lv 4` on, which
 llama-webui adds to a profile that sets no verbosity.
 
-`placement` is null when no server runs, while a server is `sleeping`, or before any placement is known. For a managed
+`placement` is null when no server runs, while a model sleeps or a managed model wakes up, or before any placement is known. For a managed
 server with `-lv 4` (the default), startup logs remain primary because they carry PCI `busId`s, layer counts and P2P
-status. When startup buffer logs are absent (an external server or a profile with `-lv < 4`), `Placement` falls back to
-the `data.memory` report from `/models/sse` (`source: 'sse'`), resolving `busId` when unambiguous. Once the launch line
-is evicted from the ring, the last placement read stays valid as long as the server has the same PID.
+status. When startup buffer logs are absent (an external single-model server or a profile with `-lv < 4`), `Placement`
+falls back to the `data.memory` report from `/models/sse` (`source: 'sse'`). It resolves local PCI `busId` values when
+unambiguous. After ring eviction or sleep, the cached log placement can still be restored for the same PID.
 
 | Field       | Type                                                     | Description                                                                                                  |
 | ----------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |

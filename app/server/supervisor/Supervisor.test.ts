@@ -759,16 +759,65 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
     }),
   );
 
+  it.effect('a managed server becomes ready through /health while SSE headers are stalled', () =>
+    fresh()(
+      Effect.gen(function* () {
+        yield* startFake({ env: { FAKE_SSE: '1', FAKE_SSE_STALL: 'headers' } });
+        const ready = yield* stateWhen(kindIs('ready')).pipe(Effect.timeout('2 seconds'));
+        const supervisor = yield* Supervisor;
+        yield* supervisor.stop;
+        yield* assertGone(pidOf(ready));
+      }),
+    ),
+  );
+
+  it.effect('an external router keeps its generic state instead of consuming individual model events', () =>
+    fresh()(
+      Effect.gen(function* () {
+        let propsRequested = false;
+        const router = yield* httpStub((req, res) => {
+          if (req.url === '/props') {
+            res.writeHead(200, { 'content-type': 'application/json' }).end('{"role":"router"}');
+            propsRequested = true;
+          } else if (req.url === '/models/sse') {
+            res.writeHead(200, { 'content-type': 'text/event-stream' });
+            res.write('data: {"model":"first","event":"status_change","data":{"status":"loaded"}}\n\n');
+            res.write('data: {"model":"second","event":"status_change","data":{"status":"sleeping"}}\n\n');
+          } else {
+            res.writeHead(200, { 'content-type': 'application/json' }).end('{"status":"ok"}');
+          }
+        });
+        const supervisor = yield* Supervisor;
+        const detected = yield* supervisor.detectExternal(router.port);
+        assert.isTrue(detected);
+        yield* Effect.raceFirst(
+          Effect.sync(() => propsRequested).pipe(
+            Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (requested) => requested }),
+          ),
+          stateWhen((s) => s.kind === 'external' && s.status === 'sleeping'),
+        );
+        const state = yield* supervisor.state;
+        assert.deepStrictEqual(state, { kind: 'external', port: router.port, pid: null });
+        const memory = yield* supervisor.memory;
+        assert.isNull(memory);
+      }),
+    ),
+  );
+
   it.effect('/models/sse streams loading progress, transitions to ready with memory, and handles sleep/wake', () =>
     fresh()(
       Effect.gen(function* () {
         const supervisor = yield* Supervisor;
         const client = yield* LlamaHttp;
         const cmd = yield* startFake({
-          env: { FAKE_SSE: '1', FAKE_LOAD_MS: '180', FAKE_SLEEP_AFTER_MS: '150' },
+          env: { FAKE_SSE: '1', FAKE_LOAD_MS: '180' },
         });
+        const baseUrl = `http://127.0.0.1:${cmd.port}`;
         const ready = yield* stateWhen(kindIs('ready'));
-        const memOnReady = yield* supervisor.memory;
+        const memOnReady = yield* supervisor.memory.pipe(
+          Effect.repeat({ schedule: Schedule.spaced('10 millis'), until: (memory) => memory !== null }),
+          Effect.timeout('2 seconds'),
+        );
         assert.isNotNull(memOnReady);
         assert.strictEqual(memOnReady.devices[0]?.name, 'CUDA0');
 
@@ -778,19 +827,21 @@ layer(NodeServices.layer, { excludeTestServices: true })('Supervisor', (it) => {
           'expected at least one starting state with SSE load progress',
         );
 
-        // Enters sleeping automatically once idle timer fires; memory cleared while sleeping.
+        // The fake enters idle sleep when asked so the test observes loaded memory first.
+        yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
         const sleeping = yield* stateWhen(kindIs('sleeping'));
         assert.strictEqual(sleeping.kind, 'sleeping');
         const memWhileSleeping = yield* supervisor.memory;
         assert.isNull(memWhileSleeping);
 
         // Waking up via /slots transitions sleeping -> starting -> ready and restores memory.
-        yield* client.get(`http://127.0.0.1:${cmd.port}/slots`).pipe(Effect.scoped, Effect.ignore);
+        yield* client.get(`${baseUrl}/slots`).pipe(Effect.scoped);
         yield* stateWhen(kindIs('ready'));
         const memAfterWake = yield* supervisor.memory;
         assert.deepStrictEqual(memAfterWake, memOnReady);
 
         // Stopping a sleeping server works cleanly too.
+        yield* client.post(`${baseUrl}/test/sleep`).pipe(Effect.scoped);
         yield* stateWhen(kindIs('sleeping'));
         yield* supervisor.stop;
         yield* assertState({ kind: 'idle' });

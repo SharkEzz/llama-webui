@@ -1,4 +1,4 @@
-import { isServerSleeping, type ModelPlacement, type ServerState } from '@llama-webui/shared';
+import type { ModelPlacement, ServerState } from '@llama-webui/shared';
 import { Array as Arr, Context, Effect, Equal, type FileSystem, Layer, Option, type Path, Ref, Stream } from 'effect';
 import type { ModelMemory } from 'llamacpp-js/models';
 import { LogRing } from '../logs/LogRing.ts';
@@ -13,6 +13,8 @@ interface Held {
   readonly memory: ModelMemory | null;
   readonly current: ModelPlacement | null;
   readonly last: Option.Option<{ readonly pid: number; readonly placement: ModelPlacement }>;
+  /** A managed model is asleep or has yet to finish waking up. */
+  readonly suspended: boolean;
 }
 
 type Event =
@@ -51,21 +53,29 @@ export class Placement extends Context.Service<
 
         /** What to hold once the placement is recomputed from `state`, `memory` and the log ring. */
         const reread = (held: Held, state: ServerState, memory: ModelMemory | null): Effect.Effect<Held> => {
-          if (state.kind === 'idle' || state.kind === 'crashed' || isServerSleeping(state)) {
-            return Effect.succeed({ state, memory, current: null, last: Option.none() });
+          const next = { state, memory, suspended: false };
+          if (state.kind === 'idle' || state.kind === 'crashed') {
+            return Effect.succeed({ ...next, current: null, last: Option.none() });
           }
           if (state.kind === 'external') {
-            const fromSse = memory === null ? null : placementFromMemory({ memory, gpus });
-            return Effect.succeed({ state, memory, current: fromSse, last: Option.none() });
+            const fromSse =
+              state.status === 'sleeping' || memory === null ? null : placementFromMemory({ memory, gpus });
+            return Effect.succeed({ ...next, current: fromSse, last: Option.none() });
+          }
+          const kept = Option.filter(held.last, (last) => last.pid === state.pid);
+          if (
+            state.kind === 'sleeping' ||
+            (state.kind !== 'ready' && held.suspended && 'pid' in held.state && held.state.pid === state.pid)
+          ) {
+            return Effect.succeed({ ...next, current: null, last: kept, suspended: true });
           }
           return Effect.map(ring.since(0), (lines): Held => {
             const parsed = parsePlacement(lines);
             if (parsed !== null && parsed.buffers.length > 0) {
-              return { state, memory, current: parsed, last: Option.some({ pid: state.pid, placement: parsed }) };
+              return { ...next, current: parsed, last: Option.some({ pid: state.pid, placement: parsed }) };
             }
-            const kept = Option.filter(held.last, (last) => last.pid === state.pid);
             if (Option.isSome(kept)) {
-              return { state, memory, current: kept.value.placement, last: kept };
+              return { ...next, current: kept.value.placement, last: kept };
             }
             if (memory !== null) {
               const fromSse = placementFromMemory({
@@ -80,16 +90,16 @@ export class Placement extends Context.Service<
                       ...(parsed.p2p === undefined ? {} : { p2p: parsed.p2p }),
                     }),
               });
-              if (fromSse !== null) return { state, memory, current: fromSse, last: Option.none() };
+              if (fromSse !== null) return { ...next, current: fromSse, last: Option.none() };
             }
-            return { state, memory, current: parsed, last: Option.none() };
+            return { ...next, current: parsed, last: Option.none() };
           });
         };
 
         const nowState = yield* supervisor.state;
         const nowMemory = yield* supervisor.memory;
         const initial = yield* reread(
-          { state: nowState, memory: nowMemory, current: null, last: Option.none() },
+          { state: nowState, memory: nowMemory, current: null, last: Option.none(), suspended: false },
           nowState,
           nowMemory,
         );

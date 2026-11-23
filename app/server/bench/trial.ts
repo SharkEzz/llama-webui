@@ -186,7 +186,6 @@ export const runTrial = Effect.fn('trial.runTrial')(function* (options: {
 
   const pollUntilLoaded = Effect.gen(function* () {
     for (;;) {
-      if (yield* Deferred.isDone(exit)) return yield* yield* exitError;
       const status = yield* health(target);
       if (Option.contains(status, 200)) return;
       yield* Effect.sleep(healthPoll);
@@ -194,41 +193,42 @@ export const runTrial = Effect.fn('trial.runTrial')(function* (options: {
   });
 
   const sseUntilLoaded = Effect.gen(function* () {
-    const loaded = yield* Ref.make(false);
     for (;;) {
-      if (yield* Deferred.isDone(exit)) return yield* yield* exitError;
       const outcome = yield* streamModelsSse(target).pipe(
         Stream.takeUntil((ev) => ev.event === 'status_change' && (ev.status === 'loaded' || ev.status === 'unloaded')),
-        Stream.runForEach((ev) =>
+        Stream.tap((ev) =>
           Effect.gen(function* () {
-            if (ev.event !== 'status_change') return;
-            if (ev.status === 'loading' && ev.progress !== undefined && options.onLoadProgress !== undefined) {
+            if (
+              ev.event === 'status_change' &&
+              ev.status === 'loading' &&
+              ev.progress !== undefined &&
+              options.onLoadProgress !== undefined
+            ) {
               yield* options.onLoadProgress(sanitizeLoadProgress(ev.progress));
-            } else if (ev.status === 'loaded') {
-              yield* Ref.set(loaded, true);
             }
           }),
         ),
+        Stream.filter((ev) => ev.event === 'status_change' && ev.status === 'loaded'),
+        Stream.runHead,
         Effect.result,
       );
-      if (yield* Ref.get(loaded)) return;
-      if (yield* Deferred.isDone(exit)) return yield* yield* exitError;
+      if (outcome._tag === 'Success' && Option.isSome(outcome.success)) return;
       if (outcome._tag === 'Failure' && outcome.failure._tag === 'ModelsSseUnsupported') {
-        return yield* pollUntilLoaded;
+        // Let the independent health poll finish the wait.
+        return yield* Effect.never;
       }
-      const probe = yield* health(target);
-      if (Option.contains(probe, 200)) return;
       yield* Effect.sleep(healthPoll);
     }
   });
 
-  const waitLoaded = Effect.raceFirst(
+  const waitLoaded = Effect.raceAllFirst([
     sseUntilLoaded,
+    pollUntilLoaded,
     Deferred.await(exit).pipe(
       Effect.andThen(exitError),
       Effect.flatMap((err) => Effect.fail(err)),
     ),
-  ).pipe(
+  ]).pipe(
     Effect.timeoutOrElse({
       duration: Duration.millis(loadTimeout),
       orElse: () => Effect.fail(TrialFailed.make({ message: `loading > ${duration(loadTimeout)}` })),

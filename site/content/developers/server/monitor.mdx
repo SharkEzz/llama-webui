@@ -342,10 +342,12 @@ connected GPUs` or a channel `via SHM/…` gives `unavailable`, and no NCCL line
 `Placement` reads the log ring when its layer is built, and keeps the last placement it read with the PID of its
 server, so once the launch lines have left the ring it still knows the placement of the same PID. It follows the new
 log lines (only those that can change the result, `RELEVANT`), the supervisor's state and `supervisor.memoryChanges`,
-and publishes each change as a `placement` message. While a server is `sleeping`, the model is unloaded from VRAM so
-placement becomes `null`. When startup buffer logs are missing (an external server, or a managed profile with `-lv < 4`),
+and publishes each change as a `placement` message. During managed sleep and wakeup, placement is published as
+`null`. The cached placement is available again once the same process is ready. When startup buffer logs are missing
+(an external single-model server, or a managed profile with `-lv < 4`),
 `placementFromMemory()` (`placementMemory.ts`) falls back to the `data.memory` report from `/models/sse` (`source: 'sse'`),
-matching PCI `busId` from `using device` logs or unambiguously when a single GPU of that vendor exists in sysfs.
+matching PCI `busId` from `using device` logs or, for recognized local backends, an unambiguous GPU in sysfs.
+Remote RPC buffers have no local PCI mapping.
 
 ## Add a collector
 

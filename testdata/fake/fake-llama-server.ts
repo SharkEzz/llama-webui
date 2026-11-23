@@ -119,9 +119,13 @@ function scheduleSleep() {
   if (!sseEnabled || sseSleepAfterMs === null || sleepTimer !== null) return;
   sleepTimer = setTimeout(() => {
     sleepTimer = null;
-    isSleeping = true;
-    sseEmit("status_change", { status: "sleeping" });
+    enterSleep();
   }, sseSleepAfterMs);
+}
+
+function enterSleep() {
+  isSleeping = true;
+  sseEmit("status_change", { status: "sleeping" });
 }
 
 function runLoadCycle(firstLoad: boolean) {
@@ -176,12 +180,20 @@ const server = serve(port, host, async (req) => {
   const path = new URL(req.url).pathname;
   const loading = isLoading || Date.now() - t0 < loadMs;
   if (path === "/models/sse" && sseEnabled) {
+    if (process.env.FAKE_SSE_STALL === "headers") {
+      await new Promise<void>((done) => req.signal.addEventListener("abort", () => done(), { once: true }));
+      return new Response(null, { status: 204 });
+    }
     let ctrl: ReadableStreamDefaultController<Uint8Array> | null = null;
     const stream = new ReadableStream<Uint8Array>({
       start(c) {
         ctrl = c;
-        sseClients.add(c);
-        if (sseLastEvent !== null) c.enqueue(sseEnc.encode(`data: ${JSON.stringify(sseLastEvent)}\n\n`));
+        if (process.env.FAKE_SSE_STALL === "events") {
+          c.enqueue(sseEnc.encode(": waiting\n\n"));
+        } else {
+          sseClients.add(c);
+          if (sseLastEvent !== null) c.enqueue(sseEnc.encode(`data: ${JSON.stringify(sseLastEvent)}\n\n`));
+        }
         req.signal.addEventListener("abort", () => {
           sseClients.delete(c);
           try { c.close(); } catch {}
@@ -195,6 +207,10 @@ const server = serve(port, host, async (req) => {
   }
   if (path === "/health") return loading ? new Response('{"error":{"type":"unavailable_error"}}', { status: 503 }) : Response.json({ status: "ok" });
   if (loading) return new Response("", { status: 503 });
+  if (path === "/test/sleep" && req.method === "POST" && sseEnabled) {
+    enterSleep();
+    return new Response(null, { status: 204 });
+  }
   if (path === "/completion" && req.method === "POST") {
     wakeIfSleeping();
     const body = (await req.json()) as { n_predict?: number };

@@ -17,15 +17,15 @@ described on [Server](/docs/server/).
 
 The supervisor's state, a union on `kind` (`packages/webui-shared/src/server.ts`):
 
-| `kind`     | Other fields                                                        | Meaning                                                                                                                                               |
-| ---------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `idle`     |                                                                     | No server is running.                                                                                                                                 |
-| `starting` | `profile`, `profileId`, `pid`, `host`, `port`, `since`, `progress?` | The process runs and loads its model; `/models/sse` streams optional `LoadProgress` (`{ stages, current, value }`), falling back to `/health` poll.   |
-| `ready`    | `profile`, `profileId`, `pid`, `host`, `port`, `since`              | The model is loaded and ready to serve requests.                                                                                                      |
-| `sleeping` | `profile`, `profileId`, `pid`, `host`, `port`, `since`              | The server entered idle sleep (`--sleep-idle-seconds`, reported via `/models/sse`): VRAM is freed until the next request wakes it.                    |
-| `stopping` | `profile`, `profileId`, `pid`, `host`, `port`                       | `SIGTERM` was sent; `SIGKILL` follows after 5 seconds.                                                                                                |
-| `crashed`  | `profile`, `profileId`, `exitCode`, `signal`, `at`, `message?`      | The process exited without being asked to, or could not be launched (`message`: why, for example `directory not found: <cwd>`).                       |
-| `external` | `pid` (number \| null), `port`, `status?`, `progress?`              | A `llama-server` llama-webui did not start answers on the port; `status` (`loading` \| `ready` \| `sleeping`) and `progress` come from `/models/sse`. |
+| `kind`     | Other fields                                                        | Meaning                                                                                                                                                                         |
+| ---------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `idle`     |                                                                     | No server is running.                                                                                                                                                           |
+| `starting` | `profile`, `profileId`, `pid`, `host`, `port`, `since`, `progress?` | The process is loading its model. `/models/sse` streams optional `LoadProgress` (`{ stages, current, value }`). During cold startup the app also polls `/health` for readiness. |
+| `ready`    | `profile`, `profileId`, `pid`, `host`, `port`, `since`              | The model is loaded and ready to serve requests.                                                                                                                                |
+| `sleeping` | `profile`, `profileId`, `pid`, `host`, `port`, `since`              | The server entered idle sleep (`--sleep-idle-seconds`, reported via `/models/sse`): VRAM is freed until the next request wakes it.                                              |
+| `stopping` | `profile`, `profileId`, `pid`, `host`, `port`                       | `SIGTERM` was sent; `SIGKILL` follows after 5 seconds.                                                                                                                          |
+| `crashed`  | `profile`, `profileId`, `exitCode`, `signal`, `at`, `message?`      | The process exited without being asked to, or could not be launched (`message`: why, for example `directory not found: <cwd>`).                                                 |
+| `external` | `pid` (number \| null), `port`, `status?`, `progress?`              | A `llama-server` llama-webui did not start answers on the port. In single-model mode, `status` (`loading` \| `ready` \| `sleeping`) and `progress` come from `/models/sse`.     |
 
 `profile` is the profile's name at launch, `host` its `--host` (the probes reach it there, loopback for `0.0.0.0`),
 `since` and `at` are epoch milliseconds, `exitCode` and `signal` are `null` when unknown. llama-webui looks for an

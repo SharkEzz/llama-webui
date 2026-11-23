@@ -39,19 +39,19 @@ export const readSysfsGpus = (
     return out;
   });
 
-/** Vendor implied by a ggml device name (`CUDA0` → nvidia, `ROCm0`/`HIP0` → amd, `SYCL0` → intel), else undefined. */
-const vendorOfDevice = (name: string): TopologyNode['vendor'] | undefined => {
-  if (/^CUDA\d+$/i.test(name)) return 'nvidia';
-  if (/^(?:ROCm|HIP)\d+$/i.test(name)) return 'amd';
-  if (/^SYCL\d+$/i.test(name)) return 'intel';
-  return undefined;
+/** What a recognized local PCI backend's first device can match in sysfs. */
+const firstLocalDevice = (name: string): TopologyNode['vendor'] | 'any' | null => {
+  if (/^CUDA0$/i.test(name)) return 'nvidia';
+  if (/^(?:ROCm|HIP)0$/i.test(name)) return 'amd';
+  if (/^SYCL0$/i.test(name)) return 'intel';
+  if (/^Vulkan0$/i.test(name)) return 'any';
+  return null;
 };
 
 /**
  * Resolves a PCI busId for a GPU entry from `/models/sse`:
  * 1. Exact match from `busIds` (parsed from llama-server's own `using device` / NCCL logs when available).
- * 2. Unambiguous single-GPU match from `gpus` (index 0 when exactly one GPU of that vendor — or one GPU total for
- *    vendor-neutral backends like Vulkan — exists).
+ * 2. Unambiguous single-GPU match from `gpus` for a known local PCI backend's first device.
  * Otherwise `null` (never guesses across multiple GPUs).
  */
 const resolveBusId = (
@@ -62,9 +62,9 @@ const resolveBusId = (
   if (device.kind === 'host') return null;
   const fromLogs = busIds.get(device.name);
   if (fromLogs !== undefined) return fromLogs;
-  if (!Str.endsWith('0')(device.name)) return null;
-  const vendor = vendorOfDevice(device.name);
-  const candidates = vendor === undefined ? gpus : Arr.filter(gpus, (g) => g.vendor === vendor);
+  const vendor = firstLocalDevice(device.name);
+  if (vendor === null) return null;
+  const candidates = vendor === 'any' ? gpus : Arr.filter(gpus, (g) => g.vendor === vendor);
   return candidates.length === 1 ? (candidates[0]?.busId ?? null) : null;
 };
 

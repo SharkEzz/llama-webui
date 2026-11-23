@@ -1,6 +1,6 @@
 import { assert, describe, it } from '@effect/vitest';
 import { DEFAULT_SETTINGS, type LoadProgress, type Profile } from '@llama-webui/shared';
-import { Array as Arr, Effect, Layer, Option, Ref, type Scope } from 'effect';
+import { Array as Arr, type Duration, Effect, Layer, Option, Ref, type Scope } from 'effect';
 import { health } from '../llama/probes.ts';
 import { buildCommand } from '../supervisor/command.ts';
 import { FAKE, fakeOutside, freePort } from '../testing/llama.ts';
@@ -30,7 +30,7 @@ const fakeOn = (port: number, env: Record<string, string>) => {
   return buildCommand({ profile, settings: { ...DEFAULT_SETTINGS, binary: FAKE } });
 };
 
-const trialOf = (cmd: Effect.Success<ReturnType<typeof fakeOn>>) =>
+const trialOf = (cmd: Effect.Success<ReturnType<typeof fakeOn>>, loadTimeout?: Duration.Input) =>
   runTrial({
     cmd,
     p: 16,
@@ -42,6 +42,7 @@ const trialOf = (cmd: Effect.Success<ReturnType<typeof fakeOn>>) =>
     say: () => Effect.void,
     killTimeout: '1 second',
     healthPoll: '50 millis',
+    ...(loadTimeout === undefined ? {} : { loadTimeout }),
   });
 
 describe('trial', () => {
@@ -101,6 +102,19 @@ describe('trial', () => {
         assert.isAbove(result.pp.tps, 0);
         assert.isAbove(result.tg.tps, 0);
         const after = yield* health({ host: '127.0.0.1', port });
+        assert.deepStrictEqual(after, Option.none());
+      }),
+    ),
+  );
+
+  it.live('a trial starts measuring through /health when SSE stays open without status events', () =>
+    fresh(
+      Effect.gen(function* () {
+        const port = yield* freePort;
+        const cmd = yield* fakeOn(port, { FAKE_SSE: '1', FAKE_SSE_STALL: 'events', FAKE_LOAD_MS: '50' });
+        const measured = yield* trialOf(cmd, '1 second');
+        assert.isAbove(measured.tg.tps, 0);
+        const after = yield* health({ port });
         assert.deepStrictEqual(after, Option.none());
       }),
     ),
