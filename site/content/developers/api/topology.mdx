@@ -71,9 +71,8 @@ and NVMe controllers (class `0x0108`). Each device is linked to the CPU directly
 when the first bridge below the root port has the root port's vendor, is not marked removable, and is not a
 Thunderbolt or USB4 bridge (a PCIe switch from another vendor, on an NVMe card or a riser, is not a chipset). Any failed
 read degrades to unknown: at worst the graph holds the CPU and memory only. The CPU node comes from the CPU info the
-server keeps (`CpuInfo`, the one [System](/docs/system/) shows), not from a new read of `/proc/cpuinfo`; the files that
-do not depend on each other (memory, block devices, each device's chain of bridges and link) are read concurrently, and
-the nodes and links keep the bus id order.
+server keeps (`CpuInfo`, the one [System](/docs/system/) shows), not from a new read of `/proc/cpuinfo`. The devices
+are read one after the other in bus id order, which is the order of the nodes and links.
 
 `TopologyGraph`:
 
