@@ -15,7 +15,9 @@ The guard and the error shape follow the common rules of the [API overview](/dev
 <Endpoint method="GET" path="/api/topology" />
 
 The graph is read again on every call: the current state of a PCIe link changes with power states. The placement is
-the tracker's latest value.
+the tracker's latest value. Only the Topology page asks for it: once when it is shown (on a cold load, once the
+WebSocket opens), then on each reconnect while it is; the `placement` messages keep the placement up to date in
+between.
 
 **Response**: `200` with `{ graph: TopologyGraph, placement: ModelPlacement | null }`.
 
@@ -68,7 +70,9 @@ memory nodes and their `cpu-ram` link, then walks `/sys/bus/pci/devices` for dis
 and NVMe controllers (class `0x0108`). Each device is linked to the CPU directly (root port), or through a chipset node
 when the first bridge below the root port has the root port's vendor, is not marked removable, and is not a
 Thunderbolt or USB4 bridge (a PCIe switch from another vendor, on an NVMe card or a riser, is not a chipset). Any failed
-read degrades to unknown: at worst the graph holds the CPU and memory only.
+read degrades to unknown: at worst the graph holds the CPU and memory only. The CPU node comes from the CPU info the
+server keeps (`CpuInfo`, the one [System](/docs/system/) shows), not from a new read of `/proc/cpuinfo`. The devices
+are read one after the other in bus id order, which is the order of the nodes and links.
 
 `TopologyGraph`:
 

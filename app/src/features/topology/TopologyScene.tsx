@@ -613,7 +613,7 @@ function Link({ link, path, flow, color, colors, reducedMotion, busy, smoother, 
     if (link.kind === 'memory' && f.fwdBps === null && f.backBps === null) {
       // Without a DRAM measurement: a pulse whose rate follows CPU activity (0–100); without animation, a fixed intensity.
       const a = Math.min(1, (f.activity ?? 0) / 100);
-      if (!reducedMotion && a > 0) pacerRef.current.active = true;
+      if (!reducedMotion && a > 0) pacerRef.current.ambient = true;
       target = reducedMotion
         ? 0.08 + 0.6 * a
         : 0.08 + a * (0.35 + 0.35 * Math.abs(Math.sin(clock.elapsedTime * (1 + 4 * a))));
@@ -710,13 +710,14 @@ function Streaks({ id, curve, bps, color, reverse, side, thickness, smoother, pa
     const m = mesh.current;
     if (!m) return;
     const vis = flowVisual(bpsRef.current);
-    const speed = smoother.step(`${id}:speed`, vis.speed, dt);
-    const length = Math.min(smoother.step(`${id}:length`, vis.length, dt), span * 0.3);
+    // Their own easing only needs the ambient rate, like the streaks themselves (see FramePacer).
+    const speed = smoother.step(`${id}:speed`, vis.speed, dt, 'ambient');
+    const length = Math.min(smoother.step(`${id}:length`, vis.length, dt, 'ambient'), span * 0.3);
     // Streaks never cover more than half the lane: on a short link they would merge into a solid bar.
     const room = length > 0 ? Math.max(1, Math.floor((span * 0.5) / length)) : 0;
-    const n = Math.min(room, Math.round(smoother.step(`${id}:n`, vis.count, dt)));
+    const n = Math.min(room, Math.round(smoother.step(`${id}:n`, vis.count, dt, 'ambient')));
     phase.current = (phase.current + speed * dt) % 1;
-    if (n > 0) pacerRef.current.active = true;
+    if (n > 0) pacerRef.current.ambient = true;
     m.count = n;
     for (let i = 0; i < n; i++) {
       let u = (offsets[i]! + phase.current) % 1;

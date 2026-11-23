@@ -134,7 +134,7 @@ link to the CPU, with the sum of the devices behind it: two busy devices on one 
 
 | Link             | Measured from                                                                             | Without a measurement                              |
 | ---------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| CPU ↔ NVIDIA GPU | The card's PCIe counters, through NVML                                                    | No streaks, no badge (NVIDIA through `nvidia-smi`) |
+| CPU ↔ NVIDIA GPU | The card's PCIe counters, through NVML, read every 5 seconds                              | No streaks, no badge (NVIDIA through `nvidia-smi`) |
 | CPU ↔ AMD GPU    | Not measured: the `amdgpu` driver does not report PCIe traffic                            | No streaks, no badge                               |
 | CPU ↔ NVMe drive | The drive's read and write counters (**Disks** collector)                                 | No streaks, no badge                               |
 | CPU ↔ chipset    | The sum of the devices behind it                                                          | No streaks, no badge                               |

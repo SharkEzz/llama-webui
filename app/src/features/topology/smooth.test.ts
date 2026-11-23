@@ -17,7 +17,53 @@ test('Smoother: a frame after a long pause eases in (dt capped), it does not jum
   s.step('a', 0, 0.016);
   // 30 s without a frame: counted as MAX_DT.
   expect(s.step('a', 10, 30)).toBeCloseTo(10 * (1 - Math.exp(-MAX_DT / 0.5)), 6);
-  expect(s.takeMoving()).toBe(true);
+  expect(s.takeMoving()).toBe('active');
+});
+
+test('Smoother: the easing follows time, not frames: 30 fps and 60 fps draw the same curve', () => {
+  const at30 = new Smoother(0.4);
+  const at60 = new Smoother(0.4);
+  at30.step('a', 0, 1 / 30);
+  at60.step('a', 0, 1 / 60);
+  for (let frame = 1; frame <= 75; frame++) {
+    const slow = at30.step('a', 10, 1 / 30);
+    at60.step('a', 10, 1 / 60);
+    const fast = at60.step('a', 10, 1 / 60);
+    expect(slow).toBeCloseTo(fast, 9);
+  }
+});
+
+test('Smoother: a streak parameter still easing alone only needs the ambient rate', () => {
+  const s = new Smoother(0.4);
+  s.step('lane:n', 3, 1 / 30);
+  s.step('lane:n', 20, 1 / 30, 'ambient');
+  expect(s.takeMoving()).toBe('ambient');
+  // Reported once: the next frame starts again from nothing.
+  expect(s.takeMoving()).toBe(false);
+});
+
+test('Smoother: an easing glow needs the active rate, also next to an easing streak parameter', () => {
+  const s = new Smoother(0.4);
+  s.step('link:glow', 0.1, 1 / 60);
+  s.step('lane:n', 3, 1 / 60);
+  s.step('link:glow', 0.9, 1 / 60);
+  expect(s.takeMoving()).toBe('active');
+  // Whatever the order of the keys within the frame.
+  s.step('link:glow', 0.9, 1 / 60);
+  s.step('lane:n', 20, 1 / 60, 'ambient');
+  expect(s.takeMoving()).toBe('active');
+  s.step('lane:n', 20, 1 / 60, 'ambient');
+  s.step('link:glow', 0.9, 1 / 60);
+  expect(s.takeMoving()).toBe('active');
+});
+
+test('Smoother: nothing easing (values at their targets) reports no motion', () => {
+  const s = new Smoother(0.4);
+  s.step('link:glow', 0.5, 1 / 60);
+  s.step('lane:n', 12, 1 / 60, 'ambient');
+  s.step('link:glow', 0.5, 1 / 60);
+  s.step('lane:n', 12, 1 / 60, 'ambient');
+  expect(s.takeMoving()).toBe(false);
 });
 
 test('flowVisual: log scale, nothing under 100 kB/s, bounded at 20 GB/s', () => {

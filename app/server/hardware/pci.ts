@@ -1,4 +1,4 @@
-import type { TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/shared';
+import type { CpuInfo, TopologyGraph, TopologyLink, TopologyNode } from '@llama-webui/shared';
 import { Array as Arr, Clock, Effect, FileSystem, HashSet, Option, Order, Path, String as Str } from 'effect';
 import { physicalDisks } from '../collectors/disk.ts';
 import { readTrimmed } from '../collectors/read.ts';
@@ -149,15 +149,17 @@ const ramNode = Effect.fnUntraced(function* (sysRoot: string, procRoot: string) 
  * Hardware graph: CPU, memory, then each GPU (class 0x03) and NVMe controller (0x0108) with its link to the CPU,
  * directly (root port) or through a chipset node (bridges between the root port and the card that aren't the card's
  * own). Any failed read degrades to unknown: at worst the graph holds only the CPU and memory.
+ *
+ * `cpu` gives the CPU (the server's cached `CpuInfo`, read once); without it, `cpuinfo` is read under `procRoot`.
  */
 export const readPciTopology = Effect.fn('pci.readPciTopology')(function* (
-  options: { readonly sysRoot?: string; readonly procRoot?: string } = {},
+  options: { readonly sysRoot?: string; readonly procRoot?: string; readonly cpu?: Effect.Effect<CpuInfo> } = {},
 ): Effect.fn.Return<TopologyGraph, never, FileSystem.FileSystem | Path.Path | PciIds> {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const sysRoot = options.sysRoot ?? '/sys';
   const procRoot = options.procRoot ?? '/proc';
-  const cpu = yield* readCpuInfo({ procRoot, sysRoot });
+  const cpu = yield* options.cpu ?? readCpuInfo({ procRoot, sysRoot });
   const nodes: Array<TopologyNode> = [
     {
       id: 'cpu',

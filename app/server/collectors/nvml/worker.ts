@@ -4,7 +4,8 @@
  *
  * It reads `ToSampler` commands on its stdin and writes `FromSampler` messages on its stdout, one JSON value per line
  * (`protocol.ts`). On `start` it opens and inits NVML: `error` when it cannot (it then stays idle), else `ready`, then
- * one `sample` every `intervalMs` (100 ms at least, the round's own time included). `configure` changes the interval
+ * one `sample` every `intervalMs` (100 ms at least, the round's own time included), read at the time of its start, by
+ * which the reader keeps its slow values for their period (`read.ts`). `configure` changes the interval
  * and what to read from the next round. The end of its stdin (the server gone, even killed) ends it, with exit 0.
  *
  * Run as is by Node in development (relative imports with `.ts`, erasable syntax only), bundled to
@@ -15,7 +16,7 @@ import { type Cause, Clock, Effect, Fiber, Predicate, Queue, Ref, Schema, Stdio,
 import { Ndjson } from 'effect/encoding';
 import { type GpuPollConfig, MEASURE_ALL } from '../gpu.ts';
 import { FromSampler, ToSampler } from './protocol.ts';
-import { deviceHandles, readNvml } from './read.ts';
+import { deviceHandles, nvmlReader } from './read.ts';
 import { openNvml } from './symbols.ts';
 
 /** NVML could not be opened, or a reading failed. */
@@ -28,14 +29,16 @@ const MIN_INTERVAL_MS = 100;
 const failed = (cause: unknown) =>
   NvmlFailed.make({ message: Predicate.isError(cause) ? cause.message : String(cause) });
 
-/** The library at `path` (else the system's), opened and initialized; shut down with the scope. */
+/**
+ * The library at `path` (else the system's), opened and initialized, and the reader of its cards; shut down with the
+ * scope.
+ */
 const open = Effect.fnUntraced(function* (path: string | undefined) {
   const lib = yield* Effect.try({ try: () => openNvml(path), catch: failed });
   const rc = yield* Effect.sync(() => lib.nvmlInit_v2());
   if (rc !== 0) return yield* NvmlFailed.make({ message: `nvmlInit_v2 returned ${rc}` });
   yield* Effect.addFinalizer(() => Effect.sync(() => lib.nvmlShutdown()));
-  const handles = yield* Effect.sync(() => deviceHandles(lib));
-  return { lib, handles };
+  return yield* Effect.sync(() => nvmlReader(lib, deviceHandles(lib)));
 });
 
 const program = Effect.gen(function* () {
@@ -57,10 +60,10 @@ const program = Effect.gen(function* () {
 
   /** Samples forever; each wait is the interval minus the round's time. A reading that fails ends it. */
   const sampling = Effect.fnUntraced(
-    function* (nvml: Effect.Success<ReturnType<typeof open>>) {
+    function* (read: Effect.Success<ReturnType<typeof open>>) {
       const t0 = yield* Clock.currentTimeMillis;
       const { needs } = yield* Ref.get(config);
-      const snapshot = yield* Effect.try({ try: () => readNvml(nvml.lib, nvml.handles, needs), catch: failed });
+      const snapshot = yield* Effect.try({ try: () => read(needs, t0), catch: failed });
       yield* send({ type: 'sample', snapshot });
       const { intervalMs } = yield* Ref.get(config);
       const t1 = yield* Clock.currentTimeMillis;
@@ -74,9 +77,9 @@ const program = Effect.gen(function* () {
     function* (command: Extract<ToSampler, { readonly type: 'start' }>) {
       if (yield* Ref.getAndSet(started, true)) return;
       yield* apply(command);
-      const nvml = yield* open(command.lib);
+      const read = yield* open(command.lib);
       yield* send({ type: 'ready' });
-      yield* sampling(nvml).pipe(
+      yield* sampling(read).pipe(
         Effect.catchTag('NvmlFailed', (e) => send({ type: 'error', message: e.message })),
         Effect.forkScoped,
       );

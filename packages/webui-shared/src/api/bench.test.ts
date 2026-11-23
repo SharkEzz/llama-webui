@@ -56,7 +56,6 @@ test('a BenchRun with a Nitro-written spec and empty hardware decodes', () => {
     draftAcceptPct: 47.5,
     vramPeak: [{ key: 'nvidia:GPU-1', name: 'Fake GPU', mib: 2048 }],
     error: 'Out of memory: unable to allocate',
-    logExcerpt: 'line',
     durationMs: 1234,
     diskReadPeakBps: 1.5e9,
     sweepId: 2,

@@ -35,9 +35,12 @@ export const MonitorHandlers = HttpApiBuilder.group(
       return { cpu: yield* cpu.read, gpus, nvidiaSource };
     }).pipe(Effect.withSpan('MonitorHandlers.systemInfo'));
 
-    /** The hardware graph, read again on every call (the link state changes with power states), and the placement. */
+    /**
+     * The hardware graph, read again on every call (the link state changes with power states), its CPU from the cached
+     * `CpuInfo` (the one of the system info), and the placement.
+     */
     const topology = Effect.gen(function* () {
-      const graph = yield* readPciTopology().pipe(Effect.provideContext(services));
+      const graph = yield* readPciTopology({ cpu: cpu.read }).pipe(Effect.provideContext(services));
       return { graph, placement: yield* placement.current };
     }).pipe(Effect.withSpan('MonitorHandlers.topology'));
 

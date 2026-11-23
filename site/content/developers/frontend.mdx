@@ -62,7 +62,6 @@ trigger, at least as wide as it), and `GlassCard` puts the glass look on the sha
 ```tsx title="app/src/main.tsx"
 startThemeSync();
 startServerSync();
-startLogsSync();
 startMonitorSync();
 startTopologySync();
 startDownloadsSync({ navigate: (to) => void router.navigate(to) });
@@ -73,7 +72,10 @@ useWs.getState().connect();
 open the model on the Models page: the store does not import the router (which imports the pages).
 
 The benchmark and tuning stores start their own sync the first time their page mounts (`startBenchSync()` in
-`BenchPage`, `startTuningSync()` in `TuningPage`).
+`BenchPage`, `startTuningSync()` in `TuningPage`). So do the logs, which only the Logs and Server pages show:
+`startLogsSync()` in `LogsPage` and in the Server page's latest logs, the whole ring read then, and the store kept
+running afterwards. The monitor's sync follows the snapshots from the start, but reads the history only when the first
+chart mounts (`wantHistory()` in `TimeSeriesChart`).
 
 ## Routing
 
@@ -143,23 +145,23 @@ A component reads a store through one selector per field or action (`useBench((s
 `useMemo`; the lint reports both ([React](/developers/contributing/conventions/#react)). `getState()` is for handlers,
 effects and the sync functions.
 
-| Module         | Store                                    | Fed by                                                                                                                         |
-| -------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `ws.ts`        | `useWs`                                  | The socket: connection status and last message.                                                                                |
-| `server.ts`    | `useServer`                              | `server-state`; `GET /api/state` on connection. Also the start, switch, restart and stop actions.                              |
-| `monitor.ts`   | `useMonitor`                             | `snapshot`, appended to a client-side history; `GET /api/monitor/history` on connection and when the history shape changes.    |
-| `logs.ts`      | `useLogs`                                | `hello` and `log`; `GET /api/logs?since=<seq>` on connection.                                                                  |
-| `topology.ts`  | `useTopology`                            | `placement`; `GET /api/topology` on connection.                                                                                |
-| `downloads.ts` | `useDownloads`                           | `download`, `download-progress`, `download-deleted`; the queue reloaded on connection. A finished download rescans the models. |
-| `bench.ts`     | `useBench`                               | `bench-progress`, `bench-run`, `bench-deleted`; the history reloaded on connection.                                            |
-| `tuning.ts`    | `useTuning`                              | `sweep`, `sweep-progress`, `sweep-deleted`, and the `bench-*` messages of the open sweep; the sweeps reloaded on connection.   |
-| `chat.ts`      | `useChat`                                | REST and the SSE stream of the open conversation.                                                                              |
-| `health.ts`    | `useHealth`                              | `GET /api/health`, refreshed by `AppLayout` on every connection.                                                               |
-| `theme.ts`     | `useTheme`                               | `localStorage` and the `theme` setting.                                                                                        |
-| `models.ts`    | `useModels`                              | `GET /api/models`, on demand.                                                                                                  |
-| `profiles.ts`  | `useProfiles`                            | `GET /api/profiles`, on demand.                                                                                                |
-| `flags.ts`     | `useFlags()` (hook over a private store) | `GET /api/flags`, read once: the flag catalogue of the configured `llama-server`.                                              |
-| `settings.ts`  | `useSettingsEditor()` (hook, no store)   | `GET` and `PATCH /api/settings`, with per-field validation errors.                                                             |
+| Module         | Store                                    | Fed by                                                                                                                                                                          |
+| -------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ws.ts`        | `useWs`                                  | The socket: connection status and last message.                                                                                                                                 |
+| `server.ts`    | `useServer`                              | `server-state`; `GET /api/state` on connection. Also the start, switch, restart and stop actions.                                                                               |
+| `monitor.ts`   | `useMonitor`                             | `snapshot`, appended to a client-side history once a chart has asked for it (`wantHistory`); `GET /api/monitor/history` then, on connection and when the history shape changes. |
+| `logs.ts`      | `useLogs`                                | Once the Logs or Server page has been shown (`startLogsSync`): `hello` and `log`; `GET /api/logs?since=<seq>` then and on connection.                                           |
+| `topology.ts`  | `useTopology`                            | `placement`; `GET /api/topology` while the Topology page is shown (`watchTopology`), again on each connection.                                                                  |
+| `downloads.ts` | `useDownloads`                           | `download`, `download-progress`, `download-deleted`; the queue reloaded on connection. A finished download rescans the models.                                                  |
+| `bench.ts`     | `useBench`                               | `bench-progress`, `bench-run`, `bench-deleted`; the history reloaded on connection.                                                                                             |
+| `tuning.ts`    | `useTuning`                              | `sweep`, `sweep-progress`, `sweep-deleted`, and the `bench-*` messages of the open sweep; the sweeps reloaded on connection.                                                    |
+| `chat.ts`      | `useChat`                                | REST and the SSE stream of the open conversation.                                                                                                                               |
+| `health.ts`    | `useHealth`                              | `GET /api/health`, refreshed by `AppLayout` on every connection.                                                                                                                |
+| `theme.ts`     | `useTheme`                               | `localStorage` and the `theme` setting.                                                                                                                                         |
+| `models.ts`    | `useModels`                              | `GET /api/models`, on demand.                                                                                                                                                   |
+| `profiles.ts`  | `useProfiles`                            | `GET /api/profiles`, on demand.                                                                                                                                                 |
+| `flags.ts`     | `useFlags()` (hook over a private store) | `GET /api/flags`, read once: the flag catalogue of the configured `llama-server`.                                                                                               |
+| `settings.ts`  | `useSettingsEditor()` (hook, no store)   | `GET` and `PATCH /api/settings`, with per-field validation errors.                                                                                                              |
 
 ### Monitoring history
 
@@ -168,7 +170,9 @@ effects and the sync functions.
 update, and `useSeries(key)` re-renders on it. Each `snapshot` carries the values of its tick in `points`, and the
 history's `intervalMs` and `capacity`: when they no longer match the local copy (the polling interval or history
 length changed in Settings), the client reloads the whole history. Snapshots that arrive during a reload are queued and
-appended afterwards.
+appended afterwards. The first snapshot of a connection comes right after `hello` (the latest one the hub kept), so the
+gauges fill as soon as the WebSocket opens; its point is already in the history that the connection reloads, and
+`append()` skips a point whose time is not after the last one.
 
 ### Chat streaming
 
@@ -177,6 +181,34 @@ decodes each event with the endpoint's schema. `delta` events accumulate and are
 conversation whose reply is still running (`live: true`) attaches to it with `GET /api/chat/:id/stream`. Switching to
 another conversation aborts the stream, which only unsubscribes: the generation goes on on the server (see
 [Chat runs](/developers/server/chat/)).
+
+A flush renders only the end of the reply. The page and the thread read the store through selectors, and `Message`,
+`Reasoning` and `CodeBlock` are memoized: the conversation list, the composer and the finished messages do not render
+again during a reply.
+
+`Markdown` (`features/chat/Markdown.tsx`) cuts a growing reply into pieces of top-level blocks (`features/chat/blocks.ts`)
+and renders each piece with its own react-markdown, memoized and keyed by its offset: the pieces before the last one are
+neither parsed nor rendered again, and a piece keeps its components (a code block its highlighting). The cuts come from
+the parse of the last piece, which rendering it makes anyway (a remark plugin notes where its top-level blocks start):
+finding them costs no parse of its own. A cut is made only where it is final and the pieces render as the whole text
+would:
+
+- before a block whose first line is complete, unindented, after a blank line (`2` after `1. a` is a paragraph until
+  its line ends: `2. b` would continue the list);
+- not after an indented code block (micromark reads the next block as if it interrupted a paragraph), nor after a list
+  item or a quote that ends inside a code or HTML block left open (closed by the next line, it does not take the same
+  blank lines as at the end of the text);
+- never in a reply with a link reference definition or a footnote (`]:`, `[^`), which ties blocks to text elsewhere, or
+  a carriage return: those render whole.
+
+A finished reply opened as such is one piece, parsed once. `Markdown.test.ts` renders a corpus and random documents at
+every cut of a stream with `react-dom/server`, by pieces and whole, and compares the HTML.
+
+Each piece renders from a string of its own (`detached`): a finished piece's text is copied once, when it is cut, and
+the last piece's at each flush. In V8 a slice of a string is a view that keeps the whole string alive, and React keeps
+the props of a component's last two renders: without the copy, each finished piece, through its parse, its props and
+its DOM, kept the whole reply as it was when it was cut (about 5 MB for a reply of 29 000 characters, until the page
+was reloaded). `Markdown.test.ts` checks the retention after a garbage collection.
 
 ## WebSocket client
 
@@ -323,8 +355,8 @@ draws its scene with react-three-fiber (`features/topology/`).
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `flows.ts`          | Pure: projects the snapshot and the placement onto the graph. `linkFlows()` (throughput, share of the capacity, alert level), `linkBadge()`, `nodeLive()` (tank layers, labels, tooltip), `peerLinks()`. |
 | `layout.ts`         | Pure: where each block sits, the curve of each link (`linkPath()`, `peerPath()`) and the camera fit.                                                                                                     |
-| `smooth.ts`         | `Smoother` (per-key easing between two ticks) and `flowVisual()`, the log scale of the streaks.                                                                                                          |
-| `pacing.ts`         | `FramePacer`: a frame only when something moves.                                                                                                                                                         |
+| `smooth.ts`         | `Smoother` (per-key easing between two ticks, on the time between frames) and `flowVisual()`, the log scale of the streaks.                                                                              |
+| `pacing.ts`         | `FramePacer`: a frame only when something moves, at 60 fps for transitions, gestures and easing values, 30 for the streaks (their easing included) and the memory pulse, 20 for the drift alone.         |
 | `TopologyScene.tsx` | The three.js scene: tanks, CPU thread grid, tubes, streaks, peer-to-peer dots, and the `Projector` that anchors the DOM labels.                                                                          |
 | `Labels.tsx`        | DOM labels, link badges and the tooltip, positioned by the scene.                                                                                                                                        |
 | `Hud.tsx`           | The Phase and Model cards and the legend popover; `hudPrefs.ts` keeps the folded cards in `localStorage` (`llama-webui:topology-hud`).                                                                   |

@@ -185,12 +185,18 @@ layer(NO_IDS)('amdgpu', (it) => {
         const path = yield* Path.Path;
         const root = yield* tmp('llt-proc-');
         const dir = path.join(root, '123', 'fdinfo');
+        const fd = path.join(root, '123', 'fd');
+        yield* mkdir(fd);
         const vram = yield* fx('fdinfo-amd-vram.txt');
         yield* write(path.join(dir, '96'), vram);
+        yield* link('/dev/dri/renderD128', path.join(fd, '96'));
         yield* write(path.join(dir, '97'), vram);
+        yield* link('/dev/dri/renderD128', path.join(fd, '97'));
         const igpu = yield* fx('fdinfo-amd-igpu.txt');
         yield* write(path.join(dir, '98'), igpu);
+        yield* link('/dev/dri/card2', path.join(fd, '98'));
         yield* write(path.join(dir, '3'), 'pos: 0\n');
+        yield* link('/dev/dri/renderD129', path.join(fd, '3'));
         const m = yield* readProcAmdVram(123, { procRoot: root, skipNodes: new Set() });
         assert.strictEqual(m.get('amd:0000:08:00.0'), 6146240 * 1024);
         assert.strictEqual(m.get('amd:0000:0d:00.0'), 32 * 1024);
@@ -433,6 +439,35 @@ layer(NO_IDS)('amdgpu', (it) => {
         const m = yield* readProcAmdVram(123, { procRoot: root, skipNodes: new Set(['card2', 'renderD129']) });
         assert.strictEqual(m.get('amd:0000:08:00.0'), 6146240 * 1024);
         assert.isFalse(m.has('amd:0000:0d:00.0'));
+      }),
+    ),
+  );
+
+  it.effect('readProcAmdVram reads the fdinfo of DRM descriptors only, from where each link points on this read', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* tmp('llt-proc-drm-');
+        const fdinfo = path.join(root, '123', 'fdinfo');
+        const fd = path.join(root, '123', 'fd');
+        yield* mkdir(fd);
+        const vramText = yield* fx('fdinfo-amd-vram.txt');
+        // A model file whose fdinfo would count (it cannot on a real system): not a DRM node, never opened.
+        yield* write(path.join(fdinfo, '5'), vramText);
+        yield* link('/models/qwen.gguf', path.join(fd, '5'));
+        // A descriptor closed between the listing and its link: its fdinfo is left alone.
+        yield* write(path.join(fdinfo, '6'), vramText);
+        const read = readProcAmdVram(123, { procRoot: root, skipNodes: new Set() });
+        assert.strictEqual((yield* read).size, 0);
+        // Number 5 closed, then opened again on a card: seen on the next read.
+        yield* fs.remove(path.join(fd, '5'));
+        yield* link('/dev/dri/renderD128', path.join(fd, '5'));
+        assert.strictEqual((yield* read).get('amd:0000:08:00.0'), 6146240 * 1024);
+        // And the other way round: a number of a card reused for a file is no longer read.
+        yield* fs.remove(path.join(fd, '5'));
+        yield* link('/models/qwen.gguf', path.join(fd, '5'));
+        assert.strictEqual((yield* read).size, 0);
       }),
     ),
   );

@@ -36,8 +36,9 @@ llama-webui starts `llama-server` with `-lv 4` (see [Flags llama-webui sets itse
 loading writes a few hundred lines, and each request a few dozen. The `update_slots: all slots are idle` line, which
 this level repeats every time the monitor polls the server, is left out of the buffer.
 
-The buffer is never written to disk: restarting llama-webui empties it. When the browser connects, or reconnects
-after a network drop, it loads the lines already in the buffer, then receives new ones live.
+The buffer is never written to disk: restarting llama-webui empties it. The first time you open this page or the
+[Server](/docs/server/) page, the browser loads the lines already in the buffer, then receives new ones live; after a
+network drop it loads the lines it missed.
 
 <Callout type="note">
 

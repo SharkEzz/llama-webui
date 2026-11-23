@@ -1,5 +1,5 @@
 import { MessageSquare } from 'lucide-react';
-import { useLayoutEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import { useChat } from '@/lib/chat';
 import { Message } from './Message';
 
@@ -10,6 +10,7 @@ export function Thread({ canSend }: { canSend: boolean }) {
   const regenerate = useChat((s) => s.regenerate);
   const box = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  const onRegenerate = useCallback(() => void regenerate(), [regenerate]);
 
   useLayoutEffect(() => {
     const el = box.current;
@@ -46,7 +47,7 @@ export function Thread({ canSend }: { canSend: boolean }) {
               message={m}
               live={streaming?.assistantId === m.id ? streaming : undefined}
               canRegenerate={canSend && !streaming && m.id === lastAssistant?.id}
-              onRegenerate={() => void regenerate()}
+              onRegenerate={onRegenerate}
             />
           ))}
         </div>

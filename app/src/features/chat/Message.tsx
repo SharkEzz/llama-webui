@@ -1,6 +1,6 @@
 import type { ChatMessage } from '@llama-webui/shared';
 import { Check, Copy, RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { copyText } from '@/lib/clipboard';
@@ -16,7 +16,8 @@ interface MessageProps {
   onRegenerate: () => void;
 }
 
-export function Message({ message, live, canRegenerate, onRegenerate }: MessageProps) {
+/** A message of the thread; memo: while a reply streams, only that reply renders again. */
+export const Message = memo(function Message({ message, live, canRegenerate, onRegenerate }: MessageProps) {
   const [copied, setCopied] = useState(false);
   if (message.role === 'user')
     return (
@@ -78,4 +79,4 @@ export function Message({ message, live, canRegenerate, onRegenerate }: MessageP
       )}
     </div>
   );
-}
+});

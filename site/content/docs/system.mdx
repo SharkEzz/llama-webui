@@ -31,15 +31,15 @@ Two gauges come first:
 
 Then a list of readings:
 
-| Row                     | What it shows                                                                                            |
-| ----------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Total VRAM**          | The card's memory.                                                                                       |
-| **PCIe**                | Current link generation and width, and in brackets the most the link supports: `Gen5 x8 (max Gen5 x16)`. |
-| **PCIe RX / TX**        | Traffic over the link: RX from the host to the card, TX from the card to the host.                       |
-| **Power**               | Current draw, and the power limit after a slash when the card reports it: `120 W / 300 W`.               |
-| **GPU / memory clocks** | Current graphics and memory clocks.                                                                      |
-| **Temperature**         | GPU temperature.                                                                                         |
-| **Fan**                 | Fan speed, in percent of its maximum.                                                                    |
+| Row                     | What it shows                                                                                                                                |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Total VRAM**          | The card's memory.                                                                                                                           |
+| **PCIe**                | Current link generation and width, and in brackets the most the link supports: `Gen5 x8 (max Gen5 x16)`.                                     |
+| **PCIe RX / TX**        | Traffic over the link: RX from the host to the card, TX from the card to the host. Through NVML, measured every 5 seconds.                   |
+| **Power**               | Current draw, and the power limit after a slash when the card reports it: `120 W / 300 W`. Through NVML, the limit is read every 10 seconds. |
+| **GPU / memory clocks** | Current graphics and memory clocks.                                                                                                          |
+| **Temperature**         | GPU temperature.                                                                                                                             |
+| **Fan**                 | Fan speed, in percent of its maximum.                                                                                                        |
 
 A chart at the bottom plots **Utilization** and **VRAM** over the history.
 
@@ -73,7 +73,7 @@ Without PCIe traffic, the [Topology](/docs/topology/) page draws no streaks and 
 ### NVIDIA: NVML or nvidia-smi
 
 NVML is the library installed with the NVIDIA driver (`libnvidia-ml.so.1`). llama-webui loads it when it starts and
-reads every card from a background thread. If NVML cannot be loaded or does not
+reads every card from a process of its own. If NVML cannot be loaded or does not
 answer within 3 seconds, llama-webui falls back to `nvidia-smi`, which reports fewer values (see the table above).
 
 To use `nvidia-smi` on purpose, turn off **NVML for NVIDIA GPUs** on the **Monitoring** tab of Settings. The change
@@ -170,7 +170,9 @@ of the card: it starts on the running profile's model, or the first model of you
 those checks. **Measure disk** reads the selected model's file to measure the disk's sequential read speed, which the
 **Model disk bandwidth** check then uses; the system cache may inflate the result if the file was read recently.
 
-While expanded, the card refreshes every 10 seconds; the reload button refreshes it at once. The checks that do not
+While expanded, the card refreshes every 10 seconds; the reload button refreshes it at once. NVML reads the
+persistence mode and the power limit of a card every 10 seconds, so after you change one with `nvidia-smi` its check
+can take up to 20 seconds to follow. The checks that do not
 depend on a model also appear in the first-run checklist (see [First run](/docs/getting-started/first-run/)).
 
 ## When a collector is off

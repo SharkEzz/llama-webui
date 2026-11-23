@@ -48,9 +48,15 @@ export function parseFdinfo(
   return { driver, clientId, pdev: Str.toLowerCase(pdev), vramBytes: vram === null ? 0 : Number(vram[1]) * unit };
 }
 
+/** A DRM node's name (`card1`, `renderD128`): what an open descriptor of a card links to, in `/dev/dri`. */
+const DRM_NODE = /^(card|renderD)\d+$/;
+
 /**
- * AMD VRAM of a process, per card (`amd:<pdev>`), from its fdinfo. Descriptors open on a `skipNodes` node (hidden or
- * suspended card) are recognized by the target of their /proc/<pid>/fd/N link and their fdinfo is not read.
+ * AMD VRAM of a process, per card (`amd:<pdev>`), from the fdinfo of its DRM descriptors. Each tick reads the target
+ * of every `/proc/<pid>/fd/N` link (one `readlink`, no file opened) and the fdinfo only of a descriptor open on a DRM
+ * node (`card<N>`, `renderD<N>`) that is not in `skipNodes` (a hidden or suspended card): a process holds tens of
+ * descriptors and a few of them on a card. The links are read again on every tick, never kept: a number closed then
+ * opened again between two ticks may point elsewhere.
  */
 export const readProcAmdVram = Effect.fn('amdgpu.readProcAmdVram')(function* (
   pid: number,
@@ -59,19 +65,21 @@ export const readProcAmdVram = Effect.fn('amdgpu.readProcAmdVram')(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const procRoot = options.procRoot ?? '/proc';
-  const dir = path.join(procRoot, String(pid), 'fdinfo');
-  const entries = yield* fs.readDirectory(dir).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
+  const dir = path.join(procRoot, String(pid));
+  const entries = yield* fs
+    .readDirectory(path.join(dir, 'fd'))
+    .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
   const seen = new Set<string>();
   const perCard = new Map<string, number>();
   yield* Effect.forEach(
     entries,
     (entry) =>
       Effect.gen(function* () {
-        if (options.skipNodes.size > 0) {
-          const target = yield* fs.readLink(path.join(procRoot, String(pid), 'fd', entry)).pipe(Effect.option);
-          if (Option.isSome(target) && options.skipNodes.has(path.basename(target.value))) return;
-        }
-        const text = yield* fs.readFileString(path.join(dir, entry)).pipe(Effect.option);
+        const target = yield* fs.readLink(path.join(dir, 'fd', entry)).pipe(Effect.option);
+        if (Option.isNone(target)) return;
+        const node = path.basename(target.value);
+        if (!DRM_NODE.test(node) || options.skipNodes.has(node)) return;
+        const text = yield* fs.readFileString(path.join(dir, 'fdinfo', entry)).pipe(Effect.option);
         if (Option.isNone(text) || !Str.includes('amdgpu')(text.value)) return;
         const info = parseFdinfo(text.value);
         if (info === null) return;

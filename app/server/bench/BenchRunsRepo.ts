@@ -70,7 +70,10 @@ const SpecJson = Schema.fromJsonString(StoredBenchSpec);
 const HardwareJson = Schema.fromJsonString(BenchHardware);
 const VramJson = Schema.fromJsonString(BenchRun.fields.vramPeak);
 
-/** A row of `bench_runs`; its stats stay text, decoded by `runOf` (stats that do not decode are dropped). */
+/**
+ * A row of `bench_runs` as the runs are read (`COLUMNS`); its stats stay text, decoded by `runOf` (stats that do not
+ * decode are dropped). `log_excerpt` is written and never read back: no reply carries a run's log.
+ */
 const Row = Schema.Struct({
   id: Schema.Int,
   kind: BenchKind,
@@ -85,7 +88,6 @@ const Row = Schema.Struct({
   stats_json: Schema.NullOr(Schema.String),
   vram_mib_json: VramJson,
   error: Schema.NullOr(Schema.String),
-  log_excerpt: Schema.String,
   duration_ms: Schema.NullOr(Schema.Finite),
   sweep_id: Schema.NullOr(Schema.Int),
   sweep_label: Schema.NullOr(Schema.String),
@@ -132,7 +134,6 @@ const runOf = Effect.fn('BenchRunsRepo.runOf')(function* (row: typeof Row.Type) 
     draftAcceptPct: stats.draftAcceptPct,
     vramPeak: row.vram_mib_json,
     error: row.error,
-    logExcerpt: row.log_excerpt,
     durationMs: row.duration_ms,
     diskReadPeakBps: stats.diskReadPeakBps ?? null,
     sweepId: row.sweep_id,
@@ -145,11 +146,11 @@ const runOf = Effect.fn('BenchRunsRepo.runOf')(function* (row: typeof Row.Type) 
 
 /** What `finish` writes over a run: an omitted field is kept. */
 export type BenchFinish = Partial<
-  Pick<
-    BenchRun,
-    'status' | 'pp' | 'tg' | 'draftAcceptPct' | 'vramPeak' | 'error' | 'logExcerpt' | 'durationMs' | 'diskReadPeakBps'
-  >
->;
+  Pick<BenchRun, 'status' | 'pp' | 'tg' | 'draftAcceptPct' | 'vramPeak' | 'error' | 'durationMs' | 'diskReadPeakBps'>
+> & {
+  /** The tool's last lines, stored in `log_excerpt` for a look at the database: the run itself does not carry them. */
+  readonly logExcerpt?: string;
+};
 
 /** A new run: a one-off run (`running`), or an item of a sweep. */
 export interface NewRun {
@@ -207,17 +208,22 @@ export class BenchRunsRepo extends Context.Service<
     BenchRunsRepo,
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
+      /** The columns of `Row`: every one but `log_excerpt`, which a list of 500 runs would read for nothing. */
+      const COLUMNS = sql.literal(
+        'id, kind, status, model_path, profile_id, args_json, command, hardware_json, pp_tps, tg_tps, stats_json, ' +
+          'vram_mib_json, error, duration_ms, sweep_id, sweep_label, fit, created_at',
+      );
 
       const findById = SqlSchema.findOneOption({
         Request: Schema.Int,
         Result: Row,
-        execute: (id) => sql`SELECT * FROM bench_runs WHERE id = ${id}`,
+        execute: (id) => sql`SELECT ${COLUMNS} FROM bench_runs WHERE id = ${id}`,
       });
       const findNextQueued = SqlSchema.findOneOption({
         Request: Schema.Int,
         Result: Row,
         execute: (sweepId) =>
-          sql`SELECT * FROM bench_runs WHERE sweep_id = ${sweepId} AND status = 'queued' ORDER BY id LIMIT 1`,
+          sql`SELECT ${COLUMNS} FROM bench_runs WHERE sweep_id = ${sweepId} AND status = 'queued' ORDER BY id LIMIT 1`,
       });
 
       /** The run of `id`: a row the caller holds the id of (one missing is a defect). */
@@ -249,7 +255,7 @@ export class BenchRunsRepo extends Context.Service<
           VALUES (${run.spec.kind}, ${run.status}, ${run.spec.modelPath},
             (SELECT id FROM profiles WHERE id = CAST(${run.spec.profileId} AS INTEGER)), ${spec}, ${run.command},
             ${run.hardware}, '[]', ${run.sweepId ?? null}, ${run.label ?? null}, ${run.fit ?? null}, ${now})
-          RETURNING *`;
+          RETURNING ${COLUMNS}`;
         const [row] = yield* Schema.decodeUnknownEffect(Schema.Array(Row))(rows);
         return row === undefined ? yield* Effect.die('INSERT … RETURNING gave no row') : yield* runOf(row);
       });
@@ -341,8 +347,8 @@ export class BenchRunsRepo extends Context.Service<
             stats_json: stats,
             vram_mib_json: vram,
             error: next.error,
-            log_excerpt: next.logExcerpt,
             duration_ms: next.durationMs,
+            ...(result.logExcerpt === undefined ? {} : { log_excerpt: result.logExcerpt }),
           })} WHERE id = ${id}`;
           return yield* byId(id);
         },
@@ -365,7 +371,7 @@ export class BenchRunsRepo extends Context.Service<
           const order = Predicate.isNumber(filters.sweep)
             ? sql.literal('id ASC')
             : sql.literal('created_at DESC, id DESC');
-          const rows = yield* sql`SELECT * FROM bench_runs
+          const rows = yield* sql`SELECT ${COLUMNS} FROM bench_runs
             ${Arr.isArrayNonEmpty(where) ? sql`WHERE ${sql.and(where)}` : sql.literal('')}
             ORDER BY ${order} LIMIT CAST(${filters.limit} AS INTEGER)`;
           const decoded = yield* Schema.decodeUnknownEffect(Schema.Array(Row))(rows);

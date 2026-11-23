@@ -182,7 +182,8 @@ model only adds a warning: it has no effect there.
 The **Checks** button of the **Hardware** card opens the [System](/docs/system/) page, where the **Checks** card reviews
 the system settings that affect llama.cpp. It is read-only: for each item it shows the state (ok, to improve, unknown or
 not applicable), the impact, and, when there is one, the command to copy. A badge says whether the fix lasts **until
-reboot** or is **permanent**.
+reboot** or is **permanent**. The persistence mode and the power limit of an NVIDIA card are read every 10 seconds:
+after you change one, its check can take up to 20 seconds to follow.
 
 The checks look at the model picked in that card and at the last recommendation computed for it on the Tuning page: the
 memlock limit is only checked when `--load-mode mmap+mlock` is recommended, and swappiness and swap are only flagged when the

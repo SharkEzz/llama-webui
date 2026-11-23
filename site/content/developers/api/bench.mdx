@@ -120,7 +120,6 @@ file name, in the same folder (`benchBinary()`).
 | `draftAcceptPct`  | number \| null          | `server` runs with speculative decoding: accepted draft tokens, %, one decimal.                                                   |
 | `vramPeak`        | object[]                | Per card (`key`, `name`, `mib`): peak VRAM above what the card held at launch. Cards with 0 MiB are left out.                     |
 | `error`           | string \| null          | Why it failed. An out-of-memory failure starts with `Out of memory` (`OOM_ERROR`; test it with `isOomError()`).                   |
-| `logExcerpt`      | string                  | The tool's last 50 lines.                                                                                                         |
 | `durationMs`      | number \| null          | Duration of the execution.                                                                                                        |
 | `diskReadPeakBps` | number \| null          | Peak read throughput of the model's disk during the run, if measured.                                                             |
 | `sweepId`         | number \| null          | Its sweep, null for a one-off run.                                                                                                |
@@ -198,7 +197,6 @@ curl -X POST http://127.0.0.1:7860/api/bench/run \
   "draftAcceptPct": null,
   "vramPeak": [],
   "error": null,
-  "logExcerpt": "",
   "durationMs": null,
   "diskReadPeakBps": null,
   "sweepId": null,

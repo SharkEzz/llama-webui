@@ -308,10 +308,26 @@ export function figures(results: Results): Figure[] {
       push({
         ...plain,
         id: 'collectors.nvml.sampleCpuMs',
-        label: 'NVML sample, CPU',
+        label: 'NVML full sample, CPU',
         value: nvml.sampleCpuMs,
         kind: 'duration',
       });
+      if (nvml.lightCpuMs !== undefined)
+        push({
+          ...plain,
+          id: 'collectors.nvml.lightCpuMs',
+          label: 'NVML light sample, CPU',
+          value: nvml.lightCpuMs,
+          kind: 'duration',
+        });
+      if (nvml.avgCpuMs !== undefined)
+        push({
+          ...plain,
+          id: 'collectors.nvml.avgCpuMs',
+          label: 'NVML sample on average at 1 Hz, CPU',
+          value: nvml.avgCpuMs,
+          kind: 'duration',
+        });
       for (const c of nvml.calls)
         push({
           ...plain,

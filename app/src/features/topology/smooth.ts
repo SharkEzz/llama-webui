@@ -1,3 +1,5 @@
+import type { Motion } from './pacing';
+
 /** Distance to the target below which a smoothed value has arrived (invisible: less than one 8-bit color level). */
 const SETTLED = 2e-3;
 /**
@@ -9,7 +11,7 @@ export const MAX_DT = 0.1;
 /** Per-key exponential smoothing, so tick values (1 s) do not advance in jumps in the render loop. */
 export class Smoother {
   private readonly v = new Map<string, number>();
-  private moving = false;
+  private moving: Motion = false;
   private readonly tau: number;
 
   /** `tau`: time constant (s); after `tau`, 63% of the way to the target is covered. */
@@ -17,7 +19,11 @@ export class Smoother {
     this.tau = tau;
   }
 
-  step(key: string, target: number | null, dt: number): number {
+  /**
+   * `pace`: the frame rate the value needs while it eases, `ambient` for the streaks' own count, length and speed (they
+   * never settle between two ticks, and 30 fps draws the same curve), `active` for everything else.
+   */
+  step(key: string, target: number | null, dt: number, pace: 'active' | 'ambient' = 'active'): number {
     const t = target ?? 0;
     const prev = this.v.get(key);
     if (prev === undefined) {
@@ -26,12 +32,15 @@ export class Smoother {
     }
     const next = prev + (t - prev) * (1 - Math.exp(-Math.min(dt, MAX_DT) / this.tau));
     this.v.set(key, next);
-    if (Math.abs(t - next) > SETTLED) this.moving = true;
+    if (Math.abs(t - next) > SETTLED && this.moving !== 'active') this.moving = pace;
     return next;
   }
 
-  /** A value had not yet reached its target since the last call: the animation must go on. */
-  takeMoving(): boolean {
+  /**
+   * A value had not yet reached its target since the last call: the animation must go on, at the active rate as soon as
+   * one such value needs it, else at the ambient rate.
+   */
+  takeMoving(): Motion {
     const m = this.moving;
     this.moving = false;
     return m;

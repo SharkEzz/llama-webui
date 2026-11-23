@@ -71,9 +71,18 @@ A few scenarios leave things as they find them only on the way out:
   from the disk as after a reboot; the report shows the share of the model still cached at the start.
 - `generation` and `chat` create conversations titled `Profiling (temp)` and delete them at the end.
 - `collectors` is a breakdown, not a verdict. Its NVML table times only the calls, in the tool's own process: the
-  sampler process also runs Node, encodes and sends each sample and collects its garbage. The NVML sampler's whole
-  cost is its row in the windows of `idle` or `dashboard`. The list of `/proc` and sysfs reads is kept in the tool,
-  written from `app/server/collectors/`: it does not follow the code.
+  sampler process also runs Node, encodes and sends each sample and collects its garbage. The reader reads the PCIe
+  throughput, the power limit and the persistence mode again only once their period has passed, by the time the tool
+  gives it: after a first round that reads everything (dropped, with the values the sampler keeps: identity, maxima,
+  driver versions), the tool alternates full samples (every period passed) and light ones (none), one per second. The
+  table is the cost of each call in a full sample, labelled with how often it runs at 1 Hz (counted over a minute of
+  samples on a reader of its own); the tiles give a full sample, a light one and the average at 1 Hz (a light sample
+  plus the calls it leaves out, as often as they run). The NVML sampler's whole cost is its row in the windows of
+  `idle` or `dashboard`. The list of `/proc` and sysfs reads is kept in the tool,
+  written from `app/server/collectors/`: it does not follow the code. It holds what a tick reads again each time:
+  not what the app keeps once read (an AMD card's link maximum), nor the cards the instance hides, and
+  for llama-server's descriptors their `/proc/<pid>/fd` links (a `readlink` each) then the fdinfo of those open on a
+  DRM node, only when an AMD card is read.
 
 ## Check a fix
 
@@ -111,7 +120,9 @@ reference to check one fix against, as the next section explains.
 ## Read a comparison
 
 With `--compare`, the report opens on **What changed**: the figures whose difference exceeds the noise of their kind,
-largest first. Every other figure shows the reference value and the difference, and a figure under its noise is shown
+largest first. A full pass lists a few hundred of them: the field above the table keeps the rows whose label contains
+what you type (`chrome-gpu`, `/topology`), and **Group by measured window** puts them under the window they were
+measured in. Every other figure shows the reference value and the difference, and a figure under its noise is shown
 as unchanged. The noise is a fixed threshold per kind of figure: a difference is a change when it exceeds both the
 share of the reference and the floor; a figure of a profiled window has twice that threshold. They were set from two
 runs of the same scenarios on unchanged code: two runs give a spread, not a distribution. A smaller difference may
@@ -155,7 +166,8 @@ Three things to keep in mind:
 </FileTree>
 
 `.cache/` is ignored by git, the formatter and the linter. `pnpm profiling:report` reads `results.json` only, so a
-report can be rewritten, or compared, without the raw data.
+report can be rewritten, or compared, without the raw data. The report follows the system's light or dark theme; its
+switch (**Auto**, **Light**, **Dark**) picks one, which the browser keeps.
 
 ## What the tool undoes
 

@@ -21,7 +21,8 @@ non-browser clients send none. A refused upgrade gets the guard's `403` (`Reques
 `WebSocket upgrade expected` (plain text), after the guard. `/ws/` is a `308` to `/ws`.
 
 Every frame is a JSON text message `{ "type": "…", "payload": … }` (`ping` and `pong` have no payload). There is no
-subscription: every connected client receives every broadcast message. The server reads only `ping` and `pong` from
+subscription: every connected client receives every broadcast message, the same text: the hub encodes a message
+once for all of them, and not at all while no client is connected. The server reads only `ping` and `pong` from
 clients and ignores anything else: frames that are not JSON, and JSON that is not a `ping` or a `pong`.
 
 ```ts title="watch.ts"
@@ -44,6 +45,13 @@ On every new connection, the hub sends `hello` to that client before anything el
 ```json
 { "type": "hello", "payload": { "serverTime": 1794210000000, "bootId": "1b0f6c52-8a7e-4f4e-9d0b-3f2a5c7e9a14" } }
 ```
+
+Right after `hello`, the hub sends that client the last [`snapshot`](#snapshot) published, so a page shows live
+values as soon as it connects instead of waiting for the next monitor tick. Before the first tick (or with the monitor
+stubbed by `LLAMA_WEBUI_TEST_MONITOR=stub`) there is none, and nothing is sent. The client then gets every message
+published after that snapshot, none twice: the hub keeps the snapshot and publishes it in one step, and subscribes a
+client and reads it in another, under the same lock. No other message is kept: the rest of the state is read over REST
+after a connection.
 
 `bootId` identifies the llama-webui process (a random UUID drawn by `AppInfo`, `app/server/config/AppInfo.ts`, when
 the services are built). It changes when llama-webui restarts, and in development whenever a save of a server file
@@ -78,7 +86,7 @@ clients reconnect once llama-webui is back, to a new `bootId`. A development res
 | [`hello`](#hello)                         | server to client | `{ serverTime, bootId }`                 | Once, when the client connects.                                                   |
 | [`ping`](#ping-and-pong)                  | both             | none                                     | Every 15 seconds by the server; by a client when it wants.                        |
 | [`pong`](#ping-and-pong)                  | both             | none                                     | In answer to a `ping`.                                                            |
-| [`snapshot`](#snapshot)                   | server to all    | `Snapshot` (`monitor.ts`)                | At every monitor tick (`pollIntervalMs`, 1000 ms by default).                     |
+| [`snapshot`](#snapshot)                   | server to all    | `Snapshot` (`monitor.ts`)                | At every tick (`pollIntervalMs`, 1000 ms by default); the last one after `hello`. |
 | [`log`](#log)                             | server to all    | `LogLine[]` (`logs.ts`)                  | When lines reach the log ring, batched.                                           |
 | [`server-state`](#server-state)           | server to all    | `ServerView` (`server.ts`)               | On every change of the supervisor's state.                                        |
 | [`bench-progress`](#bench-progress)       | server to all    | `BenchLive \| null` (`bench.ts`)         | On every change of the running benchmark's progress; `null` when the run is over. |
@@ -106,7 +114,8 @@ No payload: `{ "type": "ping" }` and `{ "type": "pong" }`. See [Heartbeat](#hear
 ### `snapshot`
 
 The monitor's state at a tick (`app/server/monitor/tick.ts`, run by `Monitor`, `app/server/monitor/Monitor.ts`); `GET /api/monitor/snapshot` returns the
-latest one. Its main fields:
+latest one. A client that connects gets the latest one right after `hello`: it is at most one `pollIntervalMs` old,
+since the monitor ticks whether a client is connected or not (its `at` tells when it was taken). Its main fields:
 
 | Field            | Type                                             | Description                                                                 |
 | ---------------- | ------------------------------------------------ | --------------------------------------------------------------------------- |
@@ -169,7 +178,7 @@ sweep too).
 A whole `BenchRun` (`packages/webui-shared/src/bench.ts`): sent when the run starts (a one-off run when it is created, a sweep item
 when its turn comes), when it ends, and again if the server restart that follows it fails (the error is appended to
 the run's). Its fields: `id`, `kind`, `status`, `spec`, `command`, `hardware`, `pp`, `tg`, `draftAcceptPct`,
-`vramPeak`, `error`, `logExcerpt`, `durationMs`, `diskReadPeakBps`, `sweepId`, `sweepLabel`, `fit` and `createdAt`.
+`vramPeak`, `error`, `durationMs`, `diskReadPeakBps`, `sweepId`, `sweepLabel`, `fit` and `createdAt`.
 See [Benchmarks](/developers/api/bench/).
 
 ### `bench-deleted`
@@ -246,15 +255,15 @@ A whole `DownloadItem` (`packages/webui-shared/src/hf.ts`) on every status chang
 The socket only carries changes, so a client that connects, or reconnects after a drop, first reads the current state
 over REST. The web app does it in each store: when `useWs` goes to `open`, it reloads.
 
-| Store (`app/src/lib/`) | Reloads                          | Then applies                                                                               |
-| ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------ |
-| `server.ts`            | `GET /api/state`                 | `server-state`                                                                             |
-| `logs.ts`              | `GET /api/logs?since=<next seq>` | `log`                                                                                      |
-| `monitor.ts`           | `GET /api/monitor/history`       | `snapshot`                                                                                 |
-| `topology.ts`          | `GET /api/topology`              | `placement`                                                                                |
-| `bench.ts`             | `GET /api/bench/runs`            | `bench-progress`, `bench-run`, `bench-deleted`                                             |
-| `tuning.ts`            | `GET /api/sweeps`                | `sweep-progress`, `sweep`, `bench-progress`, `bench-run`, `bench-deleted`, `sweep-deleted` |
-| `downloads.ts`         | `GET /api/downloads`             | `download-progress`, `download`, `download-deleted`                                        |
+| Store (`app/src/lib/`) | Reloads                                                                   | Then applies                                                                               |
+| ---------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `server.ts`            | `GET /api/state`                                                          | `server-state`                                                                             |
+| `logs.ts`              | `GET /api/logs?since=<next seq>` (once the Logs or Server page was shown) | `log`                                                                                      |
+| `monitor.ts`           | `GET /api/monitor/history` (once a chart was shown)                       | `snapshot`                                                                                 |
+| `topology.ts`          | `GET /api/topology` (Topology page shown)                                 | `placement`                                                                                |
+| `bench.ts`             | `GET /api/bench/runs`                                                     | `bench-progress`, `bench-run`, `bench-deleted`                                             |
+| `tuning.ts`            | `GET /api/sweeps`                                                         | `sweep-progress`, `sweep`, `bench-progress`, `bench-run`, `bench-deleted`, `sweep-deleted` |
+| `downloads.ts`         | `GET /api/downloads`                                                      | `download-progress`, `download`, `download-deleted`                                        |
 
 The list routes return the current progress with the list (`{ runs, live }`, `{ sweeps, live }`, `{ items, live }`), so
 a progress bar comes back without waiting for the next `*-progress` message.

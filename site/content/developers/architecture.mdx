@@ -125,7 +125,8 @@ The browser talks to llama-webui over three channels, all on the same port.
 runs one fiber per client. A client message over 4,096 bytes closes the socket with code `1009`.
 
 There is one hub and one connection per tab. The hub sends `hello` with the `bootId` and the server time when a
-client connects, then broadcasts every message to every client: there are no subscriptions, the client dispatches by
+client connects, then the last monitor `snapshot` it kept (none before the first tick), then broadcasts every message to
+every client: there are no subscriptions, the client dispatches by
 `type`. Every 15 seconds the hub sends `ping`; a client that leaves two pings unanswered is closed with code `4000`
 `heartbeat`. A client's `ping` is answered with `pong`. Every message is encoded with the `WsMessage` union of
 `packages/webui-shared/src/ws.ts`, listed on the [WebSocket](/developers/api/websocket/) page.

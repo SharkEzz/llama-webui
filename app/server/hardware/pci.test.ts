@@ -437,6 +437,88 @@ layer(NodeServices.layer)('pci', (it) => {
     }),
   );
 
+  it.effect('readPciTopology: nodes and links in bus id order, one node and one uplink per chipset', () =>
+    Effect.gen(function* () {
+      const link = ['16.0 GT/s PCIe', 4, '16.0 GT/s PCIe', 4] as const;
+      const gpu = (device: string): Dev => ({ vendor: '0x10de', device, cls: '0x030000', link });
+      // A second chipset under its own root port, with a card behind each of two downstream ports.
+      const g = yield* machine({
+        '0000:00:03.1': {
+          vendor: '0x1022',
+          device: '0x14db',
+          cls: '0x060400',
+          link,
+          children: {
+            '0000:10:00.0': {
+              vendor: '0x1022',
+              device: '0x43f4',
+              cls: '0x060400',
+              link,
+              children: {
+                '0000:11:00.0': {
+                  vendor: '0x1022',
+                  device: '0x43f5',
+                  cls: '0x060400',
+                  link,
+                  children: { '0000:12:00.0': gpu('0x2c05') },
+                },
+                '0000:11:01.0': {
+                  vendor: '0x1022',
+                  device: '0x43f5',
+                  cls: '0x060400',
+                  link,
+                  children: { '0000:13:00.0': gpu('0x2c05') },
+                },
+              },
+            },
+          },
+        },
+      }).pipe(Effect.flatMap(topologyOf));
+      assert.deepStrictEqual(
+        Arr.map(g.nodes, (n) => n.id),
+        [
+          'cpu',
+          'ram',
+          'pci:0000:01:00.0',
+          'pci:0000:02:00.0',
+          'chipset:0000:04:00.0',
+          'pci:0000:08:00.0',
+          'pci:0000:0d:00.0',
+          'chipset:0000:10:00.0',
+          'pci:0000:12:00.0',
+          'pci:0000:13:00.0',
+        ],
+      );
+      assert.deepStrictEqual(
+        Arr.map(g.links, (l) => l.id),
+        [
+          'cpu-ram',
+          'cpu-pci:0000:01:00.0',
+          'cpu-pci:0000:02:00.0',
+          'cpu-chipset:0000:04:00.0',
+          'chipset:0000:04:00.0-pci:0000:08:00.0',
+          'cpu-pci:0000:0d:00.0',
+          'cpu-chipset:0000:10:00.0',
+          'chipset:0000:10:00.0-pci:0000:12:00.0',
+          'chipset:0000:10:00.0-pci:0000:13:00.0',
+        ],
+      );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect('readPciTopology: the CPU given as `cpu` is used, cpuinfo is not read', () =>
+    Effect.gen(function* () {
+      const m = yield* machine();
+      const cpu = { model: 'Cached CPU', physicalCores: 2, logicalThreads: 4, numaNodes: 1, flags: [] };
+      const g = yield* withIds(
+        [m.ids],
+        readPciTopology({ sysRoot: m.sysRoot, procRoot: m.procRoot, cpu: Effect.succeed(cpu) }),
+      );
+      const node = Arr.findFirst(g.nodes, (n) => n.id === 'cpu').pipe(Option.getOrUndefined);
+      assert.deepStrictEqual(node?.detail, { model: 'Cached CPU', physicalCores: 2, logicalThreads: 4, numaNodes: 1 });
+    }).pipe(Effect.scoped),
+  );
+
   it.effect('readPciTopology: a sleeping card reporting width 63 (config read 0xFFFF) gives an unknown width', () =>
     Effect.gen(function* () {
       const path = yield* Path.Path;

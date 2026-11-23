@@ -114,21 +114,20 @@ bounds `historySeconds` to 30 to 1,800 and `pollIntervalMs` to at least 250, so 
 The history is only in memory: it is lost when llama-webui stops, and in development when a save of a file the
 server imports restarts it.
 
-The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`):
+The keys are built by `SERIES` (`packages/webui-shared/src/monitor.ts`), one per value a chart of the app draws over
+time; a value no chart draws (a GPU's power or temperature, the request queue) stays in the snapshot only:
 
-| Keys                                                                         | Measure                                       |
-| ---------------------------------------------------------------------------- | --------------------------------------------- |
-| `llama.genTps`, `llama.ppTps`, `llama.specAccept`                            | Generation and prompt speed, draft acceptance |
-| `llama.kvPct`, `llama.reqProcessing`, `llama.reqDeferred`, `llama.busySlots` | Context use and request queue                 |
-| `proc.cpuPct`, `proc.dram`                                                   | The `llama-server` process                    |
-| `gpu.<key>.util`, `.vramPct`, `.pcieRx`, `.pcieTx`, `.power`, `.temp`        | Per GPU, `<key>` being `GpuSample.key`        |
-| `sys.cpu`, `sys.memPct`, `sys.tempC`, `mem.read`, `mem.write`                | Machine CPU, memory, DRAM bandwidth           |
-| `disk.read`, `disk.write`, `disk.modelRead`                                  | Disks, and the disk holding the model         |
+| Keys                                             | Measure                                |
+| ------------------------------------------------ | -------------------------------------- |
+| `llama.genTps`, `llama.ppTps`                    | Generation and prompt speed            |
+| `gpu.<key>.util`, `.vramPct`                     | Per GPU, `<key>` being `GpuSample.key` |
+| `sys.cpu`, `sys.memPct`, `mem.read`, `mem.write` | Machine CPU, memory, DRAM bandwidth    |
+| `disk.read`, `disk.write`, `disk.modelRead`      | Disks, and the disk holding the model  |
 
 Two rules keep the series aligned on the timestamps:
 
 - Some series start at their first known value: they are pushed only when the value is a finite number or the
-  series already exists. A machine without a CPU sensor never gets a `sys.tempC` series. The others exist from the
+  series already exists. A machine whose DRAM bandwidth is not measurable never gets a `mem.read` series. The others exist from the
   first tick.
 - Once it exists, a series moves one point per tick. An unknown value is stored as `NaN`, and `endTick()` pushes `NaN`
   to any series not fed on the tick. `NaN` becomes `null` in `points` and in the dump.
@@ -139,13 +138,16 @@ left with `null` for a series that started after the oldest timestamp.
 ## How snapshots reach the browser
 
 The monitor publishes each snapshot on the hub (`WsHub`, `app/server/ws/WsHub.ts`) as a `snapshot` WebSocket
-message ([WebSocket](/developers/api/websocket/)). The web app (`app/src/lib/monitor.ts`):
+message ([WebSocket](/developers/api/websocket/)). The hub keeps the latest one and sends it to a client right after
+its `hello`, so a page has values as soon as it connects. The web app (`app/src/lib/monitor.ts`):
 
-- reads `GET /api/monitor/history` when the WebSocket opens, and replays the snapshots that arrived during that
-  request;
-- appends each snapshot's `points` to its copy of the history, and trims it to `capacity`;
-- reads the history again when `snapshot.history` (interval or capacity) no longer matches its copy, after a settings
-  change;
+- keeps the latest snapshot from the start, for every page;
+- reads `GET /api/monitor/history` only when the first chart is shown (`wantHistory()`, called by `TimeSeriesChart`;
+  when the WebSocket opens if it is not open yet), and replays the snapshots that arrived during that request; before
+  that, a snapshot leaves the history empty, so a page without a chart never reads it;
+- from then on, appends each snapshot's `points` to its copy of the history, and trims it to `capacity`;
+- reads the history again on each reconnect of the WebSocket, and when `snapshot.history` (interval or capacity) no
+  longer matches its copy, after a settings change;
 - empties its copy when the `hello` message carries a different `bootId`, since the server restarted.
 
 `GET /api/monitor/snapshot` returns the latest snapshot, or `null` before the first tick.
@@ -191,10 +193,27 @@ its stdin and stdout, and both sides decode the lines with the schemas of `nvml/
 | server to sampler (`ToSampler`)   | `{ type: 'start', intervalMs, needs, lib? }`, then `{ type: 'configure', intervalMs, needs }` |
 | sampler to server (`FromSampler`) | `{ type: 'ready' }`, `{ type: 'error', message }`, `{ type: 'sample', snapshot }`             |
 
-`nvml/read.ts` reads, per card: name, UUID, bus ID, utilization, memory utilization, VRAM, temperature, power and
-power limits, persistence mode, clocks, fan, current and maximum PCIe link, PCIe throughput, the compute processes,
-and the driver and CUDA driver versions. Device handles are pointers, kept as `bigint`; out-parameters are buffers.
-The typed `dlopen()` checks the `NvmlSymbols` interface against the symbol definitions.
+`nvmlReader()` (`nvml/read.ts`) makes one sample per call, at the time the sampler gives it (`Clock`). On every sample
+it reads, per card: utilization, memory utilization, VRAM, temperature, power, graphics and memory clocks, fan, current
+PCIe link and the compute processes. Three values cost a call into the driver each that nothing needs every second, so
+they are read again only once their period has passed since their last read, and each sample in between reports the
+value last read:
+
+| Value                                                     | Period                            | Read by                                                                                  |
+| --------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------- |
+| PCIe throughput, received and sent (the calls that block) | 5 s (`PCIE_THROUGHPUT_PERIOD_MS`) | The System page's GPU card, the Topology page's streaks                                  |
+| Power limit, persistence mode                             | 10 s (`LIMITS_PERIOD_MS`)         | The GPU card (the limit) and the tuning checks, which the System page reloads every 10 s |
+
+The periods are times, not counts of samples: with an interval longer than a period, the value is read on every
+sample. The first sample reads them all, and so does the first sample of a card after it was hidden. A slow value
+NVML refuses is reported unknown (`null`) and asked again on the next sample, never replaced by the one before; an
+answer that the card does not support it is kept for the period. A clock that goes back reads them again. What does
+not change is read on the first sample that needs it, then kept: per card its UUID, name, bus ID, maximum graphics clock, maximum
+PCIe link and default power limit, and the driver and CUDA driver versions. Such a value is kept once NVML gives it, or
+says the card does not support it; any other failure is asked again on the next sample, and a card whose UUID fails is
+left out of that sample. A hidden card is only identified, so after its first sample it costs no call. Device handles
+are pointers, kept as `bigint`, read once when NVML starts; out-parameters are buffers, allocated once per reader and
+reused by every sample. The typed `dlopen()` checks the `NvmlSymbols` interface against the symbol definitions.
 
 `node:ffi` is experimental in Node 26: the sampler starts with `--disable-warning=ExperimentalWarning`, so its warning
 does not print on every start. `workerPath()` (`nvml/Nvml.ts`) finds its module next to the one that starts it:
@@ -230,12 +249,19 @@ background every 5 ticks (`appsEvery` of `Monitor.layerWith`). The binary is `nv
 `discoverAmdCards()` lists `/sys/class/drm/card<N>` entries whose `device/vendor` is `0x1002`, with their hwmon
 folder, their DRM nodes (`card<N>`, `renderD<N>`), the PCIe link that leads to the slot, and a name from `pci.ids`.
 `readAmdCard()` reads `gpu_busy_percent`, `mem_info_vram_used` and `mem_info_vram_total`, `mem_busy_percent`, the
-link speed and width, `pp_dpm_sclk` and `pp_dpm_mclk`, and from hwmon the temperature, power, power cap and fan.
+link speed and width, `pp_dpm_sclk` and `pp_dpm_mclk`, and from hwmon the temperature, power, power cap and fan. The
+link's maximum is kept once both ends are known; the other files cost a few microseconds each and are read on every
+tick.
 
-- A card whose `power/runtime_status` is `suspended` is not read: reading its attributes would wake it up.
-- The process VRAM comes from `/proc/<pid>/fdinfo`: entries with `drm-driver: amdgpu` give `drm-pdev` and
-  `drm-memory-vram`, counted once per `drm-pdev` and `drm-client-id`. Descriptors open on a hidden or suspended card's
-  DRM node are recognized by their `/proc/<pid>/fd` link and their fdinfo is not read.
+- A card whose `power/runtime_status` is `suspended` is not read: reading its attributes would wake it up. A hidden
+  card is not read at all.
+- The process VRAM comes from the fdinfo of its DRM descriptors: each tick reads the target of every
+  `/proc/<pid>/fd/<N>` link, then `/proc/<pid>/fdinfo/<N>` only for a descriptor open on a DRM node (`card<N>`,
+  `renderD<N>`) that is not a hidden or suspended card's. A `llama-server` holds a hundred descriptors or more
+  (sockets, pipes, the NVIDIA driver's), and a few on a card. The links are read again on every tick, never kept: a
+  number closed and opened again between two ticks may point elsewhere. Entries with `drm-driver: amdgpu` give
+  `drm-pdev` and `drm-memory-vram`, counted once per `drm-pdev` and `drm-client-id`. With no AMD card read (none, or all
+  hidden or suspended), no descriptor is looked at.
 
 ### `/proc`: process, CPU and memory
 
