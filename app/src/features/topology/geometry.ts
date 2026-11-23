@@ -30,9 +30,17 @@ const MIN_INTERVALS = 6;
 const CUBIC_STEPS = 64;
 const QUAD_STEPS = 16;
 
-/** Smallest and largest scale of a drawing in its frame: under the first it scrolls, over the second it stops growing. */
-export const SCALE_MIN = 0.75;
-export const SCALE_MAX = 1.5;
+/**
+ * Smallest and largest scale of a drawing in its frame. Between them the drawing takes its frame exactly, and never
+ * scrolls; under the first, in a window too small to read it, it keeps half its size and scrolls.
+ */
+export const SCALE_MIN = 0.5;
+export const SCALE_MAX = 2;
+
+/** What the side column takes from the width of the page (20 rem and its gap), in px. */
+export const COLUMN_PX = 336;
+/** What the header takes from the height of the page when it sits above the drawing (2.5 rem and its gap), in px. */
+export const HEADER_PX = 52;
 
 /** A coordinate in a path: one decimal at most. */
 const n = (v: number) => String(Math.round(v * 10) / 10);
@@ -172,8 +180,25 @@ export function crosses(a: Route, b: Route): boolean {
   return false;
 }
 
+interface Size {
+  w: number;
+  h: number;
+}
+
 /** Scale at which a drawing of a natural size takes its frame, within the bounds. */
-export function fitScale(frame: { w: number; h: number }, natural: { w: number; h: number }): number {
+export function fitScale(frame: Size, natural: Size): number {
   if (!(natural.w > 0) || !(natural.h > 0)) return 1;
   return Math.max(SCALE_MIN, Math.min(SCALE_MAX, frame.w / natural.w, frame.h / natural.h));
+}
+
+/**
+ * Whether the side column stands at the right of the drawing, in a page of this size, rather than under it: it does
+ * when the drawing keeps its natural size beside it, or when the whole width would not make it any larger (a drawing
+ * its height already limits). Otherwise the drawing takes the whole width, and the column comes after it.
+ */
+export function columnAtRight(page: Size, natural: Size): boolean {
+  if (!(page.w > 0) || !(page.h > 0) || !(natural.w > 0) || !(natural.h > 0)) return false;
+  const beside = Math.min((page.w - COLUMN_PX) / natural.w, page.h / natural.h);
+  const alone = Math.min(page.w / natural.w, (page.h - HEADER_PX) / natural.h);
+  return beside >= Math.min(1, alone);
 }

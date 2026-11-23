@@ -20,7 +20,7 @@ const FIGURE = 'num text-foreground';
 /** A part the size of a drive or less: one line. */
 const STICK_MAX_H = 40;
 
-export function BoardView({ graph, live, peers, tones, selected, onSelect, ...stage }: ViewProps) {
+export function BoardView({ graph, live, peers, tones, ...stage }: ViewProps) {
   const layout = useMemo(() => layoutBoard(graph, peers), [graph, peers]);
   const pattern = useId();
   return (
@@ -35,14 +35,7 @@ export function BoardView({ graph, live, peers, tones, selected, onSelect, ...st
         const rect = layout.rects.get(node.id);
         const l = live.get(node.id);
         if (!rect || !l) return null;
-        const block = {
-          node,
-          live: l,
-          rect,
-          tone: toneOfNode(node, tones),
-          selected: selected === node.id,
-          onSelect,
-        };
+        const block = { node, live: l, rect, tone: toneOfNode(node, tones) };
         if (node.kind === 'ram')
           return (
             <Block key={node.id} {...block} bare>

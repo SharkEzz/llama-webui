@@ -2,8 +2,10 @@ import type { TopologyNode } from '@llama-webui/shared';
 import type { CSSProperties, ReactNode } from 'react';
 import { GLASS } from '@/components/glass/glass';
 import type { Tone } from '@/components/glass/tones';
+import { PopoverTrigger } from '@/components/ui/popover';
 import { formatPct } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { detailPopover } from './detailPopover';
 import type { LayerKind, Level, NodeLive } from './flows';
 import type { Rect } from './geometry';
 import { LAYER_TINT, tint } from './themeColors';
@@ -57,16 +59,17 @@ interface BlockProps {
   live: NodeLive;
   rect: Rect;
   tone: BlockTone;
-  selected: boolean;
-  onSelect: (id: string) => void;
   /** No glass surface of its own: the block is made of parts that have theirs (the memory modules of the board). */
   bare?: boolean;
   className?: string;
   children: ReactNode;
 }
 
-/** A block at its rectangle. Its content is phrasing content (spans): it sits in a button. */
-export function Block({ node, live, rect, tone, selected, onSelect, bare = false, className, children }: BlockProps) {
+/**
+ * A block at its rectangle: a button that opens its details beside it, outlined while they are open. Its content is
+ * phrasing content (spans).
+ */
+export function Block({ node, live, rect, tone, bare = false, className, children }: BlockProps) {
   const style: CSSProperties & { '--tone': string } = {
     left: rect.x,
     top: rect.y,
@@ -75,27 +78,26 @@ export function Block({ node, live, rect, tone, selected, onSelect, bare = false
     '--tone': toneVar(tone),
   };
   return (
-    <button
-      type="button"
+    <PopoverTrigger
+      handle={detailPopover}
+      payload={node.id}
       data-node={node.id}
-      aria-pressed={selected}
-      onClick={() => onSelect(node.id)}
       style={style}
       className={cn(
         'absolute cursor-pointer text-left text-foreground',
         bare
-          ? ['rounded-lg outline-offset-4 outline-primary-ink focus-visible:outline-2', selected && 'outline-2']
+          ? 'rounded-lg outline-offset-4 outline-primary-ink focus-visible:outline-2 data-popup-open:outline-2'
           : [
               GLASS,
               'transition-shadow outline-none hover:ring-surface-border-bright focus-visible:ring-2 focus-visible:ring-ring',
-              selected && 'ring-2 ring-primary-ink hover:ring-primary-ink',
+              'data-popup-open:ring-2 data-popup-open:ring-primary-ink',
             ],
         live.dim && 'opacity-60',
         className,
       )}
     >
       {children}
-    </button>
+    </PopoverTrigger>
   );
 }
 

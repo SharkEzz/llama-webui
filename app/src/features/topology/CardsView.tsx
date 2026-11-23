@@ -6,7 +6,7 @@ import { layoutCards, TALL_THREADS } from './layoutCards';
 import { Stage, type ViewProps } from './Stage';
 
 /** The machine as a diagram of glass cards: the CPU on top, what hangs off it below, linked by curves. */
-export function CardsView({ graph, live, peers, tones, selected, onSelect, ...stage }: ViewProps) {
+export function CardsView({ graph, live, peers, tones, ...stage }: ViewProps) {
   const layout = useMemo(() => layoutCards(graph, peers), [graph, peers]);
   return (
     <Stage graph={graph} layout={layout} tones={tones} {...stage}>
@@ -21,8 +21,6 @@ export function CardsView({ graph, live, peers, tones, selected, onSelect, ...st
             live={l}
             rect={rect}
             tone={toneOfNode(node, tones)}
-            selected={selected === node.id}
-            onSelect={onSelect}
             className="flex flex-col gap-[7px] px-[13px] py-[11px]"
           >
             <Head node={node} />

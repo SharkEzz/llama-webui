@@ -26,8 +26,6 @@ export interface ViewProps {
   /** llama-server is loading, processing a prompt or generating: every link with traffic shows it. */
   busy: boolean;
   reducedMotion: boolean;
-  selected: string | null;
-  onSelect: (id: string) => void;
 }
 
 export interface StageProps extends Pick<ViewProps, 'graph' | 'flows' | 'specs' | 'tones' | 'busy' | 'reducedMotion'> {
@@ -85,6 +83,10 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
   }, []);
 
   const scale = fitScale(room ?? { w: 0, h: 0 }, { w: layout.width, h: layout.height });
+  // The drawing takes its frame: only a window too small for half its size makes it scroll
+  const width = Math.floor(layout.width * scale);
+  const height = Math.floor(layout.height * scale);
+  const scrolls = room !== null && (width > room.w || height > room.h);
   const ratio = Math.min(MAX_RATIO, scale * (typeof devicePixelRatio === 'number' ? devicePixelRatio : 1));
 
   const links = useMemo(() => {
@@ -126,11 +128,8 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
   }, [states, links, theme]);
 
   return (
-    <div ref={frame} className="flex size-full overflow-auto">
-      <div
-        className={cn('m-auto shrink-0', room === null && 'invisible')}
-        style={{ width: layout.width * scale, height: layout.height * scale }}
-      >
+    <div ref={frame} className={cn('flex size-full', scrolls ? 'overflow-auto' : 'overflow-hidden')}>
+      <div className={cn('m-auto shrink-0', room === null && 'invisible')} style={{ width, height }}>
         <div
           className="relative origin-top-left"
           style={{ width: layout.width, height: layout.height, transform: `scale(${scale})` }}
