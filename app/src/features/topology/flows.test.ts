@@ -527,7 +527,7 @@ test('peerLinks: a single GPU per backend or a device without a PCI address: not
   ).toEqual([]);
 });
 
-test('peerLinks: three cards of one backend are joined as a chain, in the order of the scene', () => {
+test('peerLinks: three cards of one backend are joined as a chain, by bus address', () => {
   const g: TopologyGraph = {
     ...threeGpus,
     nodes: [

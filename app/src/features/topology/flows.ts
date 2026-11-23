@@ -28,7 +28,7 @@ export type Level = 'ok' | 'warn' | 'crit';
 /** Share of a link's current capacity from which it turns amber, then red. */
 export const LINK_WARN = 0.7;
 export const LINK_CRIT = 0.9;
-/** Fill (%) from which a tank's surface turns amber, then red. */
+/** Fill (%) from which a tank's bar and figure turn amber, then red. */
 export const FILL_WARN_PCT = 85;
 export const FILL_CRIT_PCT = 95;
 /** Share of the capacity from which a badge spells it out: below, the figure is noise. */
@@ -36,12 +36,13 @@ const BADGE_PCT_MIN = 0.25;
 /**
  * Throughput from which a link shows its traffic (streaks and badge) while llama-server is at rest (8 MiB/s): an idle
  * GPU exchanges a few MiB/s with the host, which would otherwise keep streaks running and badges on screen, and the
- * scene redrawing. While the server loads or generates, everything from 100 kB/s shows. The tooltips keep every figure.
+ * drawing repainting. While the server loads or generates, everything from 100 kB/s shows. A block's details keep
+ * every figure.
  */
 export const REST_FLOOR_BPS = 8 * 1024 ** 2;
 
 /**
- * The link's traffic is worth showing (streaks, glow, badge): its busier direction reaches the floor. `busy`:
+ * The link's traffic is worth showing (streaks, track, badge): its busier direction reaches the floor. `busy`:
  * llama-server is loading, processing a prompt or generating.
  */
 export function linkShown(flow: Pick<LinkFlow, 'fwdBps' | 'backBps'>, busy: boolean): boolean {
@@ -89,7 +90,7 @@ export interface TankLayer {
 }
 
 export interface NodeLive {
-  /** 0..100: load (GPU, CPU utilization…) driving the glow; null = unknown. */
+  /** 0..100: load (GPU, CPU utilization, a drive's share of its link); null = unknown. */
   loadPct: number | null;
   /** 0..100: fill (VRAM, RAM); null = not applicable. */
   fillPct: number | null;
@@ -452,7 +453,7 @@ const P2P_BACKEND = /^(CUDA|ROCm)\d+$/;
 
 /**
  * GPUs concerned by peer-to-peer, per backend: those holding the model when the launch requested it or NCCL reports
- * it, in the order of the scene. A backend with a single card has no one to talk to.
+ * it, by bus address. A backend with a single card has no one to talk to.
  */
 function peerGroups(graph: TopologyGraph, placement: ModelPlacement | null): TopologyNode[][] {
   if (!placement?.p2p) return [];
@@ -486,7 +487,7 @@ export function peerLinks(graph: TopologyGraph, placement: ModelPlacement | null
   );
 }
 
-/** Peer-to-peer of a GPU in its tooltip, when it is not in use (one short line: the Model card says more). */
+/** Peer-to-peer of a GPU in its details, when it is not in use (one short line: the Model card says more). */
 const P2P_SHORT = {
   active: 'active',
   requested: 'requested, not confirmed',

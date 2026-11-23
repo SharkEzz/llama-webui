@@ -19,7 +19,7 @@ export const TopologyNode = Schema.Struct({
   vendor: Schema.optional(Schema.Literals(['nvidia', 'amd', 'intel', 'other'])),
   /** Block device of an NVMe (`nvme0n1`): ties the node to `DiskSample.perDisk` and `model.disk`. */
   block: Schema.optionalKey(Schema.String),
-  /** Static facts shown in the tooltip (model, cores, size…); null = unknown. */
+  /** Static facts shown in the block's details (model, cores, size…); null = unknown. */
   detail: Schema.Record(Schema.String, Schema.NullOr(Schema.Union([Schema.String, Schema.Finite]))),
 });
 export type TopologyNode = typeof TopologyNode.Type;
