@@ -20,6 +20,10 @@ export interface State {
   /** the default profile to put back, when the tool changed it */
   restoreDefaultProfile: { id: number | null } | null;
   profileStarted: boolean;
+  /** the git worktree of a base ref (`--base`), with what was installed and built in it */
+  worktree: string | null;
+  /** the run's copy of the data directory (`--base`), in its `datadir` folder */
+  dataCopy: boolean;
 }
 
 export const EMPTY_STATE: State = {
@@ -32,6 +36,8 @@ export const EMPTY_STATE: State = {
   conversations: [],
   restoreDefaultProfile: null,
   profileStarted: false,
+  worktree: null,
+  dataCopy: false,
 };
 
 export interface RunDir {
@@ -73,6 +79,8 @@ function toState(value: unknown): State {
     conversations: arr(value.conversations).filter((c): c is number => typeof c === 'number'),
     restoreDefaultProfile: isRecord(restore) ? { id: typeof restore.id === 'number' ? restore.id : null } : null,
     profileStarted: value.profileStarted === true,
+    worktree: typeof value.worktree === 'string' && value.worktree !== '' ? value.worktree : null,
+    dataCopy: value.dataCopy === true,
   };
 }
 

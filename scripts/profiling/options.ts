@@ -8,6 +8,8 @@ export interface Options {
   /** The run's folder under `.cache/profiling/` (for `report`, the run to rewrite) */
   name: string;
   compare: string | null;
+  /** A git ref measured first, in a worktree, as the run `<name>.base` this one is compared with */
+  base: string | null;
   profile: number | null;
   dataDir: string | null;
   host: string;
@@ -109,12 +111,15 @@ export const SCENARIOS: Record<ScenarioName, ScenarioInfo> = {
   },
 };
 
-export const USAGE = `usage: pnpm profiling <scenario…|all> [--name <run>] [--compare <run>] [--profile <id>] [--data-dir <dir>]
-                       [--host <host>] [--port <port>] [--chrome <path>] [--no-build]
+export const USAGE = `usage: pnpm profiling <scenario…|all> [--name <run>] [--compare <run> | --base <ref>] [--profile <id>]
+                       [--data-dir <dir>] [--host <host>] [--port <port>] [--chrome <path>] [--no-build]
        pnpm profiling --list
        pnpm profiling:report <run> [--compare <run>]`;
 
 const RUN_NAME = /^[\w.-]+$/;
+
+/** The run a `--base` ref is measured as. */
+export const baseRunName = (name: string): string => `${name}.base`;
 
 function runName(value: string, what: string): string {
   if (!RUN_NAME.test(value)) throw new UsageError(`${what} must match [A-Za-z0-9._-]+: ${value}`);
@@ -144,6 +149,7 @@ export function parseOptions(argv: string[], now: Date): Options {
         list: { type: 'boolean' },
         name: { type: 'string' },
         compare: { type: 'string' },
+        base: { type: 'string' },
         profile: { type: 'string' },
         'data-dir': { type: 'string' },
         host: { type: 'string' },
@@ -161,6 +167,7 @@ export function parseOptions(argv: string[], now: Date): Options {
     scenarios: [],
     name: values.name === undefined ? stamp(now) : runName(values.name, '--name'),
     compare: values.compare === undefined ? null : runName(values.compare, '--compare'),
+    base: values.base ?? null,
     profile: values.profile === undefined ? null : integer(values.profile, '--profile'),
     dataDir: values['data-dir'] ?? null,
     host: values.host ?? '127.0.0.1',
@@ -174,6 +181,15 @@ export function parseOptions(argv: string[], now: Date): Options {
     if (run === undefined) throw new UsageError('report: name the run to rewrite');
     if (rest.length > 0) throw new UsageError(`report takes one run, got: ${positionals.slice(1).join(' ')}`);
     return { ...options, command: 'report', name: runName(run, 'the run') };
+  }
+  if (options.base !== null) {
+    if (options.base === '' || options.base.startsWith('-'))
+      throw new UsageError(`--base takes a git ref (a branch, a tag, a commit): ${options.base}`);
+    if (options.compare !== null)
+      throw new UsageError(
+        '--base and --compare: one reference at a time, the base is the one the run is compared with',
+      );
+    if (!options.build) throw new UsageError('--base and --no-build: the base has no build to reuse');
   }
   if (positionals.length === 0) throw new UsageError(`name at least one scenario: ${SCENARIO_NAMES.join(', ')}, all`);
   const asked = new Set<ScenarioName>();

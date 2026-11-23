@@ -5,20 +5,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseCpuProfile, summarizeProfile } from '../analyze/cpuprofile.ts';
 import { serverOrigins } from '../analyze/origins.ts';
-import {
-  alive,
-  baseUrlOf,
-  LAUNCHER,
-  now,
-  REPO,
-  SERVER_BUNDLE,
-  sleep,
-  startTime,
-  terminate,
-  waitHealth,
-} from '../instance.ts';
+import { alive, baseUrlOf, now, sleep, startTime, terminate, waitHealth } from '../instance.ts';
 import { parseJson } from '../json.ts';
 import { type Context, dataDir, type Scenario } from '../measure.ts';
+import { REPO } from '../target.ts';
 
 const LAUNCHES = 5;
 
@@ -28,7 +18,7 @@ async function launch(
   upMs: number,
 ): Promise<{ pid: number; startMs: number; stopMs: number }> {
   const { options, run } = ctx;
-  const args = [LAUNCHER, '--host', options.host, '--port', String(options.port)];
+  const args = [ctx.target.launcher, '--host', options.host, '--port', String(options.port)];
   if (options.dataDir !== null) args.push('--data-dir', options.dataDir);
   const t0 = now();
   const child = spawn(process.execPath, args, { cwd: REPO, stdio: 'ignore', env });
@@ -73,7 +63,7 @@ export const startup: Scenario<'startup'> = {
     if (file === undefined) throw new Error(`the profiled launch wrote no CPU profile in ${dir}`);
     const launchProfile = summarizeProfile(
       parseCpuProfile(parseJson(readFileSync(join(dir, file), 'utf8'))),
-      serverOrigins(SERVER_BUNDLE),
+      serverOrigins(ctx.target.serverBundle),
     );
     const bareNodeMs: number[] = [];
     for (let i = 0; i < LAUNCHES; i++) {

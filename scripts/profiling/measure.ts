@@ -6,15 +6,18 @@ import type { Browser, Page } from 'puppeteer-core';
 import { parseCpuProfile, summarizeProfile } from './analyze/cpuprofile.ts';
 import { clientOrigins, serverOrigins } from './analyze/origins.ts';
 import { summarizeTrace } from './analyze/trace.ts';
-import { type Instance, now, SERVER_BUNDLE, sleep } from './instance.ts';
+import { type Instance, now, sleep } from './instance.ts';
 import { arr, isRecord, num } from './json.ts';
 import type { Options } from './options.ts';
 import { watchProcs } from './procs.ts';
 import type { PageWindow, ScenarioName, ScenarioResults, Window, WsTraffic } from './results.ts';
 import type { RunDir } from './run-dir.ts';
+import type { Target } from './target.ts';
 
 export interface Context {
   run: RunDir;
+  /** the side this pass measures */
+  target: Target;
   options: Options;
   instance: Instance;
   browser: Browser | null;
@@ -182,7 +185,7 @@ export async function measure(ctx: Context, page: Page | null, options: WindowOp
   if (session) await session.detach();
   if (pageRaw !== null) window.pageProfile = summarizeProfile(parseCpuProfile(pageRaw), clientOrigins(sourcemaps(ctx)));
   if (serverRaw !== null)
-    window.serverProfile = summarizeProfile(parseCpuProfile(serverRaw), serverOrigins(SERVER_BUNDLE));
+    window.serverProfile = summarizeProfile(parseCpuProfile(serverRaw), serverOrigins(ctx.target.serverBundle));
   if (page && options.trace === true) window.trace = summarizeTrace(tracePath);
   if (before && after && countersBefore && countersAfter) {
     const d = (k: string) => (after.get(k) ?? 0) - (before.get(k) ?? 0);

@@ -10,6 +10,9 @@
 // count over one minute of samples at 1 Hz, the default interval, on a reader of its own.
 import { existsSync, readdirSync, readFileSync, readlinkSync, realpathSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import type * as NvmlRead from '../../../app/server/collectors/nvml/read.ts';
+import type * as NvmlSymbols from '../../../app/server/collectors/nvml/symbols.ts';
 import { now, sleep } from '../instance.ts';
 import { isRecord } from '../json.ts';
 import type { Scenario } from '../measure.ts';
@@ -32,19 +35,32 @@ const cpuMs = (c: NodeJS.CpuUsage) => (c.user + c.system) / 1000;
 
 type Collectors = ScenarioResults['collectors'];
 
-/** The app's own NVML code, loaded here only: `node:ffi` warns that it is experimental as it loads. */
-async function loadNvml() {
-  const [symbols, read] = await Promise.all([
-    import('../../../app/server/collectors/nvml/symbols.ts'),
-    import('../../../app/server/collectors/nvml/read.ts'),
-  ]);
+const exportsFunctions = (module: unknown, names: string[]): boolean =>
+  isRecord(module) && names.every((name) => typeof module[name] === 'function');
+const isSymbols = (module: unknown): module is typeof NvmlSymbols => exportsFunctions(module, ['openNvml']);
+const isRead = (module: unknown): module is typeof NvmlRead =>
+  exportsFunctions(module, ['deviceHandles', 'nvmlReader']);
+
+/**
+ * The app's own NVML code, from the sources of the side under measure (`root`), loaded here only: `node:ffi` warns
+ * that it is experimental as it loads. A base whose reader does not export what this scenario calls is refused: its
+ * NVML table is then skipped, and the head's is shown without comparison.
+ */
+async function loadNvml(root: string) {
+  const load = async (file: string): Promise<unknown> => {
+    const module: unknown = await import(pathToFileURL(join(root, 'app/server/collectors/nvml', file)).href);
+    return module;
+  };
+  const [symbols, read] = await Promise.all([load('symbols.ts'), load('read.ts')]);
+  if (!isSymbols(symbols) || !isRead(read))
+    throw new Error(`${root} does not export openNvml, deviceHandles and nvmlReader as this tool calls them`);
   return { lib: symbols.openNvml(), deviceHandles: read.deviceHandles, nvmlReader: read.nvmlReader };
 }
 
-async function nvml(skipped: string[]): Promise<Collectors['nvml']> {
+async function nvml(root: string, skipped: string[]): Promise<Collectors['nvml']> {
   let loaded: Awaited<ReturnType<typeof loadNvml>>;
   try {
-    loaded = await loadNvml();
+    loaded = await loadNvml(root);
   } catch (error) {
     skipped.push(`NVML: the library does not load (${error instanceof Error ? error.message : String(error)})`);
     return null;
@@ -306,7 +322,7 @@ export const collectors: Scenario<'collectors'> = {
   name: 'collectors',
   run: async (ctx) => {
     const skipped: string[] = [];
-    const n = await nvml(skipped);
+    const n = await nvml(ctx.target.root, skipped);
     if (n) {
       const top = n.calls.slice(0, 5).map((c) => c.call.replace('nvmlDeviceGet', ''));
       ctx.log(
