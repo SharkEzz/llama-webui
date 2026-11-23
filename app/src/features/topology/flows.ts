@@ -11,13 +11,16 @@ import {
   type TopologyNode,
 } from '@llama-webui/shared';
 import type { Tone } from '@/components/glass/tones';
-import { fmt, formatBps, formatBytes, formatPct, plural } from '@/lib/format';
-import { FLOOR_BPS } from './smooth';
+import { fmt, formatBps, formatBytes, formatPct, num, plural } from '@/lib/format';
 
 /*
  * Projects the snapshot (existing measurements) onto the hardware graph: what flows over each link and what to say
  * about each node. Pure functions, tested without DOM or Three.
  */
+
+/** Throughput under which a link counts as idle, and the top of the log scale its streaks are drawn on. */
+export const FLOOR_BPS = 1e5;
+export const CEIL_BPS = 20e9;
 
 /** How close to its limit a link or a tank is; always shown next to its figure, never by color alone. */
 export type Level = 'ok' | 'warn' | 'crit';
@@ -103,7 +106,7 @@ export interface NodeLive {
   barPct: number | null;
   /** Second line under the name (memory in use); null = none. */
   sub: string | null;
-  /** Tooltip lines. */
+  /** Every figure of the block, for its detail panel. */
   facts: Fact[];
 }
 
@@ -290,8 +293,18 @@ export function nodeLive(
       if (buf && buf.kvBytes > 0) add('KV cache', formatBytes(buf.kvBytes));
       if (buf && buf.computeBytes > 0) add('Compute buffers', formatBytes(buf.computeBytes));
       if (tank.otherBytes) add('Other VRAM', formatBytes(tank.otherBytes));
+      if (g && g.procVramBytes > 0) add('llama-server (VRAM)', formatBytes(g.procVramBytes));
       if (g?.tempC != null) add('Temperature', `${fmt(g.tempC, 1)} °C`);
       if (g?.powerW != null) add('Power', `${fmt(g.powerW, 1)} W`);
+      if (g?.memUtilPct != null) add('Memory controller', formatPct(g.memUtilPct));
+      if (g?.fanPct != null) add('Fan', formatPct(g.fanPct));
+      if (g?.powerLimitW != null) {
+        const factory = g.powerDefaultLimitW;
+        const lowered = factory != null && factory !== g.powerLimitW;
+        add('Power limit', `${fmt(g.powerLimitW, 0)} W${lowered ? ` (factory ${fmt(factory, 0)} W)` : ''}`);
+      }
+      if (g?.clockGrMhz != null) add('Graphics clock', `${fmt(g.clockGrMhz, 0)} MHz`);
+      if (g?.clockMemMhz != null) add('Memory clock', `${fmt(g.clockMemMhz, 0)} MHz`);
       add('PCIe link', linkLabel(g?.pcieGen ?? link?.genCur, g?.pcieWidth ?? link?.widthCur));
       if (flow?.fwdBps != null) add('Host → GPU', formatBps(flow.fwdBps));
       if (flow?.backBps != null) add('GPU → host', formatBps(flow.backBps));
@@ -319,6 +332,7 @@ export function nodeLive(
       if (snapshot?.proc) add('llama-server', formatPct(snapshot.proc.cpuPct));
       if (sys?.freqMhz != null) add('Frequency', `${sys.freqMhz} MHz`);
       if (sys?.tempC != null) add('Temperature', `${fmt(sys.tempC, 1)} °C`);
+      if (sys?.load) add('Load average', sys.load.map((x) => num(2).format(x)).join('  '));
       const cores = n.detail.physicalCores;
       const threads = n.detail.logicalThreads;
       if (cores != null && threads != null) add('Cores', `${cores} cores · ${threads} threads`);
@@ -341,6 +355,7 @@ export function nodeLive(
       const bw = snapshot?.system?.memBw ?? null;
       const usage = mem && used !== null ? `${formatBytes(used)} / ${formatBytes(mem.totalBytes)}` : null;
       add('Used', usage);
+      if (mem && mem.cachedBytes > 0) add('Cached', formatBytes(mem.cachedBytes));
       if (bw) add('Read', formatBps(bw.readBps));
       if (bw) add('Write', formatBps(bw.writeBps));
       if (snapshot?.proc?.dramBps != null) add('llama-server (DRAM)', formatBps(snapshot.proc.dramBps));
@@ -391,6 +406,36 @@ export function nodeLive(
     }
   }
   return out;
+}
+
+/**
+ * The current state of each PCIe link, by link id (“Gen4 x8”): what tells a link that trained below what it can do. A
+ * GPU's sample wins over the graph, read less often; a link whose state is unknown has no entry.
+ */
+export function linkSpecs(graph: TopologyGraph, snapshot: Snapshot | null): Map<string, string> {
+  const out = new Map<string, string>();
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  for (const l of graph.links) {
+    if (l.kind !== 'pcie') continue;
+    const to = byId.get(l.to);
+    const g = to?.kind === 'gpu' ? gpuOf(snapshot, to) : undefined;
+    const label = linkLabel(g?.pcieGen ?? l.genCur, g?.pcieWidth ?? l.widthCur);
+    if (label) out.set(l.id, label);
+  }
+  return out;
+}
+
+/** What the detail panel shows. */
+export interface NodeDetail {
+  node: TopologyNode;
+  live: NodeLive;
+}
+
+/** The selected block and its figures; null without a selection, or once the block is no longer in the graph. */
+export function detailOf(graph: TopologyGraph, live: Map<string, NodeLive>, id: string | null): NodeDetail | null {
+  const node = id === null ? undefined : graph.nodes.find((n) => n.id === id);
+  const figures = node ? live.get(node.id) : undefined;
+  return node && figures ? { node, live: figures } : null;
 }
 
 /** A direct GPU-to-GPU connection (peer-to-peer): not a PCIe link of the graph, and not measured apart. */

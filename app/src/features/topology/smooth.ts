@@ -1,3 +1,4 @@
+import { CEIL_BPS, FLOOR_BPS } from './flows';
 import type { Motion } from './pacing';
 
 /** Distance to the target below which a smoothed value has arrived (invisible: less than one 8-bit color level). */
@@ -47,9 +48,6 @@ export class Smoother {
   }
 }
 
-/** Throughput under which a link counts as idle: no streak. */
-export const FLOOR_BPS = 1e5;
-const CEIL_BPS = 20e9;
 const RANGE = Math.log10(CEIL_BPS / FLOOR_BPS);
 /** Most streaks on one lane of a link. */
 export const MAX_STREAKS = 24;
