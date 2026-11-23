@@ -94,11 +94,11 @@ only under `--base`; with the default port the tool already refused next to a ru
 - **The answer.** `summary.md` as a comment on the PR, with the measured commit and a link to the workflow run. A pass
   that fails or is refused answers with its reason: the last lines of the output, the runner's home, workspace,
   temporary and data paths replaced.
-- **The report.** Copied to `PROFILING_REPORTS_DIR` on the runner when that variable is set. **(my call)**: it is not
-  attached to the pull request nor uploaded as an artifact. The repository is public, and the report names the machine
-  (CPU, GPUs, kernel, the profile, the data directory's path). The design first shown to the user said the report
-  would be attached: this is a deviation, to be reopened if they want it (an artifact is the way, for a private
-  repository or once the report can leave the machine's description out).
+- **The report.** The head's `report.html` (it holds the comparison) is uploaded as an artifact of the workflow run
+  (`actions/upload-artifact`, `archive: false`: one file that opens in a browser) and linked from the answer. On a
+  public repository, whoever can read it can download it: the report names the machine (CPU, GPUs, memory, kernel) and
+  the profile, no path. The first build kept the report on the runner for that reason; the user asked for the artifact
+  (2026-11-23). `PROFILING_REPORTS_DIR`, when set, also keeps the reports and results on the runner.
 
 A workflow started by a comment runs from the default branch: the command cannot be tried before it is merged. What it
 calls (`--base`, `comment.ts`, `summary.md`) is tested before.

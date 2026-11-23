@@ -253,16 +253,16 @@ A comment on a pull request starts a pass on the maintainer's machine and gets t
 The first line holds the command: scenario names or `all` (the default when none is named), and `--profile <id>`.
 Anything else is answered with the usage. `.github/workflows/profiling.yml` then runs
 `pnpm profiling <scenarios> --base origin/<base branch>` on the pull request's last commit, and posts the run's
-`summary.md` with the commit it measured and a link to the workflow run. A pass that is refused or fails answers with
+`summary.md` with the commit it measured, a link to the workflow run and a link to the report. A pass that is refused or fails answers with
 the end of its output, the runner's paths replaced by placeholders.
 
-| Rule                 | Detail                                                                                                          |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Who can start a pass | The repository's owner and its collaborators; a comment from anyone else starts nothing.                        |
-| Forks                | A pull request from a fork is refused with an answer: push the branch to the repository to measure it.          |
-| One pass at a time   | A new comment waits for the pass in progress; a third one replaces the second while the first still runs.       |
-| The report           | Not uploaded: it names the machine. It is copied to `PROFILING_REPORTS_DIR` on the runner when that is set.     |
-| Changes to the job   | A workflow started by a comment runs from `master`: a change to `profiling.yml` takes effect once it is merged. |
+| Rule                 | Detail                                                                                                                                                                                                                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Who can start a pass | The repository's owner and its collaborators; a comment from anyone else starts nothing.                                                                                                                                                                                                            |
+| Forks                | A pull request from a fork is refused with an answer: push the branch to the repository to measure it.                                                                                                                                                                                              |
+| One pass at a time   | A new comment waits for the pass in progress; a third one replaces the second while the first still runs.                                                                                                                                                                                           |
+| The report           | The run's `report.html` is uploaded as an artifact of the workflow run, one file, not zipped: the answer links it, and whoever can read the repository can download it. It names the machine (CPU, GPUs, memory, kernel) and the profile, and no path but one a failed scenario's message may hold. |
+| Changes to the job   | A workflow started by a comment runs from `master`: a change to `profiling.yml` takes effect once it is merged.                                                                                                                                                                                     |
 
 ### Set up the runner
 
@@ -298,11 +298,11 @@ changed. Without the variable, the pass copies the data directory of the runner'
 
 </Steps>
 
-| Repository variable     | Effect                                                                                                         |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `PROFILING_DATA_DIR`    | The data directory each pass copies; the runner's user's own when unset.                                       |
-| `PROFILING_PORT`        | The port of the pass's server, 7870 when unset: it must be free.                                               |
-| `PROFILING_REPORTS_DIR` | A folder on the machine where each pass leaves its `report.html`, `results.json`, `run.json` and `summary.md`. |
+| Repository variable     | Effect                                                                                                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PROFILING_DATA_DIR`    | The data directory each pass copies; the runner's user's own when unset.                                                                                                                |
+| `PROFILING_PORT`        | The port of the pass's server, 7870 when unset: it must be free.                                                                                                                        |
+| `PROFILING_REPORTS_DIR` | A folder on the machine where each pass also leaves its `report.html`, `results.json`, `run.json` and `summary.md`: GitHub deletes an artifact after the repository's retention period. |
 
 A pass uses the GPUs for as long as its scenarios last (`all` is about twenty minutes a side) and is refused while a
 llama-server runs. Check the first report for the software rendering banner: a runner started as a service must still

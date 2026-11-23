@@ -77,12 +77,15 @@ export interface ReplyInput {
   sha: string;
   base: string;
   runUrl: string;
+  /** where the report can be downloaded, null when none was uploaded */
+  reportUrl: string | null;
   paths: Record<string, string | undefined>;
 }
 
 /** The comment posted back: the comparison when there is one, else why there is none. */
 export function reply(input: ReplyInput): string {
-  const foot = `Commit \`${input.sha.slice(0, 9)}\` against \`${input.base}\` · [workflow run](${input.runUrl})`;
+  const report = input.reportUrl === null ? '' : ` · [report](${input.reportUrl})`;
+  const foot = `Commit \`${input.sha.slice(0, 9)}\` against \`${input.base}\` · [workflow run](${input.runUrl})${report}`;
   const tail = lastLines(input.log, 20);
   const output = tail === '' ? '' : `\n\n\`\`\`text\n${tail.replaceAll('```', "'''")}\n\`\`\``;
   let body: string;
@@ -113,6 +116,7 @@ function main(argv: string[], env: NodeJS.ProcessEnv): number {
     const summaryFile = name === '' ? null : runDir(name).file('summary.md');
     const logFile = env.PROFILING_LOG ?? '';
     const code = env.PROFILING_EXIT ?? '';
+    const reportUrl = env.PROFILING_REPORT_URL ?? '';
     process.stdout.write(
       reply({
         summary: summaryFile !== null && existsSync(summaryFile) ? readFileSync(summaryFile, 'utf8') : null,
@@ -121,6 +125,8 @@ function main(argv: string[], env: NodeJS.ProcessEnv): number {
         sha: env.PROFILING_SHA ?? '',
         base: env.PROFILING_BASE ?? '',
         runUrl: env.PROFILING_RUN_URL ?? '',
+        // The upload step's output: empty when it was skipped or found no report.
+        reportUrl: reportUrl.startsWith('https://') ? reportUrl : null,
         paths: {
           '<repo>': env.GITHUB_WORKSPACE,
           '<temp>': env.RUNNER_TEMP,

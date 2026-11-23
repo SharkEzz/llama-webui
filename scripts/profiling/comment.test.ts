@@ -53,6 +53,7 @@ const input = {
   sha: '0123456789abcdef',
   base: 'master',
   runUrl: 'https://example.invalid/run/1',
+  reportUrl: null,
   paths: { '<home>': '/home/me' },
 };
 
@@ -62,6 +63,14 @@ test('the answer is the summary when the pass wrote one, with the commit and the
     '## Profiling: `a` against `b`\n\nNone.\n\nCommit `012345678` against `master` · [workflow run](https://example.invalid/run/1)\n',
   );
   expect(reply({ ...input, summary: 'S\n', exitCode: 1 })).toContain('The command ended with exit code 1.');
+});
+
+test('the answer links the report when one was uploaded', () => {
+  const text = reply({ ...input, summary: 'S\n', exitCode: 0, reportUrl: 'https://example.invalid/artifacts/2' });
+  expect(text).toContain(
+    '[workflow run](https://example.invalid/run/1) · [report](https://example.invalid/artifacts/2)\n',
+  );
+  expect(reply({ ...input, exitCode: 1, log: 'failed\n' })).not.toContain('[report]');
 });
 
 test('the answer of a pass without a comparison is why, from the end of its output, without the runner’s paths', () => {

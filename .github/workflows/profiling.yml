@@ -96,6 +96,18 @@ jobs:
             ${DATA_DIR:+--data-dir "$DATA_DIR"} 2>&1 | tee "$RUNNER_TEMP/profiling.log"
           echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
+      # The head's report holds the comparison. One file, not zipped: the download opens in a browser as it is. It names
+      # the machine (CPU, GPUs, memory, kernel) and the profile, and no path but one a failed scenario's message may hold; whoever can read the repository can download it.
+      - name: Upload the report
+        id: report
+        if: always() && steps.measure.outputs.exit != ''
+        uses: actions/upload-artifact@v7
+        with:
+          path: .cache/profiling/${{ steps.measure.outputs.name }}/report.html
+          archive: false
+          if-no-files-found: ignore
+          overwrite: true # a job run again uploads under the same name
+
       - name: Answer on the pull request
         if: always() && steps.pr.outputs.fork == 'false' && steps.comment.outcome != 'failure'
         env:
@@ -105,14 +117,14 @@ jobs:
           PROFILING_SHA: ${{ steps.pr.outputs.sha }}
           PROFILING_BASE: ${{ steps.pr.outputs.base }}
           PROFILING_DATA_DIR: ${{ vars.PROFILING_DATA_DIR }}
+          PROFILING_REPORT_URL: ${{ steps.report.outputs.artifact-url }}
         run: |
           if ! node scripts/profiling/comment.ts reply > "$RUNNER_TEMP/reply.md"; then
             echo '`/profiling` failed before it could answer: see the [workflow run]('"$PROFILING_RUN_URL"').' > "$RUNNER_TEMP/reply.md"
           fi
           gh pr comment "$PR" --body-file "$RUNNER_TEMP/reply.md"
 
-      # The report names the machine (CPU, GPUs, kernel, the profile): it stays on it, in the folder a repository
-      # variable names, and is not uploaded.
+      # The raw results are not uploaded: with the reports, they are kept in the folder a repository variable names.
       - name: Keep the reports on the machine
         if: always() && steps.measure.outputs.exit != '' && vars.PROFILING_REPORTS_DIR != ''
         env:
