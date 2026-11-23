@@ -15,7 +15,7 @@ import { fmt, formatBps, formatBytes, formatPct, num, plural } from '@/lib/forma
 
 /*
  * Projects the snapshot (existing measurements) onto the hardware graph: what flows over each link and what to say
- * about each node. Pure functions, tested without DOM or Three.
+ * about each node. Pure functions, tested without a DOM.
  */
 
 /** Throughput under which a link counts as idle, and the top of the log scale its streaks are drawn on. */

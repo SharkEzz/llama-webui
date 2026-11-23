@@ -5,7 +5,7 @@ import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { type Level, type LinkFlow, linkBadge, type NodeLive, type PeerLink } from './flows';
 import { fitScale } from './geometry';
-import { createStreakLoop, laneStates, type StreakLoop, trackIntensity } from './streaks';
+import { createStreakLoop, laneStates, type StreakLoop, trackLook } from './streaks';
 import { resolveColor } from './themeColors';
 import type { ViewLayout } from './tree';
 
@@ -147,18 +147,16 @@ export function Stage({ graph, layout, flows, specs, tones, busy, reducedMotion,
           >
             {links.map(({ geo, link, tone }) => {
               const flow = flows.get(link.id);
-              const x = trackIntensity(link, flow, busy);
+              const { share, dashed } = trackLook(link, flow, busy, reducedMotion);
               const color = flow && flow.level !== 'ok' ? LEVEL_COLOR[flow.level] : tone;
-              // Without streaks to say that a link is busy, its track says it: stronger, and dashed
-              const share = x === null ? 0 : reducedMotion ? 70 : Math.round(24 + 30 * x);
               return (
                 <path
                   key={geo.id}
                   d={geo.route.d}
                   strokeWidth={trackWidth(link, flow).toFixed(1)}
-                  strokeDasharray={x !== null && reducedMotion ? '10 8' : undefined}
+                  strokeDasharray={dashed ? '10 8' : undefined}
                   stroke={
-                    x === null
+                    share === null
                       ? 'color-mix(in oklch, var(--foreground) 13%, transparent)'
                       : `color-mix(in oklch, ${color} ${share}%, transparent)`
                   }

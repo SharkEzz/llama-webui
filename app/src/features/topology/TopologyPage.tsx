@@ -20,6 +20,9 @@ const VIEWS: readonly { view: TopologyView; label: string }[] = [
   { view: 'board', label: 'Board' },
 ];
 
+/** The block whose details are open: the only pressed one of the drawing. */
+const selectedBlock = () => document.querySelector<HTMLElement>('[data-node][aria-pressed="true"]');
+
 /**
  * The machine drawn in 2D, in one of two views, with a side column: the view control, the details of the selected
  * block, the server phase and the model split. The column stands at the right of the drawing once the page is wide
@@ -35,7 +38,6 @@ export function TopologyPage() {
   const reducedMotion = useReducedMotion();
   const [view, setView] = useView();
   const [selected, setSelected] = useState<string | null>(null);
-  const drawing = useRef<HTMLDivElement | null>(null);
   const panel = useRef<HTMLDivElement | null>(null);
 
   // The graph is read while the page is shown, and again on each reconnect: the links' current state (Gen/width)
@@ -61,9 +63,13 @@ export function TopologyPage() {
   useEffect(() => {
     if (openId === null) return;
     // In one column the panel sits under the drawing: bring it into view
-    panel.current?.scrollIntoView({ block: 'nearest' });
+    const details = panel.current;
+    details?.scrollIntoView({ block: 'nearest' });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.defaultPrevented) setSelected(null);
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      // The focus leaves with the panel it was in: it goes back to the block the panel was opened from
+      if (details?.contains(document.activeElement)) selectedBlock()?.focus();
+      setSelected(null);
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -71,11 +77,8 @@ export function TopologyPage() {
 
   const close = () => {
     // The close button leaves with its panel: the focus goes back to the block it was opened from
-    const block = [...(drawing.current?.querySelectorAll<HTMLElement>('[data-node]') ?? [])].find(
-      (el) => el.dataset.node === openId,
-    );
+    selectedBlock()?.focus();
     setSelected(null);
-    block?.focus();
   };
 
   return (
@@ -107,7 +110,7 @@ export function TopologyPage() {
           </div>
         </header>
 
-        <div ref={drawing} className="h-[72dvh] min-h-0 @7xl:col-start-1 @7xl:row-span-2 @7xl:row-start-1 @7xl:h-auto">
+        <div className="h-[72dvh] min-h-0 @7xl:col-start-1 @7xl:row-span-2 @7xl:row-start-1 @7xl:h-auto">
           {graph && live && flows ? (
             <View
               graph={graph}

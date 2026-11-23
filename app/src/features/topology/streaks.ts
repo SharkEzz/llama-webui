@@ -146,6 +146,23 @@ export function trackIntensity(link: TopologyLink, flow: LinkFlow | undefined, b
   return intensity(Math.max(flow.fwdBps ?? 0, flow.backBps ?? 0));
 }
 
+/**
+ * How a link's track is drawn: the share of its tone it takes (%), null at rest, and whether it is dashed. Under
+ * reduced motion a busy track is dashed and strong in place of its streaks; a track that follows the CPU activity
+ * never had any, and stays graded.
+ */
+export function trackLook(
+  link: TopologyLink,
+  flow: LinkFlow | undefined,
+  busy: boolean,
+  reducedMotion: boolean,
+): { share: number | null; dashed: boolean } {
+  const x = trackIntensity(link, flow, busy);
+  if (x === null) return { share: null, dashed: false };
+  if (reducedMotion && flow?.activity == null) return { share: 70, dashed: true };
+  return { share: Math.round(24 + 30 * x), dashed: false };
+}
+
 export interface StreakLoop {
   /** The links of the drawing: their lanes replace the previous ones, and carry on with what flowed. */
   setLinks: (links: readonly LinkGeo[]) => void;

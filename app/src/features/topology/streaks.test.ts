@@ -12,6 +12,7 @@ import {
   speedOf,
   streaksAt,
   trackIntensity,
+  trackLook,
 } from './streaks';
 
 const p = (x: number, y: number): Point => ({ x, y });
@@ -160,6 +161,40 @@ describe('trackIntensity', () => {
     expect(trackIntensity(link('ram', 'memory'), flow({ activity: 40 }), false)).toBe(0.4);
     expect(trackIntensity(link('ram', 'memory'), flow({ activity: 250 }), false)).toBe(1);
     expect(trackIntensity(link('ram', 'memory'), flow({ fwdBps: 1e9, backBps: 3e9 }), false)).toBe(intensity(3e9));
+  });
+});
+
+describe('trackLook', () => {
+  const gpu = link('gpu');
+  const ram = link('ram', 'memory');
+
+  test('a track at rest has no share of its tone and no dash, with or without motion', () => {
+    expect(trackLook(gpu, flow({ fwdBps: 1e6, backBps: 2e5 }), false, false)).toEqual({ share: null, dashed: false });
+    expect(trackLook(gpu, flow({ fwdBps: 1e6, backBps: 2e5 }), false, true)).toEqual({ share: null, dashed: false });
+    expect(trackLook(gpu, undefined, true, true)).toEqual({ share: null, dashed: false });
+  });
+
+  test('a busy track takes more of its tone with more traffic', () => {
+    const slow = trackLook(gpu, flow({ fwdBps: 1e8 }), true, false);
+    const fast = trackLook(gpu, flow({ fwdBps: 2e9 }), true, false);
+    expect(slow.dashed).toBe(false);
+    expect(slow.share).toBeGreaterThanOrEqual(24);
+    expect(fast.share).toBeGreaterThan(slow.share!);
+    expect(fast.share).toBeLessThanOrEqual(54);
+  });
+
+  test('under reduced motion a busy track is dashed and strong, in place of its streaks', () => {
+    expect(trackLook(gpu, flow({ fwdBps: 2e9 }), true, true)).toEqual({ share: 70, dashed: true });
+    expect(trackLook(ram, flow({ fwdBps: 1e9, backBps: 3e9 }), false, true)).toEqual({ share: 70, dashed: true });
+  });
+
+  test('a memory link that follows the CPU activity never had streaks: reduced motion leaves it as it is', () => {
+    const idle = trackLook(ram, flow({ activity: 0 }), false, true);
+    expect(idle).toEqual({ share: 24, dashed: false });
+    expect(trackLook(ram, flow({ activity: 50 }), false, true)).toEqual(
+      trackLook(ram, flow({ activity: 50 }), false, false),
+    );
+    expect(trackLook(ram, flow({ activity: 100 }), false, true)).toEqual({ share: 54, dashed: false });
   });
 });
 
